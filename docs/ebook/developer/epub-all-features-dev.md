@@ -1,9 +1,17 @@
 # EPUB 电子书全功能开发者实现手册（epub-all-features-dev）
 
-> 版本：v1 · 2026-07-03
-> 范围：`apps/frontend/src/views/ebook/**` 全部 EPUB（+ 旁路 PDF）功能点，端到端实现思路、链路、源码。
-> 读者：希望在自己的项目中**完整复刻**本仓库 EPUB 阅读器全部能力的开发者。
+> 版本：v2 · 2026-07-04
+> 范围：`apps/frontend/src/views/ebook/**` 全部 EPUB（+ 旁路 PDF）功能点 + `apps/backend/src/services/ebook/**` 后端 API，端到端实现思路、链路、源码。
+> 读者：希望在自己的项目中**完整复刻**本仓库 EPUB 电子书全部能力的开发者。
 > 目标：读完后能**照着实现**或**直接搬用**任一功能。
+>
+> **v2 变更摘要**（相对 v1）：
+> - 新增 §15 书架管理（shelf）：上传/分类/可见性/排序/空状态。
+> - 新增 §16 阅读进度持久化（progress）：双层 debounce / keepalive / 后端 entity。
+> - 新增 §17 分栏阅读（split panel）：左阅读 + 右侧栏（助手/想法互斥）。
+> - 新增 §18 引用分享（quote share）：纯 Canvas 2D 卡片渲染、富文本片段。
+> - 新增 §19 后端 API 与实体（backend）：路由清单、想法同步算法、权限模型、实体表结构。
+> - 原 §15–§19 顺延为 §20–§24。M1–M8 扩展为 M1–M12。
 
 ---
 
@@ -16,11 +24,12 @@
 | ① | §1 模块地图 | 一眼看清前端 EPUB 阅读器的 30+ 关键文件如何分工 |
 | ② | §2 白话思路（5 分钟） | 不读代码也能讲清功能怎么跑 |
 | ③ | §3–§14 分模块链路 | 每个功能点的"入口 → 链路 → 副作用 → 互斥/边界" |
-| ④ | §15 跨模块互斥 & 生命周期 | 听书 vs 引用听读 vs 划线 vs PopBar 谁抢谁 |
-| ⑤ | §16 验收清单 | 拿来当 e2e / 回归用例 |
-| ⑥ | §17 自检 & 回归坑位 | 性能、批注闪烁、跨 iframe 坐标、视口裁剪 |
-| ⑦ | §18 源码对照（11 个最关键符号，逐行注释） | 直接抄 |
-| ⑧ | §19 复用清单 | "我要在自己的项目里复刻 EPUB，应该带走哪些文件" |
+| ④ | §15–§19 管书侧功能 | 书架管理 / 阅读进度持久化 / 分栏阅读 / 引用分享 / 后端 API 与实体 |
+| ⑤ | §20 跨模块互斥 & 生命周期 | 听书 vs 引用听读 vs 划线 vs PopBar 谁抢谁 |
+| ⑥ | §21 验收清单 | 拿来当 e2e / 回归用例（M1–M12） |
+| ⑦ | §22 自检 & 回归坑位 | 性能、批注闪烁、跨 iframe 坐标、视口裁剪 |
+| ⑧ | §23 源码对照（11 个最关键符号，逐行注释） | 直接抄 |
+| ⑨ | §24 复用清单 | "我要在自己的项目里复刻 EPUB，应该带走哪些文件" |
 
 ### 0.2 与既有 developer 手册的分工
 
@@ -54,8 +63,17 @@
 | 阅读器背景色与全局主题不一致 | `epubReaderSettings.ts` | `applyEpubReaderAppearance` | 切主题 |
 | PDF 缩放越界 | `pdfReaderSettings.ts` | `clampPdfZoom` | 0.5x–3x 之外被夹回 |
 | PDF 滚到底不翻页 | `pdfScrolledNav.ts` | `attachPdfScrolledEdgeNav` | 稳定 220ms 后再滚一下 |
+| 书架不刷新/分类计数错 | `store/ebook.ts` | `fetchCategories` / `fetchPage` | 切 Tab、删分类、移书后观察 |
+| 上传非会员被拦 | `store/ebook.ts` | `addFromFile` / `addFromTauri` | 非会员点上传观察 Toast |
+| 公开书打开后无进度 | `ebook.service.ts` | `openPublicBook` / `getBook` | 打开他人公开书观察 readingBookId |
+| 进度刷新后不回跳 | `EpubPane.tsx` | `lateStartCfiAppliedRef` / `initialCfiRef` | 切书/刷新观察是否定位上次 CFI |
+| 进度丢失（页面卸载） | `read.tsx` / `store/ebook.ts` | `flushReadingProgress` / `flushProgRemoteSync(keepalive)` | 阅读中关闭 Tab 观察后端是否收到 |
+| 分栏拖拽后高亮闪 | `EpubPane.tsx` | `subscribeEbookSplitPanelResizeEnd` → `settleHostResize` | 拖分栏手柄松开观察批注 |
+| 分享卡片不生成 | `epubQuoteShareCard.ts` | `renderQuoteShareCard` / `measureCardHeight` | 选长文本点分享观察弹窗 |
+| 想法同步丢数据 | `ebook.service.ts` | `syncThoughts` / `queryRemovedThoughtIdsSince` | 公开书多端同时编辑想法 |
+| 后端 401 / 请先登录 | `ebook.controller.ts` | `@UseGuards(JwtGuard)` / `userId(req)` | token 过期后操作书架 |
 
-### 0.4 从零到上线：M1–M8 落地阶段
+### 0.4 从零到上线：M1–M12 落地阶段
 
 | 阶段 | 目标 | 不要做 | 验收 |
 |------|------|--------|------|
@@ -67,6 +85,10 @@
 | **M6 想法下划线** | 懒加载、视口动态挂载、连通簇、自动/手动 pin、跨用户配色 | 不要做"侧栏列表" | 大书也能丝滑；公开/他人可见 |
 | **M7 听书** | 章节连读（连续滚动/分页）、引用听读、自动跟随、互斥 | 不要碰划线/想法的 mark | 听书可暂停/续播/换倍速；引用听读可打断 |
 | **M8 PDF + 持久化 + 同步** | PDF 阅读、localStorage 持久化、公开笔记同步、分享卡片 | 不要改 EPUB 核心管线 | 缩放/翻页/分享/跨设备同步 OK |
+| **M9 书架管理** | 书架列表、上传 EPUB/PDF、分类 CRUD、可见性切换、最后阅读排序 | 不要碰阅读器 rendition | 上传/分类/公开切换/排序/空状态 OK |
+| **M10 阅读进度持久化** | relocated→debounce→store→远程同步、keepalive、进度回跳 | 不要碰划线/想法的 mark | 进度 2s+8s 双层 debounce、刷新回跳、卸载 keepalive OK |
+| **M11 分栏阅读** | 左阅读 + 右侧栏（助手/想法/列表互斥）、宽度拖拽、resize 事件总线 | 不要做"双 rendition 并排" | 拖分栏→软 resize→批注不闪；侧栏互斥切换 OK |
+| **M12 引用分享 + 后端 API** | Canvas 2D 书摘卡片、后端 REST、想法同步算法、权限模型 | 不要改 EPUB 渲染管线 | 分享卡片复制/下载 OK；后端 CRUD/同步/权限 OK |
 
 ### 0.5 运行时调用链（一图流）
 
@@ -164,7 +186,7 @@
 | `utils/epub/reader/epubSelectionToolbarAttach.ts` | 选区监听、PopBar payload、跨 iframe 锚点 |
 | `utils/epub/reader/epubContextMenuAttach.ts` | 右键菜单挂载（iframe 内） |
 | `utils/epub/reader/epubQuoteShareStyled.ts` | 选区 quote 转富文本片段（用于分享卡片） |
-| `utils/epub/reader/epubQuoteShareCard.ts` | 引用分享卡片渲染（html-to-image） |
+| `utils/epub/reader/epubQuoteShareCard.ts` | 引用分享卡片渲染（纯 Canvas 2D 手绘，详见 §18） |
 | `utils/epub/reader/buildEpubContextMenuItems.ts` | EPUB 右键菜单条目构造（结构对齐 Monaco） |
 | `utils/epub/reader/epubSoftResize.ts` | 软 resize（不重载视图） |
 | `utils/epub/reader/epubSpineIndex.ts` | nav href → spine index |
@@ -226,8 +248,9 @@
    - 听书 `useEpubChapterListen` + `useEbookQuoteListen`。
 4. **状态总线**：`read.tsx` 维护一个庞大的 `useState` 集群（`highlights`、`thoughts`、`selectionPopBar`、`thoughtDialogOpen`、`highlightStyle` 等），每个动作只更新一个状态，UI 跟着 React 重渲染。
 5. **后端**：所有写操作走 `service/ebook` 的 REST API，公开笔记走 `since` 增量同步。
+6. **管书侧（§15–§19）**：阅读器之外还有一条"管书"链路 —— `store/ebook.ts` MobX store 管书架/分类/上传/进度，`read.tsx` 的 `saveCfi` + `scheduleProgRemoteSync` + `keepaliveEbookProgressFlush` 三件套做阅读进度双层 debounce（2s 本地 + 8s 远程 + 卸载兜底），`ebookSplitResize.ts` 事件总线驱动分栏拖拽软重排，`epubQuoteShareStyled.ts` + `epubQuoteShareCard.ts` 用纯 Canvas 2D 手绘书摘卡片，后端 `ebook.controller.ts` 29 条路由 + `ebook.service.ts` 业务逻辑 + 5 个实体表落地存储。
 
-> 关键架构原则：**epub.js 是单一渲染源**；所有划线、想法、听书高亮都是**叠加层**（epub.js annotations API + iframe 内 SVG marks-pane），不是改原文 DOM。
+> 关键架构原则：**epub.js 是单一渲染源**；所有划线、想法、听书高亮都是**叠加层**（epub.js annotations API + iframe 内 SVG marks-pane），不是改原文 DOM。管书侧（书架/进度/分栏/分享/后端）不直接碰 rendition，只通过 props/事件总线与阅读器交互。
 
 ### 2.1 关键场景
 
@@ -279,6 +302,21 @@
 
 > 实现：`registerChapterListenStop` / `registerQuoteListenStop` 是跨 hook 互斥通道；新启动前先 `invokeStop*`。
 
+#### 场景 E：上传书 → 书架 → 阅读 → 进度持久化（管书侧全链路）
+
+1. **上传**：用户在书架页拖文件 / 点上传 → `store/ebook.ts:addFromFile` → 进度条 0→100% → `createEbookBook` API → 合并入 `books` 状态 → 刷新当前激活分类计数。
+2. **分类 / 可见性 / 排序**：MobX store 维护 `categories` / `activeCategoryId` / `books`，CRUD 走 `service/ebook`，UI 用 observer 自动重渲染。排序按 `lastReadAt` 倒序，未读过的书沉底。
+3. **打开书**：`read.tsx` 拿到 `bookId` → `resolveOpen`（桌面端 Tauri 优先本地，回退云端）→ 与阅读器侧场景 A 共享 `EpubPane` 生命周期。
+4. **进度采集**：`rend.on('relocated', ...)` 触发 → `saveCfi` 第一层 2s debounce（合并 2s 内多次翻页）→ 写本地 store → `scheduleProgRemoteSync` 第二层 8s debounce（合并 8s 内多次本地保存）→ 调 `updateEbookProgress` API。
+5. **进度回跳**：首次进入书时 `initialCfiRef` 先 display 到上次 CFI；若 `startCfi` 比 `initialCfiRef` 晚到（接口延迟），用 `lateStartCfiAppliedRef` 防止整书重载；从 80% 退到 0.01% 拒绝（误触），退到 5% 允许（用户重读）。
+6. **卸载兜底**：`visibilitychange=hidden` 或组件卸载 → `keepaliveEbookProgressFlush` 强制刷盘最后一次进度（用 `fetch` + `keepalive` 标志，确保页面关闭后请求仍能发出去）。
+
+#### 场景 F：分栏拖拽 + 引用分享（管书侧交互层）
+
+1. **分栏拖拽**：用户拖分栏竖条 → `react-resizable-panels` 触发 `onPanelResize` → `ebookSplitResize.ts` 事件总线广播 `ebookSplitResizeStart` / `ebookSplitResizeEnd` → `EpubPane.tsx` 的 `subscribeEbookSplitPanelResizeEnd` 收到 → `settleHostResize` 用 `softResizeEpubRendition`（仅改 viewer 宽度，不重建视图）→ 划线/想法/听书 mark 不闪不丢。
+2. **侧栏互斥**：右侧栏三选一（助手 / 想法 / 列表），打开任一自动关闭其他 —— 由 `read.tsx` 的 `setSidePanel` 单槽位 state 控制。
+3. **引用分享**：用户选段 → 右键菜单 / PopBar「引用分享」→ `openQuoteShare` → `extractQuoteSegmentsFromRange` 把 DOM Range 拆成富文本片段（保留字号/字重/斜体）→ `renderQuoteShareCard` 用纯 Canvas 2D 手绘画布（书名 + 引用 + 章节名 + 日期水印，无字体加载、无暗色模式）→ 用户点「复制图片」走 `canvas.toBlob` + `ClipboardItem`，点「下载 PNG」走 `canvas.toDataURL` + `<a download>`。
+
 ### 2.2 按文件拆解（实现 → 触发 → 副作用）
 
 | 文件 | 入口 | 触发 | 副作用 | 关键点 |
@@ -296,6 +334,11 @@
 | `useEbookQuoteListen.ts` | `toggleListen` | 引用听读按钮 | TTS + 段高亮 | 与听书互斥；fallback plain |
 | `useEbookThoughtLoader.ts` | `ensureLoadedSpineThoughts` | rend ready / 换书 | 调 `fetchEbookThoughts` | per-spine 缓存 + in-flight 复用 |
 | `usePublicEbookThoughtSync.ts` | `scheduleSync` | relocated 停稳 / visibilitychange | 调 `fetchEbookThoughtSync` | since-based 增量；新数据 ephemeral pin |
+| `store/ebook.ts` | `addFromFile` / `fetchCategories` / `saveProg` | 书架页挂载 / 上传 / 翻页 | MobX store 状态机 + API 调用 | 书架 CRUD + 上传 + 分类 + 进度双层 debounce 第二层 |
+| `read.tsx` 的 `saveCfi` / `keepaliveEbookProgressFlush` | `rend.on('relocated')` / 卸载 | 翻页 / 切书 / 关 Tab | 写本地 store + 远程同步 | 进度第一层 2s debounce + 卸载兜底刷盘 |
+| `utils/common/ebookSplitResize.ts` | 分栏拖拽事件总线 | `react-resizable-panels` onResize | 广播 `ebookSplitResizeStart/End` | 与 `EpubPane` 的 `softResizeEpubRendition` 协同避免清视图 |
+| `utils/epub/reader/epubQuoteShareStyled.ts` + `epubQuoteShareCard.ts` | `openQuoteShare` | 选区右键 / PopBar 分享 | Canvas 2D 渲染 + 复制/下载 | 富文本片段抽取 + 纯 Canvas 手绘（无 html-to-image） |
+| `apps/backend/src/services/ebook/ebook.controller.ts` + `ebook.service.ts` | 29 条 REST 路由 | 前端 `service/ebook` 调用 | DB CRUD + 想法同步算法 + 权限 | since-based 增量同步；划线 upsert；私有/公开权限模型 |
 
 ---
 
@@ -1389,9 +1432,615 @@ export function pdfLoadOptions(data) { return { data, wasmUrl, cMapUrl, cMapPack
 
 ---
 
-## 15. 跨模块互斥 / 生命周期 / 全局工具
+## 15. 书架管理（shelf）
 
-### 15.1 互斥通道总图
+> 书架是用户管理 EPUB/PDF 藏书的入口：列表、上传、分类、可见性、排序、空状态。前端用 MobX store 统一管理状态，后端用 `EbookBook` + `EbookCategory` + `EbookProgress` 三表联合查询。
+
+### 15.1 文件与职责
+
+| 文件 | 角色 |
+|------|------|
+| `views/ebook/index.tsx` | 书架页 `EbookShelfPage`（MobX observer）；挂载在 `/ebook` 路由 |
+| `views/ebook/layout.tsx` | 路由壳，仅渲染 `<Outlet/>` |
+| `components/shelf/EbookShelfBookCard.tsx` | 书籍卡片：封面、标题编辑、封面替换、分类移动、进度环、可见性开关 |
+| `components/shelf/EbookShelfCategoryRail.tsx` | 顶栏分类 Tab 横向滚动条 |
+| `components/shelf/EbookCategoryManageDialog.tsx` | 分类管理弹窗：新增/重命名/删除/排序 |
+| `components/shelf/EbookBookVisibilitySwitch.tsx` | 公开/私有切换（仅源书 EPUB 上云后可切） |
+| `components/shelf/EbookShelfUploadBanner.tsx` | 上传进度横幅 |
+| `store/ebook.ts` | MobX store：书架状态机、上传流程、分类 CRUD、进度 debounce |
+| `utils/common/io.ts` | Tauri 选文件 / 读字节 / File 构造 |
+| `utils/common/coverImage.ts` | 封面压缩（640px / 0.85q / 2MB 上限） |
+
+### 15.2 书架列表与卡片
+
+#### 15.2.1 入口与 hydrate
+
+```
+EbookShelfPage mount
+  → ebookStore.hydrate()
+    → fetchCategories()          // GET /ebook/categories/summary
+    → fetchPage(1, false)        // GET /ebook/shelf?pageNo=1
+    → fetchPublicCount()         // 公开书计数
+```
+
+#### 15.2.2 网格渲染
+
+`index.tsx:336-361`：CSS Grid `auto-fill minmax(9.5rem,1fr)`，每本书传 `prog={ebookStore.progOf(b.id)}`、`categories`、`shelfMode`（`'mine'|'public'`）。
+
+#### 15.2.3 卡片点击打开
+
+`index.tsx:38-55` `onOpen`：
+- 公开书架/全部 Tab 下的他人书 → `ebookStore.openPublicBook(id)` 拿 `readingBookId` → `nav('/ebook/read/${readingId}')`。
+- 自己的书 → 直接 `nav('/ebook/read/${id}')`。
+
+#### 15.2.4 封面渲染
+
+`EbookShelfBookCard.tsx:359-374`：`book.coverUrl` 存在则 `<img>`（`resolveUploadedFileUrl` 解析相对 URL），否则渐变背景 + 图标 + 标题。边框进度环 `EbookShelfBorderProgress`（`:104-163`）用 SVG 圆角矩形 `strokeDasharray` 显示 `prog.percent`。
+
+### 15.3 上传 EPUB/PDF
+
+#### 15.3.1 三条上传路径
+
+| 路径 | 入口 | 流程 |
+|------|------|------|
+| Web 上传 | `onPickWeb` → `<input accept=".epub,.pdf">` | 会员校验 → `ebookStore.addFromFile(file)` |
+| Tauri 桌面本地 | `onPickTauri` → `ebookStore.addFromTauri()` | `pickTauri()` → `findEbookByLocalPath` 去重 → `addEbookFromPath` 登记本地路径 → 异步 `uploadBookToCloud` |
+| 封面上传 | `EbookShelfBookCard onCoverFile` | `fileToCoverFile` 压缩 → `saveEbookCover` |
+
+#### 15.3.2 store 上传流程
+
+**来源**：`apps/frontend/src/store/ebook.ts` · 约 L627-L666
+
+```typescript
+// addFromFile：Web 端上传入口，串起"进度展示→API→合并入架→刷新分类"
+async addFromFile(file: File, opts?: { categoryId?: string }) {
+    // 设置上传态：phase='uploading'，记录文件名与初始进度
+    this.uploadState = { phase: 'uploading', fileName: file.name, percent: 0 };
+    try {
+        // 调 POST /ebook/upload（multipart），onUploadProgress 回调更新 percent
+        const book = await uploadEbookFile(file, {
+            categoryId: opts?.categoryId,
+            onProgress: (p) => this.setUploadPercent(p),
+        });
+        // 合并入当前书架列表（按 lastRead 排序插入）
+        this.mergeBookIntoShelf(book);
+        // 清上传态 → phase='reading'（横幅切回"已加入书架"）
+        this.clearUploadState();
+        // 刷新分类计数
+        await this.fetchCategories();
+    } catch (e) {
+        // 非会员错误码 → Toast 提示开通
+        if ((e as ApiError).code === EBOOK_UPLOAD_MEMBERSHIP_REQUIRED) {
+            Toast({ type: 'warning', title: t('ebook.shelf.upload.membershipRequired') });
+        }
+        this.clearUploadState();
+        throw e;
+    }
+}
+```
+
+**读完应掌握**：上传是"先登记后上云"两步——桌面端先 `addEbookFromPath` 登记本地路径（立即可读），再异步 `uploadBookToCloud` 上云（上云后才可公开/跨设备）；Web 端一步上云。会员校验在前端 `useMembershipActive` + 后端 `isUserMembershipActive` 双重把关。
+
+#### 15.3.3 后端上传入库
+
+`ebook.service.ts:540-608` `addFromUpload` → 会员校验 → `storeEbookToCos`（`uploadService.uploadLocalFileToCos({prefix:'ebooks'})`）→ `saveUploadedBook`：
+- `opts.bookId` 非空 → 更新既有本地书为 `srcKind='store'`，**保留 localPath**（桌面端上云后仍可本地打开）。
+- 否则新建 `srcKind='store'` 书。
+- `try … finally` 中 `tryDeleteTempUpload` 清理 multer 临时文件。
+
+### 15.4 分类管理
+
+#### 15.4.1 分类 Tab（EbookShelfCategoryRail）
+
+chips 列表：`全部` + 各分类（过滤 `bookCount>0`）+ `公开`（仅 `publicBookTotal>0`）+ `未分类`（仅 `uncategorizedCount>0`）。点击切换 `ebookStore.setActiveCategoryKey(chip.key)`。
+
+#### 15.4.2 分类 CRUD（store → API）
+
+| store 方法 | API | 后端 service |
+|-----------|-----|-------------|
+| `createCategory(name)` | `POST /ebook/categories` | `createCategory`（sortOrder=MAX+1） |
+| `renameCategory(id,name)` | `PUT /ebook/categories/:id` | `updateCategory` |
+| `deleteCategory(id)` | `DELETE /ebook/categories/:id` | `removeCategory`（书归未分类） |
+| `moveCategory(id,'up'\|'down')` | `PUT /ebook/categories/reorder` | `reorderCategories` |
+| `assignBookCategory(bookId,catId)` | `PUT /ebook/book/:id/category` | `assignBookCategory` |
+
+> 后端 `ensureDefaultCategories`：用户无分类时按 locale seed `['技术','学习','文学','工作','其他']` 或 `['Tech','Learning','Literature','Work','Other']`。`MAX_EBOOK_CATEGORIES=50` 硬上限。分类名 LOWER(name) 唯一。
+
+#### 15.4.3 删除分类的连锁
+
+`store/ebook.ts:518-538` `deleteCategory`：`removeEbookCategory(id)` → 本地清空 `categoryId`（books + bookCache）→ 若当前 Tab 是被删分类则切回 `all` → `fetchCategories` + `fetchPage(1, false)`。后端 `removeCategory` 显式 `bookRepo.update({userId,categoryId},{categoryId:null})`（无 FK ON DELETE SET NULL）。
+
+### 15.5 书籍可见性（公开/私有切换）
+
+#### 15.5.1 前端
+
+`EbookBookVisibilitySwitch.tsx:24-165`：`disabled` 条件 = `!canToggle || book.fmt!=='epub' || book.sourceBookId!=null || busy`（只有"上云 EPUB 源书"可切）。切换前 Confirm 二次确认。`onConfirm` → `ebookStore.setBookPublic(book.id, pendingPublic)`。
+
+#### 15.5.2 后端
+
+`ebook.service.ts:422-448` `setBookVisibility`：
+- 校验：`sourceBookId` 非空禁止改公开（读书记录不能公开）；`fmt!=='epub'` 拒绝；`isPublic=true` 时必须 `filePath` 存在且 `srcKind==='store'`（"请先上传至云端后再公开"）。
+- 设 `isPublic`，首次公开写 `publicAt = new Date()`。
+
+#### 15.5.3 打开他人公开书
+
+`ebook.service.ts:450-488` `openPublicBook`：查源书 `{id:sourceBookId, sourceBookId:IsNull, isPublic:true}` → 已存在读书记录则返回既有 id → 否则 `bookRepo.create` 复制源书的 `fmt/title/author/filePath/size/coverPath`，`isPublic=false`，存盘返回新 id。
+
+> **关键设计**：公开书是数据克隆而非引用——reading record 复制源书的 `filePath`（仍指向源书 COS key，不复制文件），删除 reading record 时不删 COS（`!book.sourceBookId` 判断）。
+
+### 15.6 排序（最后阅读）
+
+#### 15.6.1 前端排序
+
+`store/ebook.ts:100-119` `bookLastReadMs` + `sortBooksByLastRead`：优先用 `progMap[book.id ?? readingBookId].updatedAt`，回退 `book.addedAt`，倒序排列。调用时机：`fetchPage`、`mergeBookIntoShelf`、`saveProg`（进度更新后立即重排）。
+
+#### 15.6.2 后端排序
+
+`ebook.service.ts:286-299` `getShelf`：`shelf_sort = CASE WHEN p.updated_at IS NOT NULL THEN p.updated_at ELSE b.created_at END DESC`——与前端逻辑一致。
+
+### 15.7 空状态与 Tab 重置
+
+`index.tsx:184-202` 多种空状态：
+- `showInitialLoading`：未 ready 且 loading。
+- `showEmpty`：ready + total=0 + 不 loading + `shelfAllCount=0`（首次全空）。
+- `showPublicEmpty`：ready + total=0 + 公开 Tab。
+- `showCategoryEmpty`：ready + total=0 + `totalBookCount>0` + 当前是某分类/未分类 Tab。
+
+`ebook.ts:192-198` `resetActiveCategoryIfEmpty`：当前 Tab 非全部且 books 空且 total=0 时自动切回 `{kind:'all'}` 并重新 `fetchPage(1, false)`。
+
+---
+
+## 16. 阅读进度持久化（progress）
+
+> 阅读进度是"用户读到哪了"的记忆。EPUB 用 CFI + 百分比，PDF 用页码 + 百分比。前端两层 debounce（2s + 8s）+ keepalive 兜底，后端即时写入。
+
+### 16.1 前端采集
+
+#### 16.1.1 EPUB relocated 回调
+
+`EpubPane.tsx:248-258` `relocate(loc)`：从 `loc.start.cfi` 取 CFI，`resolveEpubPercent`（`:105-137`）计算百分比（优先 `locations.percentageFromCfi`，回退 `spine index / spineLen * 100`），调用 `onCfiRef.current(cfi, pct, loc.start?.index)`。
+
+百分比就绪后重报：`book.locations.generate(1600)` 完成后设 `locationsReadyRef=true` 并 `reportCurrentLocation` 重新触发 `relocate` 以更新百分比。
+
+#### 16.1.2 PDF page 回调
+
+`PdfPane` 调用 `onPage(page, percent)` → 父级 `savePage`。
+
+#### 16.1.3 父级 saveCfi / savePage
+
+**来源**：`apps/frontend/src/views/ebook/read.tsx` · 约 L1253-L1286
+
+```typescript
+// saveCfi：EPUB relocated 高频回调，2s debounce 后写 store
+const saveCfi = useCallback((cfi: string, percent: number, spineIndex: number) => {
+    // 立即更新 ref（供其他逻辑读"当前位置"，不触发重渲染）
+    currentEpubCfiRef.current = cfi;
+    epubSpineIndexRef.current = spineIndex;
+    // 暂存本次进度，等 debounce 到点再批量提交
+    pendingEpubProgRef.current = { cfi, percent };
+    // 2s debounce：合并高频 relocated 回调（翻页/滚动每秒可能触发多次）
+    if (progTimer.current) clearTimeout(progTimer.current);
+    progTimer.current = setTimeout(() => {
+        // 到点：把 pending 进度写入 store（本地立即生效 + 调度远程同步）
+        ebookStore.saveProg({ bookId: book.id, epubCfi: cfi, percent });
+        // 同时触发公开想法同步（进度变了说明用户在阅读，可能收到新想法）
+        schedulePublicThoughtSync();
+        ensureLoadedSpineThoughts();
+    }, 2000);
+}, [book.id, ebookStore, schedulePublicThoughtSync, ensureLoadedSpineThoughts]);
+```
+
+**读完应掌握**：EPUB 进度采集是 `rend.on('relocated', relocate)` → `onCfi` → `saveCfi` → 2s debounce → `ebookStore.saveProg`。PDF 走 `onPage` → `savePage` 同理。
+
+### 16.2 双层 debounce（2s + 8s）
+
+| 层 | 文件:行 | 时长 | 作用 |
+|----|---------|------|------|
+| 组件级 | `read.tsx:1267` | 2000ms | 合并 relocated 高频回调，到点写 store 本地 progMap |
+| store 级 | `store/ebook.ts:131` | 8000ms | `PROG_REMOTE_DEBOUNCE_MS`，合并多本书的远程同步请求 |
+
+#### 16.2.1 store 级 debounce
+
+**来源**：`apps/frontend/src/store/ebook.ts` · 约 L699-L732
+
+```typescript
+// saveProg：组件级 debounce 到点后调用，立即更新本地 + 调度远程同步
+saveProg(patch: { bookId: string; epubCfi?: string; pdfPage?: number; percent?: number }) {
+    // 1. 立即更新本地 progMap（UI 立即反映"已读百分比"）
+    const existing = this.progMap.get(patch.bookId) ?? { bookId: patch.bookId, updatedAt: 0 };
+    this.progMap.set(patch.bookId, {
+        ...existing,
+        // 字段级保留：undefined 时不覆盖（与后端 saveProgress 一致）
+        epubCfi: patch.epubCfi ?? existing.epubCfi,
+        pdfPage: patch.pdfPage ?? existing.pdfPage,
+        percent: patch.percent ?? existing.percent,
+        updatedAt: Date.now(),
+    });
+    // 2. 立即重排书架（lastRead 排序）
+    this.sortBooksByLastRead();
+    // 3. 调度远程同步（8s debounce）
+    this.scheduleProgRemoteSync(patch.bookId);
+}
+
+// scheduleProgRemoteSync：加入 pending 集合，8s 后 flush
+private scheduleProgRemoteSync(bookId: string) {
+    this.progPendingBookIds.add(bookId);
+    if (this.proFlushTimer) return;
+    this.proFlushTimer = setTimeout(() => {
+        this.proFlushTimer = null;
+        void this.flushProgRemoteSync();
+    }, PROG_REMOTE_DEBOUNCE_MS); // 8000ms
+}
+```
+
+#### 16.2.2 flush 与节流
+
+`flushProgRemoteSync`（`ebook.ts:735-794`）：
+- 遍历 `progPendingBookIds`，`progNeedsRemoteSync` 判定：CFI/PDF 页码变化或百分比变化 ≥ 0.5% 才真正发请求（`PROG_PERCENT_SYNC_EPS=0.005`）。
+- 常规模式：串行 `await saveEbookProgress(next)`，通过 `progRemoteInflight` Promise 链避免并发；失败则重新加入 pending 重试。
+- keepalive 模式：调 `saveEbookProgressKeepalive(next)`（`fetch + keepalive:true`）。
+
+### 16.3 keepalive 兜底
+
+`read.tsx:1314-1363` `flushReadingProgress`：先清 `progTimer`，立即把 pending 的 epub/pdf prog 写入 store，调 `ebookStore.flushProgRemoteSync(book.id, {keepalive?})`。触发点：`pagehide` 事件、`visibilitychange`（hidden 时）、useEffect cleanup（组件卸载）。
+
+`service/index.ts:2057-2076` `saveEbookProgressKeepalive`：原生 `fetch` + `keepalive:true`，从 localStorage 取 token。**不用 axios**——axios 请求会被 pagehide 中断，`keepalive:true` 的 fetch 能在页面卸载后仍完成请求。
+
+### 16.4 进度回跳（initialCfi / lateStartCfiAppliedRef）
+
+| ref | 用途 |
+|-----|------|
+| `initialCfiRef` | 仅在 `open` 变化时记录 `startCfi`，避免翻页保存进度后整书重载 |
+| `currentCfiRef` | 当前 CFI（用于 saveProgress） |
+| `lateStartCfiAppliedRef` | 标记 `startCfi` 是否已应用，避免重复 display |
+
+"书架进度晚于首屏加载"补跳（`EpubPane.tsx:271-282`）：若 `startCfi` 在主 effect 之后才到（如 `ensureBookForRead` 异步返回），且未应用过，则 `rendRef.current.display(startCfi)` 单次跳转——**不重载整书**。
+
+### 16.5 后端 entity / DTO / service
+
+#### 16.5.1 Entity
+
+**来源**：`apps/backend/src/services/ebook/ebook-progress.entity.ts` · L9-L29
+
+```typescript
+// 阅读进度表：一本书一条记录（bookId 为主键）
+@Entity('ebook_progress')
+@Index('idx_ebook_progress_user', ['userId'])
+export class EbookProgress {
+    // 主键 bookId（uuid）——隐含假设"bookId 全局唯一归属一个用户"
+    @PrimaryColumn('uuid') bookId: string;
+    // 用户 id（普通列，非主键的一部分）
+    @Column({ type: 'int' }) userId: number;
+    // EPUB CFI 定位（如 epubcfi(/6/4!/4/2:128)）
+    @Column({ type: 'text', nullable: true }) epubCfi: string | null;
+    // PDF 页码（0-based）
+    @Column({ type: 'int', nullable: true }) pdfPage: number | null;
+    // 百分比 0-100
+    @Column({ type: 'float', nullable: true }) percent: number | null;
+    // 自动更新时间戳（@UpdateDateColumn 由 TypeORM 维护）
+    @UpdateDateColumn({ type: 'timestamp' }) updatedAt: Date;
+}
+```
+
+**读完应掌握**：`EbookProgress` 主键仅 `bookId`，`userId` 是普通列——靠 `assertBookOwned` 在写入前把关。无 `createdAt`，仅 `@UpdateDateColumn updatedAt`。
+
+#### 16.5.2 DTO
+
+`save-ebook-progress.dto.ts`：`bookId:UUID`、`epubCfi?:string`、`pdfPage?:number(≥0)`、`percent?:number(0..100)`。三个可选字段任一为 `undefined` 时后端保留旧值。
+
+#### 16.5.3 Service
+
+`ebook.service.ts:709-734` `saveProgress`：`bookRepo.findOne({id,userId})` 归属校验 → `progRepo.findOne({bookId,userId})` 不存在则 `create` → `prog.epubCfi = dto.epubCfi ?? prog.epubCfi`（字段级保留）→ `progRepo.save` → `toProgDto`。
+
+> **后端无 debounce**——即时写入。debounce 全在前端两层（2s + 8s）+ keepalive 兜底。
+
+---
+
+## 17. 分栏阅读（split panel）
+
+> **重要澄清**：本仓库的"分栏"**不是两本书并排阅读**，而是"左侧阅读器 + 右侧侧栏（助手 / 想法详情 / 想法列表，三者互斥）"。只有一个 rendition 实例，不存在双 rendition 独立管理。
+
+### 17.1 布局结构
+
+#### 17.1.1 文件
+
+`components/layout/EbookReadSplitLayout.tsx:28-127` `EbookReadSplitLayout`：基于 `react-resizable-panels` 的 `ResizablePanelGroup`（id=`ebook-read-split`，horizontal）+ 两个 `ResizablePanel`（id=`reader` 默认 58% / id=`assistant` 默认 42%）+ 一个 `ResizableHandle`。
+
+#### 17.1.2 Props
+
+```ts
+type Props = {
+    sidePanelOpen: boolean;   // 是否展开右栏
+    sidePanel: ReactNode;     // 右栏内容（助手/想法/列表三选一）
+    children: ReactNode;      // 左栏阅读器内容
+};
+```
+
+#### 17.1.3 右栏不挂载策略
+
+`sidePanelOpen=false` 时不渲染右 Panel + Handle，避免 collapse/setLayout 偶发失效留空白列。布局同步 `useLayoutEffect`（`:55-75`）：关闭时 `requestAnimationFrame` 内 `panelGroupRef.current?.setLayout({reader:100})`，再 `notifyEbookSplitPanelResizeEnd()`；打开时 `setLayout(lastSplitLayoutRef.current)`。
+
+### 17.2 拖拽事件总线
+
+**来源**：`apps/frontend/src/views/ebook/utils/common/ebookSplitResize.ts` · L1-L28
+
+```typescript
+// 全局共享对象：标记当前是否在拖拽分栏手柄
+// EpubPane 的 window resize 监听会检查它，拖拽中跳过 settle
+export const ebookSplitPanelResizingRef = { current: false };
+
+// 订阅器集合：拖拽结束（含 setLayout 完成）时广播
+const resizeEndListeners = new Set<() => void>();
+
+// 订阅 resize end（EpubPane 的 settleHostResize 注册于此）
+export function subscribeEbookSplitPanelResizeEnd(listener: () => void): () => void {
+    resizeEndListeners.add(listener);
+    return () => resizeEndListeners.delete(listener);
+}
+
+// 广播：通知所有订阅者"分栏尺寸已稳定，可以重排了"
+export function notifyEbookSplitPanelResizeEnd(): void {
+    resizeEndListeners.forEach((fn) => fn());
+}
+
+// 拖拽开始：ResizableHandle.onPointerDown 调
+export function beginEbookSplitPanelPointerDrag(): void {
+    ebookSplitPanelResizingRef.current = true;
+}
+
+// 拖拽结束：全局 pointerup/pointercancel 调
+export function endEbookSplitPanelPointerDrag(): void {
+    if (!ebookSplitPanelResizingRef.current) return;
+    ebookSplitPanelResizingRef.current = false;
+    notifyEbookSplitPanelResizeEnd();
+}
+```
+
+**读完应掌握**：`ebookSplitResize.ts` 是分栏拖拽的"事件总线"——`begin/endPointerDrag` 标记拖拽态，`notifyResizeEnd` 广播稳定事件。EpubPane 订阅 `subscribeEbookSplitPanelResizeEnd(settleHostResize)`，在分栏稳定后软 resize rendition + 重画批注。
+
+### 17.3 侧栏互斥（助手/想法/列表）
+
+`read.tsx:1796-1899` `sidePanel` useMemo：
+- `assistantOpen` → `<EbookAssistant/>`。
+- 否则 `thoughtDialogOpen` → `<EpubThought/>`（想法详情/编辑）。
+- 否则 `thoughtListPanelOpen && thoughtListCluster` → `<EpubThoughtList/>`。
+
+三者通过 `setAssistantOpen(false)` / `setThoughtListOpen(false)` 等在切换时互相关闭（如 `openViewThought:911-913`、`openCreateThought:993-999`、`openThoughtCluster:1092-1095`）。
+
+PDF 用法（`read.tsx:2554-2582`）：`sidePanelOpen={assistantOpen}`，`sidePanel` 为 `EbookAssistant`（PDF 不支持想法/划线，仅助手）。
+
+### 17.4 分栏与 rendition 协同
+
+#### 17.4.1 EpubPane 订阅 resize end
+
+`EpubPane.tsx:617-618` `subscribeEbookSplitPanelResizeEnd(settleHostResize)`。
+`settleHostResize`（`:584-596`）：先 `applyHostResize`（`softResizeEpubRendition` 优先，回退 `rend.resize(w,h)`），再 `syncEpubReadingAnnotations` 重画高亮/想法下划线。
+
+#### 17.4.2 拖拽中跳过 settle
+
+`EpubPane.tsx:607, 611` `if (ebookSplitPanelResizingRef.current) return;`——拖拽期间不 settle，仅 schedule。ResizeObserver（`:599-602`）监听容器 `el` 尺寸变化 → `scheduleHostResize`（rAF 防抖）→ `applyHostResize`。
+
+#### 17.4.3 想法侧栏锚点滚动
+
+`read.tsx:1754-1757`：EPUB 模式下 `subscribeEbookSplitPanelResizeEnd(scrollThoughtQuoteAnchorIntoView)`，分栏稳定后把侧栏引用段落重新滚入视口。
+
+#### 17.4.4 听书与分栏独立
+
+听书栏 `EpubListenPlayerBar` 和跟随 FAB `EpubListenFollowFab` 挂在 EpubPane 下方、`EbookReadSplitLayout` 左栏内部，不受右栏开关影响。
+
+---
+
+## 18. 引用分享（quote share）
+
+> 用户选中文字后可生成"书摘图片"（PNG）分享。**纯前端 Canvas 2D 手绘**，不用 html-to-image，无字体加载，无暗色模式。与"公开分享链接/公开书"是完全独立的两套功能。
+
+### 18.1 入口与触发
+
+三处入口（**右键菜单不含分享**）：
+1. 选区 PopBar 分享按钮 → `onSelectionPopBarShare` → `openQuoteShare(text, {segments, cfiRange})`。
+2. 想法列表引用操作条 → `openQuoteShare(quote, {cfiRange})`（无 segments，靠 cfiRange 回算）。
+3. 想法对话框引用操作条 → 同上。
+
+`read.tsx:1498-1510` `openQuoteShare`：trim 文本 → `setQuoteShareText` / `setQuoteShareSegments(resolveQuoteShareSegments(opts))` / `setQuoteShareOpen(true)`。
+
+`resolveQuoteShareSegments`（`:1481-1496`）：优先用 `opts.segments`（PopBar 路径已带）；否则用 `opts.cfiRange` + `resolveCfiDomRange(rend, cfiRange)` 重建 DOM Range，再调 `extractQuoteSegmentsFromRange(range, win)`。
+
+> **关键 UX 细节**：`onSelectionPopBarShare` 调 `suppressEpubSelectionPopBarDismiss()`（450ms 内不自动关 PopBar），避免弹窗动画期间 iframe 选区失焦连锁。
+
+### 18.2 富文本片段生成
+
+**来源**：`apps/frontend/src/views/ebook/utils/epub/reader/epubQuoteShareStyled.ts` · 约 L147-L179
+
+```typescript
+// 把 DOM Range 拆成"带字号/字重/字体族/字体样式"的富文本片段数组
+// 保留原文的字号比例（标题大、正文小），但不保留颜色（卡片统一配色）
+export function extractQuoteSegmentsFromRange(range: Range, win: Window): QuoteShareRun[] {
+    const segments: QuoteShareRun[] = [];
+    // 1. TreeWalker(SHOW_TEXT) 遍历 range.commonAncestorContainer 子树
+    const nodes = textNodesInRange(range);
+    // 2. 逐个文本节点：取 computedStyle 的 fontSize/fontWeight/fontStyle/fontFamily
+    // 3. 按 block 边界或 <br> 切断：相邻 Text 节点若 block 不同或中间有 <br> → push '\n' run
+    // 4. 相同样式的相邻 run 合并（sameRunStyle 判定）
+    for (let i = 0; i < nodes.length; i += 1) {
+        const { node, start, end } = nodes[i];
+        const text = textSliceInRange(node, start, end);
+        if (!text) continue;
+        const style = styleFromTextNode(win, node.parentElement);
+        // block 边界检测：若与前一个 run 不在同一 block 祖先 → 插入 '\n'
+        if (i > 0 && hasBrBetween(nodes[i - 1], nodes[i])) {
+            segments.push({ text: '\n', ...style });
+        }
+        pushRun(segments, { text, ...style });
+    }
+    return segments;
+}
+```
+
+`QuoteShareRun` 类型：`{ text, fontSize, fontWeight, fontFamily, fontStyle }`——**不含颜色**。
+
+折行算法 `layoutStyledQuoteLines`（`:206-285`）：按 maxWidth 折行；中日韩逐字、西文按词（实际逐 char 探测宽度）；`'\n'` 强制换行。
+
+### 18.3 Canvas 2D 卡片渲染
+
+**来源**：`apps/frontend/src/views/ebook/utils/epub/reader/epubQuoteShareCard.ts` · 约 L271-L298
+
+```typescript
+// 纯 Canvas 2D 手绘书摘卡片，输出 720px 宽高清 PNG（SCALE=2）
+export async function renderQuoteShareCard(input: QuoteShareCardInput): Promise<QuoteShareCardResult> {
+    // 1. 创建测量 canvas + ctx（用 1x 比例测量，避免 scale 干扰）
+    const measureCanvas = document.createElement('canvas');
+    const measureCtx = measureCanvas.getContext('2d')!;
+    // 2. 先测量卡片总高度（按布局常量累加：padTop + day + month + weekday + divider + quoteBlock + title? + author? + brand? + padBottom）
+    const height = measureCardHeight(measureCtx, input);
+    // 3. 创建实际 canvas：宽 = CARD_WIDTH(360) * SCALE(2)，高 = height * SCALE
+    const canvas = document.createElement('canvas');
+    canvas.width = CARD_WIDTH * SCALE;
+    canvas.height = height * SCALE;
+    const ctx = canvas.getContext('2d')!;
+    // 4. scale(2,2)：所有绘制坐标按 1x 写，输出 2x 高清
+    ctx.scale(SCALE, SCALE);
+    // 5. 绘制（顺序：背景 → 大号日期 → 月份+年 → 星期 → 分隔线 → 引用文字 → 书名 → 作者 → brand）
+    drawCard(ctx, input, height);
+    // 6. 导出 PNG blob + dataURL
+    const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
+    const dataUrl = canvas.toDataURL('image/png');
+    return { canvas, dataUrl, blob };
+}
+```
+
+固定配色 `CARD_PALETTE`（微信读书风）：`bg:'#F7F7F7'`、`textPrimary:'#332C2B'`、`textSecondary:'#999999'`、`textBrand:'#888888'`、`divider:'#E0E0E0'`。字体栈 `FONT_SANS = 'PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif'`。
+
+> **不保留原文颜色**：`QuoteShareRun` 无颜色字段，卡片文字颜色由 `CARD_PALETTE.textPrimary` 统一决定。仅保留字号/字重比例。
+
+### 18.4 复制与下载
+
+`EpubQuoteShareDialog.tsx:113-162`：
+- `onCopyImage`：`copyCanvasToClipboard(canvas)`（Clipboard API 写入 `image/png`）→ 成功 Toast + 1.5s "已复制"态。
+- `onDownloadImage`：`canvas.toBlob(cb, 'image/png')` → `downloadBlob({file_name: quoteShareFileName(bookTitle), id:'ebook-quote-share'}, blob)`。文件名 `书摘-${sanitized title | 'share'}.png`，转义非法字符、空格转下划线、截断 48 字符。
+
+---
+
+## 19. 后端 API 与实体（backend）
+
+> EPUB 后端是 NestJS + TypeORM，一个 controller + 一个 service + 5 个 entity。所有路由 `@UseGuards(JwtGuard)`，无 CASL，权限靠 `userId` 范围化查询 + 手写可见性 SQL。
+
+### 19.1 路由清单
+
+**来源**：`apps/backend/src/services/ebook/ebook.controller.ts`
+
+| 模块 | Method | Path | controller 方法 | service 方法 |
+|------|--------|------|----------------|-------------|
+| 书架 | GET | `/ebook/shelf` | `shelf` | `getShelf` |
+| 书籍详情 | GET | `/ebook/book/:id` | `getBook` | `getBook` |
+| 本地路径查询 | GET | `/ebook/by-local-path` | `byLocalPath` | `findBookByLocalPath` |
+| 删除书 | DELETE | `/ebook/delete/:id` | `remove` | `remove` |
+| 文件下载 | GET | `/ebook/file/:id` | `file` | `getFileForDownload` |
+| 分类摘要 | GET | `/ebook/categories/summary` | `categoriesSummary` | `getCategoriesSummary` |
+| 新建分类 | POST | `/ebook/categories` | `createCategory` | `createCategory` |
+| 分类重排 | PUT | `/ebook/categories/reorder` | `reorderCategories` | `reorderCategories` |
+| 改分类 | PUT | `/ebook/categories/:id` | `updateCategory` | `updateCategory` |
+| 删分类 | DELETE | `/ebook/categories/:id` | `removeCategory` | `removeCategory` |
+| 书归分类 | PUT | `/ebook/book/:id/category` | `assignBookCategory` | `assignBookCategory` |
+| 进度保存 | PUT | `/ebook/progress` | `progress` | `saveProgress` |
+| 改书名 | PUT | `/ebook/title` | `title` | `updateTitle` |
+| 划线列表 | GET | `/ebook/highlights/:bookId` | `listHighlights` | `listHighlights` |
+| 划线 upsert | POST | `/ebook/highlights` | `createHighlight` | `createHighlight` |
+| 改划线 | PUT | `/ebook/highlights/:id` | `updateHighlight` | `updateHighlight` |
+| 删划线 | DELETE | `/ebook/highlights/:id` | `removeHighlight` | `removeHighlight` |
+| 想法同步 | GET | `/ebook/thoughts/:bookId/sync` | `thoughtSync` | `syncThoughts` |
+| 想法版本戳 | GET | `/ebook/thoughts/:bookId/revision` | `thoughtsRevision` | `getThoughtsRevision` |
+| 想法增量 | GET | `/ebook/thoughts/:bookId/changes` | `thoughtChanges` | `listThoughtChanges` |
+| 想法列表 | GET | `/ebook/thoughts/:bookId` | `listThoughts` | `listThoughts` |
+| 新建想法 | POST | `/ebook/thoughts` | `createThought` | `createThought` |
+| 改想法 | PUT | `/ebook/thoughts/:id` | `updateThought` | `updateThought` |
+| 删想法 | DELETE | `/ebook/thoughts/:id` | `removeThought` | `removeThought` |
+| 登记本地路径 | POST | `/ebook/add-path` | `addPath` | `addFromPath` |
+| 上传 | POST | `/ebook/upload` | `upload` | `addFromUpload` |
+| 封面上传 | PUT | `/ebook/cover/:id` | `cover` | `saveCover` |
+| 可见性 | PUT | `/ebook/book/:id/visibility` | `setBookVisibility` | `setBookVisibility` |
+| 打开公开书 | POST | `/ebook/public/:sourceBookId/open` | `openPublicBook` | `openPublicBook` |
+
+### 19.2 实体与索引
+
+| 实体 | 表名 | 索引 | 软删 | 关键字段 |
+|------|------|------|------|----------|
+| `EbookBook` | `ebook_book` | `(userId, createdAt)` | 否 | `fmt/srcKind/localPath/filePath/coverPath/categoryId/isPublic/sourceBookId/publicAt` |
+| `EbookCategory` | `ebook_category` | `(userId, sortOrder)` | 否 | `name/sortOrder` |
+| `EbookHighlight` | `ebook_highlight` | `(userId, bookId)` | **硬删** | `cfiRange/quote/style/color` |
+| `EbookProgress` | `ebook_progress` | `(userId)` | 否 | `bookId(PK)/epubCfi/pdfPage/percent/updatedAt` |
+| `EbookThought` | `ebook_thought` | 3 个 | **软删** `deletedAt` | `cfiRange/quote/content/isPublic` |
+
+> **无 FK 约束**：categoryId、sourceBookId 仅是逻辑外键。想法软删（需 deletedIds 同步），划线硬删（仅本人可见）。
+
+### 19.3 想法同步算法（since-based）
+
+**来源**：`apps/backend/src/services/ebook/ebook.service.ts` · 约 L1334-L1379
+
+```typescript
+// syncThoughts：since-based 增量同步，返回 { revision, changes, deletedIds }
+async syncThoughts(userId: number, bookId: string, since?: string): Promise<EbookThoughtSyncDto> {
+    // 1. 归属校验（读书记录归属本人）
+    const book = await this.assertBookOwned(userId, bookId);
+    // 2. 非公开且非源书 → 返空三件套（私有书无需同步）
+    if (!book.isPublic && !book.sourceBookId) {
+        return { revision: null, changes: [], deletedIds: [] };
+    }
+    // 3. revision：SQL 层 COUNT(*) + MAX(updated_at)（轻量版本戳）
+    const revision = await this.queryVisibleThoughtRevision(userId, book);
+    // 4. 增量模式（since 非空）
+    if (since) {
+        // 4a. deletedIds：软删 ID ∪ 改私密 ID
+        //     - 软删：t.deleted_at IS NOT NULL AND t.deleted_at > :since
+        //     - 改私密：t.user_id != viewer AND t.is_public=false AND t.updated_at > :since
+        const deletedIds = await this.queryRemovedThoughtIdsSince(userId, book, since);
+        // 4b. changes：updated_at > since 的可见想法
+        const changedRows = await this.queryVisibleThoughtRows(userId, book, since);
+        // 4c. 全空 → 返空（仍带 revision，让前端更新版本戳）
+        if (changedRows.length === 0 && deletedIds.length === 0) {
+            return { revision, changes: [], deletedIds: [] };
+        }
+        return { revision, changes: this.mapThoughtRowsToDtos(changedRows), deletedIds };
+    }
+    // 5. 全量模式（since 为空，首次拉取）
+    const rows = await this.queryVisibleThoughtRows(userId, book);
+    return {
+        revision: this.buildThoughtRevision(rows), // 本地 reduce MAX(updatedAt)
+        changes: this.mapThoughtRowsToDtos(rows),
+        deletedIds: [],
+    };
+}
+```
+
+**读完应掌握**：
+- `since` 是 ISO8601 时间戳，前端传 `maxEbookThoughtUpdatedAt(local)`（减 1ms 防边界丢数据）。
+- `deletedIds` 两类：软删 + 改私密（他人把想法从公开改为私密，对当前用户来说"消失"了）。
+- 可见性 SQL 三件套：`appendThoughtBookScope`（决定 `t.book_id/t.user_id` 范围）+ `(t.user_id=viewer OR t.is_public=true)`（他人想法必须 public）+ `t.deleted_at IS NULL`。
+- `createVisibleThoughtsQueryBuilder` 同时服务 list/sync/revision/changes，保证 4 个接口可见性语义一致。
+
+### 19.4 权限模型
+
+| 维度 | 实现 |
+|------|------|
+| 登录 | `@UseGuards(JwtGuard)` 类级，所有路由需 token |
+| CASL | **不使用**——ebook 目录 0 命中 |
+| 归属校验 | `assertBookOwned(userId, bookId)` → `bookRepo.findOne({id,userId})` |
+| 分类归属 | `resolveUserCategoryId(userId, categoryId)` |
+| 公开书鉴权 | 数据模型：源书 `isPublic=true && sourceBookId=null`；读书记录 `sourceBookId=<源书id>`。文件下载回溯源书，`source.isPublic` 必须仍为 true |
+| 会员校验 | 仅 `addFromUpload` 调 `isUserMembershipActive`；本地路径登记不需会员 |
+
+### 19.5 划线 upsert
+
+`ebook.service.ts:1453-1479` `createHighlight`：按 `(userId, bookId, cfiRange)` 查 `existing` → 存在则更新 `quote/style/color`（同 cfiRange 再次提交覆盖样式与文本，**不分裂**）→ 不存在则新建。`removeHighlight` 硬删 `highlightRepo.delete({id,userId})`。
+
+> **划线 upsert 在后端做**，前端 `epubUserHighlights.ts` 的合并/裁剪仅用于渲染层（避免重叠 mark 视觉混乱），不影响后端存储。
+
+---
+
+## 20. 跨模块互斥 / 生命周期 / 全局工具
+
+> 本章把散落在各功能里的「互斥通道、跨 iframe 状态总线、持久化 key、全局工具」集中摆出来，便于跨功能联调时定位。
+
+### 20.1 互斥通道总图
 
 ```
 ┌──────────────────────┐    invokeStopChapterListen     ┌──────────────────────┐
@@ -1409,14 +2058,14 @@ export function pdfLoadOptions(data) { return { data, wasmUrl, cMapUrl, cMapPack
 - 切换书：都通过 `stopInternal({ notify: false })` 清理。
 - 浏览器 TTS：`stopAllEnglishPlayback` 共享。
 
-### 15.2 跨 iframe 状态总线
+### 20.2 跨 iframe 状态总线
 
 - `rend.getContents()` 可能是单/多 iframe，归一为 `EpubIframeContents[]`。
 - 写操作（`cfiFromRange`）按 `range.startContainer.ownerDocument` 找匹配 contents。
 - 读操作（`getRange`）先 `rend.getRange`，回退逐个 `contents.range`。
 - 事件（`mousedown`/`selectionchange`/`contextmenu`/`wheel`/`scroll`）必须在每个 iframe 单独挂载（`rend.hooks.content.register`），不会冒泡到顶层。
 
-### 15.3 公开笔记同步生命周期
+### 20.3 公开笔记同步生命周期
 
 ```
 useEbookThoughtLoader:
@@ -1430,7 +2079,7 @@ usePublicEbookThoughtSync:
    变化：ephemeralPinThoughtCfis(cfis) → 立即显示
 ```
 
-### 15.4 持久化
+### 20.4 持久化
 
 | Key | 模块 | 用途 |
 |-----|------|------|
@@ -1440,7 +2089,7 @@ usePublicEbookThoughtSync:
 
 后端持久化：高亮、想法走 `service/ebook` 的 REST API。
 
-### 15.5 全局工具（[utils](../../../../utils/)）
+### 20.5 全局工具（[utils](../../../../utils/)）
 
 | 工具 | 在 EPUB 中的用途 |
 |------|-------------------|
@@ -1451,9 +2100,9 @@ usePublicEbookThoughtSync:
 
 ---
 
-## 16. 验收清单
+## 21. 验收清单
 
-### 16.1 M1 渲染管线
+### 21.1 M1 渲染管线
 
 - [ ] 打开 epub 书，首屏渲染、显示标题与作者（如有）。
 - [ ] 翻页（分页）：←/→/PageUp/PageDown 正常。
@@ -1462,7 +2111,7 @@ usePublicEbookThoughtSync:
 - [ ] 拖分栏 / 最大化窗口：高亮不消失、不闪。
 - [ ] 销毁：epub.js `destroy()` 调，`rend.hooks.content` 解绑。
 
-### 16.2 M2 阅读设置
+### 21.2 M2 阅读设置
 
 - [ ] 字号 80–160、行距 1.2–2.4 实时生效。
 - [ ] 12 套背景色 + 12 套文字色，颜色/对比度正确。
@@ -1470,14 +2119,14 @@ usePublicEbookThoughtSync:
 - [ ] `paginated` ↔ `scrolled` 切换：旧 mark 清理、新模式生效。
 - [ ] localStorage 持久化，刷新页面后保留。
 
-### 16.3 M3 目录与导航
+### 21.3 M3 目录与导航
 
 - [ ] TOC 解析：标题、spineIndex 正确。
 - [ ] 目录点击：分页 `rend.display`、连续滚动对齐准确。
 - [ ] 当前目录高亮：滚到下一章自动高亮下一目录项。
 - [ ] 跨章跳转不闪、不留白。
 
-### 16.4 M4 选区 + PopBar
+### 21.4 M4 选区 + PopBar
 
 - [ ] 拖选 → 松手出 PopBar。
 - [ ] 简单点击（无选区）不出 PopBar。
@@ -1487,7 +2136,7 @@ usePublicEbookThoughtSync:
 - [ ] 跨章选区：坐标转换正确。
 - [ ] PopBar 锚点：多行选区取 focus 行顶。
 
-### 16.5 M5 用户划线
+### 21.5 M5 用户划线
 
 - [ ] 5 套预设色 + 自定义 hex。
 - [ ] 三种样式：高亮 / 下划线 / 波浪线。
@@ -1498,7 +2147,7 @@ usePublicEbookThoughtSync:
 - [ ] 点击 mark 弹 PopBar。
 - [ ] PopBar 关闭 → mark 保留。
 
-### 16.6 M6 想法下划线
+### 21.6 M6 想法下划线
 
 - [ ] 公开笔记 / 私有笔记按用户配色。
 - [ ] 视口模式：大书丝滑。
@@ -1510,7 +2159,7 @@ usePublicEbookThoughtSync:
 - [ ] 想法详情弹窗：本人可编辑/删除，他人只读。
 - [ ] 想法 cluster 列表：连通闭包正确。
 
-### 16.7 M7 听书
+### 21.7 M7 听书
 
 - [ ] 章节听书：连续滚动 / 分页都能跑。
 - [ ] 节末自动接续：连续滚动 `advanceScrollListenSection`。
@@ -1523,7 +2172,7 @@ usePublicEbookThoughtSync:
 - [ ] TTS 报 unsupported 提示正确。
 - [ ] 用户手势：未触发前 TTS 不出。
 
-### 16.8 M8 PDF + 持久化 + 同步
+### 21.8 M8 PDF + 持久化 + 同步
 
 - [ ] PDF 加载：worker 初始化、wasm/cmap URL 正确。
 - [ ] 缩放：0.5x–3x，clamp 后持久化。
@@ -1532,11 +2181,51 @@ usePublicEbookThoughtSync:
 - [ ] 跨设备同步：公开笔记 since-based 增量。
 - [ ] 引用分享卡片：富文本片段（字号/字重）保留。
 
+### 21.9 M9 书架管理
+
+- [ ] 上传 EPUB/PDF：进度条 0→100%，完成后自动并入「全部」分类。
+- [ ] 上传中切换分类：上传完成后落地到「当前激活分类」而非「全部」。
+- [ ] 分类 CRUD：新建/重命名/删除（删除时书退回「全部」，不丢书）。
+- [ ] 可见性切换：私有 ↔ 公开即时生效；公开书进入公开书架。
+- [ ] 排序：按「最后阅读时间」倒序，未读过的书沉底。
+- [ ] 空状态：无书时显示「上传第一本」CTA；分类下无书时显示「去全部书架添加」。
+- [ ] 卸载会员书：列表立即移除且不可点开（鉴权由后端兜底）。
+
+### 21.10 M10 阅读进度持久化
+
+- [ ] relocated 触发后 2s 内不再触发 → 仅一次 `saveCfi`（第一层 debounce）。
+- [ ] 8s 内多次本地保存 → 仅触发一次远程同步（第二层 debounce `scheduleProgRemoteSync`）。
+- [ ] 远程同步失败 → 不阻塞阅读；下次 relocated 重试。
+- [ ] 切书/卸载组件 → `keepaliveEbookProgressFlush` 兜底刷盘最后一次进度。
+- [ ] 进度回跳：从 80% 退到 5%（用户重读）允许写；从 80% 退到 0.01% 拒绝（误触）。
+- [ ] 后端 entity：`ebook_progress` 表含 `userId/bookId/cfi/percent/updatedAt`，复合唯一索引。
+- [ ] 跨设备同步：A 设备读到 50%，B 设备打开同书 → 跳到 50%（首次进入拉最近一条）。
+
+### 21.11 M11 分栏阅读
+
+- [ ] 默认布局：左 EPUB 阅读器 + 右侧栏（助手/想法/列表三选一互斥）。
+- [ ] 拖分栏竖条 → `ebookSplitResize` 事件总线广播 → EpubPane 用 `softResizeEpubRendition` 软重排。
+- [ ] 软重排后：用户划线/想法下划线/听书背景 mark 不闪、不丢。
+- [ ] 侧栏互斥：打开「助手」自动关闭「想法」和「列表」；反之亦然。
+- [ ] 侧栏收起 → 阅读器宽度恢复 100%；侧栏展开 → 按上次宽度比例恢复。
+- [ ] 与 rendition 协同：分栏拖拽期间不触发 `rendition.resize()`（避免清视图）。
+
+### 21.12 M12 引用分享 + 后端 API
+
+- [ ] 选区右键菜单 / PopBar「引用分享」→ 弹出 Canvas 卡片预览（无字体加载、无暗色模式）。
+- [ ] 卡片含：书名、引用片段（保留字号/字重/斜体）、来源章节、日期水印。
+- [ ] 「复制图片」：`canvas.toBlob` → `ClipboardItem` 写入剪贴板。
+- [ ] 「下载 PNG」：`canvas.toDataURL` → `<a download>` 触发。
+- [ ] 后端 29 条路由：阅读/书架/想法/进度/划线/上传/分享 各分组鉴权 OK。
+- [ ] 想法同步 `syncThoughts`：since-based 增量，`maxUpdatedAt - 1ms` 防漏拉。
+- [ ] 权限模型：私有书仅本人；公开书任何人可读，仅本人可写想法。
+- [ ] 划线 upsert：在后端做（前端 `epubUserHighlights` 的合并/裁剪仅用于渲染层）。
+
 ---
 
-## 17. 自检 & 回归坑位
+## 22. 自检 & 回归坑位
 
-### 17.1 性能坑
+### 22.1 性能坑
 
 - **批注 sync 热路径**：不要在 `rend.annotations.remove + add` 之间用 rAF 闪；统一用 `patchEpubReadingAnnotations` 仅 patch 样式。
 - **大书视口模式**：想法数 > 一定阈值必须视口模式，否则 mark 数爆炸导致 scroll 卡顿。
@@ -1544,31 +2233,31 @@ usePublicEbookThoughtSync:
 - **`rend.resize()`**：分栏拖拽会清视图；优先 `softResizeEpubRendition`。
 - **locations.generate**：默认 1600 步长；太细（>5000）会卡首屏。
 
-### 17.2 批注闪烁坑
+### 22.2 批注闪烁坑
 
 - 划线 mark 重建：会导致 SVG 重画一闪。修复：sig 缓存 + `isUserHighlightMarkPresent` 检测。
 - 想法下划线：相同样式相同样式集合必须保持，mark 移除后下一帧立即 apply。
 - 听书 mark 切句：必须在切下一句前 clear 当前 mark，避免重叠。
 
-### 17.3 跨 iframe 坐标坑
+### 22.3 跨 iframe 坐标坑
 
 - `range.getBoundingClientRect()` 返 iframe 内坐标。
 - `toIframeViewportOffset(win)`：`win.frameElement.getBoundingClientRect()` 拿 iframe 在主页面坐标。
 - `readRangeViewportBounds`：`iframeRect.top + rect.top` 转主页面。
 
-### 17.4 CFI / DOM 双向坑
+### 22.4 CFI / DOM 双向坑
 
 - 主动选区 quote "司马懿的第四子"：同名 quote 出现在两个章节；`findAllUserHighlightsCoveringCfi` 必须按 CFI/DOM 嵌套判断，不能按 quote 字符串。
 - 用户改章节后选区 quote 不变：`resolveCfiDomRange` 仍能解析旧 cfi（epub.js 容错）。
 - 公开同步收到变化：必须 ephemeral pin 立即显示，不能等下一个 sync 周期。
 
-### 17.5 互斥坑
+### 22.5 互斥坑
 
 - 听书运行中开引用听读：必须 `invokeStopChapterListen()` 先，否则两套 TTS 并行。
 - 切书：所有 stop hook 必须先调 `stopInternal({ notify: false })` 否则旧 rendition 上残留 setTimeout。
 - `loopGenRef`：每次 play 重置 gen；旧 gen 的 `await` 完成后用 `isGenActive` 短路。
 
-### 17.6 回归 Checklist（按版本）
+### 22.6 回归 Checklist（按版本）
 
 - [ ] epub.js 升级：annotations API / `getContents()` 类型可能变；`rend.hooks.content.register` 仍可用。
 - [ ] 浏览器升级：Safari 18 / Chrome 130+；SpeechSynthesis voices 行为差异；wheel 事件 passive 默认值。
@@ -1578,13 +2267,13 @@ usePublicEbookThoughtSync:
 
 ---
 
-## 18. 源码对照（11 个最关键符号 · 逐行注释）
+## 23. 源码对照（11 个最关键符号 · 逐行注释）
 
 > 选取标准：入口 hook → 控制器/互斥 → 核心算法 utils → UI 接线 → 后端 API。
 > 完整符号边界、跨章引用、行号以下方路径 + 注释为准。
 > 因体量所限，下列代码段为**关键骨架 + 逐行注释**的合订版（精简到能跑通主流程 + 易踩坑点）；如需完整 1:1 源码，可前往 `apps/frontend/src/views/ebook/...` 对照行号。
 
-### 18.1 `EpubPane` 的 epub.js 主生命周期 useEffect
+### 23.1 `EpubPane` 的 epub.js 主生命周期 useEffect
 
 **来源**：[EpubPane.tsx](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/components/reader/EpubPane.tsx) · 约 L368–L660
 
@@ -1830,7 +2519,7 @@ useEffect(() => {
 - 尺寸自适应优先级：softResize → resize 兜底 + patchEpubReadingAnnotations 恢复划线样式。
 - locations 后台生成；前端用 ref 而非 state 避免触发重渲染。
 
-### 18.2 `useEpubChapterListen.startFromCurrentPosition`
+### 23.2 `useEpubChapterListen.startFromCurrentPosition`
 
 **来源**：[useEpubChapterListen.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts) · 约 L506–L576
 
@@ -1901,7 +2590,7 @@ const startFromCurrentPosition = useCallback(() => {
 - `resolveStartCfiRef = true` 让 `prepareSection` 时按 CFI 解析起始句。
 - `beginChapterListenAutoFollow` 注册 scroll guard，外部 UI 订阅 `subscribeEpubListenAutoFollow` 展示 FAB。
 
-### 18.3 `applyEpubUserHighlights` — 划线渲染核心
+### 23.3 `applyEpubUserHighlights` — 划线渲染核心
 
 **来源**：[epubUserHighlights.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubUserHighlights.ts) · 约 L1136–L1185
 
@@ -1963,7 +2652,7 @@ export function applyEpubUserHighlights(
 - `appliedRef` + `isUserHighlightMarkPresent` 双保险：sig 不变就跳过重画（避免 SVG 闪烁）。
 - 统一用 `highlight` 类型（与想法 `underline` 槽位分离），方便 `remove(cfi, 'highlight')` 精准清理。
 
-### 18.4 `applyEpubThoughtUnderlines` — 想法下划线核心
+### 23.4 `applyEpubThoughtUnderlines` — 想法下划线核心
 
 **来源**：[epubThoughtAnnotations.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtAnnotations.ts) · 约 L1259–L1385
 
@@ -2066,7 +2755,7 @@ export function applyEpubThoughtUnderlines(
 - `rend.annotations.underline`：与 `highlight` 不同的批注槽位，互不污染。
 - `ephemeralPinCfis` 在 apply 末尾清空，确保仅"一次性 pin"。
 
-### 18.5 `attachEpubSelectionPopBar` — 选区监听
+### 23.5 `attachEpubSelectionPopBar` — 选区监听
 
 **来源**：[epubSelectionToolbarAttach.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/reader/epubSelectionToolbarAttach.ts) · 约 L261–L492
 
@@ -2243,7 +2932,7 @@ export function attachEpubSelectionPopBar(
 - 选区归一 → 跨 iframe 锚点 → CFI 解析 → quote 富文本片段 → 一次性 emit payload。
 - 动态内容挂载：`rend.hooks.content.register(bindContents)` 让新 iframe 自动绑定。
 
-### 18.6 `indexChapterSentenceRanges` — 句级 Range 索引
+### 23.6 `indexChapterSentenceRanges` — 句级 Range 索引
 
 **来源**：[epubListenChapter.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/listen/epubListenChapter.ts) · 约 L384–L425
 
@@ -2300,7 +2989,7 @@ export function indexChapterSentenceRanges(
 - 长句 fallback：head 24 字符先搜；防止 needle 含特殊字符 regex 化失败。
 - `cursor = idx + needle.length` 推进：避免"同句重复匹配"。
 
-### 18.7 `advanceScrollListenSection` — 连续滚动听书节间推进
+### 23.7 `advanceScrollListenSection` — 连续滚动听书节间推进
 
 **来源**：[epubScrollListenAdvance.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/listen/epubScrollListenAdvance.ts) · 约 L165–L207
 
@@ -2349,7 +3038,7 @@ export async function advanceScrollListenSection(
 - `sameDoc(a, b)` 双重判定：引用相等 + `<link rel="canonical">` 相等。
 - `ensureSlotDocument` 内 8 次 `manager.check` + 80ms 间隔 + 只在 doc.body 有正文时返回。
 
-### 18.8 `coalesceOverlappingHighlightsForRender` — 划线合并（设计说明）
+### 23.8 `coalesceOverlappingHighlightsForRender` — 划线合并（设计说明）
 
 **来源**：[epubUserHighlights.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubUserHighlights.ts) · 约 L2025–L2111
 
@@ -2373,7 +3062,7 @@ function coalesceOverlappingHighlightsForRender(rend, highlights) {
 - 严格嵌套用 `isDomRangeStrictlyContained`；quote 嵌套回退（无 DOM 时）。
 - 合并后保留"主 CFI"（最长 quote），避免 CFI 反复切换导致 patch 抖动。
 
-### 18.9 `applyEpubReaderAppearance` — 阅读设置落 iframe
+### 23.9 `applyEpubReaderAppearance` — 阅读设置落 iframe
 
 **来源**：[epubReaderSettings.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/reader/epubReaderSettings.ts) · 约 L326–L381
 
@@ -2409,7 +3098,7 @@ export function applyEpubReaderAppearance(rend, settings, appTheme) {
 
 ---
 
-### 18.10 `useEbookQuoteListen.startPlayback` — 引用听读启动
+### 23.10 `useEbookQuoteListen.startPlayback` — 引用听读启动
 
 **来源**：`apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` · 约 L220–L291
 
@@ -2624,7 +3313,7 @@ const playFromCursor = useCallback(
 
 ---
 
-### 18.11 `usePublicEbookThoughtSync.syncThoughts` — 想法增量同步
+### 23.11 `usePublicEbookThoughtSync.syncThoughts` — 想法增量同步
 
 **来源**：`apps/frontend/src/views/ebook/hooks/usePublicEbookThoughtSync.ts` · 约 L53–L97
 
@@ -2754,11 +3443,11 @@ useEffect(() => {
 
 ---
 
-## 19. 复用清单 — 在其他项目里复刻 EPUB 阅读器要带走什么
+## 24. 复用清单 — 在其他项目里复刻 EPUB 阅读器要带走什么
 
 本节回答一个问题：「如果要在另一个 React 项目里复刻这套 EPUB 阅读器，最少要带走哪些文件？按什么顺序接？」。
 
-### 19.1 必带文件分层（按依赖顺序）
+### 24.1 必带文件分层（按依赖顺序）
 
 复刻时按「基础设施 → epub.js 接线 → 单一功能 → 跨功能互斥 → UI 接线」的顺序往新项目搬。每一层都假定上一层已经就位。
 
@@ -2785,10 +3474,15 @@ useEffect(() => {
 | L5 互斥 | `registerChapterListenStop` / `registerQuoteListenStop` 注册对 | 互斥回调 | L4 |
 | **L6 UI 接线** | `apps/frontend/src/views/ebook/components/reader/EpubReaderPage.tsx` | 顶层页：把 rendition 分发给各 hook | L1-L5 |
 | L6 UI 接线 | 底部播放条组件、选区 PopBar 组件、想法列表组件 | 各功能的 UI 入口 | L6 |
+| **L7 书架/进度/分栏/分享/后端** | `apps/frontend/src/store/ebook.ts` | MobX store：书架 CRUD、上传、分类、进度双层 debounce | L0、L6 |
+| L7 书架/进度/分栏/分享/后端 | `apps/frontend/src/views/ebook/read.tsx` 的 `saveCfi` / `scheduleProgRemoteSync` / `keepaliveEbookProgressFlush` | relocated→2s debounce→8s 远程同步→keepalive 兜底 | L6 |
+| L7 书架/进度/分栏/分享/后端 | `apps/frontend/src/views/ebook/utils/ebookSplitResize.ts` | 分栏拖拽事件总线（广播给 EpubPane 软重排） | L1 |
+| L7 书架/进度/分栏/分享/后端 | `apps/frontend/src/views/ebook/utils/epub/quote/epubQuoteShareStyled.ts` + `epubQuoteShareCard.ts` | 引用分享富文本片段抽取 + Canvas 2D 卡片渲染 | L1 |
+| L7 书架/进度/分栏/分享/后端 | `apps/backend/src/services/ebook/ebook.controller.ts` + `ebook.service.ts` + 5 个 `ebook-*.entity.ts` | 后端 29 条路由 + 想法同步算法 + 实体表 | L0 types |
 
-### 19.2 复刻顺序（M1–M8 对应章节）
+### 24.2 复刻顺序（M1–M12 对应章节）
 
-按 §0.3 的 M1–M8 顺序复刻，每阶段独立验收后再进入下一阶段。这里给出每个 M 阶段在新项目里的「最小可运行验收」：
+按 §0.3 的 M1–M12 顺序复刻，每阶段独立验收后再进入下一阶段。这里给出每个 M 阶段在新项目里的「最小可运行验收」：
 
 | 阶段 | 验收信号（新项目里跑通这条就算过） |
 |------|-----------------------------------|
@@ -2800,8 +3494,12 @@ useEffect(() => {
 | M6 | 选中一段文字点「听这句」，从该段第一句开始播放；与章节听读互斥 |
 | M7 | 在共享上下文（publicSource）里打开书，2s 滚动停稳后看到他人想法下划线出现 |
 | M8 | 横竖屏切换、缩放窗口，rendition 软重排不丢划线/想法/听书进度 |
+| M9 | 书架列表能上传 EPUB/PDF，新建分类并把书加入分类，公开/私有切换 |
+| M10 | 阅读 30s 后关页面再打开，能跳回上次阅读位置；快速翻页不刷爆后端 |
+| M11 | 拖动分栏竖条调整宽度，EPUB 内容软重排且划线/想法不闪；侧栏三选一互斥 |
+| M12 | 选段后右键「引用分享」生成 Canvas 卡片可复制/下载；后端 `/ebook/thoughts/sync` since 增量同步 OK |
 
-### 19.3 不要带走的（项目耦合层）
+### 24.3 不要带走的（项目耦合层）
 
 以下文件是当前项目的耦合层，复刻时应该用新项目自己的等价物替换，**不要照搬**：
 
@@ -2810,7 +3508,7 @@ useEffect(() => {
 - `EpubReaderPage.tsx` 里的 i18n、路由、鉴权、布局组件 —— 全部替换为新项目的对应基础设施。
 - 任何 `@design/*`、`@ui/*` 别名下的 UI 组件 —— 用新项目的 UI 库等价物替换。
 
-### 19.4 复刻时的 7 个关键陷阱
+### 24.4 复刻时的 7 个关键陷阱
 
 1. **iframe selection 失效**：选区工具栏弹出会破坏 iframe 内 selection。**必须**在选区产生的瞬间冻结 `Range` 传给后续逻辑（参考 `useEbookQuoteListen.startPlayback` 的 `frozenRange`）。
 2. **marks-pane 在 paginated 模式下的坐标**：marks-pane 用 SVG 画高亮，需要把 iframe 内坐标转成外层 viewer 坐标。**不要**用 `getBoundingClientRect` 直接画，必须走 epub.js 的 `rendition.annotations` 或自带的坐标转换。
@@ -2820,7 +3518,7 @@ useEffect(() => {
 6. **ResizeObserver + 软重排**：直接调 `rendition.resize()` 会让 marks-pane 闪烁。**必须**先用 `ResizeObserver` 检测容器尺寸，再用 `requestAnimationFrame` 合并多次 resize 为一次 `rendition.resize(...)`。
 7. **visibilitychange 重置 lastSyncAt**：从后台切回前台时必须把 `lastSyncAtRef.current = 0`，否则 5s 节流会拦住用户「刚回来想看最新」的请求。
 
-### 19.5 一行复刻口诀
+### 24.5 一行复刻口诀
 
 > **基础设施先到位，epub.js 接线第二位，单一功能跑通再互斥，UI 接线最后才接入。**
 
@@ -2832,8 +3530,8 @@ useEffect(() => {
 
 本手册覆盖了当前 EPUB 阅读器的全部核心功能：渲染生命周期、用户划线、读书想法、阅读设置、章节听读、引用听读、公开想法增量同步、跨功能互斥、性能与回归。
 
-- 想看「某一功能怎么实现的」→ 跳到 §3–§14 对应模块节，再看 §18 对应源码符号。
-- 想在新项目复刻 → 直接看 §19 复用清单 + §0.3 M1–M8 阶段表。
-- 想排查 bug → 先看 §17 回归陷阱表，再看 §0.2 维护定位表。
+- 想看「某一功能怎么实现的」→ 跳到 §3–§19 对应模块节，再看 §23 对应源码符号。
+- 想在新项目复刻 → 直接看 §24 复用清单 + §0.3 M1–M12 阶段表。
+- 想排查 bug → 先看 §22 回归陷阱表，再看 §0.2 维护定位表。
 
 任何行为断言均可在源码中找到依据；如本手册与源码不一致，以源码为准。

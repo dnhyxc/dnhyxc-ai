@@ -20,7 +20,7 @@
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md)                           | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触                                                                                        |
 | [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（全功能总手册 + 听读 + 想法 + 用户划线）                                                                                    |
-| [developer/epub-all-features-dev.md](./developer/epub-all-features-dev.md) | **唯一全功能总手册**：渲染生命周期 + 划线 + 想法 + 阅读设置 + 章节听读 + 引用听读 + 公开想法增量同步 + 跨功能互斥 + 复用清单（M1–M8、11 个源码符号逐行注释） |
+| [developer/epub-all-features-dev.md](./developer/epub-all-features-dev.md) | **唯一全功能总手册**：渲染生命周期 + 划线 + 想法 + 阅读设置 + 章节听读 + 引用听读 + 公开想法增量同步 + 跨功能互斥 + 书架管理 + 阅读进度持久化 + 分栏阅读 + 引用分享 + 后端 API + 复用清单（M1–M12、11 个源码符号逐行注释） |
 | [developer/epub-mark-layers-shared.md](./developer/epub-mark-layers-shared.md) | **开发者**：用户划线 / 想法虚线 / 播放背景 — 共用方法表与流程图 |
 | [developer/epub-listen-dev.md](./developer/epub-listen-dev.md)                   | **唯一主文档（听当前 + 听书）**：含连续滚动多 iframe 续播、调用链、M1–M5、源码摘录                                                                       |
 | [developer/epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) | **唯一主文档（想法）**：§0 从何下手 + §2 白话思路 + §3–§19                                                                                      |
