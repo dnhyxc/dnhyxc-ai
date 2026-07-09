@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+		/>
+		<title></title>
+		<script src="./cjs-hide.js"></script>
+		<script src="./jszip.min.js"></script>
+		<script src="./epub.min.js"></script>
+		<script src="./cjs-restore.js"></script>
+		<link rel="stylesheet" href="./epub-viewer.css" />
+	</head>
+	<body class="theme-light">
+		<div id="viewer"></div>
+
+		<div id="reader-chrome" class="reader-chrome hidden">
+			<div class="chrome-top">
+				<span id="chrome-book" class="chrome-book"></span>
+				<span id="chrome-chapter" class="chrome-chapter"></span>
+			</div>
+			<div id="chrome-mask" class="chrome-mask"></div>
+			<button type="button" id="listen-fab" class="listen-fab hidden">听</button>
+			<div class="chrome-bottom">
+				<div id="chrome-subpanel-font" class="chrome-subpanel hidden">
+					<div class="subpanel-row">
+						<span class="subpanel-label">字号</span>
+						<div class="font-stepper">
+							<button type="button" id="font-dec" class="step-btn">A-</button>
+							<span id="font-size-label" class="step-value">100%</span>
+							<button type="button" id="font-inc" class="step-btn">A+</button>
+						</div>
+					</div>
+					<div class="subpanel-row">
+						<span class="subpanel-label">行距</span>
+						<input type="range" id="line-height" min="120" max="220" value="160" step="10" />
+					</div>
+				</div>
+				<div id="chrome-subpanel-theme" class="chrome-subpanel theme-subpanel hidden">
+					<button type="button" data-theme="light" class="theme-dot theme-dot-light active" aria-label="浅色"></button>
+					<button type="button" data-theme="sepia" class="theme-dot theme-dot-sepia" aria-label="护眼"></button>
+					<button type="button" data-theme="dark" class="theme-dot theme-dot-dark" aria-label="深色"></button>
+				</div>
+				<div class="chrome-bar">
+					<button type="button" class="bar-item" data-action="toc">
+						<span class="bar-icon">☰</span>
+						<span class="bar-label">目录</span>
+					</button>
+					<button type="button" class="bar-item" data-action="theme">
+						<span class="bar-icon">◑</span>
+						<span class="bar-label">背景</span>
+					</button>
+					<button type="button" class="bar-item" data-action="font">
+						<span class="bar-icon bar-icon-font">A</span>
+						<span class="bar-label">字体</span>
+					</button>
+					<button type="button" class="bar-item" data-action="more">
+						<span class="bar-icon">···</span>
+						<span class="bar-label">更多</span>
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="toc-shell" class="toc-shell hidden">
+			<div id="toc-overlay" class="toc-overlay"></div>
+			<div id="toc-panel" class="toc-panel">
+				<div class="panel-header">
+					<span>目录</span>
+					<button type="button" id="btn-toc-close">×</button>
+				</div>
+				<div class="toc-scroll">
+					<ul id="toc-list"></ul>
+				</div>
+			</div>
+		</div>
+
+		<div id="more-sheet" class="sheet hidden">
+			<button type="button" data-more="prev">上一章</button>
+			<button type="button" data-more="next">下一章</button>
+			<button type="button" data-more="native">离线简读</button>
+			<button type="button" id="more-cancel">取消</button>
+		</div>
+
+		<div id="selection-bar" class="hidden">
+			<button type="button" data-action="highlight" data-color="yellow">高亮</button>
+			<button type="button" data-action="underline" data-color="blue">下划线</button>
+			<button type="button" data-action="wavy" data-color="green">波浪线</button>
+			<button type="button" data-action="thought">写想法</button>
+			<button type="button" data-action="listen">听书</button>
+		</div>
+		<div id="thought-dialog" class="dialog hidden">
+			<textarea id="thought-input" placeholder="写下你的想法…"></textarea>
+			<label><input type="checkbox" id="thought-public" checked /> 公开</label>
+			<div class="dialog-actions">
+				<button type="button" id="thought-cancel">取消</button>
+				<button type="button" id="thought-save">保存</button>
+			</div>
+		</div>
+		<script src="./epub-viewer.js"></script>
+	</body>
+</html>

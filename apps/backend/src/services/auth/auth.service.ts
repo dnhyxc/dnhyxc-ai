@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
 import {
 	Body,
@@ -9,9 +9,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import { MailerService } from '@nestjs-modules/mailer';
 // import * as argon2 from 'argon2';
 import * as svgCaptcha from 'svg-captcha';
+import { Repository } from 'typeorm';
 import { EmailEnum } from '../../enum/config.enum';
 import { comparePassword, randomLightColor } from '../../utils';
 import {
@@ -24,6 +26,9 @@ import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
+import { WechatLoginDto } from './dto/wechat-login.dto';
+import { UserWechat } from './wechat/user-wechat.entity';
+import { WechatMiniProgramService } from './wechat/wechat-mini-program.service';
 
 @Injectable()
 export class AuthService {
@@ -33,6 +38,9 @@ export class AuthService {
 		private cache: Cache,
 		private mailerService: MailerService,
 		private configService: ConfigService,
+		private wechatMiniProgramService: WechatMiniProgramService,
+		@InjectRepository(UserWechat)
+		private readonly userWechatRepo: Repository<UserWechat>,
 	) {}
 	async login(dto: LoginUserDTO) {
 		const { username, password, captchaId, captchaText } = dto;
@@ -47,29 +55,56 @@ export class AuthService {
 				HttpStatus.BAD_REQUEST,
 			);
 		}
-		// 使用 argon2 验证密码
-		// const isPasswordValid = await argon2.verify(user.password, password);
 		const isPasswordValid = await comparePassword(password, user.password);
 		if (isPasswordValid) {
-			const { password, ...userInfo } = user; // 使用解构赋值排除password
-			const token = await this.jwt.signAsync(
-				{
-					username: userInfo.username,
-					sub: userInfo.id,
-				},
-				// 局部设置 token 过期时间，一般用在 refreshToken 上
-				// {
-				// 	expiresIn: '1d',
-				// },
-			);
-			// 返回根据用户的用户名及密码生成的 token
-			return {
-				access_token: token,
-				...userInfo,
-			};
-		} else {
-			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
+			const { password, ...userInfo } = user;
+			const token = await this.jwt.signAsync({
+				username: userInfo.username,
+				sub: userInfo.id,
+			});
+			return { access_token: token, ...userInfo };
 		}
+		throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
+	}
+
+	async loginByWechat(dto: WechatLoginDto) {
+		if (dto.scene !== 'mini_program') {
+			throw new HttpException('暂仅支持小程序登录', HttpStatus.BAD_REQUEST);
+		}
+		const { openid, unionid } =
+			await this.wechatMiniProgramService.code2Session(dto.code);
+		const appid = this.wechatMiniProgramService.getAppId();
+		let mapping = await this.userWechatRepo.findOne({
+			where: { scene: dto.scene, appid, openid },
+		});
+		let user =
+			mapping != null ? await this.userService.findOne(mapping.userId) : null;
+		if (!user) {
+			const suffix = createHash('sha256')
+				.update(openid)
+				.digest('hex')
+				.slice(0, 12);
+			user = await this.userService.create({
+				username: `wx_${suffix}`,
+				email: `wx_${suffix}@wx.local`,
+				password: randomUUID(),
+			});
+			mapping = this.userWechatRepo.create({
+				userId: user.id,
+				scene: dto.scene,
+				appid,
+				openid,
+				unionid: unionid ?? null,
+			});
+		}
+		mapping!.lastLoginAt = new Date();
+		await this.userWechatRepo.save(mapping!);
+		const { password, ...userInfo } = user;
+		const token = await this.jwt.signAsync({
+			username: userInfo.username,
+			sub: userInfo.id,
+		});
+		return { access_token: token, ...userInfo };
 	}
 
 	async loginByEmail(dto: LoginByEmailDTO) {

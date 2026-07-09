@@ -119,6 +119,15 @@ server {
   ssl_certificate /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn_bundle.crt;
   ssl_certificate_key /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn.key;
 
+  # 小程序 web-view EPUB 阅读器（须写在 location / 之前）
+  location ^~ /epub-viewer/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:9226;
+  }
+
   location / {
     root  /usr/local/nginx/dnhyxc-ai/dist;
     index   index.html  index.htm;
@@ -130,8 +139,8 @@ server {
     proxy_set_header  X-Real-IP $remote_addr;
     proxy_set_header  REMOTE-HOST $remote_addr;
     proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header  X-Forwarded-Proto $scheme;  # 添加这一行
-    proxy_pass  https://172.17.0.1:9112;
+    proxy_set_header  X-Forwarded-Proto $scheme;
+    proxy_pass  http://127.0.0.1:9226;
   }
 
   # 附件静态资源：仅反代到 Nest（useStaticAssets 挂载 uploads 根目录）
@@ -164,6 +173,10 @@ server {
 
 # ---------------- 生产推荐：HTTPS 终止 TLS，固定端口 9112 ----------------
 #
+# 注意：微信小程序 web-view / wx.request 的合法域名不支持端口号。
+# 小程序实际访问的是 https://dnhyxc.cn/epub-viewer/（443），不是 :9112。
+# 443（或 9002）的 server 块也必须配置 ^~ /epub-viewer/ 反代，见上方 9002 示例。
+#
 # 目标：
 # - 让外部访问 `https://dnhyxc.cn:9112/api/...` 命中后端 NestJS 路由
 # - TLS 由 Nginx 负责（终止 TLS），后端服务继续跑 HTTP
@@ -183,6 +196,16 @@ server {
   # 证书配置：示例沿用本机证书目录（按实际证书路径调整）
   ssl_certificate /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn_bundle.crt;
   ssl_certificate_key /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn.key;
+
+  # 小程序 web-view EPUB 阅读器（Nest 9226 静态托管 uploads/epub-viewer）
+  # 必须 ^~ 且写在 location / 之前，否则 try_files 会回落到 SPA 出现 404
+  location ^~ /epub-viewer/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass http://127.0.0.1:9226;
+  }
 
   # 前端静态资源（可选）：若你不希望 9112 承载前端，可删除该 location，只保留 /api/ 反代
   location / {

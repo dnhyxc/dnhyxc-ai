@@ -1,0 +1,55 @@
+{
+	"pages": [
+		{
+			"path": "pages/shelf/index",
+			"style": {
+				"navigationBarTitleText": "我的书架",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/reader/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "阅读器"
+			}
+		},
+		{
+			"path": "pages/profile/index",
+			"style": {
+				"navigationBarTitleText": "我的",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "电子书",
+		"navigationBarBackgroundColor": "#ffffff",
+		"backgroundColor": "#f8f8f8",
+		"backgroundColorTop": "#f8f8f8",
+		"backgroundColorBottom": "#f8f8f8"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#5470c6",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "white",
+		"list": [
+			{
+				"pagePath": "pages/shelf/index",
+				"text": "书架",
+				"iconPath": "static/icons/shelf.png",
+				"selectedIconPath": "static/icons/shelf-active.png"
+			},
+			{
+				"pagePath": "pages/profile/index",
+				"text": "我的",
+				"iconPath": "static/icons/profile.png",
+				"selectedIconPath": "static/icons/profile-active.png"
+			}
+		]
+	}
+}

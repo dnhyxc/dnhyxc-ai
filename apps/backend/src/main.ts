@@ -10,7 +10,7 @@ import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AllExceptionFilter } from './filters/all-exception-filter';
 import { serveUploadStaticMiddleware } from './middleware/serve-upload-static.middleware';
-import { getUploadsRoot } from './utils/upload-paths';
+import { getEpubViewerDir, getUploadsRoot } from './utils/upload-paths';
 
 async function bootstrap() {
 	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -27,6 +27,13 @@ async function bootstrap() {
 	const uploadsRoot = getUploadsRoot(__dirname);
 	// 须在 globalPrefix 之前：直接处理 /images、/files（解码中文文件名）
 	app.use(serveUploadStaticMiddleware(uploadsRoot));
+
+	// 小程序 web-view EPUB 阅读页（须在 setGlobalPrefix 之前注册）
+	const epubViewerRoot = getEpubViewerDir(__dirname);
+	app.useStaticAssets(epubViewerRoot, {
+		prefix: '/epub-viewer/',
+		index: 'index.html',
+	});
 
 	// 设置全局前缀为 api
 	app.setGlobalPrefix('api');

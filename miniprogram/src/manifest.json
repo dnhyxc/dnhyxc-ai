@@ -1,0 +1,27 @@
+{
+	"name": "电子书阅读器",
+	"appid": "__UNI__EBOOK",
+	"description": "微信小程序电子书阅读器",
+	"versionName": "1.0.0",
+	"versionCode": "100",
+	"transformPx": false,
+	"h5": {
+		"title": "电子书阅读器",
+		"router": {
+			"mode": "hash",
+			"base": "./"
+		},
+		"optimization": {
+			"treeShaking": {
+				"enable": true
+			}
+		}
+	},
+	"mp-weixin": {
+		"appid": "",
+		"setting": {
+			"urlCheck": false
+		},
+		"usingComponents": true
+	}
+}

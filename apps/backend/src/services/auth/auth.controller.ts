@@ -19,6 +19,7 @@ import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
+import { WechatLoginDto } from './dto/wechat-login.dto';
 
 @Controller('auth')
 // 使用 ClassSerializerInterceptor 拦截器 将 entry.ts 中通过 Exclude() 注解的属性过滤掉
@@ -35,6 +36,11 @@ export class AuthController {
 	@Post('/loginByEmail')
 	async loginByEmail(@Body() dto: LoginByEmailDTO) {
 		return await this.authService.loginByEmail(dto);
+	}
+
+	@Post('/wechat/login')
+	async loginByWechat(@Body() dto: WechatLoginDto) {
+		return await this.authService.loginByWechat(dto);
 	}
 
 	@Post('/register')

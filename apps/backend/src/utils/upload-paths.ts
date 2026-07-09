@@ -96,6 +96,11 @@ export function getEbookFilesDir(fromDirname: string = __dirname): string {
 	return join(getUploadsRoot(fromDirname), 'ebooks');
 }
 
+/** 小程序 web-view EPUB 阅读器静态资源（与 multer 同 uploads 根） */
+export function getEpubViewerDir(fromDirname: string = __dirname): string {
+	return join(getUploadsRoot(fromDirname), 'epub-viewer');
+}
+
 export function ensureUploadDir(dir: string): void {
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
