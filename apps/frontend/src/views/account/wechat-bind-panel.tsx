@@ -1,0 +1,169 @@
+import { Button } from '@ui/button';
+import { Toast } from '@ui/sonner';
+import { CheckCircle, Copy } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/hooks';
+import {
+	createWechatLinkCode,
+	fetchWechatStatus,
+	unbindWechat,
+	type WechatStatus,
+} from '@/service';
+import { copyToClipboard } from '@/utils/clipboard';
+
+export default function WechatBindPanel() {
+	const { t } = useI18n();
+	const [status, setStatus] = useState<WechatStatus>({ bound: false });
+	const [linkCode, setLinkCode] = useState('');
+	const [expiresIn, setExpiresIn] = useState(0);
+	const [loading, setLoading] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const loadStatus = useCallback(async () => {
+		try {
+			const res = await fetchWechatStatus();
+			if (res.success && res.data) {
+				setStatus(res.data);
+				if (res.data.bound) {
+					setLinkCode('');
+					setExpiresIn(0);
+				}
+			} else {
+				setStatus({ bound: false });
+			}
+		} catch {
+			setStatus({ bound: false });
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadStatus();
+	}, [loadStatus]);
+
+	useEffect(() => {
+		setCopied(false);
+		if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+	}, [linkCode]);
+
+	useEffect(() => {
+		return () => {
+			if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+		};
+	}, []);
+
+	async function onCreateCode() {
+		setLoading(true);
+		try {
+			const res = await createWechatLinkCode();
+			if (!res.success || !res.data?.link_code) {
+				Toast({ type: 'error', title: t('account.wechat.codeFailed') });
+				return;
+			}
+			setLinkCode(res.data.link_code);
+			setExpiresIn(res.data.expires_in);
+			Toast({ type: 'success', title: t('account.wechat.codeCreated') });
+		} catch {
+			// API 错误 Toast 由 http 层统一弹出（如「当前账号已关联微信」）
+			await loadStatus();
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	async function onCopyCode() {
+		if (!linkCode) return;
+		try {
+			await copyToClipboard(linkCode);
+			setCopied(true);
+			if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+			copyTimerRef.current = setTimeout(() => setCopied(false), 1600);
+		} catch {
+			Toast({ type: 'error', title: t('account.wechat.codeCopyFailed') });
+		}
+	}
+
+	async function onUnbind() {
+		setLoading(true);
+		try {
+			await unbindWechat();
+			setLinkCode('');
+			setExpiresIn(0);
+			await loadStatus();
+			Toast({ type: 'success', title: t('account.wechat.unbindSuccess') });
+		} catch (err) {
+			Toast({
+				type: 'error',
+				title:
+					err instanceof Error ? err.message : t('account.wechat.unbindFailed'),
+			});
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	return (
+		<div className="mt-8 pt-8 pb-4 border-t border-theme-border w-full max-w-xl">
+			<div className="text-md font-semibold mb-3">
+				{t('account.wechat.title')}
+			</div>
+			<p className="text-sm text-theme-auxiliary mb-3 max-w-xl">
+				{t('account.wechat.hint')}
+			</p>
+
+			{status.bound ? (
+				<div className="flex flex-col gap-4">
+					<span className="text-sm pt-0.5">
+						{t('account.wechat.bound', { id: status.openidMasked ?? '—' })}
+					</span>
+					<Button
+						variant="outline"
+						className="w-fit cursor-pointer"
+						disabled={loading}
+						onClick={() => void onUnbind()}
+					>
+						{t('account.wechat.unbind')}
+					</Button>
+				</div>
+			) : (
+				<div className="flex flex-col gap-2">
+					{linkCode ? (
+						<div className="rounded-md bg-theme-secondary pt-0.5 inline-block">
+							<div className="text-xs text-theme/60">
+								{t('account.wechat.codeLabel', { seconds: expiresIn })}
+							</div>
+							<div className="inline-flex items-center gap-2">
+								<div className="text-3xl font-mono tracking-widest">
+									{linkCode}
+								</div>
+								<button
+									type="button"
+									className="text-theme-auxiliary hover:text-theme cursor-pointer"
+									aria-label={
+										copied ? t('account.wechat.codeCopied') : t('common.copy')
+									}
+									onClick={() => void onCopyCode()}
+								>
+									{copied ? (
+										<CheckCircle size={18} className="text-teal-500" />
+									) : (
+										<Copy size={18} />
+									)}
+								</button>
+							</div>
+						</div>
+					) : null}
+					<Button
+						className="w-fit cursor-pointer mt-1.5"
+						disabled={loading}
+						onClick={() => void onCreateCode()}
+					>
+						{linkCode
+							? t('account.wechat.refreshCode')
+							: t('account.wechat.createCode')}
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}

@@ -543,6 +543,21 @@ export const zhCN = {
 	'account.validation.emailInvalid': '请输入合法的邮箱地址',
 	'account.validation.verifyCode6Digits': '验证码必须为6位数字',
 
+	'account.wechat.title': '微信小程序',
+	'account.wechat.hint':
+		'生成 6 位关联码后，在读书小程序「绑定账号」页输入该码，即可与本 Web 账号合并。',
+	'account.wechat.createCode': '生成关联码',
+	'account.wechat.refreshCode': '刷新关联码',
+	'account.wechat.codeLabel': '请在 {seconds} 秒内在小程序输入',
+	'account.wechat.codeCreated': '关联码已生成',
+	'account.wechat.codeCopied': '关联码已复制',
+	'account.wechat.codeCopyFailed': '复制失败，请重试',
+	'account.wechat.codeFailed': '生成关联码失败',
+	'account.wechat.bound': '已关联微信 {id}',
+	'account.wechat.unbind': '解除关联',
+	'account.wechat.unbindSuccess': '已解除微信关联',
+	'account.wechat.unbindFailed': '解除关联失败',
+
 	'chat.newSession': '新对话',
 	'chat.sessionList.title': '历史对话',
 	'chat.sessionList.empty': '暂无历史对话',

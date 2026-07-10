@@ -14,6 +14,7 @@ import useStore from '@/store';
 import { type FileWithPreview } from '@/types';
 import { resolveCosUrlForWebDisplay } from '@/utils';
 import ResetEmailForm from './reset-email-form';
+import WechatBindPanel from './wechat-bind-panel';
 
 const Account = () => {
 	const { userStore } = useStore();
@@ -262,12 +263,58 @@ const Account = () => {
 		[accountInfo.avatar],
 	);
 
+	const renderInfoRow = (i: (typeof userInfos)[number]) => (
+		<div
+			key={i.key}
+			className="flex flex-col items-center mt-5 text-md font-semibold h-10"
+		>
+			{editKey !== i.key ? (
+				<div className="flex flex-1 w-full items-center gap-1 group">
+					<span className={locale === 'zh-CN' ? 'min-w-6' : 'min-w-18'}>
+						{i.label}
+					</span>
+					<span className="ml-10">{i.value}</span>
+					{i.icon || (
+						<SquarePen
+							size={18}
+							className="cursor-pointer text-transparent group-hover:text-theme"
+							onClick={() => setEdit(i.key)}
+						/>
+					)}
+				</div>
+			) : null}
+			{editKey === i.key ? (
+				<div className="flex flex-1 w-full items-center gap-1">
+					<span className="min-w-10 mr-10">{i.label}</span>
+					{i.component}
+					<Button
+						className="mx-2 cursor-pointer"
+						onClick={() => onSubmit(i.key)}
+					>
+						{t('common.confirm')}
+					</Button>
+					<Button
+						variant="outline"
+						className="cursor-pointer"
+						onClick={onCancel}
+					>
+						{t('common.cancel')}
+					</Button>
+				</div>
+			) : null}
+		</div>
+	);
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
-				<div className="bg-theme-background rounded-md">
-					<div className="h-45 flex items-center justify-between gap-3 relative">
-						<div className="absolute left-10 -bottom-10 p-2 rounded-md bg-theme-secondary box-border">
+			<ScrollArea className="w-full h-full overflow-y-auto p-5.5 rounded-none">
+				<div className="rounded-md relative">
+					<div
+						className="pointer-events-none absolute inset-x-0 top-0 z-0 h-45 rounded-md bg-theme-background"
+						aria-hidden
+					/>
+					<div className="relative z-10 flex h-45 items-center justify-between gap-3">
+						<div className="absolute left-10 -bottom-10 z-10 p-2 rounded-md bg-theme-secondary box-border">
 							<Upload
 								key={accountInfo.avatar}
 								t={t}
@@ -295,55 +342,10 @@ const Account = () => {
 								) : null}
 							</Upload>
 						</div>
-						<div className="flex-1 flex flex-col h-full pl-50 pt-5">
-							<div className="flex flex-col items-start mt-20 pl-10">
-								{userInfos.map((i) => {
-									return (
-										<div
-											key={i.key}
-											className="flex flex-col items-center mt-5 text-md font-semibold h-10"
-										>
-											{editKey !== i.key ? (
-												<div className="flex flex-1 w-full items-center gap-1 group">
-													<span
-														className={
-															locale === 'zh-CN' ? 'min-w-6' : 'min-w-18'
-														}
-													>
-														{i.label}
-													</span>
-													<span className="ml-10">{i.value}</span>
-													{i.icon || (
-														<SquarePen
-															size={18}
-															className="cursor-pointer text-transparent group-hover:text-theme"
-															onClick={() => setEdit(i.key)}
-														/>
-													)}
-												</div>
-											) : null}
-											{editKey === i.key ? (
-												<div className="flex flex-1 w-full items-center gap-1">
-													<span className="min-w-10 mr-10">{i.label}</span>
-													{i.component}
-													<Button
-														className="mx-2 cursor-pointer"
-														onClick={() => onSubmit(i.key)}
-													>
-														{t('common.confirm')}
-													</Button>
-													<Button
-														variant="outline"
-														className="cursor-pointer"
-														onClick={onCancel}
-													>
-														{t('common.cancel')}
-													</Button>
-												</div>
-											) : null}
-										</div>
-									);
-								})}
+						<div className="flex h-full flex-1 flex-col pl-50">
+							<div className="flex flex-col items-start mt-12 pl-10">
+								{userInfos.map(renderInfoRow)}
+								<WechatBindPanel />
 							</div>
 						</div>
 					</div>

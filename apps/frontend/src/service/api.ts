@@ -31,6 +31,13 @@ export const SEND_RESET_PWD_EMAIL = '/auth/sendResetPwdEmail';
 // 修改用户密码
 export const RESET_PASSWORD = '/auth/resetPassword';
 
+// 微信小程序登录与账号关联
+export const WECHAT_LOGIN = '/auth/wechat/login';
+export const WECHAT_BIND = '/auth/wechat/bind';
+export const WECHAT_LINK_CODE = '/auth/wechat/link-code';
+export const WECHAT_STATUS = '/auth/wechat/status';
+export const WECHAT_UNBIND = '/auth/wechat/unbind';
+
 // 上传文件到腾讯云 COS
 export const UPLOAD_COS = '/upload/uploadCos';
 /** 聊天附件批量上传 COS（前缀 chat/） */

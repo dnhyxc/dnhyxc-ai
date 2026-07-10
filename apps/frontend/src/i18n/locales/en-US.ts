@@ -585,6 +585,22 @@ export const enUS = {
 	'account.validation.emailInvalid': 'Please enter a valid email address.',
 	'account.validation.verifyCode6Digits': 'Verification code must be 6 digits.',
 
+	'account.wechat.title': 'WeChat Mini Program',
+	'account.wechat.hint':
+		'Generate a 6-digit link code, then enter it on the "Bind Account" page in the reading mini program to merge with this web account.',
+	'account.wechat.createCode': 'Generate link code',
+	'account.wechat.refreshCode': 'Refresh link code',
+	'account.wechat.codeLabel':
+		'Enter in the mini program within {seconds} seconds',
+	'account.wechat.codeCreated': 'Link code generated',
+	'account.wechat.codeCopied': 'Link code copied',
+	'account.wechat.codeCopyFailed': 'Copy failed, please try again',
+	'account.wechat.codeFailed': 'Failed to generate link code',
+	'account.wechat.bound': 'Linked to WeChat {id}',
+	'account.wechat.unbind': 'Unlink',
+	'account.wechat.unbindSuccess': 'WeChat unlinked',
+	'account.wechat.unbindFailed': 'Failed to unlink',
+
 	// 聊天会话文案
 	'chat.newSession': 'New chat',
 	'chat.sessionList.title': 'History',

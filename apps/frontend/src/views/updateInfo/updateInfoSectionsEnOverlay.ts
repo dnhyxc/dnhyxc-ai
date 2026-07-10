@@ -105,6 +105,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Global Tab navigation now jumps only between input fields (text inputs, textareas, select dropdowns, etc.) and skips buttons, links, and other non-input controls. Combine with Enter to submit forms—greatly speeds up login, register, and similar flows. Buttons and links still work normally with clicks.',
 	},
+	's2-12': {
+		title: 'WeChat Mini Program login & account linking',
+		description:
+			'New one-tap login via WeChat Mini Program—sign up and log in with your WeChat account, no need to type a username and password. You can also link an existing Web account: generate a 6-digit link code in the Web account settings, then enter it in the mini program. Bookshelf, reading progress, highlights, and thoughts all sync across both sides. You can unlink anytime from the Web side, and all WeChat-login sessions are immediately revoked.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

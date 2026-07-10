@@ -114,6 +114,9 @@ import {
 	UPLOAD_COS_CHAT_FILES,
 	UPLOAD_FILE,
 	UPLOAD_FILES,
+	WECHAT_LINK_CODE,
+	WECHAT_STATUS,
+	WECHAT_UNBIND,
 } from './api';
 
 export const login = async ({
@@ -150,6 +153,19 @@ export const loginByEmail = async ({
 		verifyCode: Number(verifyCode),
 	});
 };
+
+export type WechatStatus = {
+	bound: boolean;
+	openidMasked?: string;
+	lastLoginAt?: string;
+};
+
+export const fetchWechatStatus = () => http.get<WechatStatus>(WECHAT_STATUS);
+
+export const createWechatLinkCode = () =>
+	http.post<{ link_code: string; expires_in: number }>(WECHAT_LINK_CODE, {});
+
+export const unbindWechat = () => http.post(WECHAT_UNBIND, {});
 
 export const sendEmail = async (
 	email: string,
