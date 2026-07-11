@@ -9,12 +9,65 @@ import {
 	unbindWechat,
 	type WechatStatus,
 } from '@/service';
+import { userScopedStorageKey } from '@/store/loggedInUserId';
 import { copyToClipboard } from '@/utils/clipboard';
+
+const LINK_SESSION_KEY = 'wechat_link_code';
+
+type LinkSession = {
+	linkCode: string;
+	expiresAt: number;
+};
+
+function readLinkSession(): LinkSession | null {
+	if (typeof window === 'undefined') return null;
+	const raw = localStorage.getItem(userScopedStorageKey(LINK_SESSION_KEY));
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw) as LinkSession;
+		if (
+			typeof parsed.linkCode === 'string' &&
+			typeof parsed.expiresAt === 'number'
+		) {
+			return parsed;
+		}
+	} catch {
+		// ignore
+	}
+	return null;
+}
+
+function writeLinkSession(session: LinkSession) {
+	localStorage.setItem(
+		userScopedStorageKey(LINK_SESSION_KEY),
+		JSON.stringify(session),
+	);
+}
+
+function clearLinkSession() {
+	localStorage.removeItem(userScopedStorageKey(LINK_SESSION_KEY));
+}
+
+function remainingSeconds(expiresAt: number): number {
+	return Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+}
+
+function clearLinkState(
+	setLinkCode: (v: string) => void,
+	setExpiresAt: (v: number) => void,
+	setExpiresIn: (v: number) => void,
+) {
+	clearLinkSession();
+	setLinkCode('');
+	setExpiresAt(0);
+	setExpiresIn(0);
+}
 
 export default function WechatBindPanel() {
 	const { t } = useI18n();
 	const [status, setStatus] = useState<WechatStatus>({ bound: false });
 	const [linkCode, setLinkCode] = useState('');
+	const [expiresAt, setExpiresAt] = useState(0);
 	const [expiresIn, setExpiresIn] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const [copied, setCopied] = useState(false);
@@ -26,8 +79,7 @@ export default function WechatBindPanel() {
 			if (res.success && res.data) {
 				setStatus(res.data);
 				if (res.data.bound) {
-					setLinkCode('');
-					setExpiresIn(0);
+					clearLinkState(setLinkCode, setExpiresAt, setExpiresIn);
 				}
 			} else {
 				setStatus({ bound: false });
@@ -40,6 +92,33 @@ export default function WechatBindPanel() {
 	useEffect(() => {
 		void loadStatus();
 	}, [loadStatus]);
+
+	useEffect(() => {
+		const session = readLinkSession();
+		if (!session) return;
+		const left = remainingSeconds(session.expiresAt);
+		if (left <= 0) {
+			clearLinkSession();
+			return;
+		}
+		setLinkCode(session.linkCode);
+		setExpiresAt(session.expiresAt);
+		setExpiresIn(left);
+	}, []);
+
+	useEffect(() => {
+		if (!linkCode || !expiresAt) return;
+		const tick = () => {
+			const left = remainingSeconds(expiresAt);
+			setExpiresIn(left);
+			if (left <= 0) {
+				clearLinkState(setLinkCode, setExpiresAt, setExpiresIn);
+			}
+		};
+		tick();
+		const id = setInterval(tick, 1000);
+		return () => clearInterval(id);
+	}, [linkCode, expiresAt]);
 
 	useEffect(() => {
 		setCopied(false);
@@ -60,8 +139,11 @@ export default function WechatBindPanel() {
 				Toast({ type: 'error', title: t('account.wechat.codeFailed') });
 				return;
 			}
+			const at = Date.now() + res.data.expires_in * 1000;
 			setLinkCode(res.data.link_code);
+			setExpiresAt(at);
 			setExpiresIn(res.data.expires_in);
+			writeLinkSession({ linkCode: res.data.link_code, expiresAt: at });
 			Toast({ type: 'success', title: t('account.wechat.codeCreated') });
 		} catch {
 			// API 错误 Toast 由 http 层统一弹出（如「当前账号已关联微信」）
@@ -87,8 +169,7 @@ export default function WechatBindPanel() {
 		setLoading(true);
 		try {
 			await unbindWechat();
-			setLinkCode('');
-			setExpiresIn(0);
+			clearLinkState(setLinkCode, setExpiresAt, setExpiresIn);
 			await loadStatus();
 			Toast({ type: 'success', title: t('account.wechat.unbindSuccess') });
 		} catch (err) {
