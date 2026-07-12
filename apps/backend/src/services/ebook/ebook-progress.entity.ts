@@ -24,6 +24,20 @@ export class EbookProgress {
 	@Column({ type: 'float', nullable: true })
 	percent: number | null;
 
+	@Column({ type: 'int', name: 'chapter_index', nullable: true })
+	chapterIndex: number | null;
+
+	@Column({
+		type: 'varchar',
+		length: 512,
+		name: 'chapter_href',
+		nullable: true,
+	})
+	chapterHref: string | null;
+
+	@Column({ type: 'float', name: 'scroll_percent', nullable: true })
+	scrollPercent: number | null;
+
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt: Date;
 }

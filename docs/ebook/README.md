@@ -18,6 +18,8 @@
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)                 | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`）                                                                                |
 | [ebook-shelf-category.md](./ebook-shelf-category.md)                             | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类）                                                    |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
+| [miniprogram-epub-server-parse.md](./miniprogram-epub-server-parse.md)           | **主文档（本轮）**：小程序 EPUB 服务端章节解析（BullMQ 队列、`chapters`/`chapter` API、`waitForParse` 早退与 jobId 修复）                          |
+| [ebook-cos-object-key-resolve.md](./ebook-cos-object-key-resolve.md)             | **增量**：COS 对象键解析（历史中文键兼容）、`objectExists`、`uploadEbookAssetBuffer` 章节图片外链                                                  |
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md)                           | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触                                                                                        |
 | [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（全功能总手册 + 听读 + 想法 + 用户划线）                                                                                    |
 | [developer/epub-all-features-dev.md](./developer/epub-all-features-dev.md) | **唯一全功能总手册**：渲染生命周期 + 划线 + 想法 + 阅读设置 + 章节听读 + 引用听读 + 公开想法增量同步 + 跨功能互斥 + 复用清单（M1–M8、11 个源码符号逐行注释） |

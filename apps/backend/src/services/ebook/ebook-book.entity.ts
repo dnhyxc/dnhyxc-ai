@@ -60,6 +60,21 @@ export class EbookBook {
 	@Column({ name: 'public_at', type: 'timestamp', nullable: true })
 	publicAt: Date | null;
 
+	@Column({
+		type: 'varchar',
+		length: 16,
+		name: 'parse_status',
+		nullable: true,
+		default: 'pending',
+	})
+	parseStatus: 'pending' | 'ready' | 'failed' | null;
+
+	@Column({ type: 'int', name: 'total_word_count', nullable: true, default: 0 })
+	totalWordCount: number | null;
+
+	@Column({ type: 'int', name: 'parse_attempt', default: 0 })
+	parseAttempt: number;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

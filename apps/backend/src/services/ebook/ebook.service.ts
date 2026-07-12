@@ -1,13 +1,16 @@
-import { unlink } from 'node:fs';
+import { existsSync, readFile, unlink } from 'node:fs';
 import { promisify } from 'node:util';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
 	Injectable,
+	Logger,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { Queue } from 'bullmq';
 import type { Response } from 'express';
 import { Brackets, In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
@@ -30,9 +33,13 @@ import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookBook } from './ebook-book.entity';
 import { EbookCategory } from './ebook-category.entity';
+import { EbookChapter } from './ebook-chapter.entity';
 import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
+import { EpubChapterParserService } from './epub-chapter-parser.service';
+import { EPUB_PARSE_QUEUE } from './epub-parse.constants';
+import { EpubParseQueueEvents } from './epub-parse-queue-events';
 
 export type EbookBookOwnerDto = {
 	userId: number;
@@ -55,6 +62,8 @@ export type EbookBookDto = {
 	owner?: EbookBookOwnerDto;
 	/** 公开书架：当前用户已有读书记录时的 id */
 	readingBookId?: string;
+	parseStatus?: 'pending' | 'ready' | 'failed';
+	totalWordCount?: number;
 };
 
 export type EbookCategoryDto = {
@@ -75,7 +84,38 @@ export type EbookProgDto = {
 	epubCfi?: string;
 	pdfPage?: number;
 	percent?: number;
+	chapterIndex?: number;
+	chapterHref?: string;
+	scrollPercent?: number;
 	updatedAt: string;
+};
+
+export type EbookChapterMetaDto = {
+	index: number;
+	href: string;
+	title: string;
+	level: number;
+	wordCount?: number;
+};
+
+export type EbookChaptersDto = {
+	bookId: string;
+	title: string;
+	total: number;
+	totalWordCount?: number;
+	chapters: EbookChapterMetaDto[];
+};
+
+export type EbookChapterContentDto = {
+	bookId: string;
+	index: number;
+	title: string;
+	html: string;
+	wordCount?: number;
+	totalWordCount?: number;
+	prevIndex: number | null;
+	nextIndex: number | null;
+	total: number;
 };
 
 export type EbookShelfPageDto = {
@@ -146,6 +186,7 @@ export type EbookFilePayload =
 	| { kind: 'cos'; key: string; fmt: 'epub' | 'pdf' };
 
 const unlinkAsync = promisify(unlink);
+const readFileAsync = promisify(readFile);
 
 function titleFromPath(path: string): string {
 	const name = path.split(/[/\\]/).pop() ?? path;
@@ -173,9 +214,17 @@ const DEFAULT_CATEGORY_NAMES: Record<'zh-CN' | 'en-US', string[]> = {
 
 @Injectable()
 export class EbookService {
+	private readonly logger = new Logger(EbookService.name);
+
+	/** ponytail: 大 EPUB 解析可达 60s+，请求侧等待而非立刻 409 */
+	private static readonly PARSE_WAIT_MS = 120_000;
+	private static readonly MAX_PARSE_ATTEMPTS = 3;
+
 	constructor(
 		@InjectRepository(EbookBook)
 		private readonly bookRepo: Repository<EbookBook>,
+		@InjectRepository(EbookChapter)
+		private readonly chapterRepo: Repository<EbookChapter>,
 		@InjectRepository(EbookProgress)
 		private readonly progRepo: Repository<EbookProgress>,
 		@InjectRepository(EbookCategory)
@@ -188,6 +237,10 @@ export class EbookService {
 		private readonly userRepo: Repository<User>,
 		private readonly uploadService: UploadService,
 		private readonly userService: UserService,
+		private readonly epubChapterParser: EpubChapterParserService,
+		@InjectQueue(EPUB_PARSE_QUEUE)
+		private readonly epubParseQueue: Queue,
+		private readonly epubParseQueueEvents: EpubParseQueueEvents,
 	) {}
 
 	private toBookDto(book: EbookBook): EbookBookDto {
@@ -216,6 +269,10 @@ export class EbookService {
 		else dto.categoryId = null;
 		if (book.isPublic) dto.isPublic = true;
 		if (book.sourceBookId) dto.sourceBookId = book.sourceBookId;
+		if (book.parseStatus) dto.parseStatus = book.parseStatus;
+		if (book.totalWordCount != null && book.totalWordCount > 0) {
+			dto.totalWordCount = book.totalWordCount;
+		}
 		return dto;
 	}
 
@@ -243,6 +300,9 @@ export class EbookService {
 		if (prog.epubCfi) dto.epubCfi = prog.epubCfi;
 		if (prog.pdfPage != null) dto.pdfPage = prog.pdfPage;
 		if (prog.percent != null) dto.percent = prog.percent;
+		if (prog.chapterIndex != null) dto.chapterIndex = prog.chapterIndex;
+		if (prog.chapterHref) dto.chapterHref = prog.chapterHref;
+		if (prog.scrollPercent != null) dto.scrollPercent = prog.scrollPercent;
 		return dto;
 	}
 
@@ -402,6 +462,10 @@ export class EbookService {
 				where: { id: book.sourceBookId },
 			});
 			if (source) {
+				if (source.parseStatus) detail.book.parseStatus = source.parseStatus;
+				if (source.totalWordCount != null && source.totalWordCount > 0) {
+					detail.book.totalWordCount = source.totalWordCount;
+				}
 				const ownerMap = await this.buildUserInfoMap([source.userId]);
 				const owner = ownerMap.get(source.userId) ?? {
 					username: String(source.userId),
@@ -585,6 +649,8 @@ export class EbookService {
 			book.srcKind = 'store';
 			book.size = String(stored.size);
 			await this.bookRepo.save(book);
+			if (fmt === 'epub')
+				void this.markEpubParsePending(book.id, { resetAttempts: true });
 			return this.toBookDto(book);
 		}
 
@@ -604,6 +670,8 @@ export class EbookService {
 			categoryId,
 		});
 		await this.bookRepo.save(book);
+		if (fmt === 'epub')
+			void this.markEpubParsePending(book.id, { resetAttempts: true });
 		return this.toBookDto(book);
 	}
 
@@ -640,6 +708,9 @@ export class EbookService {
 		await this.thoughtRepo.delete({ bookId, userId });
 		await this.highlightRepo.delete({ bookId, userId });
 		await this.progRepo.delete({ bookId, userId });
+		if (!book.sourceBookId) {
+			await this.chapterRepo.delete({ bookId });
+		}
 		await this.bookRepo.delete({ id: bookId, userId });
 	}
 
@@ -729,6 +800,9 @@ export class EbookService {
 		prog.epubCfi = dto.epubCfi ?? prog.epubCfi;
 		prog.pdfPage = dto.pdfPage ?? prog.pdfPage;
 		prog.percent = dto.percent ?? prog.percent;
+		if (dto.chapterIndex != null) prog.chapterIndex = dto.chapterIndex;
+		if (dto.chapterHref != null) prog.chapterHref = dto.chapterHref;
+		if (dto.scrollPercent != null) prog.scrollPercent = dto.scrollPercent;
 		await this.progRepo.save(prog);
 		return this.toProgDto(prog);
 	}
@@ -1504,5 +1578,386 @@ export class EbookService {
 			throw new NotFoundException('划线不存在');
 		}
 		await this.highlightRepo.delete({ id: highlightId, userId });
+	}
+
+	async getChapters(userId: number, bookId: string): Promise<EbookChaptersDto> {
+		const { book, contentBook } = await this.resolveContentBook(userId, bookId);
+		this.assertEpubSourceAvailable(contentBook);
+		await this.ensureEpubParseScheduled(contentBook);
+		await this.waitForParse(contentBook.id);
+		const freshContent = await this.bookRepo.findOne({
+			where: { id: contentBook.id },
+		});
+		if (!freshContent) {
+			throw new NotFoundException('书籍不存在');
+		}
+		await this.assertEpubChaptersReady(freshContent);
+
+		const rows = await this.chapterRepo.find({
+			where: { bookId: freshContent.id },
+			order: { chapterIndex: 'ASC' },
+		});
+		const totalWordCount =
+			freshContent.totalWordCount ??
+			rows.reduce((sum, row) => sum + row.wordCount, 0);
+
+		return {
+			bookId: book.id,
+			title: book.title,
+			total: rows.length,
+			totalWordCount: totalWordCount || undefined,
+			chapters: rows.map((row) => ({
+				index: row.chapterIndex,
+				href: row.href,
+				title: row.title,
+				level: row.level,
+				wordCount: row.wordCount || undefined,
+			})),
+		};
+	}
+
+	async getChapter(
+		userId: number,
+		bookId: string,
+		index: number,
+	): Promise<EbookChapterContentDto> {
+		const { book, contentBook } = await this.resolveContentBook(userId, bookId);
+		this.assertEpubSourceAvailable(contentBook);
+		await this.ensureEpubParseScheduled(contentBook);
+		await this.waitForParse(contentBook.id);
+		const freshContent = await this.bookRepo.findOne({
+			where: { id: contentBook.id },
+		});
+		if (!freshContent) {
+			throw new NotFoundException('书籍不存在');
+		}
+		await this.assertEpubChaptersReady(freshContent);
+
+		const row = await this.chapterRepo.findOne({
+			where: { bookId: freshContent.id, chapterIndex: index },
+		});
+		if (!row) {
+			throw new NotFoundException('章节不存在');
+		}
+
+		const total = await this.chapterRepo.count({
+			where: { bookId: freshContent.id },
+		});
+		const totalWordCount = freshContent.totalWordCount ?? undefined;
+
+		return {
+			bookId: book.id,
+			index: row.chapterIndex,
+			title: row.title,
+			html: row.html,
+			wordCount: row.wordCount || undefined,
+			totalWordCount,
+			prevIndex: index > 0 ? index - 1 : null,
+			nextIndex: index < total - 1 ? index + 1 : null,
+			total,
+		};
+	}
+
+	private async resolveContentBook(
+		userId: number,
+		bookId: string,
+	): Promise<{ book: EbookBook; contentBook: EbookBook }> {
+		const book = await this.assertBookOwned(userId, bookId);
+		if (!book.sourceBookId) {
+			return { book, contentBook: book };
+		}
+		const source = await this.bookRepo.findOne({
+			where: { id: book.sourceBookId },
+		});
+		if (!source) {
+			throw new NotFoundException('源书不存在');
+		}
+		return { book, contentBook: source };
+	}
+
+	private canParseEpubSource(book: EbookBook): boolean {
+		if (book.fmt !== 'epub') return false;
+		if (book.filePath && isCosEbookKey(book.filePath)) return true;
+		const local = book.localPath?.trim();
+		return !!(local && existsSync(local));
+	}
+
+	private assertEpubSourceAvailable(book: EbookBook): void {
+		if (book.fmt !== 'epub') {
+			throw new BadRequestException('仅支持 EPUB 章节');
+		}
+		if (this.canParseEpubSource(book)) return;
+		throw new BadRequestException(
+			book.srcKind === 'path'
+				? '该书尚未上传云端，请在桌面端上传至云端后再阅读'
+				: '云端文件不存在，请重新上传',
+		);
+	}
+
+	private async resolveEpubBuffer(book: EbookBook): Promise<Buffer> {
+		if (book.filePath && isCosEbookKey(book.filePath)) {
+			const key = await this.uploadService.resolveCosObjectKey(book.filePath);
+			return this.uploadService.getObjectBuffer(key);
+		}
+		const local = book.localPath?.trim();
+		if (local && existsSync(local)) {
+			return readFileAsync(local);
+		}
+		throw new BadRequestException('EPUB 文件不可用');
+	}
+
+	private async ensureEpubParseScheduled(
+		contentBook: EbookBook,
+	): Promise<void> {
+		if (!this.canParseEpubSource(contentBook)) return;
+
+		const chapterCount = await this.chapterRepo.count({
+			where: { bookId: contentBook.id },
+		});
+		if (contentBook.parseStatus === 'ready' && chapterCount > 0) return;
+
+		if (contentBook.parseStatus === 'failed') return;
+		if (this.isParseAttemptExhausted(contentBook)) {
+			await this.markEpubParseFailed(contentBook.id);
+			return;
+		}
+
+		if (contentBook.parseStatus === 'pending' && chapterCount === 0) {
+			await this.startParseTask(contentBook.id);
+			return;
+		}
+
+		if (await this.isParseJobActive(contentBook.id)) return;
+		await this.markEpubParsePending(contentBook.id);
+	}
+
+	private epubParseJobId(bookId: string): string {
+		return `epub-parse-${bookId}`;
+	}
+
+	private async isParseJobActive(bookId: string): Promise<boolean> {
+		const job = await this.epubParseQueue.getJob(this.epubParseJobId(bookId));
+		if (!job) return false;
+		const state = await job.getState();
+		return state === 'active' || state === 'waiting' || state === 'delayed';
+	}
+
+	/** BullMQ worker 入口：waitThenParse → runEpubParse */
+	async processEpubParseJob(bookId: string): Promise<void> {
+		await this.waitThenParse(bookId);
+	}
+
+	private isParseAttemptExhausted(book: EbookBook): boolean {
+		return (book.parseAttempt ?? 0) >= EbookService.MAX_PARSE_ATTEMPTS;
+	}
+
+	private async startParseTask(bookId: string): Promise<void> {
+		const jobId = this.epubParseJobId(bookId);
+		const existing = await this.epubParseQueue.getJob(jobId);
+		if (existing) {
+			const state = await existing.getState();
+			if (state === 'active' || state === 'waiting' || state === 'delayed') {
+				return;
+			}
+			// ponytail: failed/completed 占着 jobId 时 add 会静默失败，先移除再入队
+			if (state === 'failed' || state === 'completed') {
+				await existing.remove();
+			}
+		}
+
+		try {
+			await this.epubParseQueue.add(
+				'parse',
+				{ bookId },
+				{
+					jobId,
+					attempts: 1,
+					removeOnComplete: true,
+					removeOnFail: { count: 50 },
+				},
+			);
+		} catch (err) {
+			this.logger.warn(`EPUB 解析入队失败 book=${bookId}`, err);
+		}
+	}
+
+	private async waitForParse(bookId: string): Promise<void> {
+		const book = await this.bookRepo.findOne({
+			where: { id: bookId },
+			select: ['id', 'parseStatus'],
+		});
+		if (book?.parseStatus === 'ready') return;
+
+		const jobId = this.epubParseJobId(bookId);
+		let job = await this.epubParseQueue.getJob(jobId);
+		// ponytail: 仅 pending 且 job 尚未可见时轮询；ready 后 job 已 removeOnComplete，不可空转 1s
+		if (!job && book?.parseStatus === 'pending') {
+			for (let i = 0; i < 10; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				job = await this.epubParseQueue.getJob(jobId);
+				if (job) break;
+			}
+		}
+		if (!job) return;
+
+		const state = await job.getState();
+		if (state === 'completed' || state === 'failed') return;
+
+		try {
+			const timeout = new Promise<void>((_, reject) =>
+				setTimeout(
+					() => reject(new Error('EPUB parse wait timeout')),
+					EbookService.PARSE_WAIT_MS,
+				),
+			);
+			await Promise.race([
+				job.waitUntilFinished(this.epubParseQueueEvents.events),
+				timeout,
+			]);
+		} catch {
+			// 超时或失败由 assertEpubChaptersReady 返回 409
+		}
+	}
+
+	private async assertEpubChaptersReady(contentBook: EbookBook): Promise<void> {
+		if (contentBook.parseStatus === 'failed') {
+			throw new ConflictException('章节解析失败，请重新上传');
+		}
+		if (contentBook.parseStatus !== 'ready') {
+			throw new ConflictException('章节正在解析中');
+		}
+		const count = await this.chapterRepo.count({
+			where: { bookId: contentBook.id },
+		});
+		if (count === 0) {
+			throw new ConflictException('章节正在解析中');
+		}
+	}
+
+	async markEpubParsePending(
+		bookId: string,
+		opts?: { resetAttempts?: boolean },
+	): Promise<void> {
+		if (await this.isParseJobActive(bookId)) return;
+
+		const book = await this.bookRepo.findOne({ where: { id: bookId } });
+		if (!book) return;
+
+		const nextAttempt = opts?.resetAttempts ? 1 : (book.parseAttempt ?? 0) + 1;
+		if (nextAttempt > EbookService.MAX_PARSE_ATTEMPTS) {
+			await this.markEpubParseFailed(bookId);
+			return;
+		}
+
+		await this.bookRepo.update(
+			{ id: bookId },
+			{ parseStatus: 'pending', parseAttempt: nextAttempt },
+		);
+		await this.chapterRepo.delete({ bookId });
+		await this.startParseTask(bookId);
+	}
+
+	private async waitThenParse(bookId: string): Promise<void> {
+		const book = await this.bookRepo.findOne({ where: { id: bookId } });
+		if (!book || !this.canParseEpubSource(book)) {
+			await this.markEpubParseFailed(bookId);
+			return;
+		}
+
+		const local = book.localPath?.trim();
+		if (
+			(!book.filePath || !isCosEbookKey(book.filePath)) &&
+			local &&
+			existsSync(local)
+		) {
+			await this.runEpubParse(bookId);
+			return;
+		}
+
+		for (let attempt = 0; attempt < 10; attempt++) {
+			const latest = await this.bookRepo.findOne({ where: { id: bookId } });
+			if (!latest?.filePath) {
+				await this.markEpubParseFailed(bookId);
+				return;
+			}
+			try {
+				const key = await this.uploadService.resolveCosObjectKey(
+					latest.filePath,
+				);
+				if (await this.uploadService.objectExists(key)) {
+					if (key !== latest.filePath) {
+						latest.filePath = key;
+						await this.bookRepo.save(latest);
+					}
+					await this.runEpubParse(bookId);
+					return;
+				}
+			} catch (err) {
+				this.logger.warn(
+					`等待 COS 文件 book=${bookId} attempt=${attempt}`,
+					err,
+				);
+			}
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		}
+		await this.markEpubParseFailed(bookId);
+	}
+
+	private async markEpubParseFailed(bookId: string): Promise<void> {
+		await this.bookRepo.update({ id: bookId }, { parseStatus: 'failed' });
+	}
+
+	private async runEpubParse(bookId: string): Promise<void> {
+		const book = await this.bookRepo.findOne({ where: { id: bookId } });
+		if (!book || book.fmt !== 'epub' || !this.canParseEpubSource(book)) {
+			await this.markEpubParseFailed(bookId);
+			return;
+		}
+
+		try {
+			const buffer = await this.resolveEpubBuffer(book);
+			const chapters = await this.epubChapterParser.parseEpubBuffer(
+				buffer,
+				bookId,
+			);
+
+			if (chapters.length === 0) {
+				throw new Error('未能解析出章节正文');
+			}
+
+			await this.chapterRepo.delete({ bookId });
+			await this.chapterRepo.save(
+				chapters.map((chapter) =>
+					this.chapterRepo.create({
+						bookId,
+						chapterIndex: chapter.index,
+						href: chapter.href,
+						title: chapter.title,
+						level: chapter.level,
+						html: chapter.html,
+						wordCount: chapter.wordCount,
+					}),
+				),
+			);
+
+			const totalWordCount = chapters.reduce(
+				(sum, chapter) => sum + chapter.wordCount,
+				0,
+			);
+			book.parseStatus = 'ready';
+			book.totalWordCount = totalWordCount;
+			book.parseAttempt = 0;
+			if (book.filePath && isCosEbookKey(book.filePath)) {
+				const key = await this.uploadService.resolveCosObjectKey(book.filePath);
+				if (key !== book.filePath) book.filePath = key;
+			}
+			await this.bookRepo.save(book);
+			this.logger.log(
+				`EPUB 解析完成 book=${bookId} chapters=${chapters.length}`,
+			);
+		} catch (err) {
+			this.logger.error(`EPUB 解析失败 book=${bookId}`, err);
+			await this.markEpubParseFailed(bookId);
+		}
 	}
 }

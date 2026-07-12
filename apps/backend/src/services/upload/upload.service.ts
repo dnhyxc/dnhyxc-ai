@@ -50,6 +50,11 @@ export class UploadService {
 		originalname: string,
 		prefix: CosObjectKeyPrefix = 'assets',
 	): string {
+		if (prefix === 'ebooks') {
+			const ext = extname(decodeChineseFilename(originalname)).toLowerCase();
+			const safeExt = ['.epub', '.pdf'].includes(ext) ? ext : '.bin';
+			return `${prefix}/${randomUUID()}${safeExt}`;
+		}
 		const safeName = basename(decodeChineseFilename(originalname)).replace(
 			/[/\\]/g,
 			'_',
@@ -153,9 +158,91 @@ export class UploadService {
 		}
 	}
 
+	async objectExists(key: string): Promise<boolean> {
+		const normalizedKey = this.normalizeCosObjectKey(key);
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const cos = this.getCosClient();
+		try {
+			await cos.headObject({
+				Bucket: config.bucket,
+				Region: config.region,
+				Key: normalizedKey,
+			});
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	/** ponytail: 按 ebooks/{uuid} 前缀列举，修复历史中文文件名键 */
+	async resolveCosObjectKey(storedKey: string): Promise<string> {
+		const key = storedKey?.replace(/^\//, '').trim();
+		if (!key || !isCosObjectKey(key)) {
+			throw new HttpException('无效的 COS 对象键', HttpStatus.BAD_REQUEST);
+		}
+		if (await this.objectExists(key)) return key;
+
+		const uuidMatch = key.match(
+			/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+		);
+		if (!uuidMatch) return key;
+
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const cos = this.getCosClient();
+		const prefix = `ebooks/${uuidMatch[1]}`;
+		const result = await cos.getBucket({
+			Bucket: config.bucket,
+			Region: config.region,
+			Prefix: prefix,
+			MaxKeys: 20,
+		});
+		const objects = (result.Contents ?? []).filter(
+			(item) => item.Key && !item.Key.endsWith('/'),
+		);
+		if (objects.length === 1) return objects[0].Key!;
+		const epub = objects.find((item) =>
+			item.Key?.toLowerCase().endsWith('.epub'),
+		);
+		if (epub?.Key) return epub.Key;
+		return key;
+	}
+
+	async uploadEbookAssetBuffer(params: {
+		bookId: string;
+		relativePath: string;
+		buffer: Buffer;
+		mimetype: string;
+	}): Promise<string> {
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const safeName = basename(params.relativePath).replace(/[/\\]/g, '_');
+		const key = `ebooks/assets/${params.bookId}/${randomUUID()}_${safeName}`;
+		const cos = this.getCosClient();
+		try {
+			await cos.putObject({
+				Bucket: config.bucket,
+				Region: config.region,
+				Key: key,
+				Body: params.buffer,
+				ContentType: params.mimetype || 'application/octet-stream',
+				ACL: config.objectAcl,
+			});
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+		return this.buildCosPublicUrl(key);
+	}
+
 	/** 从 COS 读取对象字节（小对象场景；大文件请用 pipeObjectToWritable） */
 	async getObjectBuffer(key: string): Promise<Buffer> {
-		const normalizedKey = this.normalizeCosObjectKey(key);
+		const normalizedKey = this.normalizeCosObjectKey(
+			await this.resolveCosObjectKey(key),
+		);
 		const config = getCosRuntimeConfig();
 		assertCosRuntimeConfig(config);
 		const cos = this.getCosClient();

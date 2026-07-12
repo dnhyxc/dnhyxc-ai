@@ -25,6 +25,7 @@
 | [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) | **Tauri 云端 MP3 播放修复**：Audio prime、`canplay` 后 play、Edge 非流式 endpoint、Tauri `arrayBuffer` 读 body |
 | [app-tauri-http-retry.md](./app-tauri-http-retry.md) | **Tauri HttpClient 全方法重试**：POST 等写请求默认 2 次、`!response` 门槛、`catch`/`handleErrorResponse` 修复 |
 | [auth-wechat-mini-program-bind.md](./auth-wechat-mini-program-bind.md) | **微信小程序登录与账号关联**：`user_wechat` 映射表、bind_token / link_code 绑定、JWT 解绑吊销、对既有认证与账号页的影响 |
+| [epub-miniprogram-server-parse.md](./epub-miniprogram-server-parse.md) | **小程序 EPUB 服务端解析**：`parseEpubBuffer` 懒解析、章节 API、COS 键兼容、对 Web epub.js / 进度 / 下载链路的影响 |
 | [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md) | **书架分类空 Tab 隐藏与自动回「全部」**：未分类/0 册分类不展示、移走最后一本切 Tab、卡片 Tooltip 分类 |
 | [epub-listen-player-bar-ui.md](./epub-listen-player-bar-ui.md) | **听书播放条 UI**：分句虚拟列表、滚到当前句、刻度尺倍速 0.5–3×、列表选中样式 |
 | [ebook-progress-remote-debounce.md](./ebook-progress-remote-debounce.md) | **阅读进度远端防抖 + keepalive flush**：8s PUT 合并、页内 2s debounce、`pagehide` 不丢进度 |

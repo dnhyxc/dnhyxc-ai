@@ -7,6 +7,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseIntPipe,
 	ParseUUIDPipe,
 	Post,
 	Put,
@@ -221,6 +222,25 @@ export class EbookController {
 		@Param('sourceBookId', ParseUUIDPipe) sourceBookId: string,
 	) {
 		return this.ebookService.openPublicBook(this.userId(req), sourceBookId);
+	}
+
+	@Get('book/:id/chapters')
+	@UseInterceptors(ResponseInterceptor)
+	async getChapters(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		return this.ebookService.getChapters(this.userId(req), id);
+	}
+
+	@Get('book/:id/chapter/:index')
+	@UseInterceptors(ResponseInterceptor)
+	async getChapter(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Param('index', ParseIntPipe) index: number,
+	) {
+		return this.ebookService.getChapter(this.userId(req), id, index);
 	}
 
 	@Get('book/:id')
