@@ -413,22 +413,66 @@ function scrollActiveListenIntoView(): void {
 	if (!range) return;
 	const { rend, cfi, epoch } = session;
 	void withProgrammaticScroll(async () => {
-		await scrollEpubRangeIntoView(rend, range, cfi);
+		await scrollEpubRangeToViewCenter(rend, range, cfi);
 		if (!session || session.epoch !== epoch) return;
 	});
 }
 
-/**
- * 暂停自动跟随模式
- * 若当前 session 的 autoFollow 状态为 true，则置为 false，并通知监听者
- */
 function pauseListenAutoFollow(): void {
-	// 当前没有 session 或 autoFollow 已为 false 时无需处理，直接返回
 	if (!session?.autoFollow) return;
-	// 关闭自动跟随标记
 	session.autoFollow = false;
-	// 通知所有监听该状态变化
 	emitAutoFollowState();
+}
+
+function rangeNeedsChapterRemount(range: Range | null): boolean {
+	if (!range || !isRangeConnected(range)) return true;
+	try {
+		const node = range.startContainer;
+		if (!node.isConnected) return true;
+		const iframe = node.ownerDocument?.defaultView
+			?.frameElement as HTMLElement | null;
+		if (!iframe?.isConnected) return true;
+		const rect = iframe.getBoundingClientRect();
+		return rect.width <= 0 && rect.height <= 0;
+	} catch {
+		return true;
+	}
+}
+
+export function resumeEpubListenAutoFollow(): void {
+	if (!session) return;
+	session.autoFollow = true;
+	pendingFollowScroll = false;
+	emitAutoFollowState();
+
+	const { rend, cfi, epoch } = session;
+	const key = cfi.trim();
+	const range = resolveActiveListenDomRange();
+
+	void withProgrammaticScroll(async () => {
+		// 远章 trim 后须先 display 挂回播放章；高亮/跟随由 hook 重建句 Range，勿按旧 CFI 钉死一帧
+		if (rangeNeedsChapterRemount(range) && key) {
+			try {
+				await rend.display(key);
+				await new Promise<void>((resolve) => {
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => resolve());
+					});
+				});
+			} catch {
+				// ignore
+			}
+		} else if (range) {
+			await scrollEpubRangeToViewCenter(rend, range, key);
+		}
+
+		if (!session || session.epoch !== epoch) return;
+		if (chapterListenDomRemount) {
+			chapterListenDomRemount();
+			return;
+		}
+		scrollActiveListenIntoView();
+	});
 }
 
 /**
@@ -562,14 +606,6 @@ export function beginEpubListenOverlaySession(
 	emitAutoFollowState();
 }
 
-export function resumeEpubListenAutoFollow(): void {
-	if (!session) return;
-	session.autoFollow = true;
-	pendingFollowScroll = false;
-	emitAutoFollowState();
-	scrollActiveListenIntoView();
-}
-
 /** 阅读区布局变化后：当前播放句不在视口内则暂停 autoFollow，展示右下角回到播放 FAB */
 export function checkEpubListenFollowAfterLayout(rend: Rendition): void {
 	// 使用双层 requestAnimationFrame，确保页面动画和重排完成后再进行可见性检测，避免因布局抖动导致判断不准
@@ -637,6 +673,8 @@ export function showEpubListenDomRange(
 	const isNew = !prev || !rangesEqual(prev, snapped);
 	active.lastSentenceIndex = -1;
 	active.activeDomRange = snapped.cloneRange();
+	const rangeCfi = cfiFromDomRange(rend, snapped)?.trim();
+	if (rangeCfi) active.cfi = rangeCfi;
 	if (isNew) clearListenMarkHighlight(rend);
 	showListenMarkHighlight(rend, snapped);
 
@@ -787,9 +825,11 @@ export function clearEpubListenSegmentOverlay(): void {
 // --- 听当前 / 听书互斥 ---
 
 type StopFn = () => void;
+type DomRemountFn = () => void;
 
 let stopQuoteListen: StopFn | null = null;
 let stopChapterListen: StopFn | null = null;
+let chapterListenDomRemount: DomRemountFn | null = null;
 
 export function registerQuoteListenStop(fn: StopFn | null): void {
 	stopQuoteListen = fn;
@@ -797,6 +837,11 @@ export function registerQuoteListenStop(fn: StopFn | null): void {
 
 export function registerChapterListenStop(fn: StopFn | null): void {
 	stopChapterListen = fn;
+}
+
+/** 跨章回跳 display 后：听书 hook 重建句 Range，避免钉死旧 iframe 高亮 */
+export function registerChapterListenDomRemount(fn: DomRemountFn | null): void {
+	chapterListenDomRemount = fn;
 }
 
 export function invokeStopQuoteListen(): void {

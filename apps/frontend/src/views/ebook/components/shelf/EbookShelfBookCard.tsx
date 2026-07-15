@@ -184,7 +184,10 @@ export function EbookShelfBookCard({
 	const [titleSaving, setTitleSaving] = useState(false);
 	const [categoryBusy, setCategoryBusy] = useState(false);
 	const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
-	const pct = prog?.percent;
+	const pct =
+		prog?.percent != null
+			? Math.min(100, Math.max(0, Math.round(prog.percent)))
+			: undefined;
 	const fmtLabel = book.fmt === 'epub' ? 'EPUB' : 'PDF';
 	const ownerLabel = book.owner?.username?.trim();
 	const ownerDisplay = ownerLabel || t('ebook.shelf.publicOwner');

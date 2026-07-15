@@ -8,6 +8,10 @@ import { useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EbookTocItem } from '../../types';
+import {
+	epubReaderChromeListItemActiveClass,
+	epubReaderChromeListItemIdleClass,
+} from '../../utils/epub/reader/epubReaderSettings';
 
 export type EbookTocDrawerProps = {
 	open: boolean;
@@ -15,7 +19,7 @@ export type EbookTocDrawerProps = {
 	items: EbookTocItem[];
 	/** 当前阅读位置对应的目录项索引；无匹配时为 -1 */
 	activeIndex?: number;
-	onSelect: (href: string) => void;
+	onSelect: (item: EbookTocItem) => void;
 	/** EPUB 阅读 chrome 字色（Drawer Portal 内需单独挂载） */
 	chromeStyle?: CSSProperties;
 };
@@ -66,12 +70,11 @@ export function EbookTocDrawer({
 										disabled={!clickable}
 										aria-current={isActive ? 'location' : undefined}
 										className={cn(
-											'cursor-pointer text-textcolor w-full rounded-md px-2 py-2 text-left text-sm',
+											'w-full cursor-pointer rounded-md px-2 py-2 text-left text-sm',
 											clickable
-												? 'transition-colors hover:bg-theme/10'
-												: 'text-textcolor/45 cursor-default',
-											isActive &&
-												'bg-theme/15 text-theme font-medium hover:bg-theme/15',
+												? epubReaderChromeListItemIdleClass
+												: 'cursor-default text-textcolor/45',
+											isActive && epubReaderChromeListItemActiveClass,
 										)}
 										style={
 											item.depth
@@ -80,7 +83,7 @@ export function EbookTocDrawer({
 										}
 										onClick={() => {
 											if (!item.href) return;
-											onSelect(item.href);
+											onSelect(item);
 											onOpenChange(false);
 										}}
 									>

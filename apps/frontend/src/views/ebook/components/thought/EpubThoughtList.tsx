@@ -102,7 +102,7 @@ function EpubThoughtListItem({
 			selected={selected}
 			onClick={() => onOpenThoughtDetail(thought)}
 		>
-			<p className="text-textcolor text-sm wrap-break-word">
+			<p className="text-textcolor text-justify text-sm wrap-break-word">
 				{thought.content}
 			</p>
 		</EpubThoughtItemCard>

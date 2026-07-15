@@ -1445,6 +1445,7 @@ export const zhCN = {
 	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax 云端朗读失败',
 	'englishLearning.tts.cloudFallbackLocal':
 		'已改用本机语音播放，请检查讯飞应用凭证或服务端配置。',
+	'englishLearning.tts.cloudFallbackEdge': '已改用 Edge 免费语音继续播放。',
 	'englishLearning.tts.hint':
 		'消息区朗读优先云端 TTS，失败时使用浏览器语音；单词表可逐词播放。',
 	'route.document.title': '智能文档处理',
@@ -1594,6 +1595,8 @@ export const zhCN = {
 	'ebook.read.listenBook.resume': '继续',
 	'ebook.read.listenBook.prevSentence': '上一句',
 	'ebook.read.listenBook.nextSentence': '下一句',
+	'ebook.read.listenBook.prevChapter': '上一章',
+	'ebook.read.listenBook.nextChapter': '下一章',
 	'ebook.read.listenBook.sentenceMenu': '分句',
 	'ebook.read.listenBook.sentenceMenuEmpty': '暂无分句',
 	'ebook.read.listenBook.scrollToCurrentSentence': '滚动到当前句',

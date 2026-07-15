@@ -247,7 +247,10 @@ export function EpubThoughtClusterExcerpt({
 			<div ref={wrapperRef} className="min-w-0 flex-1">
 				<p
 					ref={textRef}
-					className={cn('min-h-lh leading-normal', !expanded && clampClass)}
+					className={cn(
+						'min-h-lh text-justify leading-normal',
+						!expanded && clampClass,
+					)}
 				>
 					{t('ebook.read.thought.clusterExcerpt', { length: spanLength })}
 					<span className="text-textcolor/40 mx-1">·</span>
@@ -460,7 +463,7 @@ export function EpubThoughtQuoteCard({
 							<p
 								ref={textRef}
 								className={cn(
-									'text-textcolor/85 font-serif leading-[1.85] wrap-break-word',
+									'text-textcolor/85 text-justify font-serif leading-[1.85] wrap-break-word',
 									overflows && !expanded && clampClass,
 								)}
 							>

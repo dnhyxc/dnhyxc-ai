@@ -1579,6 +1579,8 @@ export const enUS = {
 	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax cloud playback failed',
 	'englishLearning.tts.cloudFallbackLocal':
 		'Playing with local voice instead. Check your iFlytek credentials or server configuration.',
+	'englishLearning.tts.cloudFallbackEdge':
+		'Continuing with Edge free voice instead.',
 	'englishLearning.tts.hint':
 		'Cloud TTS is tried first; browser speech is the fallback. Vocabulary cards play each word.',
 	'route.document.title': 'Document',
@@ -1739,6 +1741,8 @@ export const enUS = {
 	'ebook.read.listenBook.resume': 'Resume',
 	'ebook.read.listenBook.prevSentence': 'Previous sentence',
 	'ebook.read.listenBook.nextSentence': 'Next sentence',
+	'ebook.read.listenBook.prevChapter': 'Previous chapter',
+	'ebook.read.listenBook.nextChapter': 'Next chapter',
 	'ebook.read.listenBook.sentenceMenu': 'Sentences',
 	'ebook.read.listenBook.sentenceMenuEmpty': 'No sentences',
 	'ebook.read.listenBook.scrollToCurrentSentence': 'Scroll to current sentence',

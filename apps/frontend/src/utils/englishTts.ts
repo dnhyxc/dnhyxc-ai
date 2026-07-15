@@ -44,19 +44,36 @@ export function isEnglishTtsSupported(): boolean {
 	);
 }
 
+/**
+ * 将输入的 Markdown 文本规整为适合 TTS 的纯文本。
+ * 主要作用包括去除代码块、行内代码、粗体/斜体、标题、链接、列表符号、编号等 Markdown 语法，保证 TTS 朗读时只保留纯文本内容。
+ */
 export function stripMarkdownForTts(raw: string): string {
+	// 原始内容为空（null、undefined、纯空白等）直接返回空字符串
 	if (!raw?.trim()) return '';
-	return raw
-		.replace(/```[\s\S]*?```/g, ' ')
-		.replace(/`[^`\n]+`/g, ' ')
-		.replace(/\*\*([^*]+)\*\*/g, '$1')
-		.replace(/\*([^*]+)\*/g, '$1')
-		.replace(/^#{1,6}\s+/gm, '')
-		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-		.replace(/^[-*+]\s+/gm, '')
-		.replace(/^\d+\.\s+/gm, '')
-		.replace(/\s+/g, ' ')
-		.trim();
+	return (
+		raw
+			// 移除 Markdown 代码块（``` 包围的多行内容）替换为空格，避免代码被朗读
+			.replace(/```[\s\S]*?```/g, ' ')
+			// 移除 Markdown 行内代码（`内容`）替换为空格
+			.replace(/`[^`\n]+`/g, ' ')
+			// 还原粗体（**内容**），去掉星号，仅保留原文
+			.replace(/\*\*([^*]+)\*\*/g, '$1')
+			// 还原斜体（*内容*），去掉星号，仅保留原文
+			.replace(/\*([^*]+)\*/g, '$1')
+			// 移除 Markdown 标题前缀（#~######），仅保留文本
+			.replace(/^#{1,6}\s+/gm, '')
+			// 还原超链接，仅保留链接文本部分 [文本](链接) => 文本
+			.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+			// 移除无序列表项符号（-, *, +），仅保留内容
+			.replace(/^[-*+]\s+/gm, '')
+			// 移除有序列表项编号（1.、2. ...），仅保留内容
+			.replace(/^\d+\.\s+/gm, '')
+			// 合并所有空白字符为一个空格（包含换行、Tab 等），避免朗读卡顿
+			.replace(/\s+/g, ' ')
+			// 去除首尾的多余空格
+			.trim()
+	);
 }
 
 /** 本机朗读分段：文本 + 段后停顿时长（毫秒），用于句读顿挫 */
@@ -474,18 +491,33 @@ export type PlayEnglishPreferredOptions = {
 	speak?: SpeakEnglishOptions;
 	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
-	/** 听书/听当前逐句：由上一轮发起的下一句云端预取（缩短句间等待） */
+	/** 听书/听当前：由上一轮发起的云端预取（缩短等待） */
 	prefetchedCloud?: Promise<EnglishTtsSentencePrefetch> | null;
+	/**
+	 * 云端整段一次合成（听书/听当前按段 TTS）。
+	 * 为 true 时不按句读拆 HTTP；超厂商字节上限仍回退 cadence。
+	 * 句高亮靠播放进度估算触发 onCadenceChunk。
+	 */
+	cloudSingleUtterance?: boolean;
+	/**
+	 * 当前段真正开始出声后回调（云端 audio.play / 本机 speak 成功）。
+	 * 听书用来错开预取，避免与首包 HTTP 抢带宽。
+	 */
+	onPlaybackStart?: () => void;
 };
 
 type CadencePlaybackHooks = Pick<
 	PlayEnglishPreferredOptions,
-	'onCadenceChunk' | 'prefetchedCloud'
+	'onCadenceChunk' | 'prefetchedCloud' | 'onPlaybackStart'
 >;
 
 type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
 	rate?: number;
+	singleUtterance?: boolean;
 };
+
+/** 与 Edge / 讯飞单次上限对齐（字节） */
+const CLOUD_SINGLE_UTTERANCE_MAX_BYTES = 8000;
 
 /** ponytail: 听书逐句时云端可能连续失败，冷却内只弹一次 Toast */
 let lastCloudTtsErrorToastAt = 0;
@@ -499,20 +531,29 @@ function throwNoTts(opts?: { cloudTtsNotified?: boolean }): never {
 	throw err;
 }
 
+function cloudSourceTitleKey(
+	source: string,
+):
+	| 'englishLearning.tts.cloudXfyunFailed'
+	| 'englishLearning.tts.cloudEdgeFailed'
+	| 'englishLearning.tts.cloudMinimaxFailed' {
+	if (source === 'xfyun') return 'englishLearning.tts.cloudXfyunFailed';
+	if (source === 'edge') return 'englishLearning.tts.cloudEdgeFailed';
+	return 'englishLearning.tts.cloudMinimaxFailed';
+}
+
 /** 云端 TTS 失败时统一 Toast（试听/听书/单词朗读等共用） */
-function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
+function notifyCloudTtsFallback(
+	canFallbackLocal: boolean,
+	failedSource?: string,
+): void {
 	const now = Date.now();
 	if (now - lastCloudTtsErrorToastAt < CLOUD_TTS_ERROR_TOAST_COOLDOWN_MS)
 		return;
 	lastCloudTtsErrorToastAt = now;
 
-	const source = loadMinimaxTtsUserPrefs().playbackSource;
-	const titleKey =
-		source === 'xfyun'
-			? 'englishLearning.tts.cloudXfyunFailed'
-			: source === 'edge'
-				? 'englishLearning.tts.cloudEdgeFailed'
-				: 'englishLearning.tts.cloudMinimaxFailed';
+	const source = failedSource ?? effectiveCloudPlaybackSource();
+	const titleKey = cloudSourceTitleKey(source);
 
 	if (canFallbackLocal) {
 		Toast({
@@ -527,6 +568,24 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 		title: translateSync(titleKey),
 		message: translateSync('englishLearning.tts.unsupported'),
 	});
+}
+
+function notifyCloudFallbackToEdge(failedSource: string): void {
+	const now = Date.now();
+	if (now - lastCloudTtsErrorToastAt < CLOUD_TTS_ERROR_TOAST_COOLDOWN_MS)
+		return;
+	lastCloudTtsErrorToastAt = now;
+	Toast({
+		type: 'warning',
+		title: translateSync(cloudSourceTitleKey(failedSource)),
+		message: translateSync('englishLearning.tts.cloudFallbackEdge'),
+	});
+}
+
+/** 当前实际走的云端源（含会话降级） */
+function effectiveCloudPlaybackSource(): string {
+	if (sessionCloudSourceOverride) return sessionCloudSourceOverride;
+	return loadMinimaxTtsUserPrefs().playbackSource;
 }
 
 /** HTMLAudioElement.playbackRate 常用可听范围；听书 UI 最高 3x */
@@ -832,6 +891,8 @@ function emitCadenceChunk(
 
 let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
+/** stopPlaybackMediaOnly 时打断 waitCloudAudioEnd，避免 onended 被清掉后一直挂到超时 */
+let abortCloudAudioWait: (() => void) | null = null;
 /** 点击同步解锁 Tauri/WKWebView 云端 Audio（须在 fetch 合成之前调用） */
 let cloudAudioUnlock: HTMLAudioElement | null = null;
 const SILENT_WAV_DATA_URI =
@@ -840,9 +901,204 @@ const SILENT_WAV_DATA_URI =
 /** 每次新播放或 stopAll 时递增，用于丢弃过期的异步 TTS 请求/本机朗读 */
 let playbackGeneration = 0;
 
+/** 应用内 pause/stop 触发的 audio.pause，忽略以免回环进 Media Session / UI bridge */
+let suppressAudioPauseEvent = false;
+let detachCloudAudioPauseBridge: (() => void) | null = null;
+
+/** 软暂停：不打断 wait/世代，便于从 currentTime 续播 */
+let playbackSoftPaused = false;
+let softResumeWaiters: Array<() => void> = [];
+
+type EnglishPlaybackMediaHandlers = {
+	play: () => void;
+	pause: () => void;
+};
+let englishPlaybackMediaHandlers: EnglishPlaybackMediaHandlers | null = null;
+
+function withSuppressedAudioPauseEvent(run: () => void): void {
+	suppressAudioPauseEvent = true;
+	try {
+		run();
+	} finally {
+		queueMicrotask(() => {
+			suppressAudioPauseEvent = false;
+		});
+	}
+}
+
+function clearSoftPauseState(): void {
+	playbackSoftPaused = false;
+	const waiters = softResumeWaiters;
+	softResumeWaiters = [];
+	for (const w of waiters) w();
+}
+
+function waitWhileSoftPaused(_generation: number): Promise<void> {
+	if (!playbackSoftPaused) return Promise.resolve();
+	return new Promise((resolve) => {
+		softResumeWaiters.push(resolve);
+	});
+}
+
+/** 退出听书后清掉 macOS 菜单栏 / 控制中心 Now Playing（含进度条） */
+function clearEnglishPlaybackMediaSession(opts?: {
+	/** 默认 true：卸掉 play/pause 等；句间停介质时传 false，避免媒体键短暂失效 */
+	clearHandlers?: boolean;
+}): void {
+	if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
+	const ms = navigator.mediaSession;
+	try {
+		ms.metadata = null;
+	} catch {
+		// ignore
+	}
+	try {
+		ms.playbackState = 'none';
+	} catch {
+		// ignore
+	}
+	try {
+		(
+			ms as MediaSession & {
+				setPositionState: (state?: MediaPositionState | null) => void;
+			}
+		).setPositionState(null);
+	} catch {
+		try {
+			ms.setPositionState();
+		} catch {
+			// ignore
+		}
+	}
+	if (opts?.clearHandlers === false) return;
+	for (const action of [
+		'play',
+		'pause',
+		'stop',
+		'seekto',
+		'seekbackward',
+		'seekforward',
+		'previoustrack',
+		'nexttrack',
+	] as const) {
+		try {
+			ms.setActionHandler(action, null);
+		} catch {
+			// 部分 action 不支持
+		}
+	}
+}
+
+/**
+ * 丢掉云端 <audio> 引用：仅 pause/清 src 时，Chromium/macOS 仍可能按旧元素外推进度条（无声）。
+ * 句间换轨不要调用；仅听书会话结束时调用。
+ */
+function releaseCloudAudioEl(): void {
+	detachCloudAudioPauseBridge?.();
+	detachCloudAudioPauseBridge = null;
+	const audio = cloudAudio;
+	cloudAudio = null;
+	if (cloudObjectUrl) {
+		URL.revokeObjectURL(cloudObjectUrl);
+		cloudObjectUrl = null;
+	}
+	if (!audio) return;
+	try {
+		audio.muted = true;
+		audio.volume = 0;
+		audio.pause();
+		audio.onended = null;
+		audio.onerror = null;
+		audio.onloadedmetadata = null;
+		audio.ontimeupdate = null;
+		audio.removeAttribute('src');
+		audio.removeAttribute('title');
+		audio.srcObject = null;
+		audio.load();
+	} catch {
+		// ignore
+	}
+}
+
+function silenceCloudAudioUnlock(): void {
+	if (!cloudAudioUnlock) return;
+	try {
+		cloudAudioUnlock.pause();
+		cloudAudioUnlock.currentTime = 0;
+	} catch {
+		// ignore
+	}
+}
+
+function setEnglishPlaybackMediaState(state: MediaSessionPlaybackState): void {
+	if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
+	if (state === 'none') {
+		// 句间换轨也会走这里：只清展示，保留已注册的媒体键
+		clearEnglishPlaybackMediaSession({
+			clearHandlers: !englishPlaybackMediaHandlers,
+		});
+		return;
+	}
+	// 听书已退出后，异步 play() 仍可能迟到；禁止再把系统 UI 拉回 playing
+	if (!englishPlaybackMediaHandlers) return;
+	try {
+		navigator.mediaSession.playbackState = state;
+	} catch {
+		// 部分 WebView 只读
+	}
+}
+
+/** 听书/听当前：把系统媒体键接到 pause/resume；传 null 卸载 */
+export function registerEnglishPlaybackMediaHandlers(
+	handlers: EnglishPlaybackMediaHandlers | null,
+): void {
+	if (!handlers) {
+		englishPlaybackMediaHandlers = null;
+		// 先作废异步 play，再拆掉元素，避免无声进度条继续走
+		playbackGeneration += 1;
+		abortCloudAudioWait?.();
+		abortCloudAudioWait = null;
+		clearSoftPauseState();
+		if (isEnglishTtsSupported()) {
+			try {
+				window.speechSynthesis.cancel();
+			} catch {
+				// ignore
+			}
+		}
+		releaseCloudAudioEl();
+		silenceCloudAudioUnlock();
+		clearEnglishPlaybackMediaSession({ clearHandlers: true });
+		// macOS Chrome：偶发需下一帧再清一次才收起控制中心
+		requestAnimationFrame(() => {
+			if (englishPlaybackMediaHandlers) return;
+			clearEnglishPlaybackMediaSession({ clearHandlers: true });
+		});
+		return;
+	}
+	englishPlaybackMediaHandlers = handlers;
+	if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
+	try {
+		navigator.mediaSession.setActionHandler('play', () => handlers.play());
+		navigator.mediaSession.setActionHandler('pause', () => handlers.pause());
+		navigator.mediaSession.setActionHandler('stop', () => handlers.pause());
+	} catch {
+		// 旧环境不支持 setActionHandler
+	}
+}
+
+/**
+ * 会话内云端降级：MiniMax/讯飞连续 502 时粘到 Edge，避免每句都先打挂掉的源。
+ * 仅 stopAll 时清除（不要在 beginPlaybackSession 清，否则句句重试 MiniMax）。
+ */
+type CloudPlaybackSource = 'cloud' | 'xfyun' | 'edge';
+let sessionCloudSourceOverride: CloudPlaybackSource | null = null;
+
 const CLOUD_TTS_CACHE_MAX = 64;
 /** 规范化文本 → MP3 ArrayBuffer（LRU：重复 get 时移到末尾） */
 const cloudTtsAudioCache = new Map<string, ArrayBuffer>();
+/** 同一 cacheKey 进行中的请求合并，避免听书首包+预取打出重复 stream */
+const inflightCloudTts = new Map<string, Promise<CloudTtsReady>>();
 
 function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
 	if (cloudTtsAudioCache.has(key)) {
@@ -867,11 +1123,11 @@ function getCloudTtsFromCache(plain: string): Blob | null {
 
 /** 云端 MP3 LRU key：按用户选路区分 MiniMax / 讯飞参数后缀 */
 function buildCloudTtsCacheKey(plain: string): string {
-	const prefs = loadMinimaxTtsUserPrefs();
-	if (prefs.playbackSource === 'xfyun') {
+	const source = effectiveCloudPlaybackSource();
+	if (source === 'xfyun') {
 		return `${plain}\u0000xfyun${buildXfyunTtsCacheKeySuffix()}`;
 	}
-	if (prefs.playbackSource === 'edge') {
+	if (source === 'edge') {
 		return `${plain}\u0000edge${buildEdgeTtsCacheKeySuffix()}`;
 	}
 	return plain + buildMinimaxTtsCacheKeySuffix();
@@ -938,19 +1194,41 @@ function isPlaybackGenerationActive(generation: number): boolean {
 
 /** 仅停止当前音频与本机 speech，不递增世代（供会话内切换介质使用） */
 function stopPlaybackMediaOnly(): void {
+	clearSoftPauseState();
 	if (isEnglishTtsSupported()) {
 		window.speechSynthesis.cancel();
 	}
+	abortCloudAudioWait?.();
+	abortCloudAudioWait = null;
+	detachCloudAudioPauseBridge?.();
+	detachCloudAudioPauseBridge = null;
 	if (cloudAudio) {
-		cloudAudio.pause();
-		cloudAudio.src = '';
-		cloudAudio.load();
-		cloudAudio = null;
+		// bridge 已卸，不再 suppress：让浏览器原生感知 pause，便于系统收起 Now Playing
+		try {
+			cloudAudio.pause();
+			cloudAudio.onended = null;
+			cloudAudio.onerror = null;
+			cloudAudio.onloadedmetadata = null;
+			cloudAudio.ontimeupdate = null;
+			cloudAudio.removeAttribute('src');
+			cloudAudio.removeAttribute('title');
+			cloudAudio.srcObject = null;
+			cloudAudio.load();
+		} catch {
+			// ignore
+		}
+		// ponytail: 句间保留元素。会话结束由 register(null) → releaseCloudAudioEl 丢掉引用
 	}
 	if (cloudObjectUrl) {
 		URL.revokeObjectURL(cloudObjectUrl);
 		cloudObjectUrl = null;
 	}
+	setEnglishPlaybackMediaState('none');
+}
+
+function ensureCloudAudioEl(): HTMLAudioElement {
+	if (!cloudAudio) cloudAudio = new Audio();
+	return cloudAudio;
 }
 
 /** 开始新的播放会话：作废上一轮并清空介质 */
@@ -966,23 +1244,96 @@ export function stopEnglishTts(): void {
 }
 
 export function stopCloudEnglishTts(): void {
-	if (cloudAudio) {
-		cloudAudio.pause();
-		cloudAudio.src = '';
-		cloudAudio.load();
-		cloudAudio = null;
-	}
-	if (cloudObjectUrl) {
-		URL.revokeObjectURL(cloudObjectUrl);
-		cloudObjectUrl = null;
-	}
+	stopPlaybackMediaOnly();
 }
 
 export function stopAllEnglishPlayback(): void {
 	playbackGeneration += 1;
 	// 新听书/试听会话开始时会先 stop；重置冷却以便云端报错立即 Toast
 	lastCloudTtsErrorToastAt = 0;
+	sessionCloudSourceOverride = null;
 	stopPlaybackMediaOnly();
+}
+
+/**
+ * 听书底栏软暂停：只 pause 介质，不递增世代、不 abort wait。
+ * 续播走 resumeEnglishPlaybackSoft，从 currentTime 继续。
+ */
+export function pauseEnglishPlaybackSoft(): void {
+	playbackSoftPaused = true;
+	if (isEnglishTtsSupported()) {
+		try {
+			window.speechSynthesis.pause();
+		} catch {
+			// ignore
+		}
+	}
+	if (cloudAudio && !cloudAudio.paused) {
+		withSuppressedAudioPauseEvent(() => {
+			cloudAudio?.pause();
+		});
+	}
+	setEnglishPlaybackMediaState('paused');
+}
+
+/** @returns 是否已从暂停的 Audio / speechSynthesis 续上（含合成已就绪待播） */
+export function resumeEnglishPlaybackSoft(): boolean {
+	const audio = cloudAudio;
+	const hasSrc = Boolean(audio?.currentSrc || audio?.getAttribute('src'));
+	const canResumeAudio = !!(audio && hasSrc && !audio.ended);
+
+	playbackSoftPaused = false;
+	const waiters = softResumeWaiters;
+	softResumeWaiters = [];
+	for (const w of waiters) w();
+
+	let resumed = false;
+	if (canResumeAudio && audio) {
+		if (audio.paused) {
+			void audio
+				.play()
+				.then(() => {
+					if (playbackSoftPaused) return;
+					setEnglishPlaybackMediaState('playing');
+				})
+				.catch(() => {});
+		}
+		resumed = true;
+	}
+	if (isEnglishTtsSupported()) {
+		try {
+			if (window.speechSynthesis.paused) {
+				window.speechSynthesis.resume();
+				resumed = true;
+			}
+		} catch {
+			// ignore
+		}
+	}
+	if (resumed) setEnglishPlaybackMediaState('playing');
+	return resumed;
+}
+
+function bindCloudAudioPauseBridge(
+	audio: HTMLAudioElement,
+	generation: number,
+): void {
+	detachCloudAudioPauseBridge?.();
+	const onPause = () => {
+		if (suppressAudioPauseEvent) return;
+		if (!isPlaybackGenerationActive(generation)) return;
+		if (audio.ended) return;
+		if (englishPlaybackMediaHandlers) {
+			// 系统控制中心 / 耳机键 pause：同步听书 UI（hook 内软暂停）
+			englishPlaybackMediaHandlers.pause();
+			return;
+		}
+		pauseEnglishPlaybackSoft();
+	};
+	audio.addEventListener('pause', onPause);
+	detachCloudAudioPauseBridge = () => {
+		audio.removeEventListener('pause', onPause);
+	};
 }
 
 /** 听书等场景切换倍速：云端 MP3 即时生效；本机 Web Speech 仅影响下一句 */
@@ -1028,6 +1379,12 @@ function firstCloudTtsChunkPlain(plain: string): string {
 	return chunks[0]?.text ?? plain;
 }
 
+function cloudPlainWithinSingleLimit(plain: string): boolean {
+	return (
+		new TextEncoder().encode(plain).length <= CLOUD_SINGLE_UTTERANCE_MAX_BYTES
+	);
+}
+
 async function resolveCloudTtsReady(
 	chunkPlain: string,
 	prefetched?: Promise<EnglishTtsSentencePrefetch> | null,
@@ -1044,23 +1401,29 @@ async function resolveCloudTtsReady(
 }
 
 /**
- * 听书/听当前：在播当前句时预取下一句云端 MP3；非云端路径返回 null。
+ * 听书/听当前：预取云端 MP3。
+ * `whole: true` 时预取整段文本（与 cloudSingleUtterance 对齐）；否则预取首个 cadence chunk。
  */
 export function prefetchCloudEnglishTts(
 	rawText: string,
-	options?: Pick<PlayEnglishPreferredOptions, 'preferLocal'>,
+	options?: Pick<PlayEnglishPreferredOptions, 'preferLocal'> & {
+		whole?: boolean;
+	},
 ): Promise<EnglishTtsSentencePrefetch> | null {
 	if (!shouldUseCloudEnglishTts(options)) return null;
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return null;
-	const chunkPlain = firstCloudTtsChunkPlain(plain);
+	const chunkPlain =
+		options?.whole && cloudPlainWithinSingleLimit(plain)
+			? plain
+			: firstCloudTtsChunkPlain(plain);
 	return startCloudTts(chunkPlain).then((ready) => ({
 		plain: chunkPlain,
 		ready,
 	}));
 }
 
-/** 发起云端 TTS 请求；命中 LRU 则直接返回 Blob */
+/** 发起云端 TTS 请求；命中 LRU / 进行中请求则复用，避免同文案并发多条 stream */
 async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 	await ensureMinimaxTtsUserPrefsLoaded();
 	const cacheKey = buildCloudTtsCacheKey(plain);
@@ -1069,42 +1432,62 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		return { kind: 'cached', blob: cached, cacheKey };
 	}
 
-	const token = readToken();
-	if (!token) {
-		throw new Error('NO_TOKEN');
-	}
-	const platformFetch = await getPlatformFetch();
-	const headers = {
-		Authorization: `Bearer ${token}`,
-		'Content-Type': 'application/json',
-	};
+	const inflight = inflightCloudTts.get(cacheKey);
+	if (inflight) return inflight;
 
-	const prefs = loadMinimaxTtsUserPrefs();
-	const source = prefs.playbackSource;
-	const endpoint =
-		source === 'xfyun'
-			? SPEECH_XFYUN_TTS_STREAM
-			: source === 'edge'
-				? SPEECH_EDGE_TTS_STREAM
-				: SPEECH_MINIMAX_TTS_STREAM;
-	const bodyExtras =
-		source === 'xfyun'
-			? buildXfyunTtsRequestExtras()
-			: source === 'edge'
-				? buildEdgeTtsRequestExtras()
-				: buildMinimaxTtsRequestExtras();
-	const res = await platformFetch(BASE_URL + endpoint, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify({ text: plain, ...bodyExtras }),
-	});
+	const pending = (async (): Promise<CloudTtsReady> => {
+		try {
+			const token = readToken();
+			if (!token) {
+				throw new Error('NO_TOKEN');
+			}
+			const platformFetch = await getPlatformFetch();
+			const headers = {
+				Authorization: `Bearer ${token}`,
+				'Content-Type': 'application/json',
+			};
 
-	// ponytail: 云端失败不中转硅基/MiniMax；由 playEnglishPreferred catch 统一降级本机 Web Speech
-	if (!res.ok) {
-		throw new Error(`TTS_HTTP_${res.status}`);
-	}
+			const source = effectiveCloudPlaybackSource();
+			const endpoint =
+				source === 'xfyun'
+					? SPEECH_XFYUN_TTS_STREAM
+					: source === 'edge'
+						? SPEECH_EDGE_TTS_STREAM
+						: SPEECH_MINIMAX_TTS_STREAM;
+			const bodyExtras =
+				source === 'xfyun'
+					? buildXfyunTtsRequestExtras()
+					: source === 'edge'
+						? buildEdgeTtsRequestExtras()
+						: buildMinimaxTtsRequestExtras();
+			const res = await platformFetch(BASE_URL + endpoint, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify({ text: plain, ...bodyExtras }),
+			});
 
-	return { kind: 'live', response: res, cacheKey };
+			if (!res.ok) {
+				throw new Error(`TTS_HTTP_${res.status}`);
+			}
+
+			// 收齐后再共享：Response body 只能读一次，合并请求必须进缓存
+			const buf = await readResponseBodyAsArrayBuffer(res);
+			if (!buf.byteLength) {
+				throw new Error('TTS_EMPTY_AUDIO');
+			}
+			touchCloudTtsCache(cacheKey, buf);
+			return {
+				kind: 'cached',
+				blob: new Blob([buf], { type: 'audio/mpeg' }),
+				cacheKey,
+			};
+		} finally {
+			inflightCloudTts.delete(cacheKey);
+		}
+	})();
+
+	inflightCloudTts.set(cacheKey, pending);
+	return pending;
 }
 
 function waitCloudAudioEnd(
@@ -1120,7 +1503,6 @@ function waitCloudAudioEnd(
 			if (cloudObjectUrl === objectUrl) {
 				URL.revokeObjectURL(objectUrl);
 				cloudObjectUrl = null;
-				cloudAudio = null;
 			}
 		};
 
@@ -1128,6 +1510,7 @@ function waitCloudAudioEnd(
 			if (settled) return;
 			settled = true;
 			window.clearTimeout(timeoutId);
+			if (abortCloudAudioWait === abort) abortCloudAudioWait = null;
 			releaseUrl();
 			if (err && isPlaybackGenerationActive(generation)) {
 				reject(err);
@@ -1136,16 +1519,31 @@ function waitCloudAudioEnd(
 			resolve();
 		};
 
+		const abort = () => finish();
+		abortCloudAudioWait = abort;
+
 		const armTimeout = () => {
 			window.clearTimeout(timeoutId);
 			const playbackRate = audio.playbackRate > 0 ? audio.playbackRate : 1;
-			const durationMs =
-				Number.isFinite(audio.duration) && audio.duration > 0
-					? ((audio.duration * 1000) / playbackRate) * 1.5 + 5000
-					: 90_000;
+			const remaining =
+				Number.isFinite(audio.duration) &&
+				audio.duration > 0 &&
+				Number.isFinite(audio.currentTime)
+					? Math.max(0, audio.duration - audio.currentTime)
+					: NaN;
+			const durationMs = Number.isFinite(remaining)
+				? ((remaining * 1000) / playbackRate) * 1.5 + 5000
+				: 90_000;
 			timeoutId = window.setTimeout(
 				() => {
-					audio.pause();
+					// 软暂停不计超时，按剩余时长重新武装
+					if (playbackSoftPaused || (audio.paused && !audio.ended)) {
+						armTimeout();
+						return;
+					}
+					withSuppressedAudioPauseEvent(() => {
+						audio.pause();
+					});
 					finish(new Error('AUDIO_TIMEOUT'));
 				},
 				Math.min(durationMs, 600_000),
@@ -1153,7 +1551,13 @@ function waitCloudAudioEnd(
 		};
 
 		timeoutId = window.setTimeout(() => {
-			audio.pause();
+			if (playbackSoftPaused || (audio.paused && !audio.ended)) {
+				armTimeout();
+				return;
+			}
+			withSuppressedAudioPauseEvent(() => {
+				audio.pause();
+			});
 			finish(new Error('AUDIO_TIMEOUT'));
 		}, 120_000);
 
@@ -1173,31 +1577,68 @@ async function playCloudTtsReady(
 	ready: CloudTtsReady,
 	generation: number,
 	rate?: number,
+	onTimeUpdate?: (currentTime: number, duration: number) => void,
+	onPlaybackStart?: () => void,
 ): Promise<void> {
 	if (ready.kind === 'cached') {
-		await playCloudMp3Blob(ready.blob, generation, rate);
+		await playCloudMp3Blob(
+			ready.blob,
+			generation,
+			rate,
+			onTimeUpdate,
+			onPlaybackStart,
+		);
 		return;
 	}
 
 	// ponytail: 不用 MSE 边下边播——MiniMax MP3 分片常不对齐 MPEG 帧，会无声且 onended 不触发
 	const buf = await readResponseBodyAsArrayBuffer(ready.response);
 	if (!isPlaybackGenerationActive(generation)) return;
+	if (!buf.byteLength) {
+		throw new Error('TTS_EMPTY_AUDIO');
+	}
 	touchCloudTtsCache(ready.cacheKey, buf);
 	await playCloudMp3Blob(
 		new Blob([buf], { type: 'audio/mpeg' }),
 		generation,
 		rate,
+		onTimeUpdate,
+		onPlaybackStart,
 	);
 }
 
 /**
  * 按句读节奏分段，播当前段时预取下一段；每段收齐 MP3 后 Blob 播放。
+ * `singleUtterance`：整段一次 HTTP，用播放进度驱动句级 onCadenceChunk。
  */
 async function playCloudTtsCadenceSegments(
 	plain: string,
 	generation: number,
 	opts?: CloudTtsPlaybackOptions,
 ): Promise<void> {
+	let playbackStartNotified = false;
+	const notifyPlaybackStart = () => {
+		if (playbackStartNotified) return;
+		playbackStartNotified = true;
+		opts?.onPlaybackStart?.();
+	};
+
+	if (opts?.singleUtterance) {
+		if (cloudPlainWithinSingleLimit(plain)) {
+			await playCloudTtsSingleUtterance(plain, generation, {
+				...opts,
+				onPlaybackStart: notifyPlaybackStart,
+			});
+			return;
+		}
+		// 超长：按句打包成多段「整段合成」，禁止回退到逐句/子句 HTTP
+		await playCloudTtsPackedSingleUtterances(plain, generation, {
+			...opts,
+			onPlaybackStart: notifyPlaybackStart,
+		});
+		return;
+	}
+
 	// 将文本按节奏规则切分为块（句、短语等），每块单独生成 TTS
 	const chunks = splitTextForTtsCadence(plain);
 
@@ -1222,7 +1663,13 @@ async function playCloudTtsCadenceSegments(
 		// 检查播放世代是否仍有效，用户可能已终止
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 播放 MP3（Blob）
-		await playCloudTtsReady(ready, generation, rate);
+		await playCloudTtsReady(
+			ready,
+			generation,
+			rate,
+			undefined,
+			notifyPlaybackStart,
+		);
 		// 再次校验世代，避免用户在播放间 stop
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 播放结束，通知外部“本段结束”
@@ -1262,7 +1709,13 @@ async function playCloudTtsCadenceSegments(
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
 		// 播放当前段 MP3
-		await playCloudTtsReady(ready, generation, rate);
+		await playCloudTtsReady(
+			ready,
+			generation,
+			rate,
+			undefined,
+			i === 0 ? notifyPlaybackStart : undefined,
+		);
 		// 校验播放后世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 段播放完，发出“本块结束”事件
@@ -1270,37 +1723,201 @@ async function playCloudTtsCadenceSegments(
 	}
 }
 
-function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
-	if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-		return Promise.resolve();
+/** 整段一次合成；按 currentTime 比例估算当前句并回调 onCadenceChunk */
+async function playCloudTtsSingleUtterance(
+	plain: string,
+	generation: number,
+	opts?: CloudTtsPlaybackOptions,
+): Promise<void> {
+	const rate = clampPlaybackRate(opts?.rate);
+	const sentences = buildSentenceOffsetSpans(plain);
+	const onCadence = opts?.onCadenceChunk;
+
+	const emitSentence = (
+		si: number,
+		phase: TtsCadenceChunkEvent['phase'],
+	): void => {
+		if (!onCadence) return;
+		const span = sentences[si];
+		if (!span) return;
+		onCadence({
+			phase,
+			index: si,
+			text: plain.slice(span.start, span.end),
+			sentenceIndex: si,
+			isLastInSentence: true,
+			plainStart: span.start,
+			plainEnd: span.end,
+			sentencePlainStart: span.start,
+			sentencePlainEnd: span.end,
+		});
+	};
+
+	let lastSi = -1;
+	if (sentences.length > 0) {
+		lastSi = 0;
+		emitSentence(0, 'start');
 	}
+
+	const ready = await resolveCloudTtsReady(plain, opts?.prefetchedCloud);
+	if (!isPlaybackGenerationActive(generation)) return;
+
+	await playCloudTtsReady(
+		ready,
+		generation,
+		rate,
+		(currentTime, duration) => {
+			if (!onCadence || sentences.length === 0) return;
+			if (!(duration > 0) || !Number.isFinite(duration)) return;
+			const ratio = Math.min(1, Math.max(0, currentTime / duration));
+			const offset = Math.min(
+				Math.max(0, plain.length - 1),
+				Math.floor(ratio * plain.length),
+			);
+			const si = sentenceIndexAtOffset(sentences, offset);
+			if (si === lastSi) return;
+			if (lastSi >= 0) emitSentence(lastSi, 'end');
+			emitSentence(si, 'start');
+			lastSi = si;
+		},
+		opts?.onPlaybackStart,
+	);
+
+	if (!isPlaybackGenerationActive(generation)) return;
+	if (lastSi >= 0) emitSentence(lastSi, 'end');
+}
+
+/** singleUtterance 超长时：按句切成 ≤上限 的包，每包仍一次 HTTP（句索引相对整段 plain） */
+async function playCloudTtsPackedSingleUtterances(
+	plain: string,
+	generation: number,
+	opts?: CloudTtsPlaybackOptions,
+): Promise<void> {
+	const sentences = buildSentenceOffsetSpans(plain);
+	if (sentences.length === 0) return;
+
+	const packs: Array<{ start: number; end: number; text: string }> = [];
+	let startSi = 0;
+	while (startSi < sentences.length) {
+		let endSi = startSi;
+		while (endSi < sentences.length) {
+			const next = endSi + 1;
+			const text = plain.slice(
+				sentences[startSi]!.start,
+				sentences[next - 1]!.end,
+			);
+			if (!cloudPlainWithinSingleLimit(text) && next > startSi + 1) break;
+			if (!cloudPlainWithinSingleLimit(text) && next === startSi + 1) {
+				// 单句仍超限：硬切该句（极端）
+				endSi = next;
+				break;
+			}
+			endSi = next;
+			if (text.length >= 420 * 2) break;
+		}
+		if (endSi <= startSi) endSi = startSi + 1;
+		const text = plain
+			.slice(sentences[startSi]!.start, sentences[endSi - 1]!.end)
+			.trim();
+		if (text) {
+			packs.push({
+				start: sentences[startSi]!.start,
+				end: sentences[endSi - 1]!.end,
+				text,
+			});
+		}
+		startSi = endSi;
+	}
+
+	const parentOnCadence = opts?.onCadenceChunk;
+	for (let i = 0; i < packs.length; i += 1) {
+		if (!isPlaybackGenerationActive(generation)) return;
+		const pack = packs[i]!;
+		const baseSi = sentenceIndexAtOffset(sentences, pack.start);
+		await playCloudTtsSingleUtterance(pack.text, generation, {
+			...opts,
+			// 仅首包可吃预取 / 触发 onPlaybackStart
+			prefetchedCloud: i === 0 ? opts?.prefetchedCloud : null,
+			onPlaybackStart: i === 0 ? opts?.onPlaybackStart : undefined,
+			onCadenceChunk: parentOnCadence
+				? (event) => {
+						parentOnCadence({
+							...event,
+							sentenceIndex: baseSi + event.sentenceIndex,
+						});
+					}
+				: undefined,
+		});
+	}
+}
+
+function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
+	// 复用 Audio 换 src 后旧 readyState 可能短暂残留，须确认 currentSrc 已指向新资源
 	return new Promise((resolve, reject) => {
-		const onReady = () => {
+		let settled = false;
+		const finish = (ok: boolean) => {
+			if (settled) return;
+			settled = true;
 			cleanup();
-			resolve();
+			if (ok) resolve();
+			else reject(new Error('AUDIO_LOAD'));
 		};
-		const onError = () => {
-			cleanup();
-			reject(new Error('AUDIO_LOAD'));
-		};
+		const onReady = () => finish(true);
+		const onError = () => finish(false);
 		const cleanup = () => {
 			audio.removeEventListener('canplay', onReady);
 			audio.removeEventListener('error', onError);
 		};
 		audio.addEventListener('canplay', onReady, { once: true });
 		audio.addEventListener('error', onError, { once: true });
+		if (
+			audio.currentSrc &&
+			audio.networkState !== HTMLMediaElement.NETWORK_EMPTY &&
+			audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+		) {
+			finish(true);
+		}
 	});
 }
 
-async function startCloudAudioPlayback(audio: HTMLAudioElement): Promise<void> {
+async function startCloudAudioPlayback(
+	audio: HTMLAudioElement,
+	generation: number,
+	rate?: number,
+	onPlaybackStart?: () => void,
+): Promise<void> {
 	await waitCloudAudioCanPlay(audio);
-	try {
+	if (!isPlaybackGenerationActive(generation)) return;
+	// 必须在 src 就绪后设 playbackRate：改 src / load 会把倍速打回 1
+	audio.playbackRate = clampPlaybackRate(rate);
+
+	const playOnce = async () => {
+		// 软暂停中（含合成返回时 UI 已暂停）：等续播再 play，保留已挂好的 src
+		await waitWhileSoftPaused(generation);
+		if (!isPlaybackGenerationActive(generation)) return false;
+		if (playbackSoftPaused) return false;
 		await audio.play();
+		if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) {
+			withSuppressedAudioPauseEvent(() => {
+				audio.pause();
+			});
+			return false;
+		}
+		setEnglishPlaybackMediaState('playing');
+		onPlaybackStart?.();
+		return true;
+	};
+
+	try {
+		await playOnce();
 	} catch (err) {
+		if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) return;
 		if (!isTauriRuntime()) throw err;
 		audio.load();
 		await waitCloudAudioCanPlay(audio);
-		await audio.play();
+		if (!isPlaybackGenerationActive(generation)) return;
+		audio.playbackRate = clampPlaybackRate(rate);
+		await playOnce();
 	}
 }
 
@@ -1308,6 +1925,8 @@ function playCloudMp3Blob(
 	blob: Blob,
 	generation: number,
 	rate?: number,
+	onTimeUpdate?: (currentTime: number, duration: number) => void,
+	onPlaybackStart?: () => void,
 ): Promise<void> {
 	stopPlaybackMediaOnly();
 	if (!isPlaybackGenerationActive(generation)) {
@@ -1316,24 +1935,38 @@ function playCloudMp3Blob(
 
 	const url = URL.createObjectURL(blob);
 	cloudObjectUrl = url;
-	const audio = new Audio(url);
-	audio.playbackRate = clampPlaybackRate(rate);
-	cloudAudio = audio;
-	return startCloudAudioPlayback(audio).then(
-		() => waitCloudAudioEnd(audio, url, generation),
+	const audio = ensureCloudAudioEl();
+	audio.muted = false;
+	audio.volume = 1;
+	audio.src = url;
+	if (onTimeUpdate) {
+		audio.ontimeupdate = () => {
+			if (!isPlaybackGenerationActive(generation)) return;
+			onTimeUpdate(audio.currentTime, audio.duration);
+		};
+	}
+
+	bindCloudAudioPauseBridge(audio, generation);
+
+	// 先挂 onended，再 play：短音频可能在 then 链里注册监听前就结束，导致一直等到超时、UI 假播放
+	const ended = waitCloudAudioEnd(audio, url, generation);
+	let startNotified = false;
+	const notifyStart = () => {
+		if (startNotified) return;
+		startNotified = true;
+		onPlaybackStart?.();
+	};
+	return startCloudAudioPlayback(audio, generation, rate, notifyStart).then(
+		() => ended,
 		(err) => {
-			if (!isPlaybackGenerationActive(generation)) {
-				if (cloudObjectUrl === url) {
-					URL.revokeObjectURL(url);
-					cloudObjectUrl = null;
-					cloudAudio = null;
-				}
-				return Promise.resolve();
-			}
+			abortCloudAudioWait?.();
+			abortCloudAudioWait = null;
 			if (cloudObjectUrl === url) {
 				URL.revokeObjectURL(url);
 				cloudObjectUrl = null;
-				cloudAudio = null;
+			}
+			if (!isPlaybackGenerationActive(generation)) {
+				return Promise.resolve();
 			}
 			throw err;
 		},
@@ -1429,6 +2062,12 @@ async function speakEnglishTextWithGeneration(
 	const chunks = splitTextForTtsCadence(plain);
 	// 多段朗读语速稍慢，单段使用标准语速
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
+	let playbackStartNotified = false;
+	const notifyPlaybackStart = () => {
+		if (playbackStartNotified) return;
+		playbackStartNotified = true;
+		options?.onPlaybackStart?.();
+	};
 	// 分段顺次朗读
 	for (let i = 0; i < chunks.length; i += 1) {
 		// 朗读期间，世代快速变动需即刻 return
@@ -1444,6 +2083,7 @@ async function speakEnglishTextWithGeneration(
 		}
 		// 分段播放前事件钩子，可外部监听
 		emitCadenceChunk(options, plain, chunks, i, 'start');
+		if (i === 0) notifyPlaybackStart();
 		// 朗读当前 chunk，单段时用标准语速，多段时降为 chunkRate
 		await speakOneUtterance(chunk.text, generation, {
 			rate: options?.rate ?? chunkRate,
@@ -1462,10 +2102,23 @@ export async function speakEnglishText(
 	text: string,
 	options?: SpeakEnglishOptions,
 ): Promise<void> {
-	// 启动一个全新的播放 session（每次朗读时都会更新播放世代，避免并发/过期混乱）
+	// 先 begin 再 prime，避免 cancel 掉解锁静音片导致本机无声
 	const generation = beginPlaybackSession();
-	// 调用内部实现函数，实际朗读文本，带入当前世代参数
+	primeEnglishPlaybackForUserGesture();
 	await speakEnglishTextWithGeneration(text, generation, options);
+}
+
+/** 云端失败后改本机：清掉 Audio，并给 speechSynthesis 一点 settle 时间 */
+async function prepareLocalSpeechAfterCloud(generation: number): Promise<void> {
+	if (!isPlaybackGenerationActive(generation)) return;
+	stopPlaybackMediaOnly();
+	if (!isEnglishTtsSupported()) return;
+	await settleSpeechSynthesisAfterCancel();
+	try {
+		window.speechSynthesis.resume();
+	} catch {
+		// ignore
+	}
 }
 
 // 朗读英文文本优选本地或云端 TTS，自动处理分段语调与回退逻辑
@@ -1478,30 +2131,34 @@ export async function playEnglishPreferred(
 	// 空文本直接返回，不进行朗读
 	if (!plain) return;
 
-	// 仍在用户点击栈内：解锁 speech + Audio（线上 Edge 合成数秒，Tauri 须在此 prime）
+	const speakOpts = options?.speak;
+	const useCloud = shouldUseCloudEnglishTts(options);
+
+	// 用户明确选本机时清掉会话内 Edge 粘滞，避免设置已改仍走云端残态
+	if (options?.preferLocal === true || !useCloud) {
+		sessionCloudSourceOverride = null;
+	}
+
+	/**
+	 * 必须先 begin（cancel 旧 utterance）再 prime。
+	 * 若先 prime 再 begin，cancel 会干掉解锁用的静音片，本机 Web Speech 后续常无声。
+	 * 云端走 Audio，受影响较小，但本机试听/降级依赖此顺序。
+	 */
+	const generation = beginPlaybackSession();
 	primeEnglishPlaybackForUserGesture();
 
-	// 启动新的播放世代/session，后续朗读周期内保持唯一性，防止异步混乱
-	const generation = beginPlaybackSession();
-	// 外部透传的朗读语调/速度/音量选项
-	const speakOpts = options?.speak;
-	// 根据用户状态、设置判断是否优先使用云端 TTS
-	const useCloud = shouldUseCloudEnglishTts(options);
-	// 注入给分段 cadence 朗读的回调钩子，如分段事件、提前缓存音频等
 	const cadenceHooks: CadencePlaybackHooks = {
 		onCadenceChunk: options?.onCadenceChunk,
 		prefetchedCloud: options?.prefetchedCloud,
+		onPlaybackStart: options?.onPlaybackStart,
 	};
 
 	// 优先分支：本地 TTS
 	if (!useCloud) {
-		// 播放期间世代（播放 session）已失效直接返回（如已被 stop）
 		if (!isPlaybackGenerationActive(generation)) return;
-		// 浏览器本地 TTS 功能不可用时，抛出 NO_TTS 异常
 		if (!isEnglishTtsSupported()) {
 			throwNoTts();
 		}
-		// 实际调用本地 Web Speech 朗读，按设置参数与钩子
 		await speakEnglishTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
@@ -1509,25 +2166,52 @@ export async function playEnglishPreferred(
 		return;
 	}
 
-	// 云端优先路径，根据用户偏好及能力优先尝试云端；失败兜底本地
+	// 云端优先：失败时 MiniMax/讯飞 → Edge → 本机 Web Speech
+	const cloudPlayOpts = {
+		onCadenceChunk: options?.onCadenceChunk,
+		prefetchedCloud: options?.prefetchedCloud,
+		onPlaybackStart: options?.onPlaybackStart,
+		rate: speakOpts?.rate,
+		singleUtterance: options?.cloudSingleUtterance === true,
+	};
+
 	try {
-		// 调用云端 TTS 分段朗读，透传 cadence 钩子与用户参数
-		await playCloudTtsCadenceSegments(plain, generation, {
-			...cadenceHooks,
-			rate: speakOpts?.rate,
-		});
+		await playCloudTtsCadenceSegments(plain, generation, cloudPlayOpts);
 		return;
 	} catch {
-		const canFallbackLocal = isEnglishTtsSupported();
-		notifyCloudTtsFallback(canFallbackLocal);
 		if (!isPlaybackGenerationActive(generation)) return;
+
+		const preferred = loadMinimaxTtsUserPrefs().playbackSource;
+		const failedSource = effectiveCloudPlaybackSource();
+		// MiniMax / 讯飞挂了：同会话改走 Edge（勿复用已失败源的 prefetch）
+		if (
+			(preferred === 'cloud' || preferred === 'xfyun') &&
+			sessionCloudSourceOverride !== 'edge'
+		) {
+			try {
+				sessionCloudSourceOverride = 'edge';
+				notifyCloudFallbackToEdge(failedSource);
+				await playCloudTtsCadenceSegments(plain, generation, {
+					...cloudPlayOpts,
+					prefetchedCloud: null,
+				});
+				return;
+			} catch {
+				if (!isPlaybackGenerationActive(generation)) return;
+				lastCloudTtsErrorToastAt = 0;
+			}
+		}
+
+		const canFallbackLocal = isEnglishTtsSupported();
+		notifyCloudTtsFallback(canFallbackLocal, failedSource);
 		if (!canFallbackLocal) {
 			throwNoTts({ cloudTtsNotified: true });
 		}
-		// 回退本地朗读，参数同前
+		await prepareLocalSpeechAfterCloud(generation);
+		if (!isPlaybackGenerationActive(generation)) return;
 		await speakEnglishTextWithGeneration(rawText, generation, {
 			...speakOpts,
-			...cadenceHooks,
+			onCadenceChunk: options?.onCadenceChunk,
 		});
 	}
 }

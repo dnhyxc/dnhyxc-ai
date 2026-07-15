@@ -178,7 +178,7 @@ export function EpubThought({
 					createdAt={createdAt}
 					isPublic={isPublic !== false}
 				>
-					<p className="text-textcolor text-sm wrap-break-word">
+					<p className="text-textcolor text-justify text-sm wrap-break-word">
 						{content.trim() || t('ebook.read.thought.empty')}
 					</p>
 					{onDelete || onEdit ? (

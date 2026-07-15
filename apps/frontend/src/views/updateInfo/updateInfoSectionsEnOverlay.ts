@@ -1266,4 +1266,54 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When hovering a shelf card title, if the book is uncategorized or its category was deleted, the category name no longer shows blank — it falls back to “Uncategorized” (matching the Uncategorized tab).',
 	},
+	's25-74': {
+		title: 'EPUB listen: paragraph TTS',
+		description:
+			'Chapter listen and quote listen now synthesize cloud audio by paragraph while still highlighting sentence by sentence; the first sentence starts sooner and fewer requests are needed within a paragraph. Pause, sentence jump, and speed controls still work. EPUB only.',
+	},
+	's25-75': {
+		title: 'TOC jump restarts chapter listen',
+		description:
+			'While chapter listen is playing, picking another chapter in the book TOC continues listening from the start of that chapter and keeps your playback speed — no need to tap Listen again.',
+	},
+	's25-76': {
+		title: 'Listen speed and play-state fixes',
+		description:
+			'Cloud chapter listen now matches the chosen playback speed in the UI; when a clip ends or you stop, the bottom bar no longer stays stuck on “playing”.',
+	},
+	's25-77': {
+		title: 'Return-to-play across distant chapters',
+		description:
+			'In continuous-scroll listen mode, if you scroll far away, the “return to playback” control correctly jumps back to the sentence being read and resumes follow.',
+	},
+	's25-78': {
+		title: 'Listen prefetch after first sound',
+		description:
+			'When starting chapter listen, jumping sentences, or using quote listen, the current sentence plays first; later content is prefetched in the background to reduce first-sound wait.',
+	},
+	's25-79': {
+		title: 'Listen bar: previous / next chapter',
+		description:
+			'On the chapter-listen bottom bar, the side arrows now jump to the previous or next chapter (resume from the start of that chapter and keep your speed). Use the sentence list to jump to a specific sentence. Chapter arrows are disabled during quote listen.',
+	},
+	's25-80': {
+		title: 'Listen pause resume and system media sync',
+		description:
+			'After pausing chapter listen or quote listen, resume continues from the pause position instead of restarting the whole segment. System Control Center or headset media keys stay in sync with the bottom bar. Stopping listen ends speech and unbinds media-key handlers.',
+	},
+	's25-81': {
+		title: 'Listen play button loading',
+		description:
+			'While chapter listen or quote listen is fetching the current utterance and has not started playing yet, the bottom-bar play button shows a loading state. Background prefetch does not trigger that loading state.',
+	},
+	's25-82': {
+		title: 'Sentence list and TOC selection follow reader theme',
+		description:
+			'After you change the reading background in reader settings, the active item in the listen sentence list and book contents drawer uses the reading text color for background and type, so it stays readable on light themes.',
+	},
+	's25-83': {
+		title: 'Shelf progress percentage display',
+		description:
+			'The “about X% read” label on shelf cards now shows a whole-number percentage instead of a long decimal.',
+	},
 };

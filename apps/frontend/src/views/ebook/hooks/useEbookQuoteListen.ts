@@ -5,18 +5,23 @@ import {
 	applyActiveEnglishPlaybackRate,
 	buildSentenceOffsetSpans,
 	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	prefetchCloudEnglishTts,
+	pauseEnglishPlaybackSoft,
 	primeEnglishPlaybackForUserGesture,
+	registerEnglishPlaybackMediaHandlers,
+	resumeEnglishPlaybackSoft,
 	stopAllEnglishPlayback,
 	stripMarkdownForTts,
 	warmupEnglishTtsVoices,
 } from '@/utils/englishTts';
 import {
+	buildParagraphUnits,
+	type ParagraphUnit,
+} from '../utils/epub/listen/epubListenParagraphs';
+import { playListenUnitsFromCursor } from '../utils/epub/listen/epubListenPlayUnits';
+import {
 	beginEpubListenOverlaySession,
 	clearActiveListenHighlight,
 	clearEpubListenSegmentOverlay,
-	getEpubListenSentenceSpokenRaw,
 	getEpubListenSessionMeta,
 	getEpubListenSessionPlain,
 	invokeStopChapterListen,
@@ -53,18 +58,6 @@ function buildLabelsFromPlain(plain: string): string[] {
 	});
 }
 
-function resolveSpokenAt(index: number, fallbackPlain: string): string | null {
-	const fromSession = getEpubListenSentenceSpokenRaw(index);
-	if (fromSession) return fromSession;
-	const spans = buildSentenceOffsetSpans(fallbackPlain.trim());
-	const span = spans[index];
-	if (!span) return null;
-	const raw = stripMarkdownForTts(
-		fallbackPlain.slice(span.start, span.end),
-	).trim();
-	return raw || null;
-}
-
 /** 电子书引用/选区朗读：复用英语学习 TTS，并与听书共用底部播放条 */
 export function useEbookQuoteListen(
 	t: (key: string) => string,
@@ -92,6 +85,8 @@ export function useEbookQuoteListen(
 	const sentenceCursorRef = useRef(0);
 	const playingKeyRef = useRef<string | null>(null);
 	const fallbackPlainRef = useRef('');
+	const paragraphsRef = useRef<ParagraphUnit[]>([]);
+	const sentencesRef = useRef<Array<{ start: number; end: number }>>([]);
 
 	const syncState = useCallback((patch: Partial<QuoteListenState>) => {
 		setState((prev) => {
@@ -106,11 +101,16 @@ export function useEbookQuoteListen(
 		pausedRef.current = false;
 		playingKeyRef.current = null;
 		fallbackPlainRef.current = '';
+		paragraphsRef.current = [];
+		sentencesRef.current = [];
 		stopAllEnglishPlayback();
+		// 同步卸 Media Session，勿等 isActive effect：否则 macOS 仍残留进度条/控件
+		registerEnglishPlaybackMediaHandlers(null);
 		clearEpubListenSegmentOverlay();
 		setPlayingKey(null);
-		setState(IDLE_STATE);
-		stateRef.current = IDLE_STATE;
+		const idle = { ...IDLE_STATE, rate: rateRef.current };
+		setState(idle);
+		stateRef.current = idle;
 		if (opts?.notify !== false) onSessionEndRef.current?.();
 	}, []);
 
@@ -125,94 +125,66 @@ export function useEbookQuoteListen(
 
 	const isGenActive = (gen: number) => gen === loopGenRef.current;
 
-	// playFromCursor：从当前句指针（sentenceCursorRef.current）开始的逐句播放主循环，支持播放到末句或用户主动打断
+	/** 从当前句起播：首句逐句快出声，同段剩余与后续按段预取/合成 */
 	const playFromCursor = useCallback(
 		async (gen: number): Promise<boolean> => {
-			// 当前 EPUB rendition 实例，可能为 null
 			const rend = getRenditionRef.current?.() ?? null;
-			// 获取当前 listen 会话的元信息（分句等），可能为 null
 			const meta = getEpubListenSessionMeta();
-			// 实际要朗读的 plain 文本，优先取 meta.plain，否则用 fallback
 			const plain = meta?.plain ?? fallbackPlainRef.current;
-			// 分句总数，优先取 meta.sentenceCount，否则实时用构造函数分句
-			const sentenceCount =
-				meta?.sentenceCount ?? buildSentenceOffsetSpans(plain.trim()).length;
+			const sentences =
+				sentencesRef.current.length > 0
+					? sentencesRef.current
+					: buildSentenceOffsetSpans(plain.trim());
+			const units =
+				paragraphsRef.current.length > 0
+					? paragraphsRef.current
+					: buildParagraphUnits(plain.trim(), sentences);
+			const sentenceCount = sentences.length;
 
-			// 空文本或无可播放句时，立即返回 false
-			if (!plain.trim() || sentenceCount <= 0) return false;
-
-			// 用于缓存句索引到云端 TTS 预取 Promise（避免重复请求）
-			const prefetchedByIndex = new Map<
-				number,
-				ReturnType<typeof prefetchCloudEnglishTts>
-			>();
-
-			// 预取指定句 index 用的 TTS 音频（下一个句要用时更快）
-			const schedulePrefetch = (index: number) => {
-				// 判断：索引超界或已预取则不再处理
-				if (index >= sentenceCount || prefetchedByIndex.has(index)) return;
-				// 拿到本句要播放的原始文本
-				const raw = resolveSpokenAt(index, plain);
-				// 拿不到原文（容错）则跳过
-				if (!raw) return;
-				// 以 index 为 key 记录预取 Promise
-				prefetchedByIndex.set(index, prefetchCloudEnglishTts(raw));
-			};
-			// 首次启动时预取下一句，优化流畅衔接
-			schedulePrefetch(sentenceCursorRef.current + 1);
-
-			// 主循环：从当前游标开始，播放到最后一句（或被打断/暂停提前终止）
-			for (let si = sentenceCursorRef.current; si < sentenceCount; si += 1) {
-				// 若当前 gen 失效/被暂停，提前终止循环（返回 false 退出）
-				if (!isGenActive(gen) || pausedRef.current) return false;
-
-				// 获取当前句要播放的原始文本，空句跳过
-				const spokenRaw = resolveSpokenAt(si, plain);
-				if (!spokenRaw) continue;
-
-				// 更新当前句指针，推进 playback
-				sentenceCursorRef.current = si;
-				// 让外部 state 更新「正在播放第几句」状态
-				syncState({
-					status: 'playing',
-					sentenceIndex: si,
-					sentenceCount,
-				});
-
-				// 若有 rendition，显示淡黄高亮区块
-				if (rend) showEpubListenPlainSpan(0, 0, si);
-
-				// 提前预取下一句的音频资源（云端优先）
-				schedulePrefetch(si + 1);
-
-				try {
-					// 播放当前句音频（本地或云端优选）；预取缓存注入提升命中率
-					await playEnglishPreferred(spokenRaw, {
-						speak: { rate: rateRef.current },
-						prefetchedCloud: prefetchedByIndex.get(si) ?? null,
-					});
-				} catch (err) {
-					if (
-						isGenActive(gen) &&
-						!(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
-					) {
-						Toast({
-							type: 'warning',
-							title: tRef.current('englishLearning.tts.unsupported'),
-						});
-					}
-					// 发生异常提前终止播放流程
-					return false;
-				}
-
-				// 再度确认未被打断/暂停，始终谨慎提前退出
-				if (!isGenActive(gen) || pausedRef.current) return false;
-				// 清理当前的高亮 listen 区块
-				if (rend) clearActiveListenHighlight(rend);
+			if (!plain.trim() || sentenceCount <= 0 || units.length === 0) {
+				return false;
 			}
 
-			// 真正完整播放到尾时，返回 true，否则外部可据此做轮询保障
-			return isGenActive(gen);
+			sentencesRef.current = sentences;
+			paragraphsRef.current = units;
+
+			try {
+				return await playListenUnitsFromCursor({
+					plain,
+					sentences,
+					units,
+					startSi: sentenceCursorRef.current,
+					getRate: () => rateRef.current,
+					isActive: () => isGenActive(gen) && !pausedRef.current,
+					onSentence: (globalSi) => {
+						sentenceCursorRef.current = globalSi;
+						syncState({
+							status: 'playing',
+							sentenceIndex: globalSi,
+							sentenceCount,
+						});
+						if (rend) showEpubListenPlainSpan(0, 0, globalSi);
+					},
+					onUnitIdle: () => {
+						if (rend) clearActiveListenHighlight(rend);
+					},
+					onAwaitingCurrentTts: (waiting) => {
+						if (!isGenActive(gen) || pausedRef.current) return;
+						syncState({ status: waiting ? 'loading' : 'playing' });
+					},
+				});
+			} catch (err) {
+				if (
+					isGenActive(gen) &&
+					!(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
+				) {
+					Toast({
+						type: 'warning',
+						title: tRef.current('englishLearning.tts.unsupported'),
+					});
+				}
+				return false;
+			}
 		},
 		[syncState],
 	);
@@ -259,13 +231,16 @@ export function useEbookQuoteListen(
 			if (!speakPlain.trim()) return;
 
 			fallbackPlainRef.current = speakPlain;
+			const sentences = buildSentenceOffsetSpans(speakPlain.trim());
+			sentencesRef.current = sentences;
+			paragraphsRef.current = buildParagraphUnits(speakPlain.trim(), sentences);
+
 			const meta = getEpubListenSessionMeta();
 			const labels = meta?.sentenceLabels ?? buildLabelsFromPlain(speakPlain);
 			const sentenceCount = meta?.sentenceCount ?? labels.length;
 
 			const gen = ++loopGenRef.current;
 			pausedRef.current = false;
-			rateRef.current = stateRef.current.rate || 1;
 			sentenceCursorRef.current = 0;
 			playingKeyRef.current = key;
 			setPlayingKey(key);
@@ -307,16 +282,20 @@ export function useEbookQuoteListen(
 	);
 
 	const pause = useCallback(() => {
-		if (stateRef.current.status !== 'playing') return;
+		const status = stateRef.current.status;
+		if (status !== 'playing' && status !== 'loading') return;
 		pausedRef.current = true;
-		loopGenRef.current += 1;
-		stopAllEnglishPlayback();
+		pauseEnglishPlaybackSoft();
 		syncState({ status: 'paused' });
 	}, [syncState]);
 
 	const resume = useCallback(() => {
 		if (stateRef.current.status !== 'paused') return;
 		pausedRef.current = false;
+		if (resumeEnglishPlaybackSoft()) {
+			syncState({ status: 'playing' });
+			return;
+		}
 		const gen = ++loopGenRef.current;
 		syncState({ status: 'loading' });
 		void playFromCursor(gen).then((finished) => {
@@ -324,6 +303,11 @@ export function useEbookQuoteListen(
 			else if (!pausedRef.current && isGenActive(gen)) stopInternal();
 		});
 	}, [playFromCursor, stopInternal, syncState]);
+
+	const pauseRef = useRef(pause);
+	pauseRef.current = pause;
+	const resumeRef = useRef(resume);
+	resumeRef.current = resume;
 
 	const stop = useCallback(() => {
 		stopInternal();
@@ -365,11 +349,12 @@ export function useEbookQuoteListen(
 	);
 
 	const togglePlay = useCallback(() => {
-		if (stateRef.current.status === 'playing') {
+		const status = stateRef.current.status;
+		if (status === 'playing' || status === 'loading') {
 			pause();
 			return;
 		}
-		if (stateRef.current.status === 'paused') {
+		if (status === 'paused') {
 			resume();
 		}
 	}, [pause, resume]);
@@ -384,6 +369,15 @@ export function useEbookQuoteListen(
 		state.status === 'loading' ||
 		state.status === 'playing' ||
 		state.status === 'paused';
+
+	useEffect(() => {
+		if (!isActive) return;
+		registerEnglishPlaybackMediaHandlers({
+			play: () => resumeRef.current(),
+			pause: () => pauseRef.current(),
+		});
+		return () => registerEnglishPlaybackMediaHandlers(null);
+	}, [isActive]);
 
 	return {
 		...state,

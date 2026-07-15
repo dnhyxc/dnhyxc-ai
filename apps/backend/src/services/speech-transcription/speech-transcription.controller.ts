@@ -202,4 +202,14 @@ export class SpeechTranscriptionController {
 			type: this.edgeTtsService.resolveContentType(),
 		});
 	}
+
+	/**
+	 * Edge TTS + WordBoundary 时间戳（JSON：audioBase64 + boundaries）。
+	 * 小程序听书段内句高亮用；旧客户端继续走 /edge/speech 二进制。
+	 */
+	@Post('edge/speech/timed')
+	async edgeSpeechTimed(@Body() body: EdgeTtsDto, @Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		return this.edgeTtsService.synthesizeSpeechTimed(body, userId);
+	}
 }

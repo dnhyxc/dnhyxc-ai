@@ -6,7 +6,7 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
-import { Button, ScrollArea } from '@ui/index';
+import { Button, ScrollArea, Spinner } from '@ui/index';
 import {
 	ChevronLeft,
 	ChevronRight,
@@ -479,8 +479,10 @@ type Props = {
 	rate: number;
 	onTogglePlay: () => void;
 	onStop: () => void;
-	onPrevSentence: () => void;
-	onNextSentence: () => void;
+	onPrevChapter: () => void;
+	onNextChapter: () => void;
+	canPrevChapter?: boolean;
+	canNextChapter?: boolean;
 	onGoToSentence: (index: number) => void;
 	onRateChange: (rate: number) => void;
 	/** 受控：分句下拉是否展开（便于阅读区 pointer 关闭） */
@@ -503,8 +505,10 @@ export function EpubListenPlayerBar({
 	rate,
 	onTogglePlay,
 	onStop,
-	onPrevSentence,
-	onNextSentence,
+	onPrevChapter,
+	onNextChapter,
+	canPrevChapter = false,
+	canNextChapter = false,
 	onGoToSentence,
 	onRateChange,
 	sentenceMenuOpen: sentenceMenuOpenProp,
@@ -561,9 +565,11 @@ export function EpubListenPlayerBar({
 		>
 			<Tooltip
 				content={
-					playing
-						? t('ebook.read.listenBook.pause')
-						: t('ebook.read.listenBook.resume')
+					loading
+						? t('ebook.read.listenBook.loading')
+						: playing
+							? t('ebook.read.listenBook.pause')
+							: t('ebook.read.listenBook.resume')
 				}
 			>
 				<Button
@@ -571,15 +577,19 @@ export function EpubListenPlayerBar({
 					variant="ghost"
 					size="icon-sm"
 					className="text-teal-500 shrink-0"
-					disabled={loading}
+					aria-busy={loading}
 					aria-label={
-						playing
-							? t('ebook.read.listenBook.pause')
-							: t('ebook.read.listenBook.resume')
+						loading
+							? t('ebook.read.listenBook.loading')
+							: playing
+								? t('ebook.read.listenBook.pause')
+								: t('ebook.read.listenBook.resume')
 					}
 					onClick={onTogglePlay}
 				>
-					{playing ? (
+					{loading ? (
+						<Spinner className="size-4 text-teal-500" aria-hidden />
+					) : playing ? (
 						<Pause className="size-4" aria-hidden />
 					) : (
 						<Play className="size-4" aria-hidden />
@@ -651,29 +661,29 @@ export function EpubListenPlayerBar({
 				</DropdownMenuContent>
 			</DropdownMenu>
 
-			<Tooltip content={t('ebook.read.listenBook.prevSentence')}>
+			<Tooltip content={t('ebook.read.listenBook.prevChapter')}>
 				<Button
 					type="button"
 					variant="ghost"
 					size="icon-sm"
 					className="text-textcolor/80 shrink-0"
-					disabled={loading || sentenceIndex <= 0}
-					aria-label={t('ebook.read.listenBook.prevSentence')}
-					onClick={onPrevSentence}
+					disabled={loading || !canPrevChapter}
+					aria-label={t('ebook.read.listenBook.prevChapter')}
+					onClick={onPrevChapter}
 				>
 					<ChevronLeft className="size-4" aria-hidden />
 				</Button>
 			</Tooltip>
 
-			<Tooltip content={t('ebook.read.listenBook.nextSentence')}>
+			<Tooltip content={t('ebook.read.listenBook.nextChapter')}>
 				<Button
 					type="button"
 					variant="ghost"
 					size="icon-sm"
 					className="text-textcolor/80 shrink-0"
-					disabled={loading || sentenceIndex >= sentenceCount - 1}
-					aria-label={t('ebook.read.listenBook.nextSentence')}
-					onClick={onNextSentence}
+					disabled={loading || !canNextChapter}
+					aria-label={t('ebook.read.listenBook.nextChapter')}
+					onClick={onNextChapter}
 				>
 					<ChevronRight className="size-4" aria-hidden />
 				</Button>

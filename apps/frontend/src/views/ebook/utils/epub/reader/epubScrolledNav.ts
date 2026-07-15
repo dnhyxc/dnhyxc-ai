@@ -188,11 +188,17 @@ function alignElementTopToContainer(
 }
 
 async function trimContinuousViews(rend: Rendition): Promise<void> {
-	const trim = (
+	const manager = (
 		rend as unknown as { manager?: { trim?: () => Promise<unknown> } }
-	).manager?.trim;
+	).manager;
+	const trim = manager?.trim;
 	if (!trim) return;
-	await Promise.resolve(trim()).catch(() => undefined);
+	// epub.js continuous trim 内部会读 views；manager 未就绪时同步抛错，不能只 .catch Promise
+	try {
+		await Promise.resolve(trim.call(manager));
+	} catch {
+		// ponytail: 目录跳转 settle 时偶发 views 未挂好；跳过 trim，后续对齐仍可用
+	}
 }
 
 function alignScrolledNavTarget(
@@ -400,6 +406,7 @@ export function scrollEpubDomRangeToCenter(
 
 /**
  * 听书分句跳转等：将 Range 滚到视口中央；分页模式回退 scrollEpubRangeIntoView。
+ * 连续滚动下若章 iframe 已被 trim，DOM 滚动无效，需 display(cfi) 重新挂载。
  */
 export async function scrollEpubRangeToViewCenter(
 	rend: Rendition,
@@ -407,18 +414,29 @@ export async function scrollEpubRangeToViewCenter(
 	fallbackCfi?: string,
 ): Promise<boolean> {
 	if (getEpubScrollContainer(rend)) {
-		try {
-			return scrollEpubDomRangeToCenter(rend, range);
-		} catch {
-			return false;
+		if (canScrollDomRangeInLayout(range)) {
+			try {
+				if (scrollEpubDomRangeToCenter(rend, range)) {
+					try {
+						if (isEpubRangeInReaderView(rend, range, QUOTE_VIEW_MARGIN_PX)) {
+							return true;
+						}
+					} catch {
+						// fall through → CFI
+					}
+				}
+			} catch {
+				// fall through → CFI
+			}
 		}
+		return bringEpubCfiIntoScrolledView(rend, range, fallbackCfi, 'center');
 	}
 	return scrollEpubRangeIntoView(rend, range, fallbackCfi);
 }
 
 /**
  * 听当前 / 引用定位：Range 不在视口内时滚入可见区域。
- * 连续滚动调容器 scrollTop；分页模式 rend.display(cfi) 翻页。
+ * 连续滚动调容器 scrollTop；跨章 trim 后回退 rend.display(cfi)；分页模式同样走 CFI。
  */
 export async function scrollEpubRangeIntoView(
 	rend: Rendition,
@@ -430,11 +448,26 @@ export async function scrollEpubRangeIntoView(
 			return true;
 		}
 	} catch {
-		return false;
+		// range/iframe 可能已因 continuous trim 失效
 	}
 
 	if (getEpubScrollContainer(rend)) {
-		return scrollEpubDomRangeIntoView(rend, range);
+		if (canScrollDomRangeInLayout(range)) {
+			try {
+				if (scrollEpubDomRangeIntoView(rend, range)) {
+					try {
+						if (isEpubRangeInReaderView(rend, range, QUOTE_VIEW_MARGIN_PX)) {
+							return true;
+						}
+					} catch {
+						// fall through → CFI
+					}
+				}
+			} catch {
+				// fall through → CFI
+			}
+		}
+		return bringEpubCfiIntoScrolledView(rend, range, fallbackCfi, 'nearest');
 	}
 
 	const cfi = cfiFromDomRange(rend, range)?.trim() || fallbackCfi?.trim();
@@ -455,6 +488,54 @@ export async function scrollEpubRangeIntoView(
 	if (!resolved) return true;
 	try {
 		return isEpubRangeInReaderView(rend, resolved, QUOTE_VIEW_MARGIN_PX);
+	} catch {
+		return true;
+	}
+}
+
+/** continuous 下目标章 iframe 仍挂在布局里时才可直接改 scrollTop */
+function canScrollDomRangeInLayout(range: Range): boolean {
+	try {
+		const win = range.startContainer.ownerDocument?.defaultView;
+		const iframe = win?.frameElement as HTMLIFrameElement | null;
+		if (!iframe?.isConnected) return false;
+		const rect = iframe.getBoundingClientRect();
+		return rect.width > 0 || rect.height > 0;
+	} catch {
+		return false;
+	}
+}
+
+/** 用 CFI 重新 display 挂载目标章，再滚入视口（跨章听书回到播放位置） */
+async function bringEpubCfiIntoScrolledView(
+	rend: Rendition,
+	range: Range | null,
+	fallbackCfi: string | undefined,
+	align: 'nearest' | 'center',
+): Promise<boolean> {
+	const cfi =
+		(range ? cfiFromDomRange(rend, range)?.trim() : '') ||
+		fallbackCfi?.trim() ||
+		'';
+	if (!cfi) return false;
+
+	try {
+		await rend.display(cfi);
+		await new Promise<void>((resolve) => {
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => resolve());
+			});
+		});
+	} catch {
+		return false;
+	}
+
+	const resolved = resolveCfiDomRange(rend, cfi);
+	if (!resolved) return true;
+	try {
+		return align === 'center'
+			? scrollEpubDomRangeToCenter(rend, resolved)
+			: scrollEpubDomRangeIntoView(rend, resolved);
 	} catch {
 		return true;
 	}

@@ -2,6 +2,8 @@
 
 ## 延伸阅读
 
+- [EPUB 听书：首包出声后再预取](epub-listen-prefetch-after-start.md) — `onPlaybackStart` 错开首包与预取 HTTP（本篇句间预取的后续优化）
+- [EPUB 听书：跨章 trim 后 FAB CFI 重挂载](epub-listen-follow-cfi-remount.md) — FAB 回位与滚动（与本篇带宽优化正交）
 - [epub-listen-cloud-prefetch.md](../Influence-point/epub-listen-cloud-prefetch.md) — **影响面矩阵**与回归清单
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册
 - [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) — 句界算法（与本篇正交，可同轮发布）

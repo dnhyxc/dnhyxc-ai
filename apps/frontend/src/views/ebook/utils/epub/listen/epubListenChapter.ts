@@ -130,12 +130,13 @@ function pickDocumentForListen(
 			const doc = view.contents?.document;
 			if (doc?.body && sectionPlain(doc)) return doc;
 		}
+		// continuous 下 views() 可能尚未带上目标章：继续走可视兜底
 	}
 
 	// 只有一个文档，直接返回
 	if (docs.length === 1) return docs[0]!;
 
-	// 多文档时，优先选择屏幕正中处的 iframe
+	// 多文档时，优先选择屏幕正中处的 iframe（目录跳转后目标章应在视口）
 	const host = getEpubScrollContainer(rend);
 	const centerY = host
 		? host.getBoundingClientRect().top + host.getBoundingClientRect().height / 2
@@ -146,24 +147,29 @@ function pickDocumentForListen(
 		if (!frame) continue;
 		const rect = frame.getBoundingClientRect();
 		if (rect.height <= 0) continue;
-		// 判断 frame 是否跨越屏幕中心线（可视内容优先级最高）
 		if (rect.top <= centerY && rect.bottom >= centerY) return doc;
 	}
 
-	// 兜底返回第一个有效文档
 	return docs[0]!;
 }
 
 /**
  * 获取当前文档的 spine index（优先用传入 hint，否则兼容 epubjs 的 location/start/index）
  */
-function spineIndexFromRendition(rend: Rendition, hint?: number): number {
+export function listenSpineIndexFromRendition(
+	rend: Rendition,
+	hint?: number,
+): number {
 	if (hint != null && Number.isFinite(hint) && hint >= 0) return hint;
 	const loc = (
 		rend as Rendition & { location?: { start?: { index?: number } } }
 	).location;
 	const idx = loc?.start?.index;
 	return idx != null && Number.isFinite(idx) ? idx : 0;
+}
+
+function spineIndexFromRendition(rend: Rendition, hint?: number): number {
+	return listenSpineIndexFromRendition(rend, hint);
 }
 
 /**

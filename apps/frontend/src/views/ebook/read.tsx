@@ -35,6 +35,7 @@ import {
 import useStore from '@/store';
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
+import { primeEnglishPlaybackForUserGesture } from '@/utils/englishTts';
 import { getRequestErrorMessage } from '@/utils/fetch';
 import { EbookPageShell } from './components/layout/EbookPageShell';
 import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
@@ -206,6 +207,8 @@ function EbookReadPage() {
 		() => epubNavRef.current?.syncReadingAnnotations(),
 		() => epubSpineIndexRef.current ?? epubSpineIndex,
 	);
+	const chapterListenRef = useRef(chapterListen);
+	chapterListenRef.current = chapterListen;
 
 	const { toggleListen, listenLabel, ...quoteListen } = useEbookQuoteListen(
 		t,
@@ -1293,6 +1296,107 @@ function EbookReadPage() {
 			),
 		[tocItems, book?.fmt, pdfPage, epubSpineIndex],
 	);
+
+	/** EPUB 目录/听书切章共用：go → 听书中则 restartFromChapterStart */
+	const goEpubTocHref = useCallback((href: string, spineIndex?: number) => {
+		const target = href.trim();
+		if (!target) return;
+		if (spineIndex != null && Number.isFinite(spineIndex)) {
+			epubSpineIndexRef.current = spineIndex;
+			setEpubSpineIndex(spineIndex);
+		}
+		const listen = chapterListenRef.current;
+		const wasListening = listen.isActive;
+		if (wasListening) {
+			primeEnglishPlaybackForUserGesture();
+			listen.stop({ notify: false });
+		}
+		void (async () => {
+			try {
+				await epubNavRef.current?.go(target);
+			} catch {
+				// ignore
+			}
+			const rend = epubNavRef.current?.getRendition();
+			const loc = (
+				rend as { location?: { start?: { index?: number } } } | null | undefined
+			)?.location?.start?.index;
+			if (loc != null && Number.isFinite(loc)) {
+				epubSpineIndexRef.current = loc;
+				setEpubSpineIndex(loc);
+			}
+			if (wasListening) {
+				chapterListenRef.current.restartFromChapterStart();
+			}
+		})();
+	}, []);
+
+	const listenTocIndex = chapterListen.isActive
+		? findActiveTocItemIndex(tocItems, {
+				epubSpineIndex: epubListenBar.spineIndex,
+			})
+		: -1;
+
+	const findListenTocNeighbor = useCallback(
+		(from: number, delta: -1 | 1): EbookTocItem | null => {
+			for (let i = from + delta; i >= 0 && i < tocItems.length; i += delta) {
+				const href = tocItems[i]?.href?.trim();
+				if (href && parsePdfPageHref(href) == null) return tocItems[i];
+			}
+			return null;
+		},
+		[tocItems],
+	);
+
+	/** 听书底栏切章：优先目录相邻项（与点目录一致）；无目录时回退 spine±1 */
+	const goListenChapter = useCallback(
+		(delta: -1 | 1) => {
+			const listen = chapterListenRef.current;
+			if (!listen.isActive) return;
+
+			const active = findActiveTocItemIndex(tocItems, {
+				epubSpineIndex: listen.spineIndex,
+			});
+			if (active >= 0) {
+				const neighbor = findListenTocNeighbor(active, delta);
+				const href = neighbor?.href?.trim();
+				if (href) {
+					goEpubTocHref(href, neighbor?.spineIndex);
+					return;
+				}
+			}
+
+			const spine = epubNavRef.current?.getBook()?.spine as
+				| {
+						length?: number;
+						get?: (i: number) => { href?: string } | null;
+				  }
+				| undefined;
+			const len = spine?.length ?? 0;
+			const target = listen.spineIndex + delta;
+			if (!spine?.get || target < 0 || target >= len) return;
+			const href = spine.get(target)?.href?.trim();
+			if (!href) return;
+			goEpubTocHref(href, target);
+		},
+		[findListenTocNeighbor, goEpubTocHref, tocItems],
+	);
+
+	const canListenPrevChapter =
+		chapterListen.isActive &&
+		(listenTocIndex >= 0
+			? findListenTocNeighbor(listenTocIndex, -1) != null
+			: epubListenBar.spineIndex > 0);
+	const canListenNextChapter =
+		chapterListen.isActive &&
+		(listenTocIndex >= 0
+			? findListenTocNeighbor(listenTocIndex, 1) != null
+			: epubNavReady &&
+				epubListenBar.spineIndex >= 0 &&
+				epubListenBar.spineIndex <
+					((epubNavRef.current?.getBook()?.spine as { length?: number })
+						?.length ?? 0) -
+						1);
 
 	const savePage = useCallback(
 		(page: number, percent?: number) => {
@@ -2538,8 +2642,10 @@ function EbookReadPage() {
 								rate={epubListenBar.rate}
 								onTogglePlay={epubListenBar.togglePlay}
 								onStop={epubListenBar.stop}
-								onPrevSentence={epubListenBar.prevSentence}
-								onNextSentence={epubListenBar.nextSentence}
+								onPrevChapter={() => goListenChapter(-1)}
+								onNextChapter={() => goListenChapter(1)}
+								canPrevChapter={canListenPrevChapter}
+								canNextChapter={canListenNextChapter}
 								onGoToSentence={epubListenBar.goToSentence}
 								onRateChange={epubListenBar.setRate}
 								sentenceMenuOpen={listenSentenceMenuOpen}
@@ -2591,18 +2697,15 @@ function EbookReadPage() {
 				chromeStyle={
 					book.fmt === 'epub' ? epubSurfaceProps?.chromeStyle : undefined
 				}
-				onSelect={(href) => {
+				onSelect={(item) => {
+					const href = item.href?.trim() ?? '';
+					if (!href) return;
 					const pdfPage = parsePdfPageHref(href);
 					if (pdfPage != null) {
 						pdfNavRef.current?.go(pdfPage);
 						return;
 					}
-					void (async () => {
-						await epubNavRef.current?.go(href);
-						if (chapterListen.isActive) {
-							chapterListen.syncToCurrentView();
-						}
-					})();
+					goEpubTocHref(href, item.spineIndex);
 				}}
 			/>
 

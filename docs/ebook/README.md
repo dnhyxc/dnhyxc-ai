@@ -53,6 +53,8 @@
 | [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（plain 偏移、选区缓存；**绘制层见 host 浮层专题**）                                                               |
 | [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
 | [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
+| [epub-listen-follow-cfi-remount.md](./epub-listen-follow-cfi-remount.md)               | **增量**：连续滚动听书跨章 trim 后 FAB 回位无效 — CFI display 重挂载与句 Range 重建                                                              |
+| [epub-listen-prefetch-after-start.md](./epub-listen-prefetch-after-start.md)           | **增量**：听书/听当前首包出声后再预取（`onPlaybackStart` 错开 HTTP，kick 仅当前句）                                                           |
 | [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
 | [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md)     | **增量**：连续滚动听书逐 iframe 节间衔接（`runScrollSectionLoop` / `advanceScrollListenSection`） |
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
@@ -65,6 +67,16 @@
 | [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |
 | [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)         | **增量**：听读分句句首中文标点（`……`、`——`、开引号与句界算法对称处理）                                                  |
 | [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)                           | **增量**：听书/听当前句间云端 TTS 预取（`prefetchCloudEnglishTts` 缩短连播句间等待）                                  |
+| [epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)           | **本轮索引**：听书播放已落地问题 → 专题链接（含切章 / 软暂停 / loading / 选中色 / 进度取整等）                      |
+| [epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md)                             | **增量（本轮）**：按段 TTS + 逐句高亮（kick 首句、`playListenUnitsFromCursor`、`cloudSingleUtterance`）                 |
+| [epub-listen-toc-chapter-restart.md](./epub-listen-toc-chapter-restart.md)                 | **增量**：听书中点目录切章 → `restartFromChapterStart`（第 0 句）；`trimContinuousViews` try/catch                   |
+| [epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)                             | **增量（2026-07-15）**：底栏 ◀▶ 改上一章/下一章（TOC 邻项 + `goEpubTocHref`）；听当前禁用切章                      |
+| [epub-listen-soft-pause.md](./epub-listen-soft-pause.md)                                       | **增量（2026-07-15）**：软暂停续播；系统媒体键↔底栏同步；退出 `register(null)` 拆除；macOS Now Playing 限制说明     |
+| [epub-listen-play-loading.md](./epub-listen-play-loading.md)                                     | **增量（2026-07-15）**：当前 TTS pending 时播放钮 Spinner（`onAwaitingCurrentTts`；预取不触发）                      |
+| [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md)                           | **增量（2026-07-15）**：分句/目录选中态跟阅读字色（`text-textcolor`，勿用 `text-theme`）                            |
+| [ebook-shelf-progress-pct.md](./ebook-shelf-progress-pct.md)                                     | **增量（2026-07-15）**：书架「已读约」百分比展示层取整，去掉冗长小数                                              |
+| [epub-listen-rate-after-src.md](./epub-listen-rate-after-src.md)                             | **增量**：云端听书 UI 倍速无效修复（复用 Audio 后须在 canplay 后设 `playbackRate`）                                   |
+| [epub-listen-audio-end-ui.md](./epub-listen-audio-end-ui.md)                                 | **增量**：音频已停但 UI 仍播放中（`abortCloudAudioWait`、先挂 `waitCloudAudioEnd` 再 `play`）                         |
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)                       | **增量（纯重构）**：mark 层公共 utils 抽取至 `epubMarkShared.ts` + geometry export，行为不变                          |
 | [ebook-folder-archive.md](./ebook-folder-archive.md)                                       | **增量（纯重构）**：`utils/`、`components/` 按功能域分子目录归档 + import 路径对照表，行为不变                        |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |

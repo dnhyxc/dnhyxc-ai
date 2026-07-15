@@ -10,6 +10,8 @@ import { DEFAULT_EDGE_TTS_VOICE } from './edge-tts-voices';
 
 const TTS_INPUT_MAX_BYTES = 8000;
 const TTS_SPEECH_CACHE_MAX = 128;
+/** Edge WordBoundary 单位：100ns；÷10000 → ms */
+const EDGE_TICKS_PER_MS = 10_000;
 
 type EdgeTtsResolved = {
 	text: string;
@@ -19,12 +21,30 @@ type EdgeTtsResolved = {
 	pitch: string;
 };
 
+/** 对外返回的词/字边界（毫秒，便于客户端对齐 currentTime） */
+export type EdgeTtsBoundaryDto = {
+	text: string;
+	offsetMs: number;
+	durationMs: number;
+};
+
+export type EdgeTtsTimedResult = {
+	audioBase64: string;
+	contentType: string;
+	boundaries: EdgeTtsBoundaryDto[];
+};
+
+type CachedSpeech = {
+	buffer: Buffer;
+	boundaries: EdgeTtsBoundaryDto[];
+};
+
 /**
  * Microsoft Edge 在线语音合成（edge-tts-universal）：免费、无需 API Key。
  */
 @Injectable()
 export class EdgeTtsService {
-	private readonly speechCache = new Map<string, Buffer>();
+	private readonly speechCache = new Map<string, CachedSpeech>();
 
 	resolveOptions(dto: EdgeTtsDto): EdgeTtsResolved {
 		const text = dto.text.trim();
@@ -62,7 +82,7 @@ export class EdgeTtsService {
 		].join('\u0001');
 	}
 
-	private getFromCache(key: string): Buffer | null {
+	private getFromCache(key: string): CachedSpeech | null {
 		const hit = this.speechCache.get(key);
 		if (!hit) return null;
 		this.speechCache.delete(key);
@@ -70,9 +90,9 @@ export class EdgeTtsService {
 		return hit;
 	}
 
-	private setCache(key: string, buffer: Buffer): void {
+	private setCache(key: string, entry: CachedSpeech): void {
 		if (this.speechCache.has(key)) this.speechCache.delete(key);
-		this.speechCache.set(key, buffer);
+		this.speechCache.set(key, entry);
 		while (this.speechCache.size > TTS_SPEECH_CACHE_MAX) {
 			const oldest = this.speechCache.keys().next().value;
 			if (oldest === undefined) break;
@@ -80,7 +100,17 @@ export class EdgeTtsService {
 		}
 	}
 
-	private async synthesize(resolved: EdgeTtsResolved): Promise<Buffer> {
+	private toBoundaryDto(
+		subtitle: Array<{ offset: number; duration: number; text: string }>,
+	): EdgeTtsBoundaryDto[] {
+		return subtitle.map((b) => ({
+			text: b.text ?? '',
+			offsetMs: Math.round((b.offset ?? 0) / EDGE_TICKS_PER_MS),
+			durationMs: Math.round((b.duration ?? 0) / EDGE_TICKS_PER_MS),
+		}));
+	}
+
+	private async synthesize(resolved: EdgeTtsResolved): Promise<CachedSpeech> {
 		const tts = new EdgeTTS(resolved.text, resolved.voice, {
 			rate: resolved.rate,
 			volume: resolved.volume,
@@ -88,7 +118,9 @@ export class EdgeTtsService {
 		});
 		try {
 			const result = await tts.synthesize();
-			return Buffer.from(await result.audio.arrayBuffer());
+			const buffer = Buffer.from(await result.audio.arrayBuffer());
+			const boundaries = this.toBoundaryDto(result.subtitle ?? []);
+			return { buffer, boundaries };
 		} catch (err) {
 			const detail = err instanceof Error ? err.message : String(err);
 			throw new HttpException(
@@ -98,34 +130,52 @@ export class EdgeTtsService {
 		}
 	}
 
-	async synthesizeSpeech(dto: EdgeTtsDto, userId?: number): Promise<Buffer> {
+	private async synthesizeCached(
+		dto: EdgeTtsDto,
+		userId?: number,
+	): Promise<CachedSpeech> {
 		const resolved = this.resolveOptions(dto);
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
-		if (cached) return Buffer.from(cached);
+		if (cached) {
+			return {
+				buffer: Buffer.from(cached.buffer),
+				boundaries: cached.boundaries.map((b) => ({ ...b })),
+			};
+		}
 
-		const buffer = await this.synthesize(resolved);
-		this.setCache(cacheKey, buffer);
+		const entry = await this.synthesize(resolved);
+		this.setCache(cacheKey, entry);
+		return {
+			buffer: Buffer.from(entry.buffer),
+			boundaries: entry.boundaries.map((b) => ({ ...b })),
+		};
+	}
+
+	async synthesizeSpeech(dto: EdgeTtsDto, userId?: number): Promise<Buffer> {
+		const { buffer } = await this.synthesizeCached(dto, userId);
 		return buffer;
+	}
+
+	/** 音频 + WordBoundary 时间戳（听书句/字高亮用） */
+	async synthesizeSpeechTimed(
+		dto: EdgeTtsDto,
+		userId?: number,
+	): Promise<EdgeTtsTimedResult> {
+		const { buffer, boundaries } = await this.synthesizeCached(dto, userId);
+		return {
+			audioBase64: buffer.toString('base64'),
+			contentType: this.resolveContentType(),
+			boundaries,
+		};
 	}
 
 	async *streamSpeech(
 		dto: EdgeTtsDto,
 		userId?: number,
 	): AsyncGenerator<Buffer> {
-		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
-		const cached = this.getFromCache(cacheKey);
-		if (cached?.length) {
-			yield cached;
-			return;
-		}
-
-		const buffer = await this.synthesize(resolved);
-		if (buffer.length) {
-			this.setCache(cacheKey, buffer);
-			yield buffer;
-		}
+		const { buffer } = await this.synthesizeCached(dto, userId);
+		if (buffer.length) yield buffer;
 	}
 
 	resolveContentType(): string {
