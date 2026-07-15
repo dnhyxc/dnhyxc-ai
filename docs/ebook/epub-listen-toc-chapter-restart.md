@@ -1,7 +1,8 @@
 # EPUB 听书：目录切章从第 0 句重开
 
-> **文档角色**：听书播放中点击 **书籍目录** 切章时，从目标章 **第 0 句** 自动续听；修复 `go()` / `trimContinuousViews` 同步抛错导致听书不重开。  
-> **延伸阅读**：[epub-chapter-listen.md](./epub-chapter-listen.md)（听书 MVP 与状态机）、[epub-scrolled-toc-nav-align.md](./epub-scrolled-toc-nav-align.md)（连续滚动目录 `displayEpubScrolledHref` 与 settle）、[epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md)（连续滚动多 iframe 节间衔接）、[epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)（底栏上下章复用同一 `goEpubTocHref`）、[../ideas/epub-toc-chapter-top-align.md](../ideas/epub-toc-chapter-top-align.md)（目录章首对齐，与听书重开独立路径）。
+> **文档角色**：听书播放中点击 **书籍目录** 切章时自动续听并保留倍速；修复 `go()` / `trimContinuousViews` 同步抛错导致听书不重开。  
+> **起播句更新（2026-07-16）**：同 HTML 多目录锚点时，不再固定文件「第 0 句」，改为按目标 CFI `mode: 'after'` 起播——见 [epub-listen-toc-anchor-start.md](./epub-listen-toc-anchor-start.md)。本文仍描述 **重开链路与 trim 容错**。  
+> **延伸阅读**：[epub-listen-toc-anchor-start.md](./epub-listen-toc-anchor-start.md)（锚点起播）、[epub-toc-cfi-navigate.md](./epub-toc-cfi-navigate.md)（目录 CFI 跳转）、[epub-chapter-listen.md](./epub-chapter-listen.md)（听书 MVP）、[epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)（底栏切章）、[../ideas/epub-toc-chapter-top-align.md](../ideas/epub-toc-chapter-top-align.md)（章首对齐规划）。
 
 ## 1. 背景与目标
 

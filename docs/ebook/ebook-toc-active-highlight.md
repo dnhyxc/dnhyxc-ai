@@ -2,6 +2,7 @@
 
 **延伸阅读**：
 
+- 同 spine 多锚点 CFI 高亮（2026-07-16 增量）：[epub-toc-active-cfi.md](./epub-toc-active-cfi.md)
 - 目录抽屉初版与多级缩进：[shelf-reader-polish.md](./shelf-reader-polish.md)
 - PDF 大纲解析：[pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md)（`pdfOutline.ts`）
 - 阅读页总览：[ebook-reader-shelf.md](./ebook-reader-shelf.md)

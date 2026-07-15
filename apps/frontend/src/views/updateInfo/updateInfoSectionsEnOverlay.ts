@@ -1254,7 +1254,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's25-71': {
 		title: 'EPUB continuous-scroll TOC jump',
 		description:
-			'When reading in continuous scroll, tapping a chapter in the book TOC reliably scrolls to the start of that chapter (or its anchor), instead of stopping at the chapter end or showing the previous chapter’s tail. Paginated page-flow is unchanged.',
+			'When reading in continuous scroll, tapping a chapter in the book TOC reliably scrolls to the start of that section (including in-page anchors that share one chapter file), instead of stopping at the chapter end or showing the previous section’s tail. Paginated mode also lands on TOC anchors. Related to the multi-section TOC / listen alignment update.',
 	},
 	's25-72': {
 		title: 'Shelf sorted by last read time',
@@ -1315,5 +1315,15 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Shelf progress percentage display',
 		description:
 			'The “about X% read” label on shelf cards now shows a whole-number percentage instead of a long decimal.',
+	},
+	's25-84': {
+		title: 'Multi-section TOC in one chapter file',
+		description:
+			'Some books split one chapter file into several TOC entries. Picking a section in the book contents drawer or tapping previous/next chapter on the listen bar lands on that section’s start and resumes listening from there. The TOC highlight also follows your reading or listening position instead of always marking the first or last section in the file.',
+	},
+	's25-85': {
+		title: 'Listen bar neighbor chapter fix',
+		description:
+			'While listening, previous/next chapter on the bottom bar uses the sentence currently being spoken to decide which section you are in, so a lagging reading position no longer jumps to the wrong neighbor section.',
 	},
 };

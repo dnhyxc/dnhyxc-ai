@@ -1,59 +1,135 @@
+import type { Rendition } from 'epubjs';
+import * as EpubJS from 'epubjs';
+
 import type { EbookTocItem } from '../../types';
+import { getEpubScrollContainer } from '../epub/reader/epubScrolledNav';
 import { parsePdfPageHref } from '../pdf/pdfOutline';
+
+type EpubCfiComparer = { compare: (a: string, b: string) => number };
+
+const EpubCFI = (EpubJS as unknown as { EpubCFI: new () => EpubCfiComparer })
+	.EpubCFI;
 
 export type TocActivePosition = {
 	pdfPage?: number;
 	epubSpineIndex?: number;
+	/** 当前阅读 CFI；同 spine 多目录锚点时与 tocCfi 比较 */
+	epubCfi?: string;
+	/** 无 tocCfi 时回退：按锚点在视口中的位置判定（Foliate TOCProgress） */
+	getRendition?: () => Rendition | null;
 };
+
+function compareCfi(a: string, b: string): number {
+	const Ctor =
+		EpubCFI ??
+		(EpubJS as unknown as { default?: { EpubCFI?: typeof EpubCFI } }).default
+			?.EpubCFI;
+	if (!Ctor) return 0;
+	try {
+		return new Ctor().compare(a, b);
+	} catch {
+		return 0;
+	}
+}
+
+function activeAmongSameSpine(
+	items: EbookTocItem[],
+	sameIndexes: number[],
+	epubCfi: string | undefined,
+	rend: Rendition | null,
+): number {
+	if (sameIndexes.length === 0) return -1;
+	if (sameIndexes.length === 1) return sameIndexes[0]!;
+
+	// 1) 有 tocCfi：取「不超过当前 CFI」的最后一项（Foliate）
+	if (epubCfi?.trim()) {
+		let best = -1;
+		let sawNonZero = false;
+		for (const i of sameIndexes) {
+			const tocCfi = items[i]?.tocCfi;
+			if (!tocCfi) continue;
+			const cmp = compareCfi(tocCfi, epubCfi);
+			if (cmp !== 0) sawNonZero = true;
+			if (cmp <= 0) best = i;
+		}
+		// 比较器失效时全 0，勿误选同 spine 最后一项
+		if (sawNonZero && best >= 0) return best;
+	}
+
+	// 2) 活文档：视口顶边之上（含）的最后一个锚点
+	const container = rend ? getEpubScrollContainer(rend) : null;
+	if (container) {
+		const topY = container.getBoundingClientRect().top + 16;
+		let best = sameIndexes[0]!;
+		for (const i of sameIndexes) {
+			const href = items[i]?.href ?? '';
+			const hash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
+			if (!hash) {
+				best = i;
+				continue;
+			}
+			let decoded = hash;
+			try {
+				decoded = decodeURIComponent(hash);
+			} catch {
+				// keep
+			}
+			let el: Element | null = null;
+			for (const iframe of container.querySelectorAll('iframe')) {
+				const doc = (iframe as HTMLIFrameElement).contentDocument;
+				el =
+					doc?.getElementById(decoded) ??
+					doc?.querySelector(`a[name="${CSS.escape(decoded)}"]`) ??
+					null;
+				if (el) break;
+			}
+			if (!el) continue;
+			if (el.getBoundingClientRect().top <= topY) best = i;
+			else break;
+		}
+		return best;
+	}
+
+	// 3) 未知碎片位置时取同 spine 第一项（勿取最后一项，否则全书落在该文件末节）
+	return sameIndexes[0]!;
+}
 
 /**
  * 当前阅读位置对应的目录项索引（无匹配时返回 -1）
- *
- * @param items - 目录项数组，每个元素表示一本电子书的一个目录节点
- * @param position - 当前阅读位置，包含 pdfPage（PDF 页码，number）或 epubSpineIndex（EPUB spine 索引，number）
- * @returns 对应目录项在 items 中的索引；若无匹配，返回 -1
  */
 export function findActiveTocItemIndex(
 	items: EbookTocItem[],
 	position: TocActivePosition,
 ): number {
-	// 如果目录数组为空，直接返回 -1
 	if (items.length === 0) return -1;
 
-	// 解构出 PDF 页码和 EPUB spine 索引
-	const { pdfPage, epubSpineIndex } = position;
+	const { pdfPage, epubSpineIndex, epubCfi, getRendition } = position;
 
-	// 情况 1: 当前定位是 PDF 页码，且有效
 	if (pdfPage != null && Number.isFinite(pdfPage)) {
-		let best = -1; // best 记录最后一个页码小于等于当前页码的目录项索引
-		// 遍历所有目录项
+		let best = -1;
 		for (let i = 0; i < items.length; i++) {
-			// 尝试解析此目录项的 href 得到 PDF 页码
 			const page = parsePdfPageHref(items[i].href ?? '');
-			// 只要解析出页码且小于等于当前 pdfPage，就认为该节点仍然在当前页之前
 			if (page != null && page <= pdfPage) {
 				best = i;
 			}
 		}
-		// 返回找到的最佳目录项索引（可能是 -1，表示无匹配）
 		return best;
 	}
 
-	// 情况 2: 当前定位是 EPUB 的 spineIndex，且有效
 	if (epubSpineIndex != null && Number.isFinite(epubSpineIndex)) {
-		let best = -1; // best 记录最后一个 spineIndex 小于等于当前 spineIndex 的目录项索引
-		// 遍历所有目录项
+		let bestBefore = -1;
+		const same: number[] = [];
 		for (let i = 0; i < items.length; i++) {
 			const spineIndex = items[i].spineIndex;
-			// 只要目录项的 spineIndex 有效且小于等于当前 spineIndex，就更新 best
-			if (spineIndex != null && spineIndex <= epubSpineIndex) {
-				best = i;
-			}
+			if (spineIndex == null) continue;
+			if (spineIndex < epubSpineIndex) bestBefore = i;
+			else if (spineIndex === epubSpineIndex) same.push(i);
 		}
-		// 返回找到的最佳目录项索引（可能是 -1，表示无匹配）
-		return best;
+		if (same.length === 0) return bestBefore;
+
+		const rend = getRendition?.() ?? null;
+		return activeAmongSameSpine(items, same, epubCfi, rend);
 	}
 
-	// 如果既不是合法 PDF 页码也不是 EPUB spineIndex，返回 -1
 	return -1;
 }

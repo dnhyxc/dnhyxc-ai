@@ -41,6 +41,7 @@ import {
 	advanceScrollListenSection,
 	isScrollListenMode,
 } from '../utils/epub/listen/epubScrollListenAdvance';
+import { cfiFromDomRange } from '../utils/epub/mark/epubRangeGeometry';
 
 export type ChapterListenStatus = 'idle' | 'loading' | 'playing' | 'paused';
 
@@ -140,6 +141,8 @@ export function useEpubChapterListen(
 	const sectionRef = useRef<SectionCtx | null>(null);
 	const sectionDocRef = useRef<Document | null>(null);
 	const resolveStartCfiRef = useRef(false);
+	/** 目录切章用 after，避免起播落在上一节末句；从当前位置听用 before */
+	const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
 	const scrollSeekRef = useRef(false);
 
 	const syncState = useCallback((patch: Partial<ChapterListenState>) => {
@@ -154,6 +157,7 @@ export function useEpubChapterListen(
 		loopGenRef.current += 1;
 		pausedRef.current = false;
 		resolveStartCfiRef.current = false;
+		resolveStartCfiModeRef.current = 'before';
 		sectionRef.current = null;
 		sectionDocRef.current = null;
 		stopAllEnglishPlayback();
@@ -226,9 +230,13 @@ export function useEpubChapterListen(
 					rend,
 					visible,
 					cfi,
-					ctx.sentenceRanges,
+					{
+						sentenceRanges: ctx.sentenceRanges,
+						mode: resolveStartCfiModeRef.current,
+					},
 				);
 				resolveStartCfiRef.current = false;
+				resolveStartCfiModeRef.current = 'before';
 			}
 
 			sectionRef.current = ctx;
@@ -580,6 +588,7 @@ export function useEpubChapterListen(
 		pausedRef.current = false;
 		sentenceCursorRef.current = 0;
 		resolveStartCfiRef.current = true;
+		resolveStartCfiModeRef.current = 'before';
 		sectionRef.current = null;
 		// 记录本次朗读关联的文档节点
 		sectionDocRef.current = preview.outerRange.startContainer.ownerDocument;
@@ -611,7 +620,7 @@ export function useEpubChapterListen(
 	}, [startFromCurrentPosition, stopInternal]);
 
 	/**
-	 * 目录跳转完成后：与 startFromCurrentPosition 同一开听路径，仅从第 0 句起（不解析 CFI）。
+	 * 目录/切章完成后重开听书：按跳转后 CFI 定位起播句（同 HTML 多节时非文件第 0 句）。
 	 */
 	const restartFromChapterStart = useCallback(() => {
 		if (!isEnglishPlaybackAvailable()) {
@@ -674,8 +683,9 @@ export function useEpubChapterListen(
 			pausedRef.current = false;
 			rateRef.current = keepRate;
 			sentenceCursorRef.current = 0;
-			// 与 start 相同：走 prepareSection；false 表示不按旧 CFI 取句
-			resolveStartCfiRef.current = false;
+			// 目录 / 底栏切章：按目标 CFI「处或之后」第一句起播（勿取上一节末句）
+			resolveStartCfiRef.current = true;
+			resolveStartCfiModeRef.current = 'after';
 			scrollSeekRef.current = true;
 			sectionRef.current = null;
 			// 置空 → usePrepare=true，与正常听书首段同一路径（勿钉死旧 sectionDoc）
@@ -796,6 +806,21 @@ export function useEpubChapterListen(
 		return () => registerEnglishPlaybackMediaHandlers(null);
 	}, [isActive]);
 
+	/** 当前分句播头 CFI：底栏上下章定位目录用（勿用阅读 relocated CFI，会滞后） */
+	const getPlayheadCfi = useCallback((): string | undefined => {
+		const rend = getRenditionRef.current();
+		const ctx = sectionRef.current;
+		const fallback = getCurrentCfiRef.current()?.trim() || undefined;
+		if (!rend || !ctx) return fallback;
+		const range = ctx.sentenceRanges[sentenceCursorRef.current];
+		if (!range) return fallback;
+		try {
+			return cfiFromDomRange(rend, range)?.trim() || fallback;
+		} catch {
+			return fallback;
+		}
+	}, []);
+
 	return {
 		...state,
 		isActive,
@@ -809,5 +834,6 @@ export function useEpubChapterListen(
 		nextSentence: () => seekSentence(1),
 		goToSentence,
 		setRate,
+		getPlayheadCfi,
 	};
 }

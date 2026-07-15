@@ -164,7 +164,7 @@ function EbookReadPage() {
 	const epubNavRef = useRef<{
 		prev: () => Promise<void>;
 		next: () => Promise<void>;
-		go: (href: string) => Promise<void>;
+		go: (href: string) => Promise<string | undefined>;
 		clearTextSelection: () => void;
 		getRendition: () => import('epubjs').Rendition | null;
 		getBook: () => import('epubjs').Book | null;
@@ -199,6 +199,8 @@ function EbookReadPage() {
 	const [epubSpineIndex, setEpubSpineIndex] = useState<number | undefined>(
 		undefined,
 	);
+	/** 目录高亮：同 spine 多锚点时需随 CFI 更新，不能只跟 spineIndex */
+	const [readingCfi, setReadingCfi] = useState('');
 
 	const chapterListen = useEpubChapterListen(
 		t,
@@ -1231,6 +1233,7 @@ function EbookReadPage() {
 		setPdfPage(0);
 		setPdfTotal(0);
 		setEpubSpineIndex(undefined);
+		setReadingCfi('');
 		(async () => {
 			try {
 				const result = await resolveOpen(book.src, book.fmt, book.id);
@@ -1256,7 +1259,10 @@ function EbookReadPage() {
 	const saveCfi = useCallback(
 		(cfi: string, percent?: number, spineIndex?: number) => {
 			if (!book) return;
-			if (cfi.trim()) currentEpubCfiRef.current = cfi;
+			if (cfi.trim()) {
+				currentEpubCfiRef.current = cfi;
+				setReadingCfi(cfi);
+			}
 			if (
 				spineIndex != null &&
 				Number.isFinite(spineIndex) &&
@@ -1292,9 +1298,15 @@ function EbookReadPage() {
 		() =>
 			findActiveTocItemIndex(
 				tocItems,
-				book?.fmt === 'pdf' ? { pdfPage } : { epubSpineIndex: epubSpineIndex },
+				book?.fmt === 'pdf'
+					? { pdfPage }
+					: {
+							epubSpineIndex: epubSpineIndex,
+							epubCfi: readingCfi || currentEpubCfiRef.current,
+							getRendition: () => epubNavRef.current?.getRendition() ?? null,
+						},
 			),
-		[tocItems, book?.fmt, pdfPage, epubSpineIndex],
+		[tocItems, book?.fmt, pdfPage, epubSpineIndex, readingCfi],
 	);
 
 	/** EPUB 目录/听书切章共用：go → 听书中则 restartFromChapterStart */
@@ -1312,18 +1324,31 @@ function EbookReadPage() {
 			listen.stop({ notify: false });
 		}
 		void (async () => {
+			let destCfi: string | undefined;
 			try {
-				await epubNavRef.current?.go(target);
+				destCfi = await epubNavRef.current?.go(target);
 			} catch {
 				// ignore
 			}
 			const rend = epubNavRef.current?.getRendition();
-			const loc = (
-				rend as { location?: { start?: { index?: number } } } | null | undefined
-			)?.location?.start?.index;
-			if (loc != null && Number.isFinite(loc)) {
-				epubSpineIndexRef.current = loc;
-				setEpubSpineIndex(loc);
+			const start = (
+				rend as
+					| { location?: { start?: { index?: number; cfi?: string } } }
+					| null
+					| undefined
+			)?.location?.start;
+			const cfi = destCfi?.trim() || start?.cfi?.trim();
+			// 听书重开必须用目录目标 CFI；勿等 relocated，否则会按旧位置起播
+			if (cfi) {
+				currentEpubCfiRef.current = cfi;
+				setReadingCfi(cfi);
+			}
+			if (start?.index != null && Number.isFinite(start.index)) {
+				epubSpineIndexRef.current = start.index;
+				setEpubSpineIndex(start.index);
+			} else if (spineIndex != null && Number.isFinite(spineIndex)) {
+				epubSpineIndexRef.current = spineIndex;
+				setEpubSpineIndex(spineIndex);
 			}
 			if (wasListening) {
 				chapterListenRef.current.restartFromChapterStart();
@@ -1334,6 +1359,11 @@ function EbookReadPage() {
 	const listenTocIndex = chapterListen.isActive
 		? findActiveTocItemIndex(tocItems, {
 				epubSpineIndex: epubListenBar.spineIndex,
+				epubCfi:
+					chapterListen.getPlayheadCfi() ||
+					readingCfi ||
+					currentEpubCfiRef.current,
+				getRendition: () => epubNavRef.current?.getRendition() ?? null,
 			})
 		: -1;
 
@@ -1356,6 +1386,10 @@ function EbookReadPage() {
 
 			const active = findActiveTocItemIndex(tocItems, {
 				epubSpineIndex: listen.spineIndex,
+				// 用当前分句播头，避免阅读 CFI 滞后导致邻章算错
+				epubCfi:
+					listen.getPlayheadCfi() || readingCfi || currentEpubCfiRef.current,
+				getRendition: () => epubNavRef.current?.getRendition() ?? null,
 			});
 			if (active >= 0) {
 				const neighbor = findListenTocNeighbor(active, delta);
@@ -1379,7 +1413,7 @@ function EbookReadPage() {
 			if (!href) return;
 			goEpubTocHref(href, target);
 		},
-		[findListenTocNeighbor, goEpubTocHref, tocItems],
+		[findListenTocNeighbor, goEpubTocHref, tocItems, readingCfi],
 	);
 
 	const canListenPrevChapter =
@@ -1470,7 +1504,7 @@ function EbookReadPage() {
 		(api: {
 			prev: () => Promise<void>;
 			next: () => Promise<void>;
-			go: (href: string) => Promise<void>;
+			go: (href: string) => Promise<string | undefined>;
 			clearTextSelection: () => void;
 			getRendition: () => import('epubjs').Rendition | null;
 			getBook: () => import('epubjs').Book | null;

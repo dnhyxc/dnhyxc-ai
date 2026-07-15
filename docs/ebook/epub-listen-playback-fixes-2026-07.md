@@ -18,6 +18,10 @@
 | 9 | 当前 TTS pending 时播放钮无等待反馈 | `onAwaitingCurrentTts` → `status: loading`；钮上 Spinner（预取不触发） | [epub-listen-play-loading.md](./epub-listen-play-loading.md) |
 | 10 | 换阅读背景后分句/目录选中项字色不可读 | 列表 active/idle 改跟 `text-textcolor`，勿用 `text-theme` | [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md) |
 | 11 | 书架「已读约」出现长小数 | 展示层 `Math.round` + 0–100 夹紧 | [ebook-shelf-progress-pct.md](./ebook-shelf-progress-pct.md) |
+| 12 | 同 HTML 多 `#filepos` 点目录滚到错节/章末 | Foliate CFI `display` + iframe 坐标顶对齐；`attachTocCfis` | [epub-toc-cfi-navigate.md](./epub-toc-cfi-navigate.md) |
+| 13 | 同 spine 多节目录高亮总在末项/首项 | `tocCfi` vs 阅读 CFI；比较器全 0 防护；DOM 视口回退 | [epub-toc-active-cfi.md](./epub-toc-active-cfi.md) |
+| 14 | 目录/底栏切章起播落文件第 0 句或上一节末句 | `restartFromChapterStart` + `resolveListenStartSentence` `mode: 'after'` | [epub-listen-toc-anchor-start.md](./epub-listen-toc-anchor-start.md) |
+| 15 | 听书底栏上下章切到错误邻节 | `getPlayheadCfi` 进 `findActiveTocItemIndex`，勿只用阅读 CFI | [epub-listen-bar-playhead-toc.md](./epub-listen-bar-playhead-toc.md) |
 
 ## 规划稿
 

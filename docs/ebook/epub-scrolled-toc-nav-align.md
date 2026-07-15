@@ -1,7 +1,7 @@
 # EPUB 连续滚动：目录跳转章首对齐
 
 > **文档角色**：修复 Web 端 **连续滚动** 模式下点击 **书籍目录** 后定位不准（滚到章末、上一章末尾顶入视口）的增量专题。  
-> **延伸阅读**：[epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md)（连续滚动 manager 与边界衔接）、[ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)（目录高亮）、[epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md)（relocated 批注 patch 时序）。
+> **延伸阅读**：[epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md)（连续滚动 manager 与边界衔接）、[ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)（目录高亮）、[epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md)（relocated 批注 patch 时序）。**后续**：目录 CFI 跳转与 `go` 返回 destCFI 见 [epub-toc-cfi-navigate.md](./epub-toc-cfi-navigate.md)（替代本文 `EpubPane.go` 接线）。
 
 ## 1. 背景与目标
 

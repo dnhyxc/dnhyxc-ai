@@ -1,7 +1,7 @@
 # EPUB 听书底栏：上一章 / 下一章
 
 > **文档角色**：听书底部播放条 ◀▶ 由「上下句」改为「上下章」；与点目录共用 `go → restartFromChapterStart`。  
-> **延伸阅读**：[epub-listen-toc-chapter-restart.md](./epub-listen-toc-chapter-restart.md)（目录切章重开）、[epub-listen-player-bar.md](./epub-listen-player-bar.md)（播放条基线）、[../ideas/epub-listen-playback-optimize.md](../ideas/epub-listen-playback-optimize.md)（M2 规划，本文归档落地）。
+> **延伸阅读**：[epub-listen-toc-chapter-restart.md](./epub-listen-toc-chapter-restart.md)（目录切章重开）、[epub-listen-bar-playhead-toc.md](./epub-listen-bar-playhead-toc.md)（播头 CFI 目录邻项）、[epub-listen-player-bar.md](./epub-listen-player-bar.md)（播放条基线）、[../ideas/epub-listen-playback-optimize.md](../ideas/epub-listen-playback-optimize.md)（M2 规划，本文归档落地）。
 
 ## 1. 背景与目标
 

@@ -65,6 +65,8 @@ export type EbookTocItem = {
 	depth?: number;
 	/** EPUB：对应 spine 索引，用于目录高亮 */
 	spineIndex?: number;
+	/** EPUB：TOC 锚点 CFI（同 spine 多 #fragment 时用于高亮比较） */
+	tocCfi?: string;
 };
 
 export type EbookShelfData = {

@@ -459,18 +459,23 @@ export function teardownChapterListenHighlight(rend?: Rendition): void {
 }
 
 /**
- * 根据 startCfi 对应位置，逆找所属的句子编号（第几句起播）（若找不到则回退到0）。
- * @param rend            epub 渲染实例
- * @param section         朗读节
- * @param startCfi        cfi 定位字符串
- * @param sentenceRanges  已索引的句子 DOM Range，可复用
- * @returns               起始句索引
+ * 根据 startCfi 对应位置，找所属的句子编号（第几句起播）（若找不到则回退到0）。
+ * @param mode `before`：CFI 左侧最后一句（从当前位置续听）
+ *             `after`：CFI 处或之后第一句（目录锚点起播，避免上一节末句）
+ */
+/**
+ * 根据 startCfi 对应位置，找所属的句子编号（第几句起播）（若找不到则回退到0）。
+ * @param mode `before`：CFI 左侧最后一句（从当前位置续听）
+ *             `after`：CFI 处或之后第一句（目录锚点起播，避免上一节末句）
  */
 export function resolveListenStartSentence(
 	rend: Rendition,
 	section: VisibleListenSection,
 	startCfi: string,
-	sentenceRanges?: Array<Range | null>,
+	opts?: {
+		sentenceRanges?: Array<Range | null>;
+		mode?: 'before' | 'after';
+	},
 ): number {
 	const trimmed = section.plain.trim();
 	const sentences = buildSentenceOffsetSpans(trimmed);
@@ -486,7 +491,21 @@ export function resolveListenStartSentence(
 	if (at.startContainer.ownerDocument !== sectionDoc) return 0;
 
 	const ranges =
-		sentenceRanges ?? indexChapterSentenceRanges(section.outerRange, trimmed);
+		opts?.sentenceRanges ??
+		indexChapterSentenceRanges(section.outerRange, trimmed);
+
+	const startMode = opts?.mode ?? 'before';
+	if (startMode === 'after') {
+		// 目录/锚点：从前往后，命中「含 CFI」或「句首 ≥ CFI」的第一句
+		for (let i = 0; i < sentences.length; i += 1) {
+			const r = ranges[i];
+			if (!r) continue;
+			const startVs = r.compareBoundaryPoints(Range.START_TO_START, at);
+			const endVs = r.compareBoundaryPoints(Range.END_TO_START, at);
+			if (startVs >= 0 || (startVs <= 0 && endVs > 0)) return i;
+		}
+		return 0;
+	}
 
 	// 从后往前找，定位最靠前且比 CFI 范围“在左边”的句
 	for (let i = sentences.length - 1; i >= 0; i -= 1) {

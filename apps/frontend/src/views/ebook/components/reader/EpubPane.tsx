@@ -42,22 +42,24 @@ import {
 	type EpubReaderSettings,
 	resolveEpubReaderSurfaceBackground,
 } from '../../utils/epub/reader/epubReaderSettings';
-import {
-	attachEpubScrolledEdgeNav,
-	displayEpubScrolledHref,
-} from '../../utils/epub/reader/epubScrolledNav';
+import { attachEpubScrolledEdgeNav } from '../../utils/epub/reader/epubScrolledNav';
 import {
 	attachEpubSelectionPopBar,
 	clearEpubTextSelection,
 	type EpubSelectionPopBarPayload,
 } from '../../utils/epub/reader/epubSelectionToolbarAttach';
 import { softResizeEpubRendition } from '../../utils/epub/reader/epubSoftResize';
-import { resolveSpineIndexForHref } from '../../utils/epub/reader/epubSpineIndex';
+import { flattenEpubNavToc } from '../../utils/epub/reader/epubSpineIndex';
+import {
+	attachTocCfis,
+	navigateEpubTocHref,
+} from '../../utils/epub/reader/epubTocNavigate';
 
 type NavApi = {
 	prev: () => Promise<void>;
 	next: () => Promise<void>;
-	go: (href: string) => Promise<void>;
+	/** 跳转后返回目标 CFI（听书目录切章用以定位起播句） */
+	go: (href: string) => Promise<string | undefined>;
 	clearTextSelection: () => void;
 	getRendition: () => Rendition | null;
 	getBook: () => Book | null;
@@ -485,15 +487,19 @@ export function EpubPane({
 					go: async (href) => {
 						const rend = rendRef.current;
 						const spineBook = bookRef.current;
-						if (!rend) return;
-						if (
-							readerSettingsRef.current.pageFlow === 'scrolled' &&
-							spineBook
-						) {
-							await displayEpubScrolledHref(rend, spineBook, href);
-							return;
+						if (!rend) return undefined;
+						// Foliate：TOC → CFI/spineIndex 导航（同文件 #filepos 等多锚点）
+						if (spineBook) {
+							return navigateEpubTocHref(rend, spineBook, href);
 						}
 						await rend.display(href);
+						return (
+							(
+								rend as {
+									location?: { start?: { cfi?: string } };
+								}
+							).location?.start?.cfi ?? undefined
+						);
 					},
 					clearTextSelection: () => {
 						if (!rendRef.current) return;
@@ -515,17 +521,13 @@ export function EpubPane({
 					},
 				});
 
-				// 12. 读取目录导航信息，回调传递数据给父层
+				// 12. 读取目录：展平 subitems + 规范化 href；后台挂 tocCfi
 				const nav = await book.loaded.navigation;
-				const spineBook = book;
-				const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
-					label: t.label?.trim() || t.href, // 目录名默认去空格，否则用链接
-					href: t.href,
-					spineIndex: t.href
-						? resolveSpineIndexForHref(spineBook, t.href)
-						: undefined,
-				}));
+				const toc = flattenEpubNavToc(nav.toc, book);
 				if (!destroyed) onTocRef.current?.(toc);
+				void attachTocCfis(book, toc).then((enriched) => {
+					if (!destroyed) onTocRef.current?.(enriched);
+				});
 
 				// 13. 启动后台分页索引生成，生成成功则刷新全书百分比进度
 				void book.locations

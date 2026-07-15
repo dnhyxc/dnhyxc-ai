@@ -9,6 +9,7 @@
 | [shelf-cover-title.md](./shelf-cover-title.md)                                   | **增量**：自定义封面（文件落盘）、书名编辑、卡片 hover 操作层、桌面端「选择本地文件」文案                                                       |
 | [epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md)               | **增量**：EPUB 阅读设置（字号/行距/颜色/背景/翻页方式）、连续滚动章节衔接                                                                       |
 | [epub-scrolled-toc-nav-align.md](./epub-scrolled-toc-nav-align.md)               | **增量（2026-07-03）**：连续滚动目录跳转章首/锚点对齐（Web 定位修复、`displayEpubScrolledHref`）                                                  |
+| [epub-toc-cfi-navigate.md](./epub-toc-cfi-navigate.md)                           | **增量（2026-07-16）**：Foliate 式 TOC→CFI 跳转（同 HTML 多 `#filepos`）、iframe 坐标顶对齐、`attachTocCfis`、`go` 返回 destCFI                      |
 | [ebook-cos-local-shelf.md](./ebook-cos-local-shelf.md)                           | **增量**：COS 云端备份、桌面本地优先、书架分页、阅读设置 12 色块、PDF/EPUB 滚动条统一                                                           |
 | [pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md)                           | **增量**：PDF 适应宽度、顶栏缩放、滚动换页（停稳后翻页）                                                                                        |
 | [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)               | **增量**：EPUB 右键菜单、智能助手分栏（对齐知识库助手 UI 与流式贴底）                                                                           |
@@ -16,6 +17,7 @@
 | [ebook-local-path-dedup.md](./ebook-local-path-dedup.md)                         | **增量**：按 `local_path` 查库，重复选同一路径不再 COS 上传                                                                                     |
 | [ebook-membership-upload.md](./ebook-membership-upload.md)                       | **增量**：会员专属云端上传；Web 非会员拦截；COS-only 存储                                                                                       |
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)                 | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`）                                                                                |
+| [epub-toc-active-cfi.md](./epub-toc-active-cfi.md)                               | **增量（2026-07-16）**：同 spine 多锚点目录高亮 — `tocCfi`/`epubCfi` 比较、比较器全 0 防护、DOM 视口回退                                      |
 | [ebook-shelf-category.md](./ebook-shelf-category.md)                             | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类）                                                    |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
 | [miniprogram-epub-server-parse.md](./miniprogram-epub-server-parse.md)           | **主文档（本轮）**：小程序 EPUB 服务端章节解析（BullMQ 队列、`chapters`/`chapter` API、`waitForParse` 早退与 jobId 修复）                          |
@@ -69,8 +71,10 @@
 | [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)                           | **增量**：听书/听当前句间云端 TTS 预取（`prefetchCloudEnglishTts` 缩短连播句间等待）                                  |
 | [epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)           | **本轮索引**：听书播放已落地问题 → 专题链接（含切章 / 软暂停 / loading / 选中色 / 进度取整等）                      |
 | [epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md)                             | **增量（本轮）**：按段 TTS + 逐句高亮（kick 首句、`playListenUnitsFromCursor`、`cloudSingleUtterance`）                 |
-| [epub-listen-toc-chapter-restart.md](./epub-listen-toc-chapter-restart.md)                 | **增量**：听书中点目录切章 → `restartFromChapterStart`（第 0 句）；`trimContinuousViews` try/catch                   |
+| [epub-listen-toc-chapter-restart.md](./epub-listen-toc-chapter-restart.md)                 | **增量**：听书中点目录切章 → `restartFromChapterStart`；`trimContinuousViews` try/catch                           |
+| [epub-listen-toc-anchor-start.md](./epub-listen-toc-anchor-start.md)                       | **增量（2026-07-16）**：目录/底栏切章按锚点 CFI `mode: 'after'` 起播第一句（替代固定句 0）                        |
 | [epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)                             | **增量（2026-07-15）**：底栏 ◀▶ 改上一章/下一章（TOC 邻项 + `goEpubTocHref`）；听当前禁用切章                      |
+| [epub-listen-bar-playhead-toc.md](./epub-listen-bar-playhead-toc.md)                           | **增量（2026-07-16）**：听书底栏切章用播头 CFI 定位目录邻项（修复同 spine 多节切错章）                            |
 | [epub-listen-soft-pause.md](./epub-listen-soft-pause.md)                                       | **增量（2026-07-15）**：软暂停续播；系统媒体键↔底栏同步；退出 `register(null)` 拆除；macOS Now Playing 限制说明     |
 | [epub-listen-play-loading.md](./epub-listen-play-loading.md)                                     | **增量（2026-07-15）**：当前 TTS pending 时播放钮 Spinner（`onAwaitingCurrentTts`；预取不触发）                      |
 | [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md)                           | **增量（2026-07-15）**：分句/目录选中态跟阅读字色（`text-textcolor`，勿用 `text-theme`）                            |
