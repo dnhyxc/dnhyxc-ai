@@ -69,11 +69,27 @@ export function stripMarkdownForTts(raw: string): string {
 			.replace(/^[-*+]\s+/gm, '')
 			// 移除有序列表项编号（1.、2. ...），仅保留内容
 			.replace(/^\d+\.\s+/gm, '')
+			// 网文装饰分隔线（*** / --- / ——— 等），勿朗读
+			.replace(/[*＊]{3,}/g, ' ')
+			.replace(/[-—_=~～]{3,}/g, ' ')
+			.replace(/[·•.]{3,}/g, ' ')
+			// * * * 间隔星号分隔
+			.replace(/(?:^|\s)(?:\*[ \t]*){2,}\*(?=\s|$)/gm, ' ')
 			// 合并所有空白字符为一个空格（包含换行、Tab 等），避免朗读卡顿
 			.replace(/\s+/g, ' ')
 			// 去除首尾的多余空格
 			.trim()
 	);
+}
+
+// ponytail: 装饰分隔线不得进 TTS
+if (import.meta.env.DEV) {
+	const sep = stripMarkdownForTts(
+		'上一句。\n**************************************************\n下一句。',
+	);
+	if (sep.includes('*') || !sep.includes('上一句') || !sep.includes('下一句')) {
+		throw new Error(`[speech] separator stars leaked into TTS: ${sep}`);
+	}
 }
 
 /** 本机朗读分段：文本 + 段后停顿时长（毫秒），用于句读顿挫 */

@@ -212,18 +212,24 @@ function EbookReadPage() {
 	const chapterListenRef = useRef(chapterListen);
 	chapterListenRef.current = chapterListen;
 
-	const { toggleListen, listenLabel, ...quoteListen } = useEbookQuoteListen(
+	const { toggleListen, listenLabel } = useEbookQuoteListen(
 		t,
 		() => epubNavRef.current?.getRendition() ?? null,
 		() => epubNavRef.current?.syncReadingAnnotations(),
 		() => epubSpineIndexRef.current ?? epubSpineIndex,
+		{
+			startFromCfi: (cfi, mode, anchorRange, selectionPlain) =>
+				chapterListenRef.current.startFromCfi(
+					cfi,
+					mode,
+					anchorRange,
+					selectionPlain,
+				),
+		},
 	);
 
-	const epubListenBar = chapterListen.isActive
-		? chapterListen
-		: quoteListen.isActive
-			? quoteListen
-			: chapterListen;
+	/** 听当前切入听书后共用底栏（切章等能力可用） */
+	const epubListenBar = chapterListen;
 
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
@@ -1667,14 +1673,11 @@ function EbookReadPage() {
 	const onSelectionPopBarListen = useCallback(() => {
 		const payload = selectionPopBarRef.current;
 		if (!payload?.selectedText.trim()) return;
-		suppressEpubSelectionPopBarDismiss();
-		void toggleListen(
-			payload.selectedText,
-			'popbar',
-			payload.cfiRange,
-			getRememberedEpubPopBarSelectionRange(),
-		);
-	}, [toggleListen]);
+		// 先抓选区再清 UI：隐藏 PopBar + 去掉选中高亮（微信读书）
+		const frozen = getRememberedEpubPopBarSelectionRange();
+		clearEpubSelection();
+		void toggleListen(payload.selectedText, 'popbar', payload.cfiRange, frozen);
+	}, [toggleListen, clearEpubSelection]);
 
 	const onSelectionPopBarAskBook = useCallback(() => {
 		const payload = selectionPopBarRef.current;

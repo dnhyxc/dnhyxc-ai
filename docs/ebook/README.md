@@ -17,6 +17,7 @@
 | [ebook-local-path-dedup.md](./ebook-local-path-dedup.md)                         | **增量**：按 `local_path` 查库，重复选同一路径不再 COS 上传                                                                                     |
 | [ebook-membership-upload.md](./ebook-membership-upload.md)                       | **增量**：会员专属云端上传；Web 非会员拦截；COS-only 存储                                                                                       |
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)                 | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`）                                                                                |
+| [ebook-list-scroll-cycle.md](./ebook-list-scroll-cycle.md)                       | **增量（2026-07-17）**：目录 / 分句列表同一按钮循环滚到底、顶、当前（图标随状态切换）                                                          |
 | [epub-toc-active-cfi.md](./epub-toc-active-cfi.md)                               | **增量（2026-07-16）**：同 spine 多锚点目录高亮 — `tocCfi`/`epubCfi` 比较、比较器全 0 防护、DOM 视口回退                                      |
 | [ebook-shelf-category.md](./ebook-shelf-category.md)                             | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类）                                                    |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
@@ -52,6 +53,11 @@
 | [epub-read-split-panel.md](./epub-read-split-panel.md)                             | **主文档（当前）**：MK 问书与读书想法右侧分栏 state + 布局收起（条件卸载右栏、删最后一条、热更新全宽）                                      |
 | [epub-context-menu-popbar.md](./epub-context-menu-popbar.md)                       | **增量**：右键菜单与选区 PopBar（关菜单不闪、无选区不自动点词）                                                                               |
 | [epub-quote-listen.md](./epub-quote-listen.md)                                     | **增量**：引用「听当前」朗读（PopBar/想法三入口、英语学习 TTS、本机中英分句与音色修复）                                                       |
+| [epub-listen-quote-continue.md](./epub-listen-quote-continue.md)                   | **增量（2026-07-16）**：听当前切入听书续读；选区 plain / 重叠起播，修复偏下一句                                                                   |
+| [epub-listen-popbar-dismiss.md](./epub-listen-popbar-dismiss.md)                   | **增量（2026-07-16）**：PopBar 听当前无暂停态；听后隐藏 PopBar 并清选区                                                                         |
+| [epub-listen-select-pause-follow.md](./epub-listen-select-pause-follow.md)         | **增量（2026-07-16）**：听书中划选正文暂停自动跟随（与手动滚动一致）                                                                            |
+| [epub-selection-scroll-clear.md](./epub-selection-scroll-clear.md)                 | **增量（2026-07-16）**：滚动/relocated 时收起 PopBar 并清除原生选中样式                                                                         |
+| [epub-tts-separator-filter.md](./epub-tts-separator-filter.md)                     | **增量（2026-07-16）**：TTS 过滤网文 `***` / `---` 等装饰分隔线                                                                                |
 | [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（plain 偏移、选区缓存；**绘制层见 host 浮层专题**）                                                               |
 | [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
 | [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
@@ -60,7 +66,7 @@
 | [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
 | [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md)     | **增量**：连续滚动听书逐 iframe 节间衔接（`runScrollSectionLoop` / `advanceScrollListenSection`） |
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
-| [epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)             | **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」                                                     |
+| [epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)             | **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」；三态滚动见 [ebook-list-scroll-cycle.md](./ebook-list-scroll-cycle.md) |
 | [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)                     | **增量**：书架空分类 Tab 隐藏、移走最后一本自动回「全部」、卡片 Tooltip 显示分类                                        |
 | [ebook-shelf-sort-last-read.md](./ebook-shelf-sort-last-read.md)                       | **增量（2026-07-03）**：书架按最近阅读时间排序（后端 `CASE WHEN shelf_sort` + 前端 `sortBooksByLastRead` 兜底） |
 | [ebook-shelf-card-uncategorized.md](./ebook-shelf-card-uncategorized.md)               | **增量（2026-07-03）**：书架卡片书名 Tooltip 分类名缺失时回退「未分类」文案，避免空白                              |

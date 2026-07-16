@@ -503,6 +503,14 @@ function attachListenScrollGuard(rend: Rendition): () => void {
 		pauseListenAutoFollow();
 		scheduleScrollSettle();
 	};
+	/** 划选正文：与手动滚动一致，停 autoFollow 并露出「回到播放」FAB */
+	const onUserSelectIntent = (doc: Document) => {
+		if (programmaticScroll > 0) return;
+		if (!session) return;
+		const text = doc.getSelection()?.toString().trim() ?? '';
+		if (!text) return; // 清空选区（含听当前后 clear）不打断
+		pauseListenAutoFollow();
+	};
 	const bind = (target: EventTarget | null | undefined) => {
 		if (!target) return;
 		target.addEventListener('scroll', onUserScrollIntent, { passive: true });
@@ -519,9 +527,11 @@ function attachListenScrollGuard(rend: Rendition): () => void {
 		);
 	}
 	const bindContents = (contents: { document: Document }) => {
-		bind(
-			contents.document.scrollingElement ?? contents.document.documentElement,
-		);
+		const doc = contents.document;
+		bind(doc.scrollingElement ?? doc.documentElement);
+		const onSel = () => onUserSelectIntent(doc);
+		doc.addEventListener('selectionchange', onSel);
+		cleanups.push(() => doc.removeEventListener('selectionchange', onSel));
 	};
 	rend.hooks.content.register(bindContents);
 	for (const item of getContents(rend)) bindContents(item);

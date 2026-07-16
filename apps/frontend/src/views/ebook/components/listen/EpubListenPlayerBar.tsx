@@ -8,8 +8,10 @@ import {
 } from '@ui/dropdown-menu';
 import { Button, ScrollArea, Spinner } from '@ui/index';
 import {
+	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	ChevronUp,
 	ListOrdered,
 	LocateFixed,
 	Pause,
@@ -27,6 +29,15 @@ import {
 	epubReaderChromeListItemIdleClass,
 	epubReaderChromeMenuContentClass,
 } from '../../utils/epub/reader/epubReaderSettings';
+
+/** 分句列表滚动：同一按钮循环 底 → 顶 → 当前 */
+type SentenceScrollMode = 'bottom' | 'top' | 'current';
+
+const SENTENCE_SCROLL_NEXT: Record<SentenceScrollMode, SentenceScrollMode> = {
+	bottom: 'top',
+	top: 'current',
+	current: 'bottom',
+};
 
 function formatListenRate(value: number): string {
 	return `${value.toFixed(1)} X`;
@@ -305,44 +316,73 @@ function VirtualSentenceMenuList({
 	const activeIndexRef = useRef(activeIndex);
 	activeIndexRef.current = activeIndex;
 	const [scrollTop, setScrollTop] = useState(0);
-	const [userScrolled, setUserScrolled] = useState(false);
+	const [scrollMode, setScrollMode] = useState<SentenceScrollMode>('bottom');
 	const { t } = useI18n();
 	const total = labels.length;
 	const listHeight = total * SENTENCE_ROW_STRIDE_PX;
+
+	const markProgrammaticScroll = useCallback(() => {
+		programmaticScrollRef.current = true;
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				programmaticScrollRef.current = false;
+			});
+		});
+	}, []);
 
 	const scrollToIndex = useCallback(
 		(index: number, opts?: { force?: boolean }) => {
 			if (!opts?.force && userScrolledRef.current) return;
 			const viewport = viewportRef.current;
 			if (!viewport) return;
-			programmaticScrollRef.current = true;
+			markProgrammaticScroll();
 			scrollSentenceIndexIntoView(viewport, index, total);
 			setScrollTop(viewport.scrollTop);
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					programmaticScrollRef.current = false;
-				});
-			});
 		},
-		[total],
+		[markProgrammaticScroll, total],
+	);
+
+	const scrollToEdge = useCallback(
+		(edge: 'top' | 'bottom') => {
+			const viewport = viewportRef.current;
+			if (!viewport) return;
+			userScrolledRef.current = true;
+			markProgrammaticScroll();
+			const maxScroll = Math.max(0, listHeight - viewport.clientHeight);
+			viewport.scrollTop = edge === 'top' ? 0 : maxScroll;
+			setScrollTop(viewport.scrollTop);
+		},
+		[listHeight, markProgrammaticScroll],
 	);
 
 	const scrollToCurrent = useCallback(() => {
 		userScrolledRef.current = false;
-		setUserScrolled(false);
 		scrollToIndex(activeIndexRef.current, { force: true });
 	}, [scrollToIndex]);
+
+	const scrollLabel =
+		scrollMode === 'bottom'
+			? t('ebook.read.tocScrollToBottom')
+			: scrollMode === 'top'
+				? t('ebook.read.tocScrollToTop')
+				: t('ebook.read.listenBook.scrollToCurrentSentence');
+
+	const onScrollFabClick = useCallback(() => {
+		if (scrollMode === 'bottom') scrollToEdge('bottom');
+		else if (scrollMode === 'top') scrollToEdge('top');
+		else scrollToCurrent();
+		setScrollMode(SENTENCE_SCROLL_NEXT[scrollMode]);
+	}, [scrollMode, scrollToCurrent, scrollToEdge]);
 
 	// 仅菜单打开时滚到当前句（勿依赖 activeIndex，避免切句时重复触发）
 	useEffect(() => {
 		if (!menuOpen) {
 			userScrolledRef.current = false;
-			setUserScrolled(false);
 			return;
 		}
+		setScrollMode('bottom');
 		if (total <= 0) return;
 		userScrolledRef.current = false;
-		setUserScrolled(false);
 		const index = activeIndexRef.current;
 		let cancelled = false;
 		let attempts = 0;
@@ -378,7 +418,6 @@ function VirtualSentenceMenuList({
 		setScrollTop(e.currentTarget.scrollTop);
 		if (programmaticScrollRef.current) return;
 		userScrolledRef.current = true;
-		setUserScrolled(true);
 	}, []);
 
 	const first = Math.max(
@@ -400,24 +439,28 @@ function VirtualSentenceMenuList({
 						{t('ebook.read.listenBook.sentenceMenu')} （{activeIndex + 1}/
 						{total}）
 					</div>
-					{userScrolled ? (
-						<Tooltip
-							content={t('ebook.read.listenBook.scrollToCurrentSentence')}
-						>
+					{total > 0 ? (
+						<Tooltip content={scrollLabel}>
 							<Button
 								type="button"
 								variant="ghost"
 								size="icon-sm"
 								className="text-textcolor/55 size-7 shrink-0 bg-theme/5 hover:bg-theme/15 hover:text-textcolor/70 border border-theme/5 rounded-full"
-								aria-label={t('ebook.read.listenBook.scrollToCurrentSentence')}
+								aria-label={scrollLabel}
 								onPointerDown={(e) => e.stopPropagation()}
 								onClick={(e) => {
 									e.preventDefault();
 									e.stopPropagation();
-									scrollToCurrent();
+									onScrollFabClick();
 								}}
 							>
-								<LocateFixed className="size-3.5" aria-hidden />
+								{scrollMode === 'bottom' ? (
+									<ChevronDown className="size-3.5" aria-hidden />
+								) : scrollMode === 'top' ? (
+									<ChevronUp className="size-3.5" aria-hidden />
+								) : (
+									<LocateFixed className="size-3.5" aria-hidden />
+								)}
 							</Button>
 						</Tooltip>
 					) : null}
@@ -523,9 +566,13 @@ export function EpubListenPlayerBar({
 	const [rateOpenUncontrolled, setRateOpenUncontrolled] = useState(false);
 	const sentenceOpen = sentenceMenuOpenProp ?? sentenceOpenUncontrolled;
 	const rateOpen = rateMenuOpenProp ?? rateOpenUncontrolled;
+	const statusRef = useRef(status);
+	statusRef.current = status;
 
 	const handleRateOpenChange = useCallback(
 		(open: boolean) => {
+			// loading 时禁止打开倍速面板（Radix Trigger 可能仍回调 onOpenChange）
+			if (open && statusRef.current === 'loading') return;
 			if (onRateMenuOpenChange) onRateMenuOpenChange(open);
 			else setRateOpenUncontrolled(open);
 		},
@@ -534,11 +581,18 @@ export function EpubListenPlayerBar({
 
 	const handleSentenceOpenChange = useCallback(
 		(open: boolean) => {
+			if (open && statusRef.current === 'loading') return;
 			if (onSentenceMenuOpenChange) onSentenceMenuOpenChange(open);
 			else setSentenceOpenUncontrolled(open);
 		},
 		[onSentenceMenuOpenChange],
 	);
+
+	useEffect(() => {
+		if (status !== 'loading') return;
+		handleSentenceOpenChange(false);
+		handleRateOpenChange(false);
+	}, [status, handleSentenceOpenChange, handleRateOpenChange]);
 
 	if (status === 'idle') return null;
 
@@ -614,115 +668,124 @@ export function EpubListenPlayerBar({
 				{progressLabel}
 			</span>
 
-			<DropdownMenu
-				modal={false}
-				open={sentenceOpen}
-				onOpenChange={handleSentenceOpenChange}
+			{/* loading：视觉 disabled 不够，Radix 菜单仍可能打开；整组禁点击 */}
+			<div
+				className={cn(
+					'flex shrink-0 items-center gap-2',
+					loading && 'pointer-events-none',
+				)}
+				aria-disabled={loading || undefined}
 			>
-				<DropdownMenuTrigger asChild>
+				<DropdownMenu
+					modal={false}
+					open={sentenceOpen}
+					onOpenChange={handleSentenceOpenChange}
+				>
+					<DropdownMenuTrigger asChild disabled={loading || sentenceCount <= 0}>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							disabled={loading || sentenceCount <= 0}
+							className="text-textcolor/80 shrink-0"
+							aria-label={t('ebook.read.listenBook.sentenceMenu')}
+							onPointerDown={(e) => e.stopPropagation()}
+						>
+							<ListOrdered className="size-4" aria-hidden />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent
+						side="top"
+						align="end"
+						className={cn(
+							'z-50 w-72 overflow-hidden p-1 pb-4',
+							epubReaderChromeMenuContentClass,
+						)}
+						style={menuChromeStyle}
+					>
+						{sentenceLabels.length === 0 ? (
+							<>
+								<DropdownMenuLabel className="text-textcolor/45 px-3 pt-2 pb-3 text-center text-xs font-normal">
+									{t('ebook.read.listenBook.sentenceMenu')}
+								</DropdownMenuLabel>
+								<p className="text-textcolor/45 px-2 py-2 text-xs">
+									{t('ebook.read.listenBook.sentenceMenuEmpty')}
+								</p>
+							</>
+						) : (
+							<VirtualSentenceMenuList
+								labels={sentenceLabels}
+								activeIndex={sentenceIndex}
+								menuOpen={sentenceOpen}
+								onSelect={onGoToSentence}
+							/>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				<Tooltip content={t('ebook.read.listenBook.prevChapter')}>
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						disabled={loading || sentenceCount <= 0}
 						className="text-textcolor/80 shrink-0"
-						aria-label={t('ebook.read.listenBook.sentenceMenu')}
-						onPointerDown={(e) => e.stopPropagation()}
+						disabled={loading || !canPrevChapter}
+						aria-label={t('ebook.read.listenBook.prevChapter')}
+						onClick={onPrevChapter}
 					>
-						<ListOrdered className="size-4" aria-hidden />
+						<ChevronLeft className="size-4" aria-hidden />
 					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent
-					side="top"
-					align="end"
-					className={cn(
-						'z-50 w-72 overflow-hidden p-1 pb-4',
-						epubReaderChromeMenuContentClass,
-					)}
-					style={menuChromeStyle}
-				>
-					{sentenceLabels.length === 0 ? (
-						<>
-							<DropdownMenuLabel className="text-textcolor/45 px-3 pt-2 pb-3 text-center text-xs font-normal">
-								{t('ebook.read.listenBook.sentenceMenu')}
-							</DropdownMenuLabel>
-							<p className="text-textcolor/45 px-2 py-2 text-xs">
-								{t('ebook.read.listenBook.sentenceMenuEmpty')}
-							</p>
-						</>
-					) : (
-						<VirtualSentenceMenuList
-							labels={sentenceLabels}
-							activeIndex={sentenceIndex}
-							menuOpen={sentenceOpen}
-							onSelect={onGoToSentence}
-						/>
-					)}
-				</DropdownMenuContent>
-			</DropdownMenu>
+				</Tooltip>
 
-			<Tooltip content={t('ebook.read.listenBook.prevChapter')}>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-sm"
-					className="text-textcolor/80 shrink-0"
-					disabled={loading || !canPrevChapter}
-					aria-label={t('ebook.read.listenBook.prevChapter')}
-					onClick={onPrevChapter}
-				>
-					<ChevronLeft className="size-4" aria-hidden />
-				</Button>
-			</Tooltip>
-
-			<Tooltip content={t('ebook.read.listenBook.nextChapter')}>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-sm"
-					className="text-textcolor/80 shrink-0"
-					disabled={loading || !canNextChapter}
-					aria-label={t('ebook.read.listenBook.nextChapter')}
-					onClick={onNextChapter}
-				>
-					<ChevronRight className="size-4" aria-hidden />
-				</Button>
-			</Tooltip>
-
-			<DropdownMenu
-				modal={false}
-				open={rateOpen}
-				onOpenChange={handleRateOpenChange}
-			>
-				<DropdownMenuTrigger asChild>
+				<Tooltip content={t('ebook.read.listenBook.nextChapter')}>
 					<Button
 						type="button"
 						variant="ghost"
-						size="sm"
-						disabled={loading}
-						className={cn(
-							'text-textcolor/80 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
-							'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
-						)}
-						aria-label={t('ebook.read.listenBook.speed')}
-						title={t('ebook.read.listenBook.speed')}
-						onPointerDown={(e) => e.stopPropagation()}
+						size="icon-sm"
+						className="text-textcolor/80 shrink-0"
+						disabled={loading || !canNextChapter}
+						aria-label={t('ebook.read.listenBook.nextChapter')}
+						onClick={onNextChapter}
 					>
-						{formatListenRate(rate)}
+						<ChevronRight className="size-4" aria-hidden />
 					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent
-					side="top"
-					align="end"
-					className={cn(
-						'z-50 w-80 overflow-hidden p-0',
-						epubReaderChromeMenuContentClass,
-					)}
-					style={menuChromeStyle}
+				</Tooltip>
+
+				<DropdownMenu
+					modal={false}
+					open={rateOpen}
+					onOpenChange={handleRateOpenChange}
 				>
-					<EpubListenRatePanel rate={rate} onRateChange={onRateChange} />
-				</DropdownMenuContent>
-			</DropdownMenu>
+					<DropdownMenuTrigger asChild disabled={loading}>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							disabled={loading}
+							className={cn(
+								'text-textcolor/80 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
+								'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
+							)}
+							aria-label={t('ebook.read.listenBook.speed')}
+							title={t('ebook.read.listenBook.speed')}
+							onPointerDown={(e) => e.stopPropagation()}
+						>
+							{formatListenRate(rate)}
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent
+						side="top"
+						align="end"
+						className={cn(
+							'z-50 w-80 overflow-hidden p-0',
+							epubReaderChromeMenuContentClass,
+						)}
+						style={menuChromeStyle}
+					>
+						<EpubListenRatePanel rate={rate} onRateChange={onRateChange} />
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
 		</div>
 	);
 }

@@ -1,7 +1,7 @@
 # EPUB 听书播放改动索引（2026-07）
 
 > **角色**：本轮听书 / 听当前相关 **已落地改动** 的索引（只列链接与一句话）；实现细节见各专题。  
-> **规划中尚未落地**（装饰符号不读等）：见 [ideas/epub-listen-playback-optimize.md](../ideas/epub-listen-playback-optimize.md) 与 `apps/frontend/specs/demand.md`。
+> **规划中尚未落地**（其它体验优化）：见 [ideas/epub-listen-playback-optimize.md](../ideas/epub-listen-playback-optimize.md) 与 `apps/frontend/specs/demand.md`。
 
 ## 问题 → 处理一览
 
@@ -22,6 +22,11 @@
 | 13  | 同 spine 多节目录高亮总在末项/首项           | `tocCfi` vs 阅读 CFI；比较器全 0 防护；DOM 视口回退                                                                  | [epub-toc-active-cfi.md](./epub-toc-active-cfi.md)                           |
 | 14  | 目录/底栏切章起播落文件第 0 句或上一节末句   | `restartFromChapterStart` + `resolveListenStartSentence` `mode: 'after'`                                             | [epub-listen-toc-anchor-start.md](./epub-listen-toc-anchor-start.md)         |
 | 15  | 听书底栏上下章切到错误邻节                   | `getPlayheadCfi` 进 `findActiveTocItemIndex`，勿只用阅读 CFI                                                         | [epub-listen-bar-playhead-toc.md](./epub-listen-bar-playhead-toc.md)         |
+| 16  | 听当前播完即停；起播偏到下一句               | 切入听书续读；选区 plain / 重叠起播                                                                                  | [epub-listen-quote-continue.md](./epub-listen-quote-continue.md)             |
+| 17  | PopBar 听当前有暂停态；听后条与选区仍在      | 固定「听当前」文案；听后 clear PopBar+选区                                                                           | [epub-listen-popbar-dismiss.md](./epub-listen-popbar-dismiss.md)             |
+| 18  | 听书中划选仍被自动滚回播放句                 | `selectionchange` → `pauseListenAutoFollow`                                                                          | [epub-listen-select-pause-follow.md](./epub-listen-select-pause-follow.md)   |
+| 19  | 滚动后 PopBar 关了但选中高亮残留             | scroll/relocated 清 Selection                                                                                        | [epub-selection-scroll-clear.md](./epub-selection-scroll-clear.md)           |
+| 20  | 朗读整行 `***` 装饰分隔线                    | `stripMarkdownForTts` 过滤连续装饰符                                                                                 | [epub-tts-separator-filter.md](./epub-tts-separator-filter.md)               |
 
 ## 规划稿
 

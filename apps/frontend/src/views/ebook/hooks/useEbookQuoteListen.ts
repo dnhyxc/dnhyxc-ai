@@ -1,34 +1,16 @@
 import { Toast } from '@ui/sonner';
 import type { Rendition } from 'epubjs';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
-	applyActivePlaybackRate,
-	buildSentenceOffsetSpans,
 	isPlaybackAvailable,
-	pausePlaybackSoft,
 	primePlaybackForUserGesture,
-	registerPlaybackMediaHandlers,
-	resumePlaybackSoft,
-	stopAllPlayback,
-	stripMarkdownForTts,
 	warmupSpeechVoices,
 } from '@/utils/speech';
+import { resolveEpubListenPlain } from '../utils/epub/listen/epubListenSegmentOverlay';
 import {
-	buildParagraphUnits,
-	type ParagraphUnit,
-} from '../utils/epub/listen/epubListenParagraphs';
-import { playListenUnitsFromCursor } from '../utils/epub/listen/epubListenPlayUnits';
-import {
-	beginEpubListenOverlaySession,
-	clearActiveListenHighlight,
-	clearEpubListenSegmentOverlay,
-	getEpubListenSessionMeta,
-	getEpubListenSessionPlain,
-	invokeStopChapterListen,
-	registerQuoteListenStop,
-	resolveEpubListenPlain,
-	showEpubListenPlainSpan,
-} from '../utils/epub/listen/epubListenSegmentOverlay';
+	cfiFromDomRange,
+	resolveCfiDomRange,
+} from '../utils/epub/mark/epubRangeGeometry';
 import type { ChapterListenStatus } from './useEpubChapterListen';
 
 type QuoteListenState = {
@@ -49,157 +31,102 @@ const IDLE_STATE: QuoteListenState = {
 	rate: 1,
 };
 
-function buildLabelsFromPlain(plain: string): string[] {
-	const trimmed = plain.trim();
-	if (!trimmed) return [];
-	return buildSentenceOffsetSpans(trimmed).map(({ start, end }) => {
-		const label = stripMarkdownForTts(trimmed.slice(start, end)).trim();
-		return label || '…';
-	});
+export type QuoteListenChapterBridge = {
+	startFromCfi: (
+		cfi: string,
+		mode?: 'before' | 'after',
+		anchorRange?: Range | null,
+		selectionPlain?: string | null,
+	) => void;
+};
+
+/**
+ * 选区/CFI → 完整选区 Range（供重叠定位起播句）+ 起点 CFI（供 display）。
+ * 注意：anchor 不要 collapse，否则句末选区会偏到下一句。
+ */
+function resolveListenAnchor(
+	rend: Rendition | null,
+	text: string,
+	cfiRange?: string,
+	frozenRange?: Range | null,
+): { cfi: string; anchor: Range | null } {
+	const { selectionRange } = resolveEpubListenPlain(rend, text, frozenRange);
+
+	let anchor: Range | null = null;
+	if (selectionRange) {
+		try {
+			anchor = selectionRange.cloneRange();
+		} catch {
+			anchor = null;
+		}
+	}
+
+	if (!anchor && rend && cfiRange?.trim()) {
+		const resolved = resolveCfiDomRange(rend, cfiRange.trim());
+		if (resolved) {
+			try {
+				anchor = resolved.cloneRange();
+			} catch {
+				anchor = null;
+			}
+		}
+	}
+
+	let cfi = '';
+	if (rend && anchor) {
+		try {
+			const start = anchor.cloneRange();
+			start.collapse(true);
+			cfi = cfiFromDomRange(rend, start)?.trim() ?? '';
+		} catch {
+			cfi = '';
+		}
+	}
+	if (!cfi) cfi = cfiRange?.trim() ?? '';
+
+	return { cfi, anchor };
 }
 
-/** 电子书引用/选区朗读：复用英语学习 TTS，并与听书共用底部播放条 */
+/**
+ * 听当前入口：每次点击都从选区切入听书并续读（微信读书：无暂停/继续态，暂停用底栏）。
+ */
 export function useEbookQuoteListen(
 	t: (key: string) => string,
 	getRendition?: () => Rendition | null,
-	onListenSessionEnd?: () => void,
-	getSpineIndex?: () => number | undefined,
+	_onListenSessionEnd?: () => void,
+	_getSpineIndex?: () => number | undefined,
+	chapterBridge?: QuoteListenChapterBridge,
 ) {
-	const [state, setState] = useState<QuoteListenState>(IDLE_STATE);
-	const [playingKey, setPlayingKey] = useState<string | null>(null);
-
-	const stateRef = useRef(state);
-	stateRef.current = state;
 	const tRef = useRef(t);
 	tRef.current = t;
 	const getRenditionRef = useRef(getRendition);
 	getRenditionRef.current = getRendition;
-	const getSpineIndexRef = useRef(getSpineIndex);
-	getSpineIndexRef.current = getSpineIndex;
-	const onSessionEndRef = useRef(onListenSessionEnd);
-	onSessionEndRef.current = onListenSessionEnd;
-
-	const loopGenRef = useRef(0);
-	const pausedRef = useRef(false);
-	const rateRef = useRef(1);
-	const sentenceCursorRef = useRef(0);
-	const playingKeyRef = useRef<string | null>(null);
-	const fallbackPlainRef = useRef('');
-	const paragraphsRef = useRef<ParagraphUnit[]>([]);
-	const sentencesRef = useRef<Array<{ start: number; end: number }>>([]);
-
-	const syncState = useCallback((patch: Partial<QuoteListenState>) => {
-		setState((prev) => {
-			const next = { ...prev, ...patch };
-			stateRef.current = next;
-			return next;
-		});
-	}, []);
-
-	const stopInternal = useCallback((opts?: { notify?: boolean }) => {
-		loopGenRef.current += 1;
-		pausedRef.current = false;
-		playingKeyRef.current = null;
-		fallbackPlainRef.current = '';
-		paragraphsRef.current = [];
-		sentencesRef.current = [];
-		stopAllPlayback();
-		// 同步卸 Media Session，勿等 isActive effect：否则 macOS 仍残留进度条/控件
-		registerPlaybackMediaHandlers(null);
-		clearEpubListenSegmentOverlay();
-		setPlayingKey(null);
-		const idle = { ...IDLE_STATE, rate: rateRef.current };
-		setState(idle);
-		stateRef.current = idle;
-		if (opts?.notify !== false) onSessionEndRef.current?.();
-	}, []);
+	const bridgeRef = useRef(chapterBridge);
+	bridgeRef.current = chapterBridge;
 
 	useEffect(() => {
 		warmupSpeechVoices();
-		registerQuoteListenStop(() => stopInternal({ notify: false }));
-		return () => {
-			registerQuoteListenStop(null);
-			stopInternal({ notify: false });
-		};
-	}, [stopInternal]);
+	}, []);
 
-	const isGenActive = (gen: number) => gen === loopGenRef.current;
-
-	/** 从当前句起播：首句逐句快出声，同段剩余与后续按段预取/合成 */
-	const playFromCursor = useCallback(
-		async (gen: number): Promise<boolean> => {
-			const rend = getRenditionRef.current?.() ?? null;
-			const meta = getEpubListenSessionMeta();
-			const plain = meta?.plain ?? fallbackPlainRef.current;
-			const sentences =
-				sentencesRef.current.length > 0
-					? sentencesRef.current
-					: buildSentenceOffsetSpans(plain.trim());
-			const units =
-				paragraphsRef.current.length > 0
-					? paragraphsRef.current
-					: buildParagraphUnits(plain.trim(), sentences);
-			const sentenceCount = sentences.length;
-
-			if (!plain.trim() || sentenceCount <= 0 || units.length === 0) {
-				return false;
-			}
-
-			sentencesRef.current = sentences;
-			paragraphsRef.current = units;
-
-			try {
-				return await playListenUnitsFromCursor({
-					plain,
-					sentences,
-					units,
-					startSi: sentenceCursorRef.current,
-					getRate: () => rateRef.current,
-					isActive: () => isGenActive(gen) && !pausedRef.current,
-					onSentence: (globalSi) => {
-						sentenceCursorRef.current = globalSi;
-						syncState({
-							status: 'playing',
-							sentenceIndex: globalSi,
-							sentenceCount,
-						});
-						if (rend) showEpubListenPlainSpan(0, 0, globalSi);
-					},
-					onUnitIdle: () => {
-						if (rend) clearActiveListenHighlight(rend);
-					},
-					onAwaitingCurrentTts: (waiting) => {
-						if (!isGenActive(gen) || pausedRef.current) return;
-						syncState({ status: waiting ? 'loading' : 'playing' });
-					},
-				});
-			} catch (err) {
-				if (
-					isGenActive(gen) &&
-					!(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
-				) {
-					Toast({
-						type: 'warning',
-						title: tRef.current('englishLearning.tts.unsupported'),
-					});
-				}
-				return false;
-			}
-		},
-		[syncState],
-	);
-
-	const startPlayback = useCallback(
-		async (
+	const startFromSelection = useCallback(
+		(
 			text: string,
-			key: string,
+			_key: string,
 			cfiRange?: string,
 			frozenRange?: Range | null,
 		) => {
 			const trimmed = text.trim();
 			if (!trimmed) return;
 
-			invokeStopChapterListen();
+			const bridge = bridgeRef.current;
+			if (!bridge) {
+				Toast({
+					type: 'warning',
+					title: tRef.current('ebook.read.listenBook.notReady'),
+				});
+				return;
+			}
+
 			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
@@ -209,189 +136,46 @@ export function useEbookQuoteListen(
 			}
 
 			primePlaybackForUserGesture();
-			stopAllPlayback();
-			clearEpubListenSegmentOverlay();
-
 			const rend = getRenditionRef.current?.() ?? null;
-			const cfi = cfiRange?.trim() ?? '';
-			const { plain, selectionRange } = resolveEpubListenPlain(
+			const { cfi, anchor } = resolveListenAnchor(
 				rend,
 				trimmed,
+				cfiRange,
 				frozenRange,
 			);
-
-			if (rend && plain) {
-				beginEpubListenOverlaySession(rend, plain, {
-					cfi,
-					selectionRange,
+			if (!cfi && !anchor) {
+				Toast({
+					type: 'warning',
+					title: tRef.current('ebook.read.listenBook.notReady'),
 				});
-			}
-
-			const speakPlain = getEpubListenSessionPlain() ?? plain;
-			if (!speakPlain.trim()) return;
-
-			fallbackPlainRef.current = speakPlain;
-			const sentences = buildSentenceOffsetSpans(speakPlain.trim());
-			sentencesRef.current = sentences;
-			paragraphsRef.current = buildParagraphUnits(speakPlain.trim(), sentences);
-
-			const meta = getEpubListenSessionMeta();
-			const labels = meta?.sentenceLabels ?? buildLabelsFromPlain(speakPlain);
-			const sentenceCount = meta?.sentenceCount ?? labels.length;
-
-			const gen = ++loopGenRef.current;
-			pausedRef.current = false;
-			sentenceCursorRef.current = 0;
-			playingKeyRef.current = key;
-			setPlayingKey(key);
-
-			const spineIndex = getSpineIndexRef.current?.() ?? -1;
-			syncState({
-				status: 'loading',
-				spineIndex,
-				sentenceIndex: 0,
-				sentenceCount,
-				sentenceLabels: labels,
-				rate: rateRef.current,
-			});
-
-			const finished = await playFromCursor(gen);
-			if (finished && isGenActive(gen)) {
-				stopInternal();
-			} else if (!pausedRef.current && isGenActive(gen)) {
-				stopInternal();
-			}
-		},
-		[playFromCursor, stopInternal, syncState],
-	);
-
-	const toggleListen = useCallback(
-		async (
-			text: string,
-			key: string,
-			cfiRange?: string,
-			frozenRange?: Range | null,
-		) => {
-			if (playingKeyRef.current === key && stateRef.current.status !== 'idle') {
-				stopInternal();
 				return;
 			}
-			await startPlayback(text, key, cfiRange, frozenRange);
+
+			bridge.startFromCfi(cfi, 'after', anchor, trimmed);
 		},
-		[startPlayback, stopInternal],
+		[],
 	);
 
-	const pause = useCallback(() => {
-		const status = stateRef.current.status;
-		if (status !== 'playing' && status !== 'loading') return;
-		pausedRef.current = true;
-		pausePlaybackSoft();
-		syncState({ status: 'paused' });
-	}, [syncState]);
-
-	const resume = useCallback(() => {
-		if (stateRef.current.status !== 'paused') return;
-		pausedRef.current = false;
-		if (resumePlaybackSoft()) {
-			syncState({ status: 'playing' });
-			return;
-		}
-		const gen = ++loopGenRef.current;
-		syncState({ status: 'loading' });
-		void playFromCursor(gen).then((finished) => {
-			if (finished && isGenActive(gen)) stopInternal();
-			else if (!pausedRef.current && isGenActive(gen)) stopInternal();
-		});
-	}, [playFromCursor, stopInternal, syncState]);
-
-	const pauseRef = useRef(pause);
-	pauseRef.current = pause;
-	const resumeRef = useRef(resume);
-	resumeRef.current = resume;
-
-	const stop = useCallback(() => {
-		stopInternal();
-	}, [stopInternal]);
-
-	const goToSentence = useCallback(
-		(index: number) => {
-			const count = stateRef.current.sentenceCount;
-			if (count <= 0) return;
-			const next = Math.min(count - 1, Math.max(0, index));
-			sentenceCursorRef.current = next;
-			loopGenRef.current += 1;
-			stopAllPlayback();
-			pausedRef.current = false;
-			const gen = loopGenRef.current;
-			syncState({ sentenceIndex: next, status: 'playing' });
-			void playFromCursor(gen).then((finished) => {
-				if (finished && isGenActive(gen)) stopInternal();
-				else if (!pausedRef.current && isGenActive(gen)) stopInternal();
-			});
-		},
-		[playFromCursor, stopInternal, syncState],
-	);
-
-	const seekSentence = useCallback(
-		(delta: -1 | 1) => {
-			goToSentence(sentenceCursorRef.current + delta);
-		},
-		[goToSentence],
-	);
-
-	const setRate = useCallback(
-		(rate: number) => {
-			rateRef.current = rate;
-			applyActivePlaybackRate(rate);
-			syncState({ rate });
-		},
-		[syncState],
-	);
-
-	const togglePlay = useCallback(() => {
-		const status = stateRef.current.status;
-		if (status === 'playing' || status === 'loading') {
-			pause();
-			return;
-		}
-		if (status === 'paused') {
-			resume();
-		}
-	}, [pause, resume]);
-
+	/** 固定文案，无播放态（暂停/继续只在底栏） */
 	const listenLabel = useCallback(
-		(key: string, defaultLabel: string) =>
-			playingKey === key ? t('englishLearning.tts.stop') : defaultLabel,
-		[playingKey, t],
+		(_key: string, defaultLabel: string) => defaultLabel,
+		[],
 	);
-
-	const isActive =
-		state.status === 'loading' ||
-		state.status === 'playing' ||
-		state.status === 'paused';
-
-	useEffect(() => {
-		if (!isActive) return;
-		registerPlaybackMediaHandlers({
-			play: () => resumeRef.current(),
-			pause: () => pauseRef.current(),
-		});
-		return () => registerPlaybackMediaHandlers(null);
-	}, [isActive]);
 
 	return {
-		...state,
-		isActive,
-		toggleListen,
-		playingKey,
+		...IDLE_STATE,
+		status: 'idle' as ChapterListenStatus,
+		isActive: false,
+		toggleListen: startFromSelection,
+		playingKey: null as string | null,
 		listenLabel,
-		togglePlay,
-		pause,
-		resume,
-		stop,
-		prevSentence: () => seekSentence(-1),
-		nextSentence: () => seekSentence(1),
-		goToSentence,
-		setRate,
+		togglePlay: () => {},
+		pause: () => {},
+		resume: () => {},
+		stop: () => {},
+		prevSentence: () => {},
+		nextSentence: () => {},
+		goToSentence: (_index: number) => {},
+		setRate: (_rate: number) => {},
 	};
 }

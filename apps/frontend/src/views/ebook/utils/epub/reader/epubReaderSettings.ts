@@ -258,10 +258,10 @@ export const epubReaderChromeMenuContentClass = cn(
 
 /** 阅读 chrome 列表项：默认 / 选中（与 EbookTocDrawer 目录项一致；跟阅读字色，勿用 text-theme） */
 export const epubReaderChromeListItemIdleClass =
-	'text-textcolor transition-colors hover:bg-textcolor/8 focus:bg-textcolor/8 focus:text-textcolor';
+	'text-textcolor transition-colors hover:bg-textcolor/8 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-textcolor/30';
 
 export const epubReaderChromeListItemActiveClass =
-	'bg-textcolor/12 text-textcolor font-medium hover:bg-textcolor/12 focus:bg-textcolor/12 focus:text-textcolor';
+	'bg-textcolor/12 text-textcolor font-medium hover:bg-textcolor/12 focus-visible:outline-none focus-visible:bg-textcolor/12 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-textcolor/30';
 
 /** 选区 PopBar 毛玻璃面板（基于阅读 surface，Portal 内需配合 getEpubReaderChromeCssVars） */
 export const epubReaderPopBarSurfaceClass =

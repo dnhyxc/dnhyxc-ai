@@ -1326,4 +1326,34 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While listening, previous/next chapter on the bottom bar uses the sentence currently being spoken to decide which section you are in, so a lagging reading position no longer jumps to the wrong neighbor section.',
 	},
+	's25-86': {
+		title: 'Listen from here continues the book',
+		description:
+			'After Listen from the selection or a thought quote, playback starts at the sentence that contains the selection and continues downward like full Listen. The bottom bar (including chapter skip) stays available. The button label stays Listen from here; use the bar to pause.',
+	},
+	's25-87': {
+		title: 'Listen from here dismisses the selection bar',
+		description:
+			'Tapping Listen from here hides the floating selection bar and clears the text highlight so it does not block reading.',
+	},
+	's25-88': {
+		title: 'Selecting text pauses listen follow',
+		description:
+			'While Listen is playing, selecting body text pauses auto-scroll to the current sentence (same as manual scrolling). Use Back to playback to resume follow.',
+	},
+	's25-89': {
+		title: 'Scrolling clears leftover selection',
+		description:
+			'After you scroll and the selection bar is already hidden, any leftover native selection highlight on the page is cleared as well.',
+	},
+	's25-90': {
+		title: 'Listen skips decorative separators',
+		description:
+			'Full-line decorative separators such as *** or --- in a chapter are no longer spoken aloud.',
+	},
+	's25-91': {
+		title: 'TOC / sentence list three-way scroll',
+		description:
+			'The book contents drawer (bottom-right) and the listen sentence menu header share one control that cycles Scroll to bottom → top → current chapter/sentence, with icons switching (↓ / ↑ / locate) for long lists.',
+	},
 };

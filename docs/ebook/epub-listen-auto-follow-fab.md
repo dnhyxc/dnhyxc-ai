@@ -3,6 +3,7 @@
 ## 延伸阅读
 
 - [EPUB 听书：跨章 trim 后 FAB CFI 重挂载](epub-listen-follow-cfi-remount.md) — 连续滚动远章 trim 后「回到播放位置」修复（display + 句 Range 重建）
+- [EPUB 听书：划选暂停自动跟随](epub-listen-select-pause-follow.md) — 划选正文与手动滚动共用 `pauseListenAutoFollow`
 - [EPUB 听读 — 句间云端 TTS 预取](epub-listen-cloud-prefetch.md) — 句间预取；[首包出声后再预取](epub-listen-prefetch-after-start.md) — 错开首包 HTTP
 - [EPUB 听当前：滚动容器浮层与跨段句间清除](epub-listen-host-overlay.md) — 播放背景绘制与句间清除
 - [EPUB 边听边读开发者手册](developer/epub-listen-dev.md) — 听当前 + 听书完整实现（§5.3 自动跟随、§8.7 scroll guard）

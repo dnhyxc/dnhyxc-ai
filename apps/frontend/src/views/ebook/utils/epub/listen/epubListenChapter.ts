@@ -13,7 +13,7 @@ import { resolveSpineIndexForHref } from '../reader/epubSpineIndex';
 import { clearListenMarkHighlight } from './epubListenMarkHighlight';
 import { showEpubListenDomRange } from './epubListenSegmentOverlay';
 
-// 最大可处理文本长度，超过此长度的文本会被裁剪（避免性能问题）
+// 单次听书文本上限（超长章 HTML 分段续听，勿一次塞爆句索引）
 const MAX_PLAIN_CHARS = 50_000;
 // 节跳转自动等待时长（ms），播放下一节时的超时时间
 const SECTION_ADVANCE_MS = 4000;
@@ -24,9 +24,15 @@ const RELOCATE_WAIT_MS = 900;
  * 用于表示当前可见的待听节（听书章节段落）。
  */
 export type VisibleListenSection = {
-	plain: string; // 该节可读纯文本
+	plain: string; // 该节可读纯文本（可能是长章中的一段）
 	outerRange: Range; // 该节在文档中的整体 DOM Range
 	spineIndex: number; // EPUB spine 索引
+	/** 本段在全文 plain 中的起点 */
+	plainFrom: number;
+	/** 下一段起点；hasMorePlain 时用于同文档续听 */
+	nextPlainFrom: number;
+	/** 同文档全文在本段之后还有未听正文 */
+	hasMorePlain: boolean;
 };
 
 /**
@@ -35,12 +41,76 @@ export type VisibleListenSection = {
 type TextPos = { node: Text; offset: number };
 
 /**
- * 对整个文档抽取纯文本（去 markdown/特殊标记），供 TTS 使用。
+ * 对整个文档抽取纯文本，供 TTS / 分句用。
+ * 必须与 indexChapterSentenceRanges 的 buildNormStream 同源，否则短句会误匹配、高亮整段错位。
  */
 function sectionPlain(doc: Document): string {
-	return stripMarkdownForTts(
-		doc.body?.innerText ?? doc.body?.textContent ?? '',
-	).trim();
+	const body = doc.body;
+	if (!body) return '';
+	const { norm } = buildNormStream(listBodyTextPositions(body));
+	return norm.trim();
+}
+
+/** 从全文 offset 切一段听书 plain；尽量在句末断开 */
+export function sliceListenPlainChunk(
+	fullPlain: string,
+	from = 0,
+): { plain: string; nextFrom: number; hasMore: boolean } {
+	const start = Math.max(0, Math.min(from, fullPlain.length));
+	const rest = fullPlain.slice(start);
+	if (!rest) {
+		return { plain: '', nextFrom: start, hasMore: false };
+	}
+	if (rest.length <= MAX_PLAIN_CHARS) {
+		return {
+			plain: rest,
+			nextFrom: start + rest.length,
+			hasMore: false,
+		};
+	}
+	let end = MAX_PLAIN_CHARS;
+	const window = rest.slice(0, MAX_PLAIN_CHARS);
+	// 在窗口后半段找句末，避免拦腰切断
+	const minBreak = Math.floor(MAX_PLAIN_CHARS * 0.5);
+	let breakAt = -1;
+	for (const mark of ['。', '！', '？', '；', '\n'] as const) {
+		const i = window.lastIndexOf(mark);
+		if (i >= minBreak && i > breakAt) breakAt = i;
+	}
+	if (breakAt >= 0) end = breakAt + 1;
+	const plain = rest.slice(0, end);
+	return {
+		plain,
+		nextFrom: start + end,
+		hasMore: start + end < fullPlain.length,
+	};
+}
+
+function buildVisibleFromDoc(
+	doc: Document,
+	spineIndex: number,
+	plainFrom = 0,
+): VisibleListenSection | null {
+	const full = sectionPlain(doc);
+	if (!full) return null;
+	const { plain, nextFrom, hasMore } = sliceListenPlainChunk(full, plainFrom);
+	if (!plain.trim()) return null;
+
+	const outerRange = doc.createRange();
+	try {
+		outerRange.selectNodeContents(doc.body!);
+	} catch {
+		return null;
+	}
+
+	return {
+		plain,
+		outerRange,
+		spineIndex,
+		plainFrom,
+		nextPlainFrom: nextFrom,
+		hasMorePlain: hasMore,
+	};
 }
 
 /**
@@ -171,35 +241,20 @@ function spineIndexFromRendition(rend: Rendition, hint?: number): number {
 
 /**
  * 抽取当前可见文档的朗读文本片段（用于听书的节级文本、以及 DOM Range）。
- * 截断超长文本，返回期望结构。
+ * 超长章按 MAX_PLAIN_CHARS 分段；同文档续听传 plainFrom。
  */
 export function extractVisibleListenSection(
 	rend: Rendition,
 	spineHint?: number,
+	plainFrom = 0,
 ): VisibleListenSection | null {
 	const doc = pickDocumentForListen(rend, spineHint);
 	if (!doc?.body) return null;
-
-	let plain = stripMarkdownForTts(
-		doc.body.innerText ?? doc.body.textContent ?? '',
-	).trim();
-	if (!plain) return null;
-	if (plain.length > MAX_PLAIN_CHARS) {
-		plain = plain.slice(0, MAX_PLAIN_CHARS);
-	}
-
-	const outerRange = doc.createRange();
-	try {
-		outerRange.selectNodeContents(doc.body);
-	} catch {
-		return null;
-	}
-
-	return {
-		plain,
-		outerRange,
-		spineIndex: spineIndexFromRendition(rend, spineHint),
-	};
+	return buildVisibleFromDoc(
+		doc,
+		spineIndexFromRendition(rend, spineHint),
+		plainFrom,
+	);
 }
 
 /**
@@ -232,45 +287,17 @@ function spineIndexForDocument(rend: Rendition, doc: Document): number {
 
 /**
  * 针对指定 document 抽取朗读节信息。主要用于连续滚动场景中节间衔接或跨文档定位。
- * @param rend     渲染器
- * @param doc      指定待抽取的 Document
+ * @param rend      渲染器
+ * @param doc       指定待抽取的 Document
+ * @param plainFrom 同文档分段续听起点（strip 后全文偏移）
  */
 export function extractListenSectionForDocument(
 	rend: Rendition,
 	doc: Document,
+	plainFrom = 0,
 ): VisibleListenSection | null {
-	// 若 document 不含 body 节点，无法进行节抽取，直接返回 null
 	if (!doc.body) return null;
-
-	// 尝试抽取经过 stripMarkdownForTts 处理的正文纯文本（兼容 innerText / textContent）
-	let plain = stripMarkdownForTts(
-		doc.body.innerText ?? doc.body.textContent ?? '',
-	).trim();
-
-	// 纯文本内容为空则说明无可读内容，返回 null
-	if (!plain) return null;
-
-	// 纯文本长度超限时裁剪，保证后续朗读性能及安全
-	if (plain.length > MAX_PLAIN_CHARS) {
-		plain = plain.slice(0, MAX_PLAIN_CHARS);
-	}
-
-	// 创建 DOM Range，选中整个 <body> 作为该节整体范围
-	const outerRange = doc.createRange();
-	try {
-		// 尝试将 range 设置为覆盖 body 节点所有内容（内容节点全包围）
-		outerRange.selectNodeContents(doc.body);
-	} catch {
-		// 处理某些异常结构下 selectNodeContents 失败的容错，直接判定无法朗读
-		return null;
-	}
-
-	// 返回标准化 VisibleListenSection 结构（含文本、DOM 范围与 spineIndex）
-	return {
-		plain,
-		outerRange,
-		spineIndex: spineIndexForDocument(rend, doc),
-	};
+	return buildVisibleFromDoc(doc, spineIndexForDocument(rend, doc), plainFrom);
 }
 
 /**
@@ -309,10 +336,10 @@ function listBodyTextPositions(body: HTMLElement): TextPos[] {
 }
 
 /**
- * 对比匹配用，先去 markdown 和空白、压缩多余空格。
+ * 对比匹配用：只压空白。勿再 stripMarkdown——plain 已与 DOM norm 同源，再删 *** 会对不齐。
  */
 function normForMatch(text: string): string {
-	return stripMarkdownForTts(text).replace(/\s+/g, ' ').trim();
+	return text.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -377,38 +404,101 @@ function rangeFromPosSpan(
 }
 
 /**
+ * 将本段 plainNorm 对齐到 DOM norm：优先整段连续匹配，避免短句 indexOf 误命中前文重复台词。
+ */
+function alignPlainChunkToNorm(
+	plainNorm: string,
+	norm: string,
+	from: number,
+): { start: number; end: number } | null {
+	if (!plainNorm) return { start: from, end: from };
+	const startAt = Math.max(0, Math.min(from, norm.length));
+	if (norm.slice(startAt, startAt + plainNorm.length) === plainNorm) {
+		return { start: startAt, end: startAt + plainNorm.length };
+	}
+	const probeLen = Math.min(64, plainNorm.length);
+	const probe = plainNorm.slice(0, probeLen);
+	let start = norm.indexOf(probe, startAt);
+	if (start < 0 && startAt > 0) {
+		// 续听游标偶发偏差：允许在附近重锚定
+		start = norm.indexOf(probe, Math.max(0, startAt - probeLen));
+	}
+	if (start < 0) return null;
+	if (norm.slice(start, start + plainNorm.length) !== plainNorm) return null;
+	return { start, end: start + plainNorm.length };
+}
+
+/**
  * 句级语音跟随：对全节文本，预建立每个句子的 DOM Range。
  * 利用顺序映射方式，确保每一 TTS 句可唯一对应实际 DOM 片段（高亮、滚动）。
- * 复杂度较低。若找不到匹配则返回 null。
  * @param outerRange  整节对应 DOM Range
- * @param plain       本节净文本
- * @returns           按原句顺序匹配到的 DOM Range/未命中则为 null
+ * @param plain       本节净文本（可为长章中的一段）
+ * @param opts.normCursor  同文档上一段索引结束后的 norm 游标，避免续听段误匹配前文
+ * @returns ranges + 本段结束后的 normCursor
  */
 export function indexChapterSentenceRanges(
 	outerRange: Range,
 	plain: string,
-): Array<Range | null> {
+	opts?: { normCursor?: number },
+): { ranges: Array<Range | null>; normCursor: number } {
 	const trimmed = plain.trim();
 	const sentences = buildSentenceOffsetSpans(trimmed);
-	if (!sentences.length) return [];
+	if (!sentences.length)
+		return { ranges: [], normCursor: opts?.normCursor ?? 0 };
 
 	const body = bodyFromOuter(outerRange);
-	if (!body) return sentences.map(() => null);
+	if (!body) {
+		return {
+			ranges: sentences.map(() => null),
+			normCursor: opts?.normCursor ?? 0,
+		};
+	}
 
 	const positions = listBodyTextPositions(body);
-	if (!positions.length) return sentences.map(() => null);
+	if (!positions.length) {
+		return {
+			ranges: sentences.map(() => null),
+			normCursor: opts?.normCursor ?? 0,
+		};
+	}
 
 	const { norm, map } = buildNormStream(positions);
-	if (!norm) return sentences.map(() => null);
+	if (!norm) {
+		return {
+			ranges: sentences.map(() => null),
+			normCursor: opts?.normCursor ?? 0,
+		};
+	}
 
-	let cursor = 0;
-	return sentences.map((sent) => {
+	let cursor = Math.max(0, Math.min(opts?.normCursor ?? 0, norm.length));
+	const plainNorm = normForMatch(trimmed);
+	const aligned = alignPlainChunkToNorm(plainNorm, norm, cursor);
+	if (aligned) {
+		let localCursor = 0;
+		const ranges = sentences.map((sent) => {
+			const needle = normForMatch(trimmed.slice(sent.start, sent.end));
+			if (!needle) return null;
+			const local = plainNorm.indexOf(needle, localCursor);
+			if (local < 0) return null;
+			const idx = aligned.start + local;
+			if (idx + needle.length > aligned.end) return null;
+			const startPi = map[idx];
+			const endPi = map[idx + needle.length - 1];
+			if (startPi == null || endPi == null) return null;
+			const range = rangeFromPosSpan(positions, startPi, endPi);
+			if (range) localCursor = local + needle.length;
+			return range;
+		});
+		return { ranges, normCursor: aligned.end };
+	}
+
+	// fallback：逐句顺序 indexOf（短句易误匹配，仅整段对齐失败时用）
+	const ranges = sentences.map((sent) => {
 		const needle = normForMatch(trimmed.slice(sent.start, sent.end));
 		if (!needle) return null;
 
 		let idx = norm.indexOf(needle, cursor);
 		if (idx < 0 && needle.length >= 8) {
-			// 针对长句，fallback：只搜索前一段文本
 			const head = needle.slice(0, Math.min(24, needle.length));
 			idx = norm.indexOf(head, cursor);
 			if (idx >= 0 && norm.slice(idx, idx + needle.length) !== needle) {
@@ -425,6 +515,7 @@ export function indexChapterSentenceRanges(
 		if (range) cursor = idx + needle.length;
 		return range;
 	});
+	return { ranges, normCursor: cursor };
 }
 
 /**
@@ -456,14 +547,139 @@ export function teardownChapterListenHighlight(rend?: Rendition): void {
 }
 
 /**
- * 根据 startCfi 对应位置，找所属的句子编号（第几句起播）（若找不到则回退到0）。
- * @param mode `before`：CFI 左侧最后一句（从当前位置续听）
- *             `after`：CFI 处或之后第一句（目录锚点起播，避免上一节末句）
+ * 用活 DOM 点定位起播句下标。
+ * @param mode `before`：锚点左侧最后一句；`after`：含锚点或锚点之后第一句
  */
+export function resolveListenStartAtDomRange(
+	at: Range,
+	sentenceRanges: Array<Range | null>,
+	mode: 'before' | 'after' = 'after',
+): number {
+	if (mode === 'after') {
+		// 先找「包含锚点」的句；勿与「起点在锚点之后」混在同一条件——
+		// 中间句 Range 为 null 时后者会直接跳到下一句。
+		for (let i = 0; i < sentenceRanges.length; i += 1) {
+			const r = sentenceRanges[i];
+			if (!r) continue;
+			try {
+				const startVs = r.compareBoundaryPoints(Range.START_TO_START, at);
+				const endVs = r.compareBoundaryPoints(Range.END_TO_START, at);
+				if (startVs <= 0 && endVs >= 0) return i;
+			} catch {
+				// 跨 document 等
+			}
+		}
+		for (let i = 0; i < sentenceRanges.length; i += 1) {
+			const r = sentenceRanges[i];
+			if (!r) continue;
+			try {
+				if (r.compareBoundaryPoints(Range.START_TO_START, at) >= 0) return i;
+			} catch {
+				// 跨 document 等
+			}
+		}
+		return 0;
+	}
+
+	for (let i = sentenceRanges.length - 1; i >= 0; i -= 1) {
+		const r = sentenceRanges[i];
+		if (!r) continue;
+		try {
+			if (r.compareBoundaryPoints(Range.END_TO_START, at) <= 0) return i;
+		} catch {
+			// 跨 document 等
+		}
+	}
+	return 0;
+}
+
 /**
- * 根据 startCfi 对应位置，找所属的句子编号（第几句起播）（若找不到则回退到0）。
- * @param mode `before`：CFI 左侧最后一句（从当前位置续听）
- *             `after`：CFI 处或之后第一句（目录锚点起播，避免上一节末句）
+ * 听当前：取与选区重叠的第一句（选哪句就从哪句起，勿塌缩到句界后漂到下一句）。
+ * @returns 命中下标；无重叠时 -1（由调用方再走 plain / 点定位）
+ */
+export function resolveListenStartOverlappingSelection(
+	selection: Range,
+	sentenceRanges: Array<Range | null>,
+): number {
+	for (let i = 0; i < sentenceRanges.length; i += 1) {
+		const r = sentenceRanges[i];
+		if (!r) continue;
+		try {
+			// 重叠：sel.start < sent.end && sel.end > sent.start
+			const startBeforeSentEnd =
+				selection.compareBoundaryPoints(Range.START_TO_END, r) < 0;
+			const endAfterSentStart =
+				selection.compareBoundaryPoints(Range.END_TO_START, r) > 0;
+			if (startBeforeSentEnd && endAfterSentStart) return i;
+		} catch {
+			// 跨 document 等
+		}
+	}
+	return -1;
+}
+
+/**
+ * 听当前主路径：用选区纯文在节 plain 里找所在句（不依赖句级 DOM Range 是否 index 成功）。
+ */
+export function resolveListenStartBySelectionPlain(
+	sectionPlain: string,
+	selectionPlain: string,
+	preferSi?: number,
+): number | null {
+	const trimmed = sectionPlain.trim();
+	const needle = stripMarkdownForTts(selectionPlain).trim();
+	if (!trimmed || !needle) return null;
+
+	const sentences = buildSentenceOffsetSpans(trimmed);
+	if (!sentences.length) return null;
+
+	const hits: number[] = [];
+	for (let i = 0; i < sentences.length; i += 1) {
+		const sent = trimmed.slice(sentences[i]!.start, sentences[i]!.end);
+		if (sent.includes(needle)) hits.push(i);
+	}
+	if (hits.length === 1) return hits[0]!;
+	if (hits.length > 1) {
+		if (preferSi != null && hits.includes(preferSi)) return preferSi;
+		if (preferSi != null) {
+			let best = hits[0]!;
+			let bestDist = Math.abs(best - preferSi);
+			for (const h of hits) {
+				const d = Math.abs(h - preferSi);
+				if (d < bestDist) {
+					best = h;
+					bestDist = d;
+				}
+			}
+			return best;
+		}
+		return hits[0]!;
+	}
+
+	// 选区可能跨句或空白不一致：用 needle 在 plain 中的起点映射句下标
+	const idx = trimmed.indexOf(needle);
+	if (idx >= 0) {
+		for (let i = sentences.length - 1; i >= 0; i -= 1) {
+			if (idx >= sentences[i]!.start) return i;
+		}
+	}
+
+	const compactNeedle = needle.replace(/\s+/g, '');
+	if (compactNeedle.length < 2) return null;
+	for (let i = 0; i < sentences.length; i += 1) {
+		const sent = trimmed
+			.slice(sentences[i]!.start, sentences[i]!.end)
+			.replace(/\s+/g, '');
+		if (sent.includes(compactNeedle) || compactNeedle.includes(sent)) {
+			return i;
+		}
+	}
+	return null;
+}
+
+/**
+ * 根据 startCfi / 选区找起播句下标（找不到回退 0）。
+ * @param mode `before`：CFI 左侧最后一句；`after`：CFI 处或之后第一句
  */
 export function resolveListenStartSentence(
 	rend: Rendition,
@@ -472,45 +688,66 @@ export function resolveListenStartSentence(
 	opts?: {
 		sentenceRanges?: Array<Range | null>;
 		mode?: 'before' | 'after';
+		/** 听当前完整选区（勿先 collapse） */
+		anchorRange?: Range | null;
+		/** 听当前选区纯文：优先于 DOM（句 Range 常 index 失败导致偏下一句） */
+		selectionPlain?: string | null;
 	},
 ): number {
 	const trimmed = section.plain.trim();
 	const sentences = buildSentenceOffsetSpans(trimmed);
 	if (!sentences.length) return 0;
 
+	const indexed =
+		opts?.sentenceRanges != null
+			? {
+					ranges: opts.sentenceRanges,
+					normCursor: 0,
+				}
+			: indexChapterSentenceRanges(section.outerRange, trimmed);
+	const ranges = indexed.ranges;
+	const startMode = opts?.mode ?? 'before';
+	const sectionDoc = section.outerRange.startContainer.ownerDocument;
+
+	let domHint = -1;
+	const anchor = opts?.anchorRange;
+	if (anchor && anchor.startContainer.ownerDocument === sectionDoc) {
+		if (!anchor.collapsed) {
+			domHint = resolveListenStartOverlappingSelection(anchor, ranges);
+		} else {
+			domHint = resolveListenStartAtDomRange(anchor, ranges, startMode);
+		}
+	}
+
+	const byPlain = resolveListenStartBySelectionPlain(
+		trimmed,
+		opts?.selectionPlain ?? '',
+		domHint >= 0 ? domHint : undefined,
+	);
+	if (byPlain != null) return byPlain;
+	if (domHint >= 0) return domHint;
+
+	if (anchor && anchor.startContainer.ownerDocument === sectionDoc) {
+		const point = anchor.cloneRange();
+		point.collapse(true);
+		return resolveListenStartAtDomRange(point, ranges, startMode);
+	}
+
 	const cfi = startCfi.trim();
 	if (!cfi) return 0;
 
 	const at = resolveCfiDomRange(rend, cfi);
 	if (!at) return 0;
-
-	const sectionDoc = section.outerRange.startContainer.ownerDocument;
 	if (at.startContainer.ownerDocument !== sectionDoc) return 0;
 
-	const ranges =
-		opts?.sentenceRanges ??
-		indexChapterSentenceRanges(section.outerRange, trimmed);
-
-	const startMode = opts?.mode ?? 'before';
-	if (startMode === 'after') {
-		// 目录/锚点：从前往后，命中「含 CFI」或「句首 ≥ CFI」的第一句
-		for (let i = 0; i < sentences.length; i += 1) {
-			const r = ranges[i];
-			if (!r) continue;
-			const startVs = r.compareBoundaryPoints(Range.START_TO_START, at);
-			const endVs = r.compareBoundaryPoints(Range.END_TO_START, at);
-			if (startVs >= 0 || (startVs <= 0 && endVs > 0)) return i;
-		}
-		return 0;
+	if (!at.collapsed) {
+		const overlap = resolveListenStartOverlappingSelection(at, ranges);
+		if (overlap >= 0) return overlap;
+		const point = at.cloneRange();
+		point.collapse(true);
+		return resolveListenStartAtDomRange(point, ranges, startMode);
 	}
-
-	// 从后往前找，定位最靠前且比 CFI 范围“在左边”的句
-	for (let i = sentences.length - 1; i >= 0; i -= 1) {
-		const r = ranges[i];
-		if (!r) continue;
-		if (r.compareBoundaryPoints(Range.END_TO_START, at) <= 0) return i;
-	}
-	return 0;
+	return resolveListenStartAtDomRange(at, ranges, startMode);
 }
 
 /**
@@ -571,4 +808,17 @@ export function waitForNextSection(
 		rend.on('relocated', onRelocated);
 		void rend.next().catch(() => finish(false));
 	});
+}
+
+// ponytail: 开发态自检 — 超长 plain 须分段且 hasMore，否则会误报「本书已播完」
+if (import.meta.env.DEV) {
+	const long = `${'句。'.repeat(30_000)}尾段。`;
+	const first = sliceListenPlainChunk(long, 0);
+	if (!first.hasMore || first.nextFrom <= 0 || !first.plain.includes('句')) {
+		throw new Error('sliceListenPlainChunk: expected truncated chunk');
+	}
+	const second = sliceListenPlainChunk(long, first.nextFrom);
+	if (second.plain.length < 1) {
+		throw new Error('sliceListenPlainChunk: empty continue chunk');
+	}
 }

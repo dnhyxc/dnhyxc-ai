@@ -73,6 +73,13 @@ type SectionCtx = {
 	paragraphs: ParagraphUnit[];
 	sentenceRanges: Array<Range | null>;
 	spineIndex: number;
+	plainFrom: number;
+	nextPlainFrom: number;
+	hasMorePlain: boolean;
+	/** 本段句 Range 索引起始 norm 游标 */
+	normCursorStart: number;
+	/** 本段索引结束后的 norm 游标（下一段起点） */
+	normCursor: number;
 };
 
 function buildSentenceLabels(
@@ -97,15 +104,28 @@ function isLiveDomRange(range: Range | null | undefined): range is Range {
 	}
 }
 
-function ctxFromVisible(visible: VisibleListenSection): SectionCtx {
+function ctxFromVisible(
+	visible: VisibleListenSection,
+	normCursorStart = 0,
+): SectionCtx {
 	const plain = visible.plain.trim();
 	const sentences = buildSentenceOffsetSpans(plain);
+	const { ranges, normCursor } = indexChapterSentenceRanges(
+		visible.outerRange,
+		plain,
+		{ normCursor: normCursorStart },
+	);
 	return {
 		plain,
 		sentences,
 		paragraphs: buildParagraphUnits(plain, sentences),
-		sentenceRanges: indexChapterSentenceRanges(visible.outerRange, plain),
+		sentenceRanges: ranges,
 		spineIndex: visible.spineIndex,
+		plainFrom: visible.plainFrom,
+		nextPlainFrom: visible.nextPlainFrom,
+		hasMorePlain: visible.hasMorePlain,
+		normCursorStart,
+		normCursor,
 	};
 }
 
@@ -143,6 +163,12 @@ export function useEpubChapterListen(
 	const resolveStartCfiRef = useRef(false);
 	/** 目录切章用 after，避免起播落在上一节末句；从当前位置听用 before */
 	const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
+	/** 听当前等：一次性覆盖 getCurrentCfi，供 applySection 定位起播句 */
+	const startCfiOverrideRef = useRef<string | null>(null);
+	/** 听当前：完整选区 Range（供 DOM 重叠提示） */
+	const startRangeOverrideRef = useRef<Range | null>(null);
+	/** 听当前：选区纯文（主定位，不依赖句级 DOM Range） */
+	const startPlainOverrideRef = useRef<string | null>(null);
 	const scrollSeekRef = useRef(false);
 
 	const syncState = useCallback((patch: Partial<ChapterListenState>) => {
@@ -158,6 +184,9 @@ export function useEpubChapterListen(
 		pausedRef.current = false;
 		resolveStartCfiRef.current = false;
 		resolveStartCfiModeRef.current = 'before';
+		startCfiOverrideRef.current = null;
+		startRangeOverrideRef.current = null;
+		startPlainOverrideRef.current = null;
 		sectionRef.current = null;
 		sectionDocRef.current = null;
 		stopAllPlayback();
@@ -186,16 +215,17 @@ export function useEpubChapterListen(
 		const ctx = sectionRef.current;
 		if (!ctx) return false;
 		const visible =
-			extractVisibleListenSection(rend, ctx.spineIndex) ??
-			extractVisibleListenSection(rend);
+			extractVisibleListenSection(rend, ctx.spineIndex, ctx.plainFrom) ??
+			extractVisibleListenSection(rend, undefined, ctx.plainFrom);
 		if (!visible?.outerRange) return false;
-		const sentenceRanges = indexChapterSentenceRanges(
+		const { ranges } = indexChapterSentenceRanges(
 			visible.outerRange,
 			ctx.plain,
+			{ normCursor: ctx.normCursorStart },
 		);
-		sectionRef.current = { ...ctx, sentenceRanges };
+		sectionRef.current = { ...ctx, sentenceRanges: ranges };
 		sectionDocRef.current = visible.outerRange.startContainer.ownerDocument;
-		return sentenceRanges.some(isLiveDomRange);
+		return ranges.some(isLiveDomRange);
 	}, []);
 
 	const remountListenDomAfterFollow = useCallback(() => {
@@ -220,12 +250,24 @@ export function useEpubChapterListen(
 	const isGenActive = (gen: number) => gen === loopGenRef.current;
 
 	const applySection = useCallback(
-		(rend: Rendition, visible: VisibleListenSection): SectionCtx | null => {
-			const ctx = ctxFromVisible(visible);
+		(
+			rend: Rendition,
+			visible: VisibleListenSection,
+			normCursorStart = 0,
+		): SectionCtx | null => {
+			const ctx = ctxFromVisible(visible, normCursorStart);
 			if (!ctx.sentences.length) return null;
 
 			if (resolveStartCfiRef.current) {
-				const cfi = getCurrentCfiRef.current()?.trim() ?? '';
+				const cfi =
+					startCfiOverrideRef.current?.trim() ||
+					getCurrentCfiRef.current()?.trim() ||
+					'';
+				const anchorRange = startRangeOverrideRef.current;
+				const selectionPlain = startPlainOverrideRef.current;
+				startCfiOverrideRef.current = null;
+				startRangeOverrideRef.current = null;
+				startPlainOverrideRef.current = null;
 				sentenceCursorRef.current = resolveListenStartSentence(
 					rend,
 					visible,
@@ -233,6 +275,8 @@ export function useEpubChapterListen(
 					{
 						sentenceRanges: ctx.sentenceRanges,
 						mode: resolveStartCfiModeRef.current,
+						anchorRange,
+						selectionPlain,
 					},
 				);
 				resolveStartCfiRef.current = false;
@@ -261,9 +305,19 @@ export function useEpubChapterListen(
 			const spineHint =
 				getCurrentSpineIndexRef.current?.() ??
 				listenSpineIndexFromRendition(rend);
-			const visible = extractVisibleListenSection(rend, spineHint);
+			const prev = sectionRef.current;
+			// 同 spine 续听/切句：保留 plain 分段，勿每次从 0 重切（否则分句列表在两段间循环）
+			const reuse =
+				prev && prev.spineIndex === spineHint && !resolveStartCfiRef.current
+					? prev
+					: null;
+			const visible = extractVisibleListenSection(
+				rend,
+				spineHint,
+				reuse?.plainFrom ?? 0,
+			);
 			if (!visible) return null;
-			return applySection(rend, visible);
+			return applySection(rend, visible, reuse?.normCursorStart ?? 0);
 		},
 		[applySection],
 	);
@@ -305,11 +359,17 @@ export function useEpubChapterListen(
 						let liveCtx = sectionRef.current;
 						let domRange = liveCtx?.sentenceRanges[globalSi];
 						if (!isLiveDomRange(domRange)) {
-							if (!rebindSectionDomRanges(rend)) return;
+							if (!rebindSectionDomRanges(rend)) {
+								clearChapterListenSentenceHighlight(rend);
+								return;
+							}
 							liveCtx = sectionRef.current;
 							domRange = liveCtx?.sentenceRanges[globalSi];
 						}
-						if (!isLiveDomRange(domRange)) return;
+						if (!isLiveDomRange(domRange)) {
+							clearChapterListenSentenceHighlight(rend);
+							return;
+						}
 						const jumpScroll = info.forceCenter
 							? ({ forceScroll: true, align: 'center' as const } as const)
 							: undefined;
@@ -337,6 +397,50 @@ export function useEpubChapterListen(
 			}
 		},
 		[rebindSectionDomRanges, syncState],
+	);
+
+	/**
+	 * 播完当前 plain 段后，若同文档还有截断剩余（MAX_PLAIN_CHARS），续切下一段再播，
+	 * 避免误判「本书已播完」。
+	 */
+	const playSectionPlainChunks = useCallback(
+		async (
+			rend: Rendition,
+			startCtx: SectionCtx,
+			gen: number,
+			opts?: { scrollCenterOnFirst?: boolean },
+		): Promise<boolean> => {
+			let ctx = startCtx;
+			let scrollCenter = opts?.scrollCenterOnFirst;
+			for (;;) {
+				const finished = await playSentencesFromCursor(ctx, gen, {
+					scrollCenterOnFirst: scrollCenter,
+				});
+				if (!finished) return false;
+				if (!isGenActive(gen)) return false;
+				if (!ctx.hasMorePlain) return true;
+
+				const doc = sectionDocRef.current;
+				if (!doc) return true;
+
+				sentenceCursorRef.current = 0;
+				resolveStartCfiRef.current = false;
+				scrollSeekRef.current = true;
+				syncState({ status: 'loading' });
+
+				const visible = extractListenSectionForDocument(
+					rend,
+					doc,
+					ctx.nextPlainFrom,
+				);
+				if (!visible) return true;
+				const next = applySection(rend, visible, ctx.normCursor);
+				if (!next) return true;
+				ctx = next;
+				scrollCenter = true;
+			}
+		},
+		[applySection, playSentencesFromCursor, syncState],
 	);
 
 	/**
@@ -378,8 +482,15 @@ export function useEpubChapterListen(
 						stopInternal();
 						return;
 					}
-					// 提取该文档下的可朗读 Section（如正文内容等）
-					const visible = extractListenSectionForDocument(rend, sectionDoc);
+					const prev = sectionRef.current;
+					const reuse =
+						prev && sectionDocRef.current === sectionDoc ? prev : null;
+					// 提取该文档下的可朗读 Section（同文档保留 plainFrom）
+					const visible = extractListenSectionForDocument(
+						rend,
+						sectionDoc,
+						reuse?.plainFrom ?? 0,
+					);
 					if (!visible) {
 						// 若当前 section 不可朗读（为空），弹 toast 提示，并停止
 						Toast({
@@ -390,7 +501,7 @@ export function useEpubChapterListen(
 						return;
 					}
 					// 构建朗读上下文（如分句、文本定位等）
-					ctx = applySection(rend, visible);
+					ctx = applySection(rend, visible, reuse?.normCursorStart ?? 0);
 				}
 
 				// 再次检测 SectionCtx 是否可用
@@ -411,8 +522,8 @@ export function useEpubChapterListen(
 				// 将 scrollSeek 标志置为 false，避免下次误触发
 				scrollSeekRef.current = false;
 
-				// 调用逐句播放核心逻辑，开始从当前游标处依次播放本节所有句子
-				const finished = await playSentencesFromCursor(ctx, gen, {
+				// 本节（含超长 plain 分段续听）播完
+				const finished = await playSectionPlainChunks(rend, ctx, gen, {
 					scrollCenterOnFirst: scrollCenter,
 				});
 				if (!finished) {
@@ -454,13 +565,14 @@ export function useEpubChapterListen(
 				}
 
 				// 成功推进后进入下一个章节文档，准备下轮播放
+				sectionRef.current = null;
 				sectionDoc = nextDoc;
 				sectionDocRef.current = nextDoc;
 			}
 		},
 		[
 			applySection,
-			playSentencesFromCursor,
+			playSectionPlainChunks,
 			prepareSection,
 			stopInternal,
 			syncState,
@@ -490,7 +602,7 @@ export function useEpubChapterListen(
 					return;
 				}
 
-				const finished = await playSentencesFromCursor(ctx, gen);
+				const finished = await playSectionPlainChunks(rend, ctx, gen);
 				if (!finished) {
 					if (!isGenActive(gen) || pausedRef.current) return;
 					stopInternal();
@@ -519,7 +631,7 @@ export function useEpubChapterListen(
 				}
 			}
 		},
-		[playSentencesFromCursor, prepareSection, stopInternal],
+		[playSectionPlainChunks, prepareSection, stopInternal],
 	);
 
 	const runListenLoop = useCallback(
@@ -618,6 +730,128 @@ export function useEpubChapterListen(
 		}
 		startFromCurrentPosition();
 	}, [startFromCurrentPosition, stopInternal]);
+
+	/**
+	 * 从指定 CFI / 选区起听书并续读（微信读书「听当前」）。
+	 * selectionPlain 为主定位；anchorRange 仅作并列歧义时的 DOM 提示。
+	 */
+	const startFromCfi = useCallback(
+		(
+			cfi: string,
+			mode: 'before' | 'after' = 'after',
+			anchorRange?: Range | null,
+			selectionPlain?: string | null,
+		) => {
+			const trimmed = cfi.trim();
+			const plain = selectionPlain?.trim() || '';
+			if (!trimmed && !anchorRange && !plain) {
+				startFromCurrentPosition();
+				return;
+			}
+
+			primePlaybackForUserGesture();
+			if (!isPlaybackAvailable()) {
+				Toast({
+					type: 'warning',
+					title: tRef.current('englishLearning.tts.unsupported'),
+				});
+				return;
+			}
+
+			const rend = getRenditionRef.current();
+			if (!rend) {
+				Toast({
+					type: 'warning',
+					title: tRef.current('ebook.read.listenBook.notReady'),
+				});
+				return;
+			}
+
+			invokeStopQuoteListen();
+			stopAllPlayback();
+			clearEpubListenSegmentOverlay();
+			beginChapterListenAutoFollow(rend);
+
+			let anchor: Range | null = null;
+			if (anchorRange) {
+				try {
+					anchor = anchorRange.cloneRange();
+				} catch {
+					anchor = null;
+				}
+			}
+
+			const armStart = () => {
+				startCfiOverrideRef.current = trimmed || null;
+				startRangeOverrideRef.current = anchor;
+				startPlainOverrideRef.current = plain || null;
+				resolveStartCfiRef.current = true;
+				resolveStartCfiModeRef.current = mode;
+			};
+
+			const beginWithPreview = (preview: VisibleListenSection): boolean => {
+				if (!preview.plain.trim()) return false;
+				armStart();
+				const gen = ++loopGenRef.current;
+				pausedRef.current = false;
+				sentenceCursorRef.current = 0;
+				sectionRef.current = null;
+				sectionDocRef.current = preview.outerRange.startContainer.ownerDocument;
+				const plain = preview.plain.trim();
+				const sentences = buildSentenceOffsetSpans(plain);
+				syncState({
+					status: 'loading',
+					spineIndex: preview.spineIndex,
+					sentenceIndex: 0,
+					sentenceCount: sentences.length,
+					sentenceLabels: buildSentenceLabels(plain, sentences),
+					rate: rateRef.current,
+				});
+				void runListenLoop(gen);
+				return true;
+			};
+
+			const spineHint =
+				getCurrentSpineIndexRef.current?.() ??
+				listenSpineIndexFromRendition(rend);
+			const visible = extractVisibleListenSection(rend, spineHint);
+			if (visible && beginWithPreview(visible)) return;
+
+			void (async () => {
+				try {
+					if (trimmed) await rend.display(trimmed);
+				} catch {
+					// display 失败仍尝试抽当前可见节
+				}
+				for (let attempt = 0; attempt < 25; attempt += 1) {
+					if (attempt > 0) {
+						await new Promise<void>((r) => {
+							window.setTimeout(r, 80);
+						});
+					} else {
+						await new Promise<void>((r) => {
+							requestAnimationFrame(() => requestAnimationFrame(() => r()));
+						});
+					}
+					const hint =
+						getCurrentSpineIndexRef.current?.() ??
+						listenSpineIndexFromRendition(rend);
+					const preview =
+						extractVisibleListenSection(rend, hint) ??
+						extractVisibleListenSection(rend);
+					if (preview && beginWithPreview(preview)) return;
+				}
+				startCfiOverrideRef.current = null;
+				startRangeOverrideRef.current = null;
+				startPlainOverrideRef.current = null;
+				Toast({
+					type: 'warning',
+					title: tRef.current('ebook.read.listenBook.emptySection'),
+				});
+			})();
+		},
+		[runListenLoop, startFromCurrentPosition, syncState],
+	);
 
 	/**
 	 * 目录/切章完成后重开听书：按跳转后 CFI 定位起播句（同 HTML 多节时非文件第 0 句）。
@@ -759,6 +993,18 @@ export function useEpubChapterListen(
 				status: 'playing',
 			});
 
+			// 先高亮目标句，避免 Range 未就绪时残留上一句大块背景
+			const rend = getRenditionRef.current();
+			const jumpRange = ctx.sentenceRanges[next];
+			if (rend && isLiveDomRange(jumpRange)) {
+				showChapterListenSentenceHighlight(rend, jumpRange, {
+					forceScroll: true,
+					align: 'center',
+				});
+			} else if (rend) {
+				clearChapterListenSentenceHighlight(rend);
+			}
+
 			void runListenLoop(gen);
 		},
 		[runListenLoop, syncState],
@@ -830,6 +1076,7 @@ export function useEpubChapterListen(
 		resume,
 		stop,
 		restartFromChapterStart,
+		startFromCfi,
 		prevSentence: () => seekSentence(-1),
 		nextSentence: () => seekSentence(1),
 		goToSentence,

@@ -36,6 +36,8 @@ export interface DrawerProps {
 	footer?: React.ReactNode;
 	/** 是否隐藏关闭按钮 (通过 CSS 实现) */
 	hideClose?: boolean;
+	/** Sheet 打开时自动聚焦（可 preventDefault 后改焦到当前项） */
+	onOpenAutoFocus?: (event: Event) => void;
 	/** 宽度 (仅在 side 为 left/right 时生效)，例如 "w-[400px]" or "sm:max-w-[600px]" */
 	width?: string;
 	/** Sheet 内容区 inline 样式（如 EPUB 阅读 chrome CSS 变量） */
@@ -59,6 +61,7 @@ export function Drawer({
 	children,
 	footer,
 	hideClose,
+	onOpenAutoFocus,
 	width,
 	contentStyle,
 }: DrawerProps) {
@@ -74,6 +77,7 @@ export function Drawer({
 				)}
 				style={contentStyle}
 				aria-describedby={undefined}
+				onOpenAutoFocus={onOpenAutoFocus}
 			>
 				{/* 确保至少有一个 DialogTitle，用于无障碍访问 */}
 				<div className="sr-only">

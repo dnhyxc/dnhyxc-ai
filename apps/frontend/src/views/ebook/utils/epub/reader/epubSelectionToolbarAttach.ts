@@ -295,7 +295,13 @@ export function attachEpubSelectionPopBar(
 
 	const onScroll = () => {
 		suppressEmitUntil = Date.now() + 350;
-		hidePopBar();
+		if (shouldSuppressDismiss()) return;
+		clearPendingEmit();
+		onChange(null);
+		// PopBar 已隐藏时原生选区高亮常仍在；非拖选中的滚动一律清掉
+		if (selecting) return;
+		clearEpubTextSelection(rend);
+		rememberEpubPopBarSelectionRange(null);
 	};
 
 	const addScrollListener = (target: EventTarget) => {
@@ -462,7 +468,14 @@ export function attachEpubSelectionPopBar(
 	const onRendered = () => bindEpubScrollContainer();
 	const onRelocated = () => {
 		suppressEmitUntil = Date.now() + 350;
-		hidePopBar();
+		if (!shouldSuppressDismiss()) {
+			clearPendingEmit();
+			onChange(null);
+			if (!selecting) {
+				clearEpubTextSelection(rend);
+				rememberEpubPopBarSelectionRange(null);
+			}
+		}
 		bindEpubScrollContainer();
 	};
 	rend.on('rendered', onRendered);

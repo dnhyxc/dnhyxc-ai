@@ -2,11 +2,14 @@
 
 ## 延伸阅读
 
+- **现行主路径（2026-07-16）**：[听当前切入听书续读与起播定位](epub-listen-quote-continue.md)、[PopBar 听后收起](epub-listen-popbar-dismiss.md)
 - [EPUB 选区浮动工具条](epub-selection-popbar.md) — PopBar 入口与 `suppressEpubSelectionPopBarDismiss`
 - [EPUB 想法侧栏](epub-thought-drawer.md) — 列表/详情引用底栏 `variant="panel"`
 - 英语学习 TTS 能力见 `docs/english/` 相关专题；本实现复用 `playPreferred` / `stopAllPlayback`
 - [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — 长书摘云端首声加速（分段 + 预取）
 - [听当前逐句播放背景](epub-listen-sentence-bg.md) — 朗读时当前句淡黄底、与划线解耦的浮层实现
+
+> **说明**：本文描述早期「独立听当前会话」实现。当前产品语义已改为切入听书续读，以 [epub-listen-quote-continue.md](./epub-listen-quote-continue.md) 为准。
 
 ## 1. 背景与目标
 
