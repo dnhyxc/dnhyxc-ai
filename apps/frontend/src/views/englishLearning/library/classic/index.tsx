@@ -27,10 +27,7 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
@@ -117,21 +114,21 @@ export function ClassicQuotesLibrarySection({
 	}, [libraryId, libraryMeta, resolvedLibrary, items.length]);
 
 	useEffect(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPlayingKey(null);
 	}, [libraryId]);
 
 	const toggleQuoteAudio = useCallback(
 		async (text: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(text);
+				await playPreferred(text);
 			} catch {
 				Toast({
 					type: 'warning',

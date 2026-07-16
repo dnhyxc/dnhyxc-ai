@@ -167,7 +167,7 @@ listEpubViewSlots(.epub-view)
 | `read.tsx` | 顶栏听书、播放条绑定、互斥 controller 未 touch |
 | `EpubListenPlayerBar.tsx` | UI / props 未 touch |
 | `waitForNextSection` | 实现未改；分页听书仍唯一调用方 |
-| `playSentencesFromCursor` / TTS 预取 | 算法与 `englishTts` 调用未改 |
+| `playSentencesFromCursor` / TTS 预取 | 算法与 `speech` 调用未改 |
 | `epubListenMarkHighlight` / 用户划线 sync | 未 touch |
 | `invokeStopQuoteListen` / `registerChapterListenStop` | 互斥注册未改 |
 | PDF / 非 EPUB 阅读 | 不在 scope |

@@ -400,7 +400,7 @@ import { EnglishLearningToolbar } from './LearningToolbar';
 import { VocabularyPackSection } from './VocabularySection';
 
 const onNewChat = useCallback(() => {
-	stopAllEnglishPlayback();
+	stopAllPlayback();
 	englishAgentStore.resetConversation();
 	setSearchParams({}, { replace: true });
 }, [setSearchParams]);
@@ -434,7 +434,7 @@ const onNewChat = useCallback(() => {
 | 行/片段 | 逐行注释 |
 |---------|----------|
 | `import ClassicQuotesSection` | 在单词区块下方追加经典语句独立组件。 |
-| `onNewChat` 内 `stopAllEnglishPlayback` | 新对话时停止左栏可能正在播放的 TTS。 |
+| `onNewChat` 内 `stopAllPlayback` | 新对话时停止左栏可能正在播放的 TTS。 |
 | `englishAgentStore.resetConversation()` | 清空 Agent 消息与相关会话状态。 |
 | `setSearchParams({}, { replace: true })` | 去掉 URL 上 `?session=`，避免刷新仍绑定旧会话。 |
 | 三个 Section 顺序 | 工具条 → 单词 → 经典；共用同一 `levelTier`（MobX store）。 |

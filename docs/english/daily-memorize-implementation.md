@@ -551,7 +551,7 @@ useEffect(() => {
 | 输出 | `{ playing, playWord, playLabel }` |
 | 换词 | `DailyCardSession` 在 `card.key` 变化时 `playWord({ force: true })` 自动朗读 |
 | 不支持 TTS | Toast 警告，不抛错 |
-| 卸载 | `stopAllEnglishPlayback()` 清理 |
+| 卸载 | `stopAllPlayback()` 清理 |
 
 **来源**：`apps/frontend/src/views/englishLearning/daily/hooks/useDailyPlayback.ts`（约 L24–L48）
 

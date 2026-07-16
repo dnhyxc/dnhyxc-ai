@@ -27,8 +27,8 @@
 
 ```mermaid
 flowchart TD
-  A[用户点喇叭] --> B[前端 playEnglishPreferred]
-  B --> C{shouldUseCloudEnglishTts?}
+  A[用户点喇叭] --> B[前端 playPreferred]
+  B --> C{shouldUseCloudTts?}
   C -->|否：非会员或会员选本机| D[本机 Web Speech]
   C -->|是：有效会员且选云端| E[fetchCloudTtsBlob 请求后端]
   E --> F{MiniMax 流式 API}
@@ -53,7 +53,7 @@ flowchart TD
 
 ## 3. 谁决定走本机还是云端？
 
-决策集中在浏览器里的一个函数 **`shouldUseCloudEnglishTts`**（文件 `apps/frontend/src/utils/englishTts.ts`）。规则如下：
+决策集中在浏览器里的一个函数 **`shouldUseCloudTts`**（文件 `apps/frontend/src/utils/speech.ts`）。规则如下：
 
 | 条件 | 结果 |
 |------|------|
@@ -69,22 +69,22 @@ flowchart TD
 
 ## 4. 前端：从点喇叭到出声（逐步说明）
 
-### 4.1 入口：`playEnglishPreferred`
+### 4.1 入口：`playPreferred`
 
-几乎所有英语学习页面的喇叭，最终都调用 **`playEnglishPreferred(文本)`**。它做四件事：
+几乎所有英语学习页面的喇叭，最终都调用 **`playPreferred(文本)`**。它做四件事：
 
 1. 清理文本（去 Markdown）。
 2. **开启新一轮播放**（作废上一轮，防止声音重叠）。
 3. 根据上一节规则选 **本机** 或 **云端**。
 4. 执行对应播放；云端失败则尝试本机。
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L682–L713）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L682–L713）
 
 ```typescript
 // 对外主入口：英语学习里点喇叭时调用
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string, // 原始文本（可能含 Markdown）
-	options?: PlayEnglishPreferredOptions, // 可选：preferLocal 强制本机等
+	options?: PlayPreferredOptions, // 可选：preferLocal 强制本机等
 ): Promise<void> {
 	// 第一步：去掉 **、链接、代码块等，得到纯朗读文本
 	const plain = stripMarkdownForTts(rawText);
@@ -95,16 +95,16 @@ export async function playEnglishPreferred(
 	const speakOpts = options?.speak; // 本机朗读时的语速/音高等（一般默认即可）
 
 	// 第三步：判断本机还是云端（见 §3）
-	const useCloud = shouldUseCloudEnglishTts(options);
+	const useCloud = shouldUseCloudTts(options);
 
 	if (!useCloud) {
 		// ---------- 本机分支 ----------
 		if (!isPlaybackGenerationActive(generation)) return; // 已被更新的播放取消
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS'); // 浏览器不支持朗读，页面会 Toast 提示
 		}
 		// 分段朗读、句间停顿，使用 Web Speech
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		return;
 	}
 
@@ -117,31 +117,31 @@ export async function playEnglishPreferred(
 	} catch {
 		// 云端失败（未登录、502 余额不足、网络错误等）→ 回退本机
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 ```
 
-### 4.2 选路函数：`shouldUseCloudEnglishTts`
+### 4.2 选路函数：`shouldUseCloudTts`
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L410–L418）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L410–L418）
 
 ```typescript
 // 返回 true 表示应走云端 TTS；false 表示走本机 Web Speech
-function shouldUseCloudEnglishTts(options?: PlayEnglishPreferredOptions): boolean {
+function shouldUseCloudTts(options?: PlayPreferredOptions): boolean {
 	// 设置页本机试听等场景：显式要求本机
 	if (options?.preferLocal === true) return false;
 
 	// 显式要求云端时，仍须是有效会员
 	if (options?.preferLocal === false) {
-		return isCloudEnglishTtsAllowed();
+		return isCloudTtsAllowed();
 	}
 
 	// 非会员：永不走云端
-	if (!isCloudEnglishTtsAllowed()) return false;
+	if (!isCloudTtsAllowed()) return false;
 
 	// 会员：读语音设置里的 playbackSource（内存缓存，来自服务端）
 	const prefs = loadMinimaxTtsUserPrefs();
@@ -159,7 +159,7 @@ function shouldUseCloudEnglishTts(options?: PlayEnglishPreferredOptions): boolea
 4. 若返回 **503**（未配 MiniMax）、**401**（鉴权）、**502**（上游异常如余额不足）→ 改请求**硅基** `/speech`（只传 `text`）。
 5. 把响应二进制存缓存，包装成 `Blob` 供播放。
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L495–L536，摘录）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L495–L536，摘录）
 
 ```typescript
 async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
@@ -200,7 +200,7 @@ async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
 	}
 
 	if (!res.ok) {
-		throw new Error(`TTS_HTTP_${res.status}`); // 交给 playEnglishPreferred 回退本机
+		throw new Error(`TTS_HTTP_${res.status}`); // 交给 playPreferred 回退本机
 	}
 
 	const buf = await readResponseBodyAsArrayBuffer(res); // 读完整 MP3 二进制
@@ -238,7 +238,7 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 
 ### 4.4 播放 MP3：`playCloudMp3Blob`
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L538–L585，摘录）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L538–L585，摘录）
 
 ```typescript
 function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
@@ -280,19 +280,19 @@ function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
 
 本机路径使用浏览器 **`window.speechSynthesis`**：创建 **`SpeechSynthesisUtterance`**，指定英语音色、语速、音量，然后 `speak`。
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L588–L622）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L588–L622）
 
 ```typescript
 function speakOneUtterance(
 	plain: string, // 本段要读的纯文本
 	generation: number, // 播放世代号，用于中途取消
-	options?: SpeakEnglishOptions,
+	options?: SpeakOptions,
 ): Promise<void> {
 	return new Promise((resolve) => {
 		// 若播放已被取消、浏览器不支持、或文本为空 → 直接结束
 		if (
 			!isPlaybackGenerationActive(generation) ||
-			!isEnglishTtsSupported() ||
+			!isSpeechSupported() ||
 			!plain
 		) {
 			resolve();
@@ -714,7 +714,7 @@ async upsert(
 
 每次新播放会 **`playbackGeneration += 1`**。异步请求返回或本机 `onend` 时会检查 **`generation` 是否仍等于当前值**；若用户已点了下一次播放，旧任务会**静默放弃**。
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L442–L447、L421–L423）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L442–L447、L421–L423）
 
 ```typescript
 let playbackGeneration = 0; // 全局计数器，每次新播放 +1
@@ -738,8 +738,8 @@ function isPlaybackGenerationActive(generation: number): boolean {
 
 | 步骤 | 在哪里 | 发生了什么 |
 |------|--------|------------|
-| 1 | 浏览器 UI | 用户点喇叭，调用 `playEnglishPreferred("hello")` |
-| 2 | `englishTts.ts` | 判定会员 + `playbackSource` → 走云端 |
+| 1 | 浏览器 UI | 用户点喇叭，调用 `playPreferred("hello")` |
+| 2 | `speech.ts` | 判定会员 + `playbackSource` → 走云端 |
 | 3 | `minimaxTtsPrefs.ts` | `buildMinimaxTtsRequestExtras()` 带上音色/语速 |
 | 4 | 网络 | POST `/speech-transcription/minimax/speech/stream` + JWT |
 | 5 | `JwtGuard` | 校验 token，注入 `userId` |
@@ -757,10 +757,10 @@ function isPlaybackGenerationActive(generation: number): boolean {
 
 | 现象 | 原因 | 对应实现位置 |
 |------|------|----------------|
-| 非会员点喇叭只有本机声 | 设计如此，不消耗云端 | `shouldUseCloudEnglishTts` 非会员分支 |
+| 非会员点喇叭只有本机声 | 设计如此，不消耗云端 | `shouldUseCloudTts` 非会员分支 |
 | 会员想一直用本机 | 语音设置开「使用本机语音朗读」 | `playbackSource === 'local'` |
 | 同一句第二次读更快 | 前后端 LRU 缓存了 MP3 | `getCloudTtsFromCache` / `MinimaxTtsService.getFromCache` |
-| 云端没声但本机有声 | MiniMax/硅基失败，已回退 | `playEnglishPreferred` 的 `catch` 分支 |
+| 云端没声但本机有声 | MiniMax/硅基失败，已回退 | `playPreferred` 的 `catch` 分支 |
 | 换电脑后云端参数还在、本机音色不在 | 云端存服务器，本机存浏览器 | `minimax_tts_user_config` vs `localStorage` |
 | 快速连点两个喇叭只听到最后一个 | 播放世代作废旧任务 | `playbackGeneration` |
 
@@ -770,7 +770,7 @@ function isPlaybackGenerationActive(generation: number): boolean {
 
 | 说明 | 路径 |
 |------|------|
-| 前端播放总控 | `apps/frontend/src/utils/englishTts.ts` |
+| 前端播放总控 | `apps/frontend/src/utils/speech.ts` |
 | 云端偏好缓存与请求体 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
 | 设置页 HTTP 客户端 | `apps/frontend/src/service/cloudTtsSettings.ts` |
 | API 路径常量 | `apps/frontend/src/service/api.ts`（`SPEECH_*`、`SETTINGS_CLOUD_TTS`） |

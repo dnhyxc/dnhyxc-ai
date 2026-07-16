@@ -5,7 +5,7 @@ import { Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
-import { stopAllEnglishPlayback } from '@/utils/englishTts';
+import { stopAllPlayback } from '@/utils/speech';
 import { PracticePageShell } from './components/shell';
 import { PracticeShortcutsMenu } from './components/shell/PracticeShortcutsMenu';
 import { Session } from './Session';
@@ -90,11 +90,11 @@ export default function EnglishLearningPracticePage() {
 	const [continueLoading, setContinueLoading] = useState(false);
 
 	useEffect(() => {
-		return () => stopAllEnglishPlayback();
+		return () => stopAllPlayback();
 	}, []);
 
 	const onExit = useCallback(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		if (returnToHome) {
 			navigate('/english-learning');
 			return;
@@ -231,7 +231,7 @@ export default function EnglishLearningPracticePage() {
 	}, [config, initialPoolTotal, practicedKeys, sessionCursor, t]);
 
 	const onBackToSetup = useCallback(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPhase('setup');
 		setConfig(null);
 		setQueue([]);
@@ -256,7 +256,7 @@ export default function EnglishLearningPracticePage() {
 	}, []);
 
 	const onGoPrevious = useCallback(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setIndex((i) => {
 			if (i <= 0) return 0;
 			const prev = i - 1;

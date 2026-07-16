@@ -11,10 +11,10 @@ import {
 	recordEnglishPracticeReviewAttempts,
 } from '@/service';
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+} from '@/utils/speech';
 import { dispatchEnglishReviewSummaryRefresh } from '../sidebar';
 import { PracticeCard } from './components/shell';
 import {
@@ -161,21 +161,21 @@ export function Summary({
 	const toggleWordPlay = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
 				});
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',
@@ -189,7 +189,7 @@ export function Summary({
 	);
 
 	useEffect(() => {
-		return () => stopAllEnglishPlayback();
+		return () => stopAllPlayback();
 	}, []);
 
 	const statLabels = {

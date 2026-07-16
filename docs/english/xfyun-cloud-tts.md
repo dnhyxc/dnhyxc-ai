@@ -1,6 +1,6 @@
 # 讯飞在线云端朗读（playbackSource=xfyun）
 
-> **文档角色（主文档）**：有效会员在 **语音设置** 增加第三种朗读来源 **讯飞云端**；Nest 经 `ws` 连讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `englishTts` 选路。  
+> **文档角色（主文档）**：有效会员在 **语音设置** 增加第三种朗读来源 **讯飞云端**；Nest 经 `ws` 连讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `speech` 选路。  
 > **规划态思路（架构/时序/分阶段）**：[`docs/ideas/xfyun-cloud-tts.md`](../ideas/xfyun-cloud-tts.md)  
 > **延伸阅读**：[`tts-playback-source.md`](./tts-playback-source.md)（选路字段）、[`cloud-tts-settings.md`](./cloud-tts-settings.md)（设置页结构）、[`minimax-cloud-tts.md`](./minimax-cloud-tts.md)（MiniMax 路径）、[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)（全景）、[`cloud-tts-user-credentials-fallback.md`](../Influence-point/cloud-tts-user-credentials-fallback.md)（用户凭证与失败降级影响面）。
 
@@ -23,7 +23,7 @@
 1. **不新建偏好表**：`playbackSource` 扩展为 `'local' \| 'cloud' \| 'xfyun'`，讯飞 vcn 仍存 `voiceId`；音量/音高 UI 用 0–100，入库经线性映射复用 `vol`/`pitch`（与 MiniMax 量纲不同但共用列，切换来源时数值会「语义漂移」——与现有 speed 共用字段策略一致）。
 2. **HTTP 形态与 MiniMax 对齐**：`POST /speech-transcription/xfyun/speech/stream` 返回 MP3；Nest 内 WebSocket 收齐后整段输出（非浏览器直连 wss）。
 3. **Node 18 生产兼容**：`import WebSocket from 'ws'`，不用 Node 22 全局 WebSocket，不用 `undici@8`。
-4. **未配置回退**：服务端无 `XFYUN_*` 或请求失败时，`englishTts` 仍走既有硅基/MiniMax/本机回退链。
+4. **未配置回退**：服务端无 `XFYUN_*` 或请求失败时，`speech` 仍走既有硅基/MiniMax/本机回退链。
 
 ---
 
@@ -38,7 +38,7 @@
 | `apps/backend/package.json` | 直接依赖 `ws` |
 | `apps/frontend/src/constants/xfyunTts.ts` | 发音人列表、0–100 映射函数 |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | `buildXfyunTtsRequestExtras`、选路归一化 |
-| `apps/frontend/src/utils/englishTts.ts` | 按 `playbackSource` 选 API 与缓存 key |
+| `apps/frontend/src/utils/speech.ts` | 按 `playbackSource` 选 API 与缓存 key |
 | `apps/frontend/src/views/setting/cloudTts/index.tsx` | 讯飞参数区（发音人/语速/音量/音高） |
 | `apps/frontend/src/views/setting/cloudTts/PlaybackSourcePicker.tsx` | 三选一选路 UI（新） |
 | `apps/frontend/src/service/cloudTtsSettings.ts` | `TtsPlaybackSource` 类型 |
@@ -55,7 +55,7 @@ flowchart LR
   UI[设置页 xfyun 区块]
   PREF[(minimax_tts_user_config)]
   BUILD[buildXfyunTtsRequestExtras]
-  TTS[englishTts.startCloudTts]
+  TTS[speech.startCloudTts]
   API[POST xfyun/speech/stream]
   WS[XfyunTtsService.ws]
   UI -->|PUT| PREF
@@ -157,7 +157,7 @@ export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
 }
 ```
 
-**变更摘要**：新建；试听与 `englishTts` 云端请求共用；缓存 suffix 亦序列化此对象。
+**变更摘要**：新建；试听与 `speech` 云端请求共用；缓存 suffix 亦序列化此对象。
 
 ---
 
@@ -189,18 +189,18 @@ export function volFromXfyunVolume(volume: number): number {
 
 ---
 
-### 4.4 `buildCloudTtsCacheKey`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.4 `buildCloudTtsCacheKey`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：新增函数 + 调用点替换（摘录 `getCloudTtsFromCache` 调用处）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L794–808）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L794–808）
 
 ```typescript
 // 命中 LRU 时用 plain 文本拼接 MiniMax 参数后缀作为 key
 const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L808–818、L985–1015）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L808–818、L985–1015）
 
 ```typescript
 /** 云端 MP3 LRU key：按用户选路区分 MiniMax / 讯飞参数后缀 */
@@ -362,7 +362,7 @@ private synthesizeViaWebSocket(resolved: XfyunTtsResolved): Promise<Buffer> {
 | 数据库 | `playback_source` 列 varchar，新值 `xfyun` 无需 migration（若已有列） |
 | 非会员 | 仍仅本机，无选路 UI |
 | MiniMax 用户 | 选 `cloud` 时行为与改前一致 |
-| 电子书听书 | `playbackSource===xfyun` 时走讯飞分段流水线（与 MiniMax 共用 `englishTts`） |
+| 电子书听书 | `playbackSource===xfyun` 时走讯飞分段流水线（与 MiniMax 共用 `speech`） |
 | 生产 Node 18 | 必须安装 `ws`；禁用仅 `undici` 方案 |
 
 ---
@@ -383,7 +383,7 @@ private synthesizeViaWebSocket(resolved: XfyunTtsResolved): Promise<Buffer> {
 |------|------|
 | 讯飞合成服务 | `apps/backend/src/services/speech-transcription/xfyun-tts.service.ts` |
 | HTTP 端点 | `apps/backend/src/services/speech-transcription/speech-transcription.controller.ts` |
-| 前端选路与请求 | `apps/frontend/src/utils/englishTts.ts` |
+| 前端选路与请求 | `apps/frontend/src/utils/speech.ts` |
 | 偏好与 extras | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
 | 设置页 UI | `apps/frontend/src/views/setting/cloudTts/index.tsx` |
 | 参数映射 | `apps/frontend/src/constants/xfyunTts.ts` |

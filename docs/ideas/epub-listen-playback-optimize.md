@@ -14,7 +14,7 @@
 - [ebook-shelf-progress-pct.md](../ebook/ebook-shelf-progress-pct.md) — **已落地**：书架进度百分比取整
 - [epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md) — 按段 TTS 规划（实现见 ebook 同名专题）
 - [epub-listen-prefetch-after-start.md](../ebook/epub-listen-prefetch-after-start.md) — 出声后预取（对应本文 M1 预取部分）
-- [EPUB 听书句间云端预取](../ebook/epub-listen-cloud-prefetch.md) — `prefetchCloudEnglishTts` 基线
+- [EPUB 听书句间云端预取](../ebook/epub-listen-cloud-prefetch.md) — `prefetchCloudTts` 基线
 - [阅读进度保存](./ebook-reading-progress-save.md) — `percent` 写入与书架展示
 - 开发者手册：[epub-listen-dev.md](../ebook/developer/epub-listen-dev.md)
 
@@ -46,7 +46,7 @@
 
 | 在范围内 | 不在范围内（非目标） |
 |----------|----------------------|
-| Web + Tauri：`useEpubChapterListen` / `useEbookQuoteListen` / `EpubListenPlayerBar` / `epubListenPlayUnits` / `englishTts` 预取钩子 | 微信小程序听书 |
+| Web + Tauri：`useEpubChapterListen` / `useEbookQuoteListen` / `EpubListenPlayerBar` / `epubListenPlayUnits` / `speech` 预取钩子 | 微信小程序听书 |
 | 播放钮 loading（`status === 'loading'` 或更细粒度 pending） | 后端新增 TTS API；改三源选路策略 |
 | 底栏 ◀▶ 改为切章；句级跳转仍保留在分句菜单 | 重新设计整条播放条布局 |
 | 分句菜单选中态跟 `epub` chrome / bgTheme | 全局主题系统重构 |
@@ -82,7 +82,7 @@
 | 听书 Hook | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | 扩展切章 API；保持 `status: loading\|playing\|paused` |
 | 听当前 Hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 共用播放条 loading；切章是否适用听当前 **待确认**（听当前多为选区，默认不切章） |
 | 段循环 + 预取 | `.../listen/epubListenPlayUnits.ts` | 调整 `schedulePrefetch` 时机（出声后） |
-| 云端 TTS / 预取 | `apps/frontend/src/utils/englishTts.ts`（`prefetchCloudEnglishTts`、`onPlaybackStart`） | 复用；保证回调在 `audio.play()` 成功后 |
+| 云端 TTS / 预取 | `apps/frontend/src/utils/speech.ts`（`prefetchCloudTts`、`onPlaybackStart`） | 复用；保证回调在 `audio.play()` 成功后 |
 | 播放条 | `.../listen/EpubListenPlayerBar.tsx` | loading UI；◀▶ 文案与回调改切章 |
 | 章续播 | `advanceScrollListenSection` / `waitForNextSection` | 切「下一章」可对齐自动续播逻辑 |
 | 目录跳转 | `epubNav.go` + `restartFromChapterStart` | 切章可参考 TOC 听书重开 |
@@ -108,7 +108,7 @@ flowchart TB
     ChHook[useEpubChapterListen]
     QHook[useEbookQuoteListen]
     Units[epubListenPlayUnits]
-    Tts[englishTts]
+    Tts[speech]
   end
   subgraph Nav [导航 / 渲染]
     Pane[EpubPane / epubNav]
@@ -138,8 +138,8 @@ flowchart TB
 | `useEpubChapterListen` | 听书会话：start/stop/pause、句游标、倍速、`status`；本需求新增 `prevChapter` / `nextChapter` |
 | `useEbookQuoteListen` | 听当前会话；与听书互斥；本需求主要吃共用播放条 loading |
 | `playListenUnitsFromCursor` | kick + 段循环；在 `onPlaybackStart` 后 `schedulePrefetch` |
-| `prefetchCloudEnglishTts` | 发起/复用云端 TTS inflight，不直接播放 |
-| `playEnglishPreferred` | 选路云端/本机；成功出声后触发 `onPlaybackStart` |
+| `prefetchCloudTts` | 发起/复用云端 TTS inflight，不直接播放 |
+| `playPreferred` | 选路云端/本机；成功出声后触发 `onPlaybackStart` |
 | `advanceScrollListenSection` | 连续滚动下挂载下一节 document，供自动续播与切下一章复用 |
 | `EpubListenPlayerBar` | 底栏：播放/停止/进度文案/分句菜单/倍速/◀▶ |
 | `EbookShelfBookCard` | 书架卡片展示 `prog.percent` |
@@ -190,8 +190,8 @@ flowchart TD
 | 方法 | 功能 |
 |------|------|
 | `playListenUnitsFromCursor` | 驱动 kick → 出声 → 预取 → rest/下一段 |
-| `schedulePrefetch` / `prefetchCloudEnglishTts` | 在出声后预取，写入 `prefetchedByText` |
-| `playEnglishPreferred(..., onPlaybackStart)` | 首包独占网络；play 成功回调预取 |
+| `schedulePrefetch` / `prefetchCloudTts` | 在出声后预取，写入 `prefetchedByText` |
+| `playPreferred(..., onPlaybackStart)` | 首包独占网络；play 成功回调预取 |
 | `prevChapter` / `nextChapter` 🆕 | 计算邻章 → 导航 → `restartFromChapterStart` 类开听 |
 | `restartFromChapterStart` | 目录/切章后从当前可见章第 0 句开听（已有，可复用） |
 | `epubReaderChromeListItemActiveClass` | 分句菜单选中态样式入口 |
@@ -213,7 +213,7 @@ sequenceDiagram
   participant Bar as EpubListenPlayerBar
   participant Hook as useEpubChapterListen
   participant Units as playListenUnitsFromCursor
-  participant Tts as playEnglishPreferred
+  participant Tts as playPreferred
   participant API as TTS API
 
   U->>Bar: 点击听书 / 下一句(菜单) / 听当前
@@ -221,12 +221,12 @@ sequenceDiagram
   Hook->>Bar: status=loading
   Bar->>Bar: 播放钮 Loading 图标
   Hook->>Units: playListenUnitsFromCursor
-  Units->>Tts: playEnglishPreferred(kick)
+  Units->>Tts: playPreferred(kick)
   Tts->>API: startCloudTts(kick) 仅 1 路
   API-->>Tts: MP3 ready
   Tts->>Tts: audio.play + onPlaybackStart
   Tts-->>Units: onPlaybackStart
-  Units->>Tts: prefetchCloudEnglishTts(rest/next)
+  Units->>Tts: prefetchCloudTts(rest/next)
   Note over Tts,API: 预取与播放并行，不挡当前出声
   Tts-->>Hook: 播放中
   Hook->>Bar: status=playing
@@ -245,8 +245,8 @@ sequenceDiagram
 |------|------|
 | `startFromCurrentPosition` / `goToSentence` | 听书开听或切句重开循环 |
 | `playListenUnitsFromCursor` | 编排 kick 与预取时机 |
-| `playEnglishPreferred` | 合成并播放；触发 `onPlaybackStart` |
-| `prefetchCloudEnglishTts` | 预取 rest/下一单元，命中 inflight/缓存则复用 |
+| `playPreferred` | 合成并播放；触发 `onPlaybackStart` |
+| `prefetchCloudTts` | 预取 rest/下一单元，命中 inflight/缓存则复用 |
 | `nextChapter` 🆕 | 底栏切章入口 |
 | `restartFromChapterStart` | 跳转落地后从章首第 0 句开听 |
 
@@ -294,7 +294,7 @@ stateDiagram-v2
 | 模块 | 职责 | 新增/改动 | 预估路径 |
 |------|------|-----------|----------|
 | `epubListenPlayUnits` | 预取时机 | 扩展 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenPlayUnits.ts` |
-| `englishTts` | `onPlaybackStart` | 扩展（多已具备） | `apps/frontend/src/utils/englishTts.ts` |
+| `speech` | `onPlaybackStart` | 扩展（多已具备） | `apps/frontend/src/utils/speech.ts` |
 | `useEpubChapterListen` | 切章 API | 扩展 | `.../hooks/useEpubChapterListen.ts` |
 | `EpubListenPlayerBar` | loading + 切章按钮 | 扩展 | `.../components/listen/EpubListenPlayerBar.tsx` |
 | `read.tsx` | 接线切章回调 | 扩展 | `.../views/ebook/read.tsx` |
@@ -423,7 +423,7 @@ function formatShelfPercent(pct: number): string {
 
 | 类型 | 路径（预估） |
 |------|--------------|
-| 前端 | `epubListenPlayUnits.ts`、`englishTts.ts`、`useEpubChapterListen.ts`、`EpubListenPlayerBar.tsx`、`read.tsx`、i18n、`EbookShelfBookCard.tsx`、可选 chrome class |
+| 前端 | `epubListenPlayUnits.ts`、`speech.ts`、`useEpubChapterListen.ts`、`EpubListenPlayerBar.tsx`、`read.tsx`、i18n、`EbookShelfBookCard.tsx`、可选 chrome class |
 | 后端 | 无 |
 | 文档（实现后） | `docs/ebook/` 听书播放优化归档；可链本篇 |
 

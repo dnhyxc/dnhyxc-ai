@@ -27,10 +27,7 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
@@ -117,21 +114,21 @@ export function VocabularyLibrarySection({
 	} = useIncrementalVocabFavoriteStatus(items);
 
 	useEffect(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPlayingKey(null);
 	}, [libraryId]);
 
 	const toggleWordAudio = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

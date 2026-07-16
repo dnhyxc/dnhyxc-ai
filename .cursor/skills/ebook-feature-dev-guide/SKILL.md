@@ -79,7 +79,7 @@ description: >-
 
 - **功能名**（一句话，用户视角）。
 - **边界**：含不含后端、PDF、与哪几个 EPUB 能力互斥/共存。
-- **取材范围**：用户 `@` 的路径，或 Agent 搜索 `apps/frontend/src/views/ebook/**`、相关 backend、`englishTts` 等。
+- **取材范围**：用户 `@` 的路径，或 Agent 搜索 `apps/frontend/src/views/ebook/**`、相关 backend、`speech` 等。
 
 列出 **必读文件清单**（入口页、主 hook、核心 utils、组件、API service、后端 controller/entity 若适用）。
 
@@ -163,8 +163,8 @@ description: >-
 **来源**：`apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` · 约 L1–L80
 
 ```typescript
-// 从 englishTts 引入句界与播放能力
-import { playEnglishPreferred, … } from '@/utils/englishTts';
+// 从 speech 引入句界与播放能力
+import { playPreferred, … } from '@/utils/speech';
 // …
 export function useEpubChapterListen(…) {
 	// …

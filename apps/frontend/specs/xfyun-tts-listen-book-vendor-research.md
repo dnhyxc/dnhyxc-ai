@@ -1,7 +1,7 @@
 # 讯飞 TTS 选型调研：听书能力接入
 
 > **调研日期**：2026-06-27  
-> **实现状态（2026-06-27）**：**已接入讯飞在线合成（后端 WS 代理 + 前端中文选路）** — 见 `xfyun-tts.service.ts`、`POST /speech-transcription/xfyun/speech/stream`、`englishTts.startCloudTts`（CJK → 讯飞，否则 MiniMax）。  
+> **实现状态（2026-06-27）**：**已接入讯飞在线合成（后端 WS 代理 + 前端中文选路）** — 见 `xfyun-tts.service.ts`、`POST /speech-transcription/xfyun/speech/stream`、`speech.startCloudTts`（CJK → 讯飞，否则 MiniMax）。  
 > **信息来源**：[讯飞控制台 · 语音合成](https://console.xfyun.cn/services/tts)、[在线语音合成 API（流式 WebSocket）](https://www.xfyun.cn/doc/tts/online_tts/API.html)、[长文本语音合成 API（HTTP 异步）](https://www.xfyun.cn/doc/tts/long_text_tts/API.html)  
 > **关联 SPEC**：[`epub-listen-while-read.md`](./epub-listen-while-read.md)（边听边读产品定义）、[`ebook-reader.md`](./ebook-reader.md)  
 > **性质**：供应商选型与接入约束说明；**非实现承诺**，落地前需 PoC 与计费核对。
@@ -14,7 +14,7 @@
 |------|------|
 | **听书（边听边读 / 听当前）应优先接哪种？** | **在线语音合成（流式 WebSocket 版）** |
 | **长文本语音合成是否适合主路径？** | **不适合** 作为交互式听书主引擎；可作为 **V2 可选**：整章/全书离线生成、导出 MP3 |
-| **与现有仓库关系** | 前端已有 `englishTts.ts` 句读分段 + 云端 **段级预取**（`playCloudTtsCadenceSegments`）；后端已有 `speech-transcription` 模块（MiniMax 流式 + 硅基 `/speech`）。讯飞 **在线流式** 最贴近该架构，改动面小于长文本异步任务链 |
+| **与现有仓库关系** | 前端已有 `speech.ts` 句读分段 + 云端 **段级预取**（`playCloudTtsCadenceSegments`）；后端已有 `speech-transcription` 模块（MiniMax 流式 + 硅基 `/speech`）。讯飞 **在线流式** 最贴近该架构，改动面小于长文本异步任务链 |
 | **中文 EPUB 听书** | 讯飞长文本/在线均支持中文及「阅读听书」发音人（如 `x4_qianxue`、`x4_mingge`）；相对当前偏英文的 MiniMax 默认音色，讯飞更适合 **中文书籍** 云端朗读补充 |
 
 **推荐策略**
@@ -34,8 +34,8 @@
 | **听当前** | 选区/引用一段，播完即停 | 单次请求文本通常 ≤ 数千字；需 **低首包延迟** |
 | **边听边读（规划）** | 从 spine 当前位置连续朗读；句级高亮；暂停/续播；上一句/下一句 | 需 **按句/按段多次合成** + **播 N 预取 N+1**；非「一次生成整章 MP3」 |
 | **句级回调** | `TtsCadenceChunkEvent`（`phase` / `sentenceIndex` / `sentencePlainStart`） | 合成粒度须与 **cadence 分段** 对齐；整章单文件难以映射到句级 UI |
-| **会员云端 / 非会员本机** | `shouldUseCloudEnglishTts` + 设置页 `playbackSource` | 新供应商走 **同一会员网关 + 后端鉴权**，密钥不进浏览器 |
-| **中文书** | EPUB 正文以中文为主 | 云端需 **中文发音人**；本机已有 `isPredominantlyCjk` → `zh-CN`（`englishTts.ts`） |
+| **会员云端 / 非会员本机** | `shouldUseCloudTts` + 设置页 `playbackSource` | 新供应商走 **同一会员网关 + 后端鉴权**，密钥不进浏览器 |
+| **中文书** | EPUB 正文以中文为主 | 云端需 **中文发音人**；本机已有 `isPredominantlyCjk` → `zh-CN`（`speech.ts`） |
 
 当前云端实现要点（已实现，与选型强相关）：
 
@@ -92,7 +92,7 @@
 | **暂停 / 继续** 同一句 | ✅ 控制 `<audio>` 或缓存 Blob | ⚠️ 仅整文件 pause；句级需自建索引 |
 | **上一句 / 下一句** | ✅ 改 cadence 索引 → 新 WS 请求 | ❌ 需重新切分文本或切 MP3 |
 | **句级淡黄底**（`onCadenceChunk`） | ✅ 与分段请求同节奏 | ❌ 无天然句边界回调 |
-| **播当前段预取下一段** | ✅ 对齐 `prefetchCloudEnglishTts` / `playCloudTtsCadenceSegments` | ❌ 任务级粒度 |
+| **播当前段预取下一段** | ✅ 对齐 `prefetchCloudTts` / `playCloudTtsCadenceSegments` | ❌ 任务级粒度 |
 | 单 spine 1–3 万字 | ⚠️ 需 **~5–15+ 次** 在线请求（每段 ≤2000 字） | ✅ 一次任务可覆盖 |
 | 密钥与会员 | ✅ 后端 WS 代理，与现 JWT 一致 | ✅ 仅后端；但多 **任务表 + 轮询/回调 + 对象存储** |
 
@@ -106,7 +106,7 @@
 | **导出「本章音频」** | 下载 MP3，类似有声书 MP3 章节 |
 | **离线包** | 桌面 Tauri 预下载；需自建存储，不能依赖讯飞 7 日链接 |
 
-若采用长文本，建议 **独立产品能力**（「生成章节音频」），**不要** 替换 `playEnglishPreferred` 主链路。
+若采用长文本，建议 **独立产品能力**（「生成章节音频」），**不要** 替换 `playPreferred` 主链路。
 
 ---
 
@@ -116,10 +116,10 @@
 
 | 现有模块 | 讯飞在线接入方式 |
 |----------|------------------|
-| `englishTts.ts` | 新增 provider 分支：`fetchCloudTtsBlob` / `startCloudTts` 在 MiniMax 失败或 **中文书** 时走 `SPEECH_XFYUN_TTS_STREAM`（命名待定） |
+| `speech.ts` | 新增 provider 分支：`fetchCloudTtsBlob` / `startCloudTts` 在 MiniMax 失败或 **中文书** 时走 `SPEECH_XFYUN_TTS_STREAM`（命名待定） |
 | `splitTextForTtsCadence` | **复用**；单段仍须 &lt; 8000 **字节**（UTF-8 中文约 2000 字），与讯飞上限同量级 |
 | `playCloudTtsCadenceSegments` | **复用** 预取循环；仅替换 `startCloudTts` 实现 |
-| `useEbookQuoteListen` / 规划 `useEpubChapterListen` | **不改** 会话状态机；仍调 `playEnglishPreferred`（或重命名为 `playTtsPreferred`） |
+| `useEbookQuoteListen` / 规划 `useEpubChapterListen` | **不改** 会话状态机；仍调 `playPreferred`（或重命名为 `playTtsPreferred`） |
 | 设置页 / `minimaxTtsPrefs` | 扩展为 **多供应商 TTS 偏好**（音色 `vcn`、speed/volume/pitch 0–100 映射） |
 
 ### 5.2 后端（`apps/backend`）
@@ -152,7 +152,7 @@
 ```mermaid
 sequenceDiagram
   participant EPUB as useEpubListen*
-  participant TTS as englishTts.play*Preferred
+  participant TTS as speech.play*Preferred
   participant API as Nest xfyun/speech/stream
   participant XF as 讯飞 wss v2/tts
 
@@ -228,7 +228,7 @@ PoC 时以控制台 **在线语音合成** 发音人列表为准。
 
 | 决策 | 选择 | 理由 |
 |------|------|------|
-| 听书主 TTS 产品 | **讯飞在线语音合成（WebSocket 流式）** | 低延迟、可分段、可对接现有 `englishTts` 预取流水线；官方亦要求超长文本 **多次请求** |
+| 听书主 TTS 产品 | **讯飞在线语音合成（WebSocket 流式）** | 低延迟、可分段、可对接现有 `speech` 预取流水线；官方亦要求超长文本 **多次请求** |
 | 长文本语音合成 | **V2 可选**，非主路径 | 异步任务 + 7 日 URL + 无句级回调，与边听边读状态机不匹配 |
 | 接入层 | **后端 `speech-transcription` 扩展** | 与 MiniMax/硅基一致；JWT + 会员；密钥不下发 |
 | 英文内容 | **保留 MiniMax 优先** | 现有投资与音色；讯飞补 **中文 EPUB** |
@@ -240,7 +240,7 @@ PoC 时以控制台 **在线语音合成** 发音人列表为准。
 - [讯飞控制台 · 语音合成服务](https://console.xfyun.cn/services/tts)
 - [在线语音合成 API 文档（WebSocket 流式）](https://www.xfyun.cn/doc/tts/online_tts/API.html)
 - [长文本语音合成 API 文档（HTTP 异步）](https://www.xfyun.cn/doc/tts/long_text_tts/API.html)
-- 仓库内：[`apps/frontend/src/utils/englishTts.ts`](../src/utils/englishTts.ts)、[`apps/backend/src/services/speech-transcription/`](../backend/src/services/speech-transcription/)、[`docs/english/cloud-tts-cadence-prefetch.md`](../../docs/english/cloud-tts-cadence-prefetch.md)
+- 仓库内：[`apps/frontend/src/utils/speech.ts`](../src/utils/speech.ts)、[`apps/backend/src/services/speech-transcription/`](../backend/src/services/speech-transcription/)、[`docs/english/cloud-tts-cadence-prefetch.md`](../../docs/english/cloud-tts-cadence-prefetch.md)
 
 ---
 

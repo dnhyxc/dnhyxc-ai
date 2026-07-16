@@ -29,7 +29,7 @@ user.ts → useMembershipActive.ts → @/store/index.ts → user.ts（未完成�
 | `apps/frontend/src/hooks/useMembershipActive.ts` | 仅保留 Hook + re-export |
 | `apps/frontend/src/store/user.ts` | import 改指 `@/utils/membershipActive` |
 | `apps/frontend/src/store/ebook.ts` | 同上 + `loggedInUserId` |
-| `apps/frontend/src/utils/englishTts.ts` | 同上 |
+| `apps/frontend/src/utils/speech.ts` | 同上 |
 | `apps/frontend/src/store/loggedInUserId.ts` | 新增 `getLoggedInUserInfoFromStorage` |
 
 ---

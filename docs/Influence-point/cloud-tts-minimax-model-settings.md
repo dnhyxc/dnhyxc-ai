@@ -15,9 +15,9 @@
 
 **对照的既有能力**：
 
-- **朗读来源三选一**（`local | cloud | xfyun`）与 `playEnglishPreferred` 选路
+- **朗读来源三选一**（`local | cloud | xfyun`）与 `playPreferred` 选路
 - **设置 → 语音设置 → MiniMax 云端**：即时保存偏好（`saveMinimaxTtsUserPrefs` → `PUT /settings/cloud-tts`）
-- **云端试听**（设置页 `onPreview` → `playEnglishPreferred`）
+- **云端试听**（设置页 `onPreview` → `playPreferred`）
 - **EPUB 听书 / 听当前**、**英语学习单词朗读**（均经 `startCloudTts` → `buildMinimaxTtsRequestExtras`）
 - **前端 MP3 LRU 缓存**（`buildMinimaxTtsCacheKeySuffix`，key 含 model 等 extras）
 - **恢复默认参数**（`onResetMinimax` → `patch` 写 `getDefaultMinimaxCloudCredentials().model`）
@@ -38,7 +38,7 @@
 | `apps/backend/.../minimax-tts.service.ts` | env 未配置时 fallback model → turbo |
 | `apps/backend/.../minimax-tts-user-config.entity.ts` | 列默认值 → turbo |
 | `apps/backend/src/enum/config.enum.ts`、`speech-transcription.controller.ts` | 注释同步 |
-| `apps/frontend/src/utils/englishTts.ts` | 仅缩进/format，**无行为变化** |
+| `apps/frontend/src/utils/speech.ts` | 仅缩进/format，**无行为变化** |
 
 **结论摘要**：
 
@@ -50,7 +50,7 @@
 | 已保存 `speech-2.6*` / `speech-02*` / `speech-01*` 的用户 | **是** | 下次保存或 TTS 请求带旧 model 时后端 400，云端失败并走既有本机降级 |
 | 设置页手动输入非法 model | **有条件变化** | 前端不再静默改默认；保存/试听请求由后端拒绝 |
 | 设置页模型 UI | **低（增强）** | 与大模型「模型名称」同型 Combobox，预设两项可点选 |
-| EPUB / 英语朗读主路径（合法 model） | **否** | `englishTts.startCloudTts` 请求体构造未改 |
+| EPUB / 英语朗读主路径（合法 model） | **否** | `speech.startCloudTts` 请求体构造未改 |
 | 前端 MP3 缓存逻辑 | **否** | 未改 LRU 读写的 skip/bypass；model 变更后 key 自然 miss（预期） |
 | MiniMax API Key / 音色 / 语速等 | **否** | 本轮未触及 |
 
@@ -96,11 +96,11 @@
 |-------------|----------|------|
 | **设置页选 MiniMax 云端 + 预设选 turbo/hd** | 无 | `patch({ model })` → `saveMinimaxTtsUserPrefs` → 后端校验通过；试听/听书读内存 prefs |
 | **设置页输入非白名单 model 并保存** | 中 | `UpsertMinimaxTtsPrefsDto` 校验失败 → 偏好不落库；需用户改回两项之一 |
-| **设置页输入非白名单 model 点试听** | 中 | `POST minimax/speech/stream` body 含非法 model → 400 → `playEnglishPreferred` catch → Toast + 本机降级（与既有云端失败链一致） |
+| **设置页输入非白名单 model 点试听** | 中 | `POST minimax/speech/stream` body 含非法 model → 400 → `playPreferred` catch → Toast + 本机降级（与既有云端失败链一致） |
 | **DB 中仍为 speech-2.6 等旧 model 的老用户** | 高 | 读偏好仍返回旧值；任意云端朗读带旧 model → **400**；直至用户在设置页改为 hd/turbo 并成功保存 |
 | **仅使用 env 默认、从未自定义的用户** | 低 | 若 `.env` 仍为 `speech-2.8-hd` 则行为不变；若已改为 turbo 或留空走代码默认则合成用 turbo |
 | **点「恢复默认参数」（MiniMax 区）** | 低 | `getDefaultMinimaxCloudCredentials().model` 现为 turbo（与改前 hd 不同） |
-| **`playEnglishPreferred` 全站调用方** | 无～低 | 合法 model 时路径不变；非法 model 时云端失败频率上升（仅脏数据用户） |
+| **`playPreferred` 全站调用方** | 无～低 | 合法 model 时路径不变；非法 model 时云端失败频率上升（仅脏数据用户） |
 | **讯飞云端 / 本机 Web Speech** | 无 | 未改选路与合成 URL |
 | **MP3 LRU** | 无 | 逻辑未改；model 变更后 cache key 变化导致 miss，属预期 |
 
@@ -125,7 +125,7 @@
 | `buildMinimaxTtsCacheKeySuffix` / LRU 读写 | 未引入 skipCache、stagePrefs 等试听特例 |
 | 讯飞凭证、`xfyunVoiceId` | 本轮 diff 未触及 |
 | `resolveCredentials` / 用户 MiniMax API Key | 未改 |
-| 云端失败 → 本机降级链 | `englishTts` 除 format 外无逻辑变更 |
+| 云端失败 → 本机降级链 | `speech` 除 format 外无逻辑变更 |
 | `MINIMAX_TTS_AUDIO_FORMATS`、emotion、voiceId 等 | 其它 MiniMax 参数校验与 UI 不变 |
 
 ---

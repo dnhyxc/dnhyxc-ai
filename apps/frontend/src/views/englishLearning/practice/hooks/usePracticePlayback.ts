@@ -1,10 +1,10 @@
 import { Toast } from '@ui/index';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+} from '@/utils/speech';
 import { DICTATION_PLAY_COUNT, DICTATION_PLAY_GAP_MS } from '../constants';
 import type { PracticeMode } from '../types';
 
@@ -45,7 +45,7 @@ export function usePracticePlayback(args: {
 	 */
 	const cancelDictationPlay = useCallback(() => {
 		dictationPlayRunRef.current += 1;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 	}, []);
 
 	/**
@@ -57,7 +57,7 @@ export function usePracticePlayback(args: {
 			for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
 				// 若 runId 早于当前，立即中断
 				if (dictationPlayRunRef.current !== runId) return;
-				await playEnglishPreferred(answerText);
+				await playPreferred(answerText);
 				if (dictationPlayRunRef.current !== runId) return;
 				// 非最后一次播放则等待间隔
 				if (i < DICTATION_PLAY_COUNT - 1) {
@@ -75,7 +75,7 @@ export function usePracticePlayback(args: {
 	const playWord = useCallback<PlayWordFn>(
 		async (options) => {
 			// 检查 TTS 支持，若不支持弹 warning
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
@@ -91,7 +91,7 @@ export function usePracticePlayback(args: {
 
 			dictationPlayRunRef.current += 1;
 			const runId = dictationPlayRunRef.current;
-			stopAllEnglishPlayback(); // 先停止所有 English 播放（防串音）
+			stopAllPlayback(); // 先停止所有 English 播放（防串音）
 			setPlaying(true); // 标记当前为播放态
 
 			// dictation 听写模式三连播：仅在 mode=“dictation” 且 sequence 明确 true
@@ -102,7 +102,7 @@ export function usePracticePlayback(args: {
 				if (useDictationSequence) {
 					await playDictationSequence(runId);
 				} else {
-					await playEnglishPreferred(answerText);
+					await playPreferred(answerText);
 				}
 			} catch {
 				// 支持突然变不可用、或系统错误

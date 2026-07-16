@@ -266,7 +266,7 @@ const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
 	// 目录跳转完成后：与 startFromCurrentPosition 同一开听路径，仅从第 0 句起（不解析 CFI）
 	const restartFromChapterStart = useCallback(() => {
 		// TTS 不可用则 Toast 并返回
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({
 				type: 'warning',
 				title: tRef.current('englishLearning.tts.unsupported'),
@@ -285,13 +285,13 @@ const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
 		}
 
 		// 用户手势解锁音频播放
-		primeEnglishPlaybackForUserGesture();
+		primePlaybackForUserGesture();
 		// 保留用户当前倍速
 		const keepRate = rateRef.current;
 
 		// 停止引用听书、清空叠加层、开启自动跟随
 		invokeStopQuoteListen();
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		clearEpubListenSegmentOverlay();
 		beginChapterListenAutoFollow(rend);
 
@@ -340,7 +340,7 @@ const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
 	// 目录/切章完成后重开听书：按跳转后 CFI 定位起播句（同 HTML 多节时非文件第 0 句）
 	const restartFromChapterStart = useCallback(() => {
 		// TTS 不可用则 Toast 并返回
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({
 				type: 'warning',
 				title: tRef.current('englishLearning.tts.unsupported'),
@@ -359,13 +359,13 @@ const resolveStartCfiModeRef = useRef<'before' | 'after'>('before');
 		}
 
 		// 用户手势解锁音频播放
-		primeEnglishPlaybackForUserGesture();
+		primePlaybackForUserGesture();
 		// 保留用户当前倍速
 		const keepRate = rateRef.current;
 
 		// 停止引用听书、清空叠加层、开启自动跟随
 		invokeStopQuoteListen();
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		clearEpubListenSegmentOverlay();
 		beginChapterListenAutoFollow(rend);
 

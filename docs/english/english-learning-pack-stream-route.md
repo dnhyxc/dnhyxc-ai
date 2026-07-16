@@ -408,7 +408,7 @@ function VocabularyPackListInner() {
       {topic ? <p>{t('englishLearning.stream.topicLabel')}: {topic}</p> : null}
       <div className="grid …">
         {items.map((item, i) => (
-          /* 单词卡片：朗读 playEnglishPreferred、收藏 API、displayIpaWrapped */
+          /* 单词卡片：朗读 playPreferred、收藏 API、displayIpaWrapped */
         ))}
       </div>
     </div>

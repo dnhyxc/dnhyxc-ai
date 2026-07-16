@@ -16,7 +16,7 @@
 
 | 层级 | 目标 |
 |------|------|
-| 手势解锁 | `playEnglishPreferred` 入口同步 `primeEnglishPlaybackForUserGesture()`；prime 增加静音 `Audio.play()` |
+| 手势解锁 | `playPreferred` 入口同步 `primePlaybackForUserGesture()`；prime 增加静音 `Audio.play()` |
 | 读 body | Tauri 下 `readResponseBodyAsArrayBuffer` 直接用 `res.arrayBuffer()` |
 | Edge endpoint | Tauri + Edge → `SPEECH_EDGE_TTS`；Web → `SPEECH_EDGE_TTS_STREAM` |
 | 播放 | `waitCloudAudioCanPlay` + `startCloudAudioPlayback`（`canplay` 后再 `play()`；Tauri 失败 `load()` 重试） |
@@ -25,12 +25,12 @@
 
 | 说明 | 路径 |
 |------|------|
-| 播放与选路 | `apps/frontend/src/utils/englishTts.ts` |
+| 播放与选路 | `apps/frontend/src/utils/speech.ts` |
 | Edge 非流式 API 常量 | `apps/frontend/src/service/api.ts` → `SPEECH_EDGE_TTS` |
 
 ## 3. 实现思路
 
-1. **在用户点击栈内 prime**：`playEnglishPreferred` 在 `beginPlaybackSession` 之前调用 `primeEnglishPlaybackForUserGesture()`，覆盖 Edge 合成耗时场景（听书 hook 内 prime 仍保留，重复调用无害）。
+1. **在用户点击栈内 prime**：`playPreferred` 在 `beginPlaybackSession` 之前调用 `primePlaybackForUserGesture()`，覆盖 Edge 合成耗时场景（听书 hook 内 prime 仍保留，重复调用无害）。
 2. **双通道解锁**：保留 `speechSynthesis` 静音 utterance；新增模块级 `cloudAudioUnlock` 播放极短静音 WAV data URI，解锁 **HTMLAudioElement**  autoplay。
 3. **Tauri 读 body**：跳过 `getReader()` 循环，避免 chunked 挂起；Web 仍用 stream reader 合并 chunks（大响应内存友好）。
 4. **Edge 分流**：`isTauriRuntime()` 选非流式 endpoint；MiniMax/讯飞仍用 stream URL。
@@ -38,11 +38,11 @@
 
 ## 4. 关键代码对比与注释
 
-### 4.1 `readResponseBodyAsArrayBuffer`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.1 `readResponseBodyAsArrayBuffer`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：函数全定义。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L995–L1013）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L995–L1013）
 
 ```typescript
 // 从 fetch Response 读取 MP3 二进制（Web 优先 stream reader）
@@ -66,7 +66,7 @@ async function readResponseBodyAsArrayBuffer(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L995–L1013）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L995–L1013）
 
 ```typescript
 // 从 fetch Response 读取 MP3 二进制（Tauri 直读 arrayBuffer）
@@ -96,11 +96,11 @@ async function readResponseBodyAsArrayBuffer(
 
 **变更摘要**：Tauri 短路为 `arrayBuffer()`；Web 路径不变。
 
-### 4.2 `startCloudTts` Edge endpoint 选路（`apps/frontend/src/utils/englishTts.ts`）
+### 4.2 `startCloudTts` Edge endpoint 选路（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：`startCloudTts` 内 `endpoint` 三元表达式（前后 `cacheKey`、headers、`platformFetch` 等未改，对称省略）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1083–L1092）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1083–L1092）
 
 ```typescript
 	// ...（未改动：prefs、source、headers）
@@ -115,7 +115,7 @@ async function readResponseBodyAsArrayBuffer(
 	// ...（未改动：bodyExtras、platformFetch POST）
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1083–L1092）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1083–L1092）
 
 ```typescript
 	// ...（未改动：prefs、source、headers）
@@ -145,7 +145,7 @@ export const SPEECH_EDGE_TTS = '/speech-transcription/edge/speech';
 
 **对比范围**：两个新函数（改动前不存在，见 `code-before-after.md` §4 纯新增）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1276–L1308）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1276–L1308）
 
 ```typescript
 // 等待 Audio 至少有当前帧数据可播
@@ -196,11 +196,11 @@ async function startCloudAudioPlayback(audio: HTMLAudioElement): Promise<void> {
 }
 ```
 
-### 4.4 `playCloudMp3Blob`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.4 `playCloudMp3Blob`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：函数全定义（播放入口改为 `startCloudAudioPlayback`）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1264–L1294）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1264–L1294）
 
 ```typescript
 // 播放云端 MP3 Blob，绑定世代与倍速
@@ -247,7 +247,7 @@ function playCloudMp3Blob(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1310–L1344）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1310–L1344）
 
 ```typescript
 // 播放云端 MP3 Blob，绑定世代与倍速
@@ -296,11 +296,11 @@ function playCloudMp3Blob(
 
 **变更摘要**：`audio.play()` → `startCloudAudioPlayback(audio)`；错误清理逻辑不变。
 
-### 4.5 `playEnglishPreferred` 入口 prime（`apps/frontend/src/utils/englishTts.ts`）
+### 4.5 `playPreferred` 入口 prime（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：函数开头至 `beginPlaybackSession`（后续选路未改，对称省略）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1435–L1442）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1435–L1442）
 
 ```typescript
 	// 去除 markdown 语法，获得纯文本
@@ -312,7 +312,7 @@ function playCloudMp3Blob(
 	const generation = beginPlaybackSession();
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1479–L1488）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1479–L1488）
 
 ```typescript
 	// 去除 markdown 语法，获得纯文本
@@ -321,7 +321,7 @@ function playCloudMp3Blob(
 	if (!plain) return;
 
 	// 仍在用户点击栈内：解锁 speech + Audio（线上 Edge 合成数秒，Tauri 须在此 prime）
-	primeEnglishPlaybackForUserGesture();
+	primePlaybackForUserGesture();
 
 	// 启动新的播放世代/session
 	const generation = beginPlaybackSession();
@@ -329,19 +329,19 @@ function playCloudMp3Blob(
 
 **变更摘要**：在 async 分支之前同步 prime，保证 Tauri autoplay 解锁仍在用户手势内。
 
-### 4.6 `primeEnglishPlaybackForUserGesture`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.6 `primePlaybackForUserGesture`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：函数全定义 + 模块级静音 Audio 常量（新增）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1505–L1517）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1505–L1517）
 
 ```typescript
 // 须在用户点击同步调用，降低后续 async TTS / Audio 被 autoplay 策略拦截的概率
-export function primeEnglishPlaybackForUserGesture(): void {
+export function primePlaybackForUserGesture(): void {
 	// SSR 安全
 	if (typeof window === 'undefined') return;
 	// 预热本机音色列表
-	warmupEnglishTtsVoices();
+	warmupSpeechVoices();
 	try {
 		// 恢复可能被 pause 的 speechSynthesis
 		window.speechSynthesis?.resume();
@@ -356,7 +356,7 @@ export function primeEnglishPlaybackForUserGesture(): void {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，模块常量约 L836–L838；函数约 L1555–L1575）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，模块常量约 L836–L838；函数约 L1555–L1575）
 
 ```typescript
 // 模块级：复用同一静音 Audio 元素做 autoplay 解锁
@@ -366,11 +366,11 @@ const SILENT_WAV_DATA_URI =
 	'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 // 须在用户点击同步调用，降低后续 async TTS / Audio 被 autoplay 策略拦截的概率
-export function primeEnglishPlaybackForUserGesture(): void {
+export function primePlaybackForUserGesture(): void {
 	// SSR 安全
 	if (typeof window === 'undefined') return;
 	// 预热本机音色列表
-	warmupEnglishTtsVoices();
+	warmupSpeechVoices();
 	try {
 		// 恢复可能被 pause 的 speechSynthesis
 		window.speechSynthesis?.resume();
@@ -416,7 +416,7 @@ export function primeEnglishPlaybackForUserGesture(): void {
 
 | 说明 | 路径 |
 |------|------|
-| 朗读主模块 | `apps/frontend/src/utils/englishTts.ts` |
+| 朗读主模块 | `apps/frontend/src/utils/speech.ts` |
 | API 常量 | `apps/frontend/src/service/api.ts` |
 | 影响面 | `docs/Influence-point/tts-tauri-cloud-playback.md` |
 | Edge 全功能 | `docs/english/cloud-tts-edge-voice.md` |

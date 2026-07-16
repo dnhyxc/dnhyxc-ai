@@ -11,62 +11,62 @@
 
 ### 0.1 文档角色与阅读顺序
 
-| 顺序 | 章节 | 你将得到 |
-|------|------|----------|
-| ① | §1 模块地图 | 一眼看清前端 EPUB 阅读器的 30+ 关键文件如何分工 |
-| ② | §2 白话思路（5 分钟） | 不读代码也能讲清功能怎么跑 |
-| ③ | §3–§14 分模块链路 | 每个功能点的"入口 → 链路 → 副作用 → 互斥/边界" |
-| ④ | §15 跨模块互斥 & 生命周期 | 听书 vs 引用听读 vs 划线 vs PopBar 谁抢谁 |
-| ⑤ | §16 验收清单 | 拿来当 e2e / 回归用例 |
-| ⑥ | §17 自检 & 回归坑位 | 性能、批注闪烁、跨 iframe 坐标、视口裁剪 |
-| ⑦ | §18 源码对照（11 个最关键符号，逐行注释） | 直接抄 |
-| ⑧ | §19 复用清单 | "我要在自己的项目里复刻 EPUB，应该带走哪些文件" |
+| 顺序 | 章节                                      | 你将得到                                        |
+| ---- | ----------------------------------------- | ----------------------------------------------- |
+| ①    | §1 模块地图                               | 一眼看清前端 EPUB 阅读器的 30+ 关键文件如何分工 |
+| ②    | §2 白话思路（5 分钟）                     | 不读代码也能讲清功能怎么跑                      |
+| ③    | §3–§14 分模块链路                         | 每个功能点的"入口 → 链路 → 副作用 → 互斥/边界"  |
+| ④    | §15 跨模块互斥 & 生命周期                 | 听书 vs 引用听读 vs 划线 vs PopBar 谁抢谁       |
+| ⑤    | §16 验收清单                              | 拿来当 e2e / 回归用例                           |
+| ⑥    | §17 自检 & 回归坑位                       | 性能、批注闪烁、跨 iframe 坐标、视口裁剪        |
+| ⑦    | §18 源码对照（11 个最关键符号，逐行注释） | 直接抄                                          |
+| ⑧    | §19 复用清单                              | "我要在自己的项目里复刻 EPUB，应该带走哪些文件" |
 
 ### 0.2 与既有 developer 手册的分工
 
-| 文档 | 主题 | 与本文档的关系 |
-|------|------|----------------|
-| [epub-listen-dev.md](./epub-listen-dev.md) | 听书（章节连读） | 单一功能深度版；本文档 §11 是其精简版 |
-| [epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md) | 新增想法下划线 | 单一功能深度版；本文档 §10 是其精简版 |
-| [epub-user-highlight-dev.md](./epub-user-highlight-dev.md) | 用户划线 | 单一功能深度版；本文档 §9 是其精简版 |
-| [epub-mark-layers-shared.md](./epub-mark-layers-shared.md) | 划线/想法 mark 共享底座 | 本文档 §12 复用并对齐 |
-| **epub-all-features-dev.md（本文件）** | **EPUB 全功能端到端** | **唯一完整版**：覆盖打开、目录、连续滚动、选区、右键、划线、想法、听书、互斥、PDF |
+| 文档                                                                     | 主题                    | 与本文档的关系                                                                    |
+| ------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------- |
+| [epub-listen-dev.md](./epub-listen-dev.md)                               | 听书（章节连读）        | 单一功能深度版；本文档 §11 是其精简版                                             |
+| [epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md) | 新增想法下划线          | 单一功能深度版；本文档 §10 是其精简版                                             |
+| [epub-user-highlight-dev.md](./epub-user-highlight-dev.md)               | 用户划线                | 单一功能深度版；本文档 §9 是其精简版                                              |
+| [epub-mark-layers-shared.md](./epub-mark-layers-shared.md)               | 划线/想法 mark 共享底座 | 本文档 §12 复用并对齐                                                             |
+| **epub-all-features-dev.md（本文件）**                                   | **EPUB 全功能端到端**   | **唯一完整版**：覆盖打开、目录、连续滚动、选区、右键、划线、想法、听书、互斥、PDF |
 
 > 旧增量专题（`docs/ebook/<feature>.md`）属于历史 diff 归档；想看"现在应该怎么实现"请来 `developer/` 目录。
 
 ### 0.3 维护定位表（出问题先看这里）
 
-| 现象 | 文件 | 符号 | 怎么验 |
-|------|------|------|--------|
-| 换书不重载、进度丢失 | `read.tsx` | `useEffect(..., [bookId, open])` 链 | 切书观察 `EpubPane` 是否重建 |
-| 翻页/分栏 resize 后高亮消失/错位 | `EpubPane.tsx` | `applyHostResize` / `softResizeEpubRendition` | 拖分栏、最大化、缩窗口 |
-| 连续滚动选不到最后一行 | `epubRangeGeometry.ts` | `getAccurateRangeLineClientRects` | 选最后一行靠右部分 |
-| 跨章目录跳转后没对齐 | `epubScrolledNav.ts` | `displayEpubScrolledHref` / `settleScrolledNavAlign` | 点目录切到下一章 |
-| 听书 TTS 报"unsupported" | `useEpubChapterListen.ts` | `isEnglishPlaybackAvailable` | 检查 `englishTts` 是否就绪 |
-| 听书节末无法接续下一章 | `epubScrollListenAdvance.ts` | `advanceScrollListenSection` | 听完一章观察是否自动下一章 |
-| 想法下划线在不同笔记下重色 | `epubThoughtAnnotations.ts` | `resolveThoughtLineColor` | 公开/私有笔记混看 |
-| 划线/想法叠层错乱（想法盖住划线） | `epubUserHighlights.ts` | `restackUserHighlightMarkGroups` | 同一位置划线 + 想法 |
-| PopBar 划线/想法重复弹出 | `epubSelectionToolbarAttach.ts` | `suppressEpubSelectionPopBarDismiss` | 划线后立即点同一位置 |
-| 右键菜单误判选区 | `epubContextMenuAttach.ts` | `hadSelectionBeforeRightClick` | 浏览器自动选词 |
-| 听书与引用听读同时触发 | `epubListenSegmentOverlay.ts` | `invokeStopQuoteListen` / `invokeStopChapterListen` | 听书时点引用听读 |
-| 视口外想法 mark 残留 | `epubThoughtAnnotations.ts` | `applyEpubThoughtUnderlines(viewportMode)` | 快速滚到底再回顶 |
-| 公开笔记同步不到 | `usePublicEbookThoughtSync.ts` | `scheduleSync` | 关闭/打开 Tab 触发 |
-| 阅读器背景色与全局主题不一致 | `epubReaderSettings.ts` | `applyEpubReaderAppearance` | 切主题 |
-| PDF 缩放越界 | `pdfReaderSettings.ts` | `clampPdfZoom` | 0.5x–3x 之外被夹回 |
-| PDF 滚到底不翻页 | `pdfScrolledNav.ts` | `attachPdfScrolledEdgeNav` | 稳定 220ms 后再滚一下 |
+| 现象                              | 文件                            | 符号                                                 | 怎么验                       |
+| --------------------------------- | ------------------------------- | ---------------------------------------------------- | ---------------------------- |
+| 换书不重载、进度丢失              | `read.tsx`                      | `useEffect(..., [bookId, open])` 链                  | 切书观察 `EpubPane` 是否重建 |
+| 翻页/分栏 resize 后高亮消失/错位  | `EpubPane.tsx`                  | `applyHostResize` / `softResizeEpubRendition`        | 拖分栏、最大化、缩窗口       |
+| 连续滚动选不到最后一行            | `epubRangeGeometry.ts`          | `getAccurateRangeLineClientRects`                    | 选最后一行靠右部分           |
+| 跨章目录跳转后没对齐              | `epubScrolledNav.ts`            | `displayEpubScrolledHref` / `settleScrolledNavAlign` | 点目录切到下一章             |
+| 听书 TTS 报"unsupported"          | `useEpubChapterListen.ts`       | `isPlaybackAvailable`                         | 检查 `speech` 是否就绪   |
+| 听书节末无法接续下一章            | `epubScrollListenAdvance.ts`    | `advanceScrollListenSection`                         | 听完一章观察是否自动下一章   |
+| 想法下划线在不同笔记下重色        | `epubThoughtAnnotations.ts`     | `resolveThoughtLineColor`                            | 公开/私有笔记混看            |
+| 划线/想法叠层错乱（想法盖住划线） | `epubUserHighlights.ts`         | `restackUserHighlightMarkGroups`                     | 同一位置划线 + 想法          |
+| PopBar 划线/想法重复弹出          | `epubSelectionToolbarAttach.ts` | `suppressEpubSelectionPopBarDismiss`                 | 划线后立即点同一位置         |
+| 右键菜单误判选区                  | `epubContextMenuAttach.ts`      | `hadSelectionBeforeRightClick`                       | 浏览器自动选词               |
+| 听书与引用听读同时触发            | `epubListenSegmentOverlay.ts`   | `invokeStopQuoteListen` / `invokeStopChapterListen`  | 听书时点引用听读             |
+| 视口外想法 mark 残留              | `epubThoughtAnnotations.ts`     | `applyEpubThoughtUnderlines(viewportMode)`           | 快速滚到底再回顶             |
+| 公开笔记同步不到                  | `usePublicEbookThoughtSync.ts`  | `scheduleSync`                                       | 关闭/打开 Tab 触发           |
+| 阅读器背景色与全局主题不一致      | `epubReaderSettings.ts`         | `applyEpubReaderAppearance`                          | 切主题                       |
+| PDF 缩放越界                      | `pdfReaderSettings.ts`          | `clampPdfZoom`                                       | 0.5x–3x 之外被夹回           |
+| PDF 滚到底不翻页                  | `pdfScrolledNav.ts`             | `attachPdfScrolledEdgeNav`                           | 稳定 220ms 后再滚一下        |
 
 ### 0.4 从零到上线：M1–M8 落地阶段
 
-| 阶段 | 目标 | 不要做 | 验收 |
-|------|------|--------|------|
-| **M1 渲染管线** | `EpubPane` 实例化 epub.js、display 首屏、resize、destroy | 不要碰选区/划线 | 打开书、翻页、拖分栏、切书无残留 |
-| **M2 阅读设置** | 主题/字号/行距/背景色/排版模式实时落 iframe | 不要碰听书 | 切设置立即生效，刷新页面后保留 |
-| **M3 目录与导航** | TOC 解析、spine index 反查、连续滚动对齐、PDF 大纲 | 不要碰选区 | 跳转准确；分页/连续滚动都能用 |
-| **M4 选区 + PopBar** | mouseup/selectionchange、跨 iframe 坐标、点位抑制 | 不要碰划线/想法 | 松手出 PopBar，滚动/右键不出 |
-| **M5 用户划线** | 高亮/下划线/波浪线、SVG marks-pane、点击 PopBar、合并/裁剪 | 不要碰想法 | 划线可增删改；连续滚动不抖 |
-| **M6 想法下划线** | 懒加载、视口动态挂载、连通簇、自动/手动 pin、跨用户配色 | 不要做"侧栏列表" | 大书也能丝滑；公开/他人可见 |
-| **M7 听书** | 章节连读（连续滚动/分页）、引用听读、自动跟随、互斥 | 不要碰划线/想法的 mark | 听书可暂停/续播/换倍速；引用听读可打断 |
-| **M8 PDF + 持久化 + 同步** | PDF 阅读、localStorage 持久化、公开笔记同步、分享卡片 | 不要改 EPUB 核心管线 | 缩放/翻页/分享/跨设备同步 OK |
+| 阶段                       | 目标                                                       | 不要做                 | 验收                                   |
+| -------------------------- | ---------------------------------------------------------- | ---------------------- | -------------------------------------- |
+| **M1 渲染管线**            | `EpubPane` 实例化 epub.js、display 首屏、resize、destroy   | 不要碰选区/划线        | 打开书、翻页、拖分栏、切书无残留       |
+| **M2 阅读设置**            | 主题/字号/行距/背景色/排版模式实时落 iframe                | 不要碰听书             | 切设置立即生效，刷新页面后保留         |
+| **M3 目录与导航**          | TOC 解析、spine index 反查、连续滚动对齐、PDF 大纲         | 不要碰选区             | 跳转准确；分页/连续滚动都能用          |
+| **M4 选区 + PopBar**       | mouseup/selectionchange、跨 iframe 坐标、点位抑制          | 不要碰划线/想法        | 松手出 PopBar，滚动/右键不出           |
+| **M5 用户划线**            | 高亮/下划线/波浪线、SVG marks-pane、点击 PopBar、合并/裁剪 | 不要碰想法             | 划线可增删改；连续滚动不抖             |
+| **M6 想法下划线**          | 懒加载、视口动态挂载、连通簇、自动/手动 pin、跨用户配色    | 不要做"侧栏列表"       | 大书也能丝滑；公开/他人可见            |
+| **M7 听书**                | 章节连读（连续滚动/分页）、引用听读、自动跟随、互斥        | 不要碰划线/想法的 mark | 听书可暂停/续播/换倍速；引用听读可打断 |
+| **M8 PDF + 持久化 + 同步** | PDF 阅读、localStorage 持久化、公开笔记同步、分享卡片      | 不要改 EPUB 核心管线   | 缩放/翻页/分享/跨设备同步 OK           |
 
 ### 0.5 运行时调用链（一图流）
 
@@ -121,9 +121,9 @@
       │ TTS / 文本片段 / 句级 Range
       ▼
    ┌──────────────────────────┐
-   │ utils/englishTts          │
-   │  - playEnglishPreferred   │
-   │  - prefetchCloudEnglishTts│
+   │ utils/speech          │
+   │  - playPreferred   │
+   │  - prefetchCloudTts│
    │  - stripMarkdownForTts    │
    └────────┬─────────────────┘
             │  TTS / 浏览器 SpeechSynthesis
@@ -139,74 +139,74 @@
 
 ### 1.1 入口与页面壳
 
-| 文件 | 角色 |
-|------|------|
-| `read.tsx` | 整页状态机：选区、PopBar、划线、想法、听书、上下文菜单、分享、AI 助手、笔记详情、公开同步等全部状态都在这里汇聚 |
-| `components/reader/EpubPane.tsx` | epub.js 渲染器主生命周期；统一安装选区/右键/划线/想法监听 |
-| `components/reader/PdfPane.tsx` | PDF 阅读器外壳（详见 §14） |
-| `hooks/useEbookQuoteListen.ts` | 引用/选区听读（共用英语学习 TTS） |
-| `hooks/useEpubChapterListen.ts` | 章节连读（连续滚动 + 分页） |
-| `hooks/useEbookThoughtLoader.ts` | 想法懒加载（按 spine 提示） |
-| `hooks/usePublicEbookThoughtSync.ts` | 公开/共享笔记的 since-based 增量同步 |
-| `types/index.ts` | 全局类型（EbookThought、EbookUserHighlight、EbookTocItem 等） |
+| 文件                                 | 角色                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `read.tsx`                           | 整页状态机：选区、PopBar、划线、想法、听书、上下文菜单、分享、AI 助手、笔记详情、公开同步等全部状态都在这里汇聚 |
+| `components/reader/EpubPane.tsx`     | epub.js 渲染器主生命周期；统一安装选区/右键/划线/想法监听                                                       |
+| `components/reader/PdfPane.tsx`      | PDF 阅读器外壳（详见 §14）                                                                                      |
+| `hooks/useEbookQuoteListen.ts`       | 引用/选区听读（共用英语学习 TTS）                                                                               |
+| `hooks/useEpubChapterListen.ts`      | 章节连读（连续滚动 + 分页）                                                                                     |
+| `hooks/useEbookThoughtLoader.ts`     | 想法懒加载（按 spine 提示）                                                                                     |
+| `hooks/usePublicEbookThoughtSync.ts` | 公开/共享笔记的 since-based 增量同步                                                                            |
+| `types/index.ts`                     | 全局类型（EbookThought、EbookUserHighlight、EbookTocItem 等）                                                   |
 
 ### 1.2 工具：阅读器
 
-| 文件 | 角色 |
-|------|------|
-| `utils/common/io.ts` | 桌面/云端打开、文件名/格式解析、File 构造 |
-| `utils/common/coverImage.ts` | 封面上传（压缩到 640px / 0.85q） |
-| `utils/common/ebookSplitResize.ts` | 分栏拖拽事件总线 |
-| `utils/common/readerScrollbar.ts` | 原生滚动条 Tailwind 美化类名 |
-| `utils/common/tocActiveIndex.ts` | 目录项高亮（EPUB spine / PDF 页码通用） |
-| `utils/epub/reader/epubReaderSettings.ts` | 主题/字号/行距/背景/排版 设置 schema、localStorage 持久化、`applyEpubReaderAppearance` |
-| `utils/epub/reader/epubScrolledNav.ts` | 连续滚动：edge nav、目录跳转对齐、视口定位 |
-| `utils/epub/reader/epubSelectionToolbarAttach.ts` | 选区监听、PopBar payload、跨 iframe 锚点 |
-| `utils/epub/reader/epubContextMenuAttach.ts` | 右键菜单挂载（iframe 内） |
-| `utils/epub/reader/epubQuoteShareStyled.ts` | 选区 quote 转富文本片段（用于分享卡片） |
-| `utils/epub/reader/epubQuoteShareCard.ts` | 引用分享卡片渲染（html-to-image） |
-| `utils/epub/reader/buildEpubContextMenuItems.ts` | EPUB 右键菜单条目构造（结构对齐 Monaco） |
-| `utils/epub/reader/epubSoftResize.ts` | 软 resize（不重载视图） |
-| `utils/epub/reader/epubSpineIndex.ts` | nav href → spine index |
+| 文件                                              | 角色                                                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `utils/common/io.ts`                              | 桌面/云端打开、文件名/格式解析、File 构造                                              |
+| `utils/common/coverImage.ts`                      | 封面上传（压缩到 640px / 0.85q）                                                       |
+| `utils/common/ebookSplitResize.ts`                | 分栏拖拽事件总线                                                                       |
+| `utils/common/readerScrollbar.ts`                 | 原生滚动条 Tailwind 美化类名                                                           |
+| `utils/common/tocActiveIndex.ts`                  | 目录项高亮（EPUB spine / PDF 页码通用）                                                |
+| `utils/epub/reader/epubReaderSettings.ts`         | 主题/字号/行距/背景/排版 设置 schema、localStorage 持久化、`applyEpubReaderAppearance` |
+| `utils/epub/reader/epubScrolledNav.ts`            | 连续滚动：edge nav、目录跳转对齐、视口定位                                             |
+| `utils/epub/reader/epubSelectionToolbarAttach.ts` | 选区监听、PopBar payload、跨 iframe 锚点                                               |
+| `utils/epub/reader/epubContextMenuAttach.ts`      | 右键菜单挂载（iframe 内）                                                              |
+| `utils/epub/reader/epubQuoteShareStyled.ts`       | 选区 quote 转富文本片段（用于分享卡片）                                                |
+| `utils/epub/reader/epubQuoteShareCard.ts`         | 引用分享卡片渲染（html-to-image）                                                      |
+| `utils/epub/reader/buildEpubContextMenuItems.ts`  | EPUB 右键菜单条目构造（结构对齐 Monaco）                                               |
+| `utils/epub/reader/epubSoftResize.ts`             | 软 resize（不重载视图）                                                                |
+| `utils/epub/reader/epubSpineIndex.ts`             | nav href → spine index                                                                 |
 
 ### 1.3 工具：批注（mark 层共享底座）
 
-| 文件 | 角色 |
-|------|------|
-| `utils/epub/mark/epubMarkShared.ts` | CFI spine 提取/归一、Range 关系、SVG 属性写入、marks-pane 查找 |
-| `utils/epub/mark/epubRangeGeometry.ts` | CFI ↔ DOM Range、选区归一、文本片段 rect、Svg 坐标投影 |
-| `utils/epub/mark/epubUserHighlights.ts` | 用户划线（高亮/下划线/波浪线、合并/裁剪、点击监听、patch 调度） |
-| `utils/epub/mark/epubThoughtAnnotations.ts` | 想法下划线（apply/pin/视口裁剪/click guard） |
-| `utils/epub/mark/epubThoughtCluster.ts` | 想法簇（连通闭包、组聚合、quote 归并） |
-| `utils/epub/mark/epubThoughtSync.ts` | 公开/共享笔记的 since-based diff 工具 |
+| 文件                                        | 角色                                                            |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `utils/epub/mark/epubMarkShared.ts`         | CFI spine 提取/归一、Range 关系、SVG 属性写入、marks-pane 查找  |
+| `utils/epub/mark/epubRangeGeometry.ts`      | CFI ↔ DOM Range、选区归一、文本片段 rect、Svg 坐标投影          |
+| `utils/epub/mark/epubUserHighlights.ts`     | 用户划线（高亮/下划线/波浪线、合并/裁剪、点击监听、patch 调度） |
+| `utils/epub/mark/epubThoughtAnnotations.ts` | 想法下划线（apply/pin/视口裁剪/click guard）                    |
+| `utils/epub/mark/epubThoughtCluster.ts`     | 想法簇（连通闭包、组聚合、quote 归并）                          |
+| `utils/epub/mark/epubThoughtSync.ts`        | 公开/共享笔记的 since-based diff 工具                           |
 
 ### 1.4 工具：听书
 
-| 文件 | 角色 |
-|------|------|
-| `utils/epub/listen/epubListenChapter.ts` | 章节级：可见段抽取、句级 Range、句高亮、章节间等待 |
+| 文件                                            | 角色                                                           |
+| ----------------------------------------------- | -------------------------------------------------------------- |
+| `utils/epub/listen/epubListenChapter.ts`        | 章节级：可见段抽取、句级 Range、句高亮、章节间等待             |
 | `utils/epub/listen/epubListenSegmentOverlay.ts` | 引用听读：overlay session、auto-follow、scroll guard、互斥注册 |
-| `utils/epub/listen/epubListenMarkHighlight.ts` | 听书 mark 高亮（淡黄色覆盖层） |
-| `utils/epub/listen/epubScrollListenAdvance.ts` | 连续滚动听书节间推进（slot 推进 + manager.check） |
+| `utils/epub/listen/epubListenMarkHighlight.ts`  | 听书 mark 高亮（淡黄色覆盖层）                                 |
+| `utils/epub/listen/epubScrollListenAdvance.ts`  | 连续滚动听书节间推进（slot 推进 + manager.check）              |
 
 ### 1.5 工具：PDF
 
-| 文件 | 角色 |
-|------|------|
-| `utils/pdf/pdfSetup.ts` | worker/wasm/cmap 资源 URL 初始化 |
-| `utils/pdf/pdfOutline.ts` | PDF 大纲（书签）→ 通用 `EbookTocItem` |
-| `utils/pdf/pdfReaderSettings.ts` | PDF 缩放持久化 |
-| `utils/pdf/pdfScrolledNav.ts` | PDF 单页/连续滚动边缘翻页（稳定 220ms + 冷却 600ms） |
-| `utils/pdf/buildPdfContextMenuItems.ts` | PDF 右键菜单 |
+| 文件                                    | 角色                                                 |
+| --------------------------------------- | ---------------------------------------------------- |
+| `utils/pdf/pdfSetup.ts`                 | worker/wasm/cmap 资源 URL 初始化                     |
+| `utils/pdf/pdfOutline.ts`               | PDF 大纲（书签）→ 通用 `EbookTocItem`                |
+| `utils/pdf/pdfReaderSettings.ts`        | PDF 缩放持久化                                       |
+| `utils/pdf/pdfScrolledNav.ts`           | PDF 单页/连续滚动边缘翻页（稳定 220ms + 冷却 600ms） |
+| `utils/pdf/buildPdfContextMenuItems.ts` | PDF 右键菜单                                         |
 
 ### 1.6 通用能力
 
-| 文件 | 角色 |
-|------|------|
-| `@/utils/englishTts` | 浏览器 SpeechSynthesis + 云端 TTS 预取/优选 |
-| `@/service/ebook` | `fetchEbookThoughts` / `fetchEbookThoughtSync` / `fetchEbookHighlights` / `fetchEbookBytes` / `createEbookHighlight` / `updateEbookHighlight` / `deleteEbookHighlight` |
-| `@/utils/clipboard` | `copyToClipboard`（写入剪贴板） |
-| `@/utils/runtime` | `isTauriRuntime`（桌面端） |
+| 文件                 | 角色                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/utils/speech` | 浏览器 SpeechSynthesis + 云端 TTS 预取/优选                                                                                                                            |
+| `@/service/ebook`    | `fetchEbookThoughts` / `fetchEbookThoughtSync` / `fetchEbookHighlights` / `fetchEbookBytes` / `createEbookHighlight` / `updateEbookHighlight` / `deleteEbookHighlight` |
+| `@/utils/clipboard`  | `copyToClipboard`（写入剪贴板）                                                                                                                                        |
+| `@/utils/runtime`    | `isTauriRuntime`（桌面端）                                                                                                                                             |
 
 ---
 
@@ -253,9 +253,9 @@
 #### 场景 C：听书（连续滚动模式）
 
 1. 用户点听书按钮 → `toggleChapterListen` → `startFromCurrentPosition`：
-   - `primeEnglishPlaybackForUserGesture`（user gesture 解锁 TTS）。
-   - `isEnglishPlaybackAvailable` 检查 → `Toast` 失败提示。
-   - `invokeStopQuoteListen` / `stopAllEnglishPlayback` 清理互斥。
+   - `primePlaybackForUserGesture`（user gesture 解锁 TTS）。
+   - `isPlaybackAvailable` 检查 → `Toast` 失败提示。
+   - `invokeStopQuoteListen` / `stopAllPlayback` 清理互斥。
    - `beginChapterListenAutoFollow(rend)` 启动自动跟随。
 2. `extractVisibleListenSection(rend, spineHint)`：挑当前 spine 的 document → `body.innerText` 提取正文 → `stripMarkdownForTts` 去 markdown → `selectNodeContents(body)` 建 outerRange → 返回 `{ plain, outerRange, spineIndex }`。
 3. `buildSentenceOffsetSpans(plain)`：正则切句 → `[{start, end}, ...]`。
@@ -263,39 +263,39 @@
 5. 主循环 `runListenLoop` → `isScrollListenMode` 选 `runScrollSectionLoop`：
    - `playSentencesFromCursor(ctx, gen, { scrollCenterOnFirst })`：
      - 预取 `si+1` 句云端 TTS。
-     - 逐句 `playEnglishPreferred(spokenRaw, { speak: { rate }, prefetchedCloud })`。
+     - 逐句 `playPreferred(spokenRaw, { speak: { rate }, prefetchedCloud })`。
      - `showChapterListenSentenceHighlight(rend, domRange, jumpScroll?)` 触发句级高亮（自动滚到视口）。
 6. 节末 `advanceScrollListenSection(rend, sectionDoc)`：列 `manager.views` 槽位 → 找下一 loaded doc → 否则 `scrollTo` + `manager.check()` 触发挂载。
 7. 全部完成 → `Toast("finished")` → `stopInternal()`。
 
 #### 场景 D：互斥矩阵
 
-| 当前态 → 启动 | 听书 | 引用听读 | 划线 | 想法 click |
-|----------------|------|----------|------|-------------|
-| 听书运行 | — | 引用听读 `invokeStopChapterListen` 抢断 | 划线可点（高亮不会顶替听书） | 想法可点 |
-| 引用听读运行 | 听书 `invokeStopQuoteListen` 抢断 | — | 同上 | 同上 |
-| 划线 | 不互斥 | 不互斥 | — | 不互斥 |
-| 想法 | 不互斥 | 不互斥 | 不互斥 | — |
+| 当前态 → 启动 | 听书                              | 引用听读                                | 划线                         | 想法 click |
+| ------------- | --------------------------------- | --------------------------------------- | ---------------------------- | ---------- |
+| 听书运行      | —                                 | 引用听读 `invokeStopChapterListen` 抢断 | 划线可点（高亮不会顶替听书） | 想法可点   |
+| 引用听读运行  | 听书 `invokeStopQuoteListen` 抢断 | —                                       | 同上                         | 同上       |
+| 划线          | 不互斥                            | 不互斥                                  | —                            | 不互斥     |
+| 想法          | 不互斥                            | 不互斥                                  | 不互斥                       | —          |
 
 > 实现：`registerChapterListenStop` / `registerQuoteListenStop` 是跨 hook 互斥通道；新启动前先 `invokeStop*`。
 
 ### 2.2 按文件拆解（实现 → 触发 → 副作用）
 
-| 文件 | 入口 | 触发 | 副作用 | 关键点 |
-|------|------|------|--------|--------|
-| `read.tsx` | 页面渲染 | URL/bookId 变化 | 全局状态机 | 听书/划线/想法 PopBar 全部在这里聚合 |
-| `EpubPane.tsx` | `open` 变化 | props 变化/父级 onReady | epub.js 实例生命周期 | 单一 useEffect 串起 book/rend/ready/cleanup |
-| `epubUserHighlights.ts` | `syncEpubUserHighlights` | thoughts/highlights 变化 | 调 `rend.annotations.highlight` | 合并/裁剪/视口裁剪/点击/Patch |
-| `epubThoughtAnnotations.ts` | `applyEpubThoughtUnderlines` | thoughts 变化 / 视口滚动 | 调 `rend.annotations.underline` | 视口模式 + pin 机制 + 点击防护 |
-| `epubRangeGeometry.ts` | CFI/Range 互换 | 选区/合并/高亮 | DOM 操作 | 文本片段精确 rect 抽取 |
-| `epubScrolledNav.ts` | `displayEpubScrolledHref` | 目录跳转/边缘滚动 | 改 `container.scrollTop` | 多帧 settle 校正 + 边缘 wheel 翻章 |
-| `epubSelectionToolbarAttach.ts` | `attachEpubSelectionPopBar` | epub.js hook content | 上报 PopBar payload | 跨 iframe 坐标、selectionchange 抑制 |
-| `epubContextMenuAttach.ts` | `attachEpubIframeContextMenu` | iframe contextmenu | 上报右键 payload | 区分"主动选区"vs"自动选词" |
-| `epubReaderSettings.ts` | `applyEpubReaderAppearance` | 设置变化 | 改 `rend.themes.default` | 12 套背景 / 12 套文字色 |
-| `useEpubChapterListen.ts` | `toggleChapterListen` | 听书按钮 | TTS + 句高亮 | loopGenRef 防并入；scroll 模式选择 |
-| `useEbookQuoteListen.ts` | `toggleListen` | 引用听读按钮 | TTS + 段高亮 | 与听书互斥；fallback plain |
-| `useEbookThoughtLoader.ts` | `ensureLoadedSpineThoughts` | rend ready / 换书 | 调 `fetchEbookThoughts` | per-spine 缓存 + in-flight 复用 |
-| `usePublicEbookThoughtSync.ts` | `scheduleSync` | relocated 停稳 / visibilitychange | 调 `fetchEbookThoughtSync` | since-based 增量；新数据 ephemeral pin |
+| 文件                            | 入口                          | 触发                              | 副作用                          | 关键点                                      |
+| ------------------------------- | ----------------------------- | --------------------------------- | ------------------------------- | ------------------------------------------- |
+| `read.tsx`                      | 页面渲染                      | URL/bookId 变化                   | 全局状态机                      | 听书/划线/想法 PopBar 全部在这里聚合        |
+| `EpubPane.tsx`                  | `open` 变化                   | props 变化/父级 onReady           | epub.js 实例生命周期            | 单一 useEffect 串起 book/rend/ready/cleanup |
+| `epubUserHighlights.ts`         | `syncEpubUserHighlights`      | thoughts/highlights 变化          | 调 `rend.annotations.highlight` | 合并/裁剪/视口裁剪/点击/Patch               |
+| `epubThoughtAnnotations.ts`     | `applyEpubThoughtUnderlines`  | thoughts 变化 / 视口滚动          | 调 `rend.annotations.underline` | 视口模式 + pin 机制 + 点击防护              |
+| `epubRangeGeometry.ts`          | CFI/Range 互换                | 选区/合并/高亮                    | DOM 操作                        | 文本片段精确 rect 抽取                      |
+| `epubScrolledNav.ts`            | `displayEpubScrolledHref`     | 目录跳转/边缘滚动                 | 改 `container.scrollTop`        | 多帧 settle 校正 + 边缘 wheel 翻章          |
+| `epubSelectionToolbarAttach.ts` | `attachEpubSelectionPopBar`   | epub.js hook content              | 上报 PopBar payload             | 跨 iframe 坐标、selectionchange 抑制        |
+| `epubContextMenuAttach.ts`      | `attachEpubIframeContextMenu` | iframe contextmenu                | 上报右键 payload                | 区分"主动选区"vs"自动选词"                  |
+| `epubReaderSettings.ts`         | `applyEpubReaderAppearance`   | 设置变化                          | 改 `rend.themes.default`        | 12 套背景 / 12 套文字色                     |
+| `useEpubChapterListen.ts`       | `toggleChapterListen`         | 听书按钮                          | TTS + 句高亮                    | loopGenRef 防并入；scroll 模式选择          |
+| `useEbookQuoteListen.ts`        | `toggleListen`                | 引用听读按钮                      | TTS + 段高亮                    | 与听书互斥；fallback plain                  |
+| `useEbookThoughtLoader.ts`      | `ensureLoadedSpineThoughts`   | rend ready / 换书                 | 调 `fetchEbookThoughts`         | per-spine 缓存 + in-flight 复用             |
+| `usePublicEbookThoughtSync.ts`  | `scheduleSync`                | relocated 停稳 / visibilitychange | 调 `fetchEbookThoughtSync`      | since-based 增量；新数据 ephemeral pin      |
 
 ---
 
@@ -309,28 +309,28 @@
 
 ```ts
 type NavApi = {
-  prev: () => Promise<void>;          // 翻到上一页（分页有效；连续滚动滚到底由 wheel 自动接续）
-  next: () => Promise<void>;          // 翻到下一页
-  go: (href: string) => Promise<void>; // 跳转：分页 rend.display；连续滚动 displayEpubScrolledHref
-  clearTextSelection: () => void;     // 清掉所有 iframe + 顶层选区
-  getRendition: () => Rendition | null;
-  getBook: () => Book | null;
-  syncReadingAnnotations: (next?) => void; // 强制重算划线 + 想法叠层
+	prev: () => Promise<void>; // 翻到上一页（分页有效；连续滚动滚到底由 wheel 自动接续）
+	next: () => Promise<void>; // 翻到下一页
+	go: (href: string) => Promise<void>; // 跳转：分页 rend.display；连续滚动 displayEpubScrolledHref
+	clearTextSelection: () => void; // 清掉所有 iframe + 顶层选区
+	getRendition: () => Rendition | null;
+	getBook: () => Book | null;
+	syncReadingAnnotations: (next?) => void; // 强制重算划线 + 想法叠层
 };
 ```
 
 #### 3.1.2 关键 ref 群
 
-| ref | 用途 |
-|-----|------|
-| `rendRef` | epub.js Rendition 实例 |
-| `bookRef` | epub.js Book 实例 |
-| `locationsReadyRef` | 是否已生成全书百分比 |
-| `readyRef` | rend 是否 ready（用于边缘翻章、滚到视口） |
-| `appliedThoughtsRef` / `appliedHighlightsRef` | `cfi -> sig` 缓存；sync 时避免重画 |
-| `currentCfiRef` | 当前 CFI（用于 saveProgress） |
-| `on*Ref` | 回调 ref 模式（避免 effect 依赖回调引用） |
-| `keyboardNavEnabledRef` | 目录打开时禁翻页键 |
+| ref                                           | 用途                                      |
+| --------------------------------------------- | ----------------------------------------- |
+| `rendRef`                                     | epub.js Rendition 实例                    |
+| `bookRef`                                     | epub.js Book 实例                         |
+| `locationsReadyRef`                           | 是否已生成全书百分比                      |
+| `readyRef`                                    | rend 是否 ready（用于边缘翻章、滚到视口） |
+| `appliedThoughtsRef` / `appliedHighlightsRef` | `cfi -> sig` 缓存；sync 时避免重画        |
+| `currentCfiRef`                               | 当前 CFI（用于 saveProgress）             |
+| `on*Ref`                                      | 回调 ref 模式（避免 effect 依赖回调引用） |
+| `keyboardNavEnabledRef`                       | 目录打开时禁翻页键                        |
 
 #### 3.1.3 生命周期阶段
 
@@ -383,18 +383,40 @@ type NavApi = {
 #### 4.1.1 类型与选项
 
 ```ts
-type EpubReaderBgTheme = 'default' | 'paper' | 'cream' | 'sepia' | 'warm'
-  | 'green' | 'blue' | 'gray' | 'pink' | 'lavender' | 'night' | 'moon';
-type EpubReaderTextColor = 'auto' | 'dark' | 'softDark' | 'brown' | 'sepia'
-  | 'gray' | 'light' | 'softLight' | 'green' | 'blue' | 'rose' | 'warmGray';
-type EpubReaderPageFlow = 'paginated' | 'scrolled';
+type EpubReaderBgTheme =
+	| "default"
+	| "paper"
+	| "cream"
+	| "sepia"
+	| "warm"
+	| "green"
+	| "blue"
+	| "gray"
+	| "pink"
+	| "lavender"
+	| "night"
+	| "moon";
+type EpubReaderTextColor =
+	| "auto"
+	| "dark"
+	| "softDark"
+	| "brown"
+	| "sepia"
+	| "gray"
+	| "light"
+	| "softLight"
+	| "green"
+	| "blue"
+	| "rose"
+	| "warmGray";
+type EpubReaderPageFlow = "paginated" | "scrolled";
 
 type EpubReaderSettings = {
-  fontSize: number;       // 80–160
-  lineHeight: number;     // 1.2–2.4
-  textColor: EpubReaderTextColor;
-  bgTheme: EpubReaderBgTheme;
-  pageFlow: EpubReaderPageFlow;
+	fontSize: number; // 80–160
+	lineHeight: number; // 1.2–2.4
+	textColor: EpubReaderTextColor;
+	bgTheme: EpubReaderBgTheme;
+	pageFlow: EpubReaderPageFlow;
 };
 ```
 
@@ -450,9 +472,9 @@ rend.themes.default({
 ```ts
 const nav = await book.loaded.navigation;
 const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
-  label: t.label?.trim() || t.href,
-  href: t.href,
-  spineIndex: t.href ? resolveSpineIndexForHref(book, t.href) : undefined,
+	label: t.label?.trim() || t.href,
+	href: t.href,
+	spineIndex: t.href ? resolveSpineIndexForHref(book, t.href) : undefined,
 }));
 onTocRef.current?.(toc);
 ```
@@ -468,7 +490,7 @@ onTocRef.current?.(toc);
 ### 5.2 目录高亮（[tocActiveIndex.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/common/tocActiveIndex.ts)）
 
 ```ts
-findActiveTocItemIndex(items, { epubSpineIndex, pdfPage })
+findActiveTocItemIndex(items, { epubSpineIndex, pdfPage });
 ```
 
 - PDF：用 `parsePdfPageHref` 提取页码。
@@ -496,17 +518,17 @@ findActiveTocItemIndex(items, { epubSpineIndex, pdfPage })
 
 #### 6.1.1 关键私有 API
 
-| 符号 | 作用 |
-|------|------|
-| `getEpubScrollContainer(rend)` | 类型断言拿 `(rend as any).manager?.container` |
-| `findViewElForSpineIndex(rend, idx)` | 通过 `manager.views.all()` 找 `.epub-view` 元素 |
-| `resolveViewElAfterDisplay` | 先按 spine idx，再按 currentLocation，再按 #anchor 找视图 |
-| `scrolledChapterScrollTop(offsetTop)` | 目标章顶对齐（减 `SCROLL_EDGE_PX=16`） |
-| `scrolledNavAlignDelta(targetTop, containerTop)` | 容器内的相对偏移 |
-| `resolveNavAnchor(viewEl, href)` | `#id` → `getElementById` / `a[name=…]` / `[id=…]` |
-| `NAV_ALIGN_SETTLE_MS = [0, 100, 220]` | 多帧 settle 校正 |
-| `settleScrolledNavAlign(rend, book, href)` | 3 轮校正 + 中间 `manager.trim()` |
-| `displayEpubScrolledHref(rend, book, href)` | `rend.display` + 多帧 settle |
+| 符号                                             | 作用                                                      |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| `getEpubScrollContainer(rend)`                   | 类型断言拿 `(rend as any).manager?.container`             |
+| `findViewElForSpineIndex(rend, idx)`             | 通过 `manager.views.all()` 找 `.epub-view` 元素           |
+| `resolveViewElAfterDisplay`                      | 先按 spine idx，再按 currentLocation，再按 #anchor 找视图 |
+| `scrolledChapterScrollTop(offsetTop)`            | 目标章顶对齐（减 `SCROLL_EDGE_PX=16`）                    |
+| `scrolledNavAlignDelta(targetTop, containerTop)` | 容器内的相对偏移                                          |
+| `resolveNavAnchor(viewEl, href)`                 | `#id` → `getElementById` / `a[name=…]` / `[id=…]`         |
+| `NAV_ALIGN_SETTLE_MS = [0, 100, 220]`            | 多帧 settle 校正                                          |
+| `settleScrolledNavAlign(rend, book, href)`       | 3 轮校正 + 中间 `manager.trim()`                          |
+| `displayEpubScrolledHref(rend, book, href)`      | `rend.display` + 多帧 settle                              |
 
 #### 6.1.2 边缘翻章（`attachEpubScrolledEdgeNav`）
 
@@ -521,15 +543,15 @@ findActiveTocItemIndex(items, { epubSpineIndex, pdfPage })
 
 #### 6.1.3 视口定位
 
-| 符号 | 作用 |
-|------|------|
-| `isEpubRangeInReaderView(rend, range, marginPx=72)` | Range 顶/底在容器内 ±72px 内 |
-| `scrollEpubDomRangeIntoView(rend, range)` | 改 `container.scrollTop` 让 range 进入视口 |
-| `scrollEpubDomRangeToCenter(rend, range)` | 滚到视口中央 |
-| `scrollEpubRangeToViewCenter(rend, range, fallbackCfi?)` | 连续滚动居中；分页回退 `rend.display` |
-| `scrollEpubRangeIntoView(rend, range, fallbackCfi?)` | 已在视口 return true；否则滚动 / 翻页 |
-| `scrollEpubCfiIntoView(rend, cfiRange)` | CFI → Range → 滚入视口 |
-| `readRangeViewportBounds(range, iframe)` | `range.getBoundingClientRect` + iframe offset 转主页面坐标 |
+| 符号                                                     | 作用                                                       |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| `isEpubRangeInReaderView(rend, range, marginPx=72)`      | Range 顶/底在容器内 ±72px 内                               |
+| `scrollEpubDomRangeIntoView(rend, range)`                | 改 `container.scrollTop` 让 range 进入视口                 |
+| `scrollEpubDomRangeToCenter(rend, range)`                | 滚到视口中央                                               |
+| `scrollEpubRangeToViewCenter(rend, range, fallbackCfi?)` | 连续滚动居中；分页回退 `rend.display`                      |
+| `scrollEpubRangeIntoView(rend, range, fallbackCfi?)`     | 已在视口 return true；否则滚动 / 翻页                      |
+| `scrollEpubCfiIntoView(rend, cfiRange)`                  | CFI → Range → 滚入视口                                     |
+| `readRangeViewportBounds(range, iframe)`                 | `range.getBoundingClientRect` + iframe offset 转主页面坐标 |
 
 #### 6.1.4 关键跨 iframe 坐标换算
 
@@ -590,11 +612,11 @@ scroll (iframe/主/全局) → suppressEmitUntil=now+350 + hidePopBar
 
 #### 7.1.2 抑制机制
 
-| 抑制类型 | 时间 | 谁设的 | 干什么 |
-|----------|------|--------|--------|
-| `suppressDismissUntil` | 450ms | 划线/想法 mark 弹 PopBar 时 | 短时间内不自动关 PopBar |
-| `suppressEmitUntil` | 350ms (scroll) / 600ms (右键) | scroll 监听 / 右键 / relocated | 不 emit 新的选区 payload |
-| `contextMenuGesture` | 跟随 mousedown→contextmenu | 拦截右键"自动选词" | mouseup 时直接跳过 emit |
+| 抑制类型               | 时间                          | 谁设的                         | 干什么                   |
+| ---------------------- | ----------------------------- | ------------------------------ | ------------------------ |
+| `suppressDismissUntil` | 450ms                         | 划线/想法 mark 弹 PopBar 时    | 短时间内不自动关 PopBar  |
+| `suppressEmitUntil`    | 350ms (scroll) / 600ms (右键) | scroll 监听 / 右键 / relocated | 不 emit 新的选区 payload |
+| `contextMenuGesture`   | 跟随 mousedown→contextmenu    | 拦截右键"自动选词"             | mouseup 时直接跳过 emit  |
 
 #### 7.1.3 跨 iframe 锚点（`rangeToViewportAnchor`）
 
@@ -611,17 +633,18 @@ scroll (iframe/主/全局) → suppressEmitUntil=now+350 + hidePopBar
 
 ```ts
 type EpubSelectionPopBarPayload = {
-  x: number;             // 水平中心
-  y: number;             // 顶
-  selectedText: string;  // 纯文本
-  quoteSegments?: QuoteShareRun[]; // 富文本片段（用于分享卡片）
-  cfiRange?: string;     // CFI range
+	x: number; // 水平中心
+	y: number; // 顶
+	selectedText: string; // 纯文本
+	quoteSegments?: QuoteShareRun[]; // 富文本片段（用于分享卡片）
+	cfiRange?: string; // CFI range
 };
 ```
 
 #### 7.1.5 `buildEpubPopBarPayloadFromCfiRange`
 
 点击划线/想法 mark 时用：
+
 1. `resolveCfiDomRange(rend, cfi)` → 拿到 Range。
 2. `rangeToViewportAnchor(win, range)` → 锚点。
 3. 失败兜底：`x: innerWidth/2, y: min(innerHeight*0.35, 240)`。
@@ -638,24 +661,24 @@ type EpubSelectionPopBarPayload = {
 
 ### 7.2 选区归一化（[epubRangeGeometry.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubRangeGeometry.ts)）
 
-| 符号 | 作用 |
-|------|------|
-| `trimSelectionRange` | 收拢到第一个非空白字符 |
-| `snapSelectionRangeToTextContent` | 收拢到首尾非空白文本节点 |
-| `normalizeSelectionRangeForEpub` | snap → trim，全空白返 null |
+| 符号                              | 作用                                                  |
+| --------------------------------- | ----------------------------------------------------- |
+| `trimSelectionRange`              | 收拢到第一个非空白字符                                |
+| `snapSelectionRangeToTextContent` | 收拢到首尾非空白文本节点                              |
+| `normalizeSelectionRangeForEpub`  | snap → trim，全空白返 null                            |
 | `getAccurateRangeLineClientRects` | 文本节点片段 rect 收集 → 过滤包含关系 → 屏蔽大块 rect |
-| `collectRangeTextClientRects` | 按 text node 段分别 createRange → getClientRects |
-| `preferLeafLineClientRects` | 若某 rect 包含另一 rect，丢弃外层（避免大块误标） |
+| `collectRangeTextClientRects`     | 按 text node 段分别 createRange → getClientRects      |
+| `preferLeafLineClientRects`       | 若某 rect 包含另一 rect，丢弃外层（避免大块误标）     |
 
 ### 7.3 CFI/Range 互换
 
-| 符号 | 作用 |
-|------|------|
-| `cfiFromDomRange(rend, range)` | 找 range 所属 contents → `contents.cfiFromRange` |
+| 符号                                         | 作用                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `cfiFromDomRange(rend, range)`               | 找 range 所属 contents → `contents.cfiFromRange`                                   |
 | `resolveSelectionCfiRange(rend, win, range)` | 先按 window 筛选 contents，回退全遍历；用 `EPUB_ANNOTATION_IGNORE_CLASS` 忽略 mark |
-| `resolveCfiDomRange(rend, cfi)` | 先 `rend.getRange`，回退各 `contents.range`；sync 期间有 `syncCfiRangeCache` 缓存 |
-| `getRenditionContentsList(rend)` | 归一 `rend.getContents()` 为数组 |
-| `forEachTextNodeInRange(range, cb)` | TreeWalker 遍历 range 内文本节点 |
+| `resolveCfiDomRange(rend, cfi)`              | 先 `rend.getRange`，回退各 `contents.range`；sync 期间有 `syncCfiRangeCache` 缓存  |
+| `getRenditionContentsList(rend)`             | 归一 `rend.getContents()` 为数组                                                   |
+| `forEachTextNodeInRange(range, cb)`          | TreeWalker 遍历 range 内文本节点                                                   |
 
 ---
 
@@ -682,11 +705,11 @@ contextmenu:
 
 ```ts
 type EpubReaderContextMenuPayload = {
-  clientX: number;          // 主页面坐标（iframe 偏移 + e.clientX）
-  clientY: number;
-  selectedText: string;     // 空字符串表示无选区
-  cfiRange?: string;
-  copySelection: () => void;
+	clientX: number; // 主页面坐标（iframe 偏移 + e.clientX）
+	clientY: number;
+	selectedText: string; // 空字符串表示无选区
+	cfiRange?: string;
+	copySelection: () => void;
 };
 ```
 
@@ -694,12 +717,12 @@ type EpubReaderContextMenuPayload = {
 
 #### 8.2.1 菜单结构
 
-| 条件 | 项 |
-|------|-----|
-| 有选区 | 复制 / 问书 / 划线 (添加想法) / 分隔 |
-| 无选区 | 智能助手 / 分隔 |
-| 分页模式 | 上一页 / 下一页 / 分隔 |
-| 总是 | 目录 / 分隔 / 设置 / 分隔 / 返回书架 |
+| 条件     | 项                                   |
+| -------- | ------------------------------------ |
+| 有选区   | 复制 / 问书 / 划线 (添加想法) / 分隔 |
+| 无选区   | 智能助手 / 分隔                      |
+| 分页模式 | 上一页 / 下一页 / 分隔               |
+| 总是     | 目录 / 分隔 / 设置 / 分隔 / 返回书架 |
 
 > `actionsRef` 模式：菜单项只持有 `id`，点击时调用 `actionsRef.current?.xxx()`，避免闭包过期。
 
@@ -712,16 +735,21 @@ type EpubReaderContextMenuPayload = {
 #### 9.1.1 类型与配色
 
 ```ts
-type EpubHighlightStyle = 'highlight' | 'underline' | 'wavy';
-type EpubHighlightPresetColorId = 'pink' | 'purple' | 'blue' | 'green' | 'yellow';
+type EpubHighlightStyle = "highlight" | "underline" | "wavy";
+type EpubHighlightPresetColorId =
+	| "pink"
+	| "purple"
+	| "blue"
+	| "green"
+	| "yellow";
 type EpubHighlightColorId = EpubHighlightPresetColorId | `#${string}`; // 自定义 hex
 
 EPUB_HIGHLIGHT_COLOR_OPTIONS = [
-  { id:'pink',   fill:'rgba(255,107,129,0.28)', stroke:'#ff6b81' },
-  { id:'purple', fill:'rgba(155,89,182,0.28)', stroke:'#9b59b6' },
-  { id:'blue',   fill:'rgba(120,191,255,0.28)', stroke:'#78bfff' },
-  { id:'green',  fill:'rgba(150,194,78,0.28)', stroke:'#96c24e' },
-  { id:'yellow', fill:'rgba(255,220,106,0.28)', stroke:'#ffdc6a' },
+	{ id: "pink", fill: "rgba(255,107,129,0.28)", stroke: "#ff6b81" },
+	{ id: "purple", fill: "rgba(155,89,182,0.28)", stroke: "#9b59b6" },
+	{ id: "blue", fill: "rgba(120,191,255,0.28)", stroke: "#78bfff" },
+	{ id: "green", fill: "rgba(150,194,78,0.28)", stroke: "#96c24e" },
+	{ id: "yellow", fill: "rgba(255,220,106,0.28)", stroke: "#ffdc6a" },
 ];
 ```
 
@@ -731,11 +759,11 @@ EPUB_HIGHLIGHT_COLOR_OPTIONS = [
 
 ```ts
 rend.annotations.highlight(
-  cfiRange,
-  data,                 // { thoughtIds, hlStyle, hlColor, epubcfi, ... }
-  clickHandler,         // 点 mark 时回调
-  className,            // 'moke-epub-user-hl'
-  styles,               // { fill, stroke, ... } 写到 marks-pane SVG
+	cfiRange,
+	data, // { thoughtIds, hlStyle, hlColor, epubcfi, ... }
+	clickHandler, // 点 mark 时回调
+	className, // 'moke-epub-user-hl'
+	styles, // { fill, stroke, ... } 写到 marks-pane SVG
 );
 ```
 
@@ -791,13 +819,13 @@ keepCfis = sorted ∩ visible
 
 #### 9.1.8 滚动/翻页 patch（`installEpubUserHighlightPatchListeners`）
 
-| 事件 | 行为 |
-|------|------|
-| `rend.hooks.content` | `schedulePatch(true)` defer |
+| 事件                   | 行为                                                                       |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `rend.hooks.content`   | `schedulePatch(true)` defer                                                |
 | `rend.on('relocated')` | 120ms idle → `refreshThoughtUnderlinesInViewport` + `schedulePatch(false)` |
-| scroll 容器 scroll | 100ms idle → viewport refresh + `schedulePatch(true)` |
-| `rend.on('rendered')` | `schedulePatch(true)` |
-| 初始化 | `schedulePatch(true)` |
+| scroll 容器 scroll     | 100ms idle → viewport refresh + `schedulePatch(true)`                      |
+| `rend.on('rendered')`  | `schedulePatch(true)`                                                      |
+| 初始化                 | `schedulePatch(true)`                                                      |
 
 `patchEpubReadingAnnotations` 用 rAF 防抖 + 二次 rAF（pending 模式）保证：只 patch 样式不 remove+readd，避免闪烁。
 
@@ -847,11 +875,18 @@ keepCfis = sorted ∩ visible
 
 ```ts
 rend.annotations.underline(
-  cfiRange,
-  { thoughtIds, [THOUGHT_MARK_DATA_SHOW_LINE]: '1', [THOUGHT_MARK_DATA_LINE_OWN]: '1' },
-  undefined,
-  EPUB_THOUGHT_UNDERLINE_CLASS,
-  { ...EPUB_THOUGHT_UNDERLINE_STYLES, stroke: resolveThoughtLineColor(group, currentUserId) },
+	cfiRange,
+	{
+		thoughtIds,
+		[THOUGHT_MARK_DATA_SHOW_LINE]: "1",
+		[THOUGHT_MARK_DATA_LINE_OWN]: "1",
+	},
+	undefined,
+	EPUB_THOUGHT_UNDERLINE_CLASS,
+	{
+		...EPUB_THOUGHT_UNDERLINE_STYLES,
+		stroke: resolveThoughtLineColor(group, currentUserId),
+	},
 );
 ```
 
@@ -931,12 +966,12 @@ useEffect(..., [bookId, bookFmt, epubNavReady, getRendition, ensureLoadedSpineTh
 
 #### 10.3.2 触发条件
 
-| 场景 | 行为 |
-|------|------|
-| `relocated` 停稳 2000ms | `scheduleSync` 调度 |
+| 场景                             | 行为                                               |
+| -------------------------------- | -------------------------------------------------- |
+| `relocated` 停稳 2000ms          | `scheduleSync` 调度                                |
 | `visibilitychange === 'visible'` | `lastSyncAtRef = 0` + `syncThoughts()`（重置节流） |
-| 间隔 < 5s | 跳过（非 force 模式） |
-| `force: true`（打开列表） | 跳过节流 |
+| 间隔 < 5s                        | 跳过（非 force 模式）                              |
+| `force: true`（打开列表）        | 跳过节流                                           |
 
 ### 10.4 文件：[epubThoughtCluster.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtCluster.ts)
 
@@ -981,15 +1016,22 @@ useEffect(..., [bookId, bookFmt, epubNavReady, getRendition, ensureLoadedSpineTh
 
 ```ts
 type ChapterListenState = {
-  status: 'idle' | 'loading' | 'playing' | 'paused';
-  spineIndex: number;
-  sentenceIndex: number;
-  sentenceCount: number;
-  sentenceLabels: string[]; // 每句纯文本
-  rate: number;
+	status: "idle" | "loading" | "playing" | "paused";
+	spineIndex: number;
+	sentenceIndex: number;
+	sentenceCount: number;
+	sentenceLabels: string[]; // 每句纯文本
+	rate: number;
 };
 
-const IDLE_STATE = { status:'idle', spineIndex:-1, sentenceIndex:0, sentenceCount:0, sentenceLabels:[], rate:1 };
+const IDLE_STATE = {
+	status: "idle",
+	spineIndex: -1,
+	sentenceIndex: 0,
+	sentenceCount: 0,
+	sentenceLabels: [],
+	rate: 1,
+};
 ```
 
 `loopGenRef`、`pausedRef`、`rateRef`、`sentenceCursorRef`、`sectionRef`、`sectionDocRef`、`resolveStartCfiRef`、`scrollSeekRef` 都在 ref 上。
@@ -998,9 +1040,12 @@ const IDLE_STATE = { status:'idle', spineIndex:-1, sentenceIndex:0, sentenceCoun
 
 ```ts
 useEffect(() => {
-  warmupEnglishTtsVoices();
-  registerChapterListenStop(() => stopInternal());
-  return () => { registerChapterListenStop(null); stopInternal({ notify: false }); };
+	warmupSpeechVoices();
+	registerChapterListenStop(() => stopInternal());
+	return () => {
+		registerChapterListenStop(null);
+		stopInternal({ notify: false });
+	};
 }, []);
 ```
 
@@ -1009,10 +1054,10 @@ useEffect(() => {
 #### 11.1.3 `startFromCurrentPosition`
 
 ```
-1. primeEnglishPlaybackForUserGesture
-2. isEnglishPlaybackAvailable check
+1. primePlaybackForUserGesture
+2. isPlaybackAvailable check
 3. rend 校验
-4. invokeStopQuoteListen / stopAllEnglishPlayback / clearEpubListenSegmentOverlay
+4. invokeStopQuoteListen / stopAllPlayback / clearEpubListenSegmentOverlay
 5. beginChapterListenAutoFollow(rend)
 6. extractVisibleListenSection(rend, spineHint) → 拿到 plain/outerRange/spineIndex
 7. gen = ++loopGenRef; pausedRef=false; rateRef=1; cursor=0
@@ -1062,7 +1107,7 @@ for si in [cursor, count):
    syncState({ status:'playing', sentenceIndex:si })
    if rend && domRange: showChapterListenSentenceHighlight(rend, domRange, jumpScroll)
    schedulePrefetch(si+1)
-   try playEnglishPreferred(spokenRaw, { rate, prefetchedCloud })
+   try playPreferred(spokenRaw, { rate, prefetchedCloud })
    catch: Toast unsupported (若 cloudTtsNotified=false)
    clearChapterListenSentenceHighlight(rend)
 return isGenActive
@@ -1070,11 +1115,11 @@ return isGenActive
 
 #### 11.1.7 `pause` / `resume` / `stop` / `goToSentence` / `setRate`
 
-- `pause`：pausedRef=true; loopGenRef++; stopAllEnglishPlayback; status='paused'。
+- `pause`：pausedRef=true; loopGenRef++; stopAllPlayback; status='paused'。
 - `resume`：pausedRef=false; gen=++loopGenRef; status='loading'; runListenLoop(gen, { continueSections: true })。
 - `stop`：调 stopInternal。
-- `goToSentence(i)`：cursor=clamp(i); scrollSeek=true; stopAllEnglishPlayback; runListenLoop（重置 section）。
-- `setRate(rate)`：rateRef=rate; applyActiveEnglishPlaybackRate(rate); syncState({ rate })。
+- `goToSentence(i)`：cursor=clamp(i); scrollSeek=true; stopAllPlayback; runListenLoop（重置 section）。
+- `setRate(rate)`：rateRef=rate; applyActivePlaybackRate(rate); syncState({ rate })。
 
 #### 11.1.8 `syncToCurrentView`（视图同步）
 
@@ -1083,7 +1128,7 @@ return isGenActive
 ```
 1. status === 'idle' → no-op
 2. await waitForRelocated(rend) + 双 rAF
-3. stopAllEnglishPlayback / teardownChapterListenHighlight / clearEpubListenSegmentOverlay
+3. stopAllPlayback / teardownChapterListenHighlight / clearEpubListenSegmentOverlay
 4. beginChapterListenAutoFollow
 5. gen = ++loopGenRef
 6. pausedRef = !resumePlay (原来 playing/loading → 继续；paused → 保留暂停)
@@ -1095,22 +1140,22 @@ return isGenActive
 
 #### 11.2.1 与章节听读的差异
 
-| 维度 | 章节听读 | 引用听读 |
-|------|----------|----------|
-| 文本源 | 当前可见的 body | 选区 quote / 划线 quote / 侧栏引用 |
-| 互斥 | 抢断引用听读 | 抢断章节听读 |
-| 高亮 | 句级 Range（DOM 实际段） | overlay session（plain） |
-| 范围 | 全章 + 跨章 | 选区内 |
-| 句切 | `indexChapterSentenceRanges` | `getEpubListenSessionMeta` 或 `buildLabelsFromPlain` |
-| session | 无（`beginChapterListenAutoFollow` 简单注册） | `beginEpubListenOverlaySession` |
+| 维度    | 章节听读                                      | 引用听读                                             |
+| ------- | --------------------------------------------- | ---------------------------------------------------- |
+| 文本源  | 当前可见的 body                               | 选区 quote / 划线 quote / 侧栏引用                   |
+| 互斥    | 抢断引用听读                                  | 抢断章节听读                                         |
+| 高亮    | 句级 Range（DOM 实际段）                      | overlay session（plain）                             |
+| 范围    | 全章 + 跨章                                   | 选区内                                               |
+| 句切    | `indexChapterSentenceRanges`                  | `getEpubListenSessionMeta` 或 `buildLabelsFromPlain` |
+| session | 无（`beginChapterListenAutoFollow` 简单注册） | `beginEpubListenOverlaySession`                      |
 
 #### 11.2.2 `startPlayback(text, key, cfiRange, frozenRange)`
 
 ```
 1. invokeStopChapterListen()    // 互斥
-2. isEnglishPlaybackAvailable check
-3. primeEnglishPlaybackForUserGesture
-4. stopAllEnglishPlayback / clearEpubListenSegmentOverlay
+2. isPlaybackAvailable check
+3. primePlaybackForUserGesture
+4. stopAllPlayback / clearEpubListenSegmentOverlay
 5. resolveEpubListenPlain(rend, text, frozenRange) → { plain, selectionRange, spokenRaw }
 6. beginEpubListenOverlaySession(rend, plain, { cfi, selectionRange })
 7. fallbackPlainRef = speakPlain
@@ -1124,9 +1169,10 @@ return isGenActive
 
 ```ts
 const selectionRange =
-  frozenRange && isRangeConnected(frozenRange)
-    ? frozenRange.cloneRange()
-    : (getRememberedEpubPopBarSelectionRange() ?? (rend ? cloneActiveEpubSelection(rend) : null));
+	frozenRange && isRangeConnected(frozenRange)
+		? frozenRange.cloneRange()
+		: (getRememberedEpubPopBarSelectionRange() ??
+			(rend ? cloneActiveEpubSelection(rend) : null));
 
 const spokenRaw = selectionRange?.toString().trim() || fallbackText.trim();
 const plain = stripMarkdownForTts(spokenRaw);
@@ -1193,10 +1239,10 @@ return 0
 
 ```ts
 let session: ListenSession | null = null;
-let overlayEpoch = 0;        // 单调递增版本
+let overlayEpoch = 0; // 单调递增版本
 let detachScrollGuard: (() => void) | null = null;
 let rememberedPopBarRange: Range | null = null;
-let programmaticScroll = 0;  // 防用户手势误判
+let programmaticScroll = 0; // 防用户手势误判
 let userScrolling = false;
 let scrollSettleTimer = 0;
 let pendingFollowScroll = false;
@@ -1218,13 +1264,13 @@ const followListeners = new Set<(state) => void>();
 
 #### 11.4.3 自动跟随状态机
 
-| 状态 | 触发 | 行为 |
-|------|------|------|
-| `pendingFollowScroll=true` | 句切换 + autoFollow | 双 rAF 后滚到中央 |
-| `userScrolling=true` | 用户滚轮/触摸 | 暂停 autoFollow，emit |
-| `pendingFollowScroll=false` | 停稳 800ms / 用户切回 | 恢复 |
-| `FAB` 提示 | autoFollow 被用户滚关 | 右下角"回到播放"按钮 |
-| `checkEpubListenFollowAfterLayout` | 容器尺寸变化 | 不可见 → pauseListenAutoFollow |
+| 状态                               | 触发                  | 行为                           |
+| ---------------------------------- | --------------------- | ------------------------------ |
+| `pendingFollowScroll=true`         | 句切换 + autoFollow   | 双 rAF 后滚到中央              |
+| `userScrolling=true`               | 用户滚轮/触摸         | 暂停 autoFollow，emit          |
+| `pendingFollowScroll=false`        | 停稳 800ms / 用户切回 | 恢复                           |
+| `FAB` 提示                         | autoFollow 被用户滚关 | 右下角"回到播放"按钮           |
+| `checkEpubListenFollowAfterLayout` | 容器尺寸变化          | 不可见 → pauseListenAutoFollow |
 
 #### 11.4.4 `showEpubListenDomRange(rend, range, opts?)`
 
@@ -1281,19 +1327,19 @@ export function invokeStopChapterListen() { stopChapterListen?.(); }
 - 听书 mark 用淡黄色 `<rect>` overlay。
 - `showListenMarkHighlight(rend, range)` → `clearListenMarkHighlight(rend)` → `relayoutListenMarkHighlight(rend)`。
 
-### 11.7 英文 TTS（[englishTts](../../../../utils/englishTts.ts) — 不在 ebook 目录）
+### 11.7 英文 TTS（[speech](../../../../utils/speech.ts) — 不在 ebook 目录）
 
-| 符号 | 作用 |
-|------|------|
-| `playEnglishPreferred(text, opts)` | 优先云端 TTS，回退浏览器 SpeechSynthesis |
-| `prefetchCloudEnglishTts(text)` | 预取云端音频 Promise |
-| `applyActiveEnglishPlaybackRate(rate)` | 实时改倍速（不打断当前句） |
-| `primeEnglishPlaybackForUserGesture` | 首次用户手势解锁 TTS |
-| `warmupEnglishTtsVoices` | 预加载 SpeechSynthesis voices |
-| `stopAllEnglishPlayback` | 停浏览器 + 取消云端预取 |
-| `stripMarkdownForTts` | 去除 markdown 标记（`#`/`*`/`` ` ``/`<>`等） |
-| `isEnglishPlaybackAvailable` | 浏览器是否支持 SpeechSynthesis |
-| `buildSentenceOffsetSpans(plain)` | 切句：句末 `?`/`!`/`.`/`。`/`!`/`?` + 换行 |
+| 符号                                   | 作用                                         |
+| -------------------------------------- | -------------------------------------------- |
+| `playPreferred(text, opts)`     | 优先云端 TTS，回退浏览器 SpeechSynthesis     |
+| `prefetchCloudTts(text)`        | 预取云端音频 Promise                         |
+| `applyActivePlaybackRate(rate)` | 实时改倍速（不打断当前句）                   |
+| `primePlaybackForUserGesture`   | 首次用户手势解锁 TTS                         |
+| `warmupSpeechVoices`               | 预加载 SpeechSynthesis voices                |
+| `stopAllPlayback`               | 停浏览器 + 取消云端预取                      |
+| `stripMarkdownForTts`                  | 去除 markdown 标记（`#`/`*`/`` ` ``/`<>`等） |
+| `isPlaybackAvailable`           | 浏览器是否支持 SpeechSynthesis               |
+| `buildSentenceOffsetSpans(plain)`      | 切句：句末 `?`/`!`/`.`/`。`/`!`/`?` + 换行   |
 
 ---
 
@@ -1301,18 +1347,18 @@ export function invokeStopChapterListen() { stopChapterListen?.(); }
 
 ### 12.1 文件：[epubMarkShared.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubMarkShared.ts)
 
-| 符号 | 作用 |
-|------|------|
-| `getRenditionContentsList(rend)` | 归一 `rend.getContents()` 为数组 |
-| `setSvgAttrIfChanged(el, name, value)` | 只在属性变化时 setAttribute（patch 热路径） |
-| `extractCfiSpineHint(cfi)` | `epubcfi(X!/...)` 提取 `X` |
-| `normalizeCfiSpineHint(hint)` | 去 `[id]` 标签 + 补前导 `/` |
-| `collectLoadedSpineHints(rend)` | 遍历 contents → 拿到所有已加载 iframe 的 spine 路径 |
-| `isQuoteStrictlyNested(inner, outer)` | inner 是否为 outer 的严格子串 |
-| `isDomRangeStrictlyContained(inner, outer)` | DOM Range 严格包含（边界可等，整体不等） |
-| `isDomRangeOverlapping(a, b)` | DOM Range 真实相交（不含仅端点相接） |
-| `isDomRangeTouchingOrOverlapping(a, b)` | 相交或端点相接 |
-| `findMarksPaneSvgInDocument(doc)` | 找 `.marks-pane > svg`（听书层 ensure group 用） |
+| 符号                                        | 作用                                                |
+| ------------------------------------------- | --------------------------------------------------- |
+| `getRenditionContentsList(rend)`            | 归一 `rend.getContents()` 为数组                    |
+| `setSvgAttrIfChanged(el, name, value)`      | 只在属性变化时 setAttribute（patch 热路径）         |
+| `extractCfiSpineHint(cfi)`                  | `epubcfi(X!/...)` 提取 `X`                          |
+| `normalizeCfiSpineHint(hint)`               | 去 `[id]` 标签 + 补前导 `/`                         |
+| `collectLoadedSpineHints(rend)`             | 遍历 contents → 拿到所有已加载 iframe 的 spine 路径 |
+| `isQuoteStrictlyNested(inner, outer)`       | inner 是否为 outer 的严格子串                       |
+| `isDomRangeStrictlyContained(inner, outer)` | DOM Range 严格包含（边界可等，整体不等）            |
+| `isDomRangeOverlapping(a, b)`               | DOM Range 真实相交（不含仅端点相接）                |
+| `isDomRangeTouchingOrOverlapping(a, b)`     | 相交或端点相接                                      |
+| `findMarksPaneSvgInDocument(doc)`           | 找 `.marks-pane > svg`（听书层 ensure group 用）    |
 
 ### 12.2 文件：[epubRangeGeometry.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/epub/mark/epubRangeGeometry.ts) 补充
 
@@ -1355,13 +1401,15 @@ export function invokeStopChapterListen() { stopChapterListen?.(); }
 ### 14.1 初始化（[pdfSetup.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/pdf/pdfSetup.ts)）
 
 ```ts
-import * as pdfjs from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import * as pdfjs from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-export const PDFJS_WASM_URL = pdfAssetUrl('pdfjs-wasm');  // 站点根 + 'pdfjs-wasm/'
-export const PDFJS_CMAP_URL = pdfAssetUrl('pdfjs-cmaps');
-export function pdfLoadOptions(data) { return { data, wasmUrl, cMapUrl, cMapPacked: true }; }
+export const PDFJS_WASM_URL = pdfAssetUrl("pdfjs-wasm"); // 站点根 + 'pdfjs-wasm/'
+export const PDFJS_CMAP_URL = pdfAssetUrl("pdfjs-cmaps");
+export function pdfLoadOptions(data) {
+	return { data, wasmUrl, cMapUrl, cMapPacked: true };
+}
 ```
 
 ### 14.2 缩放（[pdfReaderSettings.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/views/ebook/utils/pdf/pdfReaderSettings.ts)）
@@ -1404,10 +1452,11 @@ export function pdfLoadOptions(data) { return { data, wasmUrl, cMapUrl, cMapPack
 ```
 
 外部调用：
+
 - 进入听书：`invokeStopQuoteListen()`。
 - 引用听读：`invokeStopChapterListen()`。
 - 切换书：都通过 `stopInternal({ notify: false })` 清理。
-- 浏览器 TTS：`stopAllEnglishPlayback` 共享。
+- 浏览器 TTS：`stopAllPlayback` 共享。
 
 ### 15.2 跨 iframe 状态总线
 
@@ -1432,22 +1481,22 @@ usePublicEbookThoughtSync:
 
 ### 15.4 持久化
 
-| Key | 模块 | 用途 |
-|-----|------|------|
-| `dnhyxc_epub_reader_settings` | epubReaderSettings | 阅读设置 |
+| Key                                  | 模块               | 用途         |
+| ------------------------------------ | ------------------ | ------------ |
+| `dnhyxc_epub_reader_settings`        | epubReaderSettings | 阅读设置     |
 | `dnhyxc_epub_highlight_custom_color` | epubUserHighlights | 自定义划线色 |
-| `dnhyxc_pdf_reader_zoom` | pdfReaderSettings | PDF 缩放 |
+| `dnhyxc_pdf_reader_zoom`             | pdfReaderSettings  | PDF 缩放     |
 
 后端持久化：高亮、想法走 `service/ebook` 的 REST API。
 
 ### 15.5 全局工具（[utils](../../../../utils/)）
 
-| 工具 | 在 EPUB 中的用途 |
-|------|-------------------|
-| `englishTts` | 听书 TTS（详见 §11.7） |
-| `clipboard.copyToClipboard` | 右键复制 |
-| `runtime.isTauriRuntime` | 桌面端 IO 切换 |
-| `lib/utils.cn` | Tailwind className 合并 |
+| 工具                        | 在 EPUB 中的用途        |
+| --------------------------- | ----------------------- |
+| `speech`                | 听书 TTS（详见 §11.7）  |
+| `clipboard.copyToClipboard` | 右键复制                |
+| `runtime.isTauriRuntime`    | 桌面端 IO 切换          |
+| `lib/utils.cn`              | Tailwind className 合并 |
 
 ---
 
@@ -1591,234 +1640,270 @@ usePublicEbookThoughtSync:
 ```tsx
 // 整个阅读器渲染入口；依赖 [open, pageFlow, ...]；open 变化时重置一切
 useEffect(() => {
-    const el = hostRef.current;            // 渲染容器 div
-    if (!el) return;
+	const el = hostRef.current; // 渲染容器 div
+	if (!el) return;
 
-    let destroyed = false;                  // 标记 effect 已清理，避免异步流程完成时操作已销毁的 rend
-    let book: Book | null = null;           // epub.js Book 实例
-    let rend: Rendition | null = null;      // epub.js Rendition 实例
-    let detachScrolledNav: (() => void) | undefined;     // 连续滚动边缘翻章监听解绑
-    let detachContextMenu: (() => void) | undefined;     // 右键菜单解绑
-    let detachSelectionPopBar: (() => void) | undefined; // 选区浮条解绑
+	let destroyed = false; // 标记 effect 已清理，避免异步流程完成时操作已销毁的 rend
+	let book: Book | null = null; // epub.js Book 实例
+	let rend: Rendition | null = null; // epub.js Rendition 实例
+	let detachScrolledNav: (() => void) | undefined; // 连续滚动边缘翻章监听解绑
+	let detachContextMenu: (() => void) | undefined; // 右键菜单解绑
+	let detachSelectionPopBar: (() => void) | undefined; // 选区浮条解绑
 
-    // ==== 清空一切状态，准备重新加载 ====
-    onNavResetRef.current?.();              // 通知父级清空 nav API（避免快捷键指向已销毁的 rend）
-    readyRef.current = false;               // renderer 未就绪
-    setRendReady(false);
-    appliedThoughtsRef.current.clear();     // 清已应用的想法
-    appliedHighlightsRef.current.clear();   // 清已应用的划线
-    resetEpubReadingAnnotationSyncState();  // 清 patch 调度状态
-    locationsReadyRef.current = false;      // 百分比未就绪
-    bookRef.current = null;
-    rendRef.current = null;
-    setErr(null);
+	// ==== 清空一切状态，准备重新加载 ====
+	onNavResetRef.current?.(); // 通知父级清空 nav API（避免快捷键指向已销毁的 rend）
+	readyRef.current = false; // renderer 未就绪
+	setRendReady(false);
+	appliedThoughtsRef.current.clear(); // 清已应用的想法
+	appliedHighlightsRef.current.clear(); // 清已应用的划线
+	resetEpubReadingAnnotationSyncState(); // 清 patch 调度状态
+	locationsReadyRef.current = false; // 百分比未就绪
+	bookRef.current = null;
+	rendRef.current = null;
+	setErr(null);
 
-    // 初始 CFI（定位阅读位置）
-    const initialCfi = currentCfiRef.current ?? initialCfiRef.current ?? undefined;
-    const pageFlow = readerSettingsRef.current.pageFlow;  // 排版模式
+	// 初始 CFI（定位阅读位置）
+	const initialCfi =
+		currentCfiRef.current ?? initialCfiRef.current ?? undefined;
+	const pageFlow = readerSettingsRef.current.pageFlow; // 排版模式
 
-    // 上报当前位置（CFI + 百分比）— relocated 后或 locations 完成时调用
-    const reportCurrentLocation = async () => {
-        if (!rend || destroyed) return;
-        try {
-            const loc = (await Promise.resolve(rend.currentLocation())) as Location | undefined;
-            if (loc?.start?.cfi) relocate(loc);
-        } catch { /* 忽略 */ }
-    };
+	// 上报当前位置（CFI + 百分比）— relocated 后或 locations 完成时调用
+	const reportCurrentLocation = async () => {
+		if (!rend || destroyed) return;
+		try {
+			const loc = (await Promise.resolve(rend.currentLocation())) as
+				| Location
+				| undefined;
+			if (loc?.start?.cfi) relocate(loc);
+		} catch {
+			/* 忽略 */
+		}
+	};
 
-    // ==== 异步初始化 epub.js ====
-    (async () => {
-        try {
-            // 1. 解析二进制 EPUB
-            book = ePub(open, { openAs: 'binary', replacements: 'blobUrl' });
-            bookRef.current = book;
-            await book.opened;
-            if (destroyed || !book) return;
+	// ==== 异步初始化 epub.js ====
+	(async () => {
+		try {
+			// 1. 解析二进制 EPUB
+			book = ePub(open, { openAs: "binary", replacements: "blobUrl" });
+			bookRef.current = book;
+			await book.opened;
+			if (destroyed || !book) return;
 
-            // 2. 算渲染尺寸
-            const w = Math.max(el.clientWidth, 320) || 640;
-            const h = Math.max(el.clientHeight, 320) || 480;
+			// 2. 算渲染尺寸
+			const w = Math.max(el.clientWidth, 320) || 640;
+			const h = Math.max(el.clientHeight, 320) || 480;
 
-            // 3. 创建 renderer；连续滚动用 continuous manager
-            rend = book.renderTo(el, {
-                width: w, height: h, flow: pageFlow,
-                manager: pageFlow === 'scrolled' ? 'continuous' : 'default',
-                spread: 'none', allowScriptedContent: true,
-            });
+			// 3. 创建 renderer；连续滚动用 continuous manager
+			rend = book.renderTo(el, {
+				width: w,
+				height: h,
+				flow: pageFlow,
+				manager: pageFlow === "scrolled" ? "continuous" : "default",
+				spread: "none",
+				allowScriptedContent: true,
+			});
 
-            // 4. 应用阅读外观（主题/字号/行距/背景色）
-            applyEpubReaderAppearance(rend, readerSettingsRef.current, appThemeRef.current);
-            rendRef.current = rend;
+			// 4. 应用阅读外观（主题/字号/行距/背景色）
+			applyEpubReaderAppearance(
+				rend,
+				readerSettingsRef.current,
+				appThemeRef.current,
+			);
+			rendRef.current = rend;
 
-            // 5. 绑 relocated / keydown
-            rend.on('relocated', relocate);
-            rend.on('keydown', onRenditionKeyDown);
+			// 5. 绑 relocated / keydown
+			rend.on("relocated", relocate);
+			rend.on("keydown", onRenditionKeyDown);
 
-            // 6. 条件绑 contextmenu / selection pop bar
-            if (onReaderContextMenuRef.current) {
-                detachContextMenu = attachEpubIframeContextMenu(rend, (payload) => {
-                    onReaderContextMenuRef.current?.(payload);
-                });
-            }
-            detachSelectionPopBar = attachEpubSelectionPopBar(rend, (payload) => {
-                onSelectionPopBarRef.current?.(payload);
-            });
+			// 6. 条件绑 contextmenu / selection pop bar
+			if (onReaderContextMenuRef.current) {
+				detachContextMenu = attachEpubIframeContextMenu(rend, (payload) => {
+					onReaderContextMenuRef.current?.(payload);
+				});
+			}
+			detachSelectionPopBar = attachEpubSelectionPopBar(rend, (payload) => {
+				onSelectionPopBarRef.current?.(payload);
+			});
 
-            // 7. 首屏定位
-            await rend.display(initialCfi ?? undefined);
-            if (destroyed) return;
-            if (initialCfi) lateStartCfiAppliedRef.current = true;
+			// 7. 首屏定位
+			await rend.display(initialCfi ?? undefined);
+			if (destroyed) return;
+			if (initialCfi) lateStartCfiAppliedRef.current = true;
 
-            // 8. 等 book.ready
-            await book.ready;
-            if (destroyed) return;
+			// 8. 等 book.ready
+			await book.ready;
+			if (destroyed) return;
 
-            // 9. 标记 ready
-            readyRef.current = true;
-            setRendReady(true);
+			// 9. 标记 ready
+			readyRef.current = true;
+			setRendReady(true);
 
-            // 10. 连续滚动 → 边缘翻章
-            if (pageFlow === 'scrolled') {
-                detachScrolledNav = attachEpubScrolledEdgeNav(rend, () => destroyed);
-            }
+			// 10. 连续滚动 → 边缘翻章
+			if (pageFlow === "scrolled") {
+				detachScrolledNav = attachEpubScrolledEdgeNav(rend, () => destroyed);
+			}
 
-            // 11. 上报 nav API 给父级
-            onReadyRef.current?.({
-                prev: async () => { if (readyRef.current && rendRef.current) await rendRef.current.prev(); },
-                next: async () => { if (readyRef.current && rendRef.current) await rendRef.current.next(); },
-                go: async (href) => {
-                    const r = rendRef.current, b = bookRef.current;
-                    if (!r) return;
-                    if (readerSettingsRef.current.pageFlow === 'scrolled' && b) {
-                        await displayEpubScrolledHref(r, b, href);
-                        return;
-                    }
-                    await r.display(href);
-                },
-                clearTextSelection: () => { if (rendRef.current) clearEpubTextSelection(rendRef.current); },
-                getRendition: () => rendRef.current,
-                getBook: () => bookRef.current,
-                syncReadingAnnotations: (nextHighlights) => {
-                    const r = rendRef.current;
-                    if (!r) return;
-                    syncEpubReadingAnnotations(
-                        r,
-                        thoughtsRef.current ?? [],
-                        nextHighlights ?? highlightsRef.current ?? [],
-                        appliedThoughtsRef.current,
-                        appliedHighlightsRef.current,
-                        currentUserIdRef.current,
-                    );
-                },
-            });
+			// 11. 上报 nav API 给父级
+			onReadyRef.current?.({
+				prev: async () => {
+					if (readyRef.current && rendRef.current) await rendRef.current.prev();
+				},
+				next: async () => {
+					if (readyRef.current && rendRef.current) await rendRef.current.next();
+				},
+				go: async (href) => {
+					const r = rendRef.current,
+						b = bookRef.current;
+					if (!r) return;
+					if (readerSettingsRef.current.pageFlow === "scrolled" && b) {
+						await displayEpubScrolledHref(r, b, href);
+						return;
+					}
+					await r.display(href);
+				},
+				clearTextSelection: () => {
+					if (rendRef.current) clearEpubTextSelection(rendRef.current);
+				},
+				getRendition: () => rendRef.current,
+				getBook: () => bookRef.current,
+				syncReadingAnnotations: (nextHighlights) => {
+					const r = rendRef.current;
+					if (!r) return;
+					syncEpubReadingAnnotations(
+						r,
+						thoughtsRef.current ?? [],
+						nextHighlights ?? highlightsRef.current ?? [],
+						appliedThoughtsRef.current,
+						appliedHighlightsRef.current,
+						currentUserIdRef.current,
+					);
+				},
+			});
 
-            // 12. 加载目录
-            const nav = await book.loaded.navigation;
-            const spineBook = book;
-            const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
-                label: t.label?.trim() || t.href,
-                href: t.href,
-                spineIndex: t.href ? resolveSpineIndexForHref(spineBook, t.href) : undefined,
-            }));
-            if (!destroyed) onTocRef.current?.(toc);
+			// 12. 加载目录
+			const nav = await book.loaded.navigation;
+			const spineBook = book;
+			const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
+				label: t.label?.trim() || t.href,
+				href: t.href,
+				spineIndex: t.href
+					? resolveSpineIndexForHref(spineBook, t.href)
+					: undefined,
+			}));
+			if (!destroyed) onTocRef.current?.(toc);
 
-            // 13. 后台生成 locations（百分比）
-            void book.locations.generate(1600)
-                .then(() => {
-                    if (destroyed) return;
-                    locationsReadyRef.current = true;
-                    return reportCurrentLocation();
-                })
-                .catch(() => { /* 生成失败回退 spine 索引 */ });
-        } catch (e) {
-            if (!destroyed) setErr(e instanceof Error ? e.message : 'EPUB 打开失败');
-        }
-    })();
+			// 13. 后台生成 locations（百分比）
+			void book.locations
+				.generate(1600)
+				.then(() => {
+					if (destroyed) return;
+					locationsReadyRef.current = true;
+					return reportCurrentLocation();
+				})
+				.catch(() => {
+					/* 生成失败回退 spine 索引 */
+				});
+		} catch (e) {
+			if (!destroyed) setErr(e instanceof Error ? e.message : "EPUB 打开失败");
+		}
+	})();
 
-    // ==== 尺寸自适应 ====
-    let resizeRaf: number | null = null;
-    let windowResizeSettleTimer: ReturnType<typeof setTimeout> | null = null;
+	// ==== 尺寸自适应 ====
+	let resizeRaf: number | null = null;
+	let windowResizeSettleTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const applyHostResize = () => {
-        if (!hostRef.current || !readyRef.current || !rendRef.current) return;
-        const w = Math.max(hostRef.current.clientWidth, 320);
-        const h = Math.max(hostRef.current.clientHeight, 320);
-        const rend = rendRef.current;
-        if (!softResizeEpubRendition(rend, w, h)) {
-            try { rend.resize(w, h); } catch { /* 闪断 */ }
-        }
-        // soft resize 可能让高亮/划线丢失样式
-        patchEpubReadingAnnotations(rend, { sync: true });
-        relayoutListenMarkHighlight(rend);
-        checkEpubListenFollowAfterLayout(rend);
-    };
+	const applyHostResize = () => {
+		if (!hostRef.current || !readyRef.current || !rendRef.current) return;
+		const w = Math.max(hostRef.current.clientWidth, 320);
+		const h = Math.max(hostRef.current.clientHeight, 320);
+		const rend = rendRef.current;
+		if (!softResizeEpubRendition(rend, w, h)) {
+			try {
+				rend.resize(w, h);
+			} catch {
+				/* 闪断 */
+			}
+		}
+		// soft resize 可能让高亮/划线丢失样式
+		patchEpubReadingAnnotations(rend, { sync: true });
+		relayoutListenMarkHighlight(rend);
+		checkEpubListenFollowAfterLayout(rend);
+	};
 
-    const scheduleHostResize = () => {
-        if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
-        resizeRaf = requestAnimationFrame(() => { resizeRaf = null; applyHostResize(); });
-    };
+	const scheduleHostResize = () => {
+		if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+		resizeRaf = requestAnimationFrame(() => {
+			resizeRaf = null;
+			applyHostResize();
+		});
+	};
 
-    const settleHostResize = () => {
-        applyHostResize();
-        const rend = rendRef.current;
-        if (!rend || !readyRef.current) return;
-        syncEpubReadingAnnotations(
-            rend,
-            thoughtsRef.current ?? [], highlightsRef.current ?? [],
-            appliedThoughtsRef.current, appliedHighlightsRef.current,
-            currentUserIdRef.current,
-        );
-    };
+	const settleHostResize = () => {
+		applyHostResize();
+		const rend = rendRef.current;
+		if (!rend || !readyRef.current) return;
+		syncEpubReadingAnnotations(
+			rend,
+			thoughtsRef.current ?? [],
+			highlightsRef.current ?? [],
+			appliedThoughtsRef.current,
+			appliedHighlightsRef.current,
+			currentUserIdRef.current,
+		);
+	};
 
-    // 监听容器变化 + 窗口 resize + 分栏拖动
-    const ro = new ResizeObserver(() => scheduleHostResize());
-    ro.observe(el);
-    const onWindowResize = () => {
-        scheduleHostResize();
-        if (ebookSplitPanelResizingRef.current) return;
-        if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
-        windowResizeSettleTimer = setTimeout(() => {
-            windowResizeSettleTimer = null;
-            if (ebookSplitPanelResizingRef.current) return;
-            settleHostResize();
-        }, 150);
-    };
-    window.addEventListener('resize', onWindowResize);
-    const unsubSplitResizeEnd = subscribeEbookSplitPanelResizeEnd(settleHostResize);
+	// 监听容器变化 + 窗口 resize + 分栏拖动
+	const ro = new ResizeObserver(() => scheduleHostResize());
+	ro.observe(el);
+	const onWindowResize = () => {
+		scheduleHostResize();
+		if (ebookSplitPanelResizingRef.current) return;
+		if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
+		windowResizeSettleTimer = setTimeout(() => {
+			windowResizeSettleTimer = null;
+			if (ebookSplitPanelResizingRef.current) return;
+			settleHostResize();
+		}, 150);
+	};
+	window.addEventListener("resize", onWindowResize);
+	const unsubSplitResizeEnd =
+		subscribeEbookSplitPanelResizeEnd(settleHostResize);
 
-    // ==== 清理函数 ====
-    return () => {
-        if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
-        if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
-        window.removeEventListener('resize', onWindowResize);
-        unsubSplitResizeEnd();
-        destroyed = true;
+	// ==== 清理函数 ====
+	return () => {
+		if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+		if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
+		window.removeEventListener("resize", onWindowResize);
+		unsubSplitResizeEnd();
+		destroyed = true;
 
-        detachContextMenu?.();
-        detachSelectionPopBar?.();
-        detachScrolledNav?.();
+		detachContextMenu?.();
+		detachSelectionPopBar?.();
+		detachScrolledNav?.();
 
-        readyRef.current = false;
-        setRendReady(false);
-        appliedThoughtsRef.current.clear();
-        appliedHighlightsRef.current.clear();
-        resetEpubReadingAnnotationSyncState();
-        locationsReadyRef.current = false;
-        bookRef.current = null;
-        ro.disconnect();
+		readyRef.current = false;
+		setRendReady(false);
+		appliedThoughtsRef.current.clear();
+		appliedHighlightsRef.current.clear();
+		resetEpubReadingAnnotationSyncState();
+		locationsReadyRef.current = false;
+		bookRef.current = null;
+		ro.disconnect();
 
-        try {
-            if (rend) {
-                teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
-                teardownAppliedUserHighlights(rend, appliedHighlightsRef.current);
-                rend.off('relocated', relocate);
-                rend.off('keydown', onRenditionKeyDown);
-                rend.destroy();
-            }
-            if (book) book.destroy();
-        } catch { /* 忽略销毁错误 */ }
-        rendRef.current = null;
-    };
+		try {
+			if (rend) {
+				teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
+				teardownAppliedUserHighlights(rend, appliedHighlightsRef.current);
+				rend.off("relocated", relocate);
+				rend.off("keydown", onRenditionKeyDown);
+				rend.destroy();
+			}
+			if (book) book.destroy();
+		} catch {
+			/* 忽略销毁错误 */
+		}
+		rendRef.current = null;
+	};
 }, [open, readerSettings.pageFlow, relocate, onRenditionKeyDown]);
 ```
 
@@ -1837,66 +1922,75 @@ useEffect(() => {
 ```ts
 // 从当前阅读位置开始 TTS 朗读章节
 const startFromCurrentPosition = useCallback(() => {
-    // 触发用户手势相关英文朗读准备（unlock TTS）
-    primeEnglishPlaybackForUserGesture();
+	// 触发用户手势相关英文朗读准备（unlock TTS）
+	primePlaybackForUserGesture();
 
-    // 检查 TTS 能力
-    if (!isEnglishPlaybackAvailable()) {
-        Toast({ type: 'warning', title: tRef.current('englishLearning.tts.unsupported') });
-        return;
-    }
+	// 检查 TTS 能力
+	if (!isPlaybackAvailable()) {
+		Toast({
+			type: "warning",
+			title: tRef.current("englishLearning.tts.unsupported"),
+		});
+		return;
+	}
 
-    const rend = getRenditionRef.current();
-    if (!rend) {
-        Toast({ type: 'warning', title: tRef.current('ebook.read.listenBook.notReady') });
-        return;
-    }
+	const rend = getRenditionRef.current();
+	if (!rend) {
+		Toast({
+			type: "warning",
+			title: tRef.current("ebook.read.listenBook.notReady"),
+		});
+		return;
+	}
 
-    // 互斥：停引用听读、停所有 TTS、清高亮、启动自动跟随
-    invokeStopQuoteListen();
-    stopAllEnglishPlayback();
-    clearEpubListenSegmentOverlay();
-    beginChapterListenAutoFollow(rend);
+	// 互斥：停引用听读、停所有 TTS、清高亮、启动自动跟随
+	invokeStopQuoteListen();
+	stopAllPlayback();
+	clearEpubListenSegmentOverlay();
+	beginChapterListenAutoFollow(rend);
 
-    // 提取当前可见章节文本
-    const spineHint = getCurrentSpineIndexRef.current?.();
-    const preview = extractVisibleListenSection(rend, spineHint);
-    if (!preview?.plain.trim()) {
-        Toast({ type: 'warning', title: tRef.current('ebook.read.listenBook.emptySection') });
-        return;
-    }
+	// 提取当前可见章节文本
+	const spineHint = getCurrentSpineIndexRef.current?.();
+	const preview = extractVisibleListenSection(rend, spineHint);
+	if (!preview?.plain.trim()) {
+		Toast({
+			type: "warning",
+			title: tRef.current("ebook.read.listenBook.emptySection"),
+		});
+		return;
+	}
 
-    // 递增循环代数
-    const gen = ++loopGenRef.current;
-    pausedRef.current = false;
-    rateRef.current = stateRef.current.rate || 1;
-    sentenceCursorRef.current = 0;
-    resolveStartCfiRef.current = true;     // 首次 prepareSection 时按 CFI 解析起始句
-    sectionRef.current = null;
-    sectionDocRef.current = preview.outerRange.startContainer.ownerDocument;
+	// 递增循环代数
+	const gen = ++loopGenRef.current;
+	pausedRef.current = false;
+	rateRef.current = stateRef.current.rate || 1;
+	sentenceCursorRef.current = 0;
+	resolveStartCfiRef.current = true; // 首次 prepareSection 时按 CFI 解析起始句
+	sectionRef.current = null;
+	sectionDocRef.current = preview.outerRange.startContainer.ownerDocument;
 
-    // 切句 + labels
-    const sentences = buildSentenceOffsetSpans(preview.plain.trim());
-    const plain = preview.plain.trim();
+	// 切句 + labels
+	const sentences = buildSentenceOffsetSpans(preview.plain.trim());
+	const plain = preview.plain.trim();
 
-    // 状态同步
-    syncState({
-        status: 'loading',
-        spineIndex: preview.spineIndex,
-        sentenceIndex: 0,
-        sentenceCount: sentences.length,
-        sentenceLabels: buildSentenceLabels(plain, sentences),
-        rate: rateRef.current,
-    });
+	// 状态同步
+	syncState({
+		status: "loading",
+		spineIndex: preview.spineIndex,
+		sentenceIndex: 0,
+		sentenceCount: sentences.length,
+		sentenceLabels: buildSentenceLabels(plain, sentences),
+		rate: rateRef.current,
+	});
 
-    // 启动主循环
-    void runListenLoop(gen);
+	// 启动主循环
+	void runListenLoop(gen);
 }, [runListenLoop, syncState]);
 ```
 
 **读完应掌握**：
 
-- 用户手势 → TTS 解锁的"前置动作"是 `primeEnglishPlaybackForUserGesture()`；必须同步执行。
+- 用户手势 → TTS 解锁的"前置动作"是 `primePlaybackForUserGesture()`；必须同步执行。
 - `loopGenRef` 防并入：每次 start 自增；旧 gen 的 await 完成后用 `isGenActive` 短路。
 - `resolveStartCfiRef = true` 让 `prepareSection` 时按 CFI 解析起始句。
 - `beginChapterListenAutoFollow` 注册 scroll guard，外部 UI 订阅 `subscribeEpubListenAutoFollow` 展示 FAB。
@@ -1907,52 +2001,59 @@ const startFromCurrentPosition = useCallback(() => {
 
 ```ts
 export function applyEpubUserHighlights(
-    rend: Rendition,
-    highlights: EbookUserHighlight[],
-    appliedRef: Map<string, string>,
-    plan?: HighlightRenderPlan,
+	rend: Rendition,
+	highlights: EbookUserHighlight[],
+	appliedRef: Map<string, string>,
+	plan?: HighlightRenderPlan,
 ): void {
-    // 注入 SVG 样式（fill/stroke 渐变等）
-    try { ensureUserHighlightStyles(); } catch { return; }
+	// 注入 SVG 样式（fill/stroke 渐变等）
+	try {
+		ensureUserHighlightStyles();
+	} catch {
+		return;
+	}
 
-    // 复用 plan 或新建（plan 由 syncEpubUserHighlights 传，避免重复 build）
-    const renderPlan = plan ?? buildHighlightRenderPlan(rend, highlights);
-    const { visibleCfis, sortedHighlights, keepCfis } = renderPlan;
+	// 复用 plan 或新建（plan 由 syncEpubUserHighlights 传，避免重复 build）
+	const renderPlan = plan ?? buildHighlightRenderPlan(rend, highlights);
+	const { visibleCfis, sortedHighlights, keepCfis } = renderPlan;
 
-    // 缓存：cfi → highlight 元数据（点击/查询用）
-    highlightMetaByCfi = new Map(
-        sortedHighlights
-            .filter((item) => visibleCfis.has(item.cfiRange))
-            .map((item) => [item.cfiRange, item]),
-    );
+	// 缓存：cfi → highlight 元数据（点击/查询用）
+	highlightMetaByCfi = new Map(
+		sortedHighlights
+			.filter((item) => visibleCfis.has(item.cfiRange))
+			.map((item) => [item.cfiRange, item]),
+	);
 
-    // 卸载已不显示的 mark
-    purgeStaleUserHighlightAnnotations(rend, highlights, keepCfis, appliedRef);
+	// 卸载已不显示的 mark
+	purgeStaleUserHighlightAnnotations(rend, highlights, keepCfis, appliedRef);
 
-    // 渲染
-    for (const item of sortedHighlights) {
-        if (!visibleCfis.has(item.cfiRange)) continue;
-        const nextSig = buildHighlightApplySignature(item);
-        // sig 未变 + mark 存在 → 跳过
-        if (appliedRef.get(item.cfiRange) === nextSig && isUserHighlightMarkPresent(rend, item.cfiRange)) {
-            continue;
-        }
-        // 否则 remove + highlight 重画
-        removeUserHighlightAnnotation(rend, item.cfiRange, appliedRef);
-        try {
-            // 统一 highlight 类型，与想法 underline 批注槽位分离
-            rend.annotations.highlight(
-                item.cfiRange,
-                buildHighlightData(item),
-                buildUserHighlightClickHandler(item),
-                buildHighlightClassName(item),
-                buildHighlightStyles(item),
-            );
-            appliedRef.set(item.cfiRange, nextSig);
-        } catch {
-            appliedRef.delete(item.cfiRange);
-        }
-    }
+	// 渲染
+	for (const item of sortedHighlights) {
+		if (!visibleCfis.has(item.cfiRange)) continue;
+		const nextSig = buildHighlightApplySignature(item);
+		// sig 未变 + mark 存在 → 跳过
+		if (
+			appliedRef.get(item.cfiRange) === nextSig &&
+			isUserHighlightMarkPresent(rend, item.cfiRange)
+		) {
+			continue;
+		}
+		// 否则 remove + highlight 重画
+		removeUserHighlightAnnotation(rend, item.cfiRange, appliedRef);
+		try {
+			// 统一 highlight 类型，与想法 underline 批注槽位分离
+			rend.annotations.highlight(
+				item.cfiRange,
+				buildHighlightData(item),
+				buildUserHighlightClickHandler(item),
+				buildHighlightClassName(item),
+				buildHighlightStyles(item),
+			);
+			appliedRef.set(item.cfiRange, nextSig);
+		} catch {
+			appliedRef.delete(item.cfiRange);
+		}
+	}
 }
 ```
 
@@ -1969,93 +2070,130 @@ export function applyEpubUserHighlights(
 
 ```ts
 export function applyEpubThoughtUnderlines(
-    rend: Rendition,
-    thoughts: EbookThought[],
-    appliedRef: Map<string, string>,
-    currentUserId = 0,
-    options?: ApplyThoughtUnderlineOptions,
+	rend: Rendition,
+	thoughts: EbookThought[],
+	appliedRef: Map<string, string>,
+	currentUserId = 0,
+	options?: ApplyThoughtUnderlineOptions,
 ): void {
-    // 注入 SVG 样式（虚线/颜色）
-    try { ensureThoughtUnderlineStyles(); } catch { ephemeralPinCfis.clear(); return; }
+	// 注入 SVG 样式（虚线/颜色）
+	try {
+		ensureThoughtUnderlineStyles();
+	} catch {
+		ephemeralPinCfis.clear();
+		return;
+	}
 
-    // 解析 pin（外部强制挂载） + 视口裁剪
-    const pinCfis = resolvePinnedCfis(options);
-    const scopedThoughts = filterThoughtsForAnnotationApply(rend, thoughts);
-    const grouped = groupThoughtsByCfi(scopedThoughts);
-    const allGrouped = groupThoughtsByCfi(thoughts);
-    const loadedSpines = collectLoadedSpineHints(rend);
-    const scopeBySpine = shouldScopeThoughtApplyBySpine(allGrouped.size, loadedSpines);
-    const viewportMode = shouldUseViewportThoughtApply(allGrouped.size, grouped.size);
-    const viewportRoot = viewportMode ? resolveThoughtViewportRoot(rend) : null;
-    const viewportBands = viewportRoot ? readThoughtViewportBands(viewportRoot) : null;
+	// 解析 pin（外部强制挂载） + 视口裁剪
+	const pinCfis = resolvePinnedCfis(options);
+	const scopedThoughts = filterThoughtsForAnnotationApply(rend, thoughts);
+	const grouped = groupThoughtsByCfi(scopedThoughts);
+	const allGrouped = groupThoughtsByCfi(thoughts);
+	const loadedSpines = collectLoadedSpineHints(rend);
+	const scopeBySpine = shouldScopeThoughtApplyBySpine(
+		allGrouped.size,
+		loadedSpines,
+	);
+	const viewportMode = shouldUseViewportThoughtApply(
+		allGrouped.size,
+		grouped.size,
+	);
+	const viewportRoot = viewportMode ? resolveThoughtViewportRoot(rend) : null;
+	const viewportBands = viewportRoot
+		? readThoughtViewportBands(viewportRoot)
+		: null;
 
-    // 决定每个 cfi 是否保留
-    const shouldKeepCfiApplied = (cfiRange: string): boolean => {
-        if (pinCfis.has(cfiRange)) return true;
-        if (!viewportMode || !viewportBands) return true;
-        for (const doc of iterThoughtUnderlineDocuments(rend)) {
-            try {
-                for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
-                    if ((group as SVGElement).dataset.epubcfi?.trim() !== cfiRange) continue;
-                    return isThoughtMarkGroupInBand(group as SVGElement, viewportBands.remove);
-                }
-            } catch { /* ignore */ }
-        }
-        return isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep);
-    };
+	// 决定每个 cfi 是否保留
+	const shouldKeepCfiApplied = (cfiRange: string): boolean => {
+		if (pinCfis.has(cfiRange)) return true;
+		if (!viewportMode || !viewportBands) return true;
+		for (const doc of iterThoughtUnderlineDocuments(rend)) {
+			try {
+				for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
+					if ((group as SVGElement).dataset.epubcfi?.trim() !== cfiRange)
+						continue;
+					return isThoughtMarkGroupInBand(
+						group as SVGElement,
+						viewportBands.remove,
+					);
+				}
+			} catch {
+				/* ignore */
+			}
+		}
+		return isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep);
+	};
 
-    const presentCfis = buildPresentThoughtMarkCfis(rend);
-    const nextCfis = new Set(grouped.keys());
+	const presentCfis = buildPresentThoughtMarkCfis(rend);
+	const nextCfis = new Set(grouped.keys());
 
-    // 记录本人划线
-    for (const [cfiRange, group] of grouped) {
-        thoughtLineOwnByCfi.set(cfiRange, group.some((t) => t.userId === currentUserId));
-    }
-    for (const key of [...thoughtLineOwnByCfi.keys()]) {
-        if (!nextCfis.has(key)) thoughtLineOwnByCfi.delete(key);
-    }
+	// 记录本人划线
+	for (const [cfiRange, group] of grouped) {
+		thoughtLineOwnByCfi.set(
+			cfiRange,
+			group.some((t) => t.userId === currentUserId),
+		);
+	}
+	for (const key of [...thoughtLineOwnByCfi.keys()]) {
+		if (!nextCfis.has(key)) thoughtLineOwnByCfi.delete(key);
+	}
 
-    // 卸载不需要的 mark
-    for (const cfiRange of [...appliedRef.keys()]) {
-        const dropData = !nextCfis.has(cfiRange) || (scopeBySpine && !loadedSpines.has(thoughtSpineHint(cfiRange)));
-        const dropViewport = Boolean(options?.reclaimOffViewportMarks) && viewportMode && !shouldKeepCfiApplied(cfiRange);
-        if (!dropData && !dropViewport) continue;
-        if (pinCfis.has(cfiRange) && dropViewport && nextCfis.has(cfiRange)) continue;
-        try { rend.annotations.remove(cfiRange, 'underline'); } catch { /* ignore */ }
-        appliedRef.delete(cfiRange);
-    }
+	// 卸载不需要的 mark
+	for (const cfiRange of [...appliedRef.keys()]) {
+		const dropData =
+			!nextCfis.has(cfiRange) ||
+			(scopeBySpine && !loadedSpines.has(thoughtSpineHint(cfiRange)));
+		const dropViewport =
+			Boolean(options?.reclaimOffViewportMarks) &&
+			viewportMode &&
+			!shouldKeepCfiApplied(cfiRange);
+		if (!dropData && !dropViewport) continue;
+		if (pinCfis.has(cfiRange) && dropViewport && nextCfis.has(cfiRange))
+			continue;
+		try {
+			rend.annotations.remove(cfiRange, "underline");
+		} catch {
+			/* ignore */
+		}
+		appliedRef.delete(cfiRange);
+	}
 
-    // 按叠层顺序渲染（短 quote 排上面）
-    const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
-    for (const [cfiRange, group] of sortedEntries) {
-        if (viewportMode && !pinCfis.has(cfiRange) && viewportBands) {
-            if (!isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep)) continue;
-        }
-        const thoughtIds = group.map((t) => t.id);
-        const showLine = true;
-        const lineOwn = group.some((t) => t.userId === currentUserId);
-        const nextSig = `${buildThoughtUnderlineSignature(thoughtIds, showLine)}|${lineOwn ? '1' : '0'}`;
-        if (appliedRef.get(cfiRange) === nextSig && presentCfis.has(cfiRange)) continue;
-        try {
-            rend.annotations.remove(cfiRange, 'underline');
-            rend.annotations.underline(
-                cfiRange,
-                {
-                    thoughtIds,
-                    [THOUGHT_MARK_DATA_SHOW_LINE]: showLine ? '1' : '0',
-                    [THOUGHT_MARK_DATA_LINE_OWN]: lineOwn ? '1' : '0',
-                },
-                undefined,
-                EPUB_THOUGHT_UNDERLINE_CLASS,
-                { ...EPUB_THOUGHT_UNDERLINE_STYLES, stroke: resolveThoughtLineColor(group, currentUserId) },
-            );
-            appliedRef.set(cfiRange, nextSig);
-            presentCfis.add(cfiRange);
-        } catch {
-            appliedRef.delete(cfiRange);
-        }
-    }
-    ephemeralPinCfis.clear();
+	// 按叠层顺序渲染（短 quote 排上面）
+	const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
+	for (const [cfiRange, group] of sortedEntries) {
+		if (viewportMode && !pinCfis.has(cfiRange) && viewportBands) {
+			if (!isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep))
+				continue;
+		}
+		const thoughtIds = group.map((t) => t.id);
+		const showLine = true;
+		const lineOwn = group.some((t) => t.userId === currentUserId);
+		const nextSig = `${buildThoughtUnderlineSignature(thoughtIds, showLine)}|${lineOwn ? "1" : "0"}`;
+		if (appliedRef.get(cfiRange) === nextSig && presentCfis.has(cfiRange))
+			continue;
+		try {
+			rend.annotations.remove(cfiRange, "underline");
+			rend.annotations.underline(
+				cfiRange,
+				{
+					thoughtIds,
+					[THOUGHT_MARK_DATA_SHOW_LINE]: showLine ? "1" : "0",
+					[THOUGHT_MARK_DATA_LINE_OWN]: lineOwn ? "1" : "0",
+				},
+				undefined,
+				EPUB_THOUGHT_UNDERLINE_CLASS,
+				{
+					...EPUB_THOUGHT_UNDERLINE_STYLES,
+					stroke: resolveThoughtLineColor(group, currentUserId),
+				},
+			);
+			appliedRef.set(cfiRange, nextSig);
+			presentCfis.add(cfiRange);
+		} catch {
+			appliedRef.delete(cfiRange);
+		}
+	}
+	ephemeralPinCfis.clear();
 }
 ```
 
@@ -2072,167 +2210,194 @@ export function applyEpubThoughtUnderlines(
 
 ```ts
 export function attachEpubSelectionPopBar(
-    rend: Rendition,
-    onChange: (payload: EpubSelectionPopBarPayload | null) => void,
+	rend: Rendition,
+	onChange: (payload: EpubSelectionPopBarPayload | null) => void,
 ): () => void {
-    const contentCleanups = new Map<EpubIframeContents, () => void>();
-    const scrollCleanups: (() => void)[] = [];
-    const boundScrollContainers = new WeakSet<HTMLElement>();
-    let rafId = 0;
-    let keyboardEmitTimer = 0;
-    let selecting = false;
-    let suppressEmitUntil = 0;
-    let contextMenuGesture = false;
+	const contentCleanups = new Map<EpubIframeContents, () => void>();
+	const scrollCleanups: (() => void)[] = [];
+	const boundScrollContainers = new WeakSet<HTMLElement>();
+	let rafId = 0;
+	let keyboardEmitTimer = 0;
+	let selecting = false;
+	let suppressEmitUntil = 0;
+	let contextMenuGesture = false;
 
-    const clearPendingEmit = () => {
-        cancelAnimationFrame(rafId);
-        rafId = 0;
-        window.clearTimeout(keyboardEmitTimer);
-        keyboardEmitTimer = 0;
-    };
+	const clearPendingEmit = () => {
+		cancelAnimationFrame(rafId);
+		rafId = 0;
+		window.clearTimeout(keyboardEmitTimer);
+		keyboardEmitTimer = 0;
+	};
 
-    const hidePopBar = () => {
-        if (shouldSuppressDismiss()) return;
-        clearPendingEmit();
-        onChange(null);
-    };
+	const hidePopBar = () => {
+		if (shouldSuppressDismiss()) return;
+		clearPendingEmit();
+		onChange(null);
+	};
 
-    const forceHidePopBar = () => {
-        clearPendingEmit();
-        onChange(null);
-    };
+	const forceHidePopBar = () => {
+		clearPendingEmit();
+		onChange(null);
+	};
 
-    const shouldSuppressEmit = () => Date.now() < suppressEmitUntil;
+	const shouldSuppressEmit = () => Date.now() < suppressEmitUntil;
 
-    const onScroll = () => {
-        suppressEmitUntil = Date.now() + 350;
-        hidePopBar();
-    };
+	const onScroll = () => {
+		suppressEmitUntil = Date.now() + 350;
+		hidePopBar();
+	};
 
-    const addScrollListener = (target: EventTarget) => {
-        target.addEventListener('scroll', onScroll, { capture: true, passive: true });
-        scrollCleanups.push(() => target.removeEventListener('scroll', onScroll, { capture: true }));
-    };
+	const addScrollListener = (target: EventTarget) => {
+		target.addEventListener("scroll", onScroll, {
+			capture: true,
+			passive: true,
+		});
+		scrollCleanups.push(() =>
+			target.removeEventListener("scroll", onScroll, { capture: true }),
+		);
+	};
 
-    const bindEpubScrollContainer = () => {
-        const container = getEpubScrollContainer(rend);
-        if (!container || boundScrollContainers.has(container)) return;
-        boundScrollContainers.add(container);
-        addScrollListener(container);
-    };
+	const bindEpubScrollContainer = () => {
+		const container = getEpubScrollContainer(rend);
+		if (!container || boundScrollContainers.has(container)) return;
+		boundScrollContainers.add(container);
+		addScrollListener(container);
+	};
 
-    // 核心：双 rAF 保证跨 DOM settle + 跨 iframe 同步后 emit
-    const emitSelection = () => {
-        if (shouldSuppressEmit()) { hidePopBar(); return; }
-        cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => {
-            rafId = requestAnimationFrame(() => {
-                if (shouldSuppressEmit()) { hidePopBar(); return; }
-                const active = readActiveSelection(rend);
-                if (!active) return;  // 简单点击不关
-                const anchor = rangeToViewportAnchor(active.win, active.range);
-                if (!anchor) { onChange(null); return; }
-                rememberEpubPopBarSelectionRange(active.range);
-                onChange({
-                    x: anchor.centerX, y: anchor.top,
-                    selectedText: active.text,
-                    quoteSegments: extractQuoteSegmentsFromRange(active.range, active.win),
-                    cfiRange: resolveSelectionCfiRange(rend, active.win, active.range),
-                });
-            });
-        });
-    };
+	// 核心：双 rAF 保证跨 DOM settle + 跨 iframe 同步后 emit
+	const emitSelection = () => {
+		if (shouldSuppressEmit()) {
+			hidePopBar();
+			return;
+		}
+		cancelAnimationFrame(rafId);
+		rafId = requestAnimationFrame(() => {
+			rafId = requestAnimationFrame(() => {
+				if (shouldSuppressEmit()) {
+					hidePopBar();
+					return;
+				}
+				const active = readActiveSelection(rend);
+				if (!active) return; // 简单点击不关
+				const anchor = rangeToViewportAnchor(active.win, active.range);
+				if (!anchor) {
+					onChange(null);
+					return;
+				}
+				rememberEpubPopBarSelectionRange(active.range);
+				onChange({
+					x: anchor.centerX,
+					y: anchor.top,
+					selectedText: active.text,
+					quoteSegments: extractQuoteSegmentsFromRange(
+						active.range,
+						active.win,
+					),
+					cfiRange: resolveSelectionCfiRange(rend, active.win, active.range),
+				});
+			});
+		});
+	};
 
-    // 每章节 iframe 都挂一份（mousedown / mouseup / selectionchange / contextmenu）
-    const bindContents = (contents: EpubIframeContents) => {
-        if (contentCleanups.has(contents)) return;
-        const doc = contents.document;
+	// 每章节 iframe 都挂一份（mousedown / mouseup / selectionchange / contextmenu）
+	const bindContents = (contents: EpubIframeContents) => {
+		if (contentCleanups.has(contents)) return;
+		const doc = contents.document;
 
-        const onPointerDown = (e: Event) => {
-            if (e instanceof MouseEvent && e.button === 2) {
-                contextMenuGesture = true;
-                suppressEmitUntil = Date.now() + 600;
-            }
-            selecting = true;
-            hidePopBar();
-        };
-        const onPointerUp = (e: Event) => {
-            if (!selecting) return;
-            selecting = false;
-            if (contextMenuGesture || (e instanceof MouseEvent && e.button === 2)) return;
-            emitSelection();
-        };
-        const onSelectionChange = () => {
-            if (shouldSuppressEmit()) { hidePopBar(); return; }
-            if (!readActiveSelection(rend)) {
-                if (selecting || shouldSuppressDismiss()) return;
-                onChange(null);
-                return;
-            }
-            if (selecting) return;
-            window.clearTimeout(keyboardEmitTimer);
-            keyboardEmitTimer = window.setTimeout(() => {
-                if (selecting || shouldSuppressEmit()) return;
-                emitSelection();
-            }, 200);
-        };
-        const onContextMenu = () => {
-            contextMenuGesture = false;
-            suppressEmitUntil = Date.now() + 600;
-            forceHidePopBar();
-        };
-        doc.addEventListener('mousedown', onPointerDown, true);
-        doc.addEventListener('touchstart', onPointerDown, true);
-        doc.addEventListener('mouseup', onPointerUp, true);
-        doc.addEventListener('touchend', onPointerUp, true);
-        doc.addEventListener('selectionchange', onSelectionChange);
-        doc.addEventListener('contextmenu', onContextMenu, true);
-        addScrollListener(doc);
-        addScrollListener(contents.window);
-        contentCleanups.set(contents, () => {
-            doc.removeEventListener('mousedown', onPointerDown, true);
-            // ... 全部解绑
-        });
-    };
+		const onPointerDown = (e: Event) => {
+			if (e instanceof MouseEvent && e.button === 2) {
+				contextMenuGesture = true;
+				suppressEmitUntil = Date.now() + 600;
+			}
+			selecting = true;
+			hidePopBar();
+		};
+		const onPointerUp = (e: Event) => {
+			if (!selecting) return;
+			selecting = false;
+			if (contextMenuGesture || (e instanceof MouseEvent && e.button === 2))
+				return;
+			emitSelection();
+		};
+		const onSelectionChange = () => {
+			if (shouldSuppressEmit()) {
+				hidePopBar();
+				return;
+			}
+			if (!readActiveSelection(rend)) {
+				if (selecting || shouldSuppressDismiss()) return;
+				onChange(null);
+				return;
+			}
+			if (selecting) return;
+			window.clearTimeout(keyboardEmitTimer);
+			keyboardEmitTimer = window.setTimeout(() => {
+				if (selecting || shouldSuppressEmit()) return;
+				emitSelection();
+			}, 200);
+		};
+		const onContextMenu = () => {
+			contextMenuGesture = false;
+			suppressEmitUntil = Date.now() + 600;
+			forceHidePopBar();
+		};
+		doc.addEventListener("mousedown", onPointerDown, true);
+		doc.addEventListener("touchstart", onPointerDown, true);
+		doc.addEventListener("mouseup", onPointerUp, true);
+		doc.addEventListener("touchend", onPointerUp, true);
+		doc.addEventListener("selectionchange", onSelectionChange);
+		doc.addEventListener("contextmenu", onContextMenu, true);
+		addScrollListener(doc);
+		addScrollListener(contents.window);
+		contentCleanups.set(contents, () => {
+			doc.removeEventListener("mousedown", onPointerDown, true);
+			// ... 全部解绑
+		});
+	};
 
-    // 动态响应新章节 iframe
-    rend.hooks.content.register(bindContents);
-    const existing = rend.getContents();
-    if (Array.isArray(existing)) for (const item of existing) bindContents(item as EpubIframeContents);
-    else if (existing) bindContents(existing as EpubIframeContents);
+	// 动态响应新章节 iframe
+	rend.hooks.content.register(bindContents);
+	const existing = rend.getContents();
+	if (Array.isArray(existing))
+		for (const item of existing) bindContents(item as EpubIframeContents);
+	else if (existing) bindContents(existing as EpubIframeContents);
 
-    addScrollListener(window);
-    addScrollListener(document);
-    bindEpubScrollContainer();
+	addScrollListener(window);
+	addScrollListener(document);
+	bindEpubScrollContainer();
 
-    // 翻章 / 渲染时重绑容器 + 关 PopBar
-    const onRendered = () => bindEpubScrollContainer();
-    const onRelocated = () => { suppressEmitUntil = Date.now() + 350; hidePopBar(); bindEpubScrollContainer(); };
-    rend.on('rendered', onRendered);
-    rend.on('relocated', onRelocated);
+	// 翻章 / 渲染时重绑容器 + 关 PopBar
+	const onRendered = () => bindEpubScrollContainer();
+	const onRelocated = () => {
+		suppressEmitUntil = Date.now() + 350;
+		hidePopBar();
+		bindEpubScrollContainer();
+	};
+	rend.on("rendered", onRendered);
+	rend.on("relocated", onRelocated);
 
-    // 顶层 pointerup：兜底（用户拖出 iframe 也能结束）
-    const onDocPointerUp = () => {
-        if (!selecting) return;
-        selecting = false;
-        emitSelection();
-    };
-    document.addEventListener('pointerup', onDocPointerUp, true);
-    document.addEventListener('touchend', onDocPointerUp, true);
+	// 顶层 pointerup：兜底（用户拖出 iframe 也能结束）
+	const onDocPointerUp = () => {
+		if (!selecting) return;
+		selecting = false;
+		emitSelection();
+	};
+	document.addEventListener("pointerup", onDocPointerUp, true);
+	document.addEventListener("touchend", onDocPointerUp, true);
 
-    return () => {
-        cancelAnimationFrame(rafId);
-        window.clearTimeout(keyboardEmitTimer);
-        document.removeEventListener('pointerup', onDocPointerUp, true);
-        document.removeEventListener('touchend', onDocPointerUp, true);
-        rend.off('rendered', onRendered);
-        rend.off('relocated', onRelocated);
-        for (const fn of scrollCleanups) fn();
-        scrollCleanups.length = 0;
-        for (const fn of contentCleanups.values()) fn();
-        contentCleanups.clear();
-        onChange(null);
-    };
+	return () => {
+		cancelAnimationFrame(rafId);
+		window.clearTimeout(keyboardEmitTimer);
+		document.removeEventListener("pointerup", onDocPointerUp, true);
+		document.removeEventListener("touchend", onDocPointerUp, true);
+		rend.off("rendered", onRendered);
+		rend.off("relocated", onRelocated);
+		for (const fn of scrollCleanups) fn();
+		scrollCleanups.length = 0;
+		for (const fn of contentCleanups.values()) fn();
+		contentCleanups.clear();
+		onChange(null);
+	};
 }
 ```
 
@@ -2249,47 +2414,47 @@ export function attachEpubSelectionPopBar(
 
 ```ts
 export function indexChapterSentenceRanges(
-    outerRange: Range,
-    plain: string,
+	outerRange: Range,
+	plain: string,
 ): Array<Range | null> {
-    const trimmed = plain.trim();
-    const sentences = buildSentenceOffsetSpans(trimmed);
-    if (!sentences.length) return [];
+	const trimmed = plain.trim();
+	const sentences = buildSentenceOffsetSpans(trimmed);
+	if (!sentences.length) return [];
 
-    const body = bodyFromOuter(outerRange);
-    if (!body) return sentences.map(() => null);
+	const body = bodyFromOuter(outerRange);
+	if (!body) return sentences.map(() => null);
 
-    // 列举 body 内所有文本节点 × offset
-    const positions = listBodyTextPositions(body);
-    if (!positions.length) return sentences.map(() => null);
+	// 列举 body 内所有文本节点 × offset
+	const positions = listBodyTextPositions(body);
+	if (!positions.length) return sentences.map(() => null);
 
-    // 标准化：合并空白、压缩
-    const { norm, map } = buildNormStream(positions);
-    if (!norm) return sentences.map(() => null);
+	// 标准化：合并空白、压缩
+	const { norm, map } = buildNormStream(positions);
+	if (!norm) return sentences.map(() => null);
 
-    // 顺序搜索每句 needle → 找到对应 DOM 位置
-    let cursor = 0;
-    return sentences.map((sent) => {
-        const needle = normForMatch(trimmed.slice(sent.start, sent.end));
-        if (!needle) return null;
+	// 顺序搜索每句 needle → 找到对应 DOM 位置
+	let cursor = 0;
+	return sentences.map((sent) => {
+		const needle = normForMatch(trimmed.slice(sent.start, sent.end));
+		if (!needle) return null;
 
-        let idx = norm.indexOf(needle, cursor);
-        // 长句 fallback：前 24 字符先搜，确认 prefix 一致
-        if (idx < 0 && needle.length >= 8) {
-            const head = needle.slice(0, Math.min(24, needle.length));
-            idx = norm.indexOf(head, cursor);
-            if (idx >= 0 && norm.slice(idx, idx + needle.length) !== needle) idx = -1;
-        }
-        if (idx < 0) return null;
+		let idx = norm.indexOf(needle, cursor);
+		// 长句 fallback：前 24 字符先搜，确认 prefix 一致
+		if (idx < 0 && needle.length >= 8) {
+			const head = needle.slice(0, Math.min(24, needle.length));
+			idx = norm.indexOf(head, cursor);
+			if (idx >= 0 && norm.slice(idx, idx + needle.length) !== needle) idx = -1;
+		}
+		if (idx < 0) return null;
 
-        const startPi = map[idx];
-        const endPi = map[idx + needle.length - 1];
-        if (startPi == null || endPi == null) return null;
+		const startPi = map[idx];
+		const endPi = map[idx + needle.length - 1];
+		if (startPi == null || endPi == null) return null;
 
-        const range = rangeFromPosSpan(positions, startPi, endPi);
-        if (range) cursor = idx + needle.length;   // 顺序推进
-        return range;
-    });
+		const range = rangeFromPosSpan(positions, startPi, endPi);
+		if (range) cursor = idx + needle.length; // 顺序推进
+		return range;
+	});
 }
 ```
 
@@ -2306,39 +2471,42 @@ export function indexChapterSentenceRanges(
 
 ```ts
 export async function advanceScrollListenSection(
-    rend: Rendition,
-    currentDoc: Document,
+	rend: Rendition,
+	currentDoc: Document,
 ): Promise<Document | null> {
-    // 列所有 .epub-view 槽位
-    let slots = listEpubViewSlots(rend);
-    // 找已加载的下一 doc
-    const ready = nextLoadedDoc(slots, currentDoc);
-    if (ready) return ready;
+	// 列所有 .epub-view 槽位
+	let slots = listEpubViewSlots(rend);
+	// 找已加载的下一 doc
+	const ready = nextLoadedDoc(slots, currentDoc);
+	if (ready) return ready;
 
-    // 找不到当前 doc 的 slot → 从末尾往前找最近的 loaded doc 作为基准
-    let slotIdx = findSlotIndex(slots, currentDoc);
-    if (slotIdx < 0) {
-        for (let i = slots.length - 1; i >= 0; i -= 1) {
-            if (slots[i]!.doc) { slotIdx = i; break; }
-        }
-    }
+	// 找不到当前 doc 的 slot → 从末尾往前找最近的 loaded doc 作为基准
+	let slotIdx = findSlotIndex(slots, currentDoc);
+	if (slotIdx < 0) {
+		for (let i = slots.length - 1; i >= 0; i -= 1) {
+			if (slots[i]!.doc) {
+				slotIdx = i;
+				break;
+			}
+		}
+	}
 
-    // 5 轮：每轮对所有 next slot 尝试加载 + 必要时整屏下滚
-    for (let round = 0; round < ADVANCE_ROUNDS; round += 1) {
-        slots = listEpubViewSlots(rend);
-        for (let i = slotIdx + 1; i < slots.length; i += 1) {
-            const doc = await ensureSlotDocument(rend, slots[i]!);
-            if (doc && !sameDoc(doc, currentDoc)) return doc;
-        }
-        // 激进推进：滚一整屏 + manager.check
-        const host = getEpubScrollContainer(rend);
-        if (host) {
-            host.scrollTop += Math.max(200, Math.floor(host.clientHeight * 0.9));
-            await invokeManagerCheck(rend);
-            await pauseForLayout();
-        }
-    }
-    return null;
+	// 5 轮：每轮对所有 next slot 尝试加载 + 必要时整屏下滚
+	for (let round = 0; round < ADVANCE_ROUNDS; round += 1) {
+		slots = listEpubViewSlots(rend);
+		for (let i = slotIdx + 1; i < slots.length; i += 1) {
+			const doc = await ensureSlotDocument(rend, slots[i]!);
+			if (doc && !sameDoc(doc, currentDoc)) return doc;
+		}
+		// 激进推进：滚一整屏 + manager.check
+		const host = getEpubScrollContainer(rend);
+		if (host) {
+			host.scrollTop += Math.max(200, Math.floor(host.clientHeight * 0.9));
+			await invokeManagerCheck(rend);
+			await pauseForLayout();
+		}
+	}
+	return null;
 }
 ```
 
@@ -2359,11 +2527,11 @@ export async function advanceScrollListenSection(
 
 ```ts
 function coalesceOverlappingHighlightsForRender(rend, highlights) {
-    // 1. 同 CFI 保留 style/color 优先级最高的那条
-    // 2. 严格包含：保留外层、移除内层
-    // 3. 重叠/相邻：用 mergeDomRangeUnion 合并 client rect
-    // 4. 跨文档划线：分别归并
-    return sortedCoalesced;
+	// 1. 同 CFI 保留 style/color 优先级最高的那条
+	// 2. 严格包含：保留外层、移除内层
+	// 3. 重叠/相邻：用 mergeDomRangeUnion 合并 client rect
+	// 4. 跨文档划线：分别归并
+	return sortedCoalesced;
 }
 ```
 
@@ -2418,106 +2586,106 @@ export function applyEpubReaderAppearance(rend, settings, appTheme) {
 ```typescript
 // startPlayback：从外部（选区工具栏/划线卡片）触发引用听读
 const startPlayback = useCallback(
-    async (
-        // 用户选中的原始文本（可能含 markdown/换行）
-        text: string,
-        // 唯一播放键：用于判断「点同一个按钮 = 停止」
-        key: string,
-        // 选区对应的 epub CFI range（用于 overlay 会话定位）
-        cfiRange?: string,
-        // 用户原始选区的 DOM Range（被冻结下来，避免选区失效）
-        frozenRange?: Range | null,
-    ) => {
-        // 空文本直接退出，不进入会话
-        const trimmed = text.trim();
-        if (!trimmed) return;
+	async (
+		// 用户选中的原始文本（可能含 markdown/换行）
+		text: string,
+		// 唯一播放键：用于判断「点同一个按钮 = 停止」
+		key: string,
+		// 选区对应的 epub CFI range（用于 overlay 会话定位）
+		cfiRange?: string,
+		// 用户原始选区的 DOM Range（被冻结下来，避免选区失效）
+		frozenRange?: Range | null,
+	) => {
+		// 空文本直接退出，不进入会话
+		const trimmed = text.trim();
+		if (!trimmed) return;
 
-        // 互斥 1：先调用 registerChapterListenStop 注册的回调，停止整章听书
-        invokeStopChapterListen();
-        // 互斥 2：浏览器不支持 TTS（无 SpeechSynthesis 或无 voice）→ 提示并退出
-        if (!isEnglishPlaybackAvailable()) {
-            Toast({
-                type: 'warning',
-                title: tRef.current('englishLearning.tts.unsupported'),
-            });
-            return;
-        }
+		// 互斥 1：先调用 registerChapterListenStop 注册的回调，停止整章听书
+		invokeStopChapterListen();
+		// 互斥 2：浏览器不支持 TTS（无 SpeechSynthesis 或无 voice）→ 提示并退出
+		if (!isPlaybackAvailable()) {
+			Toast({
+				type: "warning",
+				title: tRef.current("englishLearning.tts.unsupported"),
+			});
+			return;
+		}
 
-        // 用户手势 prime：解锁 AudioContext 之类的浏览器策略限制
-        primeEnglishPlaybackForUserGesture();
-        // 清理上一次的英文 TTS（避免两次播放叠加）
-        stopAllEnglishPlayback();
-        // 清理上一次的 overlay 会话（避免高亮残留）
-        clearEpubListenSegmentOverlay();
+		// 用户手势 prime：解锁 AudioContext 之类的浏览器策略限制
+		primePlaybackForUserGesture();
+		// 清理上一次的英文 TTS（避免两次播放叠加）
+		stopAllPlayback();
+		// 清理上一次的 overlay 会话（避免高亮残留）
+		clearEpubListenSegmentOverlay();
 
-        // 拿到当前 rendition（可能为 null，比如尚未 ready）
-        const rend = getRenditionRef.current?.() ?? null;
-        // cfi 修剪为字符串
-        const cfi = cfiRange?.trim() ?? '';
-        // resolveEpubListenPlain：把选区文本 + frozenRange 解析为「可朗读 plain + selectionRange」
-        // selectionRange：用于 overlay 在 iframe 内画高亮；plain：用于 TTS
-        const { plain, selectionRange } = resolveEpubListenPlain(
-            rend,
-            trimmed,
-            frozenRange,
-        );
+		// 拿到当前 rendition（可能为 null，比如尚未 ready）
+		const rend = getRenditionRef.current?.() ?? null;
+		// cfi 修剪为字符串
+		const cfi = cfiRange?.trim() ?? "";
+		// resolveEpubListenPlain：把选区文本 + frozenRange 解析为「可朗读 plain + selectionRange」
+		// selectionRange：用于 overlay 在 iframe 内画高亮；plain：用于 TTS
+		const { plain, selectionRange } = resolveEpubListenPlain(
+			rend,
+			trimmed,
+			frozenRange,
+		);
 
-        // 仅当 rendition 与 plain 都存在时，才创建 overlay 会话
-        if (rend && plain) {
-            beginEpubListenOverlaySession(rend, plain, {
-                cfi,
-                selectionRange,
-            });
-        }
+		// 仅当 rendition 与 plain 都存在时，才创建 overlay 会话
+		if (rend && plain) {
+			beginEpubListenOverlaySession(rend, plain, {
+				cfi,
+				selectionRange,
+			});
+		}
 
-        // 取会话 plain：优先从 overlay 会话取（已被分句处理），否则用上面解析的 plain
-        const speakPlain = getEpubListenSessionPlain() ?? plain;
-        // 没有可朗读内容 → 退出（不进入播放循环）
-        if (!speakPlain.trim()) return;
+		// 取会话 plain：优先从 overlay 会话取（已被分句处理），否则用上面解析的 plain
+		const speakPlain = getEpubListenSessionPlain() ?? plain;
+		// 没有可朗读内容 → 退出（不进入播放循环）
+		if (!speakPlain.trim()) return;
 
-        // 兜底 plain：当 overlay 会话被外部清掉时，playFromCursor 还能用它分句
-        fallbackPlainRef.current = speakPlain;
-        // 句子标签列表：底部播放条上展示当前句文本
-        const meta = getEpubListenSessionMeta();
-        const labels = meta?.sentenceLabels ?? buildLabelsFromPlain(speakPlain);
-        // 总句数：来自 overlay 元信息或标签长度
-        const sentenceCount = meta?.sentenceCount ?? labels.length;
+		// 兜底 plain：当 overlay 会话被外部清掉时，playFromCursor 还能用它分句
+		fallbackPlainRef.current = speakPlain;
+		// 句子标签列表：底部播放条上展示当前句文本
+		const meta = getEpubListenSessionMeta();
+		const labels = meta?.sentenceLabels ?? buildLabelsFromPlain(speakPlain);
+		// 总句数：来自 overlay 元信息或标签长度
+		const sentenceCount = meta?.sentenceCount ?? labels.length;
 
-        // 关键：自增 loopGen，让上一轮的 playFromCursor 立刻失效（实现「打断旧播放」）
-        const gen = ++loopGenRef.current;
-        // 重置暂停标记
-        pausedRef.current = false;
-        // 取当前 state.rate 作为本次播放速率（用户在 UI 上调过）
-        rateRef.current = stateRef.current.rate || 1;
-        // 句指针归零：从第一句开始
-        sentenceCursorRef.current = 0;
-        // 记录正在播放的 key（用于按钮态/再次点击停止）
-        playingKeyRef.current = key;
-        setPlayingKey(key);
+		// 关键：自增 loopGen，让上一轮的 playFromCursor 立刻失效（实现「打断旧播放」）
+		const gen = ++loopGenRef.current;
+		// 重置暂停标记
+		pausedRef.current = false;
+		// 取当前 state.rate 作为本次播放速率（用户在 UI 上调过）
+		rateRef.current = stateRef.current.rate || 1;
+		// 句指针归零：从第一句开始
+		sentenceCursorRef.current = 0;
+		// 记录正在播放的 key（用于按钮态/再次点击停止）
+		playingKeyRef.current = key;
+		setPlayingKey(key);
 
-        // 当前 spine 索引（用于状态展示，跟整章听书字段对齐）
-        const spineIndex = getSpineIndexRef.current?.() ?? -1;
-        // 同步外部 state：loading 阶段（接下来 playFromCursor 会切到 playing）
-        syncState({
-            status: 'loading',
-            spineIndex,
-            sentenceIndex: 0,
-            sentenceCount,
-            sentenceLabels: labels,
-            rate: rateRef.current,
-        });
+		// 当前 spine 索引（用于状态展示，跟整章听书字段对齐）
+		const spineIndex = getSpineIndexRef.current?.() ?? -1;
+		// 同步外部 state：loading 阶段（接下来 playFromCursor 会切到 playing）
+		syncState({
+			status: "loading",
+			spineIndex,
+			sentenceIndex: 0,
+			sentenceCount,
+			sentenceLabels: labels,
+			rate: rateRef.current,
+		});
 
-        // 真正开始播放：playFromCursor 内部 for 循环逐句 await playEnglishPreferred
-        const finished = await playFromCursor(gen);
-        // finished = true 表示正常播完最后一句
-        if (finished && isGenActive(gen)) {
-            stopInternal();
-        } else if (!pausedRef.current && isGenActive(gen)) {
-            // 中途异常退出（如 cloudTts 失败）且非用户主动暂停 → 走 stopInternal 收尾
-            stopInternal();
-        }
-    },
-    [playFromCursor, stopInternal, syncState],
+		// 真正开始播放：playFromCursor 内部 for 循环逐句 await playPreferred
+		const finished = await playFromCursor(gen);
+		// finished = true 表示正常播完最后一句
+		if (finished && isGenActive(gen)) {
+			stopInternal();
+		} else if (!pausedRef.current && isGenActive(gen)) {
+			// 中途异常退出（如 cloudTts 失败）且非用户主动暂停 → 走 stopInternal 收尾
+			stopInternal();
+		}
+	},
+	[playFromCursor, stopInternal, syncState],
 );
 ```
 
@@ -2527,90 +2695,90 @@ playFromCursor 是 startPlayback 调用的真正播放主循环。理解它的�
 
 ```typescript
 const playFromCursor = useCallback(
-    async (gen: number): Promise<boolean> => {
-        // 当前 rendition（用于画高亮）
-        const rend = getRenditionRef.current?.() ?? null;
-        // overlay 会话元信息（含分句）
-        const meta = getEpubListenSessionMeta();
-        // plain：优先 meta，fallback 用 ref
-        const plain = meta?.plain ?? fallbackPlainRef.current;
-        // 句子总数：优先 meta，否则实时分句
-        const sentenceCount =
-            meta?.sentenceCount ?? buildSentenceOffsetSpans(plain.trim()).length;
+	async (gen: number): Promise<boolean> => {
+		// 当前 rendition（用于画高亮）
+		const rend = getRenditionRef.current?.() ?? null;
+		// overlay 会话元信息（含分句）
+		const meta = getEpubListenSessionMeta();
+		// plain：优先 meta，fallback 用 ref
+		const plain = meta?.plain ?? fallbackPlainRef.current;
+		// 句子总数：优先 meta，否则实时分句
+		const sentenceCount =
+			meta?.sentenceCount ?? buildSentenceOffsetSpans(plain.trim()).length;
 
-        // 空文本 → 直接 false（外层据此 stopInternal）
-        if (!plain.trim() || sentenceCount <= 0) return false;
+		// 空文本 → 直接 false（外层据此 stopInternal）
+		if (!plain.trim() || sentenceCount <= 0) return false;
 
-        // 预取缓存：句 index → TTS Promise
-        const prefetchedByIndex = new Map<
-            number,
-            ReturnType<typeof prefetchCloudEnglishTts>
-        >();
+		// 预取缓存：句 index → TTS Promise
+		const prefetchedByIndex = new Map<
+			number,
+			ReturnType<typeof prefetchCloudTts>
+		>();
 
-        // 预取下一句的云端 TTS（让下一句能秒播）
-        const schedulePrefetch = (index: number) => {
-            if (index >= sentenceCount || prefetchedByIndex.has(index)) return;
-            const raw = resolveSpokenAt(index, plain);
-            if (!raw) return;
-            prefetchedByIndex.set(index, prefetchCloudEnglishTts(raw));
-        };
-        // 启动时预取第二句，让第一句播完时第二句已就绪
-        schedulePrefetch(sentenceCursorRef.current + 1);
+		// 预取下一句的云端 TTS（让下一句能秒播）
+		const schedulePrefetch = (index: number) => {
+			if (index >= sentenceCount || prefetchedByIndex.has(index)) return;
+			const raw = resolveSpokenAt(index, plain);
+			if (!raw) return;
+			prefetchedByIndex.set(index, prefetchCloudTts(raw));
+		};
+		// 启动时预取第二句，让第一句播完时第二句已就绪
+		schedulePrefetch(sentenceCursorRef.current + 1);
 
-        // 主循环：从当前游标逐句播放到末句
-        for (let si = sentenceCursorRef.current; si < sentenceCount; si += 1) {
-            // gen 失效或被暂停 → 提前退出（return false）
-            if (!isGenActive(gen) || pausedRef.current) return false;
+		// 主循环：从当前游标逐句播放到末句
+		for (let si = sentenceCursorRef.current; si < sentenceCount; si += 1) {
+			// gen 失效或被暂停 → 提前退出（return false）
+			if (!isGenActive(gen) || pausedRef.current) return false;
 
-            // 拿当前句要播放的原文；空句跳过
-            const spokenRaw = resolveSpokenAt(si, plain);
-            if (!spokenRaw) continue;
+			// 拿当前句要播放的原文；空句跳过
+			const spokenRaw = resolveSpokenAt(si, plain);
+			if (!spokenRaw) continue;
 
-            // 句指针推进
-            sentenceCursorRef.current = si;
-            // 同步外部 state：正在播放第 si 句
-            syncState({
-                status: 'playing',
-                sentenceIndex: si,
-                sentenceCount,
-            });
+			// 句指针推进
+			sentenceCursorRef.current = si;
+			// 同步外部 state：正在播放第 si 句
+			syncState({
+				status: "playing",
+				sentenceIndex: si,
+				sentenceCount,
+			});
 
-            // 在 iframe 内画淡黄高亮区块（marks-pane）
-            if (rend) showEpubListenPlainSpan(0, 0, si);
+			// 在 iframe 内画淡黄高亮区块（marks-pane）
+			if (rend) showEpubListenPlainSpan(0, 0, si);
 
-            // 预取下一句（让下一句也命中缓存）
-            schedulePrefetch(si + 1);
+			// 预取下一句（让下一句也命中缓存）
+			schedulePrefetch(si + 1);
 
-            try {
-                // 播放当前句：playEnglishPreferred 会本地优先、云端兜底
-                await playEnglishPreferred(spokenRaw, {
-                    speak: { rate: rateRef.current },
-                    prefetchedCloud: prefetchedByIndex.get(si) ?? null,
-                });
-            } catch (err) {
-                // 仅当 gen 仍有效且未通知过 cloudTts 时弹 toast
-                if (
-                    isGenActive(gen) &&
-                    !(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
-                ) {
-                    Toast({
-                        type: 'warning',
-                        title: tRef.current('englishLearning.tts.unsupported'),
-                    });
-                }
-                return false;
-            }
+			try {
+				// 播放当前句：playPreferred 会本地优先、云端兜底
+				await playPreferred(spokenRaw, {
+					speak: { rate: rateRef.current },
+					prefetchedCloud: prefetchedByIndex.get(si) ?? null,
+				});
+			} catch (err) {
+				// 仅当 gen 仍有效且未通知过 cloudTts 时弹 toast
+				if (
+					isGenActive(gen) &&
+					!(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
+				) {
+					Toast({
+						type: "warning",
+						title: tRef.current("englishLearning.tts.unsupported"),
+					});
+				}
+				return false;
+			}
 
-            // 再确认：未被打断/暂停才继续下一句
-            if (!isGenActive(gen) || pausedRef.current) return false;
-            // 清掉当前句高亮（下一句会重新画）
-            if (rend) clearActiveListenHighlight(rend);
-        }
+			// 再确认：未被打断/暂停才继续下一句
+			if (!isGenActive(gen) || pausedRef.current) return false;
+			// 清掉当前句高亮（下一句会重新画）
+			if (rend) clearActiveListenHighlight(rend);
+		}
 
-        // 完整播到尾 → return true（外层据此 stopInternal）
-        return isGenActive(gen);
-    },
-    [syncState],
+		// 完整播到尾 → return true（外层据此 stopInternal）
+		return isGenActive(gen);
+	},
+	[syncState],
 );
 ```
 
@@ -2632,71 +2800,68 @@ const playFromCursor = useCallback(
 
 ```typescript
 const syncThoughts = useCallback(
-    async (options?: SyncOptions): Promise<EbookThought[] | null> => {
-        // 守卫 1：未启用（非共享上下文 / 无 bookId）→ 直接返回 null
-        if (!enabled || !bookId) return null;
-        // 守卫 2：已有进行中的 sync → 复用同一 Promise，避免重复请求
-        if (inFlightRef.current) return inFlightRef.current;
+	async (options?: SyncOptions): Promise<EbookThought[] | null> => {
+		// 守卫 1：未启用（非共享上下文 / 无 bookId）→ 直接返回 null
+		if (!enabled || !bookId) return null;
+		// 守卫 2：已有进行中的 sync → 复用同一 Promise，避免重复请求
+		if (inFlightRef.current) return inFlightRef.current;
 
-        const now = Date.now();
-        // 守卫 3：非强制同步 + 距上次同步 < 5s → 直接返回当前 thoughts（节流）
-        if (
-            !options?.force &&
-            now - lastSyncAtRef.current < MIN_SYNC_INTERVAL_MS
-        ) {
-            return thoughtsRef.current;
-        }
+		const now = Date.now();
+		// 守卫 3：非强制同步 + 距上次同步 < 5s → 直接返回当前 thoughts（节流）
+		if (!options?.force && now - lastSyncAtRef.current < MIN_SYNC_INTERVAL_MS) {
+			return thoughtsRef.current;
+		}
 
-        // 真正的同步逻辑（独立成 run()，方便 inFlightRef 持有 Promise）
-        const run = async (): Promise<EbookThought[] | null> => {
-            try {
-                // 拿本地最新 thoughts（ref，避免闭包陈旧）
-                const local = thoughtsRef.current;
-                // 计算增量参数 since：
-                //   ebookThoughtSyncSinceParam(maxEbookThoughtUpdatedAt(local))
-                //   - maxEbookThoughtUpdatedAt：取所有 thought 中最大的 updatedAt
-                //   - ebookThoughtSyncSinceParam：包装成接口需要的格式（可能减 1ms 防边界丢数据）
-                const since = ebookThoughtSyncSinceParam(
-                    maxEbookThoughtUpdatedAt(local),
-                );
-                // 调后端 /api/ebook/thought/sync?bookId=&since= 拉增量
-                const sync = await fetchEbookThoughtSync(bookId, since);
-                // applyEbookThoughtSync：本地 + 远端 → 合并后的 next
-                //   返回 { next, hasChanges }；next === local 表示无变化
-                const { next } = applyEbookThoughtSync(local, sync);
+		// 真正的同步逻辑（独立成 run()，方便 inFlightRef 持有 Promise）
+		const run = async (): Promise<EbookThought[] | null> => {
+			try {
+				// 拿本地最新 thoughts（ref，避免闭包陈旧）
+				const local = thoughtsRef.current;
+				// 计算增量参数 since：
+				//   ebookThoughtSyncSinceParam(maxEbookThoughtUpdatedAt(local))
+				//   - maxEbookThoughtUpdatedAt：取所有 thought 中最大的 updatedAt
+				//   - ebookThoughtSyncSinceParam：包装成接口需要的格式（可能减 1ms 防边界丢数据）
+				const since = ebookThoughtSyncSinceParam(
+					maxEbookThoughtUpdatedAt(local),
+				);
+				// 调后端 /api/ebook/thought/sync?bookId=&since= 拉增量
+				const sync = await fetchEbookThoughtSync(bookId, since);
+				// applyEbookThoughtSync：本地 + 远端 → 合并后的 next
+				//   返回 { next, hasChanges }；next === local 表示无变化
+				const { next } = applyEbookThoughtSync(local, sync);
 
-                // 仅当 next 真的变了才回写 state
-                if (next !== local) {
-                    // 有新增/变更的 thought → 把它们的 cfiRange 临时 pin 起来
-                    // ephemeralPinThoughtCfis：让下一次 mark 渲染保留这些 cfiRange，
-                    //   避免「远端先返回 → mark 没渲染 → 用户看到下划线闪烁」
-                    if (sync.changes.length > 0) {
-                        ephemeralPinThoughtCfis(
-                            sync.changes.map((thought) => thought.cfiRange),
-                        );
-                    }
-                    // 把合并结果回写 React state
-                    setThoughts(next);
-                    // 通知外部（如重渲染 mark）
-                    onMergedRef.current?.();
-                }
-                // 记录本次同步时刻（节流用）
-                lastSyncAtRef.current = Date.now();
-                return next;
-            } catch {
-                // 任何异常（网络错、JSON 错）→ 返回当前 thoughts，不抛出（降级）
-                return thoughtsRef.current;
-            } finally {
-                // 无论成功失败，清掉 inFlight，让下次 sync 能再发起
-                inFlightRef.current = null;
-            }
-        };
+				// 仅当 next 真的变了才回写 state
+				if (next !== local) {
+					// 有新增/变更的 thought → 把它们的 cfiRange 临时 pin 起来
+					// ephemeralPinThoughtCfis：让下一次 mark 渲染保留这些 cfiRange，
+					//   避免「远端先返回 → mark 没渲染 → 用户看到下划线闪烁」
+					if (sync.changes.length > 0) {
+						ephemeralPinThoughtCfis(
+							sync.changes.map((thought) => thought.cfiRange),
+						);
+					}
+					// 把合并结果回写 React state
+					setThoughts(next);
+					// 通知外部（如重渲染 mark）
+					onMergedRef.current?.();
+				}
+				// 记录本次同步时刻（节流用）
+				lastSyncAtRef.current = Date.now();
+				return next;
+			} catch {
+				// 任何异常（网络错、JSON 错）→ 返回当前 thoughts，不抛出（降级）
+				return thoughtsRef.current;
+			} finally {
+				// 无论成功失败，清掉 inFlight，让下次 sync 能再发起
+				inFlightRef.current = null;
+			}
+		};
 
-        // 把 run() 的 Promise 存到 inFlightRef，并在它结束前所有调用都复用同一 Promise
-        inFlightRef.current = run();
-        return inFlightRef.current;
-    },
-    [bookId, enabled, setThoughts],
+		// 把 run() 的 Promise 存到 inFlightRef，并在它结束前所有调用都复用同一 Promise
+		inFlightRef.current = run();
+		return inFlightRef.current;
+	},
+	[bookId, enabled, setThoughts],
 );
 ```
 
@@ -2708,38 +2873,38 @@ const syncThoughts = useCallback(
 // 1. refreshThoughtsNow：强制同步（force: true 跳过节流）
 //    用于「打开想法列表」「点击刷新按钮」等用户主动操作
 const refreshThoughtsNow = useCallback(
-    () => syncThoughts({ force: true }),
-    [syncThoughts],
+	() => syncThoughts({ force: true }),
+	[syncThoughts],
 );
 
 // 2. scheduleSync：滚动停稳后节流触发（不强制）
 //    用于阅读过程中的「relocate → 停稳 2s → 拉一次增量」
 const scheduleSync = useCallback(() => {
-    if (!enabled) return;
-    // 清掉上一次未触发的 timer，重新计时（防抖）
-    if (relocTimerRef.current) clearTimeout(relocTimerRef.current);
-    relocTimerRef.current = setTimeout(() => {
-        relocTimerRef.current = null;
-        // 不强制 → 受 5s 节流约束
-        void syncThoughts();
-    }, RELOC_DEBOUNCE_MS);
+	if (!enabled) return;
+	// 清掉上一次未触发的 timer，重新计时（防抖）
+	if (relocTimerRef.current) clearTimeout(relocTimerRef.current);
+	relocTimerRef.current = setTimeout(() => {
+		relocTimerRef.current = null;
+		// 不强制 → 受 5s 节流约束
+		void syncThoughts();
+	}, RELOC_DEBOUNCE_MS);
 }, [enabled, syncThoughts]);
 
 // 3. visibilitychange：从后台切回前台时立即同步一次
 useEffect(() => {
-    if (!enabled) return;
-    const onVisibility = () => {
-        if (document.visibilityState === 'visible') {
-            // 把 lastSyncAtRef 清零，让 syncThoughts 不被 5s 节流拦住
-            lastSyncAtRef.current = 0;
-            void syncThoughts();
-        }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-        document.removeEventListener('visibilitychange', onVisibility);
-        if (relocTimerRef.current) clearTimeout(relocTimerRef.current);
-    };
+	if (!enabled) return;
+	const onVisibility = () => {
+		if (document.visibilityState === "visible") {
+			// 把 lastSyncAtRef 清零，让 syncThoughts 不被 5s 节流拦住
+			lastSyncAtRef.current = 0;
+			void syncThoughts();
+		}
+	};
+	document.addEventListener("visibilitychange", onVisibility);
+	return () => {
+		document.removeEventListener("visibilitychange", onVisibility);
+		if (relocTimerRef.current) clearTimeout(relocTimerRef.current);
+	};
 }, [enabled, syncThoughts]);
 ```
 
@@ -2762,51 +2927,51 @@ useEffect(() => {
 
 复刻时按「基础设施 → epub.js 接线 → 单一功能 → 跨功能互斥 → UI 接线」的顺序往新项目搬。每一层都假定上一层已经就位。
 
-| 层 | 文件（仓库根相对路径） | 作用 | 依赖 |
-|----|----------------------|------|------|
-| **L0 基础** | `apps/frontend/src/utils/englishTts.ts` | TTS 引擎封装（本地+云端优选、预取、句界） | 无 |
-| L0 基础 | `apps/frontend/src/views/ebook/types.ts` | EbookThought / Book / PublicSource 等类型 | 无 |
-| L0 基础 | `apps/frontend/src/service/ebook/*.ts`（含 thoughtSync） | 后端 API 客户端 | types |
-| **L1 epub.js 接线** | `apps/frontend/src/views/ebook/components/reader/EpubPane.tsx` | rendition 生命周期、iframe mount、resize | L0 |
-| L1 epub.js 接线 | `apps/frontend/src/views/ebook/utils/epub/reader/epubReaderSettings.ts` | 阅读设置（字号/行距/主题）落 themes | L1 |
-| L1 epub.js 接线 | `apps/frontend/src/views/ebook/utils/epub/reader/epubSelectionToolbarAttach.ts` | iframe 内选区监听 + PopBar 触发 | L1 |
-| **L2 划线** | `apps/frontend/src/views/ebook/utils/epub/mark/epubUserHighlights.ts` | 用户划线 highlight/underline/wavy 三态渲染 | L1 |
-| L2 划线 | `apps/frontend/src/views/ebook/utils/epub/mark/epubMarkUtils.ts`（如有） | CFI↔Range、marks-pane 通用工具 | L1 |
-| **L3 想法** | `apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtAnnotations.ts` | 想法下划线渲染 + ephemeral pin | L2 |
-| L3 想法 | `apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtSync.ts` | 想法合并算法、since 计算、max updatedAt | L0 |
-| L3 想法 | `apps/frontend/src/views/ebook/hooks/useEbookThoughtLoader.ts` | 想法 viewport 懒挂载 | L3 |
-| L3 想法 | `apps/frontend/src/views/ebook/hooks/usePublicEbookThoughtSync.ts` | 公开想法增量同步 | L3 |
-| **L4 听书** | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenChapter.ts` | 章节文本抽取 + 句级 Range 索引 | L1 |
-| L4 听书 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenSegmentOverlay.ts` | overlay 会话（plain + 高亮区块） | L4 |
-| L4 听书 | `apps/frontend/src/views/ebook/utils/epub/listen/epubScrollListenAdvance.ts` | 连续滚动听书节间推进 | L4 |
-| L4 听书 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | 整章听书状态机 | L4 |
-| L4 听书 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 引用听书状态机 | L4 |
-| **L5 互斥** | epubListenController（章节/引用 listen stop 注册） | 跨 hook 互斥 | L4 |
-| L5 互斥 | `registerChapterListenStop` / `registerQuoteListenStop` 注册对 | 互斥回调 | L4 |
-| **L6 UI 接线** | `apps/frontend/src/views/ebook/components/reader/EpubReaderPage.tsx` | 顶层页：把 rendition 分发给各 hook | L1-L5 |
-| L6 UI 接线 | 底部播放条组件、选区 PopBar 组件、想法列表组件 | 各功能的 UI 入口 | L6 |
+| 层                  | 文件（仓库根相对路径）                                                          | 作用                                       | 依赖  |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------ | ----- |
+| **L0 基础**         | `apps/frontend/src/utils/speech.ts`                                         | TTS 引擎封装（本地+云端优选、预取、句界）  | 无    |
+| L0 基础             | `apps/frontend/src/views/ebook/types.ts`                                        | EbookThought / Book / PublicSource 等类型  | 无    |
+| L0 基础             | `apps/frontend/src/service/ebook/*.ts`（含 thoughtSync）                        | 后端 API 客户端                            | types |
+| **L1 epub.js 接线** | `apps/frontend/src/views/ebook/components/reader/EpubPane.tsx`                  | rendition 生命周期、iframe mount、resize   | L0    |
+| L1 epub.js 接线     | `apps/frontend/src/views/ebook/utils/epub/reader/epubReaderSettings.ts`         | 阅读设置（字号/行距/主题）落 themes        | L1    |
+| L1 epub.js 接线     | `apps/frontend/src/views/ebook/utils/epub/reader/epubSelectionToolbarAttach.ts` | iframe 内选区监听 + PopBar 触发            | L1    |
+| **L2 划线**         | `apps/frontend/src/views/ebook/utils/epub/mark/epubUserHighlights.ts`           | 用户划线 highlight/underline/wavy 三态渲染 | L1    |
+| L2 划线             | `apps/frontend/src/views/ebook/utils/epub/mark/epubMarkUtils.ts`（如有）        | CFI↔Range、marks-pane 通用工具             | L1    |
+| **L3 想法**         | `apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtAnnotations.ts`       | 想法下划线渲染 + ephemeral pin             | L2    |
+| L3 想法             | `apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtSync.ts`              | 想法合并算法、since 计算、max updatedAt    | L0    |
+| L3 想法             | `apps/frontend/src/views/ebook/hooks/useEbookThoughtLoader.ts`                  | 想法 viewport 懒挂载                       | L3    |
+| L3 想法             | `apps/frontend/src/views/ebook/hooks/usePublicEbookThoughtSync.ts`              | 公开想法增量同步                           | L3    |
+| **L4 听书**         | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenChapter.ts`          | 章节文本抽取 + 句级 Range 索引             | L1    |
+| L4 听书             | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenSegmentOverlay.ts`   | overlay 会话（plain + 高亮区块）           | L4    |
+| L4 听书             | `apps/frontend/src/views/ebook/utils/epub/listen/epubScrollListenAdvance.ts`    | 连续滚动听书节间推进                       | L4    |
+| L4 听书             | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts`                   | 整章听书状态机                             | L4    |
+| L4 听书             | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts`                    | 引用听书状态机                             | L4    |
+| **L5 互斥**         | epubListenController（章节/引用 listen stop 注册）                              | 跨 hook 互斥                               | L4    |
+| L5 互斥             | `registerChapterListenStop` / `registerQuoteListenStop` 注册对                  | 互斥回调                                   | L4    |
+| **L6 UI 接线**      | `apps/frontend/src/views/ebook/components/reader/EpubReaderPage.tsx`            | 顶层页：把 rendition 分发给各 hook         | L1-L5 |
+| L6 UI 接线          | 底部播放条组件、选区 PopBar 组件、想法列表组件                                  | 各功能的 UI 入口                           | L6    |
 
 ### 19.2 复刻顺序（M1–M8 对应章节）
 
 按 §0.3 的 M1–M8 顺序复刻，每阶段独立验收后再进入下一阶段。这里给出每个 M 阶段在新项目里的「最小可运行验收」：
 
-| 阶段 | 验收信号（新项目里跑通这条就算过） |
-|------|-----------------------------------|
-| M1 | epub.js 能渲染一本 .epub，翻页/目录跳转 OK |
-| M2 | 用户选中一段文字，PopBar 出现，点击「划线」后刷新页面划线仍在 |
-| M3 | 在划线上点击「写下想法」，输入并保存，下划线出现，刷新仍在 |
-| M4 | 切换字号/行距/主题，iframe 内容立即跟随；刷新后设置保持 |
-| M5 | 点击章节「听读」按钮，从当前页开始逐句播放，底部播放条出现 |
-| M6 | 选中一段文字点「听这句」，从该段第一句开始播放；与章节听读互斥 |
-| M7 | 在共享上下文（publicSource）里打开书，2s 滚动停稳后看到他人想法下划线出现 |
-| M8 | 横竖屏切换、缩放窗口，rendition 软重排不丢划线/想法/听书进度 |
+| 阶段 | 验收信号（新项目里跑通这条就算过）                                        |
+| ---- | ------------------------------------------------------------------------- |
+| M1   | epub.js 能渲染一本 .epub，翻页/目录跳转 OK                                |
+| M2   | 用户选中一段文字，PopBar 出现，点击「划线」后刷新页面划线仍在             |
+| M3   | 在划线上点击「写下想法」，输入并保存，下划线出现，刷新仍在                |
+| M4   | 切换字号/行距/主题，iframe 内容立即跟随；刷新后设置保持                   |
+| M5   | 点击章节「听读」按钮，从当前页开始逐句播放，底部播放条出现                |
+| M6   | 选中一段文字点「听这句」，从该段第一句开始播放；与章节听读互斥            |
+| M7   | 在共享上下文（publicSource）里打开书，2s 滚动停稳后看到他人想法下划线出现 |
+| M8   | 横竖屏切换、缩放窗口，rendition 软重排不丢划线/想法/听书进度              |
 
 ### 19.3 不要带走的（项目耦合层）
 
 以下文件是当前项目的耦合层，复刻时应该用新项目自己的等价物替换，**不要照搬**：
 
 - `apps/frontend/src/service/ebook/*` 的具体 fetch 实现 —— 用新项目的 HTTP 客户端重写。
-- `apps/frontend/src/utils/englishTts.ts` 里跟「云 TTS」鉴权相关的部分 —— 用新项目的 TTS 服务重写。
+- `apps/frontend/src/utils/speech.ts` 里跟「云 TTS」鉴权相关的部分 —— 用新项目的 TTS 服务重写。
 - `EpubReaderPage.tsx` 里的 i18n、路由、鉴权、布局组件 —— 全部替换为新项目的对应基础设施。
 - 任何 `@design/*`、`@ui/*` 别名下的 UI 组件 —— 用新项目的 UI 库等价物替换。
 

@@ -253,7 +253,7 @@ export function EpubListenPlayerBar({
 			const wasListening = listen.isActive;
 			// 听书中：解锁手势 + 静默 stop（不收底栏 notify）
 			if (wasListening) {
-				primeEnglishPlaybackForUserGesture();
+				primePlaybackForUserGesture();
 				listen.stop({ notify: false });
 			}
 			// 异步 go，避免阻塞点击；settle 失败也不挡重开

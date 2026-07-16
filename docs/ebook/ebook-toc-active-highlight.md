@@ -15,27 +15,27 @@
 
 **目标**：
 
-| # | 目标 | 验收 |
-|---|------|------|
-| 1 | 打开目录时高亮当前章节 | 匹配项主题色背景 + 加粗 |
-| 2 | EPUB / PDF 共用一套 UI | 组件与类型命名通用（`EbookTocDrawer`、`EbookTocItem`） |
-| 3 | 长目录可发现当前项 | 打开抽屉时自动 `scrollIntoView` |
-| 4 | 可访问性 | 当前项 `aria-current="location"` |
+| #   | 目标                   | 验收                                                   |
+| --- | ---------------------- | ------------------------------------------------------ |
+| 1   | 打开目录时高亮当前章节 | 匹配项主题色背景 + 加粗                                |
+| 2   | EPUB / PDF 共用一套 UI | 组件与类型命名通用（`EbookTocDrawer`、`EbookTocItem`） |
+| 3   | 长目录可发现当前项     | 打开抽屉时自动 `scrollIntoView`                        |
+| 4   | 可访问性               | 当前项 `aria-current="location"`                       |
 
 ---
 
 ## 2. 改动范围
 
-| 路径 | 说明 |
-|------|------|
-| `apps/frontend/src/views/ebook/components/EbookTocDrawer.tsx` | **新建**（原 `EpubTocDrawer`）：高亮样式、滚动定位 |
-| `apps/frontend/src/views/ebook/utils/tocActiveIndex.ts` | 按阅读位置计算活跃目录索引 |
-| `apps/frontend/src/views/ebook/utils/epubSpineIndex.ts` | nav href → spine 索引 |
-| `apps/frontend/src/views/ebook/types.ts` | `EpubToc` 重命名为 `EbookTocItem`，增加 `spineIndex` |
-| `apps/frontend/src/views/ebook/components/EpubPane.tsx` | 上报 spine 索引、解析 TOC `spineIndex` |
-| `apps/frontend/src/views/ebook/read.tsx` | 维护 `epubSpineIndex` / `pdfPage`，传入 `activeIndex` |
-| `apps/frontend/src/views/ebook/utils/pdfOutline.ts` | 类型改为 `EbookTocItem` |
-| `apps/frontend/src/views/ebook/components/PdfPane.tsx` | 回调类型对齐 |
+| 路径                                                          | 说明                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------- |
+| `apps/frontend/src/views/ebook/components/EbookTocDrawer.tsx` | **新建**（原 `EpubTocDrawer`）：高亮样式、滚动定位    |
+| `apps/frontend/src/views/ebook/utils/tocActiveIndex.ts`       | 按阅读位置计算活跃目录索引                            |
+| `apps/frontend/src/views/ebook/utils/epubSpineIndex.ts`       | nav href → spine 索引                                 |
+| `apps/frontend/src/views/ebook/types.ts`                      | `EpubToc` 重命名为 `EbookTocItem`，增加 `spineIndex`  |
+| `apps/frontend/src/views/ebook/components/EpubPane.tsx`       | 上报 spine 索引、解析 TOC `spineIndex`                |
+| `apps/frontend/src/views/ebook/read.tsx`                      | 维护 `epubSpineIndex` / `pdfPage`，传入 `activeIndex` |
+| `apps/frontend/src/views/ebook/utils/pdfOutline.ts`           | 类型改为 `EbookTocItem`                               |
+| `apps/frontend/src/views/ebook/components/PdfPane.tsx`        | 回调类型对齐                                          |
 
 ---
 
@@ -43,8 +43,8 @@
 
 1. **统一目录项模型 `EbookTocItem`**：EPUB 来自 `book.loaded.navigation`；PDF 来自 `loadPdfOutlineToc`（`href` 为 `pdf-page:{index}`）。二者共用抽屉，故去掉 `Epub*` 前缀。
 
-2. **活跃项判定（「不超过当前位置的最后一条」）**  
-   - **PDF**：比较 `parsePdfPageHref(href)` 与当前 `pdfPage`（0-based）。  
+2. **活跃项判定（「不超过当前位置的最后一条」）**
+   - **PDF**：比较 `parsePdfPageHref(href)` 与当前 `pdfPage`（0-based）。
    - **EPUB**：加载 TOC 时用 `resolveSpineIndexForHref` 写入 `spineIndex`；阅读时 `relocated` 上报 `loc.start.index`，与 `spineIndex` 比较。
 
 3. **纯函数 `findActiveTocItemIndex`**：输入 `items` + `TocActivePosition`，输出索引或 `-1`，便于单测与 `read.tsx` 内 `useMemo`。
@@ -74,7 +74,7 @@ export function findActiveTocItemIndex(
 	if (pdfPage != null && Number.isFinite(pdfPage)) {
 		let best = -1;
 		for (let i = 0; i < items.length; i++) {
-			const page = parsePdfPageHref(items[i].href ?? '');
+			const page = parsePdfPageHref(items[i].href ?? "");
 			if (page != null && page <= pdfPage) {
 				best = i;
 			}
@@ -109,9 +109,7 @@ onCfiRef.current(cfi, pct, loc.start?.index);
 const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
 	label: t.label?.trim() || t.href,
 	href: t.href,
-	spineIndex: t.href
-		? resolveSpineIndexForHref(spineBook, t.href)
-		: undefined,
+	spineIndex: t.href ? resolveSpineIndexForHref(spineBook, t.href) : undefined,
 }));
 ```
 
@@ -147,7 +145,7 @@ const activeTocIndex = useMemo(
 useEffect(() => {
 	if (!open || activeIndex < 0) return;
 	const id = requestAnimationFrame(() => {
-		activeItemRef.current?.scrollIntoView({ block: 'nearest' });
+		activeItemRef.current?.scrollIntoView({ block: "nearest" });
 	});
 	return () => cancelAnimationFrame(id);
 }, [open, activeIndex, items]);
@@ -159,30 +157,30 @@ useEffect(() => {
 
 ## 5. 兼容性与影响
 
-| 场景 | 行为 |
-|------|------|
-| EPUB 无 spine 匹配 | 该项无 `spineIndex`，可能无法高亮（仍可选跳转） |
-| PDF 无 outline | `tocItems` 为空，抽屉显示「无目录」 |
-| 切换书籍 | `read.tsx` 重置 `tocItems`、`epubSpineIndex` |
-| 旧文档引用 `EpubTocDrawer` | 已删除，以 `EbookTocDrawer` 为准 |
+| 场景                       | 行为                                            |
+| -------------------------- | ----------------------------------------------- |
+| EPUB 无 spine 匹配         | 该项无 `spineIndex`，可能无法高亮（仍可选跳转） |
+| PDF 无 outline             | `tocItems` 为空，抽屉显示「无目录」             |
+| 切换书籍                   | `read.tsx` 重置 `tocItems`、`epubSpineIndex`    |
+| 旧文档引用 `EpubTocDrawer` | 已删除，以 `EbookTocDrawer` 为准                |
 
 ---
 
 ## 6. 建议回归
 
-1. EPUB：翻到中间某一章 → 打开目录 → 对应条目高亮且滚入视野。  
-2. PDF：翻到带书签的第 N 页 → 打开目录 → 高亮为「页码 ≤ N」的最后一条。  
+1. EPUB：翻到中间某一章 → 打开目录 → 对应条目高亮且滚入视野。
+2. PDF：翻到带书签的第 N 页 → 打开目录 → 高亮为「页码 ≤ N」的最后一条。
 3. 点击其它目录项跳转后，再次打开目录，高亮应更新到新位置。
 
 ---
 
 ## 7. 相关源码路径
 
-| 说明 | 路径 |
-|------|------|
-| 共用抽屉 | `apps/frontend/src/views/ebook/components/EbookTocDrawer.tsx` |
-| 活跃索引 | `apps/frontend/src/views/ebook/utils/tocActiveIndex.ts` |
-| EPUB spine 映射 | `apps/frontend/src/views/ebook/utils/epubSpineIndex.ts` |
-| 阅读页编排 | `apps/frontend/src/views/ebook/read.tsx` |
+| 说明            | 路径                                                          |
+| --------------- | ------------------------------------------------------------- |
+| 共用抽屉        | `apps/frontend/src/views/ebook/components/EbookTocDrawer.tsx` |
+| 活跃索引        | `apps/frontend/src/views/ebook/utils/tocActiveIndex.ts`       |
+| EPUB spine 映射 | `apps/frontend/src/views/ebook/utils/epubSpineIndex.ts`       |
+| 阅读页编排      | `apps/frontend/src/views/ebook/read.tsx`                      |
 
 若与仓库最新源码不一致，以源码为准。

@@ -25,7 +25,7 @@
 
 | 文件 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | `buildSentenceOffsetSpans` 及私有 helper：句首 attach、`TRAILING_CLOSER` 收紧、模块自检扩充 |
+| `apps/frontend/src/utils/speech.ts` | `buildSentenceOffsetSpans` 及私有 helper：句首 attach、`TRAILING_CLOSER` 收紧、模块自检扩充 |
 
 **结论摘要**：
 
@@ -73,7 +73,7 @@ buildSentenceOffsetSpans(plain)
   ├─ useEbookQuoteListen → buildLabelsFromPlain / sentenceCount / resolveSpokenAt
   ├─ epubListenSegmentOverlay → buildDomSentenceIndex → paintSentence / 背景 Range
   ├─ epubListenChapter → indexChapterSentenceRanges / plain 预览
-  └─ englishTts → splitTextForTtsCadence / emitCadenceChunk
+  └─ speech → splitTextForTtsCadence / emitCadenceChunk
 ```
 
 ---
@@ -92,7 +92,7 @@ buildSentenceOffsetSpans(plain)
 | **autoFollow / FAB** | 无 | 仍跟 `paintSentence` / `showChapterListenSentenceHighlight` |
 | **英语学习 — 整句 TTS cadence** | 低 | 仅当 plain 含上述标点时段落 `sentenceIndex` 可能偏移 |
 | **用户划线 / 想法** | 无 | 不经过 `buildSentenceOffsetSpans` |
-| **云端 / 本机 TTS 路由** | 无 | `playEnglishPreferred` 接口不变 |
+| **云端 / 本机 TTS 路由** | 无 | `playPreferred` 接口不变 |
 | **句末 `！」」` 闭合 extend** | 无 | 模块自检保留原 3 条叹号/闭引号用例 |
 
 ---
@@ -113,7 +113,7 @@ buildSentenceOffsetSpans(plain)
 | 项 | 说明 |
 |----|------|
 | `buildSentenceOffsetSpans` 函数签名 | 仍 `(plain: string) => { start, end }[]` |
-| `stripMarkdownForTts` / `playEnglishPreferred` | 无 diff |
+| `stripMarkdownForTts` / `playPreferred` | 无 diff |
 | `useEpubChapterListen` / `useEbookQuoteListen` hook 文件 | 无 diff |
 | 播放条 / 互斥 / `onListenSessionEnd` | 无 diff |
 | marks-pane 播放背景绘制 | 仅输入 Range 边界随 span 变 |
@@ -130,7 +130,7 @@ buildSentenceOffsetSpans(plain)
 - [ ] 听书：原回归 `赞叹一声："阿弥陀佛！"这个` — 闭引号仍归前句
 - [ ] 听当前：选中含段首 `……` 的段落 — 按句播放条句数与背景换句一致
 - [ ] 听当前 ↔ 听书互斥、停止后划线 sync — 仍正常
-- [ ] 导入 `englishTts` 不抛自检异常（开发启动 / 电子书听读页）
+- [ ] 导入 `speech` 不抛自检异常（开发启动 / 电子书听读页）
 - [ ] `npx tsc --noEmit`（apps/frontend）通过
 
 ---

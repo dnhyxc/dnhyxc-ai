@@ -13,10 +13,7 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ReferencePageShell } from '../components/ReferencePageShell';
 import { referenceNavItemClass } from '../utils/referenceNavItemClass';
 import {
@@ -70,21 +67,21 @@ export default function EnglishMorphologyReferencePage() {
 	}, [searchParams, setSearchParams]);
 
 	useEffect(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPlayingKey(null);
 	}, [sectionKey, categoryIndex]);
 
 	const toggleExampleAudio = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

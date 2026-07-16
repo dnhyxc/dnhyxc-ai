@@ -4,7 +4,7 @@
 
 - [tts-local-cancel-settle.md](../Influence-point/tts-local-cancel-settle.md) — **影响面矩阵**与回归清单
 - [english-tts-playback.md](./english-tts-playback.md) — 播放世代与 `beginPlaybackSession`
-- [epub-quote-listen-player-bar.md](../ebook/epub-quote-listen-player-bar.md) — 听当前按句 `playEnglishPreferred` 循环
+- [epub-quote-listen-player-bar.md](../ebook/epub-quote-listen-player-bar.md) — 听当前按句 `playPreferred` 循环
 - [tts-playback-source.md](./tts-playback-source.md) — 本机 / MiniMax / 讯飞选路
 
 **文档角色**：修复 Chrome 等在 `speechSynthesis.cancel()` 后立刻 `speak()` 导致**首条 utterance 无声**；云端 `HTMLAudioElement` 路径不受影响。
@@ -15,13 +15,13 @@
 
 ### 1.1 问题
 
-听当前、听书在本机来源（`playbackSource: 'local'`）下逐句调用 `playEnglishPreferred` → `beginPlaybackSession` → `speechSynthesis.cancel()` → `speakOneUtterance`。Chrome / Safari 上 **cancel 与下一条 utterance 同一事件循环内提交** 时，首条常被丢弃（`onerror` 后仍 resolve），表现为 **第一句无声、第二句正常**。
+听当前、听书在本机来源（`playbackSource: 'local'`）下逐句调用 `playPreferred` → `beginPlaybackSession` → `speechSynthesis.cancel()` → `speakOneUtterance`。Chrome / Safari 上 **cancel 与下一条 utterance 同一事件循环内提交** 时，首条常被丢弃（`onerror` 后仍 resolve），表现为 **第一句无声、第二句正常**。
 
 云端路径因网络延迟天然避开该竞态；本机路径需显式让出事件循环。
 
 ### 1.2 目标
 
-- 在 `speakEnglishTextWithGeneration` 入口、`waitForVoicesReady` 之后 **固定等待 50ms** 再 `speak()`。
+- 在 `speakTextWithGeneration` 入口、`waitForVoicesReady` 之后 **固定等待 50ms** 再 `speak()`。
 - **不改** 对外 API、云端 MP3 播放、句内 cadence 循环。
 - settle 后再次校验 `playbackGeneration`，避免停止后误播。
 
@@ -31,7 +31,7 @@
 
 | 路径 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | 新增 `settleSpeechSynthesisAfterCancel`；`speakEnglishTextWithGeneration` 内调用 |
+| `apps/frontend/src/utils/speech.ts` | 新增 `settleSpeechSynthesisAfterCancel`；`speakTextWithGeneration` 内调用 |
 
 **分析基准**：工作区相对 `HEAD`（`2c5bf058` 侧）未提交 diff。
 
@@ -43,10 +43,10 @@
    与句内 cadence 停顿同一计时器，不引入新依赖。
 
 2. **仅本机 speak 入口 settle 一次**  
-   挂在 `speakEnglishTextWithGeneration` 整段入口，chunk 循环内不重复等待。
+   挂在 `speakTextWithGeneration` 整段入口，chunk 循环内不重复等待。
 
 3. **世代二次校验**  
-   `settle` 的 50ms 内用户可能 `stopAllEnglishPlayback`；settle 后 `isPlaybackGenerationActive` 为 false 则静默 return。
+   `settle` 的 50ms 内用户可能 `stopAllPlayback`；settle 后 `isPlaybackGenerationActive` 为 false 则静默 return。
 
 4. **云端零影响**  
    `playCloudTtsCadenceSegments` / `playCloudMp3Blob` 不经过本函数。
@@ -62,13 +62,13 @@
 
 **对比范围**：私有 async 函数全定义（改前不存在）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L355–L360）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L355–L360）
 
 ```typescript
 // beginPlaybackSession/stopAll 里 cancel() 后立刻 speak()，Chrome 会无声并 onerror；云端走 Audio 不受影响
 async function settleSpeechSynthesisAfterCancel(): Promise<void> {
 	// 环境不支持 Web Speech 则无需等待
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 	// 固定 50ms，让 cancel 在引擎内完成后再提交 utterance
 	await pauseMs(50);
 }
@@ -78,21 +78,21 @@ async function settleSpeechSynthesisAfterCancel(): Promise<void> {
 
 ---
 
-### 4.2 `speakEnglishTextWithGeneration`
+### 4.2 `speakTextWithGeneration`
 
-**对比范围**：`async function speakEnglishTextWithGeneration` 全函数。
+**对比范围**：`async function speakTextWithGeneration` 全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 HEAD，约 L1276–L1310）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 HEAD，约 L1276–L1310）
 
 ```typescript
 // 带 playbackGeneration 的本机 cadence 朗读（改前无 cancel settle）
-async function speakEnglishTextWithGeneration(
+async function speakTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakEnglishOptions & CadencePlaybackHooks,
+	options?: SpeakOptions & CadencePlaybackHooks,
 ): Promise<void> {
 	// 不支持 Web Speech 则退出
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 
 	// 去 markdown 得 plain
 	const plain = stripMarkdownForTts(text);
@@ -106,7 +106,7 @@ async function speakEnglishTextWithGeneration(
 	// 等待后再次校验世代
 	if (!isPlaybackGenerationActive(generation)) return;
 	// 改前：立刻 reset 音色缓存并 speak，易与 cancel 竞态
-	resetCachedEnglishVoice();
+	resetCachedLocalVoice();
 
 	// 按句读 / 逗号切 chunk
 	const chunks = splitTextForTtsCadence(plain);
@@ -143,17 +143,17 @@ async function speakEnglishTextWithGeneration(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1276–L1314）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1276–L1314）
 
 ```typescript
 // 带 playbackGeneration 的本机 cadence 朗读（含 cancel settle）
-async function speakEnglishTextWithGeneration(
+async function speakTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakEnglishOptions & CadencePlaybackHooks,
+	options?: SpeakOptions & CadencePlaybackHooks,
 ): Promise<void> {
 	// 不支持 Web Speech 则退出
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 
 	// 去 markdown 得 plain
 	const plain = stripMarkdownForTts(text);
@@ -171,7 +171,7 @@ async function speakEnglishTextWithGeneration(
 	// settle 期间可能被 stop，再校验
 	if (!isPlaybackGenerationActive(generation)) return;
 	// 重置音色缓存
-	resetCachedEnglishVoice();
+	resetCachedLocalVoice();
 
 	// 按句读 / 逗号切 chunk
 	const chunks = splitTextForTtsCadence(plain);
@@ -208,19 +208,19 @@ async function speakEnglishTextWithGeneration(
 }
 ```
 
-**变更摘要**：在 `waitForVoicesReady` 与 `resetCachedEnglishVoice` 之间插入 `settleSpeechSynthesisAfterCancel` 及世代再校验；chunk 循环不变。
+**变更摘要**：在 `waitForVoicesReady` 与 `resetCachedLocalVoice` 之间插入 `settleSpeechSynthesisAfterCancel` 及世代再校验；chunk 循环不变。
 
 ---
 
 ## 5. 调用链（谁受影响）
 
-| 入口 | 触发本机 `speakEnglishTextWithGeneration` 的条件 |
+| 入口 | 触发本机 `speakTextWithGeneration` 的条件 |
 |------|--------------------------------------------------|
-| `playEnglishPreferred` | `shouldUseCloudEnglishTts()` 为 false |
-| `playEnglishPreferred` catch | 云端失败且本机可用 |
-| `speakEnglishText` | 直接本机朗读 |
+| `playPreferred` | `shouldUseCloudTts()` 为 false |
+| `playPreferred` catch | 云端失败且本机可用 |
+| `speakText` | 直接本机朗读 |
 
-**不经过** 本函数：MiniMax / 讯飞 `playCloudTtsCadenceSegments`、`prefetchCloudEnglishTts` 预取 HTTP。
+**不经过** 本函数：MiniMax / 讯飞 `playCloudTtsCadenceSegments`、`prefetchCloudTts` 预取 HTTP。
 
 ---
 
@@ -249,7 +249,7 @@ async function speakEnglishTextWithGeneration(
 
 | 说明 | 路径 |
 |------|------|
-| settle 与本机 speak | `apps/frontend/src/utils/englishTts.ts` |
+| settle 与本机 speak | `apps/frontend/src/utils/speech.ts` |
 | 听当前逐句循环 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 听书逐句循环 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 

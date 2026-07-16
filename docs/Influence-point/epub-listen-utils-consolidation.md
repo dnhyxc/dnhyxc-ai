@@ -97,7 +97,7 @@ useEpubChapterListen ──► epubListenChapter ──► epubListenSegmentOver
 | `epubUserHighlights.ts` / 用户划线 | 未 import 听读 utils |
 | `epubThoughtAnnotations.ts` / 想法虚线 | 同上 |
 | `EpubPane.tsx` / annotation sync | 仅 `onSessionEnd` → sync，不依赖旧路径 |
-| `englishTts.ts` | 无反向依赖 |
+| `speech.ts` | 无反向依赖 |
 | `EpubListenFollowFab` | 仍 import overlay |
 | `read.tsx`（除 hook 间接） | PopBar Range 仍 overlay |
 

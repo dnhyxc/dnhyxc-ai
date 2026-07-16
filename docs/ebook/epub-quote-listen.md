@@ -4,7 +4,7 @@
 
 - [EPUB 选区浮动工具条](epub-selection-popbar.md) — PopBar 入口与 `suppressEpubSelectionPopBarDismiss`
 - [EPUB 想法侧栏](epub-thought-drawer.md) — 列表/详情引用底栏 `variant="panel"`
-- 英语学习 TTS 能力见 `docs/english/` 相关专题；本实现复用 `playEnglishPreferred` / `stopAllEnglishPlayback`
+- 英语学习 TTS 能力见 `docs/english/` 相关专题；本实现复用 `playPreferred` / `stopAllPlayback`
 - [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — 长书摘云端首声加速（分段 + 预取）
 - [听当前逐句播放背景](epub-listen-sentence-bg.md) — 朗读时当前句淡黄底、与划线解耦的浮层实现
 
@@ -16,7 +16,7 @@
 
 1. 三处入口统一朗读当前引用/选区文本，播放中按钮文案为「停止」，再次点击停止。
 2. 复用英语学习模块的 TTS 栈（本机优先、可接云端），避免电子书单独造轮子。
-3. 在共享 `englishTts.ts` 中修复中英混排分句、CJK 音色选择与 `speechSynthesis` 未 resume 等本机兼容问题（英语学习与本节听书共用）。
+3. 在共享 `speech.ts` 中修复中英混排分句、CJK 音色选择与 `speechSynthesis` 未 resume 等本机兼容问题（英语学习与本节听书共用）。
 
 ## 2. 改动范围
 
@@ -28,20 +28,20 @@
 | `apps/frontend/src/views/ebook/components/EpubQuoteActionBar.tsx` | 新增 `onListen`；`listen` 纳入保留选区动作 |
 | `apps/frontend/src/views/ebook/components/EpubSelectionPopBar.tsx` | 透传 `onListen` |
 | `apps/frontend/src/views/ebook/components/EpubSelectionPopBarPanel.tsx` | 透传 `onListen` |
-| `apps/frontend/src/utils/englishTts.ts` | 中英分句、CJK 音色、utterance 长度切分、resume |
+| `apps/frontend/src/utils/speech.ts` | 中英分句、CJK 音色、utterance 长度切分、resume |
 
 **未纳入本篇**（另文或已提交）：`drawer` → `panel` 重命名、`read.tsx` 讲解注释、PopBar `inline` 死路径。
 
 ## 3. 实现思路
 
-1. **单一 hook**：`useEbookQuoteListen(t)` 用 `playingKey` 标记当前朗读会话；`toggleListen(text, key)` 对同一 key 再点则 `stopAllEnglishPlayback`；不可用时 Toast 提示（复用 `englishLearning.tts.unsupported`）。
+1. **单一 hook**：`useEbookQuoteListen(t)` 用 `playingKey` 标记当前朗读会话；`toggleListen(text, key)` 对同一 key 再点则 `stopAllPlayback`；不可用时 Toast 提示（复用 `englishLearning.tts.unsupported`）。
 2. **三处接线**（`read.tsx`）：
    - PopBar：固定 key `'popbar'`，文本来自 `selectionPopBarRef.current.selectedText`；点听前 `suppressEpubSelectionPopBarDismiss()`。
    - 想法列表 / 详情：`listenKey` 为 `thought-list:${cfiRange}` / `thought-dialog:${cfiRange}`，文本为聚合引用 `quote`。
 3. **文案**：`listenLabel(key, defaultLabel)` 播放中返回 `t('englishLearning.tts.stop')`，否则为「听当前」i18n。
 4. **UI 层**：`EpubQuoteActionBar` 已有 `listen` 按钮位与 `PRESERVE_SELECTION_ACTIONS`；本轮仅补 `onListen` prop 与 handler 映射。
-5. **TTS 层**：`playEnglishPreferred` 不变；`splitTextForTtsCadence` 支持中英标点、子句分层与 `MAX_UTTERANCE_CHARS` 硬切；`pickVoiceForChunk` 按 CJK 占比选中文/英文音色；`speak` 后 `resume()`；`pickEnglishVoice` 在 voices 未就绪时不缓存 `null`。
-6. **权衡**：共享 `englishTts` 影响英语学习与本节听书，需双边回归；会员仍走云端 TTS 偏好，非会员本机。
+5. **TTS 层**：`playPreferred` 不变；`splitTextForTtsCadence` 支持中英标点、子句分层与 `MAX_UTTERANCE_CHARS` 硬切；`pickVoiceForChunk` 按 CJK 占比选中文/英文音色；`speak` 后 `resume()`；`pickEnglishVoice` 在 voices 未就绪时不缓存 `null`。
+6. **权衡**：共享 `speech` 影响英语学习与本节听书，需双边回归；会员仍走云端 TTS 偏好，非会员本机。
 
 ## 4. 关键代码对比与注释
 
@@ -57,11 +57,11 @@ import { Toast } from '@ui/sonner';
 import { useCallback, useEffect, useState } from 'react';
 // 英语学习 TTS 栈：本机/云端、全局停止、音色预热
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+	warmupSpeechVoices,
+} from '@/utils/speech';
 
 /** 电子书引用/选区朗读：复用英语学习 TTS（本机 / 云端偏好） */
 export function useEbookQuoteListen(t: (key: string) => string) {
@@ -70,8 +70,8 @@ export function useEbookQuoteListen(t: (key: string) => string) {
 
 	// 挂载预热 voices；卸载时停止朗读，避免离开阅读页仍播报
 	useEffect(() => {
-		warmupEnglishTtsVoices();
-		return () => stopAllEnglishPlayback();
+		warmupSpeechVoices();
+		return () => stopAllPlayback();
 	}, []);
 
 	// 切换播放/停止：text 为待读正文，key 区分三处入口
@@ -81,22 +81,22 @@ export function useEbookQuoteListen(t: (key: string) => string) {
 			if (!trimmed) return;
 			// 同 key 再点 → 停止
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
 			// 本机与云端均不可用时提示并返回
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
 				});
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(trimmed);
+				await playPreferred(trimmed);
 			} catch {
 				Toast({
 					type: 'warning',
@@ -121,7 +121,7 @@ export function useEbookQuoteListen(t: (key: string) => string) {
 }
 ```
 
-**变更摘要**：新 hook 封装播放 key、toggle 与 i18n 文案；卸载时 `stopAllEnglishPlayback`。
+**变更摘要**：新 hook 封装播放 key、toggle 与 i18n 文案；卸载时 `stopAllPlayback`。
 
 ---
 
@@ -265,7 +265,7 @@ export function EpubQuoteActionBar({
 
 ---
 
-### 4.5 `splitTextForTtsCadence`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.5 `splitTextForTtsCadence`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：完整函数及本轮新增的 `splitLongText` / `isPredominantlyCjk` / `MAX_UTTERANCE_CHARS`（改动前无后者三符号）。
 
@@ -474,7 +474,7 @@ function pickVoiceForChunk(chunkText: string): SpeechSynthesisVoice | null {
 | ---- | ---- |
 | 登录 | 与划线/想法一致，朗读本身不强制登录；云端 TTS 若启用仍走英语学习配置 |
 | PDF | 无「听当前」入口（引用条仅 EPUB 想法流） |
-| 共享 TTS | `englishTts.ts` 变更影响英语学习页，需抽测中英文朗读 |
+| 共享 TTS | `speech.ts` 变更影响英语学习页，需抽测中英文朗读 |
 | 破坏性 | 无 API 破坏；`EpubQuoteActionBar` 仅增可选 prop |
 
 ## 6. 风险与回归
@@ -492,7 +492,7 @@ function pickVoiceForChunk(chunkText: string): SpeechSynthesisVoice | null {
 | 朗读 hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 阅读页接线 | `apps/frontend/src/views/ebook/read.tsx` |
 | 引用操作条 | `apps/frontend/src/views/ebook/components/EpubQuoteActionBar.tsx` |
-| TTS 核心 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 核心 | `apps/frontend/src/utils/speech.ts` |
 
 ---
 

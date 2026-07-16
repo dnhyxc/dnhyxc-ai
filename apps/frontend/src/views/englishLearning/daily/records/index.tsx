@@ -17,10 +17,7 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
@@ -46,7 +43,7 @@ export default function EnglishLearningDailyRecordsPage() {
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
 
 	useEffect(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPlayingKey(null);
 	}, []);
 
@@ -61,14 +58,14 @@ export default function EnglishLearningDailyRecordsPage() {
 	const onTogglePlayWord = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

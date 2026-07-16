@@ -13,7 +13,7 @@
 评估 **`startCloudTts` 中 Edge 源取消 Tauri/Web 分流，统一 `SPEECH_EDGE_TTS_STREAM`** 是否改变或破坏已有功能：
 
 - **语音设置页 Edge 试听**（`setting/cloudTts`）
-- **全站 `playEnglishPreferred`**（英语学习喇叭、练习、收藏、错题等）
+- **全站 `playPreferred`**（英语学习喇叭、练习、收藏、错题等）
 - **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen` + 预取）
 - **Tauri 桌面 vs Web 浏览器** 云端 Edge 路径
 - **MiniMax / 讯飞 / 本机 Web Speech** 选路（应不受影响）
@@ -23,7 +23,7 @@
 
 | 文件 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | `startCloudTts`：Edge 分支移除 `isTauriRuntime() ? SPEECH_EDGE_TTS : SPEECH_EDGE_TTS_STREAM`，恒为 `SPEECH_EDGE_TTS_STREAM`；移除 `SPEECH_EDGE_TTS` import |
+| `apps/frontend/src/utils/speech.ts` | `startCloudTts`：Edge 分支移除 `isTauriRuntime() ? SPEECH_EDGE_TTS : SPEECH_EDGE_TTS_STREAM`，恒为 `SPEECH_EDGE_TTS_STREAM`；移除 `SPEECH_EDGE_TTS` import |
 
 **结论摘要**：
 
@@ -43,7 +43,7 @@
 
 ### 2.1 Edge HTTP endpoint 选择
 
-**改前**（`englishTts.ts` → `startCloudTts`）：
+**改前**（`speech.ts` → `startCloudTts`）：
 
 ```text
 playbackSource === 'edge'
@@ -73,11 +73,11 @@ playbackSource === 'edge' → 一律 POST /edge/speech/stream (SPEECH_EDGE_TTS_S
 |-------------|----------|------|
 | **Web — 设置页 Edge 试听** | **无** | 改前即 stream endpoint |
 | **Web — 听书/听当前 Edge** | **无** | 同上 + 预取逻辑未改 |
-| **Web — 英语学习喇叭 Edge** | **无** | `playEnglishPreferred` → `startCloudTts` |
+| **Web — 英语学习喇叭 Edge** | **无** | `playPreferred` → `startCloudTts` |
 | **Tauri — 设置页 Edge 试听** | **中** | HTTP 从 Content-Length 变为 chunked；依赖 Tauri `arrayBuffer()` 读整包 |
 | **Tauri — 听书 Edge** | **中** | 预取持有未读 body 的 Response + stream URL；历史风险：pending/句间卡住（见 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md)） |
 | **Tauri — MiniMax/讯飞** | **无** | endpoint 未改 |
-| **非会员 Edge 选路** | **无** | `shouldUseCloudEnglishTts` 未改 |
+| **非会员 Edge 选路** | **无** | `shouldUseCloudTts` 未改 |
 | **云端 LRU 缓存 key** | **无** | `buildCloudTtsCacheKey` 与 URL 无关 |
 | **playbackGeneration / stopAll** | **无** | 未触达 |
 | **后端 `/edge/speech`** | **无（客户端）** | 路由仍存在，前端不再调用 |
@@ -85,13 +85,13 @@ playbackSource === 'edge' → 一律 POST /edge/speech/stream (SPEECH_EDGE_TTS_S
 **调用链（Edge 云端）**：
 
 ```text
-playEnglishPreferred / prefetchCloudEnglishTts
+playPreferred / prefetchCloudTts
   → startCloudTts(plain)
   → POST SPEECH_EDGE_TTS_STREAM
   → playCloudTtsReady → readResponseBodyAsArrayBuffer → playCloudMp3Blob
 ```
 
-调用方（grep）：`useEpubChapterListen`、`useEbookQuoteListen`、`setting/cloudTts/*`、英语学习各 `*Panel` / `use*Playback` 等，均经 `playEnglishPreferred`，无单独 Edge URL 硬编码。
+调用方（grep）：`useEpubChapterListen`、`useEbookQuoteListen`、`setting/cloudTts/*`、英语学习各 `*Panel` / `use*Playback` 等，均经 `playPreferred`，无单独 Edge URL 硬编码。
 
 ---
 
@@ -113,7 +113,7 @@ playEnglishPreferred / prefetchCloudEnglishTts
 | `SPEECH_EDGE_TTS` 常量（`api.ts`） | 仍定义，后端路由保留 |
 | `readResponseBodyAsArrayBuffer` Tauri 分支 | 仍为 `arrayBuffer()` |
 | `waitCloudAudioEnd` / `playCloudMp3Blob` | 未改 |
-| 听书 `prefetchCloudEnglishTts` | 未改 API，仍调用 `startCloudTts` |
+| 听书 `prefetchCloudTts` | 未改 API，仍调用 `startCloudTts` |
 | 电子书进度防抖（同批 diff） | 独立主题，见 [ebook-progress-remote-debounce.md](./ebook-progress-remote-debounce.md) |
 
 ---

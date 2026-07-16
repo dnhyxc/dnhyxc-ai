@@ -6,7 +6,7 @@
 - [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) — Tauri 云端 MP3 播放修复（Edge 线上桌面无声挂起补丁）
 - [cloud-tts-minimax-model-settings.md](./cloud-tts-minimax-model-settings.md) — MiniMax 模型白名单与 Combobox
 - [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) — 本机 Web Speech 降级与 cancel settle
-- [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) — 句间云端预取（仍走 `shouldUseCloudEnglishTts`）
+- [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) — 句间云端预取（仍走 `shouldUseCloudTts`）
 - [cloud-tts-settings.md](../english/cloud-tts-settings.md) — 设置页结构（**滞后**：仍写「三选一 / 会员才云端」）
 - [tts-playback-source.md](../english/tts-playback-source.md) — 朗读介质 Switch（**滞后**：未含 `edge`）
 - [xfyun-cloud-tts.md](../ideas/xfyun-cloud-tts.md) — 讯飞选路设计稿（**滞后**：`playbackSource` 仍为三值）
@@ -22,11 +22,11 @@
 - **朗读来源互斥选路**（`playbackSource: local | cloud | xfyun`；会员四路径、非会员仅本机）
 - **设置 → 语音设置**（`GET/PUT /settings/cloud-tts`、内存缓存、`minimaxTtsPrefs.ts`）
 - **共用语速/音量/音高字段**（改一处影响 MiniMax / 讯飞 / 后续新增源）
-- **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen` → `playEnglishPreferred`）
-- **英语学习各页单词/句子朗读**（多处 `playEnglishPreferred`）
+- **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen` → `playPreferred`）
+- **英语学习各页单词/句子朗读**（多处 `playPreferred`）
 - **云端 MP3 LRU**（`buildCloudTtsCacheKey` / 各 `build*CacheKeySuffix`）
 - **MiniMax / 讯飞后端合成**（`/minimax/speech/stream`、`/xfyun/speech/stream`）
-- **会员 gating**（`isCloudEnglishTtsAllowed` / `useMembershipActive`）
+- **会员 gating**（`isCloudTtsAllowed` / `useMembershipActive`）
 
 **改动范围（当前 diff）**：
 
@@ -45,7 +45,7 @@
 | `apps/frontend/src/service/cloudTtsSettings.ts` | 类型扩展分模式 prosody |
 | `apps/frontend/src/service/api.ts` | `SPEECH_EDGE_TTS_STREAM` |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | 归一化、legacy 拆分、`clampPlaybackSourceForMembership`、`buildEdgeTtsRequestExtras` |
-| `apps/frontend/src/utils/englishTts.ts` | `canUseCloudPlaybackSource`；非会员可走 Edge；Edge cache key / 路由 |
+| `apps/frontend/src/utils/speech.ts` | `canUseCloudPlaybackSource`；非会员可走 Edge；Edge cache key / 路由 |
 | `apps/frontend/src/views/setting/cloudTts/*` | 选路 UI、Edge 区块前置、分模式表单项、非会员可见 Edge |
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | Edge 文案、分会员帮助语 |
 
@@ -60,8 +60,8 @@
 | 语速/音量/音高偏好 | **有条件变化** | 由共用 `speed/vol/pitch` 拆为 **MiniMax / 讯飞 / Edge 三套**；改讯飞不再覆盖 MiniMax |
 | 偏好 API 契约 | **有条件变化** | PUT body 必填 `minimaxSpeed` 等 9 字段；旧客户端仅传 `speed` 需靠前端 normalize 或会 400 |
 | 云端 MP3 缓存 | **低（增强）** | Edge 独立 key 后缀 `\u0000edge`；参数变更后旧缓存不命中（预期） |
-| EPUB 听书 / 听当前 | **有条件变化** | 仍 `playEnglishPreferred`；非会员选 Edge 时走云端而非本机 |
-| 英语学习单词朗读 | **同上** | 共用 `playEnglishPreferred` / `shouldUseCloudEnglishTts` |
+| EPUB 听书 / 听当前 | **有条件变化** | 仍 `playPreferred`；非会员选 Edge 时走云端而非本机 |
+| 英语学习单词朗读 | **同上** | 共用 `playPreferred` / `shouldUseCloudTts` |
 | 设置页本机区块置灰 | **低（增强）** | 非会员选 Edge 时亦置灰本机（与会员选云端一致） |
 | 会员过期 / 降级 | **低（增强）** | `clampPlaybackSourceForMembership` 将 `cloud/xfyun` 回退 `local` |
 | 数据库部署 | **是（部署依赖）** | 须跑迁移；未跑则读写新列失败 |
@@ -101,12 +101,12 @@ POST /speech-transcription/edge/speech/stream
 
 **动机**：避免「改讯飞音量覆盖 MiniMax」的交叉污染。
 
-### 2.3 非会员选路与 `englishTts`
+### 2.3 非会员选路与 `speech`
 
 **改前**：
 
 ```text
-shouldUseCloudEnglishTts → 非会员恒 false（除 preferLocal:false 强制且 isCloudEnglishTtsAllowed）
+shouldUseCloudTts → 非会员恒 false（除 preferLocal:false 强制且 isCloudTtsAllowed）
 ```
 
 **改后**：
@@ -134,8 +134,8 @@ PlaybackSourcePicker：非会员仅 ['local','edge']；会员 ['local','edge','c
 
 | 模块 / 场景 | 影响等级 | 分析 |
 |-------------|----------|------|
-| **`playEnglishPreferred` 全站调用** | 中 | `shouldUseCloudEnglishTts` 语义扩展：非会员 + `edge` 走 `SPEECH_EDGE_TTS_STREAM`；`cloud/xfyun` 仍要会员。调用方：`useEpubChapterListen`、`useEbookQuoteListen`、英语学习 panels、`cloudTts` 试听 |
-| **句间预取 `prefetchCloudEnglishTts`** | 低 | 非会员选 Edge 时可预取；选 local 仍 null |
+| **`playPreferred` 全站调用** | 中 | `shouldUseCloudTts` 语义扩展：非会员 + `edge` 走 `SPEECH_EDGE_TTS_STREAM`；`cloud/xfyun` 仍要会员。调用方：`useEpubChapterListen`、`useEbookQuoteListen`、英语学习 panels、`cloudTts` 试听 |
+| **句间预取 `prefetchCloudTts`** | 低 | 非会员选 Edge 时可预取；选 local 仍 null |
 | **云端失败 Toast** | 低 | 新增 `englishLearning.tts.cloudEdgeFailed`；`notifyCloudTtsFallback` 按 `playbackSource` 分支 |
 | **设置 PUT 偏好** | 中 | 新字段全集必填；仅旧版前端发 `speed` 会 DTO 校验失败——当前仓库前后端同批发布则无问题 |
 | **GET 偏好 → 旧前端** | 中 | 新后端返回 `minimaxSpeed` 等；未升级前端读 `speed` 会 undefined（若并存版本需关注） |
@@ -170,8 +170,8 @@ PlaybackSourcePicker：非会员仅 ['local','edge']；会员 ['local','edge','c
 | MiniMax / 讯飞 HTTP 路径与 DTO | `MinimaxTtsDto`、`XfyunTtsDto` 请求体仍为 `speed/vol/pitch` 或讯飞 0–100；由 `build*RequestExtras` 从分模式 prefs 组装 |
 | `preferLocal: true` | 设置页本机试听、强制本机逻辑不变 |
 | 听书 vs 听当前互斥 | 未改 hook 层互斥 |
-| 云端 cadence 分句 / 预取算法 | 仍 `splitTextForTtsCadence` + `prefetchCloudEnglishTts` |
-| 会员 MiniMax / 讯飞业务鉴权 | 仍 `isCloudEnglishTtsAllowed()` 门控 `cloud`/`xfyun` |
+| 云端 cadence 分句 / 预取算法 | 仍 `splitTextForTtsCadence` + `prefetchCloudTts` |
+| 会员 MiniMax / 讯飞业务鉴权 | 仍 `isCloudTtsAllowed()` 门控 `cloud`/`xfyun` |
 | EPUB 高亮 / 播放条 | 未触达 listen overlay 与 player bar 组件 |
 
 ---

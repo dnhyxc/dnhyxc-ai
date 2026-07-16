@@ -22,10 +22,7 @@ import {
 } from '@/store/englishPracticePool';
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useVocabularyPackHistoryList } from '../hooks/useVocabularyPackHistoryList';
@@ -250,14 +247,14 @@ function VocabularyPackSectionInner({
 	const toggleWordAudio = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

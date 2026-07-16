@@ -10,7 +10,7 @@
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md) | **mark 层公共 utils 抽取**（`epubMarkShared` + geometry export）：CFI/Range/SVG 去重、对各层影响 |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md) | **听当前共用底部播放条**：按句播放重构、与听书互斥、句内 cadence 高亮变化 |
 | [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) | **句界算法句首中文标点**：`buildSentenceOffsetSpans` 对听书/听当前/TTS 分句与背景对齐的影响 |
-| [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) | **句间云端 TTS 预取**：`prefetchCloudEnglishTts` 对听书/听当前连播与其它 `playEnglishPreferred` 调用方的影响 |
+| [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) | **句间云端 TTS 预取**：`prefetchCloudTts` 对听书/听当前连播与其它 `playPreferred` 调用方的影响 |
 | [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) | **Markdown 预览/编辑与助手 Panel**：布局 co-mount、开助手不再强制 split、纯预览全宽对 split/Diff/知识库助手的影响 |
 | [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) | **知识库长文编辑性能**：纯 edit 停喂隐藏预览、Store 派生 boolean、助手输入内化与标题区渲染隔离 |
 | [knowledge-preview-assistant-pane-perf.md](./knowledge-preview-assistant-pane-perf.md) | **预览+助手同开性能**：Monaco 预览态卸载/冻结、非受控轻量输入条、`KnowledgeMarkdownPane` 隔离 |

@@ -22,10 +22,7 @@ import {
 } from '@/store/englishPracticePool';
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useClassicQuotesPackHistoryList } from '../hooks/useClassicQuotesPackHistoryList';
@@ -251,14 +248,14 @@ function ClassicQuotesPackSectionInner({
 	const toggleQuoteAudio = useCallback(
 		async (text: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(text);
+				await playPreferred(text);
 			} catch {
 				Toast({
 					type: 'warning',

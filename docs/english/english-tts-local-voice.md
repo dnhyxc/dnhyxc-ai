@@ -19,7 +19,7 @@
 
 | 维度 | 本机 Web Speech | 云端 MiniMax 等 |
 |------|-----------------|-----------------|
-| 存储 | `localStorage` 键 `english_learning_local_tts_voice:{userId}` | 表 `minimax_tts_user_config` |
+| 存储 | `localStorage` 键 `local_tts_voice:{userId}` | 表 `minimax_tts_user_config` |
 | 设置入口 | **设置 → 语音设置** →「本机语音设置」（页面上方） | 同页 **「云端语音设置」**（**会员**，页面下方） |
 | 换号 | 读对应 `:userId` 键，UI 随 `loggedInUserId` 刷新 | 服务端 JWT + 内存缓存 |
 
@@ -31,7 +31,7 @@
 
 | 说明 | 路径 |
 |------|------|
-| TTS 核心（分键、legacy 迁移、换号清 voice 缓存） | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 核心（分键、legacy 迁移、换号清 voice 缓存） | `apps/frontend/src/utils/speech.ts` |
 | 本机 UI（`observer` + 单一 `useEffect`） | `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` |
 | 用户 id 与分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
 
@@ -41,23 +41,23 @@
 
 ### 3.1 默认与按账号持久化
 
-- **`DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY = 'karen'`**
-- 存储键：`userScopedStorageKey('english_learning_local_tts_voice', userId)` → `english_learning_local_tts_voice:123`
-- **`ensureDefaultLocalEnglishVoicePreference()`**：当前 userId 无配置时写入 `karen`（须已登录，`userId > 0`）
-- **Legacy 一次性迁移**：若仍存在无后缀旧键 `english_learning_local_tts_voice`，首次读取时复制到 `:userId` 并删除旧键
-- 选「默认（Karen）」：`setPreferredLocalEnglishVoiceKey(null)` 写回默认 key
+- **`DEFAULT_LOCAL_TTS_VOICE_KEY = 'karen'`**
+- 存储键：`userScopedStorageKey('local_tts_voice', userId)` → `local_tts_voice:123`（已弃用旧键 `english_learning_local_tts_voice*`，需用户在语音设置中重新选择）
+- **`ensureDefaultLocalVoicePreference()`**：当前 userId 无配置时写入 `karen`（须已登录，`userId > 0`）
+- **无后缀 → 分键**：若仍存在无后缀 `local_tts_voice`，首次读取时复制到 `:userId` 并删除旧键
+- 选「默认（Karen）」：`setPreferredLocalVoiceKey(null)` 写回默认 key
 
 ### 3.2 换号与内存缓存
 
-- `readPreferredVoiceKeyFromStorage()` 检测 `getLoggedInUserId()` 变化时调用 `resetCachedEnglishVoice()`，避免仍用上一账号解析出的 `SpeechSynthesisVoice`
+- `readPreferredVoiceKeyFromStorage()` 检测 `getLoggedInUserId()` 变化时调用 `resetCachedLocalVoice()`，避免仍用上一账号解析出的 `SpeechSynthesisVoice`
 - **`resetUserState()` 不删除**本机音色 localStorage（设备级、按账号分键保留，与 UI 偏好类键策略一致）
 
 ### 3.3 语音设置页 UI（LocalTtsVoiceSetting）
 
-- **DropdownMenu + RadioGroup**，分组女声/男声；试听 `playEnglishPreferred(..., { preferLocal: true })`
+- **DropdownMenu + RadioGroup**，分组女声/男声；试听 `playPreferred(..., { preferLocal: true })`
 - **`observer`**：订阅 `userStore.userInfo`，换号后 `loggedInUserId` 可靠更新
 - **单一 `useEffect`**，依赖 `[refreshVoices, loggedInUserId]`：
-  - 挂载 / 换号：`warmupEnglishTtsVoices()` + `refreshVoices()`（从分键读偏好并更新 `selected`）
+  - 挂载 / 换号：`warmupSpeechVoices()` + `refreshVoices()`（从分键读偏好并更新 `selected`）
   - 监听 `speechSynthesis` 的 `voiceschanged`
   - **避免**原先两个 effect 在挂载时重复调用 `refreshVoices()`
 
@@ -71,28 +71,28 @@
 
 ### 4.1 按 userId 分键与 legacy 迁移
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L178–L214）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L178–L214）
 
 ```typescript
 function localVoiceStorageKey(userId?: number): string {
 	// 说明：与 LLM / cloud-tts 分键同一套 userScopedStorageKey
-	return userScopedStorageKey(LOCAL_ENGLISH_TTS_VOICE_KEY, userId);
+	return userScopedStorageKey(LOCAL_TTS_VOICE_KEY, userId);
 }
 
 function readPreferredVoiceKeyFromStorage(): string | null {
 	const userId = getLoggedInUserId();
 	if (userId !== cachedVoicePrefUserId) {
 		cachedVoicePrefUserId = userId;
-		resetCachedEnglishVoice(); // 说明：换号后丢弃上一账号缓存的 Voice 对象
+		resetCachedLocalVoice(); // 说明：换号后丢弃上一账号缓存的 Voice 对象
 	}
 	if (userId <= 0) return null;
 	const scopedKey = localVoiceStorageKey(userId);
 	let raw = localStorage.getItem(scopedKey);
 	if (!raw) {
-		const legacy = localStorage.getItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+		const legacy = localStorage.getItem(LOCAL_TTS_VOICE_KEY);
 		if (legacy) {
 			localStorage.setItem(scopedKey, legacy);
-			localStorage.removeItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+			localStorage.removeItem(LOCAL_TTS_VOICE_KEY);
 			raw = legacy;
 		}
 	}
@@ -112,13 +112,13 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
 
 	const refreshVoices = useCallback(() => {
-		// 说明：内部 getPreferredLocalEnglishVoiceKey() 已按当前 userId 读分键
-		setVoices(listLocalEnglishVoices());
+		// 说明：内部 getPreferredLocalVoiceKey() 已按当前 userId 读分键
+		setVoices(listLocalVoices());
 		// ... 同步 selected 下拉状态
 	}, []);
 
 	useEffect(() => {
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		refreshVoices();
 		const onVoicesChanged = () => refreshVoices();
 		window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
@@ -134,10 +134,10 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 **来源**：`apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx`（`onVoiceChange` 附近）
 
 ```typescript
-if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
-	setPreferredLocalEnglishVoiceKey(null); // 恢复 Karen 默认
+if (value === LOCAL_TTS_VOICE_AUTO) {
+	setPreferredLocalVoiceKey(null); // 恢复 Karen 默认
 } else {
-	setPreferredLocalEnglishVoiceByUri(value); // 写入当前 userId 分键
+	setPreferredLocalVoiceByUri(value); // 写入当前 userId 分键
 }
 ```
 
@@ -170,6 +170,6 @@ if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
 | 说明 | 路径 |
 |------|------|
 | 分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
-| 播放与会员云端 | `apps/frontend/src/utils/englishTts.ts` |
+| 播放与会员云端 | `apps/frontend/src/utils/speech.ts` |
 | 设置 UI | `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` |
 | 页面整合 | [`voice-settings-page.md`](./voice-settings-page.md) |

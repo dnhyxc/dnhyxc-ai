@@ -21,23 +21,23 @@ import { cn } from '@/lib/utils';
 import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
-import type { LocalEnglishVoiceOption } from '@/utils/englishTts';
+import type { LocalVoiceOption } from '@/utils/speech';
 import {
-	getActiveLocalEnglishVoiceUri,
-	getPreferredLocalEnglishVoiceKey,
-	isEnglishTtsSupported,
-	LOCAL_ENGLISH_TTS_VOICE_AUTO,
-	listLocalEnglishVoices,
-	playEnglishPreferred,
-	setPreferredLocalEnglishVoiceByUri,
-	setPreferredLocalEnglishVoiceKey,
-	stopAllEnglishPlayback,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	getActiveLocalVoiceUri,
+	getPreferredLocalVoiceKey,
+	isSpeechSupported,
+	LOCAL_TTS_VOICE_AUTO,
+	listLocalVoices,
+	playPreferred,
+	setPreferredLocalVoiceByUri,
+	setPreferredLocalVoiceKey,
+	stopAllPlayback,
+	warmupSpeechVoices,
+} from '@/utils/speech';
 
-function groupVoicesByGender(voices: LocalEnglishVoiceOption[]) {
-	const female: LocalEnglishVoiceOption[] = [];
-	const male: LocalEnglishVoiceOption[] = [];
+function groupVoicesByGender(voices: LocalVoiceOption[]) {
+	const female: LocalVoiceOption[] = [];
+	const male: LocalVoiceOption[] = [];
 	for (const v of voices) {
 		if (v.gender === 'female') female.push(v);
 		else if (v.gender === 'male') male.push(v);
@@ -52,7 +52,7 @@ function VoiceDropdownGroup({
 	t,
 }: {
 	label: string;
-	voices: LocalEnglishVoiceOption[];
+	voices: LocalVoiceOption[];
 	genderTagKey: 'female' | 'male';
 	t: (key: string) => string;
 }) {
@@ -80,15 +80,15 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	const { t } = useI18n();
 	const { userStore } = useStore();
 	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
-	const [supported, setSupported] = useState(() => isEnglishTtsSupported());
-	const [voices, setVoices] = useState<LocalEnglishVoiceOption[]>([]);
-	const [selected, setSelected] = useState(LOCAL_ENGLISH_TTS_VOICE_AUTO);
+	const [supported, setSupported] = useState(() => isSpeechSupported());
+	const [voices, setVoices] = useState<LocalVoiceOption[]>([]);
+	const [selected, setSelected] = useState(LOCAL_TTS_VOICE_AUTO);
 	const [previewing, setPreviewing] = useState(false);
 
 	const voiceGroups = useMemo(() => groupVoicesByGender(voices), [voices]);
 
 	const selectedLabel = useMemo(() => {
-		if (selected === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
+		if (selected === LOCAL_TTS_VOICE_AUTO) {
 			return t('setting.system.localTts.autoOption');
 		}
 		const voice = voices.find((v) => v.voiceURI === selected);
@@ -106,31 +106,31 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	}, [selected, voices, t]);
 
 	const refreshVoices = useCallback(() => {
-		setSupported(isEnglishTtsSupported());
-		const list = listLocalEnglishVoices();
+		setSupported(isSpeechSupported());
+		const list = listLocalVoices();
 		setVoices(list);
-		const hasCustom = Boolean(getPreferredLocalEnglishVoiceKey());
-		const activeUri = getActiveLocalEnglishVoiceUri();
+		const hasCustom = Boolean(getPreferredLocalVoiceKey());
+		const activeUri = getActiveLocalVoiceUri();
 		if (!hasCustom) {
-			setSelected(LOCAL_ENGLISH_TTS_VOICE_AUTO);
+			setSelected(LOCAL_TTS_VOICE_AUTO);
 		} else if (activeUri && list.some((v) => v.voiceURI === activeUri)) {
 			setSelected(activeUri);
 		} else if (list[0]) {
 			setSelected(list[0].voiceURI);
 		} else {
-			setSelected(LOCAL_ENGLISH_TTS_VOICE_AUTO);
+			setSelected(LOCAL_TTS_VOICE_AUTO);
 		}
 	}, []);
 
 	useEffect(() => {
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		refreshVoices();
 		const onVoicesChanged = () => refreshVoices();
-		if (isEnglishTtsSupported()) {
+		if (isSpeechSupported()) {
 			window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
 		}
 		return () => {
-			if (isEnglishTtsSupported()) {
+			if (isSpeechSupported()) {
 				window.speechSynthesis.removeEventListener(
 					'voiceschanged',
 					onVoicesChanged,
@@ -142,10 +142,10 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	const onVoiceChange = useCallback(
 		(value: string) => {
 			setSelected(value);
-			if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
-				setPreferredLocalEnglishVoiceKey(null);
+			if (value === LOCAL_TTS_VOICE_AUTO) {
+				setPreferredLocalVoiceKey(null);
 			} else {
-				setPreferredLocalEnglishVoiceByUri(value);
+				setPreferredLocalVoiceByUri(value);
 			}
 			refreshVoices();
 		},
@@ -154,10 +154,10 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 
 	const onPreview = useCallback(async () => {
 		if (!supported || previewing) return;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setPreviewing(true);
 		try {
-			await playEnglishPreferred(t('setting.cloudTts.previewText'), {
+			await playPreferred(t('setting.cloudTts.previewText'), {
 				preferLocal: true,
 			});
 		} finally {
@@ -244,7 +244,7 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 									onValueChange={onVoiceChange}
 								>
 									<DropdownMenuRadioItem
-										value={LOCAL_ENGLISH_TTS_VOICE_AUTO}
+										value={LOCAL_TTS_VOICE_AUTO}
 										className="px-2 pl-2 [&>span:first-child]:hidden"
 									>
 										{t('setting.system.localTts.autoOption')}

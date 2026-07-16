@@ -195,7 +195,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  subgraph quote ["听当前 · epubListenSegmentOverlay.ts + englishTts"]
+  subgraph quote ["听当前 · epubListenSegmentOverlay.ts + speech"]
     Q1["playFromCursor 每句 start<br/>📁 useEbookQuoteListen<br/>showEpubListenPlainSpan"]
     Q2["paintSentence(sentenceIndex)<br/>📁 epubListenSegmentOverlay.ts<br/>DomListenSentence 锚点 → DOM Range"]
   end

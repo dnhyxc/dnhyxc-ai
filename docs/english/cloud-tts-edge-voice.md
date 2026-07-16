@@ -18,7 +18,7 @@
 | 迁移 | `1782930823469-edge-tts.ts`（新列 + `edge_voice_id`；**含** `knowledge_trash.local_bindings_json` DROP，部署前须审阅） |
 | 前端常量 | `apps/frontend/src/constants/edgeTts.ts` |
 | 偏好类型/API | `service/cloudTtsSettings.ts`、`service/api.ts` |
-| 朗读选路 | `utils/englishTts.ts`、`utils/minimaxTtsPrefs.ts` |
+| 朗读选路 | `utils/speech.ts`、`utils/minimaxTtsPrefs.ts` |
 | 设置页 | `views/setting/cloudTts/index.tsx`、`PlaybackSourcePicker.tsx`、`LocalTtsVoiceSetting.tsx` |
 | i18n | `i18n/locales/zh-CN.ts`、`en-US.ts` |
 
@@ -33,46 +33,46 @@
 
 ## 4. 关键代码对比与注释
 
-### 4.1 `shouldUseCloudEnglishTts` 与选路辅助（`apps/frontend/src/utils/englishTts.ts`）
+### 4.1 `shouldUseCloudTts` 与选路辅助（`apps/frontend/src/utils/speech.ts`）
 
-**对比范围**：`isEnglishPlaybackAvailable`、`canUseCloudPlaybackSource`、`isMemberOnlyPlaybackSource`、`shouldUseCloudEnglishTts` 四个函数（完整符号）。
+**对比范围**：`isPlaybackAvailable`、`canUseCloudPlaybackSource`、`isMemberOnlyPlaybackSource`、`shouldUseCloudTts` 四个函数（完整符号）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L886–L907）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L886–L907）
 
 ```typescript
 // 对外：当前环境是否还能发起英语朗读（旧版：非会员只看本机 Web Speech）
-export function isEnglishPlaybackAvailable(): boolean {
+export function isPlaybackAvailable(): boolean {
 	// 非会员：不允许云端，直接看本机 TTS 是否可用
-	if (!isCloudEnglishTtsAllowed()) {
-		return isEnglishTtsSupported();
+	if (!isCloudTtsAllowed()) {
+		return isSpeechSupported();
 	}
 	// 会员：若偏好不是云端则仍可能走本机
-	if (!shouldUseCloudEnglishTts()) {
-		return isEnglishTtsSupported();
+	if (!shouldUseCloudTts()) {
+		return isSpeechSupported();
 	}
 	// 会员且应走云端
 	return true;
 }
 
 // 内部：是否应走云端合成（旧版：非会员恒 false）
-function shouldUseCloudEnglishTts(
-	options?: PlayEnglishPreferredOptions,
+function shouldUseCloudTts(
+	options?: PlayPreferredOptions,
 ): boolean {
 	// 调用方强制本机
 	if (options?.preferLocal === true) return false;
 	// 调用方强制云端：仅会员为 true
 	if (options?.preferLocal === false) {
-		return isCloudEnglishTtsAllowed();
+		return isCloudTtsAllowed();
 	}
 	// 非会员：永不云端
-	if (!isCloudEnglishTtsAllowed()) return false;
+	if (!isCloudTtsAllowed()) return false;
 	// 会员：playbackSource 非 local 即云端
 	const prefs = loadMinimaxTtsUserPrefs();
 	return prefs.playbackSource !== 'local';
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L894–L928）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L894–L928）
 
 ```typescript
 // 判断来源是否仅会员可用（MiniMax / 讯飞）
@@ -86,26 +86,26 @@ function canUseCloudPlaybackSource(source: string): boolean {
 	// local 永远不走云端 HTTP
 	if (source === 'local') return false;
 	// 有效会员：local 以外均可（含 edge / cloud / xfyun）
-	if (isCloudEnglishTtsAllowed()) return true;
+	if (isCloudTtsAllowed()) return true;
 	// 非会员：仅 Edge 免费云端
 	return source === 'edge';
 }
 
 // 对外：本机或（允许的）云端任一可用即 true
-export function isEnglishPlaybackAvailable(): boolean {
+export function isPlaybackAvailable(): boolean {
 	// 读缓存中的 playbackSource
 	const prefs = loadMinimaxTtsUserPrefs();
 	// 当前来源在会员规则下可走云端
 	if (canUseCloudPlaybackSource(prefs.playbackSource)) return true;
 	// 兼容旧逻辑：shouldUseCloud 仍可能 true（如 preferLocal false）
-	if (shouldUseCloudEnglishTts()) return true;
+	if (shouldUseCloudTts()) return true;
 	// 最后回退本机 Web Speech
-	return isEnglishTtsSupported();
+	return isSpeechSupported();
 }
 
 // 是否发起云端 TTS 请求（非会员 edge 为 true）
-function shouldUseCloudEnglishTts(
-	options?: PlayEnglishPreferredOptions,
+function shouldUseCloudTts(
+	options?: PlayPreferredOptions,
 ): boolean {
 	// 强制本机短路
 	if (options?.preferLocal === true) return false;
@@ -119,7 +119,7 @@ function shouldUseCloudEnglishTts(
 		return canUseCloudPlaybackSource(source);
 	}
 	// 会员专属源但已非会员：拒绝（防过期会员脏数据）
-	if (isMemberOnlyPlaybackSource(source) && !isCloudEnglishTtsAllowed()) {
+	if (isMemberOnlyPlaybackSource(source) && !isCloudTtsAllowed()) {
 		return false;
 	}
 	// 默认：edge 对非会员开放，cloud/xfyun 需会员
@@ -131,11 +131,11 @@ function shouldUseCloudEnglishTts(
 
 ---
 
-### 4.2 `startCloudTts`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.2 `startCloudTts`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：`startCloudTts` 全函数（摘录：自 token 校验至 return）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1034–L1076）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1034–L1076）
 
 ```typescript
 // 发起云端 TTS；旧版仅 MiniMax / 讯飞两路
@@ -189,7 +189,7 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1054–L1098）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1054–L1098）
 
 ```typescript
 // 发起云端 TTS；新版按 playbackSource 三路分流
@@ -514,7 +514,7 @@ resolveOptions(dto: EdgeTtsDto): EdgeTtsResolved {
 |------|------|
 | Edge 合成服务 | `apps/backend/src/services/speech-transcription/edge-tts.service.ts` |
 | 偏好实体 | `apps/backend/src/services/speech-transcription/minimax-tts-user-config.entity.ts` |
-| 播放选路 | `apps/frontend/src/utils/englishTts.ts` |
+| 播放选路 | `apps/frontend/src/utils/speech.ts` |
 | 偏好工具 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
 | 设置页 | `apps/frontend/src/views/setting/cloudTts/index.tsx` |
 | Edge 发音人表 | `apps/frontend/src/constants/edgeTts.ts` |

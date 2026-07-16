@@ -38,7 +38,7 @@
 | **强制刷新 / 关 Tab 丢进度** | **低（增强）** | `flushReadingProgress({ keepalive: true })` 在 debounce 未到期时先写本地再 keepalive PUT |
 | **书架进度展示** | **否** | 仍读 `progMap`；本地始终最新 |
 | **多设备同步** | **有条件变化** | 另一设备在 8s 窗口内可能看不到中间 CFI，除非本端 flush 或 debounce 到期 |
-| **听书 / TTS / 划线 / 助手** | **否** | 未改听书 hook、TTS、`englishTts`（同批另有独立 Edge 改动） |
+| **听书 / TTS / 划线 / 助手** | **否** | 未改听书 hook、TTS、`speech`（同批另有独立 Edge 改动） |
 | **`saveProg` 对外签名** | **否** | 仍为 `saveProg(patch)`；新增 `flushProgRemoteSync` 仅阅读页调用 |
 
 ---

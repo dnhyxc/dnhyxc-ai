@@ -3,16 +3,16 @@
 ## 延伸阅读
 
 - [tts-local-cancel-settle.md](../english/tts-local-cancel-settle.md) — **实现说明**（改动前后对比、逐行注释）
-- [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md) — 听当前按句 `playEnglishPreferred` 循环
+- [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md) — 听当前按句 `playPreferred` 循环
 - [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) — 云端路径与句间预取（不受本改动影响）
 - [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) — 句界与高亮对齐（本改动不碰句界算法）
 
 ## 1. 分析目的
 
-评估 **`speakEnglishTextWithGeneration` 在 `waitForVoicesReady` 后增加 `settleSpeechSynthesisAfterCancel()`（50ms）** 是否改变或破坏已有功能：
+评估 **`speakTextWithGeneration` 在 `waitForVoicesReady` 后增加 `settleSpeechSynthesisAfterCancel()`（50ms）** 是否改变或破坏已有功能：
 
 - EPUB **听当前 / 听书** 在本机朗读来源（`playbackSource: 'local'`）下的逐句播放与高亮
-- 会员 **云端 TTS 失败回退本机**（`playEnglishPreferred` catch → `speakEnglishTextWithGeneration`）
+- 会员 **云端 TTS 失败回退本机**（`playPreferred` catch → `speakTextWithGeneration`）
 - 设置页 **本机音色试听**（`preferLocal: true`）
 - 英语学习各入口 **喇叭播放**（单词/经典句/练习等）
 - MiniMax / 讯飞 **纯云端** 播放路径
@@ -22,7 +22,7 @@
 
 | 文件 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | 新增私有 `settleSpeechSynthesisAfterCancel()`；在 `speakEnglishTextWithGeneration` 内、`resetCachedEnglishVoice` 前 `await` 50ms，并在 settle 后再次校验 `isPlaybackGenerationActive` |
+| `apps/frontend/src/utils/speech.ts` | 新增私有 `settleSpeechSynthesisAfterCancel()`；在 `speakTextWithGeneration` 内、`resetCachedLocalVoice` 前 `await` 50ms，并在 settle 后再次校验 `isPlaybackGenerationActive` |
 
 （`apps/frontend/tsconfig.tsbuildinfo` 为构建缓存，与行为无关，不纳入分析。）
 
@@ -30,13 +30,13 @@
 
 | 维度 | 是否影响原有功能 | 说明 |
 |------|------------------|------|
-| MiniMax / 讯飞 **纯云端** 播放 | **否** | 仍走 `playCloudTtsCadenceSegments` + `HTMLAudioElement`，不进入 `speakEnglishTextWithGeneration` |
+| MiniMax / 讯飞 **纯云端** 播放 | **否** | 仍走 `playCloudTtsCadenceSegments` + `HTMLAudioElement`，不进入 `speakTextWithGeneration` |
 | EPUB 听当前 / 听书 **本机来源** | **有条件变化** | 修复 Chrome 在 `cancel()` 后立刻 `speak()` 导致**首句无声**；每句本机播放开头多 **固定 50ms** |
 | 云端失败 **回退本机** | **有条件变化** | 回退路径同样 settle；首包前多 50ms，回退句可正常出声 |
 | 设置页本机试听 | **低（增强）** | 试听前多 50ms，避免偶发无声 |
-| 英语学习喇叭（本机路径） | **低** | 每次 `playEnglishPreferred` 走本机时多 50ms 起播延迟 |
-| 句内 cadence 多 chunk | **否** | settle 仅在整段 `speakEnglishTextWithGeneration` **入口一次**，chunk 间停顿逻辑未改 |
-| 对外 API（`playEnglishPreferred` 等） | **否** | 无签名/导出变更 |
+| 英语学习喇叭（本机路径） | **低** | 每次 `playPreferred` 走本机时多 50ms 起播延迟 |
+| 句内 cadence 多 chunk | **否** | settle 仅在整段 `speakTextWithGeneration` **入口一次**，chunk 间停顿逻辑未改 |
+| 对外 API（`playPreferred` 等） | **否** | 无签名/导出变更 |
 | 听书 ↔ 听当前互斥 / 播放条 | **否** | hook 与 overlay 未改 |
 | 用户划线 / 想法 / marks-pane | **否** | 不触达 mark 层 |
 
@@ -49,7 +49,7 @@
 **改前**：
 
 ```text
-beginPlaybackSession / stopAllEnglishPlayback
+beginPlaybackSession / stopAllPlayback
   → speechSynthesis.cancel()
   → waitForVoicesReady（可能 0ms）
   → 立刻 speakOneUtterance
@@ -71,15 +71,15 @@ cancel（仍在 beginPlaybackSession / stopAll 中）
 
 ### 2.2 调用链（谁受影响）
 
-`settleSpeechSynthesisAfterCancel` 仅由 **`speakEnglishTextWithGeneration`** 调用；该函数入口包括：
+`settleSpeechSynthesisAfterCancel` 仅由 **`speakTextWithGeneration`** 调用；该函数入口包括：
 
 | 入口 | 本机路径触发条件 |
 |------|------------------|
-| `playEnglishPreferred` | `shouldUseCloudEnglishTts()` 为 false（非会员 / `playbackSource: 'local'` / `preferLocal: true`） |
-| `playEnglishPreferred` catch | 云端 `playCloudTtsCadenceSegments` 抛错且本机可用 |
-| `speakEnglishText` | 直接本机朗读（内部 `beginPlaybackSession` + 本函数） |
+| `playPreferred` | `shouldUseCloudTts()` 为 false（非会员 / `playbackSource: 'local'` / `preferLocal: true`） |
+| `playPreferred` catch | 云端 `playCloudTtsCadenceSegments` 抛错且本机可用 |
+| `speakText` | 直接本机朗读（内部 `beginPlaybackSession` + 本函数） |
 
-**不经过** `speakEnglishTextWithGeneration` 的路径：云端 MP3（`playCloudTtsReady` / `playCloudMp3Blob`）、`prefetchCloudEnglishTts` 仅预取等。
+**不经过** `speakTextWithGeneration` 的路径：云端 MP3（`playCloudTtsReady` / `playCloudMp3Blob`）、`prefetchCloudTts` 仅预取等。
 
 ---
 
@@ -87,15 +87,15 @@ cancel（仍在 beginPlaybackSession / stopAll 中）
 
 | 模块 / 场景 | 影响等级 | 分析 |
 |-------------|----------|------|
-| **听当前** `useEbookQuoteListen` + 本机 | 中 | 每句 `playEnglishPreferred` → 本机；改前首句易丢，改后首句应正常；句间多 50ms 固定延迟（N 句约 +50N ms，通常可忽略） |
+| **听当前** `useEbookQuoteListen` + 本机 | 中 | 每句 `playPreferred` → 本机；改前首句易丢，改后首句应正常；句间多 50ms 固定延迟（N 句约 +50N ms，通常可忽略） |
 | **听书** `useEpubChapterListen` + 本机 | 中 | 与听当前同循环模型；章首句同样受益 |
 | **听当前 / 听书** + 云端 | 无 | 云端不进入 settle |
 | **设置 → 本机音色试听** | 低 | `preferLocal: true`；50ms 起播延迟 |
 | **设置 → MiniMax / 讯飞试听** | 无 | 走云端分支 |
 | **英语学习** 词包/经典句/练习/错题/收藏等喇叭 | 低 | 会员若选云端仍无变化；本机或回退本机每次播放 +50ms |
-| **停止 / 暂停** | 低 | settle 期间若 `stopAllEnglishPlayback` 递增世代，settle 后 `isPlaybackGenerationActive` 为 false 则静默 return，不误播 |
+| **停止 / 暂停** | 低 | settle 期间若 `stopAllPlayback` 递增世代，settle 后 `isPlaybackGenerationActive` 为 false 则静默 return，不误播 |
 | **高亮 / 分句索引** | 无 | `buildSentenceOffsetSpans`、overlay 句表未改 |
-| **句间云端预取** | 无 | `prefetchCloudEnglishTts` 与本机 settle 无关 |
+| **句间云端预取** | 无 | `prefetchCloudTts` 与本机 settle 无关 |
 
 ---
 
@@ -119,7 +119,7 @@ cancel（仍在 beginPlaybackSession / stopAll 中）
 | `useEbookQuoteListen` / `useEpubChapterListen` 状态机 | 未改 hook 源码 |
 | `epubListenMarkHighlight` / 播放背景绘制 | 未改 |
 | `speakOneUtterance` 的 `onerror → resolve()` | 仍吞错；依赖 settle 降低触发率 |
-| 导出 API 与 `PlayEnglishPreferredOptions` | 无变更 |
+| 导出 API 与 `PlayPreferredOptions` | 无变更 |
 
 ---
 

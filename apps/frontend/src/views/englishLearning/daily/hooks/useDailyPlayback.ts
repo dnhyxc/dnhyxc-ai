@@ -1,10 +1,10 @@
 import { Toast } from '@ui/index';
 import { useCallback, useEffect, useState } from 'react';
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+} from '@/utils/speech';
 
 type PlayOptions = { force?: boolean };
 
@@ -17,14 +17,14 @@ export function useDailyPlayback(args: {
 
 	useEffect(() => {
 		return () => {
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 		};
 	}, []);
 
 	const playWord = useCallback(
 		async (options?: PlayOptions) => {
 			if (!word.trim()) return;
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
@@ -32,14 +32,14 @@ export function useDailyPlayback(args: {
 				return;
 			}
 			if (playing && !options?.force) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlaying(false);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlaying(true);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} finally {
 				setPlaying(false);
 			}

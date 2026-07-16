@@ -2,17 +2,17 @@ import { Toast } from '@ui/sonner';
 import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-	applyActiveEnglishPlaybackRate,
+	applyActivePlaybackRate,
 	buildSentenceOffsetSpans,
-	isEnglishPlaybackAvailable,
-	pauseEnglishPlaybackSoft,
-	primeEnglishPlaybackForUserGesture,
-	registerEnglishPlaybackMediaHandlers,
-	resumeEnglishPlaybackSoft,
-	stopAllEnglishPlayback,
+	isPlaybackAvailable,
+	pausePlaybackSoft,
+	primePlaybackForUserGesture,
+	registerPlaybackMediaHandlers,
+	resumePlaybackSoft,
+	stopAllPlayback,
 	stripMarkdownForTts,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	warmupSpeechVoices,
+} from '@/utils/speech';
 import {
 	buildParagraphUnits,
 	type ParagraphUnit,
@@ -103,9 +103,9 @@ export function useEbookQuoteListen(
 		fallbackPlainRef.current = '';
 		paragraphsRef.current = [];
 		sentencesRef.current = [];
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// 同步卸 Media Session，勿等 isActive effect：否则 macOS 仍残留进度条/控件
-		registerEnglishPlaybackMediaHandlers(null);
+		registerPlaybackMediaHandlers(null);
 		clearEpubListenSegmentOverlay();
 		setPlayingKey(null);
 		const idle = { ...IDLE_STATE, rate: rateRef.current };
@@ -115,7 +115,7 @@ export function useEbookQuoteListen(
 	}, []);
 
 	useEffect(() => {
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		registerQuoteListenStop(() => stopInternal({ notify: false }));
 		return () => {
 			registerQuoteListenStop(null);
@@ -200,7 +200,7 @@ export function useEbookQuoteListen(
 			if (!trimmed) return;
 
 			invokeStopChapterListen();
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: tRef.current('englishLearning.tts.unsupported'),
@@ -208,8 +208,8 @@ export function useEbookQuoteListen(
 				return;
 			}
 
-			primeEnglishPlaybackForUserGesture();
-			stopAllEnglishPlayback();
+			primePlaybackForUserGesture();
+			stopAllPlayback();
 			clearEpubListenSegmentOverlay();
 
 			const rend = getRenditionRef.current?.() ?? null;
@@ -285,14 +285,14 @@ export function useEbookQuoteListen(
 		const status = stateRef.current.status;
 		if (status !== 'playing' && status !== 'loading') return;
 		pausedRef.current = true;
-		pauseEnglishPlaybackSoft();
+		pausePlaybackSoft();
 		syncState({ status: 'paused' });
 	}, [syncState]);
 
 	const resume = useCallback(() => {
 		if (stateRef.current.status !== 'paused') return;
 		pausedRef.current = false;
-		if (resumeEnglishPlaybackSoft()) {
+		if (resumePlaybackSoft()) {
 			syncState({ status: 'playing' });
 			return;
 		}
@@ -320,7 +320,7 @@ export function useEbookQuoteListen(
 			const next = Math.min(count - 1, Math.max(0, index));
 			sentenceCursorRef.current = next;
 			loopGenRef.current += 1;
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			pausedRef.current = false;
 			const gen = loopGenRef.current;
 			syncState({ sentenceIndex: next, status: 'playing' });
@@ -342,7 +342,7 @@ export function useEbookQuoteListen(
 	const setRate = useCallback(
 		(rate: number) => {
 			rateRef.current = rate;
-			applyActiveEnglishPlaybackRate(rate);
+			applyActivePlaybackRate(rate);
 			syncState({ rate });
 		},
 		[syncState],
@@ -372,11 +372,11 @@ export function useEbookQuoteListen(
 
 	useEffect(() => {
 		if (!isActive) return;
-		registerEnglishPlaybackMediaHandlers({
+		registerPlaybackMediaHandlers({
 			play: () => resumeRef.current(),
 			pause: () => pauseRef.current(),
 		});
-		return () => registerEnglishPlaybackMediaHandlers(null);
+		return () => registerPlaybackMediaHandlers(null);
 	}, [isActive]);
 
 	return {

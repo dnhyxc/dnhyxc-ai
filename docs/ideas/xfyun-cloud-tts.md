@@ -2,7 +2,7 @@
 
 > **状态**：核心能力已上线（2026-06）；本文为 **前后端复刻/onboarding 用规划稿**  
 > **日期**：2026-06-27  
-> **需求摘要**：有效会员在语音设置增加第三种朗读来源「讯飞云端」，Nest 代理讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `englishTts` 选路，适合中文听书。
+> **需求摘要**：有效会员在语音设置增加第三种朗读来源「讯飞云端」，Nest 代理讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `speech` 选路，适合中文听书。
 
 ## 延伸阅读
 
@@ -15,8 +15,8 @@
 ## 0. 读本文你将得到什么
 
 - **问题**：MiniMax/硅基对中文听书体验一般；会员需要第三条云端链路，且生产 Node 18 不能依赖浏览器式全局 `WebSocket`。
-- **一句话方案**：扩展 `playbackSource='xfyun'`，前端 `englishTts` 改 POST 目标与 body；后端 `XfyunTtsService` 用 `ws` 连 `wss://tts-api.xfyun.cn/v2/tts`，HTTP 仍输出 MP3 流。
-- **改动层**：设置页 UI + 偏好 API + `englishTts` 选路/缓存 + Nest Controller/Service + env 配置。
+- **一句话方案**：扩展 `playbackSource='xfyun'`，前端 `speech` 改 POST 目标与 body；后端 `XfyunTtsService` 用 `ws` 连 `wss://tts-api.xfyun.cn/v2/tts`，HTTP 仍输出 MP3 流。
+- **改动层**：设置页 UI + 偏好 API + `speech` 选路/缓存 + Nest Controller/Service + env 配置。
 - **落地阶段**：M1 后端通路 → M2 前端选路与设置 → M3 音量/音高与 Node 18 兼容。
 - **最大风险**：讯飞 vcn 未授权（11200）、Node 18 误用 `undici@8` 导致进程启动失败、与 MiniMax 共用 `vol/pitch` 量纲切换时数值语义漂移。
 
@@ -40,7 +40,7 @@
 | `playbackSource` 三选一（local / cloud / xfyun） | 浏览器直连讯飞 wss（密钥暴露） |
 | 讯飞 vcn 列表、0–100 语速/音量/音高 | 独立讯飞偏好表 / 迁移脚本（复用 `minimax_tts_user_config`） |
 | `POST .../xfyun/speech/stream` HTTP MP3 | 讯飞 WS 真·逐帧推送到前端（当前 Nest 收齐后整段写回） |
-| 与 `englishTts` 分段预取、LRU 缓存兼容 | 非会员开放讯飞（仍仅本机） |
+| 与 `speech` 分段预取、LRU 缓存兼容 | 非会员开放讯飞（仍仅本机） |
 | Node 18 使用 `ws` 包 | 强制升级 Node 22 才可用 |
 
 ### 1.3 约束与依赖
@@ -73,7 +73,7 @@
 | 能力 | 仓库中已有 | 本需求中的用法 |
 |------|------------|----------------|
 | 会员选路 `playbackSource` | `minimax_tts_user_config.playback_source` | **扩展** 枚举含 `xfyun` |
-| 云端 TTS 播放 | `apps/frontend/src/utils/englishTts.ts` | **扩展** URL/body/cache 分支 |
+| 云端 TTS 播放 | `apps/frontend/src/utils/speech.ts` | **扩展** URL/body/cache 分支 |
 | 偏好读写 | `minimaxTtsPrefs.ts` + `cloudTtsSettings.ts` | **扩展** 归一化、extras、映射 |
 | MiniMax 流式 HTTP | `speech-transcription.controller` | **对照** 讯飞 endpoint 同形态 |
 | 设置页分区 | `cloudTts/index.tsx` | **扩展** 讯飞区块 + `PlaybackSourcePicker` |
@@ -101,7 +101,7 @@ flowchart TB
   end
 
   subgraph TTS [播放层]
-    EngTts[englishTts.ts]
+    EngTts[speech.ts]
     buildKey[buildCloudTtsCacheKey 🆕]
     buildExtras[buildXfyunTtsRequestExtras 🆕]
   end
@@ -189,8 +189,8 @@ flowchart TD
 
 | 方法 | 功能 |
 |------|------|
-| `shouldUseCloudEnglishTts(options)` | 非 `preferLocal` 且会员且 `playbackSource !== 'local'` 时走云端 |
-| `playEnglishPreferred(text, options)` | 统一入口：选 local/cloud/xfyun 路径并处理 abort/世代 |
+| `shouldUseCloudTts(options)` | 非 `preferLocal` 且会员且 `playbackSource !== 'local'` 时走云端 |
+| `playPreferred(text, options)` | 统一入口：选 local/cloud/xfyun 路径并处理 abort/世代 |
 | `startCloudTts(plain)` | 组 headers/body/url；fetch 流式读 body 为 Blob；写 LRU |
 | `getCloudTtsFromCache(plain)` | 用 `buildCloudTtsCacheKey` 查内存 LRU |
 | `XfyunTtsService.resolveOptions(dto)` | 校验 text 字节上限；默认 speed/volume/pitch=50 |
@@ -201,7 +201,7 @@ flowchart TD
 
 - **失败不阻塞全局**：讯飞单请求失败进入既有回退链，与 MiniMax 502 一致。
 - 缓存 key **必须**含 source + 参数 JSON，否则切讯飞后仍播 MiniMax 旧 MP3。
-- 长文场景：`firstCloudTtsChunkPlain` + `prefetchCloudEnglishTts` 对 xfyun 同样生效。
+- 长文场景：`firstCloudTtsChunkPlain` + `prefetchCloudTts` 对 xfyun 同样生效。
 
 ---
 
@@ -213,7 +213,7 @@ sequenceDiagram
   participant UI as CloudTtsSetting
   participant Prefs as minimaxTtsPrefs
   participant API as settings/cloud-tts
-  participant TTS as englishTts
+  participant TTS as speech
   participant Ctrl as SpeechTranscriptionController
   participant Svc as XfyunTtsService
   participant WS as 讯飞 wss
@@ -225,7 +225,7 @@ sequenceDiagram
   API-->>Prefs: 200 归一化视图
 
   Note over U,WS: B. 试听 / 听书播放
-  U->>TTS: playEnglishPreferred(text)
+  U->>TTS: playPreferred(text)
   TTS->>Prefs: ensureMinimaxTtsUserPrefsLoaded
   TTS->>Prefs: buildXfyunTtsRequestExtras
   TTS->>Ctrl: POST /xfyun/speech/stream + JWT
@@ -247,7 +247,7 @@ sequenceDiagram
 | `streamSpeech(dto, userId)` | 先查 Service LRU；未命中则 `synthesizeViaWebSocket` 后 yield |
 | `buildRequestPayload(resolved, appId)` | 讯飞 business：aue=lame, vcn, speed, volume, pitch；data.status=2 单帧 |
 | `synthesizeViaWebSocket(resolved)` | Promise 封装 ws 生命周期；90s 超时 |
-| `playEnglishPreferred` | 云端 Blob 就绪后创建 Object URL 或 MSE cadence 播放 |
+| `playPreferred` | 云端 Blob 就绪后创建 Object URL 或 MSE cadence 播放 |
 
 **读图要点**：
 
@@ -296,7 +296,7 @@ stateDiagram-v2
 | `SpeechTranscriptionController` | HTTP 路由 | 扩展 | `.../speech-transcription.controller.ts` |
 | `xfyunTts.ts` | vcn 白名单、参数映射 | 新增 | `apps/frontend/src/constants/xfyunTts.ts` |
 | `minimaxTtsPrefs.ts` | extras、选路归一化 | 扩展 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
-| `englishTts.ts` | fetch 分支、cache key | 扩展 | `apps/frontend/src/utils/englishTts.ts` |
+| `speech.ts` | fetch 分支、cache key | 扩展 | `apps/frontend/src/utils/speech.ts` |
 | `PlaybackSourcePicker` | 三选一 UI | 新增 | `cloudTts/PlaybackSourcePicker.tsx` |
 | `cloudTts/index.tsx` | 讯飞表单字段 | 扩展 | `views/setting/cloudTts/index.tsx` |
 
@@ -345,7 +345,7 @@ class XfyunTtsService {
 | 阶段 | 目标 | 交付物 | 依赖 |
 |------|------|--------|------|
 | M1 | 后端讯飞 MP3 通路 | Service + DTO + Controller + env | 讯飞控制台密钥 |
-| M2 | 前端选路与播放 | Picker、englishTts 分支、试听 | M1 可联调 |
+| M2 | 前端选路与播放 | Picker、speech 分支、试听 | M1 可联调 |
 | M3 | 参数完善与生产兼容 | 音量/音高 UI、映射、`ws` 依赖 | M2 |
 
 ### M1 任务
@@ -360,7 +360,7 @@ class XfyunTtsService {
 - [ ] `TtsPlaybackSource` 扩 `'xfyun'`；DTO `@IsIn` 同步
 - [ ] `PlaybackSourcePicker` + 设置页讯飞区块（发音人、语速）
 - [ ] `buildXfyunTtsRequestExtras` + `buildCloudTtsCacheKey`
-- [ ] `playEnglishPreferred` / `prefetchCloudEnglishTts` 走新 URL
+- [ ] `playPreferred` / `prefetchCloudTts` 走新 URL
 
 ### M3 任务
 
@@ -420,7 +420,7 @@ class XfyunTtsService {
 | 类型 | 路径 |
 |------|------|
 | 后端 | `xfyun-tts.service.ts`, `xfyun-tts.dto.ts`, `speech-transcription.controller.ts`, `config.enum.ts`, `package.json`（ws） |
-| 前端 | `xfyunTts.ts`, `minimaxTtsPrefs.ts`, `englishTts.ts`, `cloudTts/index.tsx`, `PlaybackSourcePicker.tsx`, `api.ts`, i18n |
+| 前端 | `xfyunTts.ts`, `minimaxTtsPrefs.ts`, `speech.ts`, `cloudTts/index.tsx`, `PlaybackSourcePicker.tsx`, `api.ts`, i18n |
 | 偏好 | `minimax-tts-user-config.entity.ts`, `upsert-minimax-tts-prefs.dto.ts`, `minimax-tts-prefs.service.ts` |
 | 文档（实现后） | `docs/english/xfyun-cloud-tts.md`, `tts-playback-source.md`, 产品姊妹稿 §8.4 / update-info |
 

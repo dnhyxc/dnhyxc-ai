@@ -21,8 +21,8 @@
 
 - **朗读来源三选一**（`playbackSource: local | cloud | xfyun`）互斥
 - **设置 → 语音设置** 保存偏好并同步服务端（`GET/PUT /settings/cloud-tts`）
-- **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen` → `playEnglishPreferred`）
-- **英语学习各页单词朗读**（十余处 `playEnglishPreferred` 调用）
+- **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen` → `playPreferred`）
+- **英语学习各页单词朗读**（十余处 `playPreferred` 调用）
 - **设置页 / 本机试听**（`cloudTts/index.tsx`、`LocalTtsVoiceSetting`）
 - **云端 MP3 缓存**（`buildMinimaxTtsCacheKeySuffix` / `buildXfyunTtsCacheKeySuffix`）
 - **讯飞 / MiniMax 后端合成**（`xfyun-tts.service` / `minimax-tts.service`）
@@ -42,10 +42,10 @@
 | `apps/frontend/src/constants/minimaxTts.ts` | `getDefaultMinimaxCloudCredentials`（仅 model 可 env 默认） |
 | `apps/frontend/src/constants/xfyunTts.ts` | 讯飞凭证默认空，不从 `VITE_XFYUN_*` 预填 |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | `xfyunVoiceId` 独立；凭证进 cache key；保存前乐观 `setCache` |
-| `apps/frontend/src/utils/englishTts.ts` | 统一云端失败 Toast；移除讯飞失败中转硅基；`cloudTtsNotified` |
+| `apps/frontend/src/utils/speech.ts` | 统一云端失败 Toast；移除讯飞失败中转硅基；`cloudTtsNotified` |
 | `apps/frontend/src/views/setting/cloudTts/index.tsx` | 凭证输入、UI 重排、模型文本框 |
 | `apps/frontend/src/views/setting/cloudTts/ParamsHelpPopover.tsx` | 帮助项精简；入口移至标题旁 |
-| `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | 避免与 `englishTts` 重复 Toast |
+| `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | 避免与 `speech` 重复 Toast |
 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 同上 |
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | 凭证文案、云端失败 Toast 文案 |
 | `apps/frontend/src/vite-env.d.ts` | 声明 `VITE_MINIMAX_MODEL_NAME` 等 |
@@ -60,8 +60,8 @@
 | 云端失败用户感知 | **低（增强）** | 新增区分讯飞/MiniMax 的 Toast；12s 冷却；重开听书立即再弹 |
 | MiniMax / 讯飞音色互存 | **有条件变化** | `xfyunVoiceId` 独立列；旧数据经 `splitLegacyVoiceStorage` 迁移 |
 | 设置页 UI / 字段说明 | **低（增强）** | 布局重排、凭证区、模型改文本框；帮助 Popover 位置与条目变化 |
-| EPUB 听书 / 听当前主路径 | **否** | 仍 `playEnglishPreferred`；仅失败 Toast 去重 |
-| 英语学习单词朗读 | **低（增强）** | 共用 `playEnglishPreferred`，云端失败时多 Toast |
+| EPUB 听书 / 听当前主路径 | **否** | 仍 `playPreferred`；仅失败 Toast 去重 |
+| 英语学习单词朗读 | **低（增强）** | 共用 `playPreferred`，云端失败时多 Toast |
 | 前端 MP3 缓存 | **有条件变化** | cache key 含凭证摘要；改凭证后旧缓存不命中（预期） |
 | MiniMax 模型校验 | **低（增强）** | 后端由枚举改为 `@MaxLength(64)` 字符串 |
 | 数据库 schema | **是（部署依赖）** | 须跑迁移；未迁移则 upsert/读偏好可能失败 |
@@ -106,9 +106,9 @@
 
 **改后**：
 
-- 移除硅基中转；`playEnglishPreferred` catch 内 `notifyCloudTtsFallback` 统一 Toast（区分讯飞/MiniMax）
+- 移除硅基中转；`playPreferred` catch 内 `notifyCloudTtsFallback` 统一 Toast（区分讯飞/MiniMax）
 - 可本机降级时 Toast 为 warning +「已改用本机朗读」；否则 error
-- `stopAllEnglishPlayback` 重置 12s 冷却；错误带 `cloudTtsNotified` 时听书 hook 不再二次 Toast
+- `stopAllPlayback` 重置 12s 冷却；错误带 `cloudTtsNotified` 时听书 hook 不再二次 Toast
 
 **动机**：凭证错误时用户需明确感知；避免讯飞失败静默换硅基。
 
@@ -148,12 +148,12 @@
 | **讯飞云端合成** | 低 | 用户三项凭证优先；服务端 LRU 缓存 key 含 `credTag` |
 | **讯飞 HTTP 失败** | 中 | **不再**自动改走硅基；用户见 Toast 后听本机（若浏览器支持） |
 | **MiniMax HTTP 失败** | 低 | 同上 Toast 路径；无硅基中转变化（MiniMax 路径原本也无此中转） |
-| **EPUB 听书** | 低 | `playEnglishPreferred` 不变；云端连续失败 12s 内只弹一次 Toast |
+| **EPUB 听书** | 低 | `playPreferred` 不变；云端连续失败 12s 内只弹一次 Toast |
 | **EPUB 听当前** | 低 | 同听书；`cloudTtsNotified` 防重复 |
-| **句间云端预取** | 无 | `prefetchCloudEnglishTts` 仍走同一 `startCloudTts`；失败由上层 catch |
+| **句间云端预取** | 无 | `prefetchCloudTts` 仍走同一 `startCloudTts`；失败由上层 catch |
 | **英语学习单词朗读** | 低 | 云端选路时失败多 Toast；仍回退本机 |
 | **本机 Web Speech 设置/试听** | 无 | `LocalTtsVoiceSetting` 未改 |
-| **PopBar / 词汇卡片** | 低 | 经 `playEnglishPreferred` 间接获得 Toast 行为 |
+| **PopBar / 词汇卡片** | 低 | 经 `playPreferred` 间接获得 Toast 行为 |
 | **前端 MP3 LRU** | 低 | 改凭证后缓存 miss，可能多一次网络合成（正确性优先） |
 | **旧 localStorage 迁移** | 无 | 仍经 `normalizeMinimaxTtsUserPrefs` + 服务端同步 |
 | **i18n** | 无 | 纯文案 |
@@ -180,10 +180,10 @@
 | 项 | 说明 |
 |----|------|
 | `playbackSource` 三选一互斥 | `PlaybackSourcePicker` 逻辑未改 |
-| 本机音色选择与 `preferLocal: true` | `LocalTtsVoiceSetting`、`speakEnglishTextWithGeneration` 未改 |
+| 本机音色选择与 `preferLocal: true` | `LocalTtsVoiceSetting`、`speakTextWithGeneration` 未改 |
 | 听书 / 听当前互斥与播放条 | `EpubListenPlayerBar`、世代 `generation` 机制未改 |
 | 句界算法与 cadence 高亮 | `buildSentenceOffsetSpans`、overlay 未改 |
-| 云端句间预取 API | `prefetchCloudEnglishTts` / `prefetchedCloud` 签名未改 |
+| 云端句间预取 API | `prefetchCloudTts` / `prefetchedCloud` 签名未改 |
 | MiniMax 音色列表与语言增强联动 | `VoiceSelectField` 筛选逻辑保留 |
 | 讯飞 0–100 与 vol/pitch 映射 | `xfyunVolumeFromVol` 等函数未改 |
 | `enabled: false` 时不发 extras | `buildMinimaxTtsRequestExtras` 仍受 `enabled` 控制 |

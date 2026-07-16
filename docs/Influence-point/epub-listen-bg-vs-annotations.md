@@ -60,7 +60,7 @@
 
 |  | 听当前 | 听书 |
 |--|--------|------|
-| 换句触发 | TTS `onCadenceChunk` → `paintSentence` | 每句 `playEnglishPreferred` 前 `showChapterListenSentenceHighlight` |
+| 换句触发 | TTS `onCadenceChunk` → `paintSentence` | 每句 `playPreferred` 前 `showChapterListenSentenceHighlight` |
 | 句末 | `clearActiveListenHighlight`（仅 mark + session 索引） | `clearChapterListenSentenceHighlight` |
 | session 停止 | `clearEpubListenSegmentOverlay` | `stopInternal` → `clearEpubListenSegmentOverlay` |
 | 与用户/想法关系 | **相同绘制模块** | **相同绘制模块** |

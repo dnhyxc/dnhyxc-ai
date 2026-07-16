@@ -10,10 +10,10 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteMistakeListEntry } from '@/service';
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+} from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 import { useClassicQuoteMistakesList } from './useClassicQuoteMistakesList';
@@ -196,21 +196,21 @@ export function ClassicQuoteMistakesPanel({
 	const toggleQuotePlay = useCallback(
 		async (english: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
 				});
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(english);
+				await playPreferred(english);
 			} catch {
 				Toast({
 					type: 'warning',
@@ -224,7 +224,7 @@ export function ClassicQuoteMistakesPanel({
 	);
 
 	useEffect(() => {
-		return () => stopAllEnglishPlayback();
+		return () => stopAllPlayback();
 	}, []);
 
 	const selectionDisabled = loading || batchRemoving;

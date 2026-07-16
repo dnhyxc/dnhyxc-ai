@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [EPUB 听读 — 句间云端 TTS 预取](epub-listen-cloud-prefetch.md) — 句间预取总体设计与 `prefetchCloudEnglishTts`
+- [EPUB 听读 — 句间云端 TTS 预取](epub-listen-cloud-prefetch.md) — 句间预取总体设计与 `prefetchCloudTts`
 - [EPUB 听当前：播放自动跟随与回位 FAB](epub-listen-auto-follow-fab.md) — 播放跟随 FAB（与本篇带宽优化正交）
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听书 / 听当前 TTS 调用链
 
@@ -23,7 +23,7 @@
 
 ### 1.2 目标
 
-1. `englishTts` 暴露 **`onPlaybackStart`**：云端 `audio.play()` 成功或本机首段 `speak` 开始后触发；
+1. `speech` 暴露 **`onPlaybackStart`**：云端 `audio.play()` 成功或本机首段 `speak` 开始后触发；
 2. `epubListenPlayUnits` 在 **`onPlaybackStart`（及 `oncePrefetch` 兜底）之后** 再 `schedulePrefetch`；
 3. **kick 路径仅合成当前一句**（1 路 HTTP），同段剩余与后续段再整段预取。
 
@@ -33,7 +33,7 @@
 
 | 路径 | 变更 |
 | ---- | ---- |
-| `apps/frontend/src/utils/englishTts.ts` | `PlayEnglishPreferredOptions.onPlaybackStart`；`playCloudTtsCadenceSegments` / `startCloudAudioPlayback` / `playCloudMp3Blob` / `speakEnglishTextWithGeneration` 触发回调 |
+| `apps/frontend/src/utils/speech.ts` | `PlayPreferredOptions.onPlaybackStart`；`playCloudTtsCadenceSegments` / `startCloudAudioPlayback` / `playCloudMp3Blob` / `speakTextWithGeneration` 触发回调 |
 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenPlayUnits.ts` | **新增** `oncePrefetch`、`playListenUnitsFromCursor`；kick 后预取 |
 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | `playSentencesFromCursor` 委托 `playListenUnitsFromCursor`（移除内联 `schedulePrefetch`） |
 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 同上（听当前共用 play units） |
@@ -43,32 +43,32 @@
 ## 3. 实现思路
 
 1. **出声即回调**：云端在 `audio.play()` resolve 后、`playCloudMp3Blob` 内 `notifyStart` 去重调用；本机在首 chunk `speak` 前 `notifyPlaybackStart`。
-2. **oncePrefetch 兜底**：本机 Web Speech 无统一 play 事件，`await playEnglishPreferred` 返回后再调一次 `prefetchAfterKickStart()`，保证预取仍会启动。
+2. **oncePrefetch 兜底**：本机 Web Speech 无统一 play 事件，`await playPreferred` 返回后再调一次 `prefetchAfterKickStart()`，保证预取仍会启动。
 3. **kick 仅当前句**：`playListenUnitsFromCursor` 首包 `sentenceRaw` + `cloudSingleUtterance: true`，不预取；`onPlaybackStart` 里再 `schedulePrefetch` 段内下一句或下一段。
 4. **段级预取键**：`prefetchedByText` 以段文本为 key，`whole: true` 对齐整段合成。
-5. **inflight 合并**（同轮 `englishTts` 附带）：`startCloudTts` 同 cacheKey 合并进行中的请求，避免兜底与回调重复打 stream（见 `englishTts.ts` `inflightCloudTts`）。
+5. **inflight 合并**（同轮 `speech` 附带）：`startCloudTts` 同 cacheKey 合并进行中的请求，避免兜底与回调重复打 stream（见 `speech.ts` `inflightCloudTts`）。
 
 ---
 
 ## 4. 关键代码对比与注释
 
-### 4.1 `PlayEnglishPreferredOptions.onPlaybackStart`（`englishTts.ts`）
+### 4.1 `PlayPreferredOptions.onPlaybackStart`（`speech.ts`）
 
 **对比范围**：类型字段与 `CadencePlaybackHooks`。
 
 **改动前** · 基线 `HEAD`，约 L470–L488
 
 ```typescript
-export type PlayEnglishPreferredOptions = {
+export type PlayPreferredOptions = {
 	preferLocal?: boolean;
-	speak?: SpeakEnglishOptions;
+	speak?: SpeakOptions;
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
 	/** 听书/听当前逐句：由上一轮发起的下一句云端预取（缩短句间等待） */
-	prefetchedCloud?: Promise<EnglishTtsSentencePrefetch> | null;
+	prefetchedCloud?: Promise<TtsSentencePrefetch> | null;
 };
 
 type CadencePlaybackHooks = Pick<
-	PlayEnglishPreferredOptions,
+	PlayPreferredOptions,
 	'onCadenceChunk' | 'prefetchedCloud'
 >;
 ```
@@ -76,12 +76,12 @@ type CadencePlaybackHooks = Pick<
 **改动后** · 当前，约 L470–L495
 
 ```typescript
-export type PlayEnglishPreferredOptions = {
+export type PlayPreferredOptions = {
 	preferLocal?: boolean;
-	speak?: SpeakEnglishOptions;
+	speak?: SpeakOptions;
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
 	/** 听书/听当前：由上一轮发起的云端预取（缩短等待） */
-	prefetchedCloud?: Promise<EnglishTtsSentencePrefetch> | null;
+	prefetchedCloud?: Promise<TtsSentencePrefetch> | null;
 	/**
 	 * 云端整段一次合成（听书/听当前按段 TTS）。
 	 * 为 true 时不按句读拆 HTTP；超厂商字节上限仍回退 cadence。
@@ -96,7 +96,7 @@ export type PlayEnglishPreferredOptions = {
 };
 
 type CadencePlaybackHooks = Pick<
-	PlayEnglishPreferredOptions,
+	PlayPreferredOptions,
 	'onCadenceChunk' | 'prefetchedCloud' | 'onPlaybackStart'
 >;
 ```
@@ -105,7 +105,7 @@ type CadencePlaybackHooks = Pick<
 
 ---
 
-### 4.2 `playCloudTtsCadenceSegments` 出声通知（`englishTts.ts`）
+### 4.2 `playCloudTtsCadenceSegments` 出声通知（`speech.ts`）
 
 **对比范围**：函数开头 `notifyPlaybackStart` 与单段播放传参（摘录）。
 
@@ -144,7 +144,7 @@ async function playCloudTtsCadenceSegments(
 
 ---
 
-### 4.3 `startCloudAudioPlayback` / `playCloudMp3Blob`（`englishTts.ts`）
+### 4.3 `startCloudAudioPlayback` / `playCloudMp3Blob`（`speech.ts`）
 
 **对比范围**：完整 `startCloudAudioPlayback`；`playCloudMp3Blob` 中 `notifyStart` 相关摘录。
 
@@ -248,7 +248,7 @@ export async function playListenUnitsFromCursor(
 
 	const prefetchedByText = new Map<
 		string,
-		ReturnType<typeof prefetchCloudEnglishTts>
+		ReturnType<typeof prefetchCloudTts>
 	>();
 
 	const schedulePrefetch = (paraIndex: number, fromSi: number) => {
@@ -257,7 +257,7 @@ export async function playListenUnitsFromCursor(
 		const unit = units[paraIndex]!;
 		const raw = sliceParagraphFromSentence(plain, unit, sentences, fromSi);
 		if (!raw || prefetchedByText.has(raw)) return;
-		prefetchedByText.set(raw, prefetchCloudEnglishTts(raw, { whole: true }));
+		prefetchedByText.set(raw, prefetchCloudTts(raw, { whole: true }));
 	};
 
 	// ... pi / kickSentence 初始化
@@ -281,7 +281,7 @@ export async function playListenUnitsFromCursor(
 				}
 			});
 
-			await playEnglishPreferred(kickRaw, {
+			await playPreferred(kickRaw, {
 				speak: { rate: getRate() },
 				cloudSingleUtterance: true,
 				onPlaybackStart: prefetchAfterKickStart,
@@ -311,7 +311,7 @@ export async function playListenUnitsFromCursor(
 ```typescript
 			const prefetchedByIndex = new Map<
 				number,
-				ReturnType<typeof prefetchCloudEnglishTts>
+				ReturnType<typeof prefetchCloudTts>
 			>();
 
 			const schedulePrefetch = (index: number) => {
@@ -322,7 +322,7 @@ export async function playListenUnitsFromCursor(
 					plain.slice(sent.start, sent.end),
 				).trim();
 				if (!raw) return;
-				prefetchedByIndex.set(index, prefetchCloudEnglishTts(raw));
+				prefetchedByIndex.set(index, prefetchCloudTts(raw));
 			};
 			schedulePrefetch(startSi + 1);
 
@@ -330,7 +330,7 @@ export async function playListenUnitsFromCursor(
 				// ...
 				schedulePrefetch(si + 1);
 
-				await playEnglishPreferred(spokenRaw, {
+				await playPreferred(spokenRaw, {
 					speak: { rate: rateRef.current },
 					prefetchedCloud: prefetchedByIndex.get(si) ?? null,
 				});
@@ -387,16 +387,16 @@ export async function playListenUnitsFromCursor(
 sequenceDiagram
   participant Hook as useEpubChapterListen
   participant Units as epubListenPlayUnits
-  participant TTS as englishTts
+  participant TTS as speech
   participant Net as 云端 TTS API
 
   Hook->>Units: playListenUnitsFromCursor(kickRaw)
-  Units->>TTS: playEnglishPreferred(kickRaw, onPlaybackStart)
+  Units->>TTS: playPreferred(kickRaw, onPlaybackStart)
   TTS->>Net: startCloudTts(kickRaw) 仅 1 路
   Net-->>TTS: MP3
   TTS->>TTS: audio.play() 成功
   TTS->>Units: onPlaybackStart()
-  Units->>TTS: prefetchCloudEnglishTts(nextSegment, whole:true)
+  Units->>TTS: prefetchCloudTts(nextSegment, whole:true)
   Note over Units,Net: 预取与当前播放并行，但不与首包争抢
 ```
 
@@ -409,7 +409,7 @@ sequenceDiagram
 | 首次点听书 | 首句尽快出声；第二句/段预取在首句 play 后启动 |
 | 播放条切句 | kick 仅新句 1 路 HTTP；预取不提前 |
 | 本机 Web Speech | `oncePrefetch` 在 `await` 后兜底预取 |
-| 非听书调用 `playEnglishPreferred` | 不传 `onPlaybackStart` 时行为与改前兼容 |
+| 非听书调用 `playPreferred` | 不传 `onPlaybackStart` 时行为与改前兼容 |
 
 ---
 
@@ -417,7 +417,7 @@ sequenceDiagram
 
 | 说明 | 路径 |
 | ---- | ---- |
-| 出声回调与云端播放 | `apps/frontend/src/utils/englishTts.ts` |
+| 出声回调与云端播放 | `apps/frontend/src/utils/speech.ts` |
 | kick + 延迟预取 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenPlayUnits.ts` |
 | 听书接入 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 | 听当前接入 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |

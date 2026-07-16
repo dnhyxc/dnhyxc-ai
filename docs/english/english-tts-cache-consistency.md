@@ -37,7 +37,7 @@
 
 | 说明 | 路径 |
 |------|------|
-| 前端云端朗读与缓存 | `apps/frontend/src/utils/englishTts.ts` |
+| 前端云端朗读与缓存 | `apps/frontend/src/utils/speech.ts` |
 | 硅基 TTS 合成与缓存 | `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts` |
 | HTTP 出口（未改契约） | `apps/backend/src/services/speech-transcription/speech-transcription.controller.ts` → `POST speech` |
 
@@ -51,8 +51,8 @@
 
 ```mermaid
 sequenceDiagram
-  participant UI as playEnglishPreferred
-  participant FE as englishTts.fetchCloudTtsBlob
+  participant UI as playPreferred
+  participant FE as speech.fetchCloudTtsBlob
   participant API as POST /speech-transcription/speech
   participant BE as synthesizeSpeech
   participant SF as 硅基 /audio/speech
@@ -168,7 +168,7 @@ async synthesizeSpeech(text: string): Promise<Buffer> {
 
 ### 4.3 前端：LRU 与 `fetchCloudTtsBlob`
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L86–L108、L166–L193）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L86–L108、L166–L193）
 
 ```typescript
 const CLOUD_TTS_CACHE_MAX = 64;
@@ -198,7 +198,7 @@ async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
 }
 ```
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（`playEnglishPreferred` 云端分支，约 L319–L330）
+**来源**：`apps/frontend/src/utils/speech.ts`（`playPreferred` 云端分支，约 L319–L330）
 
 ```typescript
 // 说明：plain 已在函数入口 stripMarkdownForTts，与缓存 key 一致
@@ -241,6 +241,6 @@ await playCloudMp3Blob(blob, generation);
 | 说明 | 路径 |
 |------|------|
 | 播放世代 / preferLocal | [`english-tts-playback.md`](./english-tts-playback.md) |
-| 前端朗读工具 | `apps/frontend/src/utils/englishTts.ts` |
+| 前端朗读工具 | `apps/frontend/src/utils/speech.ts` |
 | 硅基合成服务 | `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts` |
 | 控制器 | `apps/backend/src/services/speech-transcription/speech-transcription.controller.ts` |

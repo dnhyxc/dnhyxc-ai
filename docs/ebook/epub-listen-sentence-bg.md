@@ -30,7 +30,7 @@
 
 | 路径 | 说明 |
 | ---- | ---- |
-| `apps/frontend/src/utils/englishTts.ts` | `TtsCadenceChunkEvent` plain 偏移、`buildSentenceOffsetSpans` 导出 |
+| `apps/frontend/src/utils/speech.ts` | `TtsCadenceChunkEvent` plain 偏移、`buildSentenceOffsetSpans` 导出 |
 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` | 三层绘制、plain 映射、选区缓存 |
 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | plain span 回调、frozen Range、播完 sync |
 | `apps/frontend/src/views/ebook/utils/epubSelectionToolbarAttach.ts` | PopBar 时缓存选区 |
@@ -38,7 +38,7 @@
 
 ## 3. 实现思路
 
-1. **数据流**：`toggleListen(text, key, cfi, frozenRange)` → `resolveEpubListenPlain` 得 plain + selectionRange → `beginEpubListenOverlaySession` → `playEnglishPreferred({ onCadenceChunk })` → `start` 时 `showEpubListenPlainSpan(sentencePlainStart, sentencePlainEnd)` → 句末 `clearEpubListenSentenceOverlay` → `finally` 全清 + `onListenSessionEnd`。
+1. **数据流**：`toggleListen(text, key, cfi, frozenRange)` → `resolveEpubListenPlain` 得 plain + selectionRange → `beginEpubListenOverlaySession` → `playPreferred({ onCadenceChunk })` → `start` 时 `showEpubListenPlainSpan(sentencePlainStart, sentencePlainEnd)` → 句末 `clearEpubListenSentenceOverlay` → `finally` 全清 + `onListenSessionEnd`。
 2. **DOM 映射**：`buildPlainCompactMap` 在 outer Range 内建去空白 compact 串与 Text 点表；`plainSliceToRange` 按 plain 偏移切 Range。
 3. **绘制优先级**：`paintListenRange` 先 CSS Highlight（Chrome 等），再独立 highlight 批注，最后 div overlay（Safari 等）。
 4. **relayout**：监听 `relocated`/`rendered`，按 session 内 `plainStart/plainEnd` 重绘当前句。
@@ -61,12 +61,12 @@ import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useState } from 'react';
 // 英语学习 TTS 能力：可用性、播放、停止、strip plain、预热音色
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
 	stripMarkdownForTts,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	warmupSpeechVoices,
+} from '@/utils/speech';
 // 播放浮层：会话开始、全清、句清、按句索引显示（旧 API）
 import {
 	beginEpubListenOverlaySession,
@@ -85,10 +85,10 @@ export function useEbookQuoteListen(
 
 	useEffect(() => {
 		// 挂载时预热 Web Speech 音色列表
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		return () => {
 			// 卸载时停止播放并清除播放浮层
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			clearEpubListenSegmentOverlay();
 		};
 	}, []);
@@ -98,19 +98,19 @@ export function useEbookQuoteListen(
 			const trimmed = text.trim();
 			if (!trimmed) return;
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				clearEpubListenSegmentOverlay();
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
 				});
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			clearEpubListenSegmentOverlay();
 			setPlayingKey(key);
 
@@ -122,7 +122,7 @@ export function useEbookQuoteListen(
 			}
 
 			try {
-				await playEnglishPreferred(trimmed, {
+				await playPreferred(trimmed, {
 					onCadenceChunk: (event) => {
 						if (!rend || !cfi) return;
 						if (event.phase === 'start') {
@@ -168,11 +168,11 @@ import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useState } from 'react';
 // 英语学习 TTS：不再在此 hook 内 stripMarkdown（改由 resolveEpubListenPlain）
 import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	isPlaybackAvailable,
+	playPreferred,
+	stopAllPlayback,
+	warmupSpeechVoices,
+} from '@/utils/speech';
 // 播放浮层：plain 解析、plain span 显示、会话 API
 import {
 	beginEpubListenOverlaySession,
@@ -191,9 +191,9 @@ export function useEbookQuoteListen(
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
 	useEffect(() => {
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		return () => {
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			clearEpubListenSegmentOverlay();
 		};
 	}, []);
@@ -208,20 +208,20 @@ export function useEbookQuoteListen(
 			const trimmed = text.trim();
 			if (!trimmed) return;
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				clearEpubListenSegmentOverlay();
 				onListenSessionEnd?.();
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
 				});
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			clearEpubListenSegmentOverlay();
 			setPlayingKey(key);
 
@@ -241,7 +241,7 @@ export function useEbookQuoteListen(
 			}
 
 			try {
-				await playEnglishPreferred(spokenRaw, {
+				await playPreferred(spokenRaw, {
 					onCadenceChunk: (event) => {
 						if (!rend) return;
 						if (event.phase === 'start') {
@@ -284,7 +284,7 @@ export function useEbookQuoteListen(
 
 ---
 
-### 4.2 `emitCadenceChunk`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.2 `emitCadenceChunk`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：完整函数（约 L504–L542）。
 
@@ -523,7 +523,7 @@ export function beginEpubListenOverlaySession(
 | 说明 | 路径 |
 | ---- | ---- |
 | 播放浮层 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
-| TTS 节奏事件 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 节奏事件 | `apps/frontend/src/utils/speech.ts` |
 | 朗读 hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | PopBar 选区缓存 | `apps/frontend/src/views/ebook/utils/epubSelectionToolbarAttach.ts` |
 

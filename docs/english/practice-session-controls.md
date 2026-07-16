@@ -73,7 +73,7 @@
 
 - `DICTATION_PLAY_COUNT = 3`、`DICTATION_PLAY_GAP_MS = 3000`；仅 `playWord({ sequence: true })` 走三连播。
 - `dictationPlayRunRef` + `cancelDictationPlay()` 取消朗读与 `sleepMs` 等待。
-- 其余听写/看中写播放均为单次 `playEnglishPreferred`。
+- 其余听写/看中写播放均为单次 `playPreferred`。
 
 ### 3.5 播放 UI 复用
 
@@ -163,14 +163,14 @@ useEffect(() => {
 /** 说明：每次 cancel 或新开播放时 runId 自增，旧异步循环在 await 后自检并退出 */
 const cancelDictationPlay = useCallback(() => {
   dictationPlayRunRef.current += 1;
-  stopAllEnglishPlayback();
+  stopAllPlayback();
 }, []);
 
 const playDictationSequence = useCallback(
   async (runId: number) => {
     for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
       if (dictationPlayRunRef.current !== runId) return; // 已被取消
-      await playEnglishPreferred(answerText, { preferLocal: true });
+      await playPreferred(answerText, { preferLocal: true });
       if (dictationPlayRunRef.current !== runId) return;
       if (i < DICTATION_PLAY_COUNT - 1) {
         await sleepMs(DICTATION_PLAY_GAP_MS); // 第 1、2 次后各等 3s
@@ -181,7 +181,7 @@ const playDictationSequence = useCallback(
 );
 
 const playWord = useCallback(async () => {
-  if (!isEnglishTtsSupported()) { /* Toast 警告 */ return; }
+  if (!isSpeechSupported()) { /* Toast 警告 */ return; }
   if (playing) {
     // 说明：播放中再点 = 停止（toggle）
     cancelDictationPlay();
@@ -190,13 +190,13 @@ const playWord = useCallback(async () => {
   }
   dictationPlayRunRef.current += 1;
   const runId = dictationPlayRunRef.current;
-  stopAllEnglishPlayback();
+  stopAllPlayback();
   setPlaying(true);
   try {
     if (mode === 'dictation') {
       await playDictationSequence(runId); // 听写：3 连播
     } else {
-      await playEnglishPreferred(answerText, { preferLocal: true }); // 拼写：单次
+      await playPreferred(answerText, { preferLocal: true }); // 拼写：单次
     }
   } finally {
     if (dictationPlayRunRef.current === runId) setPlaying(false);
@@ -219,7 +219,7 @@ useEffect(() => {
 ```typescript
 const playWord = useCallback(
   async (options?: { force?: boolean }) => {
-    if (!isEnglishTtsSupported()) { /* Toast */ return; }
+    if (!isSpeechSupported()) { /* Toast */ return; }
     // 说明：重试时 playing 可能尚未 false，force 跳过「再点即停」
     if (playing && !options?.force) {
       cancelDictationPlay();
@@ -228,13 +228,13 @@ const playWord = useCallback(
     }
     dictationPlayRunRef.current += 1;
     const runId = dictationPlayRunRef.current;
-    stopAllEnglishPlayback();
+    stopAllPlayback();
     setPlaying(true);
     try {
       if (mode === 'dictation') {
         await playDictationSequence(runId); // 3 连播
       } else {
-        await playEnglishPreferred(answerText, { preferLocal: true });
+        await playPreferred(answerText, { preferLocal: true });
       }
     } finally {
       if (dictationPlayRunRef.current === runId) setPlaying(false);
@@ -545,7 +545,7 @@ const softWrongMeta =
 | 听写播放组件 | `apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx` |
 | 拼写题干 | `apps/frontend/src/views/englishLearning/practice/components/spelling/SpellingPromptBody.tsx` |
 | 提示可用性 | `apps/frontend/src/views/englishLearning/practice/utils/hint.ts` |
-| TTS | `apps/frontend/src/utils/englishTts.ts` |
+| TTS | `apps/frontend/src/utils/speech.ts` |
 | 频谱动画 | `apps/frontend/src/index.css` |
 
 若与仓库最新源码不一致，以源码为准。

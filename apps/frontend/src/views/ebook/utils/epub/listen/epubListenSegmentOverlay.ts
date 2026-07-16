@@ -3,10 +3,7 @@
  * 视觉高亮由 epubListenMarkHighlight 负责。
  */
 import type { Rendition } from 'epubjs';
-import {
-	buildSentenceOffsetSpans,
-	stripMarkdownForTts,
-} from '@/utils/englishTts';
+import { buildSentenceOffsetSpans, stripMarkdownForTts } from '@/utils/speech';
 import {
 	cfiFromDomRange,
 	forEachTextNodeInRange,

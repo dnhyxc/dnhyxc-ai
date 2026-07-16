@@ -2,10 +2,7 @@
  * 听书/听当前：把节/选区 plain 切成「合成单元」（多句打包），供按段 TTS + 逐句高亮。
  * ponytail: 不盲信 \n——网文常一句一 <p>；也不整节一次（易超 Edge/讯飞 8KB 回退逐句）。
  */
-import {
-	buildSentenceOffsetSpans,
-	stripMarkdownForTts,
-} from '@/utils/englishTts';
+import { buildSentenceOffsetSpans, stripMarkdownForTts } from '@/utils/speech';
 
 export type ParagraphUnit = {
 	/** 段在 plain 内 [start, end) */

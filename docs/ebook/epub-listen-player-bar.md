@@ -31,7 +31,7 @@
 | ---- | ---- |
 | `apps/frontend/src/views/ebook/components/EpubListenPlayerBar.tsx` | 分句下拉、倍速下拉、当前句列表自动滚中、播放/停止按钮样式 |
 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | `sentenceLabels`、`goToSentence`、扩展 `CHAPTER_LISTEN_RATES`、`setRate` 即时生效 |
-| `apps/frontend/src/utils/englishTts.ts` | `clampPlaybackRate`、`applyActiveEnglishPlaybackRate`、云端 MP3/cadence 倍速 |
+| `apps/frontend/src/utils/speech.ts` | `clampPlaybackRate`、`applyActivePlaybackRate`、云端 MP3/cadence 倍速 |
 | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` | 高亮入口改调 `showEpubListenDomRange(..., opts)` |
 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` | `showEpubListenDomRange` 支持 `forceScroll` / `align` |
 | `apps/frontend/src/views/ebook/utils/epubScrolledNav.ts` | `scrollEpubDomRangeToCenter`、`scrollEpubRangeToViewCenter` |
@@ -42,8 +42,8 @@
 
 1. **句标签**：节级 `plain` + `buildSentenceOffsetSpans` 已有；新增 `buildSentenceLabels` 对每句 `slice` 后走 `stripMarkdownForTts`，与播放文本一致，供菜单展示。
 2. **跳转**：`goToSentence`  clamp 索引 → 递增 `loopGenRef` 取消在播 TTS → `playSentencesFromCursor(ctx, gen, { scrollCenterOnFirst: true })`；首句高亮带 `forceScroll` + `center`，不依赖 autoFollow 的 debounce。
-3. **倍速档位**：`CHAPTER_LISTEN_RATES` 扩至 10 档（0.75～3）；`setRate` 写 `rateRef` 并 `applyActiveEnglishPlaybackRate` 改正在播的 `cloudAudio.playbackRate`。
-4. **TTS 链路**：`playEnglishPreferred(..., { speak: { rate } })` → `playCloudTtsCadenceSegments` 设 `audio.playbackRate`；cadence 句间 `pauseAfterMs` 按 rate 缩短；`waitCloudAudioEnd` 超时按 `duration / playbackRate` 估算。
+3. **倍速档位**：`CHAPTER_LISTEN_RATES` 扩至 10 档（0.75～3）；`setRate` 写 `rateRef` 并 `applyActivePlaybackRate` 改正在播的 `cloudAudio.playbackRate`。
+4. **TTS 链路**：`playPreferred(..., { speak: { rate } })` → `playCloudTtsCadenceSegments` 设 `audio.playbackRate`；cadence 句间 `pauseAfterMs` 按 rate 缩短；`waitCloudAudioEnd` 超时按 `duration / playbackRate` 估算。
 5. **居中滚动**：连续滚动模式用 `scrollEpubDomRangeToCenter`（iframe Range 中点对齐容器中点）；分页模式回退 `scrollEpubRangeIntoView`。
 6. **分句菜单 UX**：`ScrollArea` + `data-active-sentence`；打开时 `scheduleScrollToActiveSentence` rAF 重试 + 80/160ms 二次对齐，应对 Portal 动画首帧 rect 不准。
 
@@ -108,7 +108,7 @@ function buildSentenceLabels(
 			// 递增代际，取消进行中的 loop / TTS
 			loopGenRef.current += 1;
 			// 停止当前英文播放实例
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			// 清除暂停标记，跳转后按 playing 续播
 			pausedRef.current = false;
 
@@ -156,7 +156,7 @@ function buildSentenceLabels(
 			);
 			sentenceCursorRef.current = next;
 			loopGenRef.current += 1;
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			pausedRef.current = false;
 
 			const gen = loopGenRef.current;
@@ -189,7 +189,7 @@ function buildSentenceLabels(
 	const setRate = useCallback(
 		(rate: number) => {
 			rateRef.current = rate;
-			applyActiveEnglishPlaybackRate(rate);
+			applyActivePlaybackRate(rate);
 			syncState({ rate });
 		},
 		[syncState],
@@ -259,7 +259,7 @@ function buildSentenceLabels(
 
 **变更摘要**：可选 `scrollCenterOnFirst` 仅作用于 **跳转起始句** 的高亮与滚动。
 
-### 6.4 `applyActiveEnglishPlaybackRate`（`apps/frontend/src/utils/englishTts.ts`）
+### 6.4 `applyActivePlaybackRate`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：纯新增 `clampPlaybackRate` + 导出函数（摘录）。
 
@@ -280,13 +280,13 @@ function clampPlaybackRate(rate?: number): number {
 // ...（中间未改动）
 
 /** 听书等场景切换倍速：云端 MP3 即时生效；本机 Web Speech 仅影响下一句 */
-export function applyActiveEnglishPlaybackRate(rate: number): void {
+export function applyActivePlaybackRate(rate: number): void {
 	const clamped = clampPlaybackRate(rate);
 	if (cloudAudio) cloudAudio.playbackRate = clamped;
 }
 ```
 
-### 6.5 `playCloudMp3Blob`（`englishTts.ts`）
+### 6.5 `playCloudMp3Blob`（`speech.ts`）
 
 **对比范围**：完整函数。
 
@@ -588,7 +588,7 @@ function scheduleScrollToActiveSentence(
 | ---- | ---- |
 | 播放条 UI | `apps/frontend/src/views/ebook/components/EpubListenPlayerBar.tsx` |
 | 听书状态机 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
-| TTS 倍速 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 倍速 | `apps/frontend/src/utils/speech.ts` |
 | 高亮 + 强制滚动 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
 | 居中滚动 | `apps/frontend/src/views/ebook/utils/epubScrolledNav.ts` |
 

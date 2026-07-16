@@ -3,10 +3,10 @@
 ## 延伸阅读
 
 - [epub-listen-audio-end-ui.md](./epub-listen-audio-end-ui.md) — 同轮修复：音频已停但 UI 仍「播放中」（`abortCloudAudioWait`、先挂 `waitCloudAudioEnd` 再 `play`）
-- [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 播放条倍速 0.75×～3× 与 `applyActiveEnglishPlaybackRate`
+- [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 播放条倍速 0.75×～3× 与 `applyActivePlaybackRate`
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册
 
-**文档角色**：听书 / 听当前 **UI 倍速 2.0× 但听感仍为 1×** 的根因与修复；分析基准为工作区相对 `HEAD` 的 `apps/frontend/src/utils/englishTts.ts` 未提交 diff。
+**文档角色**：听书 / 听当前 **UI 倍速 2.0× 但听感仍为 1×** 的根因与修复；分析基准为工作区相对 `HEAD` 的 `apps/frontend/src/utils/speech.ts` 未提交 diff。
 
 ---
 
@@ -38,9 +38,9 @@ EPUB 听书或听当前在播放条选 **2.0×**（或其它 >1 倍速）后，�
 
 | 路径 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | `ensureCloudAudioEl`（新增）；`waitCloudAudioCanPlay`、`startCloudAudioPlayback`、`playCloudMp3Blob`、`stopPlaybackMediaOnly`（复用 Audio、canplay 后设 rate） |
+| `apps/frontend/src/utils/speech.ts` | `ensureCloudAudioEl`（新增）；`waitCloudAudioCanPlay`、`startCloudAudioPlayback`、`playCloudMp3Blob`、`stopPlaybackMediaOnly`（复用 Audio、canplay 后设 rate） |
 
-听书 hook（`useEpubChapterListen` 等）**未改**；仍通过 `playEnglishPreferred` → `playCloudTtsCadenceSegments` → `playCloudMp3Blob(..., rate)` 传入倍速。
+听书 hook（`useEpubChapterListen` 等）**未改**；仍通过 `playPreferred` → `playCloudTtsCadenceSegments` → `playCloudMp3Blob(..., rate)` 传入倍速。
 
 ---
 
@@ -61,7 +61,7 @@ EPUB 听书或听当前在播放条选 **2.0×**（或其它 >1 倍速）后，�
 5. **`waitCloudAudioCanPlay` 防 stale readyState**  
    复用节点时旧资源可能短暂 `HAVE_CURRENT_DATA`；须同时检查 `currentSrc` 非空且 `networkState !== NETWORK_EMPTY`。
 
-6. **与 `applyActiveEnglishPlaybackRate` 的关系**  
+6. **与 `applyActivePlaybackRate` 的关系**  
    播放中用户拖倍速仍走 `cloudAudio.playbackRate = clamped`（即时生效）；本篇修复 **每段 Blob 开播瞬间** 的初始倍速。
 
 ---
@@ -72,13 +72,13 @@ EPUB 听书或听当前在播放条选 **2.0×**（或其它 >1 倍速）后，�
 
 **对比范围**：全函数（改前销毁 `cloudAudio`；改后清 src/事件但保留引用）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L940–L955）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L940–L955）
 
 ```typescript
 // 仅停介质、不递增 playbackGeneration（句间切换 / 预取下一段时用）
 function stopPlaybackMediaOnly(): void {
 	// 取消本机 Web Speech 当前 utterance
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		window.speechSynthesis.cancel();
 	}
 	// 若存在云端 Audio 实例
@@ -102,13 +102,13 @@ function stopPlaybackMediaOnly(): void {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L993–L1013）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L993–L1013）
 
 ```typescript
 // 仅停介质、不递增 playbackGeneration（句间切换 / 预取下一段时用）
 function stopPlaybackMediaOnly(): void {
 	// 取消本机 Web Speech 当前 utterance
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		window.speechSynthesis.cancel();
 	}
 	// 打断可能挂起的 waitCloudAudioEnd（详见 audio-end-ui 专题）
@@ -151,7 +151,7 @@ function stopPlaybackMediaOnly(): void {
 
 **对比范围**：全函数（改前不存在，每段 `new Audio(url)`）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1015–L1018）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1015–L1018）
 
 ```typescript
 // 取得可复用的云端 Audio 元素（懒创建单例）
@@ -171,7 +171,7 @@ function ensureCloudAudioEl(): HTMLAudioElement {
 
 **对比范围**：全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L1273–L1293）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L1273–L1293）
 
 ```typescript
 // 等待 Audio 有足够数据可 play（改前仅看 readyState）
@@ -205,7 +205,7 @@ function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1539–L1566）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1539–L1566）
 
 ```typescript
 // 等待 Audio 有足够数据可 play；复用节点须确认 currentSrc 已指向新资源
@@ -255,7 +255,7 @@ function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
 
 **对比范围**：全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L1295–L1305）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L1295–L1305）
 
 ```typescript
 // 在 canplay 后调用 play()；改前不设 playbackRate
@@ -276,7 +276,7 @@ async function startCloudAudioPlayback(audio: HTMLAudioElement): Promise<void> {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1568–L1587）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1568–L1587）
 
 ```typescript
 // 在 canplay 后设倍速并 play；rate 必须在 src 就绪后写入
@@ -319,7 +319,7 @@ async function startCloudAudioPlayback(
 
 **对比范围**：全函数（本篇仅强调 rate / 元素复用；`waitCloudAudioEnd` 顺序见姊妹篇）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L1307–L1339）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L1307–L1339）
 
 ```typescript
 // 播放一段云端 MP3 Blob
@@ -370,7 +370,7 @@ function playCloudMp3Blob(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1589–L1636）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1589–L1636）
 
 ```typescript
 // 播放一段云端 MP3 Blob
@@ -444,7 +444,7 @@ function playCloudMp3Blob(
 | 场景 | 改前 | 改后 |
 |------|------|------|
 | 听书 2× 连播多句 | 听感 1× | 听感 2× |
-| 播放中拖倍速 | `applyActiveEnglishPlaybackRate` 即时 | 不变 |
+| 播放中拖倍速 | `applyActivePlaybackRate` 即时 | 不变 |
 | 本机 Web Speech | 不受影响 | 不变 |
 | Tauri 云端首 play 失败重试 | 无 rate 重设 | load 后 **重写 rate** |
 
@@ -456,7 +456,7 @@ function playCloudMp3Blob(
 
 | 说明 | 路径 |
 |------|------|
-| 云端播放与倍速 | `apps/frontend/src/utils/englishTts.ts` |
+| 云端播放与倍速 | `apps/frontend/src/utils/speech.ts` |
 | 播放条倍速 UI | `apps/frontend/src/views/ebook/components/...`（经 hook 传 `rate`） |
 | 英文 TTS 端到端 | `docs/english/tts-end-to-end-guide.md` |
 

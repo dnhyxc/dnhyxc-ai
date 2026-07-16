@@ -44,7 +44,7 @@
 | `apps/frontend/src/views/setting/cloudTts/ParamsHelpPopover.tsx` | 字段说明 Popover（ScrollArea 滚动） |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | 服务端同步、内存缓存、合并请求体、缓存 key 后缀 |
 | `apps/frontend/src/constants/minimaxTts.ts` | 模型/音色/情感/格式/语言增强白名单 |
-| `apps/frontend/src/utils/englishTts.ts` | `fetchCloudTtsBlob` 合并 extras、缓存 key |
+| `apps/frontend/src/utils/speech.ts` | `fetchCloudTtsBlob` 合并 extras、缓存 key |
 | `apps/frontend/src/views/setting/menu.tsx` | 侧栏菜单项「云端朗读」 |
 | `apps/frontend/src/router/routes.ts` | 路由 `/setting/cloud-tts` |
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | 设置页与字段说明文案 |
@@ -155,7 +155,7 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 
 ### 4.2 云端拉取：合并偏好与缓存
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L340–L467）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L340–L467）
 
 ```typescript
 function getCloudTtsFromCache(plain: string): Blob | null {
@@ -216,7 +216,7 @@ const CloudTtsSetting = () => {
 
 	// 试听：强制走云端（preferLocal: false），使用当前已保存参数
 	const onPreview = async () => {
-		await playEnglishPreferred(t('setting.cloudTts.previewText'), {
+		await playPreferred(t('setting.cloudTts.previewText'), {
 			preferLocal: false,
 		});
 	};
@@ -315,4 +315,4 @@ export const MINIMAX_TTS_ENGLISH_VOICES = [ /* ... */ ] as const;
 | 播放世代 | [`english-tts-playback.md`](./english-tts-playback.md) |
 | 设置页 | `apps/frontend/src/views/setting/cloudTts/index.tsx` |
 | 用户偏好 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
-| 朗读入口 | `apps/frontend/src/utils/englishTts.ts` |
+| 朗读入口 | `apps/frontend/src/utils/speech.ts` |

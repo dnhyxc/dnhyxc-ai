@@ -21,7 +21,7 @@
 |------|------|------------------------|
 | 正文抽取 | `body.innerText` + `stripMarkdownForTts` | DOM 句表 `buildDomSentenceIndex` 作主路径 |
 | 句界 | `buildSentenceOffsetSpans(plain)` | 与 TTS 不同源的 compact 流 |
-| TTS | 直接 `playEnglishPreferred(spokenRaw)` | 每句 `beginPlaybackSession` / `playbackGeneration` 复用 |
+| TTS | 直接 `playPreferred(spokenRaw)` | 每句 `beginPlaybackSession` / `playbackGeneration` 复用 |
 | iframe 发现 | `getRenditionViewsList` + 滚动容器 iframe 扫描 | `for…of rend.views()`（epub.js 非数组，会抛错→误报空章） |
 | 播放背景 | `epubListenMarkHighlight.showListenMarkHighlight` | 听书走 `beginEpubListenOverlaySession`；`window.find` 逐句搜索（卡死） |
 
@@ -60,7 +60,7 @@ sequenceDiagram
   participant Sec as epubListenVisibleSection
   participant HL as epubListenChapterHighlight
   participant Mark as epubListenMarkHighlight
-  participant TTS as englishTts
+  participant TTS as speech
 
   UI->>Hook: toggleChapterListen
   Hook->>Sec: extractVisibleListenSection
@@ -68,7 +68,7 @@ sequenceDiagram
   loop 每句
     Hook->>HL: showChapterListenSentenceHighlight
     HL->>Mark: showListenMarkHighlight
-    Hook->>TTS: playEnglishPreferred(spokenRaw)
+    Hook->>TTS: playPreferred(spokenRaw)
     Hook->>HL: clearChapterListenSentenceHighlight
   end
   Hook->>Sec: waitForNextSection
@@ -207,7 +207,7 @@ export function showChapterListenSentenceHighlight(
 }
 ```
 
-**变更摘要**：听书背景与用户划线、听当前 overlay 解耦；播放逻辑仍用 innerText + `playEnglishPreferred`，不依赖 overlay plain 映射。
+**变更摘要**：听书背景与用户划线、听当前 overlay 解耦；播放逻辑仍用 innerText + `playPreferred`，不依赖 overlay plain 映射。
 
 ---
 
@@ -252,7 +252,7 @@ export function showChapterListenSentenceHighlight(
 				}
 
 				try {
-					await playEnglishPreferred(spokenRaw, {
+					await playPreferred(spokenRaw, {
 						speak: { rate: rateRef.current },
 					});
 				} catch {
@@ -338,20 +338,20 @@ export function indexChapterSentenceRanges(
 
 ```typescript
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				clearEpubListenSegmentOverlay();
 				onListenSessionEnd?.();
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 ```
 
 **改动后** · 当前
 
 ```typescript
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				clearEpubListenSegmentOverlay();
 				onListenSessionEnd?.();
 				setPlayingKey(null);
@@ -359,7 +359,7 @@ export function indexChapterSentenceRanges(
 			}
 			// 听当前启动前停止整章听书
 			invokeStopChapterListen();
-			if (!isEnglishPlaybackAvailable()) {
+			if (!isPlaybackAvailable()) {
 ```
 
 **变更摘要**：双向互斥；听书侧对称调用 `invokeStopQuoteListen()`。

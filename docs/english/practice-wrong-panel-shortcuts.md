@@ -344,7 +344,7 @@ const DICTATION_PLAY_GAP_MS = 3000;
 const playDictationSequence = useCallback(async (runId: number) => {
   for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
     if (dictationPlayRunRef.current !== runId) return;
-    await playEnglishPreferred(answerText, { preferLocal: true });
+    await playPreferred(answerText, { preferLocal: true });
     if (dictationPlayRunRef.current !== runId) return;
     if (i < DICTATION_PLAY_COUNT - 1) {
       await sleepMs(DICTATION_PLAY_GAP_MS);
@@ -358,7 +358,7 @@ const playDictationSequence = useCallback(async (runId: number) => {
 ```typescript
 const playWord = useCallback(
   async (options?: { force?: boolean; sequence?: boolean }) => {
-    if (!isEnglishTtsSupported()) { /* Toast */ return; }
+    if (!isSpeechSupported()) { /* Toast */ return; }
     // 说明：重试时 force 跳过「再点即停」，避免 playing 尚未 false 就 return
     if (playing && !options?.force) {
       cancelDictationPlay();
@@ -367,14 +367,14 @@ const playWord = useCallback(
     }
     dictationPlayRunRef.current += 1;
     const runId = dictationPlayRunRef.current;
-    stopAllEnglishPlayback();
+    stopAllPlayback();
     setPlaying(true);
     const useDictationSequence = mode === 'dictation' && options?.sequence === true;
     try {
       if (useDictationSequence) {
         await playDictationSequence(runId);
       } else {
-        await playEnglishPreferred(answerText, { preferLocal: true });
+        await playPreferred(answerText, { preferLocal: true });
       }
     } finally {
       if (dictationPlayRunRef.current === runId) setPlaying(false);

@@ -10,7 +10,7 @@
 
 **用户视角**：会员开启云端朗读后，朗读 **500～2000 字书摘** 或 **长经典句** 时，原先须等 **整篇合成 + 整段 MP3 下载完** 才出声；本机朗读早已按句读分段，云端未对齐。
 
-**技术视角**：`playEnglishPreferred` 云端分支曾等价于：
+**技术视角**：`playPreferred` 云端分支曾等价于：
 
 ```
 stripMarkdown → fetchCloudTtsBlob(全文) → readResponseBodyAsArrayBuffer(全文) → playCloudMp3Blob
@@ -26,12 +26,12 @@ stripMarkdown → fetchCloudTtsBlob(全文) → readResponseBodyAsArrayBuffer(�
 
 | 符号 | 文件 | 角色 |
 |------|------|------|
-| `splitTextForTtsCadence` | `englishTts.ts` | 句读切分（**未改**，云端与本机共用） |
+| `splitTextForTtsCadence` | `speech.ts` | 句读切分（**未改**，云端与本机共用） |
 | `MAX_SINGLE_CLOUD_TTS_CHARS` | 同文件 | 短句单次请求阈值 |
 | `CloudTtsReady` / `startCloudTts` | 同文件 | 发起请求，延迟读 body |
 | `playCloudTtsReady` | 同文件 | 收齐单段 MP3 并播放 |
 | `playCloudTtsCadenceSegments` | 同文件 | **分段 + 预取核心循环** |
-| `playEnglishPreferred` | 同文件 | 云端入口改为调用 `playCloudTtsCadenceSegments` |
+| `playPreferred` | 同文件 | 云端入口改为调用 `playCloudTtsCadenceSegments` |
 
 ---
 
@@ -39,7 +39,7 @@ stripMarkdown → fetchCloudTtsBlob(全文) → readResponseBodyAsArrayBuffer(�
 
 ### 3.1 句读分段：`splitTextForTtsCadence`
 
-**三层切分**（与本机 `speakEnglishTextWithGeneration` 相同）：
+**三层切分**（与本机 `speakTextWithGeneration` 相同）：
 
 1. **句末**：`(?<=[.!?。！？])\s*` 拆句；
 2. **子句**：`(?<=[,;，；：:])\s+` 拆逗号/分号层；
@@ -85,7 +85,7 @@ for i = 0 .. n-1:
 
 ### 3.5 与本机分段循环的对照
 
-| 步骤 | 本机 `speakEnglishTextWithGeneration` | 云端 `playCloudTtsCadenceSegments` |
+| 步骤 | 本机 `speakTextWithGeneration` | 云端 `playCloudTtsCadenceSegments` |
 |------|--------------------------------------|-------------------------------------|
 | 切分 | `splitTextForTtsCadence` | 同左 |
 | 段间停顿 | `pauseMs(prevPause)` | 同左 |
@@ -122,7 +122,7 @@ sequenceDiagram
 
 ### 3.7 播放世代与停止
 
-每一步 `await` 前后检查 `isPlaybackGenerationActive(generation)`。用户点「停止」→ `stopAllEnglishPlayback` 递增 `playbackGeneration` → 循环 `return`，已发起的 HTTP 结果在 `playCloudTtsReady` 入口丢弃。
+每一步 `await` 前后检查 `isPlaybackGenerationActive(generation)`。用户点「停止」→ `stopAllPlayback` 递增 `playbackGeneration` → 循环 `return`，已发起的 HTTP 结果在 `playCloudTtsReady` 入口丢弃。
 
 ---
 
@@ -130,7 +130,7 @@ sequenceDiagram
 
 ### 4.1 类型与阈值常量
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L24–L26、L51–L61）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L24–L26、L51–L61）
 
 ```typescript
 // 云端 TTS 就绪态：缓存命中或 live Response 尚未读 body
@@ -159,7 +159,7 @@ const MAX_SINGLE_CLOUD_TTS_CHARS = MAX_UTTERANCE_CHARS;
 
 **对比范围**：完整函数；云端流水线 **直接调用** 此函数，不再单独实现切分。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L97–L148）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L97–L148）
 
 ```typescript
 // 按中英句读标点分层切分，并计算段后停顿
@@ -244,7 +244,7 @@ function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 
 **对比范围**：基线 `fetchCloudTtsBlob` 全函数 vs 当前 `startCloudTts`；**读 body 与返回 Blob 已移除**，延后到 `playCloudTtsReady`。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L579–L621）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L579–L621）
 
 ```typescript
 // 旧版：请求 + 收齐 body + 缓存 + 返回 Blob（一站式）
@@ -290,7 +290,7 @@ async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L592–L629）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L592–L629）
 
 ```typescript
 // 发起云端 TTS；命中 LRU 则直接 Blob，否则返回未读 body 的 Response
@@ -342,7 +342,7 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 
 **对比范围**：纯新增；改动前无对应符号（旧版在 `fetchCloudTtsBlob` 内读完 body）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L695–L709）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L695–L709）
 
 ```typescript
 // 将 CloudTtsReady 转为音频播放（单段）
@@ -369,7 +369,7 @@ async function playCloudTtsReady(
 
 **对比范围**：完整 async 函数。改动前云端长文等价于 `fetchCloudTtsBlob(plain)` 整段，无此函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，`playEnglishPreferred` 云端 try 分支，约 L790–L794）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，`playPreferred` 云端 try 分支，约 L790–L794）
 
 ```typescript
 	try {
@@ -379,7 +379,7 @@ async function playCloudTtsReady(
 		return;
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L714–L752）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L714–L752）
 
 ```typescript
 // 云端长文：句读分段 + 播当前段时预取下一段
@@ -429,34 +429,34 @@ async function playCloudTtsCadenceSegments(
 **变更摘要**：
 
 - `pendingReady` 在 `await playCloudTtsReady` **之前** 赋值为下一段 `startCloudTts(...)`，使下一段 HTTP 与当前段 **读 body + 播放** 并行。
-- 段间 `pauseMs` 与本机 `speakEnglishTextWithGeneration` 使用同一 `chunks[i-1].pauseAfterMs` 语义。
+- 段间 `pauseMs` 与本机 `speakTextWithGeneration` 使用同一 `chunks[i-1].pauseAfterMs` 语义。
 
 ---
 
-### 4.6 `playEnglishPreferred` 云端入口
+### 4.6 `playPreferred` 云端入口
 
-**对比范围**：`export async function playEnglishPreferred` 全函数。
+**对比范围**：`export async function playPreferred` 全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L770–L802）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L770–L802）
 
 ```typescript
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string,
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 ): Promise<void> {
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return;
 
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
-	const useCloud = shouldUseCloudEnglishTts(options);
+	const useCloud = shouldUseCloudTts(options);
 
 	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		return;
 	}
 
@@ -467,34 +467,34 @@ export async function playEnglishPreferred(
 		return;
 	} catch {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L883–L911）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L883–L911）
 
 ```typescript
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string,
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 ): Promise<void> {
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return;
 
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
-	const useCloud = shouldUseCloudEnglishTts(options);
+	const useCloud = shouldUseCloudTts(options);
 
 	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		return;
 	}
 
@@ -503,10 +503,10 @@ export async function playEnglishPreferred(
 		return;
 	} catch {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 ```
@@ -515,19 +515,19 @@ export async function playEnglishPreferred(
 
 ---
 
-### 4.7 对照：本机分段循环 `speakEnglishTextWithGeneration`
+### 4.7 对照：本机分段循环 `speakTextWithGeneration`
 
 **对比范围**：完整 async 函数（未改逻辑，用于说明云端 **复用同一 `chunks` 与 `pauseMs`**）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L843–L872）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L843–L872）
 
 ```typescript
-async function speakEnglishTextWithGeneration(
+async function speakTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakEnglishOptions,
+	options?: SpeakOptions,
 ): Promise<void> {
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 
 	const plain = stripMarkdownForTts(text);
 	if (!plain) return;
@@ -535,7 +535,7 @@ async function speakEnglishTextWithGeneration(
 
 	await waitForVoicesReady();
 	if (!isPlaybackGenerationActive(generation)) return;
-	resetCachedEnglishVoice();
+	resetCachedLocalVoice();
 
 	const chunks = splitTextForTtsCadence(plain);
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
@@ -561,17 +561,17 @@ async function speakEnglishTextWithGeneration(
 
 ### 4.8 模块自检（长文必须能切成多段）
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1025–L1033）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1025–L1033）
 
 ```typescript
 /**
  * - ponytail: 模块自检——长文须能切成多段，否则云端首播仍等整段合成，
- * - 任意地方第一次 import '@/utils/englishTts' 时，模块求值到文件末尾就会跑这段 if。
+ * - 任意地方第一次 import '@/utils/speech' 时，模块求值到文件末尾就会跑这段 if。
  * - 例如电子书划句朗读、英语学习页、云 TTS 设置页等，
  * 只要 import 了这个模块，自检就会执行一次（模块通常只加载一次，不会重复跑）。
  */
 if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
-	throw new Error('[englishTts] 长文分段异常，云端流水线无法缩短首声');
+	throw new Error('[speech] 长文分段异常，云端流水线无法缩短首声');
 }
 ```
 
@@ -600,7 +600,7 @@ if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
 | 200 字无标点中文 | ≥2 段 → 首段合成完即播 |
 | 连点停止 | 世代递增，循环退出，按钮复位 |
 | 第二遍听同书摘 | 各段 cache 命中，几乎无 HTTP |
-| 云端失败 | catch → 本机 `speakEnglishTextWithGeneration` 全文 |
+| 云端失败 | catch → 本机 `speakTextWithGeneration` 全文 |
 
 ---
 
@@ -608,9 +608,9 @@ if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
 
 | 说明 | 路径 |
 |------|------|
-| 分段 + 预取 | `apps/frontend/src/utils/englishTts.ts` → `playCloudTtsCadenceSegments` |
+| 分段 + 预取 | `apps/frontend/src/utils/speech.ts` → `playCloudTtsCadenceSegments` |
 | 句读切分 | 同文件 → `splitTextForTtsCadence` |
-| 统一入口 | 同文件 → `playEnglishPreferred` |
+| 统一入口 | 同文件 → `playPreferred` |
 | 电子书听当前 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 
 ---

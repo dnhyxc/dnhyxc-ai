@@ -29,8 +29,8 @@
 1. 用户点击工具栏「收藏记录」→ `setFavoritesDrawerOpen(true)`。
 2. `useEffect` 依赖 `favoritesDrawerOpen` 为真 → 调用 `fetch*FirstPage`：offset=0，清空列表，请求第一页。
 3. 用户在 `ScrollArea` 内滚动 → `onViewportScroll` 计算距底部剩余像素；若小于 `SCROLL_LOAD_THRESHOLD_PX`（与历史抽屉一致）→ `fetch*More` 追加下一页。
-4. 朗读：抽屉内每条使用**独立 playKey**（`fav-vocab-${id}` / `fav-classic-${id}`），调用父组件传入的 `toggle*Audio(文本, playKey)`；内部会先 `stopAllEnglishPlayback()`，与主列表索引键不冲突。
-5. **单词本机朗读**：主区单词收藏（`VocabularyFavoritesSection`）使用 `playEnglishPreferred(word, { preferLocal: true })`；快速连点由播放世代丢弃过期音频，见 [`english-tts-playback.md`](./english-tts-playback.md)。
+4. 朗读：抽屉内每条使用**独立 playKey**（`fav-vocab-${id}` / `fav-classic-${id}`），调用父组件传入的 `toggle*Audio(文本, playKey)`；内部会先 `stopAllPlayback()`，与主列表索引键不冲突。
+5. **单词本机朗读**：主区单词收藏（`VocabularyFavoritesSection`）使用 `playPreferred(word, { preferLocal: true })`；快速连点由播放世代丢弃过期音频，见 [`english-tts-playback.md`](./english-tts-playback.md)。
 
 ## 4. 后端实现
 
@@ -142,7 +142,7 @@ async listVocabularyFavoritesPage(
  */
 export type EnglishVocabularyFavoriteListEntry = {
   id: string; // 说明：后端 UUID/雪花等字符串形式主键
-  word: string; // 说明：朗读传给 playEnglishPreferred 的文本
+  word: string; // 说明：朗读传给 playPreferred 的文本
   ipa: string; // 说明：音标；经 displayIpaWrapped 渲染，与主列表一致
   translationZh: string; // 说明：中文释义
   example: string; // 说明：例句，主列表同款斜体弱化样式
@@ -356,7 +356,7 @@ const onFavoritesViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
   loadingMore={favoriteLoadingMore} // 说明：追加下一页中
   onViewportScroll={onFavoritesViewportScroll} // 说明：绑在 ScrollArea 上驱动无限滚动
   playingKey={playingKey} // 说明：与主单词列表共用，同一时刻只有一个 key 处于「播放中」UI
-  onTogglePlayWord={toggleWordAudio} // 说明：传入同一函数引用，内部已含 stopAllEnglishPlayback 与 Toast
+  onTogglePlayWord={toggleWordAudio} // 说明：传入同一函数引用，内部已含 stopAllPlayback 与 Toast
 />
 ```
 
@@ -374,19 +374,19 @@ const toggleWordAudio = useCallback(
   async (word: string, key: string) => {
     // 说明：再次点击当前正在播的同一按钮 → 视为「停止」
     if (playingKey === key) {
-      stopAllEnglishPlayback(); // 说明：停止全局英文 TTS 实例（含主列表、抽屉任意来源）
+      stopAllPlayback(); // 说明：停止全局英文 TTS 实例（含主列表、抽屉任意来源）
       setPlayingKey(null);
       return;
     }
 
     // 说明：切换到另一条目前未在播 → 先掐断其它条目，再开始新一条，保证单声道体验
-    stopAllEnglishPlayback();
+    stopAllPlayback();
     // 说明：立即点亮目标按钮（不必等音频真正起播），降低网络慢时的点击迟钝感
     setPlayingKey(key);
 
     try {
-      // 说明：playEnglishPreferred 内部会选择浏览器 TTS 或后端音频等策略（以项目 englishTts 实现为准）
-      await playEnglishPreferred(word);
+      // 说明：playPreferred 内部会选择浏览器 TTS 或后端音频等策略（以项目 speech 实现为准）
+      await playPreferred(word);
     } catch {
       // 说明：例如浏览器不支持 SpeechSynthesis、或网络音频失败
       Toast({
@@ -402,7 +402,7 @@ const toggleWordAudio = useCallback(
 );
 ```
 
-经典句见 `ClassicQuotesSection.tsx` 的 `toggleQuoteAudio`：第一个参数为 `item.english`（整句英文），`playEnglishPreferred(text)` 行为一致，仅文案键改为 `englishLearning.classic.playQuote` 等。
+经典句见 `ClassicQuotesSection.tsx` 的 `toggleQuoteAudio`：第一个参数为 `item.english`（整句英文），`playPreferred(text)` 行为一致，仅文案键改为 `englishLearning.classic.playQuote` 等。
 
 ## 8. 抽屉子组件：版式、播放键、无「写入主列表」
 
@@ -613,7 +613,7 @@ const showEmpty = !loading && entries.length === 0 && !loadingMore;
 
 - **破坏性**：无；新增 GET 与 UI，原 POST 收藏/取消不变。
 - **鉴权**：列表接口依赖登录态，与现有收藏接口一致。
-- **朗读**：主区与抽屉共享 `playingKey`，关闭抽屉不会自动 `stop`（若需关抽屉即停播，可在父组件对 `open` 监听追加 `stopAllEnglishPlayback`，属后续增强）。
+- **朗读**：主区与抽屉共享 `playingKey`，关闭抽屉不会自动 `stop`（若需关抽屉即停播，可在父组件对 `open` 监听追加 `stopAllPlayback`，属后续增强）。
 
 ## 10. 建议回归用例
 
@@ -631,7 +631,7 @@ const showEmpty = !loading && entries.length === 0 && !loadingMore;
 | 经典句收藏抽屉 | `apps/frontend/src/views/englishLearning/ClassicQuotesFavoritesDrawer.tsx` |
 | 单词包父组件 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 | 经典句父组件 | `apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx` |
-| TTS 工具 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 工具 | `apps/frontend/src/utils/speech.ts` |
 | TTS 播放世代 / preferLocal | [`english-tts-playback.md`](./english-tts-playback.md) |
 | 收藏列表 HTTP 重试 | [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md) |
 | 收藏列表 API 类型 | `apps/frontend/src/service/index.ts` |

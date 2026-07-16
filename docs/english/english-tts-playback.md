@@ -22,7 +22,7 @@
 
 | 层级 | 目标 |
 |------|------|
-| `englishTts.ts` | 引入 **`playbackGeneration`（播放世代）**，新播放 / `stopAll` 时作废上一轮异步结果 |
+| `speech.ts` | 引入 **`playbackGeneration`（播放世代）**，新播放 / `stopAll` 时作废上一轮异步结果 |
 
 **朗读选路（会员云端 / 非会员本机）**已迁至 [`tts-membership-routing.md`](./tts-membership-routing.md)；本文不再维护「单词 `preferLocal: true`」策略。
 
@@ -34,7 +34,7 @@
 
 | 说明 | 路径 |
 |------|------|
-| 朗读核心 | `apps/frontend/src/utils/englishTts.ts` |
+| 朗读核心 | `apps/frontend/src/utils/speech.ts` |
 | 我的收藏 · 单词 | `apps/frontend/src/views/englishLearning/favorites/VocabularyFavoritesSection.tsx` |
 | 资源库 · 单词 | `apps/frontend/src/views/englishLearning/library/VocabularyLibraryWordsPanel.tsx` |
 | 单词包列表 | `apps/frontend/src/views/englishLearning/pack/VocabularyPackList.tsx` |
@@ -49,20 +49,20 @@
 ```mermaid
 sequenceDiagram
   participant UI as 用户点击喇叭
-  participant TTS as englishTts
+  participant TTS as speech
   participant Cloud as 云端 TTS API
 
-  UI->>TTS: playEnglishPreferred(A)
+  UI->>TTS: playPreferred(A)
   TTS->>TTS: beginPlaybackSession() gen=1
   TTS->>Cloud: fetch blob (异步)
-  UI->>TTS: playEnglishPreferred(B)
+  UI->>TTS: playPreferred(B)
   TTS->>TTS: beginPlaybackSession() gen=2
   Note over TTS: gen=1 的 blob 返回后被丢弃
   TTS->>TTS: 仅 gen=2 可播放/resolve
 ```
 
 1. **`beginPlaybackSession()`**：`playbackGeneration += 1`，并 `stopPlaybackMediaOnly()`（停本机 speech + 云端 Audio），返回当前世代号。
-2. **`stopAllEnglishPlayback()`**：同样递增世代并清空介质（与改前「停播」语义一致，且保证后续异步回调无效）。
+2. **`stopAllPlayback()`**：同样递增世代并清空介质（与改前「停播」语义一致，且保证后续异步回调无效）。
 3. **云端 / 本机路径**：在 `fetchCloudTtsBlob`、`playCloudMp3Blob`、`speakOneUtterance`、分句循环等 **await 前后** 检查 `isPlaybackGenerationActive(generation)`；已作废则 **静默 resolve**，不抛错、不覆盖新播放。
 
 **为何 `playCloudMp3Blob` 内用 `stopPlaybackMediaOnly` 而非 `stopAll`**：同一会话内从云端切到本机回退时，只需清介质，不应再递增世代导致当前 generation 失效。
@@ -92,14 +92,14 @@ sequenceDiagram
 
 ### 4.1 选项类型与播放世代
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L72–L120）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L72–L120）
 
 ```typescript
-export type PlayEnglishPreferredOptions = {
+export type PlayPreferredOptions = {
 	/** 为 true：优先本机 Web Speech（单词）；默认 false：优先云端 TTS（句子） */
 	preferLocal?: boolean;
 	/** 本机朗读时透传给 Web Speech 的 rate / pitch / volume */
-	speak?: SpeakEnglishOptions;
+	speak?: SpeakOptions;
 };
 
 /** 模块级世代计数；与 stopAll / 新播放 同步递增 */
@@ -122,7 +122,7 @@ function beginPlaybackSession(): number {
 	return playbackGeneration;
 }
 
-export function stopAllEnglishPlayback(): void {
+export function stopAllPlayback(): void {
 	playbackGeneration += 1;
 	stopPlaybackMediaOnly();
 }
@@ -130,7 +130,7 @@ export function stopAllEnglishPlayback(): void {
 
 ### 4.2 云端 MP3：世代校验
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（`playCloudMp3Blob` 约 L158–L210）
+**来源**：`apps/frontend/src/utils/speech.ts`（`playCloudMp3Blob` 约 L158–L210）
 
 ```typescript
 function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
@@ -166,14 +166,14 @@ function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
 }
 ```
 
-### 4.3 `playEnglishPreferred` 分支
+### 4.3 `playPreferred` 分支
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L300–L331）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L300–L331）
 
 ```typescript
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string,
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 ): Promise<void> {
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return;
@@ -184,10 +184,10 @@ export async function playEnglishPreferred(
 	// 分支 1：单词 — 仅本机
 	if (options?.preferLocal) {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		return;
 	}
 
@@ -198,8 +198,8 @@ export async function playEnglishPreferred(
 		await playCloudMp3Blob(blob, generation);
 	} catch {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) throw new Error('NO_TTS');
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		if (!isSpeechSupported()) throw new Error('NO_TTS');
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 ```
@@ -214,7 +214,7 @@ export async function playEnglishPreferred(
 
 | 项 | 说明 |
 |----|------|
-| API | 无后端变更；`playEnglishPreferred` 第二参数可选 |
+| API | 无后端变更；`playPreferred` 第二参数可选 |
 | 朗读选路 | 见 [`tts-membership-routing.md`](./tts-membership-routing.md) |
 | 播放世代 | 快速连点仍丢弃过期异步结果 |
 | 竞态 | 快速连点仅最后一条有效播放，旧 Promise 静默结束 |
@@ -226,7 +226,7 @@ export async function playEnglishPreferred(
 1. 资源库 / 收藏 / 单词包：快速连续点不同单词喇叭，不应两条同时响。
 2. 单词：断网时仍可本机朗读（若系统有英文 voice）。
 3. 经典句包：仍走云端；云端失败时可回退本机。
-4. 播放中切换 Tab 或 `stopAllEnglishPlayback()`：声音立即停止，且无迟到的云端 MP3。
+4. 播放中切换 Tab 或 `stopAllPlayback()`：声音立即停止，且无迟到的云端 MP3。
 
 ---
 

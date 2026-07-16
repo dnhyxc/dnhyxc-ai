@@ -1,6 +1,6 @@
 # 英语朗读按会员选路（单词/语句/练习统一）
 
-> **文档角色（主文档）**：`playEnglishPreferred` 默认路由——有效会员走云端 TTS，非会员走本机 Web Speech；单词不再单独强制本机。  
+> **文档角色（主文档）**：`playPreferred` 默认路由——有效会员走云端 TTS，非会员走本机 Web Speech；单词不再单独强制本机。  
 > **端到端全景（含本机/云端全链路）**：[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)  
 > **延伸阅读**：[`tts-playback-source.md`](./tts-playback-source.md)（会员本机/云端 Switch）、[`english-tts-playback.md`](./english-tts-playback.md)（播放世代）、[`minimax-cloud-tts.md`](./minimax-cloud-tts.md)（云端合成）、[`english-tts-local-voice.md`](./english-tts-local-voice.md)（本机音色）、[`voice-settings-page.md`](./voice-settings-page.md)（设置入口）。
 
@@ -36,7 +36,7 @@
 
 | 路径 | 职责 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | 路由核心、`isEnglishPlaybackAvailable` |
+| `apps/frontend/src/utils/speech.ts` | 路由核心、`isPlaybackAvailable` |
 | `apps/frontend/src/views/englishLearning/practice/hooks/usePracticePlayback.ts` | 练习单次 / 听写三连播 |
 | `apps/frontend/src/views/englishLearning/practice/Summary.tsx` | 结算页单词播放 |
 | `apps/frontend/src/views/englishLearning/daily/hooks/useDailyPlayback.ts` | 今日复习卡片 |
@@ -48,7 +48,7 @@
 | `apps/frontend/src/views/englishLearning/mistakes/classic/ClassicQuoteMistakesPanel.tsx` | 语句错题（仅可用性检查） |
 | `apps/frontend/src/views/englishLearning/reference/morphology/index.tsx` | 词形参考 |
 
-**未改调用方式（已符合改后语义）**：经典句收藏/资源库/词包等本就 `playEnglishPreferred(text)` 无 `preferLocal`。
+**未改调用方式（已符合改后语义）**：经典句收藏/资源库/词包等本就 `playPreferred(text)` 无 `preferLocal`。
 
 **仍强制本机**：`apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` 试听。
 
@@ -58,15 +58,15 @@
 
 ### 3.1 集中选路，不扩散到各页面
 
-`playEnglishPreferred` 内：
+`playPreferred` 内：
 
 ```text
-useCloud = shouldUseCloudEnglishTts(options)
+useCloud = shouldUseCloudTts(options)
 ```
 
-- **非会员**：`shouldUseCloudEnglishTts` 恒 `false` → 本机。
+- **非会员**：`shouldUseCloudTts` 恒 `false` → 本机。
 - **有效会员**：读 `loadMinimaxTtsUserPrefs().playbackSource`；`cloud`（默认）→ 云端，`local` → 本机。详见 [`tts-playback-source.md`](./tts-playback-source.md)。
-- `isCloudEnglishTtsAllowed()`：仍用于会员判定（读 `localStorage` 的 `userInfo`）。
+- `isCloudTtsAllowed()`：仍用于会员判定（读 `localStorage` 的 `userInfo`）。
 - 此前单词页显式 `preferLocal: true` 绕过了会员云端；**已删除这些传参**，单词与语句同一套选路。
 
 ### 3.2 `preferLocal` 语义收窄
@@ -79,21 +79,21 @@ useCloud = shouldUseCloudEnglishTts(options)
 
 不再表示「单词 vs 句子」。
 
-### 3.3 `isEnglishPlaybackAvailable`
+### 3.3 `isPlaybackAvailable`
 
-播放前若只检查 `isEnglishTtsSupported()`，选云端且本机不可用的会员会被误判。逻辑为：
+播放前若只检查 `isSpeechSupported()`，选云端且本机不可用的会员会被误判。逻辑为：
 
 ```text
-非会员 → 须 isEnglishTtsSupported()
-会员且 playbackSource === local → 须 isEnglishTtsSupported()
+非会员 → 须 isSpeechSupported()
+会员且 playbackSource === local → 须 isSpeechSupported()
 会员且 playbackSource === cloud → 可用（云端；失败再回退本机）
 ```
 
-练习、每日、错题、结算等入口改用 `isEnglishPlaybackAvailable()` 再 Toast「不支持朗读」。
+练习、每日、错题、结算等入口改用 `isPlaybackAvailable()` 再 Toast「不支持朗读」。
 
 ### 3.4 云端失败回退
 
-会员云端路径不变：`fetchCloudTtsBlob` 失败 → 本机 `speakEnglishTextWithGeneration`（需本机可用，否则 `NO_TTS`）。
+会员云端路径不变：`fetchCloudTtsBlob` 失败 → 本机 `speakTextWithGeneration`（需本机可用，否则 `NO_TTS`）。
 
 ---
 
@@ -101,53 +101,53 @@ useCloud = shouldUseCloudEnglishTts(options)
 
 ### 4.1 会员判定与可用性
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L399–L418）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L399–L418）
 
 ```typescript
 /** 会员可走云端；非会员或选本机时需 Web Speech 可用 */
-export function isEnglishPlaybackAvailable(): boolean {
-	if (!isCloudEnglishTtsAllowed()) {
-		return isEnglishTtsSupported();
+export function isPlaybackAvailable(): boolean {
+	if (!isCloudTtsAllowed()) {
+		return isSpeechSupported();
 	}
-	if (!shouldUseCloudEnglishTts()) {
-		return isEnglishTtsSupported(); // 会员选 local
+	if (!shouldUseCloudTts()) {
+		return isSpeechSupported(); // 会员选 local
 	}
 	return true; // 会员选 cloud：云端可用；失败时播放层回退本机
 }
 
 /** 会员朗读选路：读 playbackSource；非会员恒 false */
-function shouldUseCloudEnglishTts(options?: PlayEnglishPreferredOptions): boolean {
+function shouldUseCloudTts(options?: PlayPreferredOptions): boolean {
 	if (options?.preferLocal === true) return false;
-	if (options?.preferLocal === false) return isCloudEnglishTtsAllowed();
-	if (!isCloudEnglishTtsAllowed()) return false;
+	if (options?.preferLocal === false) return isCloudTtsAllowed();
+	if (!isCloudTtsAllowed()) return false;
 	const prefs = loadMinimaxTtsUserPrefs();
 	return prefs.playbackSource !== 'local';
 }
 ```
 
-### 4.2 `playEnglishPreferred` 选路
+### 4.2 `playPreferred` 选路
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L682–L713）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L682–L713）
 
 ```typescript
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string,
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 ): Promise<void> {
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return;
 
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
-	const useCloud = shouldUseCloudEnglishTts(options);
+	const useCloud = shouldUseCloudTts(options);
 
 	if (!useCloud) {
 		// 非会员、会员选 local、或 preferLocal：Web Speech
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		return;
 	}
 
@@ -159,10 +159,10 @@ export async function playEnglishPreferred(
 	} catch {
 		// 说明：会员云端失败时回退本机，世代仍有效才继续
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 ```
@@ -175,7 +175,7 @@ export async function playEnglishPreferred(
 const playWord = useCallback<PlayWordFn>(
 	async (options) => {
 		// 说明：会员无本机 TTS 时仍可云端朗读
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({ type: 'warning', title: t('englishLearning.tts.unsupported') });
 			return;
 		}
@@ -185,7 +185,7 @@ const playWord = useCallback<PlayWordFn>(
 				await playDictationSequence(runId);
 			} else {
 				// 说明：不再 preferLocal:true；会员听写/拼写走云端默认同句逻辑
-				await playEnglishPreferred(answerText);
+				await playPreferred(answerText);
 			}
 		} catch {
 			Toast({ type: 'warning', title: t('englishLearning.tts.unsupported') });
@@ -195,7 +195,7 @@ const playWord = useCallback<PlayWordFn>(
 );
 ```
 
-听写三连播 `playDictationSequence` 内同样改为 `playEnglishPreferred(answerText)`。
+听写三连播 `playDictationSequence` 内同样改为 `playPreferred(answerText)`。
 
 ### 4.4 词库等列表：统一默认调用
 
@@ -203,8 +203,8 @@ const playWord = useCallback<PlayWordFn>(
 
 ```typescript
 try {
-	// 说明：会员云端 / 非会员本机，由 englishTts 内部判定
-	await playEnglishPreferred(word);
+	// 说明：会员云端 / 非会员本机，由 speech 内部判定
+	await playPreferred(word);
 } catch {
 	Toast({ type: 'warning', title: t('englishLearning.tts.unsupported') });
 }
@@ -234,6 +234,6 @@ try {
 
 | 说明 | 路径 |
 |------|------|
-| 朗读核心 | `apps/frontend/src/utils/englishTts.ts` |
+| 朗读核心 | `apps/frontend/src/utils/speech.ts` |
 | 练习 | `apps/frontend/src/views/englishLearning/practice/hooks/usePracticePlayback.ts` |
 | 本机试听（仍 force local） | `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` |

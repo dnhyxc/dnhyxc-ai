@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
 import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
-import { stopAllEnglishPlayback } from '@/utils/englishTts';
+import { stopAllPlayback } from '@/utils/speech';
 import { AgentPanel } from './agent';
 import {
 	EnglishLearningSidebar,
@@ -51,7 +51,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 	}, []);
 
 	const onNewChat = useCallback(() => {
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		intentInputAutoFillRef.current = null;
 		setSearchParams({}, { replace: true });
 	}, [setSearchParams]);

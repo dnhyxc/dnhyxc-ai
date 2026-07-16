@@ -6,7 +6,7 @@
 - [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 底部播放条 playing / paused 状态
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册
 
-**文档角色**：云端 MP3 **已无声结束或用户已 stop**，但播放条 / 顶栏仍显示 **播放中**、进度不回落的根因与修复；分析基准为工作区相对 `HEAD` 的 `apps/frontend/src/utils/englishTts.ts` 未提交 diff。
+**文档角色**：云端 MP3 **已无声结束或用户已 stop**，但播放条 / 顶栏仍显示 **播放中**、进度不回落的根因与修复；分析基准为工作区相对 `HEAD` 的 `apps/frontend/src/utils/speech.ts` 未提交 diff。
 
 ---
 
@@ -43,9 +43,9 @@ EPUB 听书或听当前使用 **云端 TTS** 时偶发：
 
 | 路径 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | 模块变量 `abortCloudAudioWait`；`stopPlaybackMediaOnly`、`waitCloudAudioEnd`、`playCloudMp3Blob` |
+| `apps/frontend/src/utils/speech.ts` | 模块变量 `abortCloudAudioWait`；`stopPlaybackMediaOnly`、`waitCloudAudioEnd`、`playCloudMp3Blob` |
 
-上层 hook（`useEpubChapterListen`、`useEbookQuoteListen`）依赖 `playEnglishPreferred` Promise  settle 后切 UI；**englishTts 层 Promise 不结束即 UI 卡住**。
+上层 hook（`useEpubChapterListen`、`useEbookQuoteListen`）依赖 `playPreferred` Promise  settle 后切 UI；**speech 层 Promise 不结束即 UI 卡住**。
 
 ---
 
@@ -74,7 +74,7 @@ EPUB 听书或听当前使用 **云端 TTS** 时偶发：
 
 **对比范围**：`cloudObjectUrl` 邻近模块级声明（改前无此变量）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L875–L878）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L875–L878）
 
 ```typescript
 // 当前正在播放的云端 Audio 元素引用（可复用）
@@ -93,13 +93,13 @@ let abortCloudAudioWait: (() => void) | null = null;
 
 **对比范围**：全函数（本篇强调 abort 与清事件；保留节点见 rate 专题）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L940–L955）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L940–L955）
 
 ```typescript
 // 仅停介质、不递增 playbackGeneration
 function stopPlaybackMediaOnly(): void {
 	// 取消本机朗读
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		window.speechSynthesis.cancel();
 	}
 	// 停云端 Audio
@@ -117,13 +117,13 @@ function stopPlaybackMediaOnly(): void {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L993–L1013）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L993–L1013）
 
 ```typescript
 // 仅停介质、不递增 playbackGeneration
 function stopPlaybackMediaOnly(): void {
 	// 取消本机朗读
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		window.speechSynthesis.cancel();
 	}
 	// 主动结束挂起的 waitCloudAudioEnd Promise
@@ -157,7 +157,7 @@ function stopPlaybackMediaOnly(): void {
 
 **对比范围**：全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L1110–L1171）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L1110–L1171）
 
 ```typescript
 // 等到 Audio 播放结束或超时/错误
@@ -233,7 +233,7 @@ function waitCloudAudioEnd(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1196–L1259）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1196–L1259）
 
 ```typescript
 // 等到 Audio 播放结束或超时/错误；可被 abortCloudAudioWait 打断
@@ -323,7 +323,7 @@ function waitCloudAudioEnd(
 
 **对比范围**：全函数（本篇强调 `ended` 先于 `play`；rate 见姊妹篇）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `HEAD`，约 L1307–L1339）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `HEAD`，约 L1307–L1339）
 
 ```typescript
 // 播放一段云端 MP3 Blob
@@ -367,7 +367,7 @@ function playCloudMp3Blob(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1589–L1636）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1589–L1636）
 
 ```typescript
 // 播放一段云端 MP3 Blob
@@ -467,7 +467,7 @@ sequenceDiagram
 
 | 说明 | 路径 |
 |------|------|
-| 云端 end 等待与 abort | `apps/frontend/src/utils/englishTts.ts` |
+| 云端 end 等待与 abort | `apps/frontend/src/utils/speech.ts` |
 | 章节听书 hook | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 | 听当前 hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 播放条 UI | `apps/frontend/src/views/ebook/read.tsx` 等 |

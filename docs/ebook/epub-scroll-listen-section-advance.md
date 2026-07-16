@@ -413,7 +413,7 @@ const goToSentence = useCallback(
 		const next = Math.min(ctx.sentences.length - 1, Math.max(0, index));
 		sentenceCursorRef.current = next;
 		loopGenRef.current += 1;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		pausedRef.current = false;
 
 		const gen = loopGenRef.current;
@@ -445,7 +445,7 @@ const goToSentence = useCallback(
 		const next = Math.min(ctx.sentences.length - 1, Math.max(0, index));
 		sentenceCursorRef.current = next;
 		scrollSeekRef.current = true;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		pausedRef.current = false;
 
 		const gen = ++loopGenRef.current;

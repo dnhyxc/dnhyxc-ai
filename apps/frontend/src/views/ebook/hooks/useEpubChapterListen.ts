@@ -2,17 +2,17 @@ import { Toast } from '@ui/sonner';
 import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-	applyActiveEnglishPlaybackRate,
+	applyActivePlaybackRate,
 	buildSentenceOffsetSpans,
-	isEnglishPlaybackAvailable,
-	pauseEnglishPlaybackSoft,
-	primeEnglishPlaybackForUserGesture,
-	registerEnglishPlaybackMediaHandlers,
-	resumeEnglishPlaybackSoft,
-	stopAllEnglishPlayback,
+	isPlaybackAvailable,
+	pausePlaybackSoft,
+	primePlaybackForUserGesture,
+	registerPlaybackMediaHandlers,
+	resumePlaybackSoft,
+	stopAllPlayback,
 	stripMarkdownForTts,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
+	warmupSpeechVoices,
+} from '@/utils/speech';
 import {
 	clearChapterListenSentenceHighlight,
 	extractListenSectionForDocument,
@@ -110,7 +110,7 @@ function ctxFromVisible(visible: VisibleListenSection): SectionCtx {
 }
 
 /**
- * EPUB 从当前可见位置连续听书（innerText 抽正文 + playEnglishPreferred）
+ * EPUB 从当前可见位置连续听书（innerText 抽正文 + playPreferred）
  */
 export function useEpubChapterListen(
 	t: (key: string) => string,
@@ -160,9 +160,9 @@ export function useEpubChapterListen(
 		resolveStartCfiModeRef.current = 'before';
 		sectionRef.current = null;
 		sectionDocRef.current = null;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// 同步卸 Media Session，勿等 isActive effect：否则 macOS 仍残留进度条/控件
-		registerEnglishPlaybackMediaHandlers(null);
+		registerPlaybackMediaHandlers(null);
 		teardownChapterListenHighlight(getRenditionRef.current() ?? undefined);
 		clearEpubListenSegmentOverlay();
 		// 保留倍速：IDLE_STATE.rate=1 会把用户调速清掉
@@ -173,7 +173,7 @@ export function useEpubChapterListen(
 	}, []);
 
 	useEffect(() => {
-		warmupEnglishTtsVoices();
+		warmupSpeechVoices();
 		registerChapterListenStop(() => stopInternal());
 		return () => {
 			registerChapterListenStop(null);
@@ -541,10 +541,10 @@ export function useEpubChapterListen(
 	// 从当前阅读位置开始 TTS 朗读章节
 	const startFromCurrentPosition = useCallback(() => {
 		// 触发用户手势相关的英文朗读准备
-		primeEnglishPlaybackForUserGesture();
+		primePlaybackForUserGesture();
 
 		// 检查英文TTS能力是否可用（如浏览器支持等）
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			// 弹出警告：当前环境不支持英文TTS
 			Toast({
 				type: 'warning',
@@ -565,7 +565,7 @@ export function useEpubChapterListen(
 
 		// 停止引用听写、终止所有英文TTS播报、清除UI高亮、开启章节自动跟随
 		invokeStopQuoteListen();
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		clearEpubListenSegmentOverlay();
 		beginChapterListenAutoFollow(rend);
 
@@ -623,7 +623,7 @@ export function useEpubChapterListen(
 	 * 目录/切章完成后重开听书：按跳转后 CFI 定位起播句（同 HTML 多节时非文件第 0 句）。
 	 */
 	const restartFromChapterStart = useCallback(() => {
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({
 				type: 'warning',
 				title: tRef.current('englishLearning.tts.unsupported'),
@@ -640,11 +640,11 @@ export function useEpubChapterListen(
 			return;
 		}
 
-		primeEnglishPlaybackForUserGesture();
+		primePlaybackForUserGesture();
 		const keepRate = rateRef.current;
 
 		invokeStopQuoteListen();
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		clearEpubListenSegmentOverlay();
 		beginChapterListenAutoFollow(rend);
 
@@ -711,14 +711,14 @@ export function useEpubChapterListen(
 		if (status !== 'playing' && status !== 'loading') return;
 		pausedRef.current = true;
 		// 软暂停：不杀 loopGen / 不 abort TTS wait，续播从 currentTime 继续
-		pauseEnglishPlaybackSoft();
+		pausePlaybackSoft();
 		syncState({ status: 'paused' });
 	}, [syncState]);
 
 	const resume = useCallback(() => {
 		if (stateRef.current.status !== 'paused') return;
 		pausedRef.current = false;
-		if (resumeEnglishPlaybackSoft()) {
+		if (resumePlaybackSoft()) {
 			syncState({ status: 'playing' });
 			return;
 		}
@@ -748,7 +748,7 @@ export function useEpubChapterListen(
 			const next = Math.min(ctx.sentences.length - 1, Math.max(0, index));
 			sentenceCursorRef.current = next;
 			scrollSeekRef.current = true;
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			pausedRef.current = false;
 
 			const gen = ++loopGenRef.current;
@@ -774,7 +774,7 @@ export function useEpubChapterListen(
 	const setRate = useCallback(
 		(rate: number) => {
 			rateRef.current = rate;
-			applyActiveEnglishPlaybackRate(rate);
+			applyActivePlaybackRate(rate);
 			syncState({ rate });
 		},
 		[syncState],
@@ -799,11 +799,11 @@ export function useEpubChapterListen(
 
 	useEffect(() => {
 		if (!isActive) return;
-		registerEnglishPlaybackMediaHandlers({
+		registerPlaybackMediaHandlers({
 			play: () => resumeRef.current(),
 			pause: () => pauseRef.current(),
 		});
-		return () => registerEnglishPlaybackMediaHandlers(null);
+		return () => registerPlaybackMediaHandlers(null);
 	}, [isActive]);
 
 	/** 当前分句播头 CFI：底栏上下章定位目录用（勿用阅读 relocated CFI，会滞后） */

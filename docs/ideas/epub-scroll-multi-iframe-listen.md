@@ -281,7 +281,7 @@ sequenceDiagram
   participant A as epubScrollListenAdvance
   participant DOM as .epub-view 槽位
   participant M as epub manager.check
-  participant T as englishTts
+  participant T as speech
 
   U->>H: 听书 startFromCurrentPosition
   H->>E: extractVisibleListenSection
@@ -293,7 +293,7 @@ sequenceDiagram
   H->>E: extractVisibleListenSection
   H->>H: applySection → sectionDocRef
   loop 当前 iframe 每句
-    H->>T: playEnglishPreferred
+    H->>T: playPreferred
     T-->>H: onend
   end
 
@@ -314,7 +314,7 @@ sequenceDiagram
   E-->>H: visible plain + ranges
   H->>H: applySection
   loop 下一 iframe 每句
-    H->>T: playEnglishPreferred
+    H->>T: playPreferred
   end
 ```
 
@@ -330,7 +330,7 @@ sequenceDiagram
 | `ensureSlotDocument(rend, slot)` | 对空槽 scroll + 轮询 check 直到 iframe 有正文 |
 | `invokeManagerCheck(rend)` | 包装 `manager.check()`，2s 超时 |
 | `extractListenSectionForDocument(rend, doc)` | 对 nextDoc 抽 plain，供第二段起每轮使用 |
-| `playEnglishPreferred(text, opts)` | 单句 TTS（本机/云端） |
+| `playPreferred(text, opts)` | 单句 TTS（本机/云端） |
 
 **读图要点**：
 
@@ -343,13 +343,13 @@ sequenceDiagram
 sequenceDiagram
   participant U as 用户
   participant H as useEpubChapterListen
-  participant T as englishTts
+  participant T as speech
 
   Note over H: 旧 gen=X 正在 playSentencesFromCursor
   U->>H: nextSentence → goToSentence
   H->>H: sentenceCursorRef++
   H->>H: scrollSeekRef = true
-  H->>T: stopAllEnglishPlayback
+  H->>T: stopAllPlayback
   H->>H: gen = ++loopGenRef (X+1)
   H->>H: runListenLoop(X+1)
 
@@ -357,7 +357,7 @@ sequenceDiagram
   H->>H: !isGenActive(X) → return（不 stopInternal）
 
   H->>H: runScrollSectionLoop(X+1)
-  H->>T: playEnglishPreferred 新句起
+  H->>T: playPreferred 新句起
 ```
 
 **图内方法说明**：
@@ -365,7 +365,7 @@ sequenceDiagram
 | 方法 | 功能 |
 |------|------|
 | `goToSentence(index)` | 切句唯一入口；必须 `runListenLoop` 而非孤立 `playSentencesFromCursor` |
-| `stopAllEnglishPlayback()` | 停当前 TTS；不调用 `stopInternal`（保留播放条） |
+| `stopAllPlayback()` | 停当前 TTS；不调用 `stopInternal`（保留播放条） |
 | `isGenActive(gen)` | `gen === loopGenRef.current` |
 | `runListenLoop(gen)` | 新 gen 重入；滚动模式从 `sectionDocRef` 续 |
 

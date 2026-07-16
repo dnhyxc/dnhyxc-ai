@@ -1,7 +1,7 @@
 # EPUB 边听边读（Listen While Reading）实现方案 SPEC
 
 > **实现状态（2026-06-25）**：**部分已落地** — 选区/引用 **「听当前」**、逐句淡黄底、host 浮层绘制、句间清除、自动滚入视口与 **回到播放位置 FAB**；**未落地** — 全书/整章连续朗读、底部播放条、倍速/定时、章节自动衔接、听读进度独立锚点。  
-> **依据代码**：`useEbookQuoteListen.ts`、`epubListenSegmentOverlay.ts`、`englishTts.ts`、`EpubListenFollowFab.tsx`、`read.tsx`、`EpubPane.tsx`、`epubScrolledNav.ts`。  
+> **依据代码**：`useEbookQuoteListen.ts`、`epubListenSegmentOverlay.ts`、`speech.ts`、`EpubListenFollowFab.tsx`、`read.tsx`、`EpubPane.tsx`、`epubScrolledNav.ts`。  
 > **关联文档**：[`docs/ebook/epub-quote-listen.md`](../docs/ebook/epub-quote-listen.md)、[`docs/ebook/epub-listen-host-overlay.md`](../docs/ebook/epub-listen-host-overlay.md)、[`docs/ebook/epub-listen-auto-follow-fab.md`](../docs/ebook/epub-listen-auto-follow-fab.md)、[`ebook-reader.md`](./ebook-reader.md)。  
 > **参考产品**：微信读书、Kindle（Read Aloud / Whispersync）、Apple Books、多看阅读、Google Play 图书、得到（课程听读，预录为主，仅借鉴交互）。
 
@@ -61,7 +61,7 @@
 | 视口跟随 | ✅ 自动翻页/滚动 | ✅ | ✅ | ✅ | ✅ `autoFollow` + FAB（已有） |
 | 手动浏览打断 | ✅ 停止自动滚 | ✅ | ✅ | ✅ | ✅ scroll guard（已有） |
 | 播放条 | 底部固定条 | 顶部/底部 | 迷你条 | 底部 | **底部固定条**（阅读列内 `sticky`） |
-| 倍速 | 0.5–3x | 多档 | 0.5–2x | 多档 | **0.75 / 1 / 1.25 / 1.5**（会话级，写 `englishTts` rate） |
+| 倍速 | 0.5–3x | 多档 | 0.5–2x | 多档 | **0.75 / 1 / 1.25 / 1.5**（会话级，写 `speech` rate） |
 | 定时关闭 | ✅ | — | ✅ | ✅ | **V2** |
 | 音色 | 多 TTS 音色 | 系统 | 系统 | 商用 TTS | **复用设置页** 云端/本机偏好 |
 | 与划线共存 | ✅ | ✅ | ✅ | ✅ | ✅ 禁止 `annotations.remove(cfi)`（已有约束） |
@@ -71,7 +71,7 @@
 
 1. **微信读书**：边听边读 = **连续队列 + 句 highlight + 底部条**；用户拖进度条 = 我们 V1 用 **上一句/下一句** 代替（lazy：不做 spine 内 scrub 滑块，避免 CFI↔offset 双向映射成本）。
 2. **Kindle / Apple**：**从当前位置起播** 是默认路径；无选区时不弹选区框。
-3. **共性状态机**：`idle → playing → paused → playing → stopped`；任何 **新开朗读** 先 `stopAllEnglishPlayback()`（现有 `useEbookQuoteListen` 已如此）。
+3. **共性状态机**：`idle → playing → paused → playing → stopped`；任何 **新开朗读** 先 `stopAllPlayback()`（现有 `useEbookQuoteListen` 已如此）。
 
 ---
 
@@ -83,13 +83,13 @@
 sequenceDiagram
   participant UI as PopBar/想法/read.tsx
   participant Hook as useEbookQuoteListen
-  participant TTS as englishTts.playEnglishPreferred
+  participant TTS as speech.playPreferred
   participant Ov as epubListenSegmentOverlay
   participant Rend as epub.js Rendition
 
   UI->>Hook: toggleListen(text, key, cfi, frozenRange)
   Hook->>Ov: beginEpubListenOverlaySession(rend, plain, {cfi, selectionRange})
-  Hook->>TTS: playEnglishPreferred(spokenRaw, { onCadenceChunk })
+  Hook->>TTS: playPreferred(spokenRaw, { onCadenceChunk })
   loop 每个 cadence chunk
     TTS->>Hook: phase start + sentencePlainStart/End + sentenceIndex
     Hook->>Ov: showEpubListenPlainSpan(...)
@@ -106,7 +106,7 @@ sequenceDiagram
 
 | 模块 | 职责 | 边听边读复用方式 |
 |------|------|------------------|
-| `englishTts.ts` | `splitTextForTtsCadence`、`buildSentenceOffsetSpans`、`TtsCadenceChunkEvent`、`playEnglishPreferred`、云端分段预取 | **直接复用**；整章 plain 作为一次 `spokenRaw` 传入 |
+| `speech.ts` | `splitTextForTtsCadence`、`buildSentenceOffsetSpans`、`TtsCadenceChunkEvent`、`playPreferred`、云端分段预取 | **直接复用**；整章 plain 作为一次 `spokenRaw` 传入 |
 | `epubListenSegmentOverlay.ts` | Session、`plain` 映射、`paintListenRange`（host 浮层）、`autoFollow`、scroll guard、FAB 状态 | **扩展 session**：`mode: 'quote' \| 'chapter'`、`sentenceCursor` |
 | `epubScrolledNav.ts` | `scrollEpubRangeIntoView`、`getEpubScrollContainer` | **直接复用** |
 | `epubRangeGeometry.ts` | CFI ↔ Range、`getAccurateRangeLineClientRects` | **直接复用**；新增 **spine 文本抽取** 时用于校验 |
@@ -119,10 +119,10 @@ sequenceDiagram
 | 局限 | 代码表现 | 边听边读需补 |
 |------|----------|--------------|
 | 文本来源 = 选区 | `resolveEpubListenPlain` 依赖 `selectionRange` / PopBar 缓存 | **从 spine 节 DOM 或 section.load 抽 plain** |
-| 播完即停 | `playEnglishPreferred` 一次调用结束 | **章节队列**：节末触发下一节 `loadSectionPlain` |
+| 播完即停 | `playPreferred` 一次调用结束 | **章节队列**：节末触发下一节 `loadSectionPlain` |
 | 无播放条 UI | 仅 PopBar 按钮变「停止」 | **`EpubListenPlayerBar`** |
 | plain 偏移仅相对选区 | `buildPlainCompactMap(outer, session.plain)` | chapter 模式 `outer` = **整节 Range 或 body**，`startCfi` 定位句 cursor |
-| 无句级 seek API | 仅 cadence 顺序播放 | **停止当前 utterance → 从 `sentences[i]` 重新 `playEnglishPreferred` 子串** |
+| 无句级 seek API | 仅 cadence 顺序播放 | **停止当前 utterance → 从 `sentences[i]` 重新 `playPreferred` 子串** |
 
 ---
 
@@ -148,7 +148,7 @@ flowchart TB
   subgraph Core
     Spine["epubListenSpineText.ts 新建"]
     Ov["epubListenSegmentOverlay.ts 扩展"]
-    TTS["englishTts.ts"]
+    TTS["speech.ts"]
   end
 
   ToolbarBtn --> Chapter
@@ -164,7 +164,7 @@ flowchart TB
 
 ### 4.2 核心原则
 
-1. **单一 TTS 会话**：全局仍用 `playbackGeneration` + `stopAllEnglishPlayback()`；quote 与 chapter **互斥**。
+1. **单一 TTS 会话**：全局仍用 `playbackGeneration` + `stopAllPlayback()`；quote 与 chapter **互斥**。
 2. **单一 overlay session**：仍只有一个 `session` in `epubListenSegmentOverlay.ts`；chapter 模式延长生命周期，不按句重建 session。
 3. **plain 是唯一音频真相**：TTS 与 highlight 共用同一段 `plain`；DOM 映射失败时 **跳过该句并打 log**，不 fallback 到 annotation 写 iframe。
 4. **lazy 不做进度条 scrub**：V1 仅句级 prev/next；节内百分比映射留 V2。
@@ -178,14 +178,14 @@ flowchart TB
 - **触发入口**：阅读页顶栏新增 **「听书」**（i18n `ebook.read.listenBook`）；图标建议 `Headphones`（Lucide），与「听当前」区分。
 - **前置条件**：
   - 格式为 EPUB；`epubNavRef.getRendition()` 非空；
-  - `isEnglishPlaybackAvailable()` 为 true；
+  - `isPlaybackAvailable()` 为 true；
   - 与 **听当前** 互斥：若 `playingKey != null` 或 chapter `status !== idle'`，先 stop。
 - **状态变化**：
   - `chapterListen.status`: `idle → loading → playing`；
   - `beginEpubListenOverlaySession(rend, sectionPlain, { cfi: startCfi, selectionRange: sectionRange })`；
   - `session.mode = 'chapter'`（新增字段）；
   - `sentenceCursor` = 从 startCfi 对应句 index 起。
-- **网络**：`playEnglishPreferred(sectionPlainSlice, { onCadenceChunk, speak: { rate } })`；云端长节走现有 `playCloudTtsCadenceSegments`。
+- **网络**：`playPreferred(sectionPlainSlice, { onCadenceChunk, speak: { rate } })`；云端长节走现有 `playCloudTtsCadenceSegments`。
 - **UI**：显示 `EpubListenPlayerBar`；顶栏按钮变为 **「停止听书」** 或高亮态。
 - **错误与回滚**：抽文本失败 Toast `ebook.read.listenBook.emptySection`；`finally` 清 overlay + `status = idle`。
 - **边界**：
@@ -196,7 +196,7 @@ flowchart TB
 
 | 控件 | 行为 |
 |------|------|
-| 暂停 / 继续 | `stopAllEnglishPlayback` 仅停音频 vs `pause` flag；继续从 `sentenceCursor` 重播当前句起 |
+| 暂停 / 继续 | `stopAllPlayback` 仅停音频 vs `pause` flag；继续从 `sentenceCursor` 重播当前句起 |
 | 停止 | stop + `clearEpubListenSegmentOverlay` + idle |
 | 上一句 | `sentenceCursor -= 1`（下限 0）；stop 音频；从该句 plain 偏移重播 |
 | 下一句 | `sentenceCursor += 1`（上限 `sentences.length-1`）；同上 |
@@ -210,19 +210,19 @@ flowchart TB
 ### 5.3 句级高亮与视口（复用 + 小改）
 
 - **触发**：仍由 `onCadenceChunk` `phase === 'start'` → `showEpubListenPlainSpan(sentencePlainStart, sentencePlainEnd, sentenceIndex)`。
-- **chapter 模式差异**：`session.plain` = **整节 plain**；`sentencePlainStart/End` 已是节内偏移 — **无需改 englishTts**。
+- **chapter 模式差异**：`session.plain` = **整节 plain**；`sentencePlainStart/End` 已是节内偏移 — **无需改 speech**。
 - **startCfi 之前的句**：加载节文本后，用 `buildSentenceOffsetSpans(plain)` 找到 **第一个 offset ≥ startCfi 映射 plain 位置** 的句作为初始 `sentenceCursor`；播放时 TTS 仍从整段 plain 的对应 offset 切片（见 §6.2）。
 - **autoFollow / FAB**：逻辑不变；chapter 长节手动滚动更常见，FAB 保留。
 
 ### 5.4 节末衔接下一 spine
 
-- **触发**：当前 `playEnglishPreferred` 完成且 `session.mode === 'chapter'`。
+- **触发**：当前 `playPreferred` 完成且 `session.mode === 'chapter'`。
 - **逻辑**：
   1. `nextSpineIndex = current + 1`；若越界 → `status = stopped`，Toast「全书读完」可选。
   2. `await rend.display(nextSectionCfi)` 或 continuous manager 滚到下一 iframe。
   3. `loadSectionPlain(rend, nextSpineIndex)` → 新 plain；
   4. `sentenceCursor = 0`；更新 session.plain / selectionRange；
-  5. 继续 `playEnglishPreferred`。
+  5. 继续 `playPreferred`。
 - **ponytail:** V1 用 **顺序 await** 衔接，不做并行预加载下一节全文；升级路径：节末倒数 30s 预 `section.load`。
 
 ### 5.5 与「听当前」共存
@@ -309,7 +309,7 @@ async function playFromCursor() {
     selectionRange: slice.outerRange,
   });
   session.mode = 'chapter';
-  await playEnglishPreferred(subPlain, {
+  await playPreferred(subPlain, {
     onCadenceChunk: (ev) => { /* 同 useEbookQuoteListen + 更新 sentenceCursor */ },
     speak: { rate: sessionRate },
   });
@@ -317,7 +317,7 @@ async function playFromCursor() {
 }
 ```
 
-**句级 seek**：`stopAllEnglishPlayback()` → 根据 `sentenceCursor` 算 `plainStart` → 调 `playFromCursor()`（不重建 rendition）。
+**句级 seek**：`stopAllPlayback()` → 根据 `sentenceCursor` 算 `plainStart` → 调 `playFromCursor()`（不重建 rendition）。
 
 ### 6.3 重构 `useEbookQuoteListen`（可选但建议）
 
@@ -326,7 +326,7 @@ async function playFromCursor() {
   - 统一 `onCadenceChunk` 转发 overlay。
 - `useEbookQuoteListen` 仅保留 quote 三入口参数形态；`read.tsx` 同时挂 `useEpubChapterListen`。
 
-**lazy 替代**：若不重构，在 `useEpubChapterListen.start` 内先 `stopAllEnglishPlayback(); clearEpubListenSegmentOverlay()` 并清 `playingKey`（需 ref 回调或事件总线）— 能工作但易漏，**SPEC 推荐 controller 一层**。
+**lazy 替代**：若不重构，在 `useEpubChapterListen.start` 内先 `stopAllPlayback(); clearEpubListenSegmentOverlay()` 并清 `playingKey`（需 ref 回调或事件总线）— 能工作但易漏，**SPEC 推荐 controller 一层**。
 
 ### 6.4 扩展 `epubListenSegmentOverlay` Session
 
@@ -338,7 +338,7 @@ type ListenSession = {
   sentenceCursor: number;
   /** chapter：当前 spine index */
   spineIndex: number;
-  /** 会话倍速，透传 englishTts speak.rate */
+  /** 会话倍速，透传 speech speak.rate */
   rate: number;
 };
 ```
@@ -346,16 +346,16 @@ type ListenSession = {
 - `showEpubListenPlainSpan`：chapter 模式下 **不必** 在句末 `clearEpubListenSentenceOverlay`（可选保留闪灭效果；**建议保留** 与微信读书一致：句间先清再亮，已由 `paintListenRange` 整层替换保证）。
 - 导出 `getListenSessionSnapshot()` 供 PlayerBar 读 `sentenceCursor / sentences.length / spineIndex`（只读）。
 
-### 6.5 TTS 层（`englishTts.ts`）
+### 6.5 TTS 层（`speech.ts`）
 
 **无需改协议**；需注意：
 
 | 项 | 说明 |
 |----|------|
 | 整节 plain 很长 | 已支持 `splitTextForTtsCadence` + 云端分段；chapter 一次传入整节 `spokenRaw` 即可 |
-| 句级 seek | 对 `subPlain = plain.slice(startOffset)` 重新 `playEnglishPreferred` |
-| 倍速 | `SpeakEnglishOptions.rate` 已有；chapter session 保存 |
-| pause | Web Speech / cloud audio 均用 `stopAllEnglishPlayback`；**paused** 态不释放 overlay session |
+| 句级 seek | 对 `subPlain = plain.slice(startOffset)` 重新 `playPreferred` |
+| 倍速 | `SpeakOptions.rate` 已有；chapter session 保存 |
+| pause | Web Speech / cloud audio 均用 `stopAllPlayback`；**paused** 态不释放 overlay session |
 
 ### 6.6 进度（可选 V1.1）
 
@@ -513,7 +513,7 @@ stateDiagram-v2
 | section.load 与 DOM plain 不一致 | 优先 DOM；load 路径做 strip 后 **与 DOM 采样前 200 字比对**，偏差大则 warn 并仍用 DOM |
 | 整节过长云端 TTS 成本高 | 保持 cadence 分段；可选 V2 仅听当前章剩余 |
 | 分页 `display(cfi)` 闪屏 | 句级 seek 时若 CFI 已在当前页则只 scroll 不 display |
-| 与 `englishLearning` 共用 TTS 互相打断 | 全局 `stopAllEnglishPlayback` 已存在；听书时离开英语页应 stop（已有 unmount cleanup） |
+| 与 `englishLearning` 共用 TTS 互相打断 | 全局 `stopAllPlayback` 已存在；听书时离开英语页应 stop（已有 unmount cleanup） |
 
 **待产品确认**
 

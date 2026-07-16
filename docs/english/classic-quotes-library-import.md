@@ -609,7 +609,7 @@ useEffect(() => {
 	setFavoritedContentKeys(new Set(res.data?.favoritedContentKeys ?? []));
 }, [itemsEnglishSig]);
 
-// 卡片：朗读 playEnglishPreferred(english)、星标 toggleClassicQuoteFavorite
+// 卡片：朗读 playPreferred(english)、星标 toggleClassicQuoteFavorite
 // 收藏键：classicQuoteFavoriteContentKey(english) — SHA256(trim+lower)
 ```
 

@@ -16,7 +16,7 @@
 
 ## 2. 改动范围
 
-- `apps/frontend/src/utils/englishTts.ts` — `startCloudTts` 内 Edge endpoint 选择；移除 `SPEECH_EDGE_TTS` import
+- `apps/frontend/src/utils/speech.ts` — `startCloudTts` 内 Edge endpoint 选择；移除 `SPEECH_EDGE_TTS` import
 
 未改动：`readResponseBodyAsArrayBuffer`、听书预取、`playCloudMp3Blob`、后端 `EdgeTtsService`。
 
@@ -31,7 +31,7 @@ playbackSource === 'edge'
        Web:   ReadableStream reader 或 arrayBuffer 回退
 ```
 
-所有 `playEnglishPreferred` / `prefetchCloudEnglishTts` 调用方自动继承，无需改 hook。
+所有 `playPreferred` / `prefetchCloudTts` 调用方自动继承，无需改 hook。
 
 ## 4. 关键代码对比与注释
 
@@ -39,7 +39,7 @@ playbackSource === 'edge'
 
 **对比范围**：`startCloudTts` 内 `endpoint` 三元表达式（含 Edge 分支）；import 列表中 Edge 常量。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L9–L14、L1084–L1092）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L9–L14、L1084–L1092）
 
 ```typescript
 import {
@@ -59,7 +59,7 @@ import {
 				: SPEECH_MINIMAX_TTS_STREAM;
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L9–L13、L1084–L1089）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L9–L13、L1084–L1089）
 
 ```typescript
 import {
@@ -114,7 +114,7 @@ async *streamSpeech(dto: EdgeTtsDto, userId?: number): AsyncGenerator<Buffer> {
 
 | 说明 | 路径 |
 | ---- | ---- |
-| 客户端选路 | `apps/frontend/src/utils/englishTts.ts` → `startCloudTts` |
+| 客户端选路 | `apps/frontend/src/utils/speech.ts` → `startCloudTts` |
 | API 常量 | `apps/frontend/src/service/api.ts` |
 | 后端合成 | `apps/backend/src/services/speech-transcription/edge-tts.service.ts` |
 | 影响点 | `docs/Influence-point/tts-edge-unify-stream-endpoint.md` |

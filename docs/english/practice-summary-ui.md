@@ -138,7 +138,7 @@ sequenceDiagram
 3. **作答明细**：先错题、后正确；顶栏「作答明细」+ 错误/正确角标；绿/红左边框。
 4. **配色**：`metricTone.ts` 低透明度渐变底 + 语义色数值。
 5. **返回**：结算页眉左侧返回图标；底栏无「返回」文案按钮。
-6. **TTS**：单题与结算列表均用 `playEnglishPreferred`；切题 / 离页 `stopAllEnglishPlayback`。
+6. **TTS**：单题与结算列表均用 `playPreferred`；切题 / 离页 `stopAllPlayback`。
 
 ---
 
@@ -310,7 +310,7 @@ export function Session({ mode, item, isLastQuestion = false, onStepComplete }: 
   /** 统一出口：停 TTS 后通知父级推进题序 */
   const completeStep = useCallback(
     (result: PracticeAttemptResult) => {
-      stopAllEnglishPlayback();
+      stopAllPlayback();
       onStepComplete(result);
     },
     [onStepComplete],
@@ -342,7 +342,7 @@ export function Session({ mode, item, isLastQuestion = false, onStepComplete }: 
       }
 
       // 路径 B：答错 → 停播、进入揭示区，等待用户确认后再切题
-      stopAllEnglishPlayback();
+      stopAllPlayback();
       setPlaying(false);
       setLastWrong(attempt);
       setPhase('revealed');

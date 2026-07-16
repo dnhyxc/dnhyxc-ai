@@ -1,9 +1,9 @@
 /**
- * 英语学习朗读：有效会员默认走云端 TTS（单词/语句/练习统一），失败则回退本机 Web Speech；
- * 非会员默认仅本机 Web Speech，不请求 TTS 接口。
- * `preferLocal: true` 时强制本机（如本机音色设置页试听）；默认按会员状态选路。
- * 云端 CosyVoice2 / MiniMax / 讯飞在线 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
- * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
+ * 通用朗读（本机 Web Speech + 云端 MiniMax / 讯飞 / Edge）。
+ * 默认：有效会员按设置走云端，失败回退本机；非会员除 Edge 外不走会员云端。
+ * `preferLocal: true` 强制本机（如设置页试听）。
+ * 云端无 seed，对规范化文本做 MP3 缓存以保证重复播放读音一致。
+ * 本机音色偏好 key：`local_tts_voice:{userId}`（不再沿用 english_learning_*）。
  */
 import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
@@ -36,7 +36,7 @@ type CloudTtsReady =
 	| { kind: 'cached'; blob: Blob; cacheKey: string }
 	| { kind: 'live'; response: Response; cacheKey: string };
 
-export function isEnglishTtsSupported(): boolean {
+export function isSpeechSupported(): boolean {
 	return (
 		typeof window !== 'undefined' &&
 		typeof window.speechSynthesis !== 'undefined' &&
@@ -175,16 +175,14 @@ function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 	return chunks.length > 0 ? chunks : [{ text: trimmed, pauseAfterMs: 0 }];
 }
 
-/** 本机英语朗读偏好音色（localStorage 存名称关键字，如 karen、moira、victoria） */
-export const LOCAL_ENGLISH_TTS_VOICE_KEY = 'english_learning_local_tts_voice';
+/** 本机音色偏好 storage key 前缀 → `local_tts_voice:{userId}` */
+export const LOCAL_TTS_VOICE_KEY = 'local_tts_voice';
 
-/** 初始默认本机英语女声（首次进入应用 / 恢复默认时写入并用于选音） */
-export const DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY = 'karen';
+/** 初始默认本机女声关键字（首次进入 / 恢复默认） */
+export const DEFAULT_LOCAL_TTS_VOICE_KEY = 'karen';
 
-/**
- * 女性音色回退列表（当前设备无 Karen 时按序尝试）。
- */
-export const PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES = [
+/** 女声回退关键字列表（设备无 Karen 时按序尝试） */
+export const PREFERRED_LOCAL_FEMALE_VOICES = [
 	'karen',
 	'moira',
 	'victoria',
@@ -200,11 +198,11 @@ export const PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES = [
 	'ava',
 ] as const;
 
-export type PreferredLocalEnglishFemaleVoice =
-	(typeof PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES)[number];
+export type PreferredLocalFemaleVoice =
+	(typeof PREFERRED_LOCAL_FEMALE_VOICES)[number];
 
 /** 常见男声关键字（macOS / Windows Web Speech 显示名） */
-export const PREFERRED_LOCAL_ENGLISH_MALE_VOICES = [
+export const PREFERRED_LOCAL_MALE_VOICES = [
 	'alex',
 	'daniel',
 	'tom',
@@ -223,36 +221,30 @@ export const PREFERRED_LOCAL_ENGLISH_MALE_VOICES = [
 	'nathan',
 ] as const;
 
-const LOCAL_ENGLISH_MALE_VOICE_HINTS = PREFERRED_LOCAL_ENGLISH_MALE_VOICES;
+const LOCAL_ENGLISH_MALE_VOICE_HINTS = PREFERRED_LOCAL_MALE_VOICES;
 
-export type LocalEnglishVoiceGender = 'female' | 'male' | 'unknown';
+export type LocalVoiceGender = 'female' | 'male' | 'unknown';
 
-export type LocalEnglishVoiceOption = {
+export type LocalVoiceOption = {
 	name: string;
 	lang: string;
 	voiceURI: string;
-	gender: LocalEnglishVoiceGender;
+	gender: LocalVoiceGender;
 };
 
 /** 根据系统音色名推断男声 / 女声 */
-export function classifyEnglishVoiceGender(
-	name: string,
-): LocalEnglishVoiceGender {
+export function classifyVoiceGender(name: string): LocalVoiceGender {
 	const nameLower = name.toLowerCase();
 	if (LOCAL_ENGLISH_MALE_VOICE_HINTS.some((hint) => nameLower.includes(hint))) {
 		return 'male';
 	}
-	if (
-		PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES.some((hint) =>
-			nameLower.includes(hint),
-		)
-	) {
+	if (PREFERRED_LOCAL_FEMALE_VOICES.some((hint) => nameLower.includes(hint))) {
 		return 'female';
 	}
 	return 'unknown';
 }
 
-let cachedEnglishVoice: SpeechSynthesisVoice | null | undefined;
+let cachedLocalVoice: SpeechSynthesisVoice | null | undefined;
 let cachedVoicePrefUserId = 0;
 
 function normalizeVoiceKey(input: string): string {
@@ -260,7 +252,7 @@ function normalizeVoiceKey(input: string): string {
 }
 
 function localVoiceStorageKey(userId?: number): string {
-	return userScopedStorageKey(LOCAL_ENGLISH_TTS_VOICE_KEY, userId);
+	return userScopedStorageKey(LOCAL_TTS_VOICE_KEY, userId);
 }
 
 function readPreferredVoiceKeyFromStorage(): string | null {
@@ -268,16 +260,16 @@ function readPreferredVoiceKeyFromStorage(): string | null {
 	const userId = getLoggedInUserId();
 	if (userId !== cachedVoicePrefUserId) {
 		cachedVoicePrefUserId = userId;
-		resetCachedEnglishVoice();
+		resetCachedLocalVoice();
 	}
 	if (userId <= 0) return null;
 	const scopedKey = localVoiceStorageKey(userId);
 	let raw = localStorage.getItem(scopedKey);
 	if (!raw) {
-		const legacy = localStorage.getItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+		const legacy = localStorage.getItem(LOCAL_TTS_VOICE_KEY);
 		if (legacy) {
 			localStorage.setItem(scopedKey, legacy);
-			localStorage.removeItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+			localStorage.removeItem(LOCAL_TTS_VOICE_KEY);
 			raw = legacy;
 		}
 	}
@@ -286,33 +278,31 @@ function readPreferredVoiceKeyFromStorage(): string | null {
 }
 
 /** 无用户配置时写入并固定使用 Karen */
-function ensureDefaultLocalEnglishVoicePreference(): void {
+function ensureDefaultLocalVoicePreference(): void {
 	if (typeof window === 'undefined') return;
 	const userId = getLoggedInUserId();
 	if (userId <= 0) return;
 	if (!readPreferredVoiceKeyFromStorage()) {
 		localStorage.setItem(
 			localVoiceStorageKey(userId),
-			DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY,
+			DEFAULT_LOCAL_TTS_VOICE_KEY,
 		);
 	}
 }
 
 /** 实际用于选音的关键字（保证初始即为 karen） */
 function resolveVoiceKeyForPlayback(): string {
-	ensureDefaultLocalEnglishVoicePreference();
-	return (
-		readPreferredVoiceKeyFromStorage() ?? DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY
-	);
+	ensureDefaultLocalVoicePreference();
+	return readPreferredVoiceKeyFromStorage() ?? DEFAULT_LOCAL_TTS_VOICE_KEY;
 }
 
-function isLikelyMaleEnglishVoice(nameLower: string): boolean {
+function isLikelyMaleVoice(nameLower: string): boolean {
 	return LOCAL_ENGLISH_MALE_VOICE_HINTS.some((hint) =>
 		nameLower.includes(hint),
 	);
 }
 
-function scoreEnglishVoice(
+function scoreLocalVoice(
 	voice: SpeechSynthesisVoice,
 	preferredKey: string | null,
 ): number {
@@ -330,15 +320,15 @@ function scoreEnglishVoice(
 		return -1;
 	}
 
-	if (isLikelyMaleEnglishVoice(name)) return -1;
+	if (isLikelyMaleVoice(name)) return -1;
 
 	let score = 0;
 	if (voice.localService) score += 40;
 	if (lang.startsWith('en-us')) score += 12;
 	else if (lang.startsWith('en-gb')) score += 8;
 
-	for (let i = 0; i < PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES.length; i += 1) {
-		if (name.includes(PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES[i])) {
+	for (let i = 0; i < PREFERRED_LOCAL_FEMALE_VOICES.length; i += 1) {
+		if (name.includes(PREFERRED_LOCAL_FEMALE_VOICES[i])) {
 			score += 120 - i;
 			break;
 		}
@@ -376,12 +366,12 @@ function pauseMs(ms: number): Promise<void> {
 
 /** beginPlaybackSession/stopAll 里 cancel() 后立刻 speak()，Chrome 会无声并 onerror；云端走 Audio 不受影响 */
 async function settleSpeechSynthesisAfterCancel(): Promise<void> {
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 	await pauseMs(50);
 }
 
 function pickEnglishVoice(): SpeechSynthesisVoice | null {
-	if (!isEnglishTtsSupported()) return null;
+	if (!isSpeechSupported()) return null;
 
 	const voices = window.speechSynthesis.getVoices();
 	if (!voices.length) {
@@ -389,15 +379,15 @@ function pickEnglishVoice(): SpeechSynthesisVoice | null {
 		return null;
 	}
 
-	if (cachedEnglishVoice !== undefined) {
-		return cachedEnglishVoice;
+	if (cachedLocalVoice !== undefined) {
+		return cachedLocalVoice;
 	}
 
 	const activeKey = resolveVoiceKeyForPlayback();
 	let best: SpeechSynthesisVoice | null = null;
 	let bestScore = -1;
 	for (const v of voices) {
-		const score = scoreEnglishVoice(v, activeKey);
+		const score = scoreLocalVoice(v, activeKey);
 		if (score > bestScore) {
 			bestScore = score;
 			best = v;
@@ -409,13 +399,13 @@ function pickEnglishVoice(): SpeechSynthesisVoice | null {
 	}
 
 	if (!best) {
-		for (const fallback of PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES) {
+		for (const fallback of PREFERRED_LOCAL_FEMALE_VOICES) {
 			best = findVoiceByKey(voices, fallback);
 			if (best) break;
 		}
 	}
 
-	cachedEnglishVoice = best;
+	cachedLocalVoice = best;
 	return best;
 }
 
@@ -431,7 +421,7 @@ function scoreChineseVoice(voice: SpeechSynthesisVoice): number {
 }
 
 function pickChineseVoice(): SpeechSynthesisVoice | null {
-	if (!isEnglishTtsSupported()) return null;
+	if (!isSpeechSupported()) return null;
 	const voices = window.speechSynthesis.getVoices();
 	if (!voices.length) return null;
 	let best: SpeechSynthesisVoice | null = null;
@@ -453,11 +443,11 @@ function pickVoiceForChunk(chunkText: string): SpeechSynthesisVoice | null {
 	return pickEnglishVoice();
 }
 
-function resetCachedEnglishVoice(): void {
-	cachedEnglishVoice = undefined;
+function resetCachedLocalVoice(): void {
+	cachedLocalVoice = undefined;
 }
 
-export type SpeakEnglishOptions = {
+export type SpeakOptions = {
 	rate?: number;
 	pitch?: number;
 	volume?: number;
@@ -479,20 +469,20 @@ export type TtsCadenceChunkEvent = {
 };
 
 /** 听书逐句：上一句播放期间预取的云端 MP3（plain 为实际请求的 chunk 文本） */
-export type EnglishTtsSentencePrefetch = {
+export type TtsSentencePrefetch = {
 	plain: string;
 	ready: CloudTtsReady;
 };
 
-export type PlayEnglishPreferredOptions = {
+export type PlayPreferredOptions = {
 	/** 为 true 时强制本机 Web Speech（如本机音色设置试听）；省略时会员走云端、非会员走本机 */
 	preferLocal?: boolean;
 	/** 本机朗读时透传给 Web Speech */
-	speak?: SpeakEnglishOptions;
+	speak?: SpeakOptions;
 	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
 	/** 听书/听当前：由上一轮发起的云端预取（缩短等待） */
-	prefetchedCloud?: Promise<EnglishTtsSentencePrefetch> | null;
+	prefetchedCloud?: Promise<TtsSentencePrefetch> | null;
 	/**
 	 * 云端整段一次合成（听书/听当前按段 TTS）。
 	 * 为 true 时不按句读拆 HTTP；超厂商字节上限仍回退 cadence。
@@ -507,7 +497,7 @@ export type PlayEnglishPreferredOptions = {
 };
 
 type CadencePlaybackHooks = Pick<
-	PlayEnglishPreferredOptions,
+	PlayPreferredOptions,
 	'onCadenceChunk' | 'prefetchedCloud' | 'onPlaybackStart'
 >;
 
@@ -909,11 +899,11 @@ let detachCloudAudioPauseBridge: (() => void) | null = null;
 let playbackSoftPaused = false;
 let softResumeWaiters: Array<() => void> = [];
 
-type EnglishPlaybackMediaHandlers = {
+type PlaybackMediaHandlers = {
 	play: () => void;
 	pause: () => void;
 };
-let englishPlaybackMediaHandlers: EnglishPlaybackMediaHandlers | null = null;
+let englishPlaybackMediaHandlers: PlaybackMediaHandlers | null = null;
 
 function withSuppressedAudioPauseEvent(run: () => void): void {
 	suppressAudioPauseEvent = true;
@@ -941,7 +931,7 @@ function waitWhileSoftPaused(_generation: number): Promise<void> {
 }
 
 /** 退出听书后清掉 macOS 菜单栏 / 控制中心 Now Playing（含进度条） */
-function clearEnglishPlaybackMediaSession(opts?: {
+function clearPlaybackMediaSession(opts?: {
 	/** 默认 true：卸掉 play/pause 等；句间停介质时传 false，避免媒体键短暂失效 */
 	clearHandlers?: boolean;
 }): void {
@@ -1030,11 +1020,11 @@ function silenceCloudAudioUnlock(): void {
 	}
 }
 
-function setEnglishPlaybackMediaState(state: MediaSessionPlaybackState): void {
+function setPlaybackMediaState(state: MediaSessionPlaybackState): void {
 	if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
 	if (state === 'none') {
 		// 句间换轨也会走这里：只清展示，保留已注册的媒体键
-		clearEnglishPlaybackMediaSession({
+		clearPlaybackMediaSession({
 			clearHandlers: !englishPlaybackMediaHandlers,
 		});
 		return;
@@ -1049,8 +1039,8 @@ function setEnglishPlaybackMediaState(state: MediaSessionPlaybackState): void {
 }
 
 /** 听书/听当前：把系统媒体键接到 pause/resume；传 null 卸载 */
-export function registerEnglishPlaybackMediaHandlers(
-	handlers: EnglishPlaybackMediaHandlers | null,
+export function registerPlaybackMediaHandlers(
+	handlers: PlaybackMediaHandlers | null,
 ): void {
 	if (!handlers) {
 		englishPlaybackMediaHandlers = null;
@@ -1059,7 +1049,7 @@ export function registerEnglishPlaybackMediaHandlers(
 		abortCloudAudioWait?.();
 		abortCloudAudioWait = null;
 		clearSoftPauseState();
-		if (isEnglishTtsSupported()) {
+		if (isSpeechSupported()) {
 			try {
 				window.speechSynthesis.cancel();
 			} catch {
@@ -1068,11 +1058,11 @@ export function registerEnglishPlaybackMediaHandlers(
 		}
 		releaseCloudAudioEl();
 		silenceCloudAudioUnlock();
-		clearEnglishPlaybackMediaSession({ clearHandlers: true });
+		clearPlaybackMediaSession({ clearHandlers: true });
 		// macOS Chrome：偶发需下一帧再清一次才收起控制中心
 		requestAnimationFrame(() => {
 			if (englishPlaybackMediaHandlers) return;
-			clearEnglishPlaybackMediaSession({ clearHandlers: true });
+			clearPlaybackMediaSession({ clearHandlers: true });
 		});
 		return;
 	}
@@ -1139,7 +1129,7 @@ function readToken(): string {
 }
 
 /** 当前登录用户是否为有效会员（读 localStorage userInfo，与资料页 / LLM 判定一致） */
-function isCloudEnglishTtsAllowed(): boolean {
+function isCloudTtsAllowed(): boolean {
 	if (typeof window === 'undefined') return false;
 	const raw = localStorage.getItem(USER_INFO_STORAGE_KEY);
 	if (!raw?.trim()) return false;
@@ -1159,22 +1149,20 @@ function isMemberOnlyPlaybackSource(source: string): boolean {
 /** 会员可走 MiniMax / 讯飞 / Edge；非会员仅 Edge 云端 */
 function canUseCloudPlaybackSource(source: string): boolean {
 	if (source === 'local') return false;
-	if (isCloudEnglishTtsAllowed()) return true;
+	if (isCloudTtsAllowed()) return true;
 	return source === 'edge';
 }
 
 /** 会员可走云端；非会员可选 Edge 云端或本机 Web Speech */
-export function isEnglishPlaybackAvailable(): boolean {
+export function isPlaybackAvailable(): boolean {
 	const prefs = loadMinimaxTtsUserPrefs();
 	if (canUseCloudPlaybackSource(prefs.playbackSource)) return true;
-	if (shouldUseCloudEnglishTts()) return true;
-	return isEnglishTtsSupported();
+	if (shouldUseCloudTts()) return true;
+	return isSpeechSupported();
 }
 
 /** 朗读选路：读 playbackSource；非会员仅 edge 走云端 */
-function shouldUseCloudEnglishTts(
-	options?: PlayEnglishPreferredOptions,
-): boolean {
+function shouldUseCloudTts(options?: PlayPreferredOptions): boolean {
 	if (options?.preferLocal === true) return false;
 	const prefs = loadMinimaxTtsUserPrefs();
 	const source = prefs.playbackSource;
@@ -1182,7 +1170,7 @@ function shouldUseCloudEnglishTts(
 	if (options?.preferLocal === false) {
 		return canUseCloudPlaybackSource(source);
 	}
-	if (isMemberOnlyPlaybackSource(source) && !isCloudEnglishTtsAllowed()) {
+	if (isMemberOnlyPlaybackSource(source) && !isCloudTtsAllowed()) {
 		return false;
 	}
 	return canUseCloudPlaybackSource(source);
@@ -1195,7 +1183,7 @@ function isPlaybackGenerationActive(generation: number): boolean {
 /** 仅停止当前音频与本机 speech，不递增世代（供会话内切换介质使用） */
 function stopPlaybackMediaOnly(): void {
 	clearSoftPauseState();
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		window.speechSynthesis.cancel();
 	}
 	abortCloudAudioWait?.();
@@ -1223,7 +1211,7 @@ function stopPlaybackMediaOnly(): void {
 		URL.revokeObjectURL(cloudObjectUrl);
 		cloudObjectUrl = null;
 	}
-	setEnglishPlaybackMediaState('none');
+	setPlaybackMediaState('none');
 }
 
 function ensureCloudAudioEl(): HTMLAudioElement {
@@ -1238,16 +1226,16 @@ function beginPlaybackSession(): number {
 	return playbackGeneration;
 }
 
-export function stopEnglishTts(): void {
-	if (!isEnglishTtsSupported()) return;
+export function stopSpeech(): void {
+	if (!isSpeechSupported()) return;
 	window.speechSynthesis.cancel();
 }
 
-export function stopCloudEnglishTts(): void {
+export function stopCloudTts(): void {
 	stopPlaybackMediaOnly();
 }
 
-export function stopAllEnglishPlayback(): void {
+export function stopAllPlayback(): void {
 	playbackGeneration += 1;
 	// 新听书/试听会话开始时会先 stop；重置冷却以便云端报错立即 Toast
 	lastCloudTtsErrorToastAt = 0;
@@ -1257,11 +1245,11 @@ export function stopAllEnglishPlayback(): void {
 
 /**
  * 听书底栏软暂停：只 pause 介质，不递增世代、不 abort wait。
- * 续播走 resumeEnglishPlaybackSoft，从 currentTime 继续。
+ * 续播走 resumePlaybackSoft，从 currentTime 继续。
  */
-export function pauseEnglishPlaybackSoft(): void {
+export function pausePlaybackSoft(): void {
 	playbackSoftPaused = true;
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		try {
 			window.speechSynthesis.pause();
 		} catch {
@@ -1273,11 +1261,11 @@ export function pauseEnglishPlaybackSoft(): void {
 			cloudAudio?.pause();
 		});
 	}
-	setEnglishPlaybackMediaState('paused');
+	setPlaybackMediaState('paused');
 }
 
 /** @returns 是否已从暂停的 Audio / speechSynthesis 续上（含合成已就绪待播） */
-export function resumeEnglishPlaybackSoft(): boolean {
+export function resumePlaybackSoft(): boolean {
 	const audio = cloudAudio;
 	const hasSrc = Boolean(audio?.currentSrc || audio?.getAttribute('src'));
 	const canResumeAudio = !!(audio && hasSrc && !audio.ended);
@@ -1294,13 +1282,13 @@ export function resumeEnglishPlaybackSoft(): boolean {
 				.play()
 				.then(() => {
 					if (playbackSoftPaused) return;
-					setEnglishPlaybackMediaState('playing');
+					setPlaybackMediaState('playing');
 				})
 				.catch(() => {});
 		}
 		resumed = true;
 	}
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		try {
 			if (window.speechSynthesis.paused) {
 				window.speechSynthesis.resume();
@@ -1310,7 +1298,7 @@ export function resumeEnglishPlaybackSoft(): boolean {
 			// ignore
 		}
 	}
-	if (resumed) setEnglishPlaybackMediaState('playing');
+	if (resumed) setPlaybackMediaState('playing');
 	return resumed;
 }
 
@@ -1328,7 +1316,7 @@ function bindCloudAudioPauseBridge(
 			englishPlaybackMediaHandlers.pause();
 			return;
 		}
-		pauseEnglishPlaybackSoft();
+		pausePlaybackSoft();
 	};
 	audio.addEventListener('pause', onPause);
 	detachCloudAudioPauseBridge = () => {
@@ -1337,7 +1325,7 @@ function bindCloudAudioPauseBridge(
 }
 
 /** 听书等场景切换倍速：云端 MP3 即时生效；本机 Web Speech 仅影响下一句 */
-export function applyActiveEnglishPlaybackRate(rate: number): void {
+export function applyActivePlaybackRate(rate: number): void {
 	const clamped = clampPlaybackRate(rate);
 	if (cloudAudio) cloudAudio.playbackRate = clamped;
 }
@@ -1387,7 +1375,7 @@ function cloudPlainWithinSingleLimit(plain: string): boolean {
 
 async function resolveCloudTtsReady(
 	chunkPlain: string,
-	prefetched?: Promise<EnglishTtsSentencePrefetch> | null,
+	prefetched?: Promise<TtsSentencePrefetch> | null,
 ): Promise<CloudTtsReady> {
 	if (prefetched) {
 		try {
@@ -1404,13 +1392,13 @@ async function resolveCloudTtsReady(
  * 听书/听当前：预取云端 MP3。
  * `whole: true` 时预取整段文本（与 cloudSingleUtterance 对齐）；否则预取首个 cadence chunk。
  */
-export function prefetchCloudEnglishTts(
+export function prefetchCloudTts(
 	rawText: string,
-	options?: Pick<PlayEnglishPreferredOptions, 'preferLocal'> & {
+	options?: Pick<PlayPreferredOptions, 'preferLocal'> & {
 		whole?: boolean;
 	},
-): Promise<EnglishTtsSentencePrefetch> | null {
-	if (!shouldUseCloudEnglishTts(options)) return null;
+): Promise<TtsSentencePrefetch> | null {
+	if (!shouldUseCloudTts(options)) return null;
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return null;
 	const chunkPlain =
@@ -1903,7 +1891,7 @@ async function startCloudAudioPlayback(
 			});
 			return false;
 		}
-		setEnglishPlaybackMediaState('playing');
+		setPlaybackMediaState('playing');
 		onPlaybackStart?.();
 		return true;
 	};
@@ -1976,12 +1964,12 @@ function playCloudMp3Blob(
 function speakOneUtterance(
 	plain: string,
 	generation: number,
-	options?: SpeakEnglishOptions,
+	options?: SpeakOptions,
 ): Promise<void> {
 	return new Promise((resolve) => {
 		if (
 			!isPlaybackGenerationActive(generation) ||
-			!isEnglishTtsSupported() ||
+			!isSpeechSupported() ||
 			!plain
 		) {
 			resolve();
@@ -2014,7 +2002,7 @@ function speakOneUtterance(
 }
 
 function waitForVoicesReady(): Promise<void> {
-	if (!isEnglishTtsSupported()) return Promise.resolve();
+	if (!isSpeechSupported()) return Promise.resolve();
 	if (window.speechSynthesis.getVoices().length > 0) {
 		return Promise.resolve();
 	}
@@ -2032,13 +2020,13 @@ function waitForVoicesReady(): Promise<void> {
 }
 
 // 本地朗读带 playback generation 支持，句级分段、世代守护、语速处理及 50ms settle 修正
-async function speakEnglishTextWithGeneration(
+async function speakTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakEnglishOptions & CadencePlaybackHooks,
+	options?: SpeakOptions & CadencePlaybackHooks,
 ): Promise<void> {
 	// 未检测到本机 TTS 支持时直接返回
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 
 	// 去除文本 markdown 标记，仅保留朗读内容
 	const plain = stripMarkdownForTts(text);
@@ -2056,7 +2044,7 @@ async function speakEnglishTextWithGeneration(
 	// again 检查世代，有可能 settle 时用户已停止
 	if (!isPlaybackGenerationActive(generation)) return;
 	// 刷新本地缓存音色（部分平台缓存命中需刷新无废品）
-	resetCachedEnglishVoice();
+	resetCachedLocalVoice();
 
 	// 按语调规则拆分分段，得到拟朗读的 chunk 数组
 	const chunks = splitTextForTtsCadence(plain);
@@ -2098,21 +2086,21 @@ async function speakEnglishTextWithGeneration(
 }
 
 // 朗读英文文本的入口函数，自动开启新的播放世代，保障操作唯一性
-export async function speakEnglishText(
+export async function speakText(
 	text: string,
-	options?: SpeakEnglishOptions,
+	options?: SpeakOptions,
 ): Promise<void> {
 	// 先 begin 再 prime，避免 cancel 掉解锁静音片导致本机无声
 	const generation = beginPlaybackSession();
-	primeEnglishPlaybackForUserGesture();
-	await speakEnglishTextWithGeneration(text, generation, options);
+	primePlaybackForUserGesture();
+	await speakTextWithGeneration(text, generation, options);
 }
 
 /** 云端失败后改本机：清掉 Audio，并给 speechSynthesis 一点 settle 时间 */
 async function prepareLocalSpeechAfterCloud(generation: number): Promise<void> {
 	if (!isPlaybackGenerationActive(generation)) return;
 	stopPlaybackMediaOnly();
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 	await settleSpeechSynthesisAfterCancel();
 	try {
 		window.speechSynthesis.resume();
@@ -2122,9 +2110,9 @@ async function prepareLocalSpeechAfterCloud(generation: number): Promise<void> {
 }
 
 // 朗读英文文本优选本地或云端 TTS，自动处理分段语调与回退逻辑
-export async function playEnglishPreferred(
+export async function playPreferred(
 	rawText: string,
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 ): Promise<void> {
 	// 去除 markdown 语法，获得纯文本
 	const plain = stripMarkdownForTts(rawText);
@@ -2132,7 +2120,7 @@ export async function playEnglishPreferred(
 	if (!plain) return;
 
 	const speakOpts = options?.speak;
-	const useCloud = shouldUseCloudEnglishTts(options);
+	const useCloud = shouldUseCloudTts(options);
 
 	// 用户明确选本机时清掉会话内 Edge 粘滞，避免设置已改仍走云端残态
 	if (options?.preferLocal === true || !useCloud) {
@@ -2145,7 +2133,7 @@ export async function playEnglishPreferred(
 	 * 云端走 Audio，受影响较小，但本机试听/降级依赖此顺序。
 	 */
 	const generation = beginPlaybackSession();
-	primeEnglishPlaybackForUserGesture();
+	primePlaybackForUserGesture();
 
 	const cadenceHooks: CadencePlaybackHooks = {
 		onCadenceChunk: options?.onCadenceChunk,
@@ -2156,10 +2144,10 @@ export async function playEnglishPreferred(
 	// 优先分支：本地 TTS
 	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throwNoTts();
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, {
+		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
 		});
@@ -2202,35 +2190,35 @@ export async function playEnglishPreferred(
 			}
 		}
 
-		const canFallbackLocal = isEnglishTtsSupported();
+		const canFallbackLocal = isSpeechSupported();
 		notifyCloudTtsFallback(canFallbackLocal, failedSource);
 		if (!canFallbackLocal) {
 			throwNoTts({ cloudTtsNotified: true });
 		}
 		await prepareLocalSpeechAfterCloud(generation);
 		if (!isPlaybackGenerationActive(generation)) return;
-		await speakEnglishTextWithGeneration(rawText, generation, {
+		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			onCadenceChunk: options?.onCadenceChunk,
 		});
 	}
 }
 
-export function warmupEnglishTtsVoices(): void {
-	if (!isEnglishTtsSupported()) return;
-	ensureDefaultLocalEnglishVoicePreference();
-	resetCachedEnglishVoice();
+export function warmupSpeechVoices(): void {
+	if (!isSpeechSupported()) return;
+	ensureDefaultLocalVoicePreference();
+	resetCachedLocalVoice();
 	void window.speechSynthesis.getVoices();
 	window.speechSynthesis.addEventListener('voiceschanged', () => {
-		resetCachedEnglishVoice();
+		resetCachedLocalVoice();
 		void window.speechSynthesis.getVoices();
 	});
 }
 
 /** 须在用户点击同步调用，降低后续 async TTS / Audio 被 autoplay 策略拦截的概率 */
-export function primeEnglishPlaybackForUserGesture(): void {
+export function primePlaybackForUserGesture(): void {
 	if (typeof window === 'undefined') return;
-	warmupEnglishTtsVoices();
+	warmupSpeechVoices();
 	try {
 		window.speechSynthesis?.resume();
 		const unlock = new SpeechSynthesisUtterance('\u200b');
@@ -2254,42 +2242,42 @@ export function primeEnglishPlaybackForUserGesture(): void {
 }
 
 /** 当前选中的本机英语音色名 */
-export function getSelectedLocalEnglishVoiceName(): string | null {
+export function getSelectedLocalVoiceName(): string | null {
 	return pickEnglishVoice()?.name ?? null;
 }
 
-/** 用户偏好关键字（localStorage）；首次访问会初始化为 {@link DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY} */
-export function getPreferredLocalEnglishVoiceKey(): string | null {
-	ensureDefaultLocalEnglishVoicePreference();
+/** 用户偏好关键字（localStorage）；首次访问会初始化为 {@link DEFAULT_LOCAL_TTS_VOICE_KEY} */
+export function getPreferredLocalVoiceKey(): string | null {
+	ensureDefaultLocalVoicePreference();
 	return readPreferredVoiceKeyFromStorage();
 }
 
 /**
  * 设置本机英语女声偏好（如 `karen`、`moira`、`victoria`）。
- * 传入 null 或空字符串则恢复为默认 {@link DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY}（Karen）。
+ * 传入 null 或空字符串则恢复为默认 {@link DEFAULT_LOCAL_TTS_VOICE_KEY}（Karen）。
  */
-export function setPreferredLocalEnglishVoiceKey(key: string | null): void {
+export function setPreferredLocalVoiceKey(key: string | null): void {
 	if (typeof window === 'undefined') return;
 	const userId = getLoggedInUserId();
 	if (userId <= 0) return;
-	resetCachedEnglishVoice();
+	resetCachedLocalVoice();
 	const storageKey = localVoiceStorageKey(userId);
 	if (!key?.trim()) {
-		localStorage.setItem(storageKey, DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY);
+		localStorage.setItem(storageKey, DEFAULT_LOCAL_TTS_VOICE_KEY);
 		return;
 	}
 	localStorage.setItem(storageKey, normalizeVoiceKey(key));
 }
 
-const GENDER_SORT_ORDER: Record<LocalEnglishVoiceGender, number> = {
+const GENDER_SORT_ORDER: Record<LocalVoiceGender, number> = {
 	female: 0,
 	male: 1,
 	unknown: 2,
 };
 
 /** 列出当前设备可用的英语音色（含男声 / 女声分类） */
-export function listLocalEnglishVoices(): LocalEnglishVoiceOption[] {
-	if (!isEnglishTtsSupported()) return [];
+export function listLocalVoices(): LocalVoiceOption[] {
+	if (!isSpeechSupported()) return [];
 	return window.speechSynthesis
 		.getVoices()
 		.filter((v) => v.lang.toLowerCase().startsWith('en'))
@@ -2297,7 +2285,7 @@ export function listLocalEnglishVoices(): LocalEnglishVoiceOption[] {
 			name: v.name,
 			lang: v.lang,
 			voiceURI: v.voiceURI,
-			gender: classifyEnglishVoiceGender(v.name),
+			gender: classifyVoiceGender(v.name),
 		}))
 		.filter((v) => v.gender !== 'unknown')
 		.sort((a, b) => {
@@ -2307,13 +2295,13 @@ export function listLocalEnglishVoices(): LocalEnglishVoiceOption[] {
 		});
 }
 
-/** @deprecated 请用 listLocalEnglishVoices */
-export function listLocalEnglishFemaleVoices(): Array<{
+/** @deprecated 请用 listLocalVoices */
+export function listLocalFemaleVoices(): Array<{
 	name: string;
 	lang: string;
 	voiceURI: string;
 }> {
-	return listLocalEnglishVoices()
+	return listLocalVoices()
 		.filter((v) => v.gender === 'female')
 		.map(({ name, lang, voiceURI }) => ({ name, lang, voiceURI }));
 }
@@ -2321,45 +2309,45 @@ export function listLocalEnglishFemaleVoices(): Array<{
 /** 从系统音色显示名推断 localStorage 偏好关键字 */
 export function inferVoicePreferenceKeyFromName(name: string): string {
 	const nameLower = name.toLowerCase();
-	for (const key of PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES) {
+	for (const key of PREFERRED_LOCAL_FEMALE_VOICES) {
 		if (nameLower.includes(key)) return key;
 	}
-	for (const key of PREFERRED_LOCAL_ENGLISH_MALE_VOICES) {
+	for (const key of PREFERRED_LOCAL_MALE_VOICES) {
 		if (nameLower.includes(key)) return key;
 	}
 	return nameLower.split(/[\s(]/)[0]?.trim() || nameLower;
 }
 
 /** 当前生效的本机英语音色 URI（设置页下拉选中值） */
-export function getActiveLocalEnglishVoiceUri(): string | null {
+export function getActiveLocalVoiceUri(): string | null {
 	return pickEnglishVoice()?.voiceURI ?? null;
 }
 
 /** 设置页：按 Web Speech 的 voiceURI 选择音色 */
-export function setPreferredLocalEnglishVoiceByUri(voiceURI: string): void {
+export function setPreferredLocalVoiceByUri(voiceURI: string): void {
 	if (!voiceURI.trim()) {
-		setPreferredLocalEnglishVoiceKey(null);
+		setPreferredLocalVoiceKey(null);
 		return;
 	}
-	if (!isEnglishTtsSupported()) return;
+	if (!isSpeechSupported()) return;
 	const voice = window.speechSynthesis
 		.getVoices()
 		.find((v) => v.voiceURI === voiceURI);
 	if (!voice) return;
-	setPreferredLocalEnglishVoiceKey(inferVoicePreferenceKeyFromName(voice.name));
+	setPreferredLocalVoiceKey(inferVoicePreferenceKeyFromName(voice.name));
 }
 
 /** 设置页「自动」选项的 Select value */
-export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
+export const LOCAL_TTS_VOICE_AUTO = '__auto__';
 
 // /**
 //  * - ponytail: 模块自检——长文须能切成多段，否则云端首播仍等整段合成，
-//  * - 任意地方第一次 import '@/utils/englishTts' 时，模块求值到文件末尾就会跑这段 if。
+//  * - 任意地方第一次 import '@/utils/speech' 时，模块求值到文件末尾就会跑这段 if。
 //  * - 例如电子书划句朗读、英语学习页、云 TTS 设置页等，
 //  * 只要 import 了这个模块，自检就会执行一次（模块通常只加载一次，不会重复跑）。
 //  */
 // if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
-// 	throw new Error('[englishTts] 长文分段异常，云端流水线无法缩短首声');
+// 	throw new Error('[speech] 长文分段异常，云端流水线无法缩短首声');
 // }
 
 // {
@@ -2373,13 +2361,13 @@ export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
 // 		const trimmed = plain.trim();
 // 		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
 // 		if (spans.length < 2 || !first.includes('！')) {
-// 			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
+// 			throw new Error(`[speech] 叹号句界异常: ${plain}`);
 // 		}
 // 		if (!first.endsWith('\u201d')) {
-// 			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
+// 			throw new Error(`[speech] 闭合引号未纳入前句: ${plain}`);
 // 		}
 // 		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
-// 			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
+// 			throw new Error(`[speech] 叹号后句界错位: ${plain}`);
 // 		}
 // 	}
 // 	const ellipsisMid = buildSentenceOffsetSpans('第一句。……第二句。');
@@ -2389,7 +2377,7 @@ export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
 // 		ellipsisMid.length !== 2 ||
 // 		emMid.slice(e1?.start ?? 0, e1?.end ?? 0) !== '……第二句'
 // 	) {
-// 		throw new Error('[englishTts] 句中省略号应并入下一句');
+// 		throw new Error('[speech] 句中省略号应并入下一句');
 // 	}
 // 	const dashStart = buildSentenceOffsetSpans('——他说完就走了。');
 // 	const d0 = dashStart[0];
@@ -2398,7 +2386,7 @@ export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
 // 		'——他说完就走了。'.trim().slice(d0?.start ?? 0, d0?.end ?? 0) !==
 // 			'——他说完就走了'
 // 	) {
-// 		throw new Error('[englishTts] 句首破折号应并入本句');
+// 		throw new Error('[speech] 句首破折号应并入本句');
 // 	}
 // 	const leading = buildSentenceOffsetSpans('……他走了。');
 // 	const leadingText = '……他走了。'.trim();
@@ -2408,12 +2396,12 @@ export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
 // 		l0?.start !== 0 ||
 // 		leadingText.slice(l0.start, l0.end) !== '……他走了'
 // 	) {
-// 		throw new Error('[englishTts] 段首省略号不应单独成句');
+// 		throw new Error('[speech] 段首省略号不应单独成句');
 // 	}
 // 	const openerNext = buildSentenceOffsetSpans('完。\u201c下一句。\u201d');
 // 	const t2 = '完。\u201c下一句。\u201d'.trim();
 // 	const s1 = t2.slice(openerNext[1]?.start ?? 0, openerNext[1]?.end ?? 0);
 // 	if (openerNext.length !== 2 || !s1.startsWith('\u201c')) {
-// 		throw new Error('[englishTts] 句首开引号应归入下一句');
+// 		throw new Error('[speech] 句首开引号应归入下一句');
 // 	}
 // }

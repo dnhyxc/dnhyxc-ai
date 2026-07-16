@@ -17,7 +17,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | 软暂停 API；Media Session；`audio` pause bridge；`register(null)` 会话拆除（`releaseCloudAudioEl` + `clearEnglishPlaybackMediaSession`） |
+| `apps/frontend/src/utils/speech.ts` | 软暂停 API；Media Session；`audio` pause bridge；`register(null)` 会话拆除（`releaseCloudAudioEl` + `clearPlaybackMediaSession`） |
 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | `pause` / `resume` 软路径；`stopInternal` 同步卸媒体键 |
 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 同上 |
 
@@ -25,7 +25,7 @@
 
 **软暂停（相对硬 stop）**
 
-| | 硬 `stopAllEnglishPlayback` | 软 `pauseEnglishPlaybackSoft` |
+| | 硬 `stopAllPlayback` | 软 `pausePlaybackSoft` |
 |--|------------------------------|-------------------------------|
 | `playbackGeneration` | +1，作废异步 | **不变** |
 | `waitCloudAudioEnd` | abort | **保持等待** |
@@ -35,8 +35,8 @@
 ```mermaid
 stateDiagram-v2
   [*] --> playing: 出声
-  playing --> paused: pauseEnglishPlaybackSoft
-  paused --> playing: resumeEnglishPlaybackSoft\n(audio.play)
+  playing --> paused: pausePlaybackSoft
+  paused --> playing: resumePlaybackSoft\n(audio.play)
   paused --> loading: 无挂起音频时\n重开 runListenLoop
   playing --> idle: stopAll + register(null)
   paused --> idle: stopAll + register(null)
@@ -46,12 +46,12 @@ stateDiagram-v2
 
 1. `navigator.mediaSession.setActionHandler(play/pause/stop)` → hook `resume` / `pause`
 2. `audio` 的 `pause` 事件（系统键）→ 回调 hook 软暂停（应用内 pause 用 `suppressAudioPauseEvent` 防回环）
-3. `playbackState`：`playing` / `paused`；`none` 时走 `clearEnglishPlaybackMediaSession`（metadata / position / 可选 handlers）
+3. `playbackState`：`playing` / `paused`；`none` 时走 `clearPlaybackMediaSession`（metadata / position / 可选 handlers）
 
 **退出听书（会话拆除）**
 
-1. Hook `stopInternal`：先 `stopAllEnglishPlayback()`，再 **同步** `registerEnglishPlaybackMediaHandlers(null)`（勿只等 `isActive` 的 effect cleanup）
-2. `register(null)`：`playbackGeneration++`、abort wait、`releaseCloudAudioEl()`（丢掉主文档 `<audio>` 引用）、停解锁音、`clearEnglishPlaybackMediaSession({ clearHandlers: true })`，并 `requestAnimationFrame` 再清一次
+1. Hook `stopInternal`：先 `stopAllPlayback()`，再 **同步** `registerPlaybackMediaHandlers(null)`（勿只等 `isActive` 的 effect cleanup）
+2. `register(null)`：`playbackGeneration++`、abort wait、`releaseCloudAudioEl()`（丢掉主文档 `<audio>` 引用）、停解锁音、`clearPlaybackMediaSession({ clearHandlers: true })`，并 `requestAnimationFrame` 再清一次
 3. 句间换轨仍只 `stopPlaybackMediaOnly`（保留元素与已注册媒体键），不走完整 `register(null)`
 
 **刻意不做的方案（已回退）**
@@ -82,7 +82,7 @@ stateDiagram-v2
 		// 杀掉听书循环世代，当前 runListenLoop 退出
 		loopGenRef.current += 1;
 		// 硬停：递增 TTS 世代 + 清 Audio src，无法从进度续播
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// UI 显示暂停
 		syncState({ status: 'paused' });
 	}, [syncState]);
@@ -113,7 +113,7 @@ stateDiagram-v2
 		// 标记暂停（循环 isActive 会为 false，但 await wait 仍挂起）
 		pausedRef.current = true;
 		// 软暂停：不杀 loopGen / 不 abort TTS wait，续播从 currentTime 继续
-		pauseEnglishPlaybackSoft();
+		pausePlaybackSoft();
 		// UI 显示暂停
 		syncState({ status: 'paused' });
 	}, [syncState]);
@@ -125,7 +125,7 @@ stateDiagram-v2
 		// 清除暂停标记，允许 cadence / isActive
 		pausedRef.current = false;
 		// 有挂起 Audio（含合成已就绪待播）则 play() 续进度
-		if (resumeEnglishPlaybackSoft()) {
+		if (resumePlaybackSoft()) {
 			// 软续播成功：直接 playing，不重开循环
 			syncState({ status: 'playing' });
 			return;
@@ -153,33 +153,33 @@ stateDiagram-v2
 	// 听书激活期间把系统媒体键接到本 hook
 	useEffect(() => {
 		if (!isActive) return;
-		registerEnglishPlaybackMediaHandlers({
+		registerPlaybackMediaHandlers({
 			play: () => resumeRef.current(),
 			pause: () => pauseRef.current(),
 		});
 		// 失活或卸载时卸掉 handlers，避免误触
-		return () => registerEnglishPlaybackMediaHandlers(null);
+		return () => registerPlaybackMediaHandlers(null);
 	}, [isActive]);
 ```
 
-**变更摘要**：暂停不再 `stopAll` / `loopGen++`；继续优先 `resumeEnglishPlaybackSoft`；注册 Media Session。
+**变更摘要**：暂停不再 `stopAll` / `loopGen++`；继续优先 `resumePlaybackSoft`；注册 Media Session。
 
-### 4.2 `pauseEnglishPlaybackSoft` / `resumeEnglishPlaybackSoft`（纯新增）
+### 4.2 `pausePlaybackSoft` / `resumePlaybackSoft`（纯新增）
 
-**改动前**：无此二符号；暂停一律 `stopAllEnglishPlayback`。
+**改动前**：无此二符号；暂停一律 `stopAllPlayback`。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1122–L1201）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1122–L1201）
 
 ```ts
 /**
  * 听书底栏软暂停：只 pause 介质，不递增世代、不 abort wait。
- * 续播走 resumeEnglishPlaybackSoft，从 currentTime 继续。
+ * 续播走 resumePlaybackSoft，从 currentTime 继续。
  */
-export function pauseEnglishPlaybackSoft(): void {
+export function pausePlaybackSoft(): void {
 	// 标记软暂停：后续 startCloudAudioPlayback 在 play 前会 wait
 	playbackSoftPaused = true;
 	// 本机 Web Speech：浏览器 pause API（若不支持则忽略）
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		try {
 			window.speechSynthesis.pause();
 		} catch {
@@ -193,11 +193,11 @@ export function pauseEnglishPlaybackSoft(): void {
 		});
 	}
 	// 系统 Now Playing 显示 paused
-	setEnglishPlaybackMediaState('paused');
+	setPlaybackMediaState('paused');
 }
 
 /** @returns 是否已从暂停的 Audio / speechSynthesis 续上（含合成已就绪待播） */
-export function resumeEnglishPlaybackSoft(): boolean {
+export function resumePlaybackSoft(): boolean {
 	// 当前云端 Audio 元素
 	const audio = cloudAudio;
 	// 是否仍挂着可播资源
@@ -220,7 +220,7 @@ export function resumeEnglishPlaybackSoft(): boolean {
 				.then(() => {
 					// 若 play 完成前又被软暂停，不再标 playing
 					if (playbackSoftPaused) return;
-					setEnglishPlaybackMediaState('playing');
+					setPlaybackMediaState('playing');
 				})
 				.catch(() => {});
 		}
@@ -228,7 +228,7 @@ export function resumeEnglishPlaybackSoft(): boolean {
 		resumed = true;
 	}
 	// 本机 TTS 若处于 speechSynthesis.paused 则 resume
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		try {
 			if (window.speechSynthesis.paused) {
 				window.speechSynthesis.resume();
@@ -238,7 +238,7 @@ export function resumeEnglishPlaybackSoft(): boolean {
 			// ignore
 		}
 	}
-	if (resumed) setEnglishPlaybackMediaState('playing');
+	if (resumed) setPlaybackMediaState('playing');
 	return resumed;
 }
 
@@ -262,7 +262,7 @@ function bindCloudAudioPauseBridge(
 			return;
 		}
 		// 无 UI bridge 时仍软暂停介质
-		pauseEnglishPlaybackSoft();
+		pausePlaybackSoft();
 	};
 	audio.addEventListener('pause', onPause);
 	detachCloudAudioPauseBridge = () => {
@@ -275,15 +275,15 @@ function bindCloudAudioPauseBridge(
 
 ### 4.3 Media Session 注册与会话拆除
 
-**对比范围**：`registerEnglishPlaybackMediaHandlers` 全函数。
+**对比范围**：`registerPlaybackMediaHandlers` 全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线：仅卸 action + `playbackState = none`）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线：仅卸 action + `playbackState = none`）
 
 ```ts
 // 听书/听当前：把系统媒体键接到 pause/resume；传 null 卸载
-export function registerEnglishPlaybackMediaHandlers(
+export function registerPlaybackMediaHandlers(
 	// handlers 为 null 表示会话结束
-	handlers: EnglishPlaybackMediaHandlers | null,
+	handlers: PlaybackMediaHandlers | null,
 	// 函数体开始
 ): void {
 	// 模块级保存，供 audio pause bridge 调用
@@ -317,13 +317,13 @@ export function registerEnglishPlaybackMediaHandlers(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1037–L1073）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1037–L1073）
 
 ```ts
 // 听书/听当前：把系统媒体键接到 pause/resume；传 null 卸载并拆除介质
-export function registerEnglishPlaybackMediaHandlers(
+export function registerPlaybackMediaHandlers(
 	// handlers 为 null 表示会话结束（完整拆除）
-	handlers: EnglishPlaybackMediaHandlers | null,
+	handlers: PlaybackMediaHandlers | null,
 	// 函数体开始
 ): void {
 	// 卸载：先清空回调，避免异步 pause 再进 UI
@@ -339,7 +339,7 @@ export function registerEnglishPlaybackMediaHandlers(
 		// 唤醒软暂停 waiters 并清标记，避免悬挂 Promise
 		clearSoftPauseState();
 		// 取消本机 Web Speech
-		if (isEnglishTtsSupported()) {
+		if (isSpeechSupported()) {
 			try {
 				// 硬取消合成
 				window.speechSynthesis.cancel();
@@ -352,13 +352,13 @@ export function registerEnglishPlaybackMediaHandlers(
 		// 停掉 prime 用的静音解锁 Audio
 		silenceCloudAudioUnlock();
 		// 清 metadata / position / 全部 action handlers
-		clearEnglishPlaybackMediaSession({ clearHandlers: true });
+		clearPlaybackMediaSession({ clearHandlers: true });
 		// macOS Chrome：偶发需下一帧再清一次
 		requestAnimationFrame(() => {
 			// 若已重新注册听书则不再清
 			if (englishPlaybackMediaHandlers) return;
 			// 再清一次 Media Session
-			clearEnglishPlaybackMediaSession({ clearHandlers: true });
+			clearPlaybackMediaSession({ clearHandlers: true });
 		});
 		// 卸载分支结束
 		return;
@@ -403,7 +403,7 @@ export function registerEnglishPlaybackMediaHandlers(
 		// 清空节文档
 		sectionDocRef.current = null;
 		// 硬停 TTS（清 src、世代++）
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// 卸章听高亮
 		teardownChapterListenHighlight(getRenditionRef.current() ?? undefined);
 		// 清 host 浮层
@@ -436,9 +436,9 @@ export function registerEnglishPlaybackMediaHandlers(
 		// 清空节文档
 		sectionDocRef.current = null;
 		// 硬停 TTS（清 src、世代++）
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// 同步卸 Media Session / 丢弃 Audio，勿等 isActive effect
-		registerEnglishPlaybackMediaHandlers(null);
+		registerPlaybackMediaHandlers(null);
 		// 卸章听高亮
 		teardownChapterListenHighlight(getRenditionRef.current() ?? undefined);
 		// 清 host 浮层
@@ -459,15 +459,15 @@ export function registerEnglishPlaybackMediaHandlers(
 
 ### 4.5 听当前 Hook
 
-`useEbookQuoteListen` 的 `pause` / `resume` / `useEffect(register…)` 与听书同构：软暂停 + `resumeEnglishPlaybackSoft` 失败时 `playFromCursor` 重开。切句 / 停止仍走 `stopAllEnglishPlayback`；停止时额外同步 `register(null)`。
+`useEbookQuoteListen` 的 `pause` / `resume` / `useEffect(register…)` 与听书同构：软暂停 + `resumePlaybackSoft` 失败时 `playFromCursor` 重开。切句 / 停止仍走 `stopAllPlayback`；停止时额外同步 `register(null)`。
 
 ### 4.6 超时与软暂停
 
 `waitCloudAudioEnd` 的超时在 `playbackSoftPaused` 或 `audio.paused && !ended` 时 **重新武装**（按剩余时长），避免长暂停被误判 `AUDIO_TIMEOUT`。
 
-### 4.7 `setEnglishPlaybackMediaState('none')`
+### 4.7 `setPlaybackMediaState('none')`
 
-句间 `stopPlaybackMediaOnly` 会调 `setEnglishPlaybackMediaState('none')` → `clearEnglishPlaybackMediaSession({ clearHandlers: !englishPlaybackMediaHandlers })`：听书仍活跃时只清展示、**保留**已注册的 play/pause 键；会话已卸 handlers 时连 action 一并清掉。
+句间 `stopPlaybackMediaOnly` 会调 `setPlaybackMediaState('none')` → `clearPlaybackMediaSession({ clearHandlers: !englishPlaybackMediaHandlers })`：听书仍活跃时只清展示、**保留**已注册的 play/pause 键；会话已卸 handlers 时连 action 一并清掉。
 
 ## 5. 行为变化与兼容性
 
@@ -491,7 +491,7 @@ export function registerEnglishPlaybackMediaHandlers(
 
 | 说明 | 路径 |
 |------|------|
-| TTS 软暂停 / Media Session / 会话拆除 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 软暂停 / Media Session / 会话拆除 | `apps/frontend/src/utils/speech.ts` |
 | 听书 Hook | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 | 听当前 Hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 音频 ended / abort | `docs/ebook/epub-listen-audio-end-ui.md` |

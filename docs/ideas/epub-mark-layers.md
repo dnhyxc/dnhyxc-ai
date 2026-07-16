@@ -233,7 +233,7 @@ sequenceDiagram
   participant Patch as runEpubReadingAnnotationPatch
   participant Geo as epubRangeGeometry
   participant Listen as showListenMarkHighlight
-  participant TTS as englishTts
+  participant TTS as speech
 
   Note over U,TTS: 路径 A — 保存用户划线后（持久层）
 
@@ -253,7 +253,7 @@ sequenceDiagram
   Note over U,TTS: 路径 B — 听书换句（临时层，与 A 并行不调用 Sync）
 
   U->>TTS: 听书播放中
-  TTS->>Pane: playEnglishPreferred 句末/on start
+  TTS->>Pane: playPreferred 句末/on start
   Pane->>Listen: showListenMarkHighlight(range)
   Listen->>Listen: clearListenMarkHighlight
   Listen->>Geo: normalize + getAccurateRangeLineClientRects

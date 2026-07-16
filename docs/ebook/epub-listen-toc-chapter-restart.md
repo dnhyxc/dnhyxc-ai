@@ -47,7 +47,7 @@ sequenceDiagram
   TOC->>Read: onSelect(item)
   Read->>Read: epubSpineIndexRef ← item.spineIndex
   alt wasListening
-    Read->>Hook: primeEnglishPlaybackForUserGesture()
+    Read->>Hook: primePlaybackForUserGesture()
     Read->>Hook: stop({ notify: false })
   end
   Read->>Nav: go(href) [try/catch]
@@ -202,7 +202,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 					const wasListening = listen.isActive;
 					// 点击同步 unlock；stop 会保留已播过的 Audio 元素供跳转后复用
 					if (wasListening) {
-						primeEnglishPlaybackForUserGesture();
+						primePlaybackForUserGesture();
 						listen.stop({ notify: false });
 					}
 					// EPUB 跳转与听书重开
@@ -251,7 +251,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 		resolveStartCfiRef.current = false;
 		sectionRef.current = null;
 		sectionDocRef.current = null;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		teardownChapterListenHighlight(getRenditionRef.current() ?? undefined);
 		clearEpubListenSegmentOverlay();
 		setState(IDLE_STATE);
@@ -270,7 +270,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 		resolveStartCfiRef.current = false;
 		sectionRef.current = null;
 		sectionDocRef.current = null;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		teardownChapterListenHighlight(getRenditionRef.current() ?? undefined);
 		clearEpubListenSegmentOverlay();
 		// 保留倍速：IDLE_STATE.rate=1 会把用户调速清掉
@@ -311,7 +311,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 
 			if (stateRef.current.status === 'idle') return;
 
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			teardownChapterListenHighlight(rend);
 			clearEpubListenSegmentOverlay();
 			beginChapterListenAutoFollow(rend);
@@ -366,7 +366,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 	 * 目录跳转完成后：与 startFromCurrentPosition 同一开听路径，仅从第 0 句起（不解析 CFI）。
 	 */
 	const restartFromChapterStart = useCallback(() => {
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({
 				type: 'warning',
 				title: tRef.current('englishLearning.tts.unsupported'),
@@ -383,11 +383,11 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 			return;
 		}
 
-		primeEnglishPlaybackForUserGesture();
+		primePlaybackForUserGesture();
 		const keepRate = rateRef.current;
 
 		invokeStopQuoteListen();
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		clearEpubListenSegmentOverlay();
 		beginChapterListenAutoFollow(rend);
 
@@ -558,7 +558,7 @@ async function trimContinuousViews(rend: Rendition): Promise<void> {
 | 听书 Hook | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 | 目录抽屉（仅透传 item） | `apps/frontend/src/views/ebook/components/layout/EbookTocDrawer.tsx` |
 | 可见章抽取 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenChapter.ts` |
-| 用户手势 prime | `apps/frontend/src/utils/englishTts.ts` |
+| 用户手势 prime | `apps/frontend/src/utils/speech.ts` |
 
 ---
 

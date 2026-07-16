@@ -18,10 +18,7 @@ import {
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import { useVocabularyFavoritesList } from './useVocabularyFavoritesList';
@@ -135,14 +132,14 @@ export function VocabularyFavoritesSection({
 	const onTogglePlayWord = useCallback(
 		async (word: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

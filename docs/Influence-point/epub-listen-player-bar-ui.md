@@ -5,7 +5,7 @@
 - [epub-listen-player-bar.md](../ebook/epub-listen-player-bar.md) — 播放条分句菜单、倍速与 TTS 贯通（改前实现思路）
 - [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md) — 听当前共用播放条、互斥与 `setRate` 接线
 - [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md) — 连续滚动听书与播放条切句
-- [cloud-tts-user-credentials-fallback.md](./cloud-tts-user-credentials-fallback.md) — 云端 TTS 与 `applyActiveEnglishPlaybackRate`
+- [cloud-tts-user-credentials-fallback.md](./cloud-tts-user-credentials-fallback.md) — 云端 TTS 与 `applyActivePlaybackRate`
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
 
@@ -17,7 +17,7 @@
 
 - 听书 / 听当前 **互斥**，共用播放条 props（`status`、`sentenceIndex`、`onGoToSentence`、`setRate` 等）
 - 分句菜单：展示 `sentenceLabels`、跳转 `goToSentence`、打开时滚到当前句
-- 倍速：`setRate` → `applyActiveEnglishPlaybackRate`，范围约 **0.75×～3×**（原 `CHAPTER_LISTEN_RATES` 离散档）
+- 倍速：`setRate` → `applyActivePlaybackRate`，范围约 **0.75×～3×**（原 `CHAPTER_LISTEN_RATES` 离散档）
 - 上一句 / 下一句 / 播放暂停 / 停止
 - 听书切句时正文高亮、`forceScroll` / autoFollow（与菜单内滚动 **独立**）
 - TTS 连播、句间预取、云端 MP3 倍速
@@ -42,7 +42,7 @@
 | 倍速数值与 TTS | **有条件变化** | UI 改为 **0.5–3.0、步进 0.1**；原离散档 0.75/1.25/2.25/2.8 等 **无预设**，拖尺可近似 |
 | 倍速下限 | **有条件变化** | 可选 **0.5×**（改前网格最低 0.75×） |
 | `CHAPTER_LISTEN_RATES` 常量 | **低** | 仍导出自 `useEpubChapterListen.ts`，播放条 UI **不再引用** |
-| 云端/本机 TTS `setRate` 实现 | **否** | `englishTts` / hook 内 `setRate` 未改 |
+| 云端/本机 TTS `setRate` 实现 | **否** | `speech` / hook 内 `setRate` 未改 |
 | 正文高亮 / autoFollow | **否** | 菜单内滚动不调用 `showEpubListenDomRange` |
 | 键盘 / 无障碍（分句菜单） | **低** | 虚拟列表 + 绝对定位行；需 spot check 方向键与 `aria-current` |
 
@@ -136,7 +136,7 @@ pointer 拖拽吸附刻度 index；预设 1 / 1.5 / 2 / 2.5 / 3
 | 项 | 说明 |
 |----|------|
 | `useEpubChapterListen` / `useEbookQuoteListen` 状态机 | 播放/暂停/切句/停止逻辑未改 |
-| `englishTts` 倍速应用 | `applyActiveEnglishPlaybackRate` 未改 |
+| `speech` 倍速应用 | `applyActivePlaybackRate` 未改 |
 | 听书顶栏入口、互斥停止 | `read.tsx` 听书/听当前切换未改 |
 | 正文 `showEpubListenDomRange` / Follow FAB | 与菜单滚动 decoupled |
 | 分句数据来源 `buildSentenceLabels` | 仍与 TTS 同源 |

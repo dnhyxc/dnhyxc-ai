@@ -18,7 +18,7 @@
 
 ### 1.2 目标
 
-- 仅 **阻塞当前播放** 的 TTS 等待置 `loading`；`prefetchCloudEnglishTts` 不改 UI。
+- 仅 **阻塞当前播放** 的 TTS 等待置 `loading`；`prefetchCloudTts` 不改 UI。
 - 出声（`onPlaybackStart`）或结束/失败后回到 `playing`（或会话结束态）。
 - 播放钮可点（软暂停路径仍可用），用 `aria-busy` + Spinner 表达等待。
 
@@ -41,7 +41,7 @@
 ```mermaid
 sequenceDiagram
   participant Units as playListenUnitsFromCursor
-  participant Tts as playEnglishPreferred
+  participant Tts as playPreferred
   participant Hook as chapter/quote Hook
   participant Bar as EpubListenPlayerBar
   Units->>Hook: onAwaitingCurrentTts(true)
@@ -52,7 +52,7 @@ sequenceDiagram
   Hook->>Bar: status=playing → Pause
 ```
 
-1. `playCurrent` 在 `await playEnglishPreferred` 前后夹 `true/false`；出声回调里先 `false` 再转调原 `onPlaybackStart`（以便预取仍挂在出声后）。
+1. `playCurrent` 在 `await playPreferred` 前后夹 `true/false`；出声回调里先 `false` 再转调原 `onPlaybackStart`（以便预取仍挂在出声后）。
 2. Hook 在 gen 仍有效且未软暂停时同步 `loading`/`playing`。
 3. Bar：`loading` 优先于 `playing` 渲染 Spinner。
 
@@ -97,8 +97,8 @@ export type PlayListenUnitsArgs = {
 	const playCurrent = async (
 		// 待合成原文
 		raw: string,
-		// 传给 playEnglishPreferred 的选项
-		opts: Parameters<typeof playEnglishPreferred>[1],
+		// 传给 playPreferred 的选项
+		opts: Parameters<typeof playPreferred>[1],
 	) => {
 		// 进入等待：通知 Hook 置 loading
 		onAwaitingCurrentTts?.(true);
@@ -106,7 +106,7 @@ export type PlayListenUnitsArgs = {
 			// 保留调用方原来的出声回调（如 schedulePrefetch）
 			const notifyStart = opts?.onPlaybackStart;
 			// 真正播放 / 拉流
-			await playEnglishPreferred(raw, {
+			await playPreferred(raw, {
 				// 展开原选项
 				...opts,
 				// 出声时先结束 loading，再转调预取等逻辑
@@ -124,7 +124,7 @@ export type PlayListenUnitsArgs = {
 	};
 ```
 
-**变更摘要**：播放路径独享 waiting 信号；预取走 `prefetchCloudEnglishTts`，不进 `playCurrent`。
+**变更摘要**：播放路径独享 waiting 信号；预取走 `prefetchCloudTts`，不进 `playCurrent`。
 
 ---
 

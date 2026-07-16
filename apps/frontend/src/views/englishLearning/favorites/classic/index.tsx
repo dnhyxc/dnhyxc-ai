@@ -18,10 +18,7 @@ import {
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import type { FavoritesListCounts } from '../vocabulary';
@@ -130,14 +127,14 @@ export function ClassicQuotesFavoritesSection({
 	const onTogglePlayQuote = useCallback(
 		async (english: string, key: string) => {
 			if (playingKey === key) {
-				stopAllEnglishPlayback();
+				stopAllPlayback();
 				setPlayingKey(null);
 				return;
 			}
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(english);
+				await playPreferred(english);
 			} catch {
 				Toast({
 					type: 'warning',

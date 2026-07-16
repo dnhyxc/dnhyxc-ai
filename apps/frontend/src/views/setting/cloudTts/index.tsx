@@ -50,10 +50,6 @@ import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
 import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
-import {
 	clampPlaybackSourceForMembership,
 	DEFAULT_MINIMAX_TTS_USER_PREFS,
 	ensureMinimaxTtsUserPrefsLoaded,
@@ -62,6 +58,7 @@ import {
 	saveMinimaxTtsUserPrefs,
 	withDefaultCloudTtsPrefs,
 } from '@/utils/minimaxTtsPrefs';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { LocalTtsVoiceSetting } from './LocalTtsVoiceSetting';
 import { ParamsHelpPopover } from './ParamsHelpPopover';
 import { PlaybackSourcePicker } from './PlaybackSourcePicker';
@@ -540,10 +537,10 @@ const CloudTtsSetting = observer(() => {
 
 	const onPreview = async (_target: CloudTtsPreviewTarget, textKey: string) => {
 		if (previewing) return;
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		setActivePreview(_target);
 		try {
-			await playEnglishPreferred(t(textKey), { preferLocal: false });
+			await playPreferred(t(textKey), { preferLocal: false });
 		} finally {
 			setActivePreview(null);
 		}

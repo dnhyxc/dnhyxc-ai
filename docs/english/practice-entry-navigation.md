@@ -98,7 +98,7 @@ const initialReturnStreamId = searchParams.get('returnStreamId')?.trim() || unde
 const returnToHome = searchParams.get('returnTo') === 'home';
 
 const onExit = useCallback(() => {
-	stopAllEnglishPlayback();
+	stopAllPlayback();
 	// 说明：首页历史抽屉入口 — 优先于 pack 的 streamId 回跳
 	if (returnToHome) {
 		navigate('/english-learning');

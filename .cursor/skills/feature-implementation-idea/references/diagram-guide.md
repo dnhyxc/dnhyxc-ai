@@ -119,7 +119,7 @@ flowchart TD
 | 方法 | 功能 |
 |------|------|
 | `indexChapterSentences()` | 解析当前章 DOM/文本，生成带 Range 的句序列表；失败则无法播放 |
-| `playEnglishPreferred(text)` | TTS 播放单句；cadence/句末回调驱动高亮切换 |
+| `playPreferred(text)` | TTS 播放单句；cadence/句末回调驱动高亮切换 |
 | `showListenMarkHighlight(rend, range)` | 在 marks-pane 绘制当前句淡黄底；与 TTS 并行触发 |
 
 ## 5. 时序图示例（骨架）
@@ -129,12 +129,12 @@ sequenceDiagram
   participant U as 用户
   participant UI as EpubListenPlayerBar
   participant H as useEpubChapterListen
-  participant T as englishTts
+  participant T as speech
   participant M as epubListenMarkHighlight
 
   U->>UI: 点击播放
   UI->>H: start()
-  H->>T: playEnglishPreferred(句文本)
+  H->>T: playPreferred(句文本)
   H->>M: showListenMarkHighlight(range)
   T-->>H: onCadenceChunk / 句末
   H->>M: clear / 下一句 show
@@ -146,7 +146,7 @@ sequenceDiagram
 | 方法 | 功能 |
 |------|------|
 | `start()` | UI 触发后进入听书：索引句表、订阅 TTS 回调、置播放态 |
-| `playEnglishPreferred(text)` | 向 TTS 层提交句文本；异步返回 cadence/句末事件 |
+| `playPreferred(text)` | 向 TTS 层提交句文本；异步返回 cadence/句末事件 |
 | `showListenMarkHighlight(range)` | 按词级 Range 在 SVG 画播放背景；换句前先 clear |
 | `clearListenMarkHighlight()` | 移除 `g.moke-epub-listen-*`；不影响用户划线/想法层 |
 

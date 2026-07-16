@@ -191,7 +191,7 @@ flowchart TB
 2. 跳过 `script/style/svg/[hidden]` 父链上的节点（`isVisibleTextNode`）。
 3. 连续空白 **合并为一个空格**（`pendingSpace`）；plain 与 `points[]` **等长**。
 4. 去掉 plain 尾部空格及对应 points。
-5. `buildSentenceOffsetSpans(trimmed)`（来自 `englishTts`）得句界 `[start,end)`。
+5. `buildSentenceOffsetSpans(trimmed)`（来自 `speech`）得句界 `[start,end)`。
 6. `anchorFromPoints(points, trimmed, start, end)` → `{ startNode, startOffset, endNode, endOffset }`。
 7. `anchorToRange(anchor)` → 该句 **DOM Range** → `showListenMarkHighlight(rend, range)`。
 

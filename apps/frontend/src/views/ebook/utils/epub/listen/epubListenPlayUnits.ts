@@ -4,10 +4,10 @@
  * 预取错开到「当前段真正出声之后」，避免与首包 HTTP 并行抢带宽。
  */
 import {
-	playEnglishPreferred,
-	prefetchCloudEnglishTts,
+	playPreferred,
+	prefetchCloudTts,
 	stripMarkdownForTts,
-} from '@/utils/englishTts';
+} from '@/utils/speech';
 import {
 	type ParagraphUnit,
 	paragraphIndexForSentence,
@@ -29,7 +29,7 @@ export type PlayListenUnitsArgs = {
 	scrollCenterOnFirst?: boolean;
 	/**
 	 * 当前正要播放的单元 TTS 等待中（true）/ 已出声或结束（false）。
-	 * 仅阻塞播放的请求；prefetchCloudEnglishTts 不触发。
+	 * 仅阻塞播放的请求；prefetchCloudTts 不触发。
 	 */
 	onAwaitingCurrentTts?: (waiting: boolean) => void;
 };
@@ -56,7 +56,7 @@ function oncePrefetch(run: () => void): () => void {
 
 /**
  * @returns true = 播完且仍 active；false = 中断/暂停
- * @throws playEnglishPreferred 失败时原样抛出
+ * @throws playPreferred 失败时原样抛出
  */
 export async function playListenUnitsFromCursor(
 	args: PlayListenUnitsArgs,
@@ -78,7 +78,7 @@ export async function playListenUnitsFromCursor(
 
 	const prefetchedByText = new Map<
 		string,
-		ReturnType<typeof prefetchCloudEnglishTts>
+		ReturnType<typeof prefetchCloudTts>
 	>();
 
 	const schedulePrefetch = (paraIndex: number, fromSi: number) => {
@@ -87,18 +87,18 @@ export async function playListenUnitsFromCursor(
 		const unit = units[paraIndex]!;
 		const raw = sliceParagraphFromSentence(plain, unit, sentences, fromSi);
 		if (!raw || prefetchedByText.has(raw)) return;
-		prefetchedByText.set(raw, prefetchCloudEnglishTts(raw, { whole: true }));
+		prefetchedByText.set(raw, prefetchCloudTts(raw, { whole: true }));
 	};
 
 	/** 当前播放路径的 TTS 等待；预取勿走这里 */
 	const playCurrent = async (
 		raw: string,
-		opts: Parameters<typeof playEnglishPreferred>[1],
+		opts: Parameters<typeof playPreferred>[1],
 	) => {
 		onAwaitingCurrentTts?.(true);
 		try {
 			const notifyStart = opts?.onPlaybackStart;
-			await playEnglishPreferred(raw, {
+			await playPreferred(raw, {
 				...opts,
 				onPlaybackStart: () => {
 					onAwaitingCurrentTts?.(false);

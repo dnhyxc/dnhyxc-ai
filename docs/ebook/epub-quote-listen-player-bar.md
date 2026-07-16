@@ -36,7 +36,7 @@
 
 | # | 要点 | 理由 |
 |---|------|------|
-| 1 | **整段 TTS → 按句循环** | 改前一次 `playEnglishPreferred(整段)` + `onCadenceChunk`；改后与听书一致，每句单独 `playEnglishPreferred`，便于 pause/seek |
+| 1 | **整段 TTS → 按句循环** | 改前一次 `playPreferred(整段)` + `onCadenceChunk`；改后与听书一致，每句单独 `playPreferred`，便于 pause/seek |
 | 2 | **复用 `EpubListenPlayerBar`** | 不新建 UI；`read.tsx` 用 `epubListenBar` 选择活跃 hook |
 | 3 | **session meta 只读导出** | overlay 仍管 DOM 句表；hook 读 meta 填播放条 |
 | 4 | **句高亮** | 每句前 `showEpubListenPlainSpan(i)` → 内部 `paintSentence` |
@@ -75,7 +75,7 @@ const toggleListen = useCallback(
 		// 若当前正在播且 key 相同，视为用户点击「停止」
 		if (playingKey === key) {
 			// 停止所有英语 TTS 实例（云端 + 本机）
-			stopAllEnglishPlayback();
+			stopAllPlayback();
 			// 清除听读 overlay 与高亮 DOM
 			clearEpubListenSegmentOverlay();
 			// 通知阅读页同步划线/想法层
@@ -88,7 +88,7 @@ const toggleListen = useCallback(
 		// 听当前与听书互斥：先停章节听书
 		invokeStopChapterListen();
 		// 本机/云端 TTS 均不可用时提示并退出
-		if (!isEnglishPlaybackAvailable()) {
+		if (!isPlaybackAvailable()) {
 			Toast({
 				// 警告类型 Toast
 				type: 'warning',
@@ -99,7 +99,7 @@ const toggleListen = useCallback(
 			return;
 		}
 		// 清掉其它英语播放（含上一段听当前）
-		stopAllEnglishPlayback();
+		stopAllPlayback();
 		// 新 session 前清 overlay
 		clearEpubListenSegmentOverlay();
 		// 记录当前播放 key，供 listenLabel 显示「停止」
@@ -129,7 +129,7 @@ const toggleListen = useCallback(
 
 		try {
 			// 旧版：整段一次 TTS，靠 cadence 事件驱动句级高亮
-			await playEnglishPreferred(speakPlain, {
+			await playPreferred(speakPlain, {
 				// cadence 分块回调：云 TTS 流式返回时按节奏更新 UI
 				onCadenceChunk: (event) => {
 					// 无 rendition 无法画高亮
@@ -215,7 +215,7 @@ const playFromCursor = useCallback(
 
 			try {
 				// 单句 TTS，倍速来自 rateRef
-				await playEnglishPreferred(spokenRaw, {
+				await playPreferred(spokenRaw, {
 					speak: { rate: rateRef.current },
 				});
 			} catch {

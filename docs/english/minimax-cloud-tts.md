@@ -50,8 +50,8 @@
 
 ```mermaid
 flowchart TB
-  subgraph Frontend["前端 englishTts.ts"]
-    PEP[playEnglishPreferred]
+  subgraph Frontend["前端 speech.ts"]
+    PEP[playPreferred]
     FCTB[fetchCloudTtsBlob]
     CACHE_FE[cloudTtsAudioCache LRU 64]
     PCM[playCloudMp3Blob / Audio]
@@ -103,7 +103,7 @@ flowchart TB
 | 注册 App        | `apps/backend/src/app.module.ts`                                                    | `SpeechTranscriptionModule` 已在 imports           |
 | 环境键 enum     | `apps/backend/src/enum/config.enum.ts`                                              | `MinimaxEnum` 5 项                                 |
 | 前端 API 常量   | `apps/frontend/src/service/api.ts`                                                  | `SPEECH_MINIMAX_TTS_STREAM` / `SPEECH_MINIMAX_TTS` |
-| 前端朗读        | `apps/frontend/src/utils/englishTts.ts`                                             | `fetchCloudTtsBlob` 优先 MiniMax                   |
+| 前端朗读        | `apps/frontend/src/utils/speech.ts`                                             | `fetchCloudTtsBlob` 优先 MiniMax                   |
 | **未改**        | `siliconflow-transcription.service.ts`                                              | 硅基 ASR + TTS 仍独立                              |
 
 ---
@@ -386,9 +386,9 @@ sampleRate, bitrate, format, channel, languageBoost, text
 
 ## 8. 前端朗读链路（逐步）
 
-### 8.1 入口：`playEnglishPreferred`
+### 8.1 入口：`playPreferred`
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L606–L637）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L606–L637）
 
 | 步骤 | 条件                | 行为                                     |
 | ---- | ------------------- | ---------------------------------------- |
@@ -422,7 +422,7 @@ sampleRate, bitrate, format, channel, languageBoost, text
 | 401  | MiniMax 1004 / JWT 无效（后者较少，因先过 JwtGuard） |
 | 502  | 1008 余额不足、其它 MiniMax 业务错误、网关错误       |
 
-**未回退的情况**：400（文本空）、404（路由未加载）、网络错误 → 进入 `playEnglishPreferred` 的 catch → 本机朗读。
+**未回退的情况**：400（文本空）、404（路由未加载）、网络错误 → 进入 `playPreferred` 的 catch → 本机朗读。
 
 ### 8.3 流式「首包快」与前端现状
 
@@ -455,12 +455,12 @@ sampleRate, bitrate, format, channel, languageBoost, text
 ```mermaid
 sequenceDiagram
   participant U as 用户点击喇叭
-  participant FE as englishTts
+  participant FE as speech
   participant API as Nest Controller
   participant MM as MinimaxTtsService
   participant MX as MiniMax API
 
-  U->>FE: playEnglishPreferred(sentence)
+  U->>FE: playPreferred(sentence)
   FE->>FE: 前端 cache miss
   FE->>API: POST /minimax/speech/stream + JWT
   API->>MM: streamSpeech(dto)
@@ -494,7 +494,7 @@ sequenceDiagram
 ```
 
 - 其它模块可 `imports: [SpeechTranscriptionModule]` 后注入 `MinimaxTtsService` 直接合成，无需走 HTTP。
-- 当前英语学习仅通过 HTTP + `englishTts.ts` 调用。
+- 当前英语学习仅通过 HTTP + `speech.ts` 调用。
 
 ---
 
@@ -1821,7 +1821,7 @@ export const SPEECH_MINIMAX_TTS = "/speech-transcription/minimax/speech";
 
 ### 11.7 前端 cloudTtsAudioCache
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L320–L342）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L320–L342）
 
 ```typescript
 // 前端内存 MP3 缓存条数上限
@@ -1856,7 +1856,7 @@ function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
 
 ### 11.8 readResponseBodyAsArrayBuffer
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L400–L421）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L400–L421）
 
 ```typescript
 // 读尽 Response body（含 chunked）
@@ -1907,7 +1907,7 @@ async function readResponseBodyAsArrayBuffer(
 
 ### 11.9 fetchCloudTtsBlob
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L423–L462）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L423–L462）
 
 ```typescript
 // 云端 TTS：MiniMax→硅基→缓存
@@ -1987,7 +1987,7 @@ async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
 
 ### 11.10 playCloudMp3Blob
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L464–L512）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L464–L512）
 
 ```typescript
 // Object URL + Audio 元素播放
@@ -2089,17 +2089,17 @@ function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
 }
 ```
 
-### 11.11 playEnglishPreferred
+### 11.11 playPreferred
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L606–L637）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L606–L637）
 
 ```typescript
 // 朗读总入口
-export async function playEnglishPreferred(
+export async function playPreferred(
 	// 执行语句（见上下文）
 	rawText: string,
 	// 执行语句（见上下文）
-	options?: PlayEnglishPreferredOptions,
+	options?: PlayPreferredOptions,
 	// 执行语句（见上下文）
 ): Promise<void> {
 	// 去 Markdown 再朗读
@@ -2117,13 +2117,13 @@ export async function playEnglishPreferred(
 		// 世代过期则放弃播放
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 条件判断
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			// 无 Web Speech 能力
 			throw new Error("NO_TTS");
 			// 闭合括号或语句结束
 		}
 		// 本机分段朗读
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		// 生成器结束
 		return;
 		// 闭合括号或语句结束
@@ -2144,13 +2144,13 @@ export async function playEnglishPreferred(
 		// 世代过期则放弃播放
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 条件判断
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			// 无 Web Speech 能力
 			throw new Error("NO_TTS");
 			// 闭合括号或语句结束
 		}
 		// 本机分段朗读
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakTextWithGeneration(rawText, generation, speakOpts);
 		// 闭合括号或语句结束
 	}
 	// 闭合括号或语句结束
@@ -2159,7 +2159,7 @@ export async function playEnglishPreferred(
 
 ### 11.12 播放世代辅助
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L344–L375）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L344–L375）
 
 ```typescript
 // 读 JWT token
@@ -2181,7 +2181,7 @@ function isPlaybackGenerationActive(generation: number): boolean {
 // 执行语句（见上下文）
 function stopPlaybackMediaOnly(): void {
 	// 条件判断
-	if (isEnglishTtsSupported()) {
+	if (isSpeechSupported()) {
 		// 取消本机朗读队列
 		window.speechSynthesis.cancel();
 		// 闭合括号或语句结束
@@ -2583,7 +2583,7 @@ curl -X POST 'http://localhost:9226/api/speech-transcription/minimax/speech/stre
 | 环境键           | `apps/backend/src/enum/config.enum.ts`                                                |
 | 硅基 TTS（回退） | `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts` |
 | 前端 API         | `apps/frontend/src/service/api.ts`                                                    |
-| 前端朗读         | `apps/frontend/src/utils/englishTts.ts`                                               |
+| 前端朗读         | `apps/frontend/src/utils/speech.ts`                                               |
 | MiniMax 官方文档 | https://platform.minimaxi.com/docs/api-reference/speech-t2a-http                      |
 
 ---

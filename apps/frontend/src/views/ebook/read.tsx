@@ -35,8 +35,8 @@ import {
 import useStore from '@/store';
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
-import { primeEnglishPlaybackForUserGesture } from '@/utils/englishTts';
 import { getRequestErrorMessage } from '@/utils/fetch';
+import { primePlaybackForUserGesture } from '@/utils/speech';
 import { EbookPageShell } from './components/layout/EbookPageShell';
 import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/layout/EbookReadSplitLayout';
@@ -1320,7 +1320,7 @@ function EbookReadPage() {
 		const listen = chapterListenRef.current;
 		const wasListening = listen.isActive;
 		if (wasListening) {
-			primeEnglishPlaybackForUserGesture();
+			primePlaybackForUserGesture();
 			listen.stop({ notify: false });
 		}
 		void (async () => {

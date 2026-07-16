@@ -96,7 +96,7 @@ export function isPracticePlayShortcut(e: KeyboardEvent): boolean {
 
 ```typescript
 const onGoPrevious = useCallback(() => {
-  stopAllEnglishPlayback();
+  stopAllPlayback();
   setIndex((i) => {
     if (i <= 0) return 0;
     const prev = i - 1;

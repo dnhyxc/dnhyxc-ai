@@ -9,7 +9,7 @@
 - **实现归档**：[epub-listen-paragraph-tts.md](../ebook/epub-listen-paragraph-tts.md)
 - **本轮播放修复总索引**：[epub-listen-playback-fixes-2026-07.md](../ebook/epub-listen-playback-fixes-2026-07.md)
 - [EPUB 听当前共用底部播放条](../ebook/epub-quote-listen-player-bar.md) — 听当前曾「整段 TTS + cadence」后改为按句循环的原因
-- [EPUB 听书句间云端预取](../ebook/epub-listen-cloud-prefetch.md) — `prefetchCloudEnglishTts` 与句级预取
+- [EPUB 听书句间云端预取](../ebook/epub-listen-cloud-prefetch.md) — `prefetchCloudTts` 与句级预取
 - [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — `playCloudTtsCadenceSegments` / `onCadenceChunk`
 - [EPUB 听当前逐句播放背景](../ebook/epub-listen-sentence-bg.md) — plain 偏移与句高亮
 - 开发者手册：[epub-listen-dev.md](../ebook/developer/epub-listen-dev.md)
@@ -19,7 +19,7 @@
 ## 0. 读本文你将得到什么
 
 - **问题**：Web 按句 HTTP 合成请求多、韵律碎；希望按段播、仍逐句高亮。
-- **方案**：外层循环改 **段落**；段内一次 `playEnglishPreferred(段 plain)`，用已有 `onCadenceChunk.sentenceIndex` 驱动句高亮；切句则停播并从目标句 **重切段尾** 再播。
+- **方案**：外层循环改 **段落**；段内一次 `playPreferred(段 plain)`，用已有 `onCadenceChunk.sentenceIndex` 驱动句高亮；切句则停播并从目标句 **重切段尾** 再播。
 - **改动层**：仅 `apps/frontend` 听书 Hook + listen util；**不改**后端 TTS、**不改**小程序。
 - **云端三源**：Edge / MiniMax / 讯飞与本机均走同一 cadence 路径（不依赖 Edge `speech/timed` WordBoundary）。
 - **阶段**：M1 共享段表 → M2 听当前 → M3 听书 → M4 seek/预取 polish。
@@ -44,14 +44,14 @@
 |----------|----------------------|
 | Web + Tauri：`useEpubChapterListen` + `useEbookQuoteListen` | **微信小程序**任意代码 / 配置 / 文档改动 |
 | 段切分 + 句高亮 + 暂停/续播/切句/分句菜单 | 后端新增 timed / 整章 MP3；改 `edge/speech/timed` |
-| Edge / MiniMax / 讯飞 / 本机均走既有 `playEnglishPreferred` | 用 WordBoundary / MiniMax subtitle 做整段一条音频精确跟句（留给日后，非本需求） |
+| Edge / MiniMax / 讯飞 / 本机均走既有 `playPreferred` | 用 WordBoundary / MiniMax subtitle 做整段一条音频精确跟句（留给日后，非本需求） |
 | | 英语学习页单词喇叭；词级/字级高亮 |
 
 ### 1.3 约束与依赖
 
 - **平台锁**：只改 `apps/frontend` 电子书听读链路；小程序仓库/目录 **禁止** 出现在本需求 diff。
 - 听书 ↔ 听当前 **互斥** 不变。
-- 复用：`buildSentenceOffsetSpans`、`onCadenceChunk`、`showEpubListenPlainSpan` / `showChapterListenSentenceHighlight`、`prefetchCloudEnglishTts`。
+- 复用：`buildSentenceOffsetSpans`、`onCadenceChunk`、`showEpubListenPlainSpan` / `showChapterListenSentenceHighlight`、`prefetchCloudTts`。
 - 播放条 API 表面尽量不变（`sentenceIndex` / `goToSentence` 等仍按 **句** 对外）。
 - Ponytail：不引入新依赖；不做「整段 MP3 内精确 seek」。
 
@@ -59,7 +59,7 @@
 
 | 来源 | 按段合成 | 逐句高亮方式 | 本需求是否要改后端 |
 |------|----------|--------------|-------------------|
-| Edge | ✅ `playEnglishPreferred` | `onCadenceChunk`（**不用** `edge/speech/timed`） | 否 |
+| Edge | ✅ `playPreferred` | `onCadenceChunk`（**不用** `edge/speech/timed`） | 否 |
 | MiniMax | ✅ 同上 | 同上 | 否 |
 | 讯飞 | ✅ 同上 | 同上 | 否 |
 | 本机 | ✅ 同上 | 同上 | 否 |
@@ -70,7 +70,7 @@
 
 ## 2. 方案总览（一句话 + 要点）
 
-**一句话方案**：仅在 Web/桌面把听书/听当前外层循环从「句」提升为「段」，段内一次 `playEnglishPreferred` + `onCadenceChunk` 驱动逐句高亮；切句/续播从目标句截取「段内剩余文本」再合成；小程序零改动。
+**一句话方案**：仅在 Web/桌面把听书/听当前外层循环从「句」提升为「段」，段内一次 `playPreferred` + `onCadenceChunk` 驱动逐句高亮；切句/续播从目标句截取「段内剩余文本」再合成；小程序零改动。
 
 | # | 设计要点 | 理由 |
 |---|----------|------|
@@ -88,11 +88,11 @@
 | 能力 | 仓库中已有 | 本需求中的用法 |
 |------|------------|----------------|
 | 按句播放循环 | `useEpubChapterListen.playSentencesFromCursor`、`useEbookQuoteListen.playFromCursor` | **改为** `playParagraphsFromCursor`（扩展） |
-| 句偏移表 | `buildSentenceOffsetSpans`（`englishTts.ts`） | 段内映射句索引；高亮与分句菜单仍用 |
+| 句偏移表 | `buildSentenceOffsetSpans`（`speech.ts`） | 段内映射句索引；高亮与分句菜单仍用 |
 | Cadence 回调 | `onCadenceChunk` / `emitCadenceChunk` | 段播放时驱动 `show*Sentence`（扩展用法） |
 | 听当前句 overlay | `epubListenSegmentOverlay` | 直接复用 `showEpubListenPlainSpan(si)` |
 | 听书句 DOM Range | `indexChapterSentenceRanges` + `showChapterListenSentenceHighlight` | 直接复用 |
-| 句间云端预取 | `prefetchCloudEnglishTts` | **改为**预取下一段 plain（扩展） |
+| 句间云端预取 | `prefetchCloudTts` | **改为**预取下一段 plain（扩展） |
 | 长文段内切分 | `playCloudTtsCadenceSegments`（≤120 字 chunk） | 长段内部仍自动切 chunk；与「产品段」正交 |
 | 暂停 / 切句 | `pause` / `goToSentence` 停播后重入循环 | 保留；循环入口改为按段定位（扩展） |
 
@@ -120,9 +120,9 @@ flowchart TB
   end
 
   subgraph TTS [既有 TTS]
-    PlayPref[playEnglishPreferred]
+    PlayPref[playPreferred]
     Cadence[onCadenceChunk]
-    Prefetch[prefetchCloudEnglishTts]
+    Prefetch[prefetchCloudTts]
   end
 
   subgraph Overlay [高亮]
@@ -154,9 +154,9 @@ flowchart TB
 | `useEbookQuoteListen` | 听当前会话：选区 plain → 段循环 → 同款播放条 API |
 | `buildParagraphUnits(plain, outerRange?)` 🆕 | 把节/选区切成段落列表；每段含 plain 切片与句索引区间 `[siStart, siEnd)` |
 | `sliceParagraphFromSentence(unit, si)` 🆕 | 从段内目标句起截取剩余 spoken 文本，供切句/续播重合成 |
-| `playEnglishPreferred(text, opts)` | 本机/云端选路播放；段级调用时传入整段或段尾切片 |
+| `playPreferred(text, opts)` | 本机/云端选路播放；段级调用时传入整段或段尾切片 |
 | `onCadenceChunk(event)` | 段内每个 cadence chunk 起止回调；用 `sentenceIndex` 换句高亮 |
-| `prefetchCloudEnglishTts(plain)` | 预取下一段（或段尾切片）云端首包，缩短段间等待 |
+| `prefetchCloudTts(plain)` | 预取下一段（或段尾切片）云端首包，缩短段间等待 |
 | `showEpubListenPlainSpan(..., si)` | 听当前：按句索引画淡黄底 |
 | `showChapterListenSentenceHighlight(rend, range)` | 听书：按句 DOM Range 画淡黄底并可选滚入视口 |
 
@@ -164,7 +164,7 @@ flowchart TB
 
 - UI / 播放条不变；变化集中在两个 Hook 的循环单位。
 - 新增仅「段表构建 + 段内从句切片」两个纯函数，TTS 与高亮层复用。
-- 云端长段仍会在 `playEnglishPreferred` 内再按 cadence 切 chunk，与产品「段落」是两层切分。
+- 云端长段仍会在 `playPreferred` 内再按 cadence 切 chunk，与产品「段落」是两层切分。
 
 ---
 
@@ -181,7 +181,7 @@ flowchart TD
   Slice -->|段首或续播句| Spoken[spoken = 段全文或 sliceParagraphFromSentence]
   Slice -->|切句后| Spoken
   Spoken --> PrefetchNext[prefetch 下一段]
-  PrefetchNext --> Play[playEnglishPreferred spoken + onCadenceChunk]
+  PrefetchNext --> Play[playPreferred spoken + onCadenceChunk]
   Play --> CadenceStart{cadence start?}
   CadenceStart -->|是| HL[按 sentenceIndex 高亮当前句]
   HL --> Play
@@ -200,8 +200,8 @@ flowchart TD
 |------|------|
 | `buildParagraphUnits` / 准备段表 | 启动时一次性建段；失败则无可播 |
 | `sliceParagraphFromSentence` | 切句或 pause 后续播时生成「从该句到段末」文本 |
-| `prefetchCloudEnglishTts` | 当前段播放期间预取下一段 plain |
-| `playEnglishPreferred` | 合成并播放当前 spoken；失败抛错由 hook Toast |
+| `prefetchCloudTts` | 当前段播放期间预取下一段 plain |
+| `playPreferred` | 合成并播放当前 spoken；失败抛错由 hook Toast |
 | `onCadenceChunk` → 高亮 | `phase==='start'` 且句索引变化时更新淡黄底 |
 
 **读图要点**：
@@ -219,7 +219,7 @@ sequenceDiagram
   participant U as 用户
   participant H as useEpubChapterListen / useEbookQuoteListen
   participant P as buildParagraphUnits
-  participant T as playEnglishPreferred
+  participant T as playPreferred
   participant C as onCadenceChunk
   participant O as 句高亮 Overlay
 
@@ -227,7 +227,7 @@ sequenceDiagram
   H->>P: buildParagraphUnits(plain)
   P-->>H: units[]
   H->>H: schedulePrefetch(下一段)
-  H->>T: playEnglishPreferred(段plain, onCadenceChunk)
+  H->>T: playPreferred(段plain, onCadenceChunk)
   loop 段内各 cadence chunk
     T->>C: start sentenceIndex=k
     C->>O: showSentence(k)
@@ -235,9 +235,9 @@ sequenceDiagram
   end
   T-->>H: 段结束
   U->>H: 下一句 / goToSentence(j)
-  H->>H: stopAllEnglishPlayback
+  H->>H: stopAllPlayback
   H->>H: sliceParagraphFromSentence(unit, j)
-  H->>T: playEnglishPreferred(段尾切片, onCadenceChunk)
+  H->>T: playPreferred(段尾切片, onCadenceChunk)
   T->>C: start sentenceIndex=j
   C->>O: showSentence(j)
 ```
@@ -247,10 +247,10 @@ sequenceDiagram
 | 方法 | 功能 |
 |------|------|
 | `buildParagraphUnits(plain)` | 产出段落单位列表供外层循环 |
-| `playEnglishPreferred(...)` | 播当前段或段尾切片；内部可再 cadence 切 chunk |
+| `playPreferred(...)` | 播当前段或段尾切片；内部可再 cadence 切 chunk |
 | `onCadenceChunk` | 把 TTS 节奏映射到全局 `sentenceIndex` |
 | `showSentence` / `showEpubListenPlainSpan` / `showChapterListenSentenceHighlight` | 只亮当前句，换句先清再画 |
-| `stopAllEnglishPlayback` | 切句/暂停时作废当前世代音频 |
+| `stopAllPlayback` | 切句/暂停时作废当前世代音频 |
 | `sliceParagraphFromSentence` | 从句 j 截到段末，作为新的合成文本 |
 
 **读图要点**：
@@ -281,7 +281,7 @@ stateDiagram-v2
 | 方法 | 功能 |
 |------|------|
 | `toggleChapterListen` / `toggleListen` | idle↔启动；同 key 再点则 stop |
-| `pause()` | 增世代、`stopAllEnglishPlayback`，保留 `sentenceCursor` / `paragraphCursor` |
+| `pause()` | 增世代、`stopAllPlayback`，保留 `sentenceCursor` / `paragraphCursor` |
 | `resume()` | 从当前句 `sliceParagraphFromSentence` 后继续段循环 |
 | `goToSentence(i)` / `seekSentence` | 更新句游标，映射到所属段，停播后从该句重进循环 |
 
@@ -297,7 +297,7 @@ stateDiagram-v2
 | 听书 hook | 外层段循环 + cadence 高亮 + 段预取 | 改动 | `.../hooks/useEpubChapterListen.ts` |
 | 听当前 hook | 同上 | 改动 | `.../hooks/useEbookQuoteListen.ts` |
 | Overlay / 章句 Range | 高亮 API | 基本不改 | `epubListenSegmentOverlay.ts` 等 |
-| `englishTts.ts` | 可选：段级 prefetch 辅助 | 小改或不动 | 优先不动 |
+| `speech.ts` | 可选：段级 prefetch 辅助 | 小改或不动 | 优先不动 |
 
 ### 8.2 关键接口（草图）
 
@@ -364,7 +364,7 @@ function sliceParagraphFromSentence(
 
 ### M2
 
-- [ ] `playFromCursor` → 按 `paragraphCursor` 循环；段内 `playEnglishPreferred` + `onCadenceChunk` 高亮
+- [ ] `playFromCursor` → 按 `paragraphCursor` 循环；段内 `playPreferred` + `onCadenceChunk` 高亮
 - [ ] `goToSentence` / pause / resume 走段尾切片
 - [ ] 分句菜单与 `sentenceIndex` 行为回归
 
@@ -435,7 +435,7 @@ function sliceParagraphFromSentence(
 |------|--------------|
 | 前端新增 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenParagraphs.ts` |
 | 前端改动 | `hooks/useEpubChapterListen.ts`、`hooks/useEbookQuoteListen.ts` |
-| 前端可选小改 | `utils/englishTts.ts`（仅当段预取要抽 helper） |
+| 前端可选小改 | `utils/speech.ts`（仅当段预取要抽 helper） |
 | 后端 | **无**（含不改 `edge/speech/timed`） |
 | 小程序 | **无** |
 | 文档（实现后） | `docs/ebook/epub-listen-paragraph-tts.md` + Influence-point + developer 听书手册补丁 |

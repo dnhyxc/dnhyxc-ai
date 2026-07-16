@@ -29,7 +29,7 @@
 |------|------|
 | `apps/frontend/src/utils/fetch.ts` | Tauri 下**所有 HTTP 方法**默认 `retries: 2`（改前仅 GET/HEAD）；`catch` 优先识别已构造的 `RequestError`；`handleErrorResponse` 复用已解析 body，避免重复读空响应流 |
 
-（同轮 diff 中的 `englishTts.ts`、`api.ts`、版本号文件属 **TTS 播放** 主题，见 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md)。）
+（同轮 diff 中的 `speech.ts`、`api.ts`、版本号文件属 **TTS 播放** 主题，见 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md)。）
 
 **结论摘要**：
 
@@ -87,7 +87,7 @@ canRetry 仍要求：attempt 未用尽 && !response && !401 && isTransientNetwor
 | 模块 / 场景 | 影响等级 | 分析 |
 |-------------|----------|------|
 | **Tauri 登录 / 注册 / 重置密码**（`service/index.ts` → `http.post`） | 低 | 瞬时 `!response` 失败会多试最多 2 次，减少误报 Toast；若服务端已创建会话但响应丢失，极端情况下可能重复提交（改前不重试则直接失败） |
-| **Tauri Edge / MiniMax / 讯飞 TTS**（`englishTts.ts` → `http.post`） | 低 | 与线上「TTS 请求偶发网络 Toast」同源；重试后更易拿到 MP3，配合 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) 播放链路 |
+| **Tauri Edge / MiniMax / 讯飞 TTS**（`speech.ts` → `http.post`） | 低 | 与线上「TTS 请求偶发网络 Toast」同源；重试后更易拿到 MP3，配合 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) 播放链路 |
 | **Tauri 收藏增删**（非幂等 POST） | 低 | 文档 [`english-learning-list-network-retry.md`](../english/english-learning-list-network-retry.md) 曾写「add/remove 不重试」——**HttpClient 层**现对 Tauri 瞬时 `!response` 会重试；`/status` 查询仍主要靠 service 层 `retryAsync` |
 | **Tauri GET 列表 / 分页**（资源库、收藏、电子书书架） | 低 | 行为与改前基本一致（原本即有 2 次默认重试）；`catch` 修复使 4xx 错误信息更准确 |
 | **Tauri 401 未授权** | 无 | `canRetry` 排除 401；仍清 token + `notifyUnauthorized()`，与改前一致 |

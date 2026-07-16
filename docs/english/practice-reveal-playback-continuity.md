@@ -15,14 +15,14 @@
 |------|------|
 | `apps/frontend/src/views/englishLearning/practice/Session.tsx` | `onRevealAnswer` 仅 `setPhase('revealed')`，不再 cancel |
 
-**未改**：`SoftWrongStage.tsx`、`RevealedPanelInner.tsx`、`englishTts.ts` — 两页已通过 Session 注入同一套 `playing` / `playWord`。
+**未改**：`SoftWrongStage.tsx`、`RevealedPanelInner.tsx`、`speech.ts` — 两页已通过 Session 注入同一套 `playing` / `playWord`。
 
 ## 3. 实现思路
 
 1. **播放状态上提**：`playing`、`playWord`、`cancelDictationPlay` 均在 `Session` 管理；软揭示与完整揭示仅接收 props，不各自持有 TTS 实例。
-2. **TTS 全局单例**：`playEnglishPreferred` / `stopAllEnglishPlayback` 使用模块级 `playbackGeneration`（见 `english-tts-playback.md`），同一题两阶段切换**不卸载** Session，故音频介质可跨 DOM 隐藏继续。
+2. **TTS 全局单例**：`playPreferred` / `stopAllPlayback` 使用模块级 `playbackGeneration`（见 `english-tts-playback.md`），同一题两阶段切换**不卸载** Session，故音频介质可跨 DOM 隐藏继续。
 3. **叠层显隐**：`soft_wrong` / `revealed` 两张 `SessionPromptPanel` 同格 `grid` 叠放，用 `hidden` 切换；**不**因阶段切换而 unmount 播放相关子树（仅隐藏）。
-4. **看答案 = 切阶段**：`onRevealAnswer` 只做 `setPhase('revealed')`；**不**递增 `dictationPlayRunRef`、**不**调用 `stopAllEnglishPlayback`。
+4. **看答案 = 切阶段**：`onRevealAnswer` 只做 `setPhase('revealed')`；**不**递增 `dictationPlayRunRef`、**不**调用 `stopAllPlayback`。
 5. **仍要停播的路径**（行为不变）：换题（`item.key` effect）、下一题（`onNext`）、再试（`onRetryCurrent`）、答对结算（`completeStep`）、用户点播放钮停止、组件卸载 cleanup。
 
 ### 与「共用播放器」的关系
@@ -52,7 +52,7 @@ const onRevealAnswer = useCallback(() => {
 <DictationSoftWrongStage
   playing={playing}           // 说明：与 Session 单一 playing 状态绑定
   playLabel={playLabel}
-  onPlay={() => void playWord()}  // 说明：同一 playWord，内部走 englishTts 全局会话
+  onPlay={() => void playWord()}  // 说明：同一 playWord，内部走 speech 全局会话
   onShowAnswer={onRevealAnswer}
 />
 
@@ -79,10 +79,10 @@ const onNext = useCallback(() => {
 
 ### 4.4 全局 TTS 取消（供理解「为何不 cancel」）
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（`stopAllEnglishPlayback`，约 L395–L398）
+**来源**：`apps/frontend/src/utils/speech.ts`（`stopAllPlayback`，约 L395–L398）
 
 ```typescript
-export function stopAllEnglishPlayback(): void {
+export function stopAllPlayback(): void {
   playbackGeneration += 1; // 说明：递增世代后，进行中的 speak / MP3 会检测失效并结束
   stopPlaybackMediaOnly();
 }
@@ -111,6 +111,6 @@ export function stopAllEnglishPlayback(): void {
 | 阶段与播放 | `apps/frontend/src/views/englishLearning/practice/Session.tsx` |
 | 软揭示 UI | `apps/frontend/src/views/englishLearning/practice/components/session/SoftWrongStage.tsx` |
 | 完整揭示 UI | `apps/frontend/src/views/englishLearning/practice/components/reveal/RevealedPanelInner.tsx` |
-| TTS | `apps/frontend/src/utils/englishTts.ts` |
+| TTS | `apps/frontend/src/utils/speech.ts` |
 
 若与仓库最新源码不一致，以源码为准。

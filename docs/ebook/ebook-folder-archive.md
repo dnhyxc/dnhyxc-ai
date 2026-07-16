@@ -286,7 +286,7 @@ import type { Rendition } from 'epubjs';
 import {
 	buildSentenceOffsetSpans,
 	stripMarkdownForTts,
-} from '@/utils/englishTts';
+} from '@/utils/speech';
 // 同目录：听书播放背景清除
 import { clearListenMarkHighlight } from './epubListenMarkHighlight';
 // 同目录：听读 DOM Range 高亮与 session
@@ -308,7 +308,7 @@ import type { Rendition } from 'epubjs';
 import {
 	buildSentenceOffsetSpans,
 	stripMarkdownForTts,
-} from '@/utils/englishTts';
+} from '@/utils/speech';
 // listen 组内：播放背景
 import { clearListenMarkHighlight } from './epubListenMarkHighlight';
 // listen 组内：高亮 overlay

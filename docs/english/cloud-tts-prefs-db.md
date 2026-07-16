@@ -39,7 +39,7 @@
 | `apps/frontend/src/service/cloudTtsSettings.ts` | API 客户端 |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | 内存缓存、迁移、合并请求体 |
 | `apps/frontend/src/views/setting/cloudTts/index.tsx` | 加载 Spinner、PUT 保存 |
-| `apps/frontend/src/utils/englishTts.ts` | 播放前 `ensureMinimaxTtsUserPrefsLoaded` |
+| `apps/frontend/src/utils/speech.ts` | 播放前 `ensureMinimaxTtsUserPrefsLoaded` |
 | `apps/frontend/src/store/user.ts` | 登录后 `prefetchMinimaxTtsUserPrefs` |
 | `apps/frontend/src/store/resetUserState.ts` | 换号清 TTS 偏好缓存 |
 
@@ -155,7 +155,7 @@ export async function saveMinimaxTtsUserPrefs(prefs, userId?) {
 
 ### 4.3 播放前确保已加载
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L467–L470）
+**来源**：`apps/frontend/src/utils/speech.ts`（约 L467–L470）
 
 ```typescript
 async function fetchCloudTtsBlob(plain: string): Promise<Blob> {

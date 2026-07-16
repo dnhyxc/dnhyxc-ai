@@ -17,7 +17,7 @@
 |------|------|------|
 | 云端凭证 | 仅服务端 `.env`（`MINIMAX_API_KEY`、`XFYUN_*`） | 会员可在 **语音设置** 填写 **MiniMax API Key**、**讯飞 APPID/Key/Secret**，入库 `minimax_tts_user_config` |
 | 讯飞 / MiniMax 音色 | 共用 `voiceId` 列，切换来源互转 | **`xfyunVoiceId` 独立列**；旧 vcn 混存时 `splitLegacyVoiceStorage` 拆分 |
-| 讯飞 HTTP 失败 | `503/401/502` 时二次请求硅基 `SPEECH_TTS` | **不再中转硅基**；`playEnglishPreferred` catch 统一 **Toast + 本机 Web Speech** |
+| 讯飞 HTTP 失败 | `503/401/502` 时二次请求硅基 `SPEECH_TTS` | **不再中转硅基**；`playPreferred` catch 统一 **Toast + 本机 Web Speech** |
 | 失败感知 | 听书 hook 单独 Toast `unsupported` | `notifyCloudTtsFallback` 区分讯飞/MiniMax；12s 冷却；`cloudTtsNotified` 防重复 |
 | 设置页 UI | 模型下拉枚举；无凭证输入 | **API Key / 模型文本框**；讯飞凭证区；字段说明移至标题旁 |
 | 前端 MP3 缓存 | key = userId + 参数 JSON | 追加 **凭证摘要**；保存前乐观 `setCache` |
@@ -45,7 +45,7 @@
 | `apps/frontend/src/constants/minimaxTts.ts` | `getDefaultMinimaxCloudCredentials` |
 | `apps/frontend/src/constants/xfyunTts.ts` | 凭证默认空、`fillXfyunCredentialsFromEnv` 原样返回 |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | 归一化、cache key、乐观保存 |
-| `apps/frontend/src/utils/englishTts.ts` | Toast、移除硅基中转 |
+| `apps/frontend/src/utils/speech.ts` | Toast、移除硅基中转 |
 | `apps/frontend/src/views/setting/cloudTts/index.tsx` | 凭证 UI、布局 |
 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` | `cloudTtsNotified` 去重 |
 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 同上 |
@@ -62,7 +62,7 @@ flowchart LR
   PUT[PUT /settings/cloud-tts]
   DB[(minimax_tts_user_config)]
   MEM[前端 cachedPrefs]
-  TTS[playEnglishPreferred]
+  TTS[playPreferred]
   API[POST minimax|xfyun/speech/stream]
   PREFS[MinimaxTtsPrefsService]
   UI --> PUT --> DB
@@ -86,8 +86,8 @@ flowchart LR
 ### 3.3 失败降级时序
 
 1. `playCloudTtsCadenceSegments` / `startCloudTts` 抛错（HTTP 非 2xx 等）。
-2. `playEnglishPreferred` catch → `notifyCloudTtsFallback(canFallbackLocal)`。
-3. 若本机 TTS 可用 → warning Toast + `speakEnglishTextWithGeneration`。
+2. `playPreferred` catch → `notifyCloudTtsFallback(canFallbackLocal)`。
+3. 若本机 TTS 可用 → warning Toast + `speakTextWithGeneration`。
 4. 否则 → error Toast + `throwNoTts({ cloudTtsNotified: true })`。
 5. 听书 hook catch 见 `cloudTtsNotified` 则 **不再** 弹 `unsupported`。
 
@@ -95,11 +95,11 @@ flowchart LR
 
 ## 4. 关键代码对比与注释
 
-### 4.1 `notifyCloudTtsFallback`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.1 `notifyCloudTtsFallback`（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：纯新增符号（改动前无此函数）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L486–L523）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L486–L523）
 
 ```typescript
 // 模块级变量：记录上次弹出云端失败 Toast 的时间戳（毫秒）
@@ -107,7 +107,7 @@ let lastCloudTtsErrorToastAt = 0;
 // 常量：同一会话内两次 Toast 的最小间隔 12 秒，避免听书逐句失败刷屏
 const CLOUD_TTS_ERROR_TOAST_COOLDOWN_MS = 12_000;
 
-// 扩展 Error 类型，标记是否已由 englishTts 弹过 Toast
+// 扩展 Error 类型，标记是否已由 speech 弹过 Toast
 type NoTtsError = Error & { cloudTtsNotified?: boolean };
 
 // 构造 NO_TTS 错误并可附带 cloudTtsNotified 标记
@@ -156,15 +156,15 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 }
 ```
 
-**变更摘要**：新增统一 Toast；标题区分讯飞/MiniMax；12s 冷却由 `stopAllEnglishPlayback` 重置。
+**变更摘要**：新增统一 Toast；标题区分讯飞/MiniMax；12s 冷却由 `stopAllPlayback` 重置。
 
 ---
 
-### 4.2 `playEnglishPreferred` 云端 catch（`apps/frontend/src/utils/englishTts.ts`）
+### 4.2 `playPreferred` 云端 catch（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：云端 try/catch 分支全文。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1412–L1425）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1412–L1425）
 
 ```typescript
 	// 云端优先路径，根据用户偏好及能力优先尝试云端；失败兜底本地
@@ -179,18 +179,18 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 		// 云端朗读出错时，二次校验世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 若本地没有 TTS 可用，也抛 NO_TTS 错
-		if (!isEnglishTtsSupported()) {
+		if (!isSpeechSupported()) {
 			throw new Error('NO_TTS');
 		}
 		// 回退本地朗读，参数同前
-		await speakEnglishTextWithGeneration(rawText, generation, {
+		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
 		});
 	}
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1443–L1463）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1443–L1463）
 
 ```typescript
 	// 云端优先路径，根据用户偏好及能力优先尝试云端；失败兜底本地
@@ -203,7 +203,7 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 		return;
 	} catch {
 		// 判断是否可回退本机 Web Speech
-		const canFallbackLocal = isEnglishTtsSupported();
+		const canFallbackLocal = isSpeechSupported();
 		// 统一弹出云端失败 Toast（含冷却）
 		notifyCloudTtsFallback(canFallbackLocal);
 		// 播放世代已失效则不再继续
@@ -213,7 +213,7 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 			throwNoTts({ cloudTtsNotified: true });
 		}
 		// 回退本地朗读，参数同前
-		await speakEnglishTextWithGeneration(rawText, generation, {
+		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
 		});
@@ -224,11 +224,11 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 
 ---
 
-### 4.3 `startCloudTts` 移除硅基中转（`apps/frontend/src/utils/englishTts.ts`）
+### 4.3 `startCloudTts` 移除硅基中转（`apps/frontend/src/utils/speech.ts`）
 
 **对比范围**：`platformFetch` 后至 `return { kind: 'live' ...` 段。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1020–L1040）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1020–L1040）
 
 ```typescript
 	const prefs = loadMinimaxTtsUserPrefs();
@@ -264,7 +264,7 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 	return { kind: 'live', response: res, cacheKey };
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1052–L1075）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1052–L1075）
 
 ```typescript
 	const prefs = loadMinimaxTtsUserPrefs();
@@ -285,7 +285,7 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 		},
 	);
 
-	// ponytail: 云端失败不中转硅基/MiniMax；由 playEnglishPreferred catch 统一降级本机 Web Speech
+	// ponytail: 云端失败不中转硅基/MiniMax；由 playPreferred catch 统一降级本机 Web Speech
 	if (!res.ok) {
 		throw new Error(`TTS_HTTP_${res.status}`);
 	}
@@ -405,7 +405,7 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 
 ### 4.6 听书 hook Toast 去重（`useEpubChapterListen.ts`）
 
-**对比范围**：逐句 `playEnglishPreferred` 的 catch 块。
+**对比范围**：逐句 `playPreferred` 的 catch 块。
 
 **改动前** · `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts`（基线）
 
@@ -431,7 +431,7 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 							title: tRef.current('englishLearning.tts.unsupported'),
 ```
 
-**变更摘要**：`englishTts` 已 Toast 时跳过 hook 层 `unsupported`，避免双重提示。`useEbookQuoteListen.ts` 同改。
+**变更摘要**：`speech` 已 Toast 时跳过 hook 层 `unsupported`，避免双重提示。`useEbookQuoteListen.ts` 同改。
 
 ---
 
@@ -451,7 +451,7 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 
 | 说明 | 路径 |
 |------|------|
-| 统一 Toast 与降级 | `apps/frontend/src/utils/englishTts.ts` |
+| 统一 Toast 与降级 | `apps/frontend/src/utils/speech.ts` |
 | 偏好与 cache key | `apps/frontend/src/utils/minimaxTtsPrefs.ts` |
 | 设置页 UI | `apps/frontend/src/views/setting/cloudTts/index.tsx` |
 | 后端凭证读取 | `apps/backend/src/services/speech-transcription/minimax-tts-prefs.service.ts` |

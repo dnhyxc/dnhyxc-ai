@@ -18,7 +18,7 @@
 2. 前后端默认均为 `speech-2.8-hd`，与产品期望的 turbo 默认不一致。
 3. 模型字段为纯文本框，无预设下拉，体验与大模型页不一致。
 
-**本轮不改**：MP3 LRU 缓存 key 逻辑、试听 skip 缓存、englishTts 括号/本机 settle 等无关 diff。
+**本轮不改**：MP3 LRU 缓存 key 逻辑、试听 skip 缓存、speech 括号/本机 settle 等无关 diff。
 
 ## 2. 改动范围
 

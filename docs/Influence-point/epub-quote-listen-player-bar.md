@@ -49,7 +49,7 @@
 **改前**（`useEbookQuoteListen`）：
 
 ```text
-beginEpubListenOverlaySession → playEnglishPreferred(整段 plain, { onCadenceChunk })
+beginEpubListenOverlaySession → playPreferred(整段 plain, { onCadenceChunk })
   → cadence 回调 showEpubListenPlainSpan(sentenceIndex)
   → finally clear overlay + onListenSessionEnd
 ```
@@ -58,7 +58,7 @@ beginEpubListenOverlaySession → playEnglishPreferred(整段 plain, { onCadence
 
 ```text
 beginEpubListenOverlaySession → for 每句:
-  showEpubListenPlainSpan(i) → playEnglishPreferred(单句, { rate })
+  showEpubListenPlainSpan(i) → playPreferred(单句, { rate })
   → 句末 clearActiveListenHighlight
 → stopInternal → clear overlay + onListenSessionEnd
 ```
@@ -102,8 +102,8 @@ const epubListenBar = chapterListen.isActive
 | **EpubListenFollowFab** | 低 | session / autoFollow 仍由 overlay 管理；暂停不销毁 session |
 | **用户划线 apply/sync** | 无 | `onListenSessionEnd` → `syncReadingAnnotations` 时机与改前「播完 finally」等价 |
 | **播放中新增划线** | 无 | 与改前相同，并行 allowed |
-| **English TTS 云端/本机** | 低 | 每句一次 `playEnglishPreferred` vs 一次整段：句间可能有极短间隙；会员云端路径仍走同一 API |
-| **倍速** | 新增 | 听当前可 `setRate`；句间切换生效，当前句中途改速走 `applyActiveEnglishPlaybackRate` |
+| **English TTS 云端/本机** | 低 | 每句一次 `playPreferred` vs 一次整段：句间可能有极短间隙；会员云端路径仍走同一 API |
+| **倍速** | 新增 | 听当前可 `setRate`；句间切换生效，当前句中途改速走 `applyActivePlaybackRate` |
 | **暂停后继续** | 新增 | 从 **当前句索引** 重播该句及后续，非句内时间点续播（与听书一致） |
 | **分句菜单跳转** | 新增 | `goToSentence` 重算 cursor 并 `playFromCursor`；无听书式 `scrollCenterOnFirst`（仅 autoFollow） |
 | **PDF 阅读** | 无 | 无听当前入口 |

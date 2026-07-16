@@ -3,7 +3,7 @@
  * 不合并句流、不 rend.display、不 rend.next。
  */
 import type { Rendition } from 'epubjs';
-import { stripMarkdownForTts } from '@/utils/englishTts';
+import { stripMarkdownForTts } from '@/utils/speech';
 import { getEpubScrollContainer } from '../reader/epubScrolledNav';
 
 // 滚动边缘间距（像素），用于滚动定位向前腾出视野

@@ -389,7 +389,7 @@ onClick={() => {
 
 ```typescript
 const onNewChat = useCallback(() => {
-	stopAllEnglishPlayback();
+	stopAllPlayback();
 	intentInputAutoFillRef.current = null;
 	// 说明：去掉 ?session=，避免 hydrate 再次绑回旧会话
 	setSearchParams({}, { replace: true });

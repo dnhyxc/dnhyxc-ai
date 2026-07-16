@@ -184,7 +184,7 @@ export function showEpubListenPlainSpan(
 
 ### 4.4 `useEbookQuoteListen` 内 `onCadenceChunk`（`apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts`）
 
-**对比范围**：`playEnglishPreferred` 的 `onCadenceChunk` 回调（摘录）。
+**对比范围**：`playPreferred` 的 `onCadenceChunk` 回调（摘录）。
 
 **改动前** · 基线，约 L78–L90
 

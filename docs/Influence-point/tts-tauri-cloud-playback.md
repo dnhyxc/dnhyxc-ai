@@ -15,20 +15,20 @@
 
 评估 **Tauri 桌面端云端 MP3 播放链路修复**（Audio 手势解锁、`canplay` 后再 `play()`、Tauri 读 body / Edge endpoint 分流）是否改变或破坏已有朗读能力：
 
-- **全站 `playEnglishPreferred` 入口**（英语学习喇叭、练习、收藏、错题等）
+- **全站 `playPreferred` 入口**（英语学习喇叭、练习、收藏、错题等）
 - **EPUB 听书 / 听当前**（`useEpubChapterListen` / `useEbookQuoteListen`）
 - **语音设置页试听**（MiniMax / 讯飞 / Edge / 本机）
 - **MiniMax / 讯飞 / Edge 三路云端**（`startCloudTts` → `playCloudMp3Blob`）
 - **Web 浏览器**（非 Tauri，`isTauriRuntime()` 为 false 的路径）
 - **本机 Web Speech**（`preferLocal` / 非云端选路）
 - **播放世代 / stopAll / 缓存 key**（`playbackGeneration`、`cloudTtsAudioCache`）
-- **已有 `primeEnglishPlaybackForUserGesture` 调用方**（听书 hook 内重复 prime）
+- **已有 `primePlaybackForUserGesture` 调用方**（听书 hook 内重复 prime）
 
 **改动范围（当前 diff）**：
 
 | 文件 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | `playEnglishPreferred` 入口同步 `primeEnglishPlaybackForUserGesture()`；`prime` 增加静音 `Audio` 解锁；`readResponseBodyAsArrayBuffer` 在 Tauri 用 `arrayBuffer()`；Tauri+Edge 走 `SPEECH_EDGE_TTS` 非流式；新增 `waitCloudAudioCanPlay` / `startCloudAudioPlayback`；`playCloudMp3Blob` 经后者播放 |
+| `apps/frontend/src/utils/speech.ts` | `playPreferred` 入口同步 `primePlaybackForUserGesture()`；`prime` 增加静音 `Audio` 解锁；`readResponseBodyAsArrayBuffer` 在 Tauri 用 `arrayBuffer()`；Tauri+Edge 走 `SPEECH_EDGE_TTS` 非流式；新增 `waitCloudAudioCanPlay` / `startCloudAudioPlayback`；`playCloudMp3Blob` 经后者播放 |
 | `apps/frontend/src/service/api.ts` | 新增常量 `SPEECH_EDGE_TTS`（`/edge/speech`） |
 
 （`apps/frontend/latest.json`、`tauri.conf.json` 版本号、`tsconfig.tsbuildinfo` 与朗读行为无关，不纳入分析。）
@@ -37,15 +37,15 @@
 
 | 维度 | 是否影响原有功能 | 说明 |
 |------|------------------|------|
-| **Web 浏览器** 云端 MiniMax / 讯飞 / Edge | **低（增强）** | 仍走 stream endpoint + stream reader；`playEnglishPreferred` 多一次同步 prime（speech + 静音 Audio），`playCloudMp3Blob` 多等 `canplay`，起播略延迟、无声挂起概率降低 |
+| **Web 浏览器** 云端 MiniMax / 讯飞 / Edge | **低（增强）** | 仍走 stream endpoint + stream reader；`playPreferred` 多一次同步 prime（speech + 静音 Audio），`playCloudMp3Blob` 多等 `canplay`，起播略延迟、无声挂起概率降低 |
 | **Tauri 桌面** Edge 云端 | **有条件变化** | 修复线上高频「UI 播放中但无声、暂停再播恢复」；Edge 改非流式 `/edge/speech`；读 body 不再用 stream reader |
 | **Tauri 桌面** MiniMax / 讯飞云端 | **低（增强）** | 共享 `readResponseBodyAsArrayBuffer`（Tauri→`arrayBuffer()`）与 `startCloudAudioPlayback`；endpoint 仍为 stream URL，语义不变 |
-| **本机 Web Speech 路径** | **低** | 每次 `playEnglishPreferred` 多同步 prime（原仅听书 hook 显式调用）；与 `settleSpeechSynthesisAfterCancel` 叠加时入口仍只 prime 一次/次播放 |
-| **对外 API**（`playEnglishPreferred` 等 export） | **否** | 无签名变更 |
+| **本机 Web Speech 路径** | **低** | 每次 `playPreferred` 多同步 prime（原仅听书 hook 显式调用）；与 `settleSpeechSynthesisAfterCancel` 叠加时入口仍只 prime 一次/次播放 |
+| **对外 API**（`playPreferred` 等 export） | **否** | 无签名变更 |
 | **缓存 key / LRU** | **否** | `buildCloudTtsCacheKey` 未改；Tauri Edge 换 URL 不影响 key 后缀 |
 | **播放世代 / stopAll** | **否** | `beginPlaybackSession` 仍在 prime 之后；世代语义不变 |
-| **云端失败回退本机** | **否** | catch 仍进 `speakEnglishTextWithGeneration`；prime 已在入口执行 |
-| **句间预取** `prefetchCloudEnglishTts` | **否** | 仍 `startCloudTts`；Tauri 侧同样受益于 body 读取与 Edge 非流式 |
+| **云端失败回退本机** | **否** | catch 仍进 `speakTextWithGeneration`；prime 已在入口执行 |
+| **句间预取** `prefetchCloudTts` | **否** | 仍 `startCloudTts`；Tauri 侧同样受益于 body 读取与 Edge 非流式 |
 | **听书 ↔ 听当前互斥 / 播放条** | **否** | hook 未改 |
 | **后端 Edge/MiniMax/讯飞 API** | **否** | 仅前端选路；`/edge/speech` 本就存在 |
 
@@ -65,13 +65,13 @@
 **改后**：
 
 ```text
-用户点击 → playEnglishPreferred 同步 prime（speechSynthesis + 静音 Audio.play）
+用户点击 → playPreferred 同步 prime（speechSynthesis + 静音 Audio.play）
   → beginPlaybackSession → … → startCloudAudioPlayback（canplay → play，Tauri 失败则 load 重试）
 ```
 
-**动机**：线上桌面 Edge 合成慢，异步后才 `play()`；原 `primeEnglishPlaybackForUserGesture` 未解锁 `HTMLAudioElement`。
+**动机**：线上桌面 Edge 合成慢，异步后才 `play()`；原 `primePlaybackForUserGesture` 未解锁 `HTMLAudioElement`。
 
-**调用链**：`playEnglishPreferred` 被 **19+ 视图/hook** 直接调用（`grep` 全仓 `playEnglishPreferred(`）；入口统一 prime，听书 hook 内原有 `primeEnglishPlaybackForUserGesture()` 变为**冗余但无害**（二次静音 play）。
+**调用链**：`playPreferred` 被 **19+ 视图/hook** 直接调用（`grep` 全仓 `playPreferred(`）；入口统一 prime，听书 hook 内原有 `primePlaybackForUserGesture()` 变为**冗余但无害**（二次静音 play）。
 
 ### 2.2 Tauri 读响应体与 Edge endpoint
 
@@ -102,13 +102,13 @@
 
 | 模块 / 场景 | 影响等级 | 分析 |
 |-------------|----------|------|
-| **语音设置 → Edge 试听**（`cloudTts/index.tsx` → `playEnglishPreferred`） | **中（Tauri）/ 低（Web）** | Tauri 线上：修复无声挂起；Web：多 ~数十 ms `canplay` 等待 |
+| **语音设置 → Edge 试听**（`cloudTts/index.tsx` → `playPreferred`） | **中（Tauri）/ 低（Web）** | Tauri 线上：修复无声挂起；Web：多 ~数十 ms `canplay` 等待 |
 | **语音设置 → MiniMax / 讯飞试听** | **低** | 共享 `startCloudAudioPlayback` + Tauri `arrayBuffer`；endpoint 未改 |
-| **英语学习喇叭**（词库/句库/包/收藏/错题/练习等） | **低** | 均 `playEnglishPreferred`；云端路径起播更稳；本机多一次 prime |
-| **EPUB 听当前**（`useEbookQuoteListen`） | **低** | 仍 `playEnglishPreferred` + `onCadenceChunk`；hook 内 prime 与入口 prime 重复 |
+| **英语学习喇叭**（词库/句库/包/收藏/错题/练习等） | **低** | 均 `playPreferred`；云端路径起播更稳；本机多一次 prime |
+| **EPUB 听当前**（`useEbookQuoteListen`） | **低** | 仍 `playPreferred` + `onCadenceChunk`；hook 内 prime 与入口 prime 重复 |
 | **EPUB 听书**（`useEpubChapterListen`） | **低** | 同上；云端长文分段 + 预取逻辑未改 |
 | **本机朗读**（非会员 / `playbackSource: local` / `preferLocal: true`） | **低** | 不进入 `playCloudMp3Blob`；入口 prime 仅多解锁 speech + 静音 Audio |
-| **云端失败 → 回退本机** | **无** | catch 路径不变；prime 已在同次 `playEnglishPreferred` 开头执行 |
+| **云端失败 → 回退本机** | **无** | catch 路径不变；prime 已在同次 `playPreferred` 开头执行 |
 | **MP3 LRU 缓存** | **无** | 命中缓存仍 `playCloudMp3Blob`；key 算法未变 |
 | **playbackGeneration / 快速连点 stop** | **无** | `beginPlaybackSession` 在 prime 之后；作废逻辑未改 |
 | **Web 端 Edge stream** | **无** | `isTauriRuntime()` false 时 endpoint 与 body 读取与改前一致（除 `canplay` 与入口 prime） |
@@ -120,7 +120,7 @@
 
 | 风险 | 等级 | 说明 | 建议验证 |
 |------|------|------|----------|
-| **入口 double prime**（听书 hook + `playEnglishPreferred`） | 低 | 两次静音 `Audio.play()`，一般无听感 | 听书连播 10 句，无叠音/报错 |
+| **入口 double prime**（听书 hook + `playPreferred`） | 低 | 两次静音 `Audio.play()`，一般无听感 | 听书连播 10 句，无叠音/报错 |
 | **Web 起播略慢**（`canplay` 等待） | 低 | 短词 MP3 多等 metadata | Web Edge 试听与单词喇叭，感知延迟可接受 |
 | **Tauri 非 Edge 仍用 stream URL** | 低 | MiniMax/讯飞 chunked 在 Tauri 仅改读法为 `arrayBuffer()` | 线上桌面 MiniMax、讯飞各试听一句 |
 | **prime 在非用户手势上下文** | 低 | 练习自动连播等极少路径可能无点击栈；静音 play 失败被 catch | 听写三连播（`usePracticePlayback` sequence）桌面/Web |
@@ -132,7 +132,7 @@
 
 | 项 | 说明 |
 |----|------|
-| `shouldUseCloudEnglishTts` / 会员选路 | 未在本 diff 修改 |
+| `shouldUseCloudTts` / 会员选路 | 未在本 diff 修改 |
 | `buildCloudTtsCacheKey` / 各 `build*RequestExtras` | 未改 |
 | `playCloudTtsCadenceSegments` / 句读分段 | 未改 |
 | `waitCloudAudioEnd` / 超时逻辑 | 未改 |

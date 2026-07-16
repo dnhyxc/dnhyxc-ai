@@ -7,7 +7,7 @@
 - [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 听书分句列表与播放条
 - [epub-quote-listen.md](./epub-quote-listen.md) — 听当前入口与按句 TTS
 
-**文档角色**：commit `58645d24` 在 `englishTts.ts` 内对 **句界算法** 的实现说明；影响面见 Influence-point 姊妹稿。
+**文档角色**：commit `58645d24` 在 `speech.ts` 内对 **句界算法** 的实现说明；影响面见 Influence-point 姊妹稿。
 
 ---
 
@@ -36,7 +36,7 @@ EPUB **听书**、**听当前** 与英语学习 TTS 共用 `buildSentenceOffsetS
 
 | 路径 | 变更 |
 |------|------|
-| `apps/frontend/src/utils/englishTts.ts` | `TRAILING_CLOSER` 收紧；新增句首 helper 组；`sentenceBoundaryEnd` 增 `segmentStart` 参数；`buildSentenceOffsetSpans` 调用 `computeSentenceSpanStart`；模块自检扩充 |
+| `apps/frontend/src/utils/speech.ts` | `TRAILING_CLOSER` 收紧；新增句首 helper 组；`sentenceBoundaryEnd` 增 `segmentStart` 参数；`buildSentenceOffsetSpans` 调用 `computeSentenceSpanStart`；模块自检扩充 |
 
 **未改**：`useEpubChapterListen`、`useEbookQuoteListen`、`epubListenSegmentOverlay`、`epubListenChapter` 等调用方；播放条 UI。
 
@@ -72,7 +72,7 @@ EPUB **听书**、**听当前** 与英语学习 TTS 共用 `buildSentenceOffsetS
 
 **对比范围**：句末闭合符号正则（单行常量）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线 `58645d24^`，约 L471–L473）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线 `58645d24^`，约 L471–L473）
 
 ```typescript
 // 句末标点后仍属同一句的闭合符号（弯引号/直角引号/全角引号等）
@@ -80,7 +80,7 @@ const TRAILING_CLOSER_AFTER_SENTENCE_END =
 	/[\u2018\u2019\u201c\u201d\u0022\u0027\u300c\u300d\u300e\u300f\ufe41\ufe42\uff02\u00bb\u300b\u3011\uff09)]/u;
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L472–L474）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L472–L474）
 
 ```typescript
 // 句末标点后仍属同一句的闭合符号（不含开引号/开括号，避免吞掉下一句句首）
@@ -96,7 +96,7 @@ const TRAILING_CLOSER_AFTER_SENTENCE_END =
 
 **对比范围**：`isLeadingEllipsisAt` 至 `isWithinSentenceLeadingAttachables` 五个私有函数（改前不存在）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L476–L553）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L476–L553）
 
 ```typescript
 // 句首仍属同一句的开引号/开括号/破折号/省略号（与句末 extend 对称）
@@ -232,7 +232,7 @@ function isWithinSentenceLeadingAttachables(
 
 **对比范围**：两个私有函数完整定义。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L475–L517）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L475–L517）
 
 ```typescript
 // 判断 index 处是否可在句末 extend 中继续吞并
@@ -303,7 +303,7 @@ function consumeAttachableAfterSentenceEnd(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L555–L592）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L555–L592）
 
 ```typescript
 // 判断 index 处是否可在句末 extend 中继续吞并
@@ -372,7 +372,7 @@ function consumeAttachableAfterSentenceEnd(
 
 **对比范围**：`function sentenceBoundaryEnd` 全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L538–L557）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L538–L557）
 
 ```typescript
 // 句末边界（trimmed plain 内下标，不含边界字符之后的内容）
@@ -408,7 +408,7 @@ function sentenceBoundaryEnd(trimmed: string, i: number): number {
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L613–L646）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L613–L646）
 
 ```typescript
 // 句末边界（trimmed plain 内下标，不含边界字符之后的内容）
@@ -467,7 +467,7 @@ function sentenceBoundaryEnd(
 
 **对比范围**：`export function buildSentenceOffsetSpans` 全函数。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L560–L599）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L560–L599）
 
 ```typescript
 // 与 DOM 锚点 / TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移）
@@ -534,7 +534,7 @@ export function buildSentenceOffsetSpans(
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L649–L698）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L649–L698）
 
 ```typescript
 // 与 DOM 锚点 / TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移）
@@ -621,7 +621,7 @@ export function buildSentenceOffsetSpans(
 
 **对比范围**：文件末尾 `buildSentenceOffsetSpans` 断言 IIFE（叹号/引号用例之后的新增用例）。
 
-**改动前** · `apps/frontend/src/utils/englishTts.ts`（基线，约 L1313–L1332）
+**改动前** · `apps/frontend/src/utils/speech.ts`（基线，约 L1313–L1332）
 
 ```typescript
 // 块作用域：句界回归用例（import 时执行一次）
@@ -642,21 +642,21 @@ export function buildSentenceOffsetSpans(
 		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
 		// 须至少两句且第一句含叹号
 		if (spans.length < 2 || !first.includes('！')) {
-			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
+			throw new Error(`[speech] 叹号句界异常: ${plain}`);
 		}
 		// 第一句须以闭引号结尾
 		if (!first.endsWith('\u201d')) {
-			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
+			throw new Error(`[speech] 闭合引号未纳入前句: ${plain}`);
 		}
 		// 第二句须以「这」或「接下」开头
 		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
-			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
+			throw new Error(`[speech] 叹号后句界错位: ${plain}`);
 		}
 	}
 }
 ```
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L1413–L1467）
+**改动后** · `apps/frontend/src/utils/speech.ts`（当前，约 L1413–L1467）
 
 ```typescript
 // 块作用域：句界回归用例（import 时执行一次）
@@ -677,15 +677,15 @@ export function buildSentenceOffsetSpans(
 		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
 		// 须至少两句且第一句含叹号
 		if (spans.length < 2 || !first.includes('！')) {
-			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
+			throw new Error(`[speech] 叹号句界异常: ${plain}`);
 		}
 		// 第一句须以闭引号结尾
 		if (!first.endsWith('\u201d')) {
-			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
+			throw new Error(`[speech] 闭合引号未纳入前句: ${plain}`);
 		}
 		// 第二句须以「这」或「接下」开头
 		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
-			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
+			throw new Error(`[speech] 叹号后句界错位: ${plain}`);
 		}
 	}
 	// 句中省略号应并入下一句
@@ -699,7 +699,7 @@ export function buildSentenceOffsetSpans(
 		ellipsisMid.length !== 2 ||
 		emMid.slice(e1?.start ?? 0, e1?.end ?? 0) !== '……第二句'
 	) {
-		throw new Error('[englishTts] 句中省略号应并入下一句');
+		throw new Error('[speech] 句中省略号应并入下一句');
 	}
 	// 段首破折号应并入本句
 	const dashStart = buildSentenceOffsetSpans('——他说完就走了。');
@@ -711,7 +711,7 @@ export function buildSentenceOffsetSpans(
 		'——他说完就走了。'.trim().slice(d0?.start ?? 0, d0?.end ?? 0) !==
 			'——他说完就走了'
 	) {
-		throw new Error('[englishTts] 句首破折号应并入本句');
+		throw new Error('[speech] 句首破折号应并入本句');
 	}
 	// 段首省略号不应单独成句
 	const leading = buildSentenceOffsetSpans('……他走了。');
@@ -725,7 +725,7 @@ export function buildSentenceOffsetSpans(
 		l0?.start !== 0 ||
 		leadingText.slice(l0.start, l0.end) !== '……他走了'
 	) {
-		throw new Error('[englishTts] 段首省略号不应单独成句');
+		throw new Error('[speech] 段首省略号不应单独成句');
 	}
 	// 句首开引号应归入下一句
 	const openerNext = buildSentenceOffsetSpans('完。\u201c下一句。\u201d');
@@ -735,7 +735,7 @@ export function buildSentenceOffsetSpans(
 	const s1 = t2.slice(openerNext[1]?.start ?? 0, openerNext[1]?.end ?? 0);
 	// 须两句且第二句以开引号开头
 	if (openerNext.length !== 2 || !s1.startsWith('\u201c')) {
-		throw new Error('[englishTts] 句首开引号应归入下一句');
+		throw new Error('[speech] 句首开引号应归入下一句');
 	}
 }
 ```
@@ -769,7 +769,7 @@ export function buildSentenceOffsetSpans(
 
 | 说明 | 路径 |
 |------|------|
-| 句界算法（本轮改动） | `apps/frontend/src/utils/englishTts.ts` |
+| 句界算法（本轮改动） | `apps/frontend/src/utils/speech.ts` |
 | 听书分句 | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
 | 听当前分句 | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 选区 DOM 句索引 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
