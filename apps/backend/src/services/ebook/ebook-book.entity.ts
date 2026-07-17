@@ -75,6 +75,13 @@ export class EbookBook {
 	@Column({ type: 'int', name: 'parse_attempt', default: 0 })
 	parseAttempt: number;
 
+	/**
+	 * EPUB nav 展平目录（与 Web flattenEpubNavToc 对齐）。
+	 * JSON: { index, href, title, level }[]；index 为 spine 章下标。
+	 */
+	@Column({ type: 'mediumtext', name: 'toc_json', nullable: true })
+	tocJson: string | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

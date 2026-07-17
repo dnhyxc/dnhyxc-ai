@@ -18,18 +18,26 @@ export function sanitizeEpubHtml(html: string): string {
 	out = out.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (tag, name: string) => {
 		if (!ALLOWED_TAGS.test(name)) return '';
 		if (tag.startsWith('</')) return `</${name.toLowerCase()}>`;
-		if (name.toLowerCase() === 'img') {
+		const lower = name.toLowerCase();
+		if (lower === 'img') {
 			const src = tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
 			const alt = tag.match(/\salt=["']([^"']*)["']/i)?.[1];
 			if (!src) return '';
 			return `<img src="${src}"${alt != null ? ` alt="${alt}"` : ''} loading="lazy" />`;
 		}
-		if (name.toLowerCase() === 'br') return '<br />';
-		if (name.toLowerCase() === 'a') {
+		if (lower === 'br') return '<br />';
+		// 保留 id/name，供目录 #fragment 跳转（Web nav 与小程序共用）
+		const id = tag.match(/\sid=["']([^"']+)["']/i)?.[1];
+		const nameAttr = tag.match(/\sname=["']([^"']+)["']/i)?.[1];
+		const idPart = id ? ` id="${id}"` : '';
+		const namePart = nameAttr ? ` name="${nameAttr}"` : '';
+		if (lower === 'a') {
 			const href = tag.match(/\shref=["']([^"']+)["']/i)?.[1];
-			return href ? `<a href="${href}">` : '<a>';
+			return href
+				? `<a href="${href}"${idPart}${namePart}>`
+				: `<a${idPart}${namePart}>`;
 		}
-		return `<${name.toLowerCase()}>`;
+		return `<${lower}${idPart}${namePart}>`;
 	});
 
 	return out.trim();

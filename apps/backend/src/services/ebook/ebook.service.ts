@@ -103,7 +103,13 @@ export type EbookChaptersDto = {
 	title: string;
 	total: number;
 	totalWordCount?: number;
+	/** spine 线性章（阅读/进度用） */
 	chapters: EbookChapterMetaDto[];
+	/**
+	 * nav 展平目录（展示用，与 Web 一致；缺省时客户端回退 chapters）
+	 * index 仍为 spine 下标，可多条共用同一 index
+	 */
+	toc?: EbookChapterMetaDto[];
 };
 
 export type EbookChapterContentDto = {
@@ -1601,18 +1607,23 @@ export class EbookService {
 			freshContent.totalWordCount ??
 			rows.reduce((sum, row) => sum + row.wordCount, 0);
 
+		const chapters = rows.map((row) => ({
+			index: row.chapterIndex,
+			href: row.href,
+			title: row.title,
+			level: row.level,
+			wordCount: row.wordCount || undefined,
+		}));
+
+		const toc = await this.resolveEbookToc(freshContent, chapters);
+
 		return {
 			bookId: book.id,
 			title: book.title,
 			total: rows.length,
 			totalWordCount: totalWordCount || undefined,
-			chapters: rows.map((row) => ({
-				index: row.chapterIndex,
-				href: row.href,
-				title: row.title,
-				level: row.level,
-				wordCount: row.wordCount || undefined,
-			})),
+			chapters,
+			toc: toc?.length ? toc : undefined,
 		};
 	}
 
@@ -1916,10 +1927,11 @@ export class EbookService {
 
 		try {
 			const buffer = await this.resolveEpubBuffer(book);
-			const chapters = await this.epubChapterParser.parseEpubBuffer(
+			const parsed = await this.epubChapterParser.parseEpubBuffer(
 				buffer,
 				bookId,
 			);
+			const chapters = parsed.chapters;
 
 			if (chapters.length === 0) {
 				throw new Error('未能解析出章节正文');
@@ -1947,17 +1959,77 @@ export class EbookService {
 			book.parseStatus = 'ready';
 			book.totalWordCount = totalWordCount;
 			book.parseAttempt = 0;
+			book.tocJson = JSON.stringify(parsed.toc);
 			if (book.filePath && isCosEbookKey(book.filePath)) {
 				const key = await this.uploadService.resolveCosObjectKey(book.filePath);
 				if (key !== book.filePath) book.filePath = key;
 			}
 			await this.bookRepo.save(book);
 			this.logger.log(
-				`EPUB 解析完成 book=${bookId} chapters=${chapters.length}`,
+				`EPUB 解析完成 book=${bookId} chapters=${chapters.length} toc=${parsed.toc.length}`,
 			);
 		} catch (err) {
 			this.logger.error(`EPUB 解析失败 book=${bookId}`, err);
 			await this.markEpubParseFailed(bookId);
+		}
+	}
+
+	/** 读缓存 toc_json；旧书缺失时从 EPUB 补解析并写回 */
+	private async resolveEbookToc(
+		contentBook: EbookBook,
+		spineChapters: EbookChapterMetaDto[],
+	): Promise<EbookChapterMetaDto[] | null> {
+		const cached = this.parseStoredTocJson(contentBook.tocJson);
+		if (cached?.length) return cached;
+
+		try {
+			const buffer = await this.resolveEpubBuffer(contentBook);
+			const toc = await this.epubChapterParser.parseTocFromEpubBuffer(buffer);
+			if (!toc.length) return null;
+			const dto: EbookChapterMetaDto[] = toc.map((item) => ({
+				index: item.index,
+				href: item.href,
+				title: item.title,
+				level: item.level,
+			}));
+			contentBook.tocJson = JSON.stringify(dto);
+			await this.bookRepo.save(contentBook);
+			return dto;
+		} catch (err) {
+			this.logger.warn(
+				`补解析 TOC 失败 book=${contentBook.id}，回退 spine 目录`,
+				err,
+			);
+			return spineChapters;
+		}
+	}
+
+	private parseStoredTocJson(
+		raw: string | null | undefined,
+	): EbookChapterMetaDto[] | null {
+		if (!raw?.trim()) return null;
+		try {
+			const parsed = JSON.parse(raw) as unknown;
+			if (!Array.isArray(parsed) || !parsed.length) return null;
+			const out: EbookChapterMetaDto[] = [];
+			for (const row of parsed) {
+				if (!row || typeof row !== 'object') continue;
+				const item = row as Record<string, unknown>;
+				const index = Number(item.index);
+				const title = typeof item.title === 'string' ? item.title : '';
+				const href = typeof item.href === 'string' ? item.href : '';
+				const level = Number(item.level);
+				if (!Number.isFinite(index) || index < 0 || !title) continue;
+				out.push({
+					index,
+					href,
+					title,
+					level: Number.isFinite(level) ? Math.max(0, level) : 0,
+				});
+			}
+			return out.length ? out : null;
+		} catch {
+			return null;
 		}
 	}
 }
