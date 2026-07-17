@@ -6,7 +6,7 @@
 
 **姊妹文档**：[epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md)、[epub-listen-prefetch-after-start.md](./epub-listen-prefetch-after-start.md)、[epub-listen-player-bar.md](./epub-listen-player-bar.md)。
 
-**延伸阅读**：[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)。
+**延伸阅读**：[epub-listen-loading-while-await.md](./epub-listen-loading-while-await.md)（**2026-07-17 修复**：连播/多包等待时 loading 被 `onSentence` 盖掉）、[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)。
 
 ---
 

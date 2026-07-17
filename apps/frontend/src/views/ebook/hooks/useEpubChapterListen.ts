@@ -286,8 +286,8 @@ export function useEpubChapterListen(
 			sectionRef.current = ctx;
 			sectionDocRef.current = visible.outerRange.startContainer.ownerDocument;
 
+			// 勿在此写 status:playing——随后 playCurrent 才会进 TTS 等待；由 onAwaitingCurrentTts 驱动 loading/playing
 			syncState({
-				status: 'playing',
 				spineIndex: visible.spineIndex,
 				sentenceIndex: sentenceCursorRef.current,
 				sentenceCount: ctx.sentences.length,
@@ -349,8 +349,8 @@ export function useEpubChapterListen(
 					onSentence: (globalSi, info) => {
 						if (!isGenActive(gen) || pausedRef.current) return;
 						sentenceCursorRef.current = globalSi;
+						// 勿写 status:playing——cadence 常在 TTS 就绪前触发，会盖掉 loading
 						syncState({
-							status: 'playing',
 							sentenceIndex: globalSi,
 							sentenceCount: sentences.length,
 						});
@@ -990,7 +990,7 @@ export function useEpubChapterListen(
 				sentenceIndex: next,
 				sentenceCount: ctx.sentences.length,
 				sentenceLabels: buildSentenceLabels(ctx.plain, ctx.sentences),
-				status: 'playing',
+				status: 'loading',
 			});
 
 			// 先高亮目标句，避免 Range 未就绪时残留上一句大块背景

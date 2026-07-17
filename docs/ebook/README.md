@@ -83,6 +83,7 @@
 | [epub-listen-bar-playhead-toc.md](./epub-listen-bar-playhead-toc.md)                           | **增量（2026-07-16）**：听书底栏切章用播头 CFI 定位目录邻项（修复同 spine 多节切错章）                            |
 | [epub-listen-soft-pause.md](./epub-listen-soft-pause.md)                                       | **增量（2026-07-15）**：软暂停续播；系统媒体键↔底栏同步；退出 `register(null)` 拆除；macOS Now Playing 限制说明     |
 | [epub-listen-play-loading.md](./epub-listen-play-loading.md)                                     | **增量（2026-07-15）**：当前 TTS pending 时播放钮 Spinner（`onAwaitingCurrentTts`；预取不触发）                      |
+| [epub-listen-loading-while-await.md](./epub-listen-loading-while-await.md)                       | **增量（2026-07-17）**：连播/多包/跳句等待时持续 loading（勿被 onSentence 盖掉；`onAwaitingPlayback`）              |
 | [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md)                           | **增量（2026-07-15）**：分句/目录选中态跟阅读字色（`text-textcolor`，勿用 `text-theme`）                            |
 | [ebook-shelf-progress-pct.md](./ebook-shelf-progress-pct.md)                                     | **增量（2026-07-15）**：书架「已读约」百分比展示层取整，去掉冗长小数                                              |
 | [epub-listen-rate-after-src.md](./epub-listen-rate-after-src.md)                             | **增量**：云端听书 UI 倍速无效修复（复用 Audio 后须在 canplay 后设 `playbackRate`）                                   |

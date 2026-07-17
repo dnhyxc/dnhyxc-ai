@@ -1304,7 +1304,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's25-81': {
 		title: 'Listen play button loading',
 		description:
-			'While chapter listen or quote listen is fetching the current utterance and has not started playing yet, the bottom-bar play button shows a loading state. Background prefetch does not trigger that loading state.',
+			'While chapter listen or quote listen is fetching the current sentence or paragraph and has not started playing yet, the bottom-bar play button shows loading—including between sentences, multi-pack synthesis, and jumps from the sentence list. Background prefetch does not trigger that loading state.',
 	},
 	's25-82': {
 		title: 'Sentence list and TOC selection follow reader theme',
