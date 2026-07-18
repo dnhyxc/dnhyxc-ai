@@ -38,6 +38,10 @@ export class EbookProgress {
 	@Column({ type: 'float', name: 'scroll_percent', nullable: true })
 	scrollPercent: number | null;
 
+	/** 本书听书倍速覆盖；null = 用用户全局 listen_rate */
+	@Column({ type: 'float', name: 'listen_rate', nullable: true })
+	listenRate: number | null;
+
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt: Date;
 }

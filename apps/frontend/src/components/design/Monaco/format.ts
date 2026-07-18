@@ -207,13 +207,17 @@ async function formatWithPrettierForModel(model: {
 			return post === text ? null : post;
 		}
 		return formatted === text ? null : formatted;
-	} catch (err) {
-		if (import.meta.env.DEV) {
-			console.warn(`[Monaco Prettier] 格式化失败 (${language}):`, err);
-		}
+	} catch (_err) {
 		return null;
 	}
 }
+
+type MonacoIRange = {
+	startLineNumber: number;
+	startColumn: number;
+	endLineNumber: number;
+	endColumn: number;
+};
 
 function createDocumentFormattingProvider() {
 	return {
@@ -221,7 +225,7 @@ function createDocumentFormattingProvider() {
 		async provideDocumentFormattingEdits(model: {
 			getValue: () => string;
 			getLanguageId: () => string;
-			getFullModelRange: () => unknown;
+			getFullModelRange: () => MonacoIRange;
 		}) {
 			const out = await formatWithPrettierForModel(model);
 			if (out == null) return [];
@@ -237,19 +241,9 @@ function createRangeFormattingProvider() {
 			model: {
 				getValue: () => string;
 				getLanguageId: () => string;
-				getFullModelRange: () => {
-					startLineNumber: number;
-					startColumn: number;
-					endLineNumber: number;
-					endColumn: number;
-				};
+				getFullModelRange: () => MonacoIRange;
 			},
-			range: {
-				startLineNumber: number;
-				startColumn: number;
-				endLineNumber: number;
-				endColumn: number;
-			},
+			range: MonacoIRange,
 		) {
 			const full = model.getFullModelRange();
 			if (

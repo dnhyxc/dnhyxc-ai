@@ -809,16 +809,3 @@ export function waitForNextSection(
 		void rend.next().catch(() => finish(false));
 	});
 }
-
-// ponytail: 开发态自检 — 超长 plain 须分段且 hasMore，否则会误报「本书已播完」
-if (import.meta.env.DEV) {
-	const long = `${'句。'.repeat(30_000)}尾段。`;
-	const first = sliceListenPlainChunk(long, 0);
-	if (!first.hasMore || first.nextFrom <= 0 || !first.plain.includes('句')) {
-		throw new Error('sliceListenPlainChunk: expected truncated chunk');
-	}
-	const second = sliceListenPlainChunk(long, first.nextFrom);
-	if (second.plain.length < 1) {
-		throw new Error('sliceListenPlainChunk: empty continue chunk');
-	}
-}

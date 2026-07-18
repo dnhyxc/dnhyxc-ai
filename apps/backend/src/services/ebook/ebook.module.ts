@@ -12,6 +12,7 @@ import { EbookChapter } from './ebook-chapter.entity';
 import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
+import { EbookUserPrefs } from './ebook-user-prefs.entity';
 import { EpubChapterParserService } from './epub-chapter-parser.service';
 import { EPUB_PARSE_QUEUE } from './epub-parse.constants';
 import { EpubParseProcessor } from './epub-parse.processor';
@@ -23,6 +24,7 @@ import { EpubParseQueueEvents } from './epub-parse-queue-events';
 			EbookBook,
 			EbookChapter,
 			EbookProgress,
+			EbookUserPrefs,
 			EbookCategory,
 			EbookThought,
 			EbookHighlight,

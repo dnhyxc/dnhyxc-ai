@@ -42,6 +42,7 @@ import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { QueryEbookThoughtChangesDto } from './dto/query-ebook-thought-changes.dto';
 import { QueryEbookThoughtSyncDto } from './dto/query-ebook-thought-sync.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
+import { SaveEbookListenRateDto } from './dto/save-ebook-listen-rate.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookBookVisibilityDto } from './dto/update-ebook-book-visibility.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
@@ -298,6 +299,26 @@ export class EbookController {
 	@UseInterceptors(ResponseInterceptor)
 	async progress(@Req() req: AuthedRequest, @Body() dto: SaveEbookProgressDto) {
 		return this.ebookService.saveProgress(this.userId(req), dto);
+	}
+
+	@Get('listen-prefs')
+	@UseInterceptors(ResponseInterceptor)
+	async getListenPrefs(
+		@Req() req: AuthedRequest,
+		@Query('bookId') bookId?: string,
+	) {
+		const id =
+			typeof bookId === 'string' && bookId.trim() ? bookId.trim() : undefined;
+		return this.ebookService.getListenPrefs(this.userId(req), id);
+	}
+
+	@Put('listen-rate')
+	@UseInterceptors(ResponseInterceptor)
+	async saveListenRate(
+		@Req() req: AuthedRequest,
+		@Body() dto: SaveEbookListenRateDto,
+	) {
+		return this.ebookService.saveListenRate(this.userId(req), dto);
 	}
 
 	@Put('title')

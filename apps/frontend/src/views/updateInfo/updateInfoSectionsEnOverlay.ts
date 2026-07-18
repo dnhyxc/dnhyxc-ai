@@ -1304,7 +1304,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's25-81': {
 		title: 'Listen play button loading',
 		description:
-			'While chapter listen or quote listen is fetching the current utterance and has not started playing yet, the bottom-bar play button shows a loading state. Background prefetch does not trigger that loading state.',
+			'While chapter listen or quote listen is fetching the current sentence or paragraph and has not started playing yet, the bottom-bar play button shows loading—including between sentences, multi-pack synthesis, and jumps from the sentence list. Background prefetch does not trigger that loading state.',
 	},
 	's25-82': {
 		title: 'Sentence list and TOC selection follow reader theme',
@@ -1355,5 +1355,15 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'TOC / sentence list three-way scroll',
 		description:
 			'The book contents drawer (bottom-right) and the listen sentence menu header share one control that cycles Scroll to bottom → top → current chapter/sentence, with icons switching (↓ / ↑ / locate) for long lists.',
+	},
+	's25-92': {
+		title: 'Listen speed synced to account + “this book only”',
+		description:
+			'Playback speed for Listen to book / Listen to selection is saved to your account. By default it applies to all books; turn on Apply to this book only in the speed panel to limit it to the current book—others keep their own speed or the default 1.0×.',
+	},
+	's25-93': {
+		title: 'Listen bar stays usable while audio is loading',
+		description:
+			'While speech is loading, the bottom bar’s sentence list, previous/next chapter, and speed controls stay available; an open speed panel no longer closes when the next sentence starts loading.',
 	},
 };

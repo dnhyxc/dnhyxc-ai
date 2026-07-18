@@ -26,6 +26,7 @@ import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
+import { SaveEbookListenRateDto } from './dto/save-ebook-listen-rate.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
 import { UpdateEbookHighlightDto } from './dto/update-ebook-highlight.dto';
@@ -37,9 +38,14 @@ import { EbookChapter } from './ebook-chapter.entity';
 import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
+import { EbookUserPrefs } from './ebook-user-prefs.entity';
 import { EpubChapterParserService } from './epub-chapter-parser.service';
 import { EPUB_PARSE_QUEUE } from './epub-parse.constants';
 import { EpubParseQueueEvents } from './epub-parse-queue-events';
+
+const DEFAULT_LISTEN_RATE = 1;
+const LISTEN_RATE_MIN = 0.5;
+const LISTEN_RATE_MAX = 3;
 
 export type EbookBookOwnerDto = {
 	userId: number;
@@ -87,7 +93,20 @@ export type EbookProgDto = {
 	chapterIndex?: number;
 	chapterHref?: string;
 	scrollPercent?: number;
+	/** 本书听书倍速覆盖；缺省表示跟全局 */
+	listenRate?: number;
 	updatedAt: string;
+};
+
+export type EbookListenPrefsDto = {
+	/** 用户全局倍速 */
+	listenRate: number;
+	/** 本书覆盖；null = 未设置本书 */
+	bookListenRate: number | null;
+	/** 实际生效倍速 */
+	effectiveRate: number;
+	/** 是否已勾选「设置为本书籍」 */
+	bookOnly: boolean;
 };
 
 export type EbookChapterMetaDto = {
@@ -233,6 +252,8 @@ export class EbookService {
 		private readonly chapterRepo: Repository<EbookChapter>,
 		@InjectRepository(EbookProgress)
 		private readonly progRepo: Repository<EbookProgress>,
+		@InjectRepository(EbookUserPrefs)
+		private readonly prefsRepo: Repository<EbookUserPrefs>,
 		@InjectRepository(EbookCategory)
 		private readonly categoryRepo: Repository<EbookCategory>,
 		@InjectRepository(EbookThought)
@@ -309,7 +330,123 @@ export class EbookService {
 		if (prog.chapterIndex != null) dto.chapterIndex = prog.chapterIndex;
 		if (prog.chapterHref) dto.chapterHref = prog.chapterHref;
 		if (prog.scrollPercent != null) dto.scrollPercent = prog.scrollPercent;
+		if (prog.listenRate != null) dto.listenRate = prog.listenRate;
 		return dto;
+	}
+
+	private clampListenRate(rate: number): number {
+		const n = Number(rate);
+		if (!Number.isFinite(n)) return DEFAULT_LISTEN_RATE;
+		return Math.min(
+			LISTEN_RATE_MAX,
+			Math.max(LISTEN_RATE_MIN, Number(n.toFixed(1))),
+		);
+	}
+
+	private async getOrCreateUserPrefs(userId: number): Promise<EbookUserPrefs> {
+		let row = await this.prefsRepo.findOne({ where: { userId } });
+		if (!row) {
+			row = this.prefsRepo.create({
+				userId,
+				listenRate: DEFAULT_LISTEN_RATE,
+			});
+			await this.prefsRepo.save(row);
+		}
+		return row;
+	}
+
+	async getListenPrefs(
+		userId: number,
+		bookId?: string,
+	): Promise<EbookListenPrefsDto> {
+		const prefs = await this.getOrCreateUserPrefs(userId);
+		const globalRate = this.clampListenRate(
+			prefs.listenRate ?? DEFAULT_LISTEN_RATE,
+		);
+		let bookListenRate: number | null = null;
+		if (bookId) {
+			const book = await this.bookRepo.findOne({
+				where: { id: bookId, userId },
+			});
+			if (!book) {
+				throw new NotFoundException('书籍不存在');
+			}
+			const prog = await this.progRepo.findOne({
+				where: { bookId, userId },
+			});
+			if (prog?.listenRate != null) {
+				bookListenRate = this.clampListenRate(prog.listenRate);
+			}
+		}
+		const bookOnly = bookListenRate != null;
+		const effectiveRate = bookOnly ? bookListenRate! : globalRate;
+		return {
+			listenRate: globalRate,
+			bookListenRate,
+			effectiveRate,
+			bookOnly,
+		};
+	}
+
+	async saveListenRate(
+		userId: number,
+		dto: SaveEbookListenRateDto,
+	): Promise<EbookListenPrefsDto> {
+		const rate = this.clampListenRate(dto.rate);
+		const bookOnly = dto.bookOnly === true;
+
+		if (bookOnly) {
+			if (!dto.bookId) {
+				throw new BadRequestException('设置为本书籍时需要 bookId');
+			}
+			const book = await this.bookRepo.findOne({
+				where: { id: dto.bookId, userId },
+			});
+			if (!book) {
+				throw new NotFoundException('书籍不存在');
+			}
+			let prog = await this.progRepo.findOne({
+				where: { bookId: dto.bookId, userId },
+			});
+			if (!prog) {
+				prog = this.progRepo.create({
+					bookId: dto.bookId,
+					userId,
+				});
+			}
+			prog.listenRate = rate;
+			await this.progRepo.save(prog);
+
+			// 勾选本书时把全局拨回基线，避免「先改速写全局 → 再勾本书」污染其它书
+			if (dto.restoreGlobalRate != null) {
+				const prefs = await this.getOrCreateUserPrefs(userId);
+				prefs.listenRate = this.clampListenRate(dto.restoreGlobalRate);
+				await this.prefsRepo.save(prefs);
+			}
+			return this.getListenPrefs(userId, dto.bookId);
+		}
+
+		const prefs = await this.getOrCreateUserPrefs(userId);
+		prefs.listenRate = rate;
+		await this.prefsRepo.save(prefs);
+
+		if (dto.bookId) {
+			const prog = await this.progRepo.findOne({
+				where: { bookId: dto.bookId, userId },
+			});
+			if (prog?.listenRate != null) {
+				prog.listenRate = null;
+				await this.progRepo.save(prog);
+			}
+			return this.getListenPrefs(userId, dto.bookId);
+		}
+
+		return {
+			listenRate: rate,
+			bookListenRate: null,
+			effectiveRate: rate,
+			bookOnly: false,
+		};
 	}
 
 	async getShelf(

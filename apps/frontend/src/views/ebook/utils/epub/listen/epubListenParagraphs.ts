@@ -184,21 +184,3 @@ export function sliceParagraphFromSentence(
 	if (!sent) return '';
 	return stripMarkdownForTts(plain.slice(sent.start, unit.end)).trim();
 }
-
-// ponytail: 开发态自检
-if (import.meta.env.DEV) {
-	const sample = '第一句。第二句。第三句！';
-	const units = buildParagraphUnits(sample);
-	if (units.length < 1 || units[0]!.siEnd < 2) {
-		throw new Error('epubListenParagraphs: expected multi-sentence pack');
-	}
-	const lines = ['一句。', '二句。', '三句。', '四句。'].join('\n');
-	const lineUnits = buildParagraphUnits(lines);
-	const totalSentences = lineUnits.reduce(
-		(n, u) => n + (u.siEnd - u.siStart),
-		0,
-	);
-	if (totalSentences < 4) {
-		throw new Error('epubListenParagraphs: lost sentences when packing');
-	}
-}

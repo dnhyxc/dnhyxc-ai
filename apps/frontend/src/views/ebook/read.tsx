@@ -29,6 +29,8 @@ import {
 	deleteEbookHighlight,
 	deleteEbookThought,
 	fetchEbookHighlights,
+	getEbookListenPrefs,
+	saveEbookListenRate,
 	updateEbookHighlight,
 	updateEbookThought,
 } from '@/service';
@@ -230,6 +232,97 @@ function EbookReadPage() {
 
 	/** 听当前切入听书后共用底栏（切章等能力可用） */
 	const epubListenBar = chapterListen;
+
+	/** 听书倍速：默认全局；勾选后仅本书 */
+	const [listenRateBookOnly, setListenRateBookOnly] = useState(false);
+	const listenRateBookOnlyRef = useRef(false);
+	/** 进入本书时的全局倍速；勾选「本书」时用来把全局拨回去 */
+	const listenRateGlobalBaselineRef = useRef(1);
+	const listenRatePersistReadyRef = useRef(false);
+	const listenRatePersistTimerRef = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
+
+	useEffect(() => {
+		if (!bookId) return;
+		listenRatePersistReadyRef.current = false;
+		let cancelled = false;
+		void getEbookListenPrefs(bookId)
+			.then((prefs) => {
+				if (cancelled) return;
+				chapterListenRef.current.setRate(prefs.effectiveRate);
+				listenRateBookOnlyRef.current = prefs.bookOnly;
+				setListenRateBookOnly(prefs.bookOnly);
+				listenRateGlobalBaselineRef.current = prefs.listenRate;
+				listenRatePersistReadyRef.current = true;
+			})
+			.catch(() => {
+				if (cancelled) return;
+				chapterListenRef.current.setRate(1);
+				listenRateBookOnlyRef.current = false;
+				setListenRateBookOnly(false);
+				listenRateGlobalBaselineRef.current = 1;
+				listenRatePersistReadyRef.current = true;
+			});
+		return () => {
+			cancelled = true;
+			if (listenRatePersistTimerRef.current) {
+				clearTimeout(listenRatePersistTimerRef.current);
+				listenRatePersistTimerRef.current = null;
+			}
+		};
+	}, [bookId]);
+
+	const schedulePersistListenRate = useCallback(
+		(
+			rate: number,
+			bookOnly: boolean,
+			opts?: {
+				/** 取消「本书」后，把当前倍速记为新的全局基线 */ commitGlobalBaseline?: boolean;
+			},
+		) => {
+			if (!bookId || !listenRatePersistReadyRef.current) return;
+			if (listenRatePersistTimerRef.current) {
+				clearTimeout(listenRatePersistTimerRef.current);
+			}
+			listenRatePersistTimerRef.current = setTimeout(() => {
+				listenRatePersistTimerRef.current = null;
+				const body: {
+					rate: number;
+					bookOnly: boolean;
+					bookId: string;
+					restoreGlobalRate?: number;
+				} = { rate, bookOnly, bookId };
+				// 勾选本书：写本书覆盖，并把全局拨回进书/上次取消本书时的基线
+				if (bookOnly) {
+					body.restoreGlobalRate = listenRateGlobalBaselineRef.current;
+				} else if (opts?.commitGlobalBaseline) {
+					listenRateGlobalBaselineRef.current = rate;
+				}
+				void saveEbookListenRate(body).catch(() => {});
+			}, 400);
+		},
+		[bookId],
+	);
+
+	const onListenRateChange = useCallback(
+		(rate: number) => {
+			chapterListenRef.current.setRate(rate);
+			schedulePersistListenRate(rate, listenRateBookOnlyRef.current);
+		},
+		[schedulePersistListenRate],
+	);
+
+	const onListenRateBookOnlyChange = useCallback(
+		(bookOnly: boolean) => {
+			listenRateBookOnlyRef.current = bookOnly;
+			setListenRateBookOnly(bookOnly);
+			schedulePersistListenRate(chapterListenRef.current.rate, bookOnly, {
+				commitGlobalBaseline: !bookOnly,
+			});
+		},
+		[schedulePersistListenRate],
+	);
 
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
@@ -2684,7 +2777,9 @@ function EbookReadPage() {
 								canPrevChapter={canListenPrevChapter}
 								canNextChapter={canListenNextChapter}
 								onGoToSentence={epubListenBar.goToSentence}
-								onRateChange={epubListenBar.setRate}
+								onRateChange={onListenRateChange}
+								rateBookOnly={listenRateBookOnly}
+								onRateBookOnlyChange={onListenRateBookOnlyChange}
 								sentenceMenuOpen={listenSentenceMenuOpen}
 								onSentenceMenuOpenChange={setListenSentenceMenuOpen}
 								rateMenuOpen={listenRateMenuOpen}

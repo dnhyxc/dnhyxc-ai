@@ -100,6 +100,7 @@ export async function playListenUnitsFromCursor(
 			const notifyStart = opts?.onPlaybackStart;
 			await playPreferred(raw, {
 				...opts,
+				onAwaitingPlayback: onAwaitingCurrentTts,
 				onPlaybackStart: () => {
 					onAwaitingCurrentTts?.(false);
 					notifyStart?.();

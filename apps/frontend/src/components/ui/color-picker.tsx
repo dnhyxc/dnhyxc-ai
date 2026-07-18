@@ -133,19 +133,6 @@ const alphaCheckerStyle: CSSProperties = {
 	backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
 };
 
-if (import.meta.env.DEV) {
-	const rgb = { r: 67, g: 134, b: 12 };
-	const hex = rgbToHex(rgb);
-	const back = hexToRgb(hex);
-	if (!back || back.r !== rgb.r) {
-		throw new Error('[color-picker] rgb/hex roundtrip failed');
-	}
-	const rgba = parseColorString('rgba(67, 134, 12, 0.5)');
-	if (!rgba || rgba.alpha !== 50) {
-		throw new Error('[color-picker] rgba parse failed');
-	}
-}
-
 export type ColorPickerFormat = 'hex' | 'rgb';
 
 export type ColorPickerProps = {

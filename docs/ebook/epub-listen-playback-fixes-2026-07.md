@@ -16,6 +16,7 @@
 | 7   | 底栏 ◀▶ 想切章而非切句                       | TOC 邻项 / spine 回退 → `goEpubTocHref` → `restartFromChapterStart`                                                  | [epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)           |
 | 8   | 暂停后再播从头开始；系统播放与底栏不同步     | 软暂停保留 `currentTime`；Media Session + pause bridge；退出时 `register(null)` 尽力拆除（macOS 控件残留为平台限制） | [epub-listen-soft-pause.md](./epub-listen-soft-pause.md)                     |
 | 9   | 当前 TTS pending 时播放钮无等待反馈          | `onAwaitingCurrentTts` → `status: loading`；钮上 Spinner（预取不触发）                                               | [epub-listen-play-loading.md](./epub-listen-play-loading.md)                 |
+| 9b  | 连播时 loading 只在首启出现                  | 勿在 onSentence/applySection 写 playing；多包 `onAwaitingPlayback`                                                  | [epub-listen-loading-while-await.md](./epub-listen-loading-while-await.md)   |
 | 10  | 换阅读背景后分句/目录选中项字色不可读        | 列表 active/idle 改跟 `text-textcolor`，勿用 `text-theme`                                                            | [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md)       |
 | 11  | 书架「已读约」出现长小数                     | 展示层 `Math.round` + 0–100 夹紧                                                                                     | [ebook-shelf-progress-pct.md](./ebook-shelf-progress-pct.md)                 |
 | 12  | 同 HTML 多 `#filepos` 点目录滚到错节/章末    | Foliate CFI `display` + iframe 坐标顶对齐；`attachTocCfis`                                                           | [epub-toc-cfi-navigate.md](./epub-toc-cfi-navigate.md)                       |
@@ -27,6 +28,8 @@
 | 18  | 听书中划选仍被自动滚回播放句                 | `selectionchange` → `pauseListenAutoFollow`                                                                          | [epub-listen-select-pause-follow.md](./epub-listen-select-pause-follow.md)   |
 | 19  | 滚动后 PopBar 关了但选中高亮残留             | scroll/relocated 清 Selection                                                                                        | [epub-selection-scroll-clear.md](./epub-selection-scroll-clear.md)           |
 | 20  | 朗读整行 `***` 装饰分隔线                    | `stripMarkdownForTts` 过滤连续装饰符                                                                                 | [epub-tts-separator-filter.md](./epub-tts-separator-filter.md)               |
+| 21  | 倍速不落库；「本书」仍影响其它书             | 全局 prefs + 本书覆盖；勾本书时 `restoreGlobalRate`                                                                  | [epub-listen-rate-persist.md](./epub-listen-rate-persist.md)                 |
+| 22  | loading 时倍速 pop 被关、右侧按钮灰掉        | 去掉 loading 强制关菜单与右侧 `disabled`/`pointer-events-none`                                                       | [epub-listen-bar-loading-controls.md](./epub-listen-bar-loading-controls.md) |
 
 ## 规划稿
 

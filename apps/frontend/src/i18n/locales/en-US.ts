@@ -1750,6 +1750,7 @@ export const enUS = {
 	'ebook.read.listenBook.sentenceMenuEmpty': 'No sentences',
 	'ebook.read.listenBook.scrollToCurrentSentence': 'Scroll to current sentence',
 	'ebook.read.listenBook.speed': 'Playback speed',
+	'ebook.read.listenBook.speedBookOnly': 'Apply to this book only',
 	'ebook.read.listenBook.progress':
 		'Ch. {chapter} · sentence {current}/{total}',
 	'ebook.read.listenBook.loading': 'Loading…',

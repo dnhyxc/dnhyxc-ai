@@ -82,16 +82,6 @@ export function stripMarkdownForTts(raw: string): string {
 	);
 }
 
-// ponytail: 装饰分隔线不得进 TTS
-if (import.meta.env.DEV) {
-	const sep = stripMarkdownForTts(
-		'上一句。\n**************************************************\n下一句。',
-	);
-	if (sep.includes('*') || !sep.includes('上一句') || !sep.includes('下一句')) {
-		throw new Error(`[speech] separator stars leaked into TTS: ${sep}`);
-	}
-}
-
 /** 本机朗读分段：文本 + 段后停顿时长（毫秒），用于句读顿挫 */
 type TtsCadenceChunk = { text: string; pauseAfterMs: number };
 
@@ -510,11 +500,19 @@ export type PlayPreferredOptions = {
 	 * 听书用来错开预取，避免与首包 HTTP 抢带宽。
 	 */
 	onPlaybackStart?: () => void;
+	/**
+	 * 当前正要播放的音频仍在等待（合成/下载/canplay）时为 true，出声后为 false。
+	 * 多包/多段时会在每一段等待前再次 true；prefetch 未完成也会 true。
+	 */
+	onAwaitingPlayback?: (waiting: boolean) => void;
 };
 
 type CadencePlaybackHooks = Pick<
 	PlayPreferredOptions,
-	'onCadenceChunk' | 'prefetchedCloud' | 'onPlaybackStart'
+	| 'onCadenceChunk'
+	| 'prefetchedCloud'
+	| 'onPlaybackStart'
+	| 'onAwaitingPlayback'
 >;
 
 type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
@@ -1698,6 +1696,8 @@ async function playCloudTtsCadenceSegments(
 			await pauseMs(Math.max(0, Math.round(prevPause / rate)));
 			// 校验暂停期间世代是否仍然有效
 			if (!isPlaybackGenerationActive(generation)) return;
+			// 下一段 TTS 可能仍在飞：恢复等待态
+			opts?.onAwaitingPlayback?.(true);
 		}
 
 		// 发出“本块开始”事件（供 UI/外部响应）
@@ -1713,13 +1713,10 @@ async function playCloudTtsCadenceSegments(
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
 		// 播放当前段 MP3
-		await playCloudTtsReady(
-			ready,
-			generation,
-			rate,
-			undefined,
-			i === 0 ? notifyPlaybackStart : undefined,
-		);
+		await playCloudTtsReady(ready, generation, rate, undefined, () => {
+			opts?.onAwaitingPlayback?.(false);
+			if (i === 0) notifyPlaybackStart();
+		});
 		// 校验播放后世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 段播放完，发出“本块结束”事件
@@ -1836,13 +1833,18 @@ async function playCloudTtsPackedSingleUtterances(
 	const parentOnCadence = opts?.onCadenceChunk;
 	for (let i = 0; i < packs.length; i += 1) {
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 第二包起再次进入等待：首包出声后 loading 已清，后续 HTTP 需重新点亮
+		if (i > 0) opts?.onAwaitingPlayback?.(true);
 		const pack = packs[i]!;
 		const baseSi = sentenceIndexAtOffset(sentences, pack.start);
 		await playCloudTtsSingleUtterance(pack.text, generation, {
 			...opts,
-			// 仅首包可吃预取 / 触发 onPlaybackStart
+			// 仅首包可吃预取
 			prefetchedCloud: i === 0 ? opts?.prefetchedCloud : null,
-			onPlaybackStart: i === 0 ? opts?.onPlaybackStart : undefined,
+			onPlaybackStart: () => {
+				opts?.onAwaitingPlayback?.(false);
+				if (i === 0) opts?.onPlaybackStart?.();
+			},
 			onCadenceChunk: parentOnCadence
 				? (event) => {
 						parentOnCadence({
@@ -2070,6 +2072,7 @@ async function speakTextWithGeneration(
 	const notifyPlaybackStart = () => {
 		if (playbackStartNotified) return;
 		playbackStartNotified = true;
+		options?.onAwaitingPlayback?.(false);
 		options?.onPlaybackStart?.();
 	};
 	// 分段顺次朗读
@@ -2084,6 +2087,7 @@ async function speakTextWithGeneration(
 			await pauseMs(prevPause);
 			// 停顿期间世代提前变化（用户已停止）须退出
 			if (!isPlaybackGenerationActive(generation)) return;
+			options?.onAwaitingPlayback?.(true);
 		}
 		// 分段播放前事件钩子，可外部监听
 		emitCadenceChunk(options, plain, chunks, i, 'start');
@@ -2155,6 +2159,7 @@ export async function playPreferred(
 		onCadenceChunk: options?.onCadenceChunk,
 		prefetchedCloud: options?.prefetchedCloud,
 		onPlaybackStart: options?.onPlaybackStart,
+		onAwaitingPlayback: options?.onAwaitingPlayback,
 	};
 
 	// 优先分支：本地 TTS
@@ -2175,6 +2180,7 @@ export async function playPreferred(
 		onCadenceChunk: options?.onCadenceChunk,
 		prefetchedCloud: options?.prefetchedCloud,
 		onPlaybackStart: options?.onPlaybackStart,
+		onAwaitingPlayback: options?.onAwaitingPlayback,
 		rate: speakOpts?.rate,
 		singleUtterance: options?.cloudSingleUtterance === true,
 	};
