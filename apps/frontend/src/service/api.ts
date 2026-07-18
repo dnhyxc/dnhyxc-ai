@@ -213,6 +213,9 @@ export const EBOOK_ADD_PATH = '/ebook/add-path';
 export const EBOOK_UPLOAD = '/ebook/upload';
 /** 电子书：更新阅读进度 */
 export const EBOOK_PROGRESS = '/ebook/progress';
+/** 电子书：听书倍速偏好 */
+export const EBOOK_LISTEN_PREFS = '/ebook/listen-prefs';
+export const EBOOK_LISTEN_RATE = '/ebook/listen-rate';
 /** 电子书：更新书名 */
 export const EBOOK_TITLE = '/ebook/title';
 /** 电子书：上传书架封面（multipart → uploads/images） */

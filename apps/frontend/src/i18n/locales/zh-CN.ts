@@ -1604,6 +1604,7 @@ export const zhCN = {
 	'ebook.read.listenBook.sentenceMenuEmpty': '暂无分句',
 	'ebook.read.listenBook.scrollToCurrentSentence': '滚动到当前句',
 	'ebook.read.listenBook.speed': '播放倍速',
+	'ebook.read.listenBook.speedBookOnly': '设置为本书籍',
 	'ebook.read.listenBook.progress': '第 {chapter} 章 · 第 {current}/{total} 句',
 	'ebook.read.listenBook.loading': '正在加载…',
 	'ebook.read.listenBook.barAria': '听书播放控制',

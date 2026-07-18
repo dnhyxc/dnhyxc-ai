@@ -28,6 +28,8 @@
 | 18  | 听书中划选仍被自动滚回播放句                 | `selectionchange` → `pauseListenAutoFollow`                                                                          | [epub-listen-select-pause-follow.md](./epub-listen-select-pause-follow.md)   |
 | 19  | 滚动后 PopBar 关了但选中高亮残留             | scroll/relocated 清 Selection                                                                                        | [epub-selection-scroll-clear.md](./epub-selection-scroll-clear.md)           |
 | 20  | 朗读整行 `***` 装饰分隔线                    | `stripMarkdownForTts` 过滤连续装饰符                                                                                 | [epub-tts-separator-filter.md](./epub-tts-separator-filter.md)               |
+| 21  | 倍速不落库；「本书」仍影响其它书             | 全局 prefs + 本书覆盖；勾本书时 `restoreGlobalRate`                                                                  | [epub-listen-rate-persist.md](./epub-listen-rate-persist.md)                 |
+| 22  | loading 时倍速 pop 被关、右侧按钮灰掉        | 去掉 loading 强制关菜单与右侧 `disabled`/`pointer-events-none`                                                       | [epub-listen-bar-loading-controls.md](./epub-listen-bar-loading-controls.md) |
 
 ## 规划稿
 

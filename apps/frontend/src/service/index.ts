@@ -61,6 +61,8 @@ import {
 	EBOOK_DELETE,
 	EBOOK_FILE,
 	EBOOK_HIGHLIGHTS,
+	EBOOK_LISTEN_PREFS,
+	EBOOK_LISTEN_RATE,
 	EBOOK_PROGRESS,
 	EBOOK_PUBLIC_OPEN,
 	EBOOK_SHELF,
@@ -2067,6 +2069,35 @@ export const saveEbookProgress = async (prog: Prog): Promise<void> => {
 		pdfPage: prog.pdfPage,
 		percent: prog.percent,
 	});
+};
+
+export type EbookListenPrefs = {
+	listenRate: number;
+	bookListenRate: number | null;
+	effectiveRate: number;
+	bookOnly: boolean;
+};
+
+/** GET /ebook/listen-prefs：全局 + 本书听书倍速 */
+export const getEbookListenPrefs = async (
+	bookId?: string,
+): Promise<EbookListenPrefs> => {
+	const res = await http.get<EbookListenPrefs>(EBOOK_LISTEN_PREFS, {
+		querys: bookId ? { bookId } : undefined,
+	});
+	return res.data;
+};
+
+/** PUT /ebook/listen-rate：保存全局或本书听书倍速 */
+export const saveEbookListenRate = async (body: {
+	rate: number;
+	bookOnly?: boolean;
+	bookId?: string;
+	/** 勾选本书时恢复全局倍速，避免污染其它书 */
+	restoreGlobalRate?: number;
+}): Promise<EbookListenPrefs> => {
+	const res = await http.put<EbookListenPrefs>(EBOOK_LISTEN_RATE, body);
+	return res.data;
 };
 
 /** 页面刷新/关闭时 keepalive 上报（async PUT 会被浏览器中断） */

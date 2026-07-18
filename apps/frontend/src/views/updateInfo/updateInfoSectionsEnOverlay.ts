@@ -1356,4 +1356,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The book contents drawer (bottom-right) and the listen sentence menu header share one control that cycles Scroll to bottom → top → current chapter/sentence, with icons switching (↓ / ↑ / locate) for long lists.',
 	},
+	's25-92': {
+		title: 'Listen speed synced to account + “this book only”',
+		description:
+			'Playback speed for Listen to book / Listen to selection is saved to your account. By default it applies to all books; turn on Apply to this book only in the speed panel to limit it to the current book—others keep their own speed or the default 1.0×.',
+	},
+	's25-93': {
+		title: 'Listen bar stays usable while audio is loading',
+		description:
+			'While speech is loading, the bottom bar’s sentence list, previous/next chapter, and speed controls stay available; an open speed panel no longer closes when the next sentence starts loading.',
+	},
 };

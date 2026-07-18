@@ -129,6 +129,8 @@
 | EPUB 听书首句出声慢 / 首包与预取抢带宽                             | [ebook/epub-listen-prefetch-after-start.md](./ebook/epub-listen-prefetch-after-start.md)                                                                 |
 | EPUB 连续滚动听书远章后 FAB「回到播放位置」无效                    | [ebook/epub-listen-follow-cfi-remount.md](./ebook/epub-listen-follow-cfi-remount.md) · [ebook/epub-listen-auto-follow-fab.md](./ebook/epub-listen-auto-follow-fab.md) |
 | EPUB 听书倍速 2× 但听感仍 1×（云端 MP3）                           | [ebook/epub-listen-rate-after-src.md](./ebook/epub-listen-rate-after-src.md)                                                                           |
+| EPUB 听书倍速落库 /「设置为本书籍」仍影响其它书                     | [ebook/epub-listen-rate-persist.md](./ebook/epub-listen-rate-persist.md)                                                                               |
+| EPUB 听书 loading 时倍速 pop 被关掉 / 右侧按钮灰掉                 | [ebook/epub-listen-bar-loading-controls.md](./ebook/epub-listen-bar-loading-controls.md)                                                               |
 | EPUB 听书云端已停但播放条仍「播放中」                              | [ebook/epub-listen-audio-end-ui.md](./ebook/epub-listen-audio-end-ui.md)                                                                               |
 | EPUB 听书播放本轮修复总览（含切章 / 软暂停 / loading / 选中色）    | [ebook/epub-listen-playback-fixes-2026-07.md](./ebook/epub-listen-playback-fixes-2026-07.md) · [ideas/epub-listen-playback-optimize.md](./ideas/epub-listen-playback-optimize.md) |
 | EPUB 听书连播时播放钮 loading 只在首启出现                          | [ebook/epub-listen-loading-while-await.md](./ebook/epub-listen-loading-while-await.md) · [ebook/epub-listen-play-loading.md](./ebook/epub-listen-play-loading.md) |

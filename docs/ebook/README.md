@@ -86,6 +86,8 @@
 | [epub-listen-loading-while-await.md](./epub-listen-loading-while-await.md)                       | **增量（2026-07-17）**：连播/多包/跳句等待时持续 loading（勿被 onSentence 盖掉；`onAwaitingPlayback`）              |
 | [epub-chrome-list-active-theme.md](./epub-chrome-list-active-theme.md)                           | **增量（2026-07-15）**：分句/目录选中态跟阅读字色（`text-textcolor`，勿用 `text-theme`）                            |
 | [ebook-shelf-progress-pct.md](./ebook-shelf-progress-pct.md)                                     | **增量（2026-07-15）**：书架「已读约」百分比展示层取整，去掉冗长小数                                              |
+| [epub-listen-rate-persist.md](./epub-listen-rate-persist.md)                                 | **增量（2026-07-18）**：听书倍速账号落库（全局 +「设置为本书籍」覆盖、`restoreGlobalRate`、Switch 卡片 UI）          |
+| [epub-listen-bar-loading-controls.md](./epub-listen-bar-loading-controls.md)                 | **增量（2026-07-18）**：播放 loading 时右侧分句/切章/倍速可用，倍速 pop 不因句间 loading 被关掉                      |
 | [epub-listen-rate-after-src.md](./epub-listen-rate-after-src.md)                             | **增量**：云端听书 UI 倍速无效修复（复用 Audio 后须在 canplay 后设 `playbackRate`）                                   |
 | [epub-listen-audio-end-ui.md](./epub-listen-audio-end-ui.md)                                 | **增量**：音频已停但 UI 仍播放中（`abortCloudAudioWait`、先挂 `waitCloudAudioEnd` 再 `play`）                         |
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)                       | **增量（纯重构）**：mark 层公共 utils 抽取至 `epubMarkShared.ts` + geometry export，行为不变                          |

@@ -6,7 +6,7 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
-import { Button, ScrollArea, Spinner } from '@ui/index';
+import { Button, ScrollArea, Spinner, Switch } from '@ui/index';
 import {
 	ChevronDown,
 	ChevronLeft,
@@ -33,6 +33,36 @@ import {
 /** 分句列表滚动：同一按钮循环 底 → 顶 → 当前 */
 type SentenceScrollMode = 'bottom' | 'top' | 'current';
 
+type Props = {
+	status: ChapterListenStatus;
+	spineIndex: number;
+	sentenceIndex: number;
+	sentenceCount: number;
+	sentenceLabels: string[];
+	rate: number;
+	onTogglePlay: () => void;
+	onStop: () => void;
+	onPrevChapter: () => void;
+	onNextChapter: () => void;
+	canPrevChapter?: boolean;
+	canNextChapter?: boolean;
+	onGoToSentence: (index: number) => void;
+	onRateChange: (rate: number) => void;
+	/** 倍速仅对本书生效 */
+	rateBookOnly?: boolean;
+	onRateBookOnlyChange?: (bookOnly: boolean) => void;
+	/** 受控：分句下拉是否展开（便于阅读区 pointer 关闭） */
+	sentenceMenuOpen?: boolean;
+	onSentenceMenuOpenChange?: (open: boolean) => void;
+	/** 受控：倍速下拉是否展开（便于阅读区 pointer 关闭） */
+	rateMenuOpen?: boolean;
+	onRateMenuOpenChange?: (open: boolean) => void;
+	/** Portal 下拉菜单需单独挂阅读 chrome 字色变量 */
+	menuChromeStyle?: CSSProperties;
+};
+
+type RateRulerTick = { index: number; major: boolean };
+
 const SENTENCE_SCROLL_NEXT: Record<SentenceScrollMode, SentenceScrollMode> = {
 	bottom: 'top',
 	top: 'current',
@@ -58,8 +88,12 @@ const RATE_RULER_LABELS = Array.from(
 );
 /** 刻度区左右留白，使 0 / max 刻度与指示器均按中心对齐且可贴边选中 */
 const RULER_INSET_PX = 6;
-
-type RateRulerTick = { index: number; major: boolean };
+/** 分句行高（含 gap），与 VirtualSentenceMenuList 布局一致 */
+const SENTENCE_ROW_STRIDE_PX = 40;
+const SENTENCE_LIST_VIEWPORT_MAX_PX = 260;
+const SENTENCE_LIST_OVERSCAN = 5;
+/** 刻度尺下方快捷倍速（参考 UI 圆形按钮） */
+const RATE_PRESETS = [1, 1.5, 2, 2.5, 3] as const;
 
 function buildRateRulerTicks(stepCount: number): RateRulerTick[] {
 	const ticks: RateRulerTick[] = [];
@@ -72,8 +106,6 @@ function buildRateRulerTicks(stepCount: number): RateRulerTick[] {
 	}
 	return ticks;
 }
-/** 刻度尺下方快捷倍速（参考 UI 圆形按钮） */
-const RATE_PRESETS = [1, 1.5, 2, 2.5, 3] as const;
 
 function clampListenRate(rate: number, max = RATE_RULER_MAX): number {
 	return Math.min(max, Math.max(RATE_RULER_MIN, rate));
@@ -112,12 +144,37 @@ function rateFromTrackClientX(track: HTMLDivElement, clientX: number): number {
 	return Number((RATE_RULER_MIN + index * RATE_RULER_STEP).toFixed(1));
 }
 
+function truncateSentenceLabel(text: string, maxLen = 56): string {
+	const normalized = text.replace(/\s+/g, ' ').trim();
+	if (!normalized) return '…';
+	if (normalized.length <= maxLen) return normalized;
+	return `${normalized.slice(0, maxLen)}…`;
+}
+
+function scrollSentenceIndexIntoView(
+	viewport: HTMLDivElement,
+	index: number,
+	total: number,
+): void {
+	if (total <= 0) return;
+	const totalHeight = total * SENTENCE_ROW_STRIDE_PX;
+	const maxScroll = Math.max(0, totalHeight - viewport.clientHeight);
+	const centered =
+		index * SENTENCE_ROW_STRIDE_PX -
+		(viewport.clientHeight - SENTENCE_ROW_STRIDE_PX) / 2;
+	viewport.scrollTop = Math.min(maxScroll, Math.max(0, centered));
+}
+
 function EpubListenRatePanel({
 	rate,
 	onRateChange,
+	bookOnly,
+	onBookOnlyChange,
 }: {
 	rate: number;
 	onRateChange: (rate: number) => void;
+	bookOnly: boolean;
+	onBookOnlyChange: (bookOnly: boolean) => void;
 }) {
 	const { t } = useI18n();
 	const trackRef = useRef<HTMLDivElement>(null);
@@ -184,12 +241,12 @@ function EpubListenRatePanel({
 			<div className="text-textcolor/45 text-sm font-normal mb-2.5">
 				{t('ebook.read.listenBook.speed')}
 			</div>
-			<div className="bg-theme/5 px-4.5 pt-2 pb-3.5 rounded-md">
+			<div className="bg-theme/5 pt-2 pb-3.5 rounded-md">
 				<p className="text-textcolor text-center text-3xl font-semibold tabular-nums">
 					{formatListenRate(snapRateToRuler(rate))}
 				</p>
 
-				<div className="relative mt-5">
+				<div className="relative mt-5 px-5">
 					<div
 						ref={trackRef}
 						role="slider"
@@ -245,7 +302,7 @@ function EpubListenRatePanel({
 					</div>
 				</div>
 
-				<div className="mt-5 flex items-center justify-between gap-1">
+				<div className="mt-5 px-3 flex items-center justify-between gap-1">
 					{RATE_PRESETS.map((preset) => {
 						const selected = Math.abs(rate - preset) < 0.001;
 						return (
@@ -268,34 +325,23 @@ function EpubListenRatePanel({
 					})}
 				</div>
 			</div>
+
+			<label
+				htmlFor="epub-listen-rate-book-only"
+				className="bg-theme/5 mt-2 flex cursor-pointer items-center justify-between gap-3 rounded-md px-3.5 py-3"
+			>
+				<span className="text-textcolor text-sm">
+					{t('ebook.read.listenBook.speedBookOnly')}
+				</span>
+				<Switch
+					id="epub-listen-rate-book-only"
+					checked={bookOnly}
+					onCheckedChange={(v) => onBookOnlyChange(v === true)}
+					aria-label={t('ebook.read.listenBook.speedBookOnly')}
+				/>
+			</label>
 		</div>
 	);
-}
-
-function truncateSentenceLabel(text: string, maxLen = 56): string {
-	const normalized = text.replace(/\s+/g, ' ').trim();
-	if (!normalized) return '…';
-	if (normalized.length <= maxLen) return normalized;
-	return `${normalized.slice(0, maxLen)}…`;
-}
-
-/** 分句行高（含 gap），与 VirtualSentenceMenuList 布局一致 */
-const SENTENCE_ROW_STRIDE_PX = 40;
-const SENTENCE_LIST_VIEWPORT_MAX_PX = 260;
-const SENTENCE_LIST_OVERSCAN = 5;
-
-function scrollSentenceIndexIntoView(
-	viewport: HTMLDivElement,
-	index: number,
-	total: number,
-): void {
-	if (total <= 0) return;
-	const totalHeight = total * SENTENCE_ROW_STRIDE_PX;
-	const maxScroll = Math.max(0, totalHeight - viewport.clientHeight);
-	const centered =
-		index * SENTENCE_ROW_STRIDE_PX -
-		(viewport.clientHeight - SENTENCE_ROW_STRIDE_PX) / 2;
-	viewport.scrollTop = Math.min(maxScroll, Math.max(0, centered));
 }
 
 /** ponytail: 长章数百句，只渲染视口附近行，避免 600+ DropdownMenuItem 卡 scroll */
@@ -468,8 +514,8 @@ function VirtualSentenceMenuList({
 			</DropdownMenuLabel>
 			<ScrollArea
 				ref={viewportRef}
-				className="max-h-65 w-full"
-				viewportClassName="max-h-65 overscroll-y-contain px-1 [&>div]:!block [&>div]:!min-h-0"
+				className="max-h-55.5 w-full"
+				viewportClassName="max-h-55.5 overscroll-y-contain px-1 [&>div]:!block [&>div]:!min-h-0"
 				scrollbarClassName="right-0"
 				onScroll={handleScroll}
 			>
@@ -513,31 +559,6 @@ function VirtualSentenceMenuList({
 	);
 }
 
-type Props = {
-	status: ChapterListenStatus;
-	spineIndex: number;
-	sentenceIndex: number;
-	sentenceCount: number;
-	sentenceLabels: string[];
-	rate: number;
-	onTogglePlay: () => void;
-	onStop: () => void;
-	onPrevChapter: () => void;
-	onNextChapter: () => void;
-	canPrevChapter?: boolean;
-	canNextChapter?: boolean;
-	onGoToSentence: (index: number) => void;
-	onRateChange: (rate: number) => void;
-	/** 受控：分句下拉是否展开（便于阅读区 pointer 关闭） */
-	sentenceMenuOpen?: boolean;
-	onSentenceMenuOpenChange?: (open: boolean) => void;
-	/** 受控：倍速下拉是否展开（便于阅读区 pointer 关闭） */
-	rateMenuOpen?: boolean;
-	onRateMenuOpenChange?: (open: boolean) => void;
-	/** Portal 下拉菜单需单独挂阅读 chrome 字色变量 */
-	menuChromeStyle?: CSSProperties;
-};
-
 /** 听书底部播放条 */
 export function EpubListenPlayerBar({
 	status,
@@ -554,6 +575,8 @@ export function EpubListenPlayerBar({
 	canNextChapter = false,
 	onGoToSentence,
 	onRateChange,
+	rateBookOnly = false,
+	onRateBookOnlyChange,
 	sentenceMenuOpen: sentenceMenuOpenProp,
 	onSentenceMenuOpenChange,
 	rateMenuOpen: rateMenuOpenProp,
@@ -566,13 +589,9 @@ export function EpubListenPlayerBar({
 	const [rateOpenUncontrolled, setRateOpenUncontrolled] = useState(false);
 	const sentenceOpen = sentenceMenuOpenProp ?? sentenceOpenUncontrolled;
 	const rateOpen = rateMenuOpenProp ?? rateOpenUncontrolled;
-	const statusRef = useRef(status);
-	statusRef.current = status;
 
 	const handleRateOpenChange = useCallback(
 		(open: boolean) => {
-			// loading 时禁止打开倍速面板（Radix Trigger 可能仍回调 onOpenChange）
-			if (open && statusRef.current === 'loading') return;
 			if (onRateMenuOpenChange) onRateMenuOpenChange(open);
 			else setRateOpenUncontrolled(open);
 		},
@@ -581,18 +600,11 @@ export function EpubListenPlayerBar({
 
 	const handleSentenceOpenChange = useCallback(
 		(open: boolean) => {
-			if (open && statusRef.current === 'loading') return;
 			if (onSentenceMenuOpenChange) onSentenceMenuOpenChange(open);
 			else setSentenceOpenUncontrolled(open);
 		},
 		[onSentenceMenuOpenChange],
 	);
-
-	useEffect(() => {
-		if (status !== 'loading') return;
-		handleSentenceOpenChange(false);
-		handleRateOpenChange(false);
-	}, [status, handleSentenceOpenChange, handleRateOpenChange]);
 
 	if (status === 'idle') return null;
 
@@ -668,25 +680,18 @@ export function EpubListenPlayerBar({
 				{progressLabel}
 			</span>
 
-			{/* loading：视觉 disabled 不够，Radix 菜单仍可能打开；整组禁点击 */}
-			<div
-				className={cn(
-					'flex shrink-0 items-center gap-2',
-					loading && 'pointer-events-none',
-				)}
-				aria-disabled={loading || undefined}
-			>
+			<div className="flex shrink-0 items-center gap-2">
 				<DropdownMenu
 					modal={false}
 					open={sentenceOpen}
 					onOpenChange={handleSentenceOpenChange}
 				>
-					<DropdownMenuTrigger asChild disabled={loading || sentenceCount <= 0}>
+					<DropdownMenuTrigger asChild disabled={sentenceCount <= 0}>
 						<Button
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							disabled={loading || sentenceCount <= 0}
+							disabled={sentenceCount <= 0}
 							className="text-textcolor/80 shrink-0"
 							aria-label={t('ebook.read.listenBook.sentenceMenu')}
 							onPointerDown={(e) => e.stopPropagation()}
@@ -698,7 +703,7 @@ export function EpubListenPlayerBar({
 						side="top"
 						align="end"
 						className={cn(
-							'z-50 w-72 overflow-hidden p-1 pb-4',
+							'z-50 w-90 overflow-hidden p-1 pb-4',
 							epubReaderChromeMenuContentClass,
 						)}
 						style={menuChromeStyle}
@@ -729,7 +734,7 @@ export function EpubListenPlayerBar({
 						variant="ghost"
 						size="icon-sm"
 						className="text-textcolor/80 shrink-0"
-						disabled={loading || !canPrevChapter}
+						disabled={!canPrevChapter}
 						aria-label={t('ebook.read.listenBook.prevChapter')}
 						onClick={onPrevChapter}
 					>
@@ -743,7 +748,7 @@ export function EpubListenPlayerBar({
 						variant="ghost"
 						size="icon-sm"
 						className="text-textcolor/80 shrink-0"
-						disabled={loading || !canNextChapter}
+						disabled={!canNextChapter}
 						aria-label={t('ebook.read.listenBook.nextChapter')}
 						onClick={onNextChapter}
 					>
@@ -756,12 +761,11 @@ export function EpubListenPlayerBar({
 					open={rateOpen}
 					onOpenChange={handleRateOpenChange}
 				>
-					<DropdownMenuTrigger asChild disabled={loading}>
+					<DropdownMenuTrigger asChild>
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							disabled={loading}
 							className={cn(
 								'text-textcolor/80 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
 								'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
@@ -777,12 +781,17 @@ export function EpubListenPlayerBar({
 						side="top"
 						align="end"
 						className={cn(
-							'z-50 w-80 overflow-hidden p-0',
+							'z-50 w-90 overflow-hidden p-0',
 							epubReaderChromeMenuContentClass,
 						)}
 						style={menuChromeStyle}
 					>
-						<EpubListenRatePanel rate={rate} onRateChange={onRateChange} />
+						<EpubListenRatePanel
+							rate={rate}
+							onRateChange={onRateChange}
+							bookOnly={rateBookOnly}
+							onBookOnlyChange={onRateBookOnlyChange ?? (() => {})}
+						/>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
