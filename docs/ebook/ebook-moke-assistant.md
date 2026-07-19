@@ -5,6 +5,7 @@
 - EPUB 右键菜单初版：`epub-assistant-context-menu.md`
 - 知识库选区写入后聚焦（含 IME 修复）：`../knowledge/assistant-insert-focus.md`
 - PDF 适应宽度与滚动换页：`pdf-reader-fit-scroll.md`
+- **EPUB 侧栏写想法 / MK 问书输入焦点（2026-07-19）**：[`epub-side-panel-input-focus.md`](./epub-side-panel-input-focus.md) —— 电子书问书已改为 `assistantFocusKey` + settle 交焦，**不再**经 `EbookAssistant` 的 `focusInputAtEndKey`；下文 §3 / §4.12 中电子书路径的旧叙述以该专题为准（知识库复制到助手仍可用 `focusInputAtEndKey`）。
 
 ---
 

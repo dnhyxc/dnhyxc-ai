@@ -36,6 +36,8 @@ interface ChatTextAreaProps {
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: ChatI18nT;
 	maxLength?: number;
+	/** 透传到原生 textarea，供 label/htmlFor 或 getElementById 聚焦 */
+	textareaId?: string;
 	onScrollAreaWheel?: React.WheelEventHandler<HTMLDivElement>;
 	onScrollAreaWheelCapture?: React.WheelEventHandler<HTMLDivElement>;
 }
@@ -57,6 +59,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			disableTextInput = false,
 			t,
 			maxLength,
+			textareaId,
 			onScrollAreaWheel,
 			onScrollAreaWheelCapture,
 		},
@@ -134,6 +137,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			<>
 				<ScrollArea
 					ref={scrollRef}
+					viewportTabIndex={-1}
 					className={cn(
 						'flex max-h-35 w-full flex-col overflow-y-auto border-0',
 						className,
@@ -143,6 +147,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				>
 					<Textarea
 						ref={ref}
+						id={textareaId}
 						value={value}
 						maxLength={maxLength}
 						onChange={

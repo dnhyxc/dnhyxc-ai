@@ -1,8 +1,8 @@
 import ChatTextArea from '@design/ChatTextArea';
 import { Button } from '@ui/index';
-import { useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { EPUB_THOUGHT_COMPOSE_INPUT_ID } from '../../utils/common/epubThoughtComposeInput';
 import {
 	epubReaderChromeBorderColorClass,
 	epubReaderChromeOutlineButtonClass,
@@ -22,7 +22,7 @@ export type EpubThoughtMode = 'create' | 'view' | 'edit';
 type Props = {
 	onClose: () => void;
 	mode: EpubThoughtMode;
-	/** 递增时滚到底部并聚焦输入框（含写想法页内再次点「写想法」） */
+	/** 兼容旧调用；交焦由 read 页 settle 路径负责 */
 	scrollToComposeKey?: number;
 	quote: string;
 	content: string;
@@ -49,7 +49,6 @@ const THOUGHT_TEXTAREA_CLASS = cn(
 export function EpubThought({
 	onClose,
 	mode,
-	scrollToComposeKey = 0,
 	quote,
 	content,
 	username,
@@ -64,9 +63,6 @@ export function EpubThought({
 	quoteActions,
 	onQuoteHighlightClick,
 }: Props) {
-	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const scrollRef = useRef<HTMLDivElement>(null);
-
 	const { t } = useI18n();
 	const readOnly = mode === 'view';
 	const displayName = username || t('ebook.read.thought.unknownUser');
@@ -83,21 +79,8 @@ export function EpubThought({
 		void onSave(true);
 	};
 
-	useEffect(() => {
-		if (mode === 'view') return;
-		const frame = requestAnimationFrame(() => {
-			const el = textareaRef.current;
-			if (!el) return;
-			el.focus({ preventScroll: true });
-			const end = el.value.length;
-			el.setSelectionRange(end, end);
-		});
-		return () => cancelAnimationFrame(frame);
-	}, [mode, quote, scrollToComposeKey]);
-
 	return (
 		<EpubThoughtPanelShell
-			ref={scrollRef}
 			footer={
 				readOnly ? undefined : (
 					<EpubThoughtComposeCard
@@ -142,7 +125,7 @@ export function EpubThought({
 						}
 					>
 						<ChatTextArea
-							ref={textareaRef}
+							textareaId={EPUB_THOUGHT_COMPOSE_INPUT_ID}
 							input={content}
 							setInput={onContentChange}
 							sendMessage={handleSaveFromKeyboard}

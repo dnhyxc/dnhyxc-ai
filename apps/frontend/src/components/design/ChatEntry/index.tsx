@@ -166,6 +166,8 @@ interface ChatEntryProps {
 	inputWrapClassName?: string;
 	/** 递增时在 input 同步后聚焦并将光标置于末尾（如预填摘录） */
 	focusInputAtEndKey?: number;
+	/** 透传到原生 textarea（如电子书侧栏用 id 延后聚焦） */
+	textareaId?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -194,6 +196,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	t,
 	inputWrapClassName,
 	focusInputAtEndKey,
+	textareaId,
 }) => {
 	const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const textareaRef = chatInputRef ?? internalTextareaRef;
@@ -210,6 +213,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 		consumedFocusAtEndKeyRef.current = focusInputAtEndKey;
 		const len = el.value.length;
+		const active = document.activeElement;
+		if (active instanceof HTMLIFrameElement) active.blur();
 		el.focus({ preventScroll: true });
 		el.setSelectionRange(len, len);
 		el.scrollTop = el.scrollHeight;
@@ -896,6 +901,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 						<ChatTextArea
 							ref={textareaRef}
 							mode="chat"
+							textareaId={textareaId}
 							placeholder={chatTextAreaPlaceholder}
 							input={input}
 							setInput={setInput}

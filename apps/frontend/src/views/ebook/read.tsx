@@ -72,7 +72,13 @@ import type {
 	EpubHighlightColorId,
 	EpubHighlightStyle,
 } from './types';
-import { subscribeEbookSplitPanelResizeEnd } from './utils/common/ebookSplitResize';
+import {
+	EPUB_ASSISTANT_INPUT_ID,
+	EPUB_THOUGHT_COMPOSE_INPUT_ID,
+	focusEpubAssistantInput,
+	focusThoughtComposeInput,
+	setEpubReaderPointerSuspended,
+} from './utils/common/epubThoughtComposeInput';
 import { type EbookOpenSource, resolveOpen } from './utils/common/io';
 import { findActiveTocItemIndex } from './utils/common/tocActiveIndex';
 import { getRememberedEpubPopBarSelectionRange } from './utils/epub/listen/epubListenSegmentOverlay';
@@ -327,7 +333,8 @@ function EbookReadPage() {
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
 	const [assistantInput, setAssistantInput] = useState('');
-	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
+	/** 递增时：问书面板就绪后再交焦（勿在开栏瞬间 focus） */
+	const [assistantFocusKey, setAssistantFocusKey] = useState(0);
 	const [contextMenu, setContextMenu] =
 		useState<EpubReaderContextMenuState | null>(null);
 	const contextMenuOpenRef = useRef(false);
@@ -349,6 +356,11 @@ function EbookReadPage() {
 	const [thoughtSaving, setThoughtSaving] = useState(false);
 	const [thoughtListOpen, setThoughtListOpen] = useState(false);
 	const [thoughtComposeScrollKey, setThoughtComposeScrollKey] = useState(0);
+
+	const focusThoughtCompose = useCallback(() => {
+		focusThoughtComposeInput();
+	}, []);
+
 	const [selectionPopBar, setSelectionPopBar] =
 		useState<EpubSelectionPopBarState | null>(null);
 	const selectionPopBarRef = useRef<EpubSelectionPopBarPayload | null>(null);
@@ -370,8 +382,10 @@ function EbookReadPage() {
 		Promise.resolve(null as EbookUserHighlight | null),
 	);
 	const returnToListClusterRef = useRef<EbookThoughtClickCluster | null>(null);
-	/** 想法侧栏开合时保持左侧引用段落在视口内（分栏 resize 后回滚） */
+	/** 想法引用 CFI：供划线 pin；阅读位保持改由 EpubPane 视口钉住 */
 	const thoughtQuoteAnchorCfiRef = useRef<string | undefined>(undefined);
+	/** 右侧分栏是否已展开（开栏前采样，避免闭包陈旧） */
+	const sidePanelOpenRef = useRef(false);
 	const [thoughtDraft, setThoughtDraft] = useState({
 		id: '',
 		userId: 0,
@@ -1154,6 +1168,7 @@ function EbookReadPage() {
 	const onSelectionPopBarWriteThought = useCallback(() => {
 		const payload = selectionPopBarRef.current;
 		if (!payload) return;
+		// 只开栏；交焦等右侧面板挂载完成后再做（见下方 effect）
 		openCreateThought(payload.selectedText, payload.cfiRange);
 	}, [openCreateThought]);
 
@@ -1164,10 +1179,63 @@ function EbookReadPage() {
 		}
 	}, [thoughtDialogOpen, contextMenu?.open]);
 
+	/** 当前侧栏实际挂载的可编辑输入（问书优先于想法） */
+	const sideComposeTarget = assistantOpen
+		? ('assistant' as const)
+		: thoughtDialogOpen && thoughtDialogMode !== 'view'
+			? ('thought' as const)
+			: null;
+
+	/**
+	 * 侧栏交焦（单一 effect）：按当前可见面板等输入框进 DOM，再 settle 后 focus。
+	 * 问书/想法来回切换只改 target，避免两个 effect 互相 cancel。
+	 */
+	useEffect(() => {
+		if (!sideComposeTarget) return;
+
+		const inputId =
+			sideComposeTarget === 'assistant'
+				? EPUB_ASSISTANT_INPUT_ID
+				: EPUB_THOUGHT_COMPOSE_INPUT_ID;
+		const focusInput =
+			sideComposeTarget === 'assistant'
+				? focusEpubAssistantInput
+				: focusThoughtComposeInput;
+
+		setEpubReaderPointerSuspended(true);
+		let cancelled = false;
+		let focusTimer = 0;
+
+		const applyFocus = () => {
+			if (cancelled) return;
+			epubNavRef.current?.clearTextSelection();
+			focusInput();
+			setEpubReaderPointerSuspended(false);
+		};
+
+		const waitForPanel = () => {
+			if (cancelled) return;
+			if (!document.getElementById(inputId)) {
+				requestAnimationFrame(waitForPanel);
+				return;
+			}
+			focusTimer = window.setTimeout(applyFocus, 150);
+		};
+		requestAnimationFrame(waitForPanel);
+
+		return () => {
+			cancelled = true;
+			if (focusTimer) window.clearTimeout(focusTimer);
+			setEpubReaderPointerSuspended(false);
+		};
+	}, [sideComposeTarget, thoughtComposeScrollKey, assistantFocusKey]);
+
 	const openThoughtCluster = useCallback(
 		(cluster: EbookThoughtClickCluster) => {
 			if (cluster.allThoughts.length === 0) return;
 			const seedCluster = { ...cluster, selectedThoughtId: undefined };
+			// 侧栏已开时宽度不变，视口钉不住新引用，需显式滚入
+			const sideAlreadyOpen = sidePanelOpenRef.current;
 
 			void (async () => {
 				const rend = epubNavRef.current?.getRendition() ?? undefined;
@@ -1197,9 +1265,12 @@ function EbookReadPage() {
 					setThoughtListCluster(reconciled);
 					setThoughtListOpen(true);
 				});
+				if (sideAlreadyOpen && cfiRange.trim()) {
+					void ensureQuoteCfiInViewport(cfiRange);
+				}
 			})();
 		},
-		[refreshThoughtsNow],
+		[refreshThoughtsNow, ensureQuoteCfiInViewport],
 	);
 
 	const saveThought = useCallback(
@@ -1692,6 +1763,8 @@ function EbookReadPage() {
 		if (draft?.trim()) {
 			setAssistantInput(draft.trim());
 		}
+		// 与想法互斥占栏，避免「双开」导致切回时交焦依赖对不上
+		setThoughtDialogOpen(false);
 		setAssistantOpen(true);
 	}, []);
 
@@ -1709,8 +1782,9 @@ function EbookReadPage() {
 		(selectedText: string) => {
 			const quote = selectedText.trim();
 			if (!quote) return;
+			// 只开栏填草稿；交焦等问书面板挂载后再做
 			openAssistant(t('ebook.read.assistant.askSelectionDraft', { quote }));
-			setFocusInputAtEndKey((n) => n + 1);
+			setAssistantFocusKey((n) => n + 1);
 		},
 		[openAssistant, t],
 	);
@@ -1777,6 +1851,7 @@ function EbookReadPage() {
 		const text = payload?.selectedText ?? '';
 		setSelectionPopBar(null);
 		selectionPopBarRef.current = null;
+		// 清选区改到问书交焦 effect 里，避免开栏前把焦点打进 iframe
 		openAssistantWithSelection(text);
 	}, [openAssistantWithSelection]);
 
@@ -1885,6 +1960,7 @@ function EbookReadPage() {
 				void removeHighlightForQuote(cfiRange, thoughtDraft.quote),
 			onWriteThought: () => {
 				if (thoughtDialogOpen && thoughtDialogMode === 'create') {
+					// 触发下方 effect 在面板就绪后再交焦
 					setThoughtComposeScrollKey((key) => key + 1);
 					return;
 				}
@@ -1925,6 +2001,7 @@ function EbookReadPage() {
 		thoughtListCluster.allThoughts.length > 0;
 
 	const thoughtPanelOpen = thoughtDialogOpen || thoughtListPanelOpen;
+	sidePanelOpenRef.current = assistantOpen || thoughtPanelOpen;
 	const [pinnedThoughtCfisRevision, setPinnedThoughtCfisRevision] = useState(0);
 
 	const syncThoughtQuoteAnchorCfi = useCallback(() => {
@@ -1979,38 +2056,12 @@ function EbookReadPage() {
 		setPinnedThoughtCfisRevision((revision) => revision + 1);
 	}, [thoughtPanelOpen, thoughtDraft.cfiRange, thoughtListCluster]);
 
-	const scrollThoughtQuoteAnchorIntoView = useCallback(() => {
-		const cfi = thoughtQuoteAnchorCfiRef.current;
-		if (!cfi) return;
-		void ensureQuoteCfiInViewport(cfi);
-	}, [ensureQuoteCfiInViewport]);
-
-	useEffect(() => {
-		if (book?.fmt !== 'epub') return;
-		return subscribeEbookSplitPanelResizeEnd(scrollThoughtQuoteAnchorIntoView);
-	}, [book?.fmt, scrollThoughtQuoteAnchorIntoView]);
-
+	// 开合侧栏 / 窗口缩放 / 拖手柄的阅读位保持由 EpubPane.applyHostResize 视口钉住完成。
+	// 此处只同步锚点 CFI（划线 pin），避免再 display/scroll 抢焦点、打乱原阅读位置。
 	useEffect(() => {
 		if (book?.fmt !== 'epub') return;
 		if (thoughtPanelOpen) syncThoughtQuoteAnchorCfi();
-		let raf2 = 0;
-		const raf1 = requestAnimationFrame(() => {
-			raf2 = requestAnimationFrame(scrollThoughtQuoteAnchorIntoView);
-		});
-		return () => {
-			cancelAnimationFrame(raf1);
-			cancelAnimationFrame(raf2);
-		};
-	}, [
-		book?.fmt,
-		thoughtPanelOpen,
-		thoughtDialogOpen,
-		thoughtListPanelOpen,
-		thoughtListCluster,
-		thoughtDraft.cfiRange,
-		syncThoughtQuoteAnchorCfi,
-		scrollThoughtQuoteAnchorIntoView,
-	]);
+	}, [book?.fmt, thoughtPanelOpen, syncThoughtQuoteAnchorCfi]);
 
 	const closeThoughtDialog = useCallback(() => {
 		setThoughtDialogOpen(false);
@@ -2036,7 +2087,6 @@ function EbookReadPage() {
 					bookTitle={book.title}
 					input={assistantInput}
 					onInputChange={setAssistantInput}
-					focusInputAtEndKey={focusInputAtEndKey}
 				/>
 			);
 		}
@@ -2071,7 +2121,10 @@ function EbookReadPage() {
 					}
 					onEdit={
 						viewingOwnThought && thoughtDialogMode === 'view'
-							? () => setThoughtDialogMode('edit')
+							? () => {
+									setThoughtDialogMode('edit');
+									requestAnimationFrame(() => focusThoughtCompose());
+								}
 							: undefined
 					}
 					saving={thoughtSaving}
@@ -2096,7 +2149,6 @@ function EbookReadPage() {
 		closeThoughtDialog,
 		closeThoughtList,
 		deleteThought,
-		focusInputAtEndKey,
 		openViewThought,
 		saveThought,
 		thoughtComposeScrollKey,
@@ -2112,6 +2164,7 @@ function EbookReadPage() {
 		thoughtListQuoteActions,
 		openHighlightPopBarAtBookContent,
 		thoughtSaving,
+		focusThoughtCompose,
 	]);
 
 	/** 右侧分栏开关与 state 对齐 */
@@ -2217,10 +2270,7 @@ function EbookReadPage() {
 			const quote = payload?.selectedText.trim() ?? '';
 			const cfiRange = payload?.cfiRange;
 			if (!quote) return;
-			clearEpubSelection();
-			window.setTimeout(() => {
-				openCreateThought(quote, cfiRange);
-			}, 0);
+			openCreateThought(quote, cfiRange);
 		},
 		openAssistant: () => {
 			clearEpubSelection();
@@ -2798,7 +2848,6 @@ function EbookReadPage() {
 									bookTitle={book.title}
 									input={assistantInput}
 									onInputChange={setAssistantInput}
-									focusInputAtEndKey={focusInputAtEndKey}
 								/>
 							) : null
 						}

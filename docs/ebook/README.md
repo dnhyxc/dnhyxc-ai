@@ -98,7 +98,9 @@
 | [../Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md) | **影响点**：听读 utils 7→3 文件合并、路径对照与回归清单                                                                                       |
 - [epub-highlight-custom-color.md](./epub-highlight-custom-color.md) — 实现说明与代码对比
 - [../Influence-point/epub-highlight-custom-color-picker.md](../Influence-point/epub-highlight-custom-color-picker.md) — **影响点**：划线自定义色 ColorPicker、`#rrggbb(aa)` 持久化与 PopBar/想法侧栏波及面                                                           |
-| [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
+| [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量（已被 pin 部分取代）**：想法侧栏开合后引用 CFI scroll；通用阅读位见 [epub-viewport-pin.md](./epub-viewport-pin.md)                    |
+| [epub-viewport-pin.md](./epub-viewport-pin.md)                                     | **增量（2026-07-19）**：softResize 视口钉住（`captureEpubViewportPin` / 每次 `applyHostResize`）                                              |
+| [epub-side-panel-input-focus.md](./epub-side-panel-input-focus.md)               | **增量（2026-07-19）**：侧栏写想法/MK 问书输入焦点（PopBar 去 FocusScope、单一 settle 交焦 effect）                                            |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |
 | [epub-window-resize-relayout.md](./epub-window-resize-relayout.md)                 | **增量**：窗口放大/全屏后 EPUB 正文居中重排（view relayout + window.resize settle）                                                               |
