@@ -31,7 +31,7 @@
 | 9   | 准入 = registry 上架 + 生产 https；对方 Remote 自配 CORS（含 `tauri://localhost`）                            |
 | 10  | 一仓多 expose：`remoteName` + `expose`；业务 Dialog 内嵌（如 `ebookIdeasList`）                               |
 | 11  | 插件默认懒加载（`preload: route`）；勿在 init 里 `await` 全量 loadRemote                                      |
-| 12  | **样式**：partner 构建期 scoped（无 Preflight + `data-plugin-root`）；`untrusted` 强制 iframe；禁 Host 半套 Shadow |
+| 12  | **样式**：Host 运行时 `@scope` 自动隔离（子项目零侵入）；`untrusted` 强制 iframe；详见 [style-isolation-implementation.md](./style-isolation-implementation.md) |
 
 ---
 

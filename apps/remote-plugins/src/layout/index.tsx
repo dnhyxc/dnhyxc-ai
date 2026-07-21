@@ -9,10 +9,7 @@ const links: { to: string; label: string; end?: boolean }[] = [
 
 export default function Layout() {
 	return (
-		<div
-			className="plugin-standalone bg-theme-background text-textcolor flex h-screen flex-col"
-			data-plugin-root
-		>
+		<div className="bg-theme-background text-textcolor flex h-screen flex-col">
 			<header className="border-theme-border flex shrink-0 items-center gap-4 border-b px-4 py-2.5">
 				<span className="text-sm font-medium">remote-plugins</span>
 				<nav className="flex flex-wrap gap-1">

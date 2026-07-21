@@ -1,0 +1,271 @@
+# 主项目样式隔离技术说明
+
+> **文档角色**：面向主/子应用开发者的样式隔离技术快速参考
+> **阅读时间**：约 5 分钟
+> **目标**：让开发者快速了解主项目使用的样式隔离技术、原理、以及各自需要关注的点
+
+---
+
+## 一、一句话总结
+
+**主项目采用「CSS `@scope` 规则 + DOM 方法劫持 + MutationObserver」的组合方案，实现零侵入的主子项目样式隔离，子项目无需任何改造。**
+
+---
+
+## 二、使用的核心技术
+
+| 技术 | 作用 | 所属层级 |
+|------|------|---------|
+| **CSS `@scope` 规则** | 将子项目的所有 CSS 选择器限制在指定容器内 | 浏览器原生能力 |
+| **`head.appendChild` / `insertBefore` 劫持** | 同步捕获子项目注入的 style/link 标签 | 运行时劫持 |
+| **MutationObserver** | 异步捕获子项目延迟注入的样式（HMR、动态 import 等） | DOM 监听 API |
+| **`data-mf-plugin` 属性** | 作为 `@scope` 的根选择器，标记插件容器边界 | DOM 属性约定 |
+| **iframe（untrusted 模式）** | 不可信插件的完全隔离方案 | 浏览器原生能力 |
+
+---
+
+## 三、技术原理详解
+
+### 3.1 CSS @scope 是什么
+
+`@scope` 是 CSS 原生的作用域规则（Chrome 118+ / Firefox 125+ / Safari 17.4+ 支持），可以将一组样式限制在指定的根元素范围内：
+
+```css
+/* 只有在 [data-mf-plugin="my-plugin"] 容器内，这些样式才生效 */
+@scope ([data-mf-plugin="my-plugin"]) {
+  .button { background: blue; }
+  body { margin: 0; }
+  /* ... 所有子项目样式 ... */
+}
+```
+
+**关键特性**：
+- ✅ 浏览器原生支持，性能极佳
+- ✅ 选择器不会"漏出"容器外
+- ✅ 支持 Tailwind、CSS 变量、@keyframes 等所有 CSS 特性
+- ✅ 可以继承容器外的 CSS 变量（主题统一）
+
+### 3.2 主项目如何自动包裹子项目样式
+
+主项目在子项目加载期间，自动拦截所有注入到 `document.head` 的 style/link 标签：
+
+```
+子项目注入样式 → 主项目拦截 → 用 @scope 包裹 → 放回 DOM
+```
+
+具体流程：
+
+1. **加载前**：开启样式捕获模式
+2. **加载中**：子项目的 CSS 被打包工具注入到 `document.head`
+3. **拦截处理**：
+   - style 标签：直接将内容用 `@scope` 包裹
+   - link 标签：fetch 获取 CSS 内容后转成 scoped style
+4. **加载后**：结束首次捕获
+5. **运行时**：插件页面挂载期间持续捕获（HMR、动态 import）
+
+### 3.3 插件容器约定
+
+每个子项目渲染在一个带有 `data-mf-plugin` 属性的容器内：
+
+```html
+<div data-mf-plugin="plugin-id" data-plugin-root>
+  <!-- 子项目渲染在这里 -->
+  <!-- 所有 scoped 样式仅在这个 div 内生效 -->
+</div>
+```
+
+---
+
+## 四、主项目做了什么
+
+### 4.1 核心模块
+
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| 样式隔离核心 | [styleIsolation.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/plugins/host/styleIsolation.ts) | 提供 `beginPluginStyleCapture` 和 `attachPluginStyleIsolation` 两个 API |
+| 插件管理器 | [PluginManager.ts](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/plugins/core/PluginManager.ts) | 在 `loadRemoteApp` 前后调用样式捕获 |
+| 插件宿主页 | [PluginHostPage.tsx](file:///Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src/plugins/host/PluginHostPage.tsx) | 提供 `data-mf-plugin` 容器，页面生命周期内持续隔离 |
+
+### 4.2 两个捕获阶段
+
+| 阶段 | 触发时机 | 捕获内容 | 持续时间 |
+|------|---------|---------|---------|
+| **初始加载捕获** | `loadRemoteApp` 前后 | 子项目入口模块及依赖的所有 CSS | 加载完成即结束 |
+| **运行时持续捕获** | `PluginHostPage` 挂载期间 | HMR 热更新、动态 `import()`、第三方库注入的样式 | 组件整个生命周期 |
+
+### 4.3 样式识别策略
+
+主项目通过以下方式判断一个 style/link 标签属于哪个插件：
+
+1. **已标记元素**：检查 `data-mf-style-owner` 属性
+2. **link 标签**：比对 `href` 的 origin 与插件入口 origin
+3. **Vite 开发模式**：检查 `data-vite-dev-id` 是否包含 remote 路径
+4. **生产环境**：捕获窗口期内注入的都归属于当前插件
+
+---
+
+## 五、子项目需要知道什么
+
+### 5.1 子项目需要改造吗？
+
+**不需要！零侵入。**
+
+子项目可以像普通前端项目一样开发：
+
+- ✅ 正常使用 Tailwind CSS（`@import "tailwindcss"`）
+- ✅ 正常写全局样式（`body`、`html`、`#root` 等）
+- ✅ 正常使用 CSS Modules / CSS-in-JS
+- ✅ 正常使用第三方组件库（shadcn/ui、Ant Design 等）
+- ✅ 正常使用 CSS 变量、`@keyframes`
+- ✅ 正常配置 Vite / Webpack
+
+### 5.2 子项目唯一需要注意的点
+
+**外链 CSS 的 CORS 配置**：
+
+如果子项目使用了 `<link rel="stylesheet" href="...">` 引入跨域 CSS 文件，需要确保：
+- CSS 文件服务器配置了 CORS（允许主项目域名访问）
+- 否则主项目无法获取 CSS 内容进行 scoped 处理
+- 未处理的样式会原样生效（不隔离，但不影响功能）
+
+**Nginx 配置示例**：
+```nginx
+location /static/css/ {
+    add_header Access-Control-Allow-Origin *;
+}
+```
+
+> 💡 **建议**：尽量将 CSS 打包进 JS 中（Vite 默认行为），变成 style 标签注入，完全没有 CORS 问题。
+
+### 5.3 子项目能感知到隔离吗？
+
+**正常开发感知不到。** 只有以下情况可能需要留意：
+
+- **想写全局样式**：如果子项目故意想写全局样式（影响主项目），做不到，所有样式都会被限制在插件容器内
+- **CSS 变量继承**：主项目的 CSS 变量（主题色等）可以被子项目自动继承，无需额外配置
+- **`:root` 选择器**：子项目的 `:root` 会被 scoped 限制，只在插件容器内生效，不会影响主项目的 `:root`
+
+---
+
+## 六、两种隔离模式
+
+主项目支持两种隔离模式，根据插件的信任等级自动选择：
+
+| 模式 | 适用场景 | 技术方案 | 隔离程度 | JS 隔离 |
+|------|---------|---------|---------|--------|
+| **trusted 模式** | 可信插件（MF 加载） | CSS @scope + DOM 劫持 | 样式级隔离 | ❌ 不隔离 |
+| **untrusted 模式** | 不可信第三方插件 | iframe | 完全隔离 | ✅ 完全隔离 |
+
+### trusted 模式（默认）
+
+```
+┌─────────────────────────┐
+│      主项目 DOM         │
+│  ┌───────────────────┐  │
+│  │ data-mf-plugin    │  │
+│  │  ┌─────────────┐  │  │
+│  │  │  子项目组件  │  │  │
+│  │  └─────────────┘  │  │
+│  └───────────────────┘  │
+│                         │
+│  共享同一个 document    │
+│  共享同一个 JS 上下文    │
+└─────────────────────────┘
+```
+
+### untrusted 模式
+
+```
+┌─────────────────────────┐
+│      主项目 DOM         │
+│  ┌───────────────────┐  │
+│  │   <iframe>        │  │
+│  │  ┌─────────────┐  │  │
+│  │  │ 独立 document│  │  │
+│  │  │ 独立 JS 上下文│  │  │
+│  │  └─────────────┘  │  │
+│  └───────────────────┘  │
+│                         │
+│  通过 postMessage 通信   │
+└─────────────────────────┘
+```
+
+---
+
+## 七、为什么选择这个方案
+
+### 7.1 与其他方案对比
+
+| 方案 | 子项目改造成本 | 隔离效果 | 性能 | 主题继承 | 本项目是否采用 |
+|------|--------------|---------|------|---------|--------------|
+| **CSS @scope + 劫持** | 零 | 良好（选择器级） | 高 | ✅ 支持 | ✅ 采用 |
+| Shadow DOM | 中（需改挂载） | 完全 | 中 | ❌ 不支持 | ❌ 未采用 |
+| CSS Modules | 中（需用 Modules） | 较好（class 级） | 高 | ✅ 支持 | ❌ 未采用 |
+| qiankun strictStyleIsolation | 低 | 完全 | 中 | ❌ 不支持 | ❌ 未采用 |
+| qiankun experimentalStyleIsolation | 低 | 较好 | 中 | ✅ 支持 | ❌ 未采用（用原生 @scope 更好） |
+| iframe | 低 | 完全 | 低 | ❌ 不支持 | ✅ untrusted 插件用 |
+
+### 7.2 选择理由
+
+1. **零侵入**：子项目开发者不需要学习任何特殊规则，按普通项目开发即可
+2. **性能好**：基于浏览器原生 `@scope`，没有运行时选择器改写的开销
+3. **主题统一**：子项目自动继承主项目的 CSS 变量，视觉风格一致
+4. **事件正常**：React 事件系统不受影响（Shadow DOM 会有事件冒泡问题）
+5. **覆盖全面**：同步/异步/HMR 注入的样式都能正确捕获
+
+---
+
+## 八、常见问题
+
+### Q1：子项目的 Tailwind 会和主项目冲突吗？
+
+不会。子项目的所有 Tailwind 类名都会被 `@scope` 包裹，只在插件容器内生效。
+
+### Q2：子项目写 `body { margin: 0 }` 会影响主项目吗？
+
+不会。被 `@scope` 包裹后，这个选择器只在插件容器内匹配，不会影响容器外的 body。
+
+### Q3：子项目能使用主项目的主题变量吗？
+
+可以。CSS 变量可以继承，主项目定义的 `--primary`、`--background` 等主题变量，子项目可以直接使用，无需额外配置。
+
+### Q4：HMR 热更新时样式会闪烁吗？
+
+不会。插件页面挂载期间会持续捕获样式，HMR 注入的新 style 会被立即 scoped 处理。
+
+### Q5：浏览器不支持 @scope 会怎样？
+
+`@scope` 规则会被浏览器忽略，样式变成全局的，功能不受影响，只是隔离失效。但本项目目标浏览器（Chrome 118+ / Firefox 125+ / Safari 17.4+）都已支持。
+
+### Q6：untrusted 插件的样式隔离也是这个方案吗？
+
+不是。untrusted 插件使用 iframe 加载，天然完全隔离（独立 document），不需要 @scope 方案。
+
+---
+
+## 九、快速参考
+
+### 主项目开发者需要知道
+
+- 样式隔离核心在 `src/plugins/host/styleIsolation.ts`
+- 两个 API：`beginPluginStyleCapture`（初始加载）、`attachPluginStyleIsolation`（运行时持续）
+- 插件容器必须有 `data-mf-plugin={pluginId}` 属性
+- untrusted 插件走 iframe，不需要 JS 侧隔离
+
+### 子项目开发者需要知道
+
+- **不需要任何改造**，按普通项目开发即可
+- 外链 CSS 注意开 CORS（或直接打包进 JS）
+- 所有样式自动限制在插件容器内
+- 可以继承主项目的主题 CSS 变量
+
+---
+
+## 十、相关文档索引
+
+| 文档 | 内容 | 适合谁看 |
+|------|------|---------|
+| [style-isolation-implementation.md](./style-isolation-implementation.md) | 完整实现手册（逐行代码注释、工作流程、边界情况） | 需要深入理解实现的开发者 |
+| [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | 主项目接入插件方式指南 | 主项目业务开发者 |
+| [plugin-development-guide.md](./plugin-development-guide.md) | 子项目/插件开发手册 | 插件开发者 |
+| [mf-implementation-guide.md](./mf-implementation-guide.md) | MF 实现过程总文档 | 架构师 / 核心开发者 |

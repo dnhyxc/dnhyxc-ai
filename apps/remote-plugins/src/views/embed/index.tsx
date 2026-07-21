@@ -13,6 +13,11 @@ type Bridge = {
 	plugin: ComponentProps<typeof IdeasListApp>['plugin'];
 };
 
+function applyBodyTheme(theme: 'light' | 'dark') {
+	document.documentElement.classList.toggle('dark', theme === 'dark');
+	document.body.classList.toggle('dark', theme === 'dark');
+}
+
 function EmbedShell({
 	pluginId,
 	App,
@@ -39,33 +44,22 @@ function EmbedShell({
 		};
 	}, [pluginId]);
 
+	useEffect(() => {
+		if (!bridge) return;
+		applyBodyTheme(bridge.api.theme);
+	}, [bridge]);
+
 	if (error) {
-		return (
-			<div
-				className="plugin-standalone text-destructive h-full p-3 text-sm"
-				data-plugin-root
-			>
-				{error}
-			</div>
-		);
+		return <div className="text-destructive h-full p-3 text-sm">{error}</div>;
 	}
 	if (!bridge) {
 		return (
-			<div
-				className="plugin-standalone text-textcolor/55 h-full p-3 text-sm"
-				data-plugin-root
-			>
-				连接 Host…
-			</div>
+			<div className="text-textcolor/55 h-full p-3 text-sm">连接 Host…</div>
 		);
 	}
 
 	return (
-		<div
-			className="plugin-standalone h-full min-h-0"
-			data-plugin-root
-			data-theme={bridge.api.theme}
-		>
+		<div className="h-full min-h-0">
 			<App {...bridge} />
 		</div>
 	);

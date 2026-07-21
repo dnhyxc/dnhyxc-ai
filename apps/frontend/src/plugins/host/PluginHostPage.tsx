@@ -3,6 +3,7 @@ import { attachIframeBridge } from '../core/attachIframeBridge';
 import { pluginManager } from '../core/PluginManager';
 import type { HostBridgeProps } from '../core/types';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
+import { attachPluginStyleIsolation } from './styleIsolation';
 
 type Props = { pluginId: string };
 
@@ -61,7 +62,6 @@ export function PluginHostPage({ pluginId }: Props) {
 				bump((n) => n + 1);
 				return;
 			}
-			// 已失败且非手动重试：稳住错误态，禁止自动再拉（避免闪烁）
 			if (cur?.status === 'failed' && retryKey === 0) {
 				setError(cur.error ?? null);
 				setBusy(false);
@@ -91,9 +91,16 @@ export function PluginHostPage({ pluginId }: Props) {
 	}, [pluginId, retryKey]);
 
 	const loaded = pluginManager.get(pluginId);
+	const entry = loaded?.meta.entry;
+	const trust = loaded?.meta.trust;
+	const status = loaded?.status;
+
+	useEffect(() => {
+		if (status !== 'activated' || trust === 'untrusted' || !entry) return;
+		return attachPluginStyleIsolation(pluginId, entry);
+	}, [pluginId, status, entry, trust]);
 
 	if (loaded?.status === 'activated') {
-		// 不可信：整页 iframe，不进主文档 MF / 共享 CSS
 		if (loaded.meta.trust === 'untrusted') {
 			const src = loaded.meta.iframeUrl?.trim();
 			if (!src) {
@@ -120,6 +127,7 @@ export function PluginHostPage({ pluginId }: Props) {
 				<div
 					className={`plugin-${pluginId} h-full w-full`}
 					data-mf-plugin={pluginId}
+					data-plugin-root
 				>
 					<Comp {...loaded.bridge} />
 				</div>

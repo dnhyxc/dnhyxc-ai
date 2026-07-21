@@ -4,13 +4,20 @@
 	"version": "1.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite --host 127.0.0.1 --port 9008 --strictPort",
+		"dev": "vite",
 		"build": "vite build",
-		"preview": "vite preview --host 127.0.0.1 --port 9008 --strictPort"
+		"preview": "vite preview",
+		"publish": "dnhyxc-ci publish remotePlugins",
+		"deploy": "pnpm run build && pnpm run publish",
+		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart main'"
 	},
 	"dependencies": {
 		"@radix-ui/react-scroll-area": "^1.2.10",
 		"@radix-ui/react-slot": "^1.2.4",
+		"@tiptap/extension-placeholder": "^3.0.0",
+		"@tiptap/pm": "^3.0.0",
+		"@tiptap/react": "^3.0.0",
+		"@tiptap/starter-kit": "^3.0.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"lucide-react": "^0.563.0",

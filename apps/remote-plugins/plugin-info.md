@@ -2,19 +2,18 @@
 
 基座专用 MF 插件包（一仓多 expose）。federation name：`remotePlugins`，开发端口 **9008**。
 
-UI 与主站对齐：**Tailwind CSS v4 + shadcn/ui**（`src/components/ui`、`@` / `@ui` 别名、`components.json`）。嵌入 Host 时复用页面 CSS 变量（含 `theme-black`）；独立预览用 `src/styles.css` 兜底。
+UI 与主站对齐：**Tailwind CSS v4 + shadcn/ui**（`src/components/ui`、`@` / `@ui` 别名、`components.json`）。`styles.css` 为常规 `:root` / `.dark` token；嵌入 Host 时继承主站变量。
 
-## 样式契约（上架硬性条件）
+## 样式契约
 
-等价于 qiankun `experimentalStyleIsolation`：**构建期作用域**，Light DOM 嵌入，主/子互不污染且子应用 Button 等组件样式完整。
+**隔离由 Host 负责**（`plugins/host/styleIsolation.ts`：运行时 `@scope([data-mf-plugin])`）。
 
-| 必须 | 禁止 |
+| Remote 可正常做 | Host 保证 |
 |------|------|
-| `styles.css` **不**引入 Preflight（勿 `@import "tailwindcss"` 全家桶） | 完整 Tailwind Preflight（会改 `html` 字体/全局 reset） |
-| utilities 挂在 `[data-plugin-root] { @tailwind utilities }` | 往 `document` 注入无作用域的全局 utility（`.flex` 等） |
-| 每个 expose 根节点带 `data-plugin-root` | 依赖 Host 运行时劫持 head / Shadow 搬样式 |
+| `@import "tailwindcss"` 全家桶（含 Preflight） | Remote 注入的 CSS 不会污染主站 |
+| 普通 Vite + Tailwind 工程配置 | 插件页包装 `data-mf-plugin` 作为 scope 根 |
 
-不遵守 → **不得**以 `trust: partner` 进主文档 MF；只能 `trust: untrusted` + registry `iframeUrl`（整页 iframe，见 `docs/ideas/mf-css-isolation.md`）。
+`trust: untrusted` 仍走 iframe（见 `docs/ideas/mf-css-isolation.md`）。
 
 ## 启动
 

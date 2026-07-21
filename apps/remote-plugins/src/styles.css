@@ -1,103 +1,97 @@
 /*
- * 生产者侧样式隔离（MF 官方推荐 / 类 qiankun experimentalStyleIsolation）：
- * - 禁止 `@import "tailwindcss"` 全家桶（含 Preflight），避免污染 Host html/字体。
- * - utilities 挂在 [data-plugin-root] 下：子→主不命中；子内特异性压过 Host 同名 utility。
- * 详见 docs/ideas/mf-css-isolation.md
+ * 常规 Tailwind v4 + shadcn token。
+ * 嵌入 Host 时主题变量由主站继承；独立预览 / iframe 用本文件 :root / .dark。
  */
-@layer theme, base, components, utilities;
-
-@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:where(.dark, .dark *, .theme-black, .theme-black *));
+@custom-variant dark (&:where(.dark, .dark *));
 
-/* Tailwind v4：用 import 替代 @tailwind，避免 Biome unknown at-rule；嵌套实现 scoped */
-[data-plugin-root] {
-	@import "tailwindcss/utilities.css" layer(utilities);
+html,
+body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	width: 100%;
 }
 
-/*
- * 独立预览无全局 Preflight：原生 button 会保留 UA 立体边框/阴影，叠在 bg-theme 上像「粗黑边」。
- * 只在插件根内做表单控件 reset（@layer base，可被 utilities 覆盖）；不碰 html/body，嵌入 Host 也不污染主站。
- */
-@layer base {
-	[data-plugin-root] :where(button, input, textarea, select) {
-		appearance: none;
-		background-color: transparent;
-		border-style: solid;
-		border-width: 0;
-		border-color: transparent;
-		color: inherit;
-		font: inherit;
-		letter-spacing: inherit;
-		margin: 0;
-		padding: 0;
-	}
-}
-
-/*
- * 嵌入 Host：沿用页面 CSS 变量（含 body.theme-black / theme-white）。
- * 独立预览：对齐主站 .theme-white（白底深字）；勿用青绿 --theme-color，也勿默认 theme-black。
- */
-.plugin-standalone {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.15 0.02 264.665);
-	--muted: oklch(0.98 0.005 264.665);
-	--muted-foreground: oklch(0.551 0.027 264.364);
-	--accent: oklch(0.967 0.003 264.542);
-	--border: oklch(0.95 0.00845 271.331);
-	--destructive: oklch(0.577 0.245 27.325);
-	--ring: oklch(0.707 0.022 261.325);
-	--radius: 0.625rem;
-	--theme-color: oklch(0.15 0.02 264.665);
-	--theme-background: oklch(1 0 0);
-	--theme-border: oklch(0.95 0.00845 271.331);
-	--theme-textcolor: oklch(0.15 0.02 264.665);
-	--theme-default: oklch(100% 0.00011 271.152);
-	--theme-foreground: oklch(0.15 0.02 264.665);
-	box-sizing: border-box;
+#root {
+	height: 100%;
+	min-height: 100%;
+	width: 100%;
+	background-color: var(--background);
+	color: var(--foreground);
 	font-family: ui-sans-serif, system-ui, sans-serif;
-	color: var(--theme-textcolor);
-	background-color: var(--theme-background);
 }
 
-/* Host iframe 深色主题（对齐 theme-black） */
-.plugin-standalone[data-theme="dark"] {
-	--background: oklch(0.125 0.011 272);
-	--foreground: oklch(92.46% 0.012 255.8);
-	--muted: color-mix(in oklch, oklch(0.125 0.011 272) 90%, white);
-	--muted-foreground: oklch(0.7 0.01 264);
-	--accent: color-mix(in oklch, oklch(0.125 0.011 272) 92%, white);
-	--border: color-mix(
-		in oklch,
-		color-mix(in oklch, oklch(0.125 0.011 272) 72%, white) 22%,
-		transparent
-	);
-	--theme-seed: oklch(0.125 0.011 272);
-	--theme-background: var(--theme-seed);
-	--theme-border: color-mix(
-		in oklch,
-		color-mix(in oklch, var(--theme-seed) 72%, white) 22%,
-		transparent
-	);
-	--theme-textcolor: oklch(92.46% 0.012 255.8);
-	--theme-default: oklch(0.08 0.01 264.665);
-	--theme-foreground: color-mix(in oklch, white 72%, var(--theme-seed));
-	--theme-color: oklch(92.46% 0.012 255.8);
-}
-
-.plugin-standalone *,
-.plugin-standalone *::before,
-.plugin-standalone *::after {
-	box-sizing: border-box;
-}
-
-[data-plugin-root] [data-radix-scroll-area-viewport] > div {
+[data-radix-scroll-area-viewport] > div {
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 100%;
 	min-width: 0 !important;
 	table-layout: fixed;
+}
+
+:root {
+	--radius: 0.625rem;
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.145 0.02 264);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.145 0.02 264);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.145 0.02 264);
+	--primary: oklch(0.21 0.034 264.665);
+	--primary-foreground: oklch(0.985 0.002 247.839);
+	--secondary: oklch(0.967 0.003 264.542);
+	--secondary-foreground: oklch(0.21 0.034 264.665);
+	--muted: oklch(0.967 0.003 264.542);
+	--muted-foreground: oklch(0.551 0.027 264.364);
+	--accent: oklch(0.967 0.003 264.542);
+	--accent-foreground: oklch(0.21 0.034 264.665);
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: oklch(0.922 0.006 264.531);
+	--input: oklch(0.922 0.006 264.531);
+	--ring: oklch(0.708 0.022 261.325);
+	/* 与组件里 bg-theme / text-textcolor 等类名兼容 */
+	--theme-color: var(--primary);
+	--theme-background: var(--background);
+	--theme-border: var(--border);
+	--theme-textcolor: var(--foreground);
+	--theme-default: var(--primary-foreground);
+	--theme-foreground: var(--foreground);
+	--theme-secondary: var(--secondary);
+	--theme-muted: var(--muted);
+	--theme-card: var(--card);
+}
+
+.dark {
+	--background: oklch(0.145 0.02 264);
+	--foreground: oklch(0.985 0.002 247.839);
+	--card: oklch(0.205 0.03 264);
+	--card-foreground: oklch(0.985 0.002 247.839);
+	--popover: oklch(0.205 0.03 264);
+	--popover-foreground: oklch(0.985 0.002 247.839);
+	--primary: oklch(0.922 0.006 264.531);
+	--primary-foreground: oklch(0.205 0.03 264);
+	--secondary: oklch(0.269 0.03 256);
+	--secondary-foreground: oklch(0.985 0.002 247.839);
+	--muted: oklch(0.269 0.03 256);
+	--muted-foreground: oklch(0.708 0.022 261.325);
+	--accent: oklch(0.269 0.03 256);
+	--accent-foreground: oklch(0.985 0.002 247.839);
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 15%);
+	--ring: oklch(0.556 0.027 264.364);
+	--theme-color: var(--primary);
+	--theme-background: var(--background);
+	--theme-border: var(--border);
+	--theme-textcolor: var(--foreground);
+	--theme-default: var(--primary-foreground);
+	--theme-foreground: var(--foreground);
+	--theme-secondary: var(--secondary);
+	--theme-muted: var(--muted);
+	--theme-card: var(--card);
 }
 
 @theme inline {
@@ -107,11 +101,21 @@
 	--radius-xl: calc(var(--radius) + 4px);
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
 	--color-muted: var(--muted);
 	--color-muted-foreground: var(--muted-foreground);
 	--color-accent: var(--accent);
-	--color-border: var(--border);
+	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
 	--color-ring: var(--ring);
 	--color-theme: var(--theme-color);
 	--color-theme-background: var(--theme-background);
@@ -119,4 +123,7 @@
 	--color-textcolor: var(--theme-textcolor);
 	--color-default: var(--theme-default);
 	--color-theme-foreground: var(--theme-foreground);
+	--color-theme-secondary: var(--theme-secondary);
+	--color-theme-muted: var(--theme-muted);
+	--color-theme-card: var(--theme-card);
 }

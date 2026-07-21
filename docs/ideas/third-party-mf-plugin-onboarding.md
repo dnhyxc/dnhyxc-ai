@@ -284,7 +284,7 @@ type ThirdPartyPluginRow = {
 };
 ```
 
-**样式**：`partner` / `first-party` 须遵守构建期 scoped（无 Preflight、根节点 `data-plugin-root`），见 [mf-css-isolation.md](./mf-css-isolation.md)。无法保证 → `trust: untrusted` + `iframeUrl`。
+**样式**：Host 侧自动 `@scope` 隔离，`partner` / `first-party` 无需手动 scoped（子项目零侵入），详见 [style-isolation-implementation.md](../app/style-isolation-implementation.md)。无法保证样式安全 → `trust: untrusted` + `iframeUrl`。
 
 ### 8.3 Host Origin 常量（契约）
 
@@ -452,9 +452,9 @@ curl -s "$ENTRY" | head -c 400
 | `entry`                    | `https://cdn.partner.com/mf-manifest.json` |
 | `version` / `hostApiRange` | `1.0.0` / `^1.0.0`                         |
 | 建议 `routePath`           | 与产品约定                                 |
-| `trust` 申请               | `partner`（须 scoped CSS）或 `untrusted` + `iframeUrl` |
+| `trust` 申请               | `partner`（Host 自动隔离，零侵入）或 `untrusted` + `iframeUrl` |
 | CORS 自测截图或 curl 输出  | AC1/AC2                                    |
-| 样式契约确认               | 无 Preflight；utilities 挂 `[data-plugin-root]`（partner） |
+| 样式契约确认               | Host 侧 `@scope` 自动隔离，子项目无需特殊配置（partner） |
 
 ---
 

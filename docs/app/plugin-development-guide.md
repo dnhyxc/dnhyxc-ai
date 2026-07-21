@@ -381,8 +381,8 @@ export async function deactivate() {
 |------|---------|------|
 | `default` 导出 | ✅ | 必须导出 React 组件 |
 | `HostBridgeProps` 类型 | ✅ | 必须定义或导入 |
-| 根元素 `data-plugin-root` | ✅ | 必须添加此属性 |
-| 根元素 `plugin-standalone` | ✅ | 必须添加此类名 |
+| 根元素 `data-plugin-root` | ❌ | **已废弃**：样式隔离由 Host 侧自动处理，无需手动添加 |
+| 根元素 `plugin-standalone` | ❌ | **已废弃**：独立预览使用标准 `:root` + `.dark` 主题变量 |
 | `api` 参数使用 | ⚠️ | 按需使用，注意权限检查 |
 | `activate` 钩子 | ❌ | 可选生命周期钩子 |
 | `deactivate` 钩子 | ❌ | 可选生命周期钩子 |
@@ -391,89 +391,113 @@ export async function deactivate() {
 
 ## 5. 样式处理规范
 
+> **重要更新（2026-07-22）**：样式隔离责任已从子项目侧转移到 Host 侧。子项目现在可以像普通 Vite + Tailwind 项目一样开发，**无需任何手动 scoped 配置**。
+>
+> 详细原理见 [style-isolation-implementation.md](./style-isolation-implementation.md)、[style-isolation-tech-overview.md](./style-isolation-tech-overview.md)。
+
 ### 5.1 样式文件配置
 
 **文件路径**：`src/styles.css`
 
+子项目可以直接使用标准 Tailwind CSS 配置，无需任何特殊处理：
+
 ```css
 /*
- * 生产者侧样式隔离（强制要求）：
- * - 禁止 @import "tailwindcss" 全家桶（含 Preflight）
- * - utilities 挂在 [data-plugin-root] 下实现 scoped
+ * 常规 Tailwind v4 + shadcn token。
+ * 嵌入 Host 时主题变量由主站继承；独立预览 / iframe 用本文件 :root / .dark。
  */
-@layer theme, base, components, utilities;
-
-/* 只引入主题和动画，不引入 Preflight */
-@import "tailwindcss/theme.css" layer(theme);
+// 直接导入完整 Tailwind（含 Preflight + utilities），Host 侧会自动用 @scope 包裹
+@import "tailwindcss";
+// 导入动画库
 @import "tw-animate-css";
 
-/* Tailwind v4：嵌套实现 scoped */
-[data-plugin-root] {
-	@import "tailwindcss/utilities.css" layer(utilities);
+// 自定义深色模式变体（标准写法）
+@custom-variant dark (&:where(.dark, .dark *));
+
+// html / body 基础样式：独立预览和 iframe 模式下占满视口
+html,
+body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	width: 100%;
 }
 
-/* 只在插件根内做表单控件 reset */
-@layer base {
-	[data-plugin-root] :where(button, input, textarea, select) {
-		appearance: none;
-		background-color: transparent;
-		border-style: solid;
-		border-width: 0;
-		border-color: transparent;
-		color: inherit;
-		font: inherit;
-		letter-spacing: inherit;
-		margin: 0;
-		padding: 0;
-	}
+// #root 容器样式：背景色、文字色、字体
+#root {
+	height: 100%;
+	min-height: 100%;
+	width: 100%;
+	background-color: var(--background);
+	color: var(--foreground);
+	font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
-/* 独立预览时的默认变量 */
-.plugin-standalone {
+// 浅色主题变量（独立预览 / iframe 模式使用；嵌入 Host 时继承主站变量）
+:root {
+	--radius: 0.625rem;
 	--background: oklch(1 0 0);
-	--foreground: oklch(0.15 0.02 264.665);
-	--muted: oklch(0.98 0.005 264.665);
+	--foreground: oklch(0.145 0.02 264);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.145 0.02 264);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.145 0.02 264);
+	--primary: oklch(0.21 0.034 264.665);
+	--primary-foreground: oklch(0.985 0.002 247.839);
+	--secondary: oklch(0.967 0.003 264.542);
+	--secondary-foreground: oklch(0.21 0.034 264.665);
+	--muted: oklch(0.967 0.003 264.542);
 	--muted-foreground: oklch(0.551 0.027 264.364);
 	--accent: oklch(0.967 0.003 264.542);
-	--border: oklch(0.95 0.00845 271.331);
+	--accent-foreground: oklch(0.21 0.034 264.665);
 	--destructive: oklch(0.577 0.245 27.325);
-	--ring: oklch(0.707 0.022 261.325);
-	--radius: 0.625rem;
-	--theme-color: oklch(0.15 0.02 264.665);
-	--theme-background: oklch(1 0 0);
-	--theme-border: oklch(0.95 0.00845 271.331);
-	--theme-textcolor: oklch(0.15 0.02 264.665);
-	box-sizing: border-box;
-	font-family: ui-sans-serif, system-ui, sans-serif;
-	color: var(--theme-textcolor);
-	background-color: var(--theme-background);
-}
-
-/* 深色主题变量 */
-.plugin-standalone[data-theme='dark'] {
-	--background: oklch(0.125 0.011 272);
-	--foreground: oklch(92.46% 0.012 255.8);
-	--muted: color-mix(in oklch, oklch(0.125 0.011 272) 90%, white);
-	--muted-foreground: oklch(0.7 0.01 264);
-	--accent: color-mix(in oklch, oklch(0.125 0.011 272) 92%, white);
-	--border: color-mix(
-		in oklch,
-		color-mix(in oklch, oklch(0.125 0.011 272) 72%, white) 22%,
-		transparent
-	);
+	--border: oklch(0.922 0.006 264.531);
+	--input: oklch(0.922 0.006 264.531);
+	--ring: oklch(0.708 0.022 261.325);
+	/* 与组件里 bg-theme / text-textcolor 等类名兼容 */
+	--theme-color: var(--primary);
 	--theme-background: var(--background);
 	--theme-border: var(--border);
 	--theme-textcolor: var(--foreground);
+	--theme-default: var(--primary-foreground);
+	--theme-foreground: var(--foreground);
+	--theme-secondary: var(--secondary);
+	--theme-muted: var(--muted);
+	--theme-card: var(--card);
 }
 
-/* 确保 box-sizing 正确 */
-.plugin-standalone *,
-.plugin-standalone *::before,
-.plugin-standalone *::after {
-	box-sizing: border-box;
+// 深色主题变量（通过 .dark 类名切换）
+.dark {
+	--background: oklch(0.145 0.02 264);
+	--foreground: oklch(0.985 0.002 247.839);
+	--card: oklch(0.205 0.03 264);
+	--card-foreground: oklch(0.985 0.002 247.839);
+	--popover: oklch(0.205 0.03 264);
+	--popover-foreground: oklch(0.985 0.002 247.839);
+	--primary: oklch(0.922 0.006 264.531);
+	--primary-foreground: oklch(0.205 0.03 264);
+	--secondary: oklch(0.269 0.03 256);
+	--secondary-foreground: oklch(0.985 0.002 247.839);
+	--muted: oklch(0.269 0.03 256);
+	--muted-foreground: oklch(0.708 0.022 261.325);
+	--accent: oklch(0.269 0.03 256);
+	--accent-foreground: oklch(0.985 0.002 247.839);
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 15%);
+	--ring: oklch(0.556 0.027 264.364);
+	--theme-color: var(--primary);
+	--theme-background: var(--background);
+	--theme-border: var(--border);
+	--theme-textcolor: var(--foreground);
+	--theme-default: var(--primary-foreground);
+	--theme-foreground: var(--foreground);
+	--theme-secondary: var(--secondary);
+	--theme-muted: var(--muted);
+	--theme-card: var(--card);
 }
 
-/* 自定义主题变量（与 Tailwind CSS 对齐） */
+// Tailwind v4 @theme 内联配置：标准 shadcn token
 @theme inline {
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
@@ -481,16 +505,31 @@ export async function deactivate() {
 	--radius-xl: calc(var(--radius) + 4px);
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
 	--color-muted: var(--muted);
 	--color-muted-foreground: var(--muted-foreground);
 	--color-accent: var(--accent);
-	--color-border: var(--border);
+	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
 	--color-ring: var(--ring);
 	--color-theme: var(--theme-color);
 	--color-theme-background: var(--theme-background);
 	--color-theme-border: var(--theme-border);
 	--color-textcolor: var(--theme-textcolor);
+	--color-default: var(--theme-default);
+	--color-theme-foreground: var(--theme-foreground);
+	--color-theme-secondary: var(--theme-secondary);
+	--color-theme-muted: var(--theme-muted);
+	--color-theme-card: var(--theme-card);
 }
 ```
 
@@ -498,21 +537,46 @@ export async function deactivate() {
 
 | 要求 | 是否必须 | 说明 |
 |------|---------|------|
-| 禁止 `@import "tailwindcss"` | ✅ | 会引入 Preflight 污染 Host |
-| 只引入 `tailwindcss/theme.css` | ✅ | 只引入主题，不含 Preflight |
-| utilities 挂在 `[data-plugin-root]` 下 | ✅ | 实现 scoped 隔离 |
-| 表单控件局部 reset | ✅ | 只在插件根内做 reset |
-| CSS 变量定义 | ✅ | 浅色/深色主题变量 |
-| `@theme inline` | ✅ | 与 Tailwind CSS 对齐 |
+| 使用标准 `@import "tailwindcss"` | ✅ | 推荐直接使用完整 Tailwind，Host 侧自动隔离 |
+| 定义 `:root` 浅色主题变量 | ✅ | 独立预览 / iframe 模式使用 |
+| 定义 `.dark` 深色主题变量 | ✅ | 独立预览 / iframe 模式使用 |
+| html/body/#root 基础样式 | ✅ | 独立预览模式下占满视口 |
+| `@theme inline` 配置 | ✅ | 与 Tailwind CSS 对齐 |
+| 手动 scoped utilities | ❌ | **已废弃**：由 Host 侧自动处理 |
+| 手动表单控件 reset | ❌ | **已废弃**：Tailwind Preflight 已包含，由 Host 侧自动隔离 |
 
-### 5.3 样式违规后果
+### 5.3 样式隔离原理（Host 侧自动处理）
 
-| 违规行为 | 后果 |
-|---------|------|
-| 引入完整 Tailwind Preflight | Host 全局样式被污染（字体、边距等） |
-| 无作用域 utilities | `.text-red-500` 等类名全局生效 |
-| 修改 `html`/`body` 样式 | 影响 Host 页面整体布局 |
-| 不做表单控件 reset | 按钮、输入框显示浏览器默认样式 |
+子项目**不需要**做任何样式隔离工作。Host 侧通过以下机制自动实现：
+
+| 机制 | 作用 |
+|------|------|
+| CSS `@scope` 规则 | 将子项目样式限制在 `[data-mf-plugin="id"]` 容器内 |
+| `head.appendChild` 劫持 | 同步捕获子项目注入的 style/link 标签 |
+| MutationObserver | 兜底捕获 HMR、动态 import 注入的样式 |
+
+**效果**：
+- ✅ 子项目的 Tailwind Preflight 不会污染 Host 全局样式
+- ✅ 子项目的所有 utilities、组件库样式自动限制在插件容器内
+- ✅ 子项目的 `body`、`html` 等全局选择器只在插件容器内生效
+- ✅ 子项目自动继承 Host 的 CSS 变量（主题统一）
+
+### 5.4 唯一注意点：跨域外链 CSS
+
+如果子项目使用了 `<link rel="stylesheet" href="...">` 引入跨域 CSS 文件，需要确保：
+
+- CSS 文件服务器配置了 CORS（允许主项目域名访问）
+- 否则主项目无法获取 CSS 内容进行 scoped 处理
+- 未处理的样式会原样生效（不隔离，但不影响功能）
+
+**Nginx 配置示例**：
+```nginx
+location /static/css/ {
+    add_header Access-Control-Allow-Origin *;
+}
+```
+
+> 💡 **建议**：尽量将 CSS 打包进 JS 中（Vite 默认行为），变成 style 标签注入，完全没有 CORS 问题。
 
 ---
 
@@ -563,7 +627,7 @@ export default function App({ api, plugin }: HostBridgeProps) {
 	};
 
 	return (
-		<div className="plugin-standalone" data-plugin-root>
+		<div className="text-textcolor min-h-full p-4 text-sm">
 			<h1>{api.t('plugin.title')}</h1>
 			<p>主题：{api.theme}</p>
 			<button onClick={handleFetch}>获取数据</button>
@@ -637,7 +701,7 @@ await api.http.get('/api/data'); // TypeError: api.http is undefined
 ```typescript
 export default function App({ api }: HostBridgeProps) {
 	// 组件内逻辑
-	return <div className="plugin-standalone" data-plugin-root>...</div>;
+	return <div className="text-textcolor min-h-full p-4 text-sm">...</div>;
 }
 
 // 激活钩子：初始化资源
@@ -955,6 +1019,11 @@ type Bridge = {
 	plugin: { id: string; version: string; routePath: string };
 };
 
+function applyBodyTheme(theme: 'light' | 'dark') {
+	document.documentElement.classList.toggle('dark', theme === 'dark');
+	document.body.classList.toggle('dark', theme === 'dark');
+}
+
 function EmbedShell({ pluginId, AppComponent }: { pluginId: string; AppComponent: ComponentType<Bridge> }) {
 	const [bridge, setBridge] = useState<Bridge | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -967,24 +1036,21 @@ function EmbedShell({ pluginId, AppComponent }: { pluginId: string; AppComponent
 		return () => { cancelled = true; };
 	}, [pluginId]);
 
+	useEffect(() => {
+		if (!bridge) return;
+		applyBodyTheme(bridge.api.theme);
+	}, [bridge]);
+
 	if (error) {
-		return (
-			<div className="plugin-standalone text-destructive h-full p-3 text-sm" data-plugin-root>
-				{error}
-			</div>
-		);
+		return <div className="text-destructive h-full p-3 text-sm">{error}</div>;
 	}
 
 	if (!bridge) {
-		return (
-			<div className="plugin-standalone text-textcolor/55 h-full p-3 text-sm" data-plugin-root>
-				连接 Host…
-			</div>
-		);
+		return <div className="text-textcolor/55 h-full p-3 text-sm">连接 Host…</div>;
 	}
 
 	return (
-		<div className="plugin-standalone h-full min-h-0" data-plugin-root data-theme={bridge.api.theme}>
+		<div className="h-full min-h-0">
 			<AppComponent {...bridge} />
 		</div>
 	);
@@ -1139,7 +1205,7 @@ server {
 |--------|---------|
 | Vite 配置 | `shared.singleton: true`、`optimizeDeps.exclude` React |
 | 组件导出 | 有 `default` 导出，接收 `HostBridgeProps` |
-| 样式隔离 | 无 Preflight，utilities 挂在 `[data-plugin-root]` 下 |
+| 样式隔离 | 由 Host 侧自动处理，子项目无需手动配置，可直接用标准 Tailwind |
 | API 使用 | 使用受限 API 前检查权限 |
 | 独立预览 | 可通过 `pnpm dev` 独立运行 |
 | Host 集成 | 可通过 Registry 加载并正常显示 |
@@ -1182,15 +1248,16 @@ server {
 
 ### Q2：为什么我的样式影响了 Host 页面？
 
-**可能原因**：
-- 引入了完整 Tailwind Preflight
-- 修改了 `html`/`body` 样式
-- 使用了无作用域的 CSS 类名
+**正常情况下不会。** Host 侧会自动将子项目的所有样式用 `@scope` 包裹，限制在插件容器内。
+
+**如果确实发生了样式污染，可能原因**：
+- 使用了跨域外链 CSS 且服务器未配置 CORS（Host 无法 fetch 内容进行 scoped 处理）
+- 样式是通过非标准方式注入的（如直接修改 `document.styleSheets`）
 
 **解决方案**：
-- 只引入 `tailwindcss/theme.css` 和 scoped utilities
-- 使用 `[data-plugin-root]` 限定样式范围
-- 不修改全局样式
+- 尽量将 CSS 打包进 JS 中（Vite 默认行为），变成 style 标签注入
+- 如果必须用外链 CSS，确保服务器配置了 CORS
+- 详细原理见 [style-isolation-implementation.md](./style-isolation-implementation.md)
 
 ### Q3：如何在插件中使用 shadcn/ui？
 
@@ -1224,8 +1291,10 @@ server {
 
 ### B. 参考文档
 
+- [style-isolation-implementation.md](./style-isolation-implementation.md)：样式隔离实现手册（逐行注释）
+- [style-isolation-tech-overview.md](./style-isolation-tech-overview.md)：样式隔离技术概览
 - [mf-implementation-guide.md](./mf-implementation-guide.md)：实现过程文档
-- [mf-css-isolation.md](../ideas/mf-css-isolation.md)：CSS 隔离方案
+- [mf-css-isolation.md](../ideas/mf-css-isolation.md)：CSS 隔离方案思路
 - [third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)：第三方插件接入指南
 
 ### C. 示例项目

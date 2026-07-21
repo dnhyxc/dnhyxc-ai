@@ -1,6 +1,7 @@
 import { type ComponentType, createElement } from 'react';
 import type { RouteConfig } from '@/router/routes';
 import { PluginHostPage } from '../host/PluginHostPage';
+import { beginPluginStyleCapture } from '../host/styleIsolation';
 import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
@@ -161,7 +162,13 @@ class PluginManagerImpl {
 			}
 
 			registerRemote(meta);
-			const mod = await loadRemoteApp(meta);
+			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
+			try {
+				mod = await loadRemoteApp(meta);
+			} finally {
+				endCapture();
+			}
 			const bridge = createHostBridge(meta, nav);
 			await mod.activate?.(bridge.api);
 

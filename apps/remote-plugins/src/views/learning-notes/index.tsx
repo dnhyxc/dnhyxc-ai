@@ -43,10 +43,7 @@ export default function LearningNotesApp({ api, plugin }: HostBridgeProps) {
 	};
 
 	return (
-		<div
-			data-plugin-root
-			className={cn('text-textcolor min-h-full px-0.5 py-1 text-sm')}
-		>
+		<div className={cn('text-textcolor min-h-full px-0.5 py-1 text-sm')}>
 			<p className="text-textcolor/55 mb-3 text-xs">
 				英语学习 · 学习笔记（{plugin.id}@{plugin.version}）
 			</p>

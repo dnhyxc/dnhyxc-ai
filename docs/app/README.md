@@ -25,6 +25,8 @@
 | [plugin-development-guide.md](./plugin-development-guide.md) | **子项目/插件开发手册**：环境准备、Vite 配置、组件规范、全局样式隔离、HostBridge API、权限声明、生命周期、iframe 隔离模式、调试与发布 |
 | [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | **主项目接入插件方式**：自动路由注入、业务内手动挂载、iframe 隔离；电子书/英语学习接入示例、插件中心管理、Registry 配置、侧栏菜单注入 |
 | [plugin-shelf-toggle.md](./plugin-shelf-toggle.md) | **插件上架/下架实现**：PluginManager.setEnabled、persistPluginEnabled 持久化、enabledOverrides 订阅、usePluginEnabled Hook、插件中心 Switch、Registry 编辑页、后端 PUT /upload/remotes（含改动前/后对比与逐行注释） |
+| [style-isolation-tech-overview.md](./style-isolation-tech-overview.md) | **主项目样式隔离技术说明**：5 分钟快速了解 @scope 原理、两层捕获机制、trusted/untrusted 两种模式、主子项目各自关注点、常见问题 FAQ |
+| [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |
 

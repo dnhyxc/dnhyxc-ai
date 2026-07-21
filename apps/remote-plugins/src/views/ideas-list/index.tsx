@@ -178,10 +178,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 	};
 
 	return (
-		<div
-			data-plugin-root
-			className="text-textcolor flex h-full min-h-0 flex-col text-sm"
-		>
+		<div className="text-textcolor flex h-full min-h-0 flex-col text-sm">
 			{bookTitle ? (
 				<div className="text-textcolor/55 border-theme-border mb-1 shrink-0 border-b px-2 pb-2.5 text-xs">
 					{bookTitle}
