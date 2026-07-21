@@ -13,6 +13,7 @@ export const DICTS: Record<Locale, Record<string, string>> = {
 export const SUPPORTED_LOCALES: Locale[] = ['zh-CN', 'en-US'];
 
 const LOCALE_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_locale_bootstrap';
+const LOCALE_RUNTIME_KEY = '__dnhyxc_locale_runtime__';
 
 /** 供非 React 模块（如 HttpClient Toast）读取当前语言 */
 export function getActiveLocale(): Locale {
@@ -20,6 +21,14 @@ export function getActiveLocale(): Locale {
 		return DEFAULT_LOCALE;
 	}
 	try {
+		const runtime = (
+			globalThis as typeof globalThis & {
+				[LOCALE_RUNTIME_KEY]?: { locale: Locale };
+			}
+		)[LOCALE_RUNTIME_KEY];
+		if (runtime?.locale && SUPPORTED_LOCALES.includes(runtime.locale)) {
+			return runtime.locale;
+		}
 		const params = new URLSearchParams(window.location.search);
 		const fromUrl = params.get('lang') || params.get('locale');
 		if (fromUrl === 'zh-CN' || fromUrl === 'en-US') {

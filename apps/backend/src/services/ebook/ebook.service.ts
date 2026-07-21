@@ -178,6 +178,13 @@ export type EbookThoughtDto = {
 	isPublic: boolean;
 };
 
+export type EbookThoughtPageDto = {
+	list: EbookThoughtDto[];
+	total: number;
+	pageNo: number;
+	pageSize: number;
+};
+
 export type EbookThoughtRevisionDto = {
 	count: number;
 	latestUpdatedAt: string | null;
@@ -1522,10 +1529,40 @@ export class EbookService {
 		userId: number,
 		bookId: string,
 		spineHints?: string[],
-	): Promise<EbookThoughtDto[]> {
+		page?: { pageNo?: number; pageSize?: number },
+		publicOnly?: boolean,
+	): Promise<EbookThoughtDto[] | EbookThoughtPageDto> {
 		const book = await this.assertBookOwned(userId, bookId);
-		const rows = await this.collectThoughtRowsForBook(userId, book, spineHints);
-		return this.mapThoughtRowsToDtos(rows);
+		const paginate = page?.pageNo != null || page?.pageSize != null;
+		if (!paginate) {
+			const rows = await this.collectThoughtRowsForBook(
+				userId,
+				book,
+				spineHints,
+			);
+			const filtered = publicOnly
+				? rows.filter((row) => row.isPublic !== false)
+				: rows;
+			return this.mapThoughtRowsToDtos(filtered);
+		}
+
+		const pageNo = page?.pageNo ?? 1;
+		const pageSize = Math.min(Math.max(page?.pageSize ?? 50, 1), 100);
+		const qb = await this.createVisibleThoughtsQueryBuilder(userId, book);
+		this.appendThoughtSpineHintsFilter(qb, spineHints);
+		if (publicOnly) {
+			qb.andWhere('t.is_public = :publicOnlyTrue', { publicOnlyTrue: true });
+		}
+		qb.orderBy('t.created_at', 'DESC')
+			.skip((pageNo - 1) * pageSize)
+			.take(pageSize);
+		const [rows, total] = await qb.getManyAndCount();
+		return {
+			list: await this.mapThoughtRowsToDtos(rows),
+			total,
+			pageNo,
+			pageSize,
+		};
 	}
 
 	async getThoughtsRevision(

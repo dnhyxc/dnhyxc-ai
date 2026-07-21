@@ -25,6 +25,7 @@ import EnglishLearningImportPage from '@/views/englishLearning/import';
 import EnglishLearningLayout from '@/views/englishLearning/Layout';
 import EnglishLearningLibraryPage from '@/views/englishLearning/library';
 import EnglishLearningMistakesPage from '@/views/englishLearning/mistakes';
+import EnglishLearningNotesPage from '@/views/englishLearning/notes';
 import EnglishLearningPackStreamPage from '@/views/englishLearning/pack';
 import EnglishLearningPracticePage from '@/views/englishLearning/practice';
 import {
@@ -37,6 +38,9 @@ import LegalServicePolicy from '@/views/legal/servicePolicy';
 import LegalUserAgreement from '@/views/legal/userAgreement';
 import Login from '@/views/login';
 import Pay from '@/views/pay';
+import PluginsPage from '@/views/plugins';
+import PluginsLayout from '@/views/plugins/Layout';
+import PluginRegistryEditorPage from '@/views/plugins/registry';
 import Profile from '@/views/profile';
 import ProjectGuidePage from '@/views/projectGuide';
 import Setting from '@/views/setting';
@@ -192,6 +196,13 @@ const routes: RouteConfig[] = [
 						},
 					},
 					{
+						path: 'notes',
+						Component: EnglishLearningNotesPage,
+						meta: {
+							titleKey: 'route.englishLearning.notes.title',
+						},
+					},
+					{
 						path: 'mistakes',
 						Component: EnglishLearningMistakesPage,
 						meta: {
@@ -255,6 +266,29 @@ const routes: RouteConfig[] = [
 				meta: {
 					titleKey: 'route.account.title',
 				},
+			},
+			{
+				path: '/plugins',
+				Component: PluginsLayout,
+				meta: {
+					titleKey: 'route.plugins.title',
+				},
+				children: [
+					{
+						index: true,
+						Component: PluginsPage,
+						meta: {
+							titleKey: 'route.plugins.title',
+						},
+					},
+					{
+						path: 'registry',
+						Component: PluginRegistryEditorPage,
+						meta: {
+							titleKey: 'route.plugins.registry.title',
+						},
+					},
+				],
 			},
 			{
 				path: '/pay',

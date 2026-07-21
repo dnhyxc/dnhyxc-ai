@@ -20,6 +20,8 @@
 | [miniprogram-epub-parse-logic.md](./miniprogram-epub-parse-logic.md) | **小程序 EPUB 解析逻辑**（部分已落地）：后端 `parseEpubBuffer` 懒解析、COS 键兼容、章节 API、`mp-html` 消费与 409 轮询；M1–M2 已上线 → **归档** [miniprogram-epub-server-parse.md](../ebook/miniprogram-epub-server-parse.md) |
 | [epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md) | **Web/桌面听书·听当前按段 TTS + 逐句高亮**（核心已落地）：规划脉络 → **归档** [ebook/epub-listen-paragraph-tts.md](../ebook/epub-listen-paragraph-tts.md) |
 | [epub-listen-playback-optimize.md](./epub-listen-playback-optimize.md) | **听书播放优化**（主项已落地）：loading / 分句选中色 / 进度取整见 ebook 专题；总索引 [ebook/epub-listen-playback-fixes-2026-07.md](../ebook/epub-listen-playback-fixes-2026-07.md) |
+| [third-party-mf-plugin-onboarding.md](./third-party-mf-plugin-onboarding.md) | **第三方 MF 插件接入配置**（核心加载已上线）：对方 CORS 契约、`tauri://localhost`、registry 上架、capabilities 不加第三方域、双端验收与 `/mf-proxy` 兜底 |
+| [mf-css-isolation.md](./mf-css-isolation.md) | **MF 主/子样式互不影响**（已落地）：构建期 scoped CSS vs 半套 Shadow 否决、`untrusted` iframe、验收清单 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

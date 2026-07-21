@@ -32,19 +32,19 @@
 			"identifier": "http:default",
 			"allow": [
 				{
-					"url": "http://101.43.50.15:9112/*"
+					"url": "https://dnhyxc.cn:*/*"
 				},
 				{
-					"url": "http://dnhyxc.cn:9112/*"
+					"url": "http://dnhyxc.cn:*/*"
 				},
 				{
-					"url": "https://dnhyxc.cn:9112/*"
+					"url": "http://101.43.50.15:*/*"
 				},
 				{
-					"url": "http://localhost:9226/*"
+					"url": "http://localhost:*/*"
 				},
 				{
-					"url": "http://127.0.0.1:9112/*"
+					"url": "http://127.0.0.1:*/*"
 				},
 				{
 					"url": "https://github.com/*"
@@ -56,7 +56,7 @@
 					"url": "https://cdn.jsdelivr.net/*"
 				}
 			],
-			"description": "dnhyxc-ai nest api"
+			"description": "仅 API/附件/更新等；MF 插件走 WebView，不加第三方域名"
 		}
 	]
 }

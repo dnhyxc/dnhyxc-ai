@@ -9,10 +9,11 @@ const MIME_BY_EXT: Record<string, string> = {
 	'.gif': 'image/gif',
 	'.webp': 'image/webp',
 	'.pdf': 'application/pdf',
+	'.json': 'application/json; charset=utf-8',
 };
 
 /**
- * 在 Nest 全局前缀 / 其它中间件之前处理 GET /images|/files。
+ * 在 Nest 全局前缀 / 其它中间件之前处理 GET /images|/files|/remotes。
  * 解码 URL 中的中文文件名并与磁盘一致，避免 proxy+root 混配或仅编码路径导致 400/404。
  */
 export function serveUploadStaticMiddleware(uploadsRoot: string) {
@@ -21,12 +22,12 @@ export function serveUploadStaticMiddleware(uploadsRoot: string) {
 			return next();
 		}
 
-		const matched = req.path.match(/^\/(images|files)\/([^/]+)$/);
+		const matched = req.path.match(/^\/(images|files|remotes)\/([^/]+)$/);
 		if (!matched) {
 			return next();
 		}
 
-		const folder = matched[1] as 'images' | 'files';
+		const folder = matched[1] as 'images' | 'files' | 'remotes';
 		let filename: string;
 		try {
 			filename = decodeURIComponent(matched[2]);
@@ -50,7 +51,11 @@ export function serveUploadStaticMiddleware(uploadsRoot: string) {
 			res.setHeader('Content-Type', mime);
 		}
 		res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-		res.setHeader('Cache-Control', 'public, max-age=604800');
+		// registry 宜短缓存，便于单独更新
+		res.setHeader(
+			'Cache-Control',
+			folder === 'remotes' ? 'public, max-age=60' : 'public, max-age=604800',
+		);
 		res.sendFile(absolutePath, (err) => {
 			if (err) {
 				next(err);

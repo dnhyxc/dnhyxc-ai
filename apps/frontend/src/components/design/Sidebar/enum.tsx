@@ -1,3 +1,17 @@
+import {
+	BookOpenText,
+	Bot,
+	// Codesandbox,
+	Flower,
+	LibraryBig,
+	NotebookTabs,
+	Package,
+	Puzzle,
+	TreePalm,
+	Vegan,
+	WalletCards,
+} from 'lucide-react';
+
 export type SidebarMenuConfig = {
 	nameKey: string;
 	icon: string;
@@ -6,15 +20,29 @@ export type SidebarMenuConfig = {
 	requiresAuth?: boolean;
 };
 
+export const ICON_MAP = {
+	TreePalm: <TreePalm />,
+	Package: <Package />,
+	Bot: <Bot />,
+	// Codesandbox: <Codesandbox />,
+	NotebookTabs: <NotebookTabs />,
+	LibraryBig: <LibraryBig />,
+	BookOpenText: <BookOpenText />,
+	WalletCards: <WalletCards />,
+	Vegan: <Vegan />,
+	Puzzle: <Puzzle />,
+	Flower: <Flower />,
+};
+
 export const MENUS: SidebarMenuConfig[] = [
 	{
 		nameKey: 'nav.home',
-		icon: 'House',
+		icon: 'TreePalm',
 		path: '/',
 	},
 	{
 		nameKey: 'nav.knowledge',
-		icon: 'BookOpenText',
+		icon: 'NotebookTabs',
 		path: '/knowledge',
 	},
 	{
@@ -32,6 +60,11 @@ export const MENUS: SidebarMenuConfig[] = [
 		nameKey: 'nav.englishLearning',
 		icon: 'Vegan',
 		path: '/english-learning',
+	},
+	{
+		nameKey: 'nav.plugins',
+		icon: 'Flower',
+		path: '/plugins',
 	},
 	// {
 	// 	name: 'document',

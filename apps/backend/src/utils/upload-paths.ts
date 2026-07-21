@@ -96,6 +96,11 @@ export function getEbookFilesDir(fromDirname: string = __dirname): string {
 	return join(getUploadsRoot(fromDirname), 'ebooks');
 }
 
+/** 插件 registry 等远程配置：uploads/remotes/ */
+export function getUploadRemotesDir(fromDirname: string = __dirname): string {
+	return join(getUploadsRoot(fromDirname), 'remotes');
+}
+
 export function ensureUploadDir(dir: string): void {
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
@@ -104,7 +109,7 @@ export function ensureUploadDir(dir: string): void {
 
 export function resolveStoredUploadAbsolutePath(
 	filename: string,
-	folder: 'images' | 'files',
+	folder: 'images' | 'files' | 'remotes',
 	fromDirname: string = __dirname,
 ): string {
 	const absolutePath = join(getUploadsRoot(fromDirname), folder, filename);
@@ -133,13 +138,17 @@ export function normalizeUploadPublicPath(path: string): string {
 	if (!trimmed) return trimmed;
 
 	const fromAbsolute = trimmed.match(
-		/^https?:\/\/[^/]+(\/(?:images|files)\/.+)$/i,
+		/^https?:\/\/[^/]+(\/(?:images|files|remotes)\/.+)$/i,
 	);
 	if (fromAbsolute) {
 		return fromAbsolute[1];
 	}
 
-	if (trimmed.startsWith('/images/') || trimmed.startsWith('/files/')) {
+	if (
+		trimmed.startsWith('/images/') ||
+		trimmed.startsWith('/files/') ||
+		trimmed.startsWith('/remotes/')
+	) {
 		return trimmed;
 	}
 
@@ -180,13 +189,13 @@ export function resolveUploadPublicPathToAbsolute(
 	fromDirname: string = __dirname,
 ): string {
 	const decoded = decodeUploadPublicPath(path);
-	const matched = decoded.match(/^\/(images|files)\/(.+)$/);
+	const matched = decoded.match(/^\/(images|files|remotes)\/(.+)$/);
 	if (!matched) {
 		throw new Error(`无法解析附件路径: ${path}`);
 	}
 	return resolveStoredUploadAbsolutePath(
 		matched[2],
-		matched[1] as 'images' | 'files',
+		matched[1] as 'images' | 'files' | 'remotes',
 		fromDirname,
 	);
 }

@@ -1,16 +1,19 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { extname } from 'node:path';
+import { extname, join } from 'node:path';
 import {
 	Controller,
 	Get,
 	HttpException,
 	HttpStatus,
+	Param,
 	Query,
 	Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
 	decodeUploadPublicPath,
+	ensureUploadDir,
+	getUploadRemotesDir,
 	resolveUploadPublicPathToAbsolute,
 } from '../../utils/upload-paths';
 
@@ -23,6 +26,7 @@ const MIME_BY_EXT: Record<string, string> = {
 	'.pdf': 'application/pdf',
 	'.txt': 'text/plain',
 	'.md': 'text/markdown',
+	'.json': 'application/json; charset=utf-8',
 };
 
 /**
@@ -38,7 +42,7 @@ export class UploadPublicController {
 		}
 
 		const decoded = decodeUploadPublicPath(path);
-		if (!/^\/(images|files)\/[^/]+$/.test(decoded)) {
+		if (!/^\/(images|files|remotes)\/[^/]+$/.test(decoded)) {
 			throw new HttpException('非法附件路径', HttpStatus.BAD_REQUEST);
 		}
 
@@ -57,7 +61,48 @@ export class UploadPublicController {
 		const mime = MIME_BY_EXT[ext] ?? 'application/octet-stream';
 		res.setHeader('Content-Type', mime);
 		res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-		res.setHeader('Cache-Control', 'public, max-age=604800');
+		res.setHeader(
+			'Cache-Control',
+			decoded.startsWith('/remotes/')
+				? 'public, max-age=60'
+				: 'public, max-age=604800',
+		);
+		createReadStream(absolutePath).pipe(res);
+	}
+
+	/**
+	 * 插件 registry 等：磁盘 `uploads/remotes/:filename`
+	 * 首选静态：GET /remotes/plugins-registry.json（与 /images 同形态）
+	 * 本接口备用：GET /api/upload/remotes/plugins-registry.json
+	 */
+	@Get('remotes/:filename')
+	serveRemote(@Param('filename') filename: string, @Res() res: Response) {
+		if (
+			!filename ||
+			filename.includes('..') ||
+			filename.includes('/') ||
+			filename.includes('\\')
+		) {
+			throw new HttpException('非法文件名', HttpStatus.BAD_REQUEST);
+		}
+		// ponytail: 仅放行 json，避免 remote 目录被当成任意静态桶
+		if (!filename.toLowerCase().endsWith('.json')) {
+			throw new HttpException('仅支持 .json', HttpStatus.BAD_REQUEST);
+		}
+
+		const remotesDir = getUploadRemotesDir();
+		ensureUploadDir(remotesDir);
+		const absolutePath = join(remotesDir, filename);
+		if (!existsSync(absolutePath)) {
+			throw new HttpException('文件不存在', HttpStatus.NOT_FOUND);
+		}
+
+		res.setHeader(
+			'Content-Type',
+			MIME_BY_EXT['.json'] ?? 'application/json; charset=utf-8',
+		);
+		res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+		res.setHeader('Cache-Control', 'public, max-age=60');
 		createReadStream(absolutePath).pipe(res);
 	}
 }

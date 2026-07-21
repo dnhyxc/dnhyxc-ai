@@ -9,6 +9,7 @@ import {
 	type QuickIntentInputSyncPayload,
 } from './components/LearningToolbar';
 import { MistakeBookSession } from './components/MistakeBookSession';
+import { NotesSession } from './components/NotesSession';
 import { ReviewSession } from './components/ReviewSession';
 import { SIDEBAR_SECTION_STACK } from './tokens';
 
@@ -41,6 +42,7 @@ export function EnglishLearningSidebar({
 			<FavoriteSession />
 			<ReviewSession />
 			<MistakeBookSession />
+			<NotesSession />
 		</div>
 	);
 }

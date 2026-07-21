@@ -3,13 +3,15 @@ import type { UploadedFile } from '@/types';
 import { isTauriRuntime } from './runtime';
 
 /** 从 API 根地址推导 uploads 静态资源源站（与 Nest useStaticAssets 同端口） */
-function getUploadStaticOrigin(): string {
+export function getUploadStaticOrigin(): string {
 	return BASE_URL.replace(/\/api\/?$/, '');
 }
 
-/** 将历史数据中的绝对 URL 还原为 /images、/files 相对路径 */
+/** 将历史数据中的绝对 URL 还原为 /images、/files、/remotes 相对路径 */
 function stripUploadOriginToRelative(path: string): string | null {
-	const matched = path.match(/^https?:\/\/[^/]+(\/(?:images|files)\/.+)$/i);
+	const matched = path.match(
+		/^https?:\/\/[^/]+(\/(?:images|files|remotes)\/.+)$/i,
+	);
 	return matched ? matched[1] : null;
 }
 

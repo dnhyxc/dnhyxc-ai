@@ -5,6 +5,28 @@ import { getValue, onEmit, setValue } from '@/utils';
 /** 供首屏同步读取，降低刷新时语言晚于首帧 */
 export const LOCALE_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_locale_bootstrap';
 
+/** MF / HMR 可能复制本模块；locale 与订阅者必须挂在 globalThis 上才能跨副本同步 */
+const LOCALE_RUNTIME_KEY = '__dnhyxc_locale_runtime__';
+const LOCALE_INIT_KEY = '__dnhyxc_locale_init_done__';
+
+type LocaleRuntime = {
+	locale: Locale;
+	listeners: Set<() => void>;
+};
+
+function getLocaleRuntime(): LocaleRuntime {
+	const g = globalThis as typeof globalThis & {
+		[LOCALE_RUNTIME_KEY]?: LocaleRuntime;
+	};
+	if (!g[LOCALE_RUNTIME_KEY]) {
+		g[LOCALE_RUNTIME_KEY] = {
+			locale: readLocaleBootstrapSync() ?? DEFAULT_LOCALE,
+			listeners: new Set(),
+		};
+	}
+	return g[LOCALE_RUNTIME_KEY];
+}
+
 function persistLocaleBootstrap(locale: Locale) {
 	try {
 		localStorage.setItem(LOCALE_BOOTSTRAP_STORAGE_KEY, locale);
@@ -58,21 +80,20 @@ function interpolate(
 	});
 }
 
-// ---- 全局 i18n 状态（保证任意组件切换语言都会更新） ----
-let currentLocale: Locale = readLocaleBootstrapSync() ?? DEFAULT_LOCALE;
-const localeListeners = new Set<() => void>();
-
 function emitLocaleChanged() {
-	for (const l of localeListeners) l();
+	for (const l of getLocaleRuntime().listeners) l();
 }
 
 function subscribeLocale(listener: () => void) {
-	localeListeners.add(listener);
-	return () => localeListeners.delete(listener);
+	const { listeners } = getLocaleRuntime();
+	listeners.add(listener);
+	return () => {
+		listeners.delete(listener);
+	};
 }
 
 function getLocaleSnapshot(): Locale {
-	return currentLocale;
+	return getLocaleRuntime().locale;
 }
 
 async function setLocaleGlobal(
@@ -80,18 +101,13 @@ async function setLocaleGlobal(
 	opts?: { syncUrl?: boolean; emitEvent?: boolean },
 ) {
 	if (!SUPPORTED_LOCALES.includes(next)) return;
-	if (next === currentLocale) return;
-	currentLocale = next;
+	const runtime = getLocaleRuntime();
+	if (next === runtime.locale) return;
+	runtime.locale = next;
 	applyLangToDocument(next);
 	persistLocaleBootstrap(next);
-	emitLocaleChanged();
-	await setValue('locale', next);
-	if (opts?.emitEvent !== false) {
-		// 跨窗口同步：主窗口切换语言后，子窗口自动跟随
-		await onEmit('locale', next);
-	}
 
-	// 推荐：同步覆盖 URL lang，保证复制/刷新一致
+	// 先写 URL，再通知订阅者：避免重挂组件的 init 读到旧 lang 又切回去
 	if (opts?.syncUrl !== false && typeof window !== 'undefined') {
 		try {
 			const u = new URL(window.location.href);
@@ -100,6 +116,13 @@ async function setLocaleGlobal(
 		} catch {
 			// ignore
 		}
+	}
+
+	emitLocaleChanged();
+	await setValue('locale', next);
+	if (opts?.emitEvent !== false) {
+		// 跨窗口同步：主窗口切换语言后，子窗口自动跟随
+		await onEmit('locale', next);
 	}
 }
 
@@ -115,12 +138,18 @@ export function useI18n() {
 		applyLangToDocument(locale);
 		persistLocaleBootstrap(locale);
 
+		const g = globalThis as typeof globalThis & {
+			[LOCALE_INIT_KEY]?: boolean;
+		};
+		// 全应用只 hydrate 一次，避免路由/key 重挂时用旧 URL/store 覆盖刚切好的语言
+		if (g[LOCALE_INIT_KEY]) return;
+		g[LOCALE_INIT_KEY] = true;
+
 		const init = async () => {
 			if (typeof window !== 'undefined') {
 				const fromUrl = parseLocaleFromSearch(window.location.search);
 				if (fromUrl) {
 					await setLocaleGlobal(fromUrl, { syncUrl: false });
-					// 仅写 bootstrap，不强制覆盖用户持久化设置
 					return;
 				}
 			}

@@ -83,8 +83,8 @@ const KnowledgeTitleField = observer(function KnowledgeTitleField({
 }) {
 	const { knowledgeStore } = useStore();
 	return (
-		<div className="flex flex-1 items-center pl-3 gap-1">
-			<span
+		<div className="flex flex-1 items-center pl-3">
+			<div
 				role="img"
 				aria-label={
 					knowledgeStore.isDraftDirty
@@ -100,7 +100,7 @@ const KnowledgeTitleField = observer(function KnowledgeTitleField({
 						aria-hidden
 					/>
 				) : null}
-			</span>
+			</div>
 			<Input
 				value={knowledgeStore.knowledgeTitle}
 				maxLength={100}

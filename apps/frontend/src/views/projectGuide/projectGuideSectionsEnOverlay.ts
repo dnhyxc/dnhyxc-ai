@@ -18,6 +18,7 @@ export const PROJECT_GUIDE_SECTION_TITLES_EN: Record<string, string> = {
 	'pg-s14': '14. Going deeper',
 	'pg-s15': '15. About window and legal pages',
 	'pg-s16': '16. E-books (bookshelf & reader)',
+	'pg-s17': '17. Plugin center (module management)',
 };
 
 export const PROJECT_GUIDE_ITEMS_EN: Record<
@@ -343,6 +344,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Each left-sidebar feature (daily memorize, quick intents, libraries, topic pulls, favorites, today review, mistake books, etc.) sits in its own card with a colored icon beside the title—subtle borders and light fills aligned with the Agent panel, while button colors stay per block. JSON format examples in library cards are collapsed by default; tap the label to expand or collapse. Quick intents show a few chips first; when expanded, chips use two columns in a narrow sidebar and add columns when the panel is wider.',
 	},
+	'pg-s13-18': {
+		title: '13.18 Learning notes',
+		description:
+			'Entry: open Learning notes from the English Learning sidebar, or go to /english-learning/notes. Usage: the page shows the notes module (loaded from an independent feature module). If the module is unavailable, check the network and tap Reload; other English Learning pages are unaffected.',
+	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
 		description:
@@ -417,5 +423,20 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		title: '16.10 EPUB listen while reading (EPUB only)',
 		description:
 			'Entry: while reading EPUB, tap the headphones icon left of the Bot icon in the header to start Listen to book; tap again to stop.\nPlayback: continuous TTS from the visible chapter (or the sentence at your current reading position). With cloud voice, audio is synthesized by paragraph while the UI still highlights sentence by sentence (first sentence starts sooner); advances to the next spine section at section end; shows a message when the book is finished. In continuous scroll reading mode, playback continues into the next on-screen block after the current section finishes. Full-line decorative separators (such as a long run of asterisks) are not spoken.\nBar: a fixed bottom bar with pause/resume, stop, sentence list jump, previous/next chapter, playback speed 0.5×–3× (ruler in 0.1 steps), and chapter/sentence progress. Previous/next chapter and jumps from the sentence list do not exit playback.\nPause and resume: resume continues from where you paused; system Control Center or headset media keys stay in sync with the bar. Stop or tapping Listen again ends speech and unbinds media-key handlers.\nSentences menu: tap Sentences (list icon) on the bar to open a per-chapter list; tap any line to start from that sentence and scroll it to the center of the screen—the list scrolls to the line currently playing when opened; long chapters use virtual scrolling; a header scroll button cycles Scroll to bottom → top → current sentence (icons switch accordingly). Use this menu for sentence jumps (bar arrows now change chapters). After you change the reading background, the active sentence’s highlight colors follow the reading text color so it stays readable.\nLoading: whenever the utterance about to play is still loading and has not started (start listen, chapter change, sentence jump, between paragraph packs, etc.), the play button shows a loading state until speech starts, then switches to pause. Background prefetch of the next segment does not alone trigger loading.\nSpeed: tap the speed button (e.g. 1.0 X) to open a ruler panel—drag or tap round presets (1.0, 1.5, 2.0, etc.) for 0.5×–3×; with cloud voice, heard speed matches the UI. Speed is synced to your account and applies to all books by default; turn on Apply to this book only under the panel to limit it to the current book—others keep their own speed or the default 1.0×. You can open or change speed while speech is loading; an open speed panel does not close when the next sentence starts loading.\nHighlight: light yellow tint on the current sentence (same as quote Listen); clears at sentence end; independent from user highlights and reading-note underlines; stays aligned when you resize the right sidebar or toggle the reading-notes panel.\nAuto-follow: the current sentence scrolls into view while playing; manual scroll, wheel, or selecting body text pauses follow—a bottom-right button returns to the playing line and resumes follow (works even after scrolling to a distant chapter in continuous scroll).\nTOC / bar chapter jump: while listening, picking another chapter in the book TOC or tapping previous/next chapter on the bar continues from the start of that section (TOC entry) and keeps your playback speed. If several TOC entries share one chapter file (split by in-page anchors), jumps land on the matching section rather than the start of the whole file. The bar uses the sentence currently being spoken to decide the current section before choosing neighbors.\nVs quote Listen: selection/thought Listen joins the same playback session as header Listen and continues reading; starting Listen again from a new selection restarts from that selection. PDF has no listen-while-reading yet.',
+	},
+	'pg-s17-1': {
+		title: '17.1 Open the plugin center',
+		description:
+			'Entry: Plugin Center (flower icon) in the left sidebar, or visit /plugins. Toggling modules and editing the registry require signing in.',
+	},
+	'pg-s17-2': {
+		title: '17.2 Enable / disable (shelf toggle)',
+		description:
+			'Card list: the page shows every available module as a card with a name, description, and switch. Enable (switch on): the state is saved to your account and takes effect immediately—the sidebar entry appears and the module is usable; if it has not been downloaded yet, it loads on first entry. Disable (switch off): the state is also saved and takes effect immediately—the sidebar entry disappears and any open page is unloaded; enabling again restores it. Load failure: if a module fails to load, the page shows a stable message with manual retry—no flicker loops—and other features are unaffected.',
+	},
+	'pg-s17-3': {
+		title: '17.3 Registry editor (advanced)',
+		description:
+			'Entry: the registry editor entry inside the plugin center (sign-in required). Purpose: view and edit the raw module list as JSON; saving reloads the configuration automatically. Validation: basic structural checks run on save (e.g. the module list must be an array); invalid content is rejected with a message and not written.',
 	},
 };

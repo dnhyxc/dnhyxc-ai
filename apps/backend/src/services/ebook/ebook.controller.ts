@@ -401,10 +401,13 @@ export class EbookController {
 			?.split(',')
 			.map((hint) => hint.trim())
 			.filter(Boolean);
+		const paginate = query.pageNo != null || query.pageSize != null;
 		return this.ebookService.listThoughts(
 			this.userId(req),
 			bookId,
 			spineHints?.length ? spineHints : undefined,
+			paginate ? { pageNo: query.pageNo, pageSize: query.pageSize } : undefined,
+			query.publicOnly === true,
 		);
 	}
 

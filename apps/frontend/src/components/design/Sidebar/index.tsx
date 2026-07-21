@@ -7,59 +7,59 @@ import {
 } from '@ui/dropdown-menu';
 import {
 	ArrowLeftRight,
-	BookOpenText,
-	Bot,
 	CircleUserRound,
-	Codesandbox,
-	House,
-	LibraryBig,
 	LogOut,
-	Package,
 	SquareArrowRight,
-	Vegan,
-	WalletCards,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { observer } from 'mobx-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { sidebarInjector } from '@/plugins';
 import { hasValidAuthToken } from '@/router/authPaths';
 import useStore from '@/store';
 import { removeStorage, resolveCosUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
-import { MENUS } from './enum';
+import { ICON_MAP, MENUS, type SidebarMenuConfig } from './enum';
 
-const Sidebar = () => {
+const Sidebar = observer(() => {
 	const navigate = useNavigate();
 	const { userStore } = useStore();
 	const { storageInfo } = useStorageInfo();
 	const { t } = useI18n();
+	const [pluginMenus, setPluginMenus] = useState(() => [
+		...sidebarInjector.items,
+	]);
+
+	useEffect(() => {
+		const sync = () => setPluginMenus([...sidebarInjector.items]);
+		sync();
+		return sidebarInjector.subscribe(sync);
+	}, []);
 
 	const onJump = (path: string) => {
 		navigate(path);
 	};
 
-	const iconMap = {
-		House: <House />,
-		Package: <Package />,
-		Bot: <Bot />,
-		Codesandbox: <Codesandbox />,
-		BookOpenText: <BookOpenText />,
-		LibraryBig: <LibraryBig />,
-		WalletCards: <WalletCards />,
-		Vegan: <Vegan />,
-	};
-
 	const visibleMenus = useMemo(() => {
 		const loggedIn = hasValidAuthToken();
-		return MENUS.filter((menu) => !menu.requiresAuth || loggedIn);
+		const dynamic: SidebarMenuConfig[] = pluginMenus.map((m) => ({
+			nameKey: m.nameKey,
+			icon: m.icon,
+			path: m.path,
+			requiresAuth: m.requiresAuth,
+		}));
+		return [...MENUS, ...dynamic].filter(
+			(menu) => !menu.requiresAuth || loggedIn,
+		);
 		// storageInfo 变化（登录/登出）时与 token 展示状态对齐并重算菜单
-	}, [storageInfo]);
+	}, [storageInfo, pluginMenus]);
 
 	const processedMenus = visibleMenus.map((menu) => ({
 		...menu,
-		icon: iconMap[menu.icon as keyof typeof iconMap],
+		icon: ICON_MAP[menu.icon as keyof typeof ICON_MAP],
 		onClick: () => onJump(menu.path),
 	}));
 
@@ -104,8 +104,10 @@ const Sidebar = () => {
 						>
 							<span
 								className={cn(
-									'flex size-full items-center justify-center [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:overflow-visible',
-									item.nameKey === 'nav.chat' && '[&>svg]:size-[24px]',
+									'flex size-full items-center justify-center [&>svg]:size-5.5 [&>svg]:shrink-0 [&>svg]:overflow-visible',
+									item.nameKey === 'nav.home' && '[&>svg]:size-6',
+									item.nameKey === 'nav.chat' && '[&>svg]:size-6',
+									item.nameKey === 'nav.plugins' && '[&>svg]:size-6',
 								)}
 							>
 								{item.icon}
@@ -117,7 +119,7 @@ const Sidebar = () => {
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<div className="lucide-stroke-draw-hover group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
-								<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />
+								<CircleUserRound className="size-6 shrink-0 overflow-visible" />
 							</div>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent side="right" align="end" className="min-w-26">
@@ -166,12 +168,12 @@ const Sidebar = () => {
 						className="lucide-stroke-draw-hover group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 						onClick={() => onJump('/login')}
 					>
-						<SquareArrowRight className="size-[22px] shrink-0 overflow-visible" />
+						<SquareArrowRight className="size-6 shrink-0 overflow-visible" />
 					</div>
 				)}
 			</div>
 		</div>
 	);
-};
+});
 
 export default Sidebar;

@@ -58,6 +58,9 @@ export const DOWNLOAD_FILE = '/upload/download';
 // 下载 zip 文件
 export const DOWNLOAD_ZIP_FILE = '/upload/downloadZip';
 
+/** 写入 uploads/remotes/:filename（JWT） */
+export const UPLOAD_REMOTES_PUT = '/upload/remotes';
+
 // 图片分析
 export const IMAGE_OCR = '/ocr/imageOcr';
 

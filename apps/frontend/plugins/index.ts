@@ -113,3 +113,23 @@ export function removeDistMinMapsPlugin(): Plugin {
 		},
 	};
 }
+
+/**
+ * @module-federation/vite 会把 virtual:mf:...mf_owner__N... 写进 optimizeDeps。
+ * N 在每次 vite 配置重载时递增，磁盘上的 .vite/deps 仍引用旧 N → import-analysis 报 Failed to resolve。
+ * serve 时每次配置阶段清缓存，让 deps 与当前 owner 对齐（#708/#768）。
+ */
+export function clearMfViteDepCachePlugin(): Plugin {
+	return {
+		name: 'clear-mf-vite-dep-cache',
+		enforce: 'pre',
+		config(config, { command }) {
+			if (command !== 'serve') return;
+			const root = config.root ? path.resolve(config.root) : process.cwd();
+			fs.rmSync(path.join(root, 'node_modules/.vite'), {
+				recursive: true,
+				force: true,
+			});
+		},
+	};
+}

@@ -209,6 +209,51 @@ server {
     proxy_pass http://127.0.0.1:9226;
   }
 
+  # 插件 registry：须写在 location / 之前，否则 try_files 会回 SPA HTML
+  location ^~ /remotes/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass http://127.0.0.1:9226;
+  }
+
+  # ---------- MF Remote 反代（兜底：对方无法开 CORS 时用；常规请对方自配 CORS）----------
+  # 完整接入契约：docs/ideas/third-party-mf-plugin-onboarding.md
+  # 常规路径：对方放行 9002 + tauri://localhost，registry 直连对方 HTTPS entry（不发桌面版）
+  # 本段示例：把自建 9008（remotePlugins）当上游演示 /mf-proxy（registry.entry 指代理 URL）
+  #   https://dnhyxc.cn:9112/mf-proxy/remotePlugins/mf-manifest.json
+  location ^~ /mf-proxy/remotePlugins/ {
+    if ($request_method = OPTIONS) {
+      add_header Access-Control-Allow-Origin $mf_cors_origin;
+      add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
+      add_header Access-Control-Allow-Headers "Content-Type, Range";
+      add_header Access-Control-Max-Age 86400;
+      add_header Content-Length 0;
+      add_header Vary "Origin";
+      return 204;
+    }
+
+    rewrite ^/mf-proxy/remotePlugins/(.*)$ /$1 break;
+    proxy_pass https://127.0.0.1:9008;
+    proxy_ssl_server_name on;
+    proxy_ssl_name dnhyxc.cn;
+    proxy_set_header Host dnhyxc.cn;
+    proxy_set_header Accept-Encoding "";
+
+    # 构建产物里 publicPath 仍是 https://dnhyxc.cn:9008/ 时必须改写，否则 chunk 直打 9008
+    sub_filter_types application/json application/javascript text/javascript;
+    sub_filter_once off;
+    sub_filter "https://dnhyxc.cn:9008/" "https://dnhyxc.cn:9112/mf-proxy/remotePlugins/";
+    sub_filter "https://dnhyxc.cn:9008" "https://dnhyxc.cn:9112/mf-proxy/remotePlugins";
+
+    add_header Access-Control-Allow-Origin $mf_cors_origin always;
+    add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Range" always;
+    add_header Cross-Origin-Resource-Policy "cross-origin" always;
+    add_header Vary "Origin" always;
+  }
+
   # 后端 API：/api 前缀与 Nest `app.setGlobalPrefix('api')` 对齐
   location /api/ {
     proxy_set_header Host $http_host;

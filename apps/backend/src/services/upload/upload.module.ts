@@ -11,6 +11,7 @@ import {
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { UploadPublicController } from './upload-public.controller';
+import { UploadRemotesWriteController } from './upload-remotes-write.controller';
 
 const UPLOAD_IMAGES_DIR = getUploadImagesDir(__dirname);
 const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
@@ -48,7 +49,11 @@ const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
 			},
 		}),
 	],
-	controllers: [UploadController, UploadPublicController],
+	controllers: [
+		UploadController,
+		UploadPublicController,
+		UploadRemotesWriteController,
+	],
 	providers: [UploadService],
 	exports: [UploadService],
 })

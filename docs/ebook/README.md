@@ -14,6 +14,7 @@
 | [pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md)                           | **增量**：PDF 适应宽度、顶栏缩放、滚动换页（停稳后翻页）                                                                                        |
 | [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)               | **增量**：EPUB 右键菜单、智能助手分栏（对齐知识库助手 UI 与流式贴底）                                                                           |
 | [ebook-moke-assistant.md](./ebook-moke-assistant.md)                             | **主文档（本轮）**：MOKE 独立后端与会话、公共 Assistant 层、PDF 接入 / 右键菜单、分享保存、分栏与顶栏体验                                       |
+| [ebook-plugin-ideas-list.md](./ebook-plugin-ideas-list.md)                       | **增量（2026-07-20）**：电子书阅读页插件化接入（`usePluginEnabled`、`setEbookHostHandlers`、`PluginHostPage` 渲染、`ebookHostApi.ts` 模块 API），含改动前/后对比与逐行注释 |
 | [ebook-local-path-dedup.md](./ebook-local-path-dedup.md)                         | **增量**：按 `local_path` 查库，重复选同一路径不再 COS 上传                                                                                     |
 | [ebook-membership-upload.md](./ebook-membership-upload.md)                       | **增量**：会员专属云端上传；Web 非会员拦截；COS-only 存储                                                                                       |
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)                 | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`）                                                                                |

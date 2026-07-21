@@ -1,0 +1,97 @@
+import { Toast } from '@ui/sonner';
+import { http } from '@/utils/fetch';
+import { deepFreeze } from '../host-api/deepFreeze';
+import { eventBus } from '../host-api/EventBus';
+import { createEbookModulesApi } from '../host-api/ebookHostApi';
+import type { HostBridgeProps, PluginDescriptor } from './types';
+
+function readTheme(): 'light' | 'dark' {
+	try {
+		const t = document.documentElement.getAttribute('data-theme');
+		if (t === 'dark' || t === 'light') return t;
+		if (document.documentElement.classList.contains('dark')) return 'dark';
+		// Host 黑色主题挂在 body.theme-black（不是 html.dark）
+		if (
+			document.body.classList.contains('dark') ||
+			document.body.classList.contains('theme-black')
+		) {
+			return 'dark';
+		}
+	} catch {
+		/* ignore */
+	}
+	return 'light';
+}
+
+/** 按 permissions 组装并密封；未授权能力不存在 */
+export function createHostBridge(
+	d: PluginDescriptor,
+	navigate: (to: string) => void,
+): HostBridgeProps {
+	const allow = new Set(d.permissions);
+	const api: Record<string, unknown> = {
+		t: (key: string) => key,
+		theme: readTheme(),
+		event: {
+			on: (event: string, handler: (data?: unknown) => void) =>
+				eventBus.on(d.id, event, handler),
+			off: (event: string, handler: (data?: unknown) => void) =>
+				eventBus.off(d.id, event, handler),
+			emit: (event: string, data?: unknown) => eventBus.emit(d.id, event, data),
+		},
+	};
+
+	if (allow.has('ui:toast')) {
+		api.ui = Object.freeze({
+			showToast: (options: {
+				message: string;
+				type?: 'success' | 'error' | 'info';
+			}) => {
+				Toast({
+					type: options.type ?? 'info',
+					title: options.message,
+				});
+			},
+		});
+	}
+
+	if (allow.has('nav:subtree')) {
+		api.navigate = (to: string) => {
+			if (!to.startsWith(d.routePath)) {
+				throw new Error(`NAV_OUT_OF_SCOPE: ${to}`);
+			}
+			navigate(to);
+		};
+	}
+
+	if (allow.has('http:plugin-api')) {
+		api.http = Object.freeze({
+			get: <T = unknown>(url: string) => http.get<T>(url),
+			post: <T = unknown>(url: string, body?: unknown) =>
+				http.post<T>(url, body),
+		});
+	}
+
+	const modules: Record<string, unknown> = {};
+	if (allow.has('modules:chat')) {
+		modules.openThread = (id: unknown) => {
+			if (typeof id !== 'string') throw new Error('INVALID_THREAD_ID');
+			navigate(`/chat/c/${id}`);
+		};
+	}
+	if (allow.has('modules:ebook')) {
+		modules.ebook = createEbookModulesApi();
+	}
+	if (Object.keys(modules).length > 0) {
+		api.modules = Object.freeze(modules);
+	}
+
+	return deepFreeze({
+		api,
+		plugin: {
+			id: d.id,
+			version: d.version,
+			routePath: d.routePath,
+		},
+	}) as HostBridgeProps;
+}

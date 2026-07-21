@@ -116,6 +116,7 @@ import {
 	UPLOAD_COS_CHAT_FILES,
 	UPLOAD_FILE,
 	UPLOAD_FILES,
+	UPLOAD_REMOTES_PUT,
 	WECHAT_LINK_CODE,
 	WECHAT_STATUS,
 	WECHAT_UNBIND,
@@ -317,6 +318,19 @@ export const downloadZip = async (filename: string): Promise<any> => {
 	return await http.get(DOWNLOAD_ZIP_FILE, {
 		querys: { filename },
 	});
+};
+
+/** 将 JSON 文本写入 uploads/remotes/:filename（需登录） */
+export const putUploadRemoteJson = async (
+	filename: string,
+	content: string,
+) => {
+	return await http.put(
+		`${UPLOAD_REMOTES_PUT}/${encodeURIComponent(filename)}`,
+		{
+			content,
+		},
+	);
 };
 
 export const deleteFile = async (
@@ -2146,7 +2160,14 @@ export const saveEbookCover = async (
 	return res.data;
 };
 
-/** GET /ebook/thoughts/:bookId */
+export type EbookThoughtPage = {
+	list: EbookThought[];
+	total: number;
+	pageNo: number;
+	pageSize: number;
+};
+
+/** GET /ebook/thoughts/:bookId — 无分页参数时返回全量数组；带 pageNo/pageSize 时返回分页对象 */
 export const fetchEbookThoughts = async (
 	bookId: string,
 	options?: { spineHints?: string[] },
@@ -2159,6 +2180,21 @@ export const fetchEbookThoughts = async (
 			spineHints && spineHints.length > 0
 				? { spineHints: spineHints.join(',') }
 				: undefined,
+	});
+	return res.data;
+};
+
+/** GET /ebook/thoughts/:bookId?pageNo=&pageSize= */
+export const fetchEbookThoughtsPage = async (
+	bookId: string,
+	options: { pageNo: number; pageSize?: number; publicOnly?: boolean },
+): Promise<EbookThoughtPage> => {
+	const res = await http.get<EbookThoughtPage>(`${EBOOK_THOUGHTS}/${bookId}`, {
+		querys: {
+			pageNo: options.pageNo,
+			pageSize: options.pageSize ?? 50,
+			...(options.publicOnly ? { publicOnly: true } : {}),
+		},
 	});
 	return res.data;
 };

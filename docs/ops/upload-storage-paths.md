@@ -1,7 +1,7 @@
 # 本地上传目录与线上部署路径
 
 > **文档角色（主文档）**：NestJS `upload` 模块的落盘目录、静态资源挂载与环境变量（`UPLOAD_ROOT` / `SERVER_ROOT`）。  
-> **延伸阅读**：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)（前端 URL 解析与 Nginx/CORP）；[deploy.md](./deploy.md)、[nginx.md](./nginx.md)。
+> **延伸阅读**：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)（前端 URL 解析与 Nginx/CORP）；[remotes-registry-static.md](./remotes-registry-static.md)（`uploads/remotes` 插件清单）；[deploy.md](./deploy.md)、[nginx.md](./nginx.md)。
 
 ---
 

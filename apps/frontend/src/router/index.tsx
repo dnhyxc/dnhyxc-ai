@@ -1,8 +1,9 @@
 import { Toaster } from '@ui/sonner';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { useInputsOnlyTab } from '@/hooks';
+import { pluginManager, routeInjector } from '@/plugins';
 import {
 	attachTauriPlainFieldClipboardShortcuts,
 	getValue,
@@ -11,10 +12,30 @@ import {
 } from '@/utils';
 import { http } from '@/utils/fetch';
 import { isTauriRuntime } from '@/utils/runtime';
-import routes from './routes';
+import { buildRoutes } from './buildRoutes';
 
 const App = () => {
 	useInputsOnlyTab();
+	const [routeEpoch, setRouteEpoch] = useState(0);
+
+	useEffect(() => {
+		const unsub = routeInjector.subscribe(() => {
+			setRouteEpoch((n) => n + 1);
+		});
+		void pluginManager
+			.init()
+			.then(() => setRouteEpoch((n) => n + 1))
+			.catch((e) => console.error('[plugins] init failed', e));
+		return unsub;
+	}, []);
+
+	const router = useMemo(() => {
+		const r = createBrowserRouter(buildRoutes() as RouteObject[]);
+		pluginManager.setNavigate((to) => {
+			void r.navigate(to);
+		});
+		return r;
+	}, [routeEpoch]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -65,7 +86,6 @@ const App = () => {
 		};
 	}, []);
 
-	const router = createBrowserRouter(routes as RouteObject[]);
 	return (
 		<div className="h-full w-full bg-theme-background">
 			<Toaster />

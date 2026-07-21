@@ -10,7 +10,11 @@ import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AllExceptionFilter } from './filters/all-exception-filter';
 import { serveUploadStaticMiddleware } from './middleware/serve-upload-static.middleware';
-import { getUploadsRoot } from './utils/upload-paths';
+import {
+	ensureUploadDir,
+	getUploadRemotesDir,
+	getUploadsRoot,
+} from './utils/upload-paths';
 
 async function bootstrap() {
 	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -25,7 +29,8 @@ async function bootstrap() {
 	app.useBodyParser('urlencoded', { limit: '6mb', extended: true });
 
 	const uploadsRoot = getUploadsRoot(__dirname);
-	// 须在 globalPrefix 之前：直接处理 /images、/files（解码中文文件名）
+	ensureUploadDir(getUploadRemotesDir(__dirname));
+	// 须在 globalPrefix 之前：直接处理 /images、/files、/remotes（解码中文文件名）
 	app.use(serveUploadStaticMiddleware(uploadsRoot));
 
 	// 设置全局前缀为 api

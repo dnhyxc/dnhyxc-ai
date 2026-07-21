@@ -140,6 +140,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'On Tauri desktop, when a remote API call fails with a transient no-response network error (not only list loading), the app briefly retries before showing an error—fewer false “network error, please check your connection” toasts. Browser behavior is unchanged.',
 	},
+	's3-7': {
+		title: 'Dynamic remote feature modules',
+		description:
+			'The host app can load independently deployed feature modules at runtime from a registry (sharing the host UI shell). On load failure the UI shows a stable message with manual retry—no flicker loops. Some demo entries may appear in the sidebar depending on registry config.',
+	},
+	's3-8': {
+		title: 'Plugin center & enable/disable (shelf toggle)',
+		description:
+			'A new Plugin Center page lists every available module as a card with a switch. Toggle it on to enable (publish) a module—state is persisted to your account and takes effect immediately: the sidebar entry appears and the module is usable. Toggle it off to disable (unpublish)—the entry disappears and any open page is unloaded. A registry editor page (sign-in required) lets you view and edit the raw module list (JSON); saving it reloads the configuration automatically.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:
@@ -576,6 +586,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Backend supports common deployment shapes and env configuration; Nginx reverse proxy and TLS are illustrated in repo ops docs.',
 	},
+	's17-2': {
+		title: 'Same-origin plugin registry path',
+		description:
+			'The host fetches the plugin registry via a same-origin short path (dev server proxy locally; gateway can serve files in production), avoiding cross-port browser blocks. Each remote module’s own entry files still need correct CORS on that module’s origin.',
+	},
 	's18-1': {
 		title: 'Shared tools package',
 		description:
@@ -900,6 +915,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Desktop cloud narration playback fix',
 		description:
 			'Fixes Tauri desktop cases where Edge / MiniMax / iFlytek cloud narration showed “playing” but stayed silent until pause/play or a second tap. Applies to English learning speaker, EPUB listen-to-book / listen selection, and voice-settings preview. Browser still uses stream endpoints; startup is slightly more reliable.',
+	},
+	's24-50': {
+		title: 'Learning notes (remote module)',
+		description:
+			'English Learning adds a Learning notes entry (/english-learning/notes). The notes UI loads from an independent module; if it is not ready, the page shows a message with manual retry without breaking other English Learning features.',
 	},
 	's25-1': {
 		title: 'E-book bookshelf',

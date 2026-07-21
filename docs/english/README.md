@@ -6,6 +6,8 @@
 
 | 文档 | 说明 |
 |------|------|
+| [learning-notes-remote.md](./learning-notes-remote.md) | **学习笔记 MF Remote**：`/english-learning/notes`、`remotePlugins/LearningNotes`（:9008）、`injectRoute: false` |
+| [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |
 | [english-learning-impl-overview.md](./english-learning-impl-overview.md) | 产品能力总览 |
 | [english-learning-backend-implementation.md](./english-learning-backend-implementation.md) | 后端模块总览 |
 | [english-learning-master-agent-web-search-to-llm.md](./english-learning-master-agent-web-search-to-llm.md) | 主 Agent 与联网 |
