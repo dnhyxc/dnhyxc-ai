@@ -16,5 +16,6 @@
 			"@design/*": ["./src/components/design/*"]
 		}
 	},
-	"include": ["src"]
+	"include": ["src"],
+	"exclude": ["src/**/*.selfcheck.ts"]
 }

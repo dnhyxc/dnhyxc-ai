@@ -1,0 +1,138 @@
+import { Extension } from '@tiptap/core';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Document from '@tiptap/extension-document';
+import Highlight from '@tiptap/extension-highlight';
+import Image from '@tiptap/extension-image';
+import { TaskItem, TaskList } from '@tiptap/extension-list';
+import { Placeholder } from '@tiptap/extension-placeholder';
+import { TableKit } from '@tiptap/extension-table';
+import TextAlign from '@tiptap/extension-text-align';
+import { CharacterCount } from '@tiptap/extensions';
+import type { Extensions } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { common, createLowlight } from 'lowlight';
+import { fileToDataUrl, ImageUpload } from '../image';
+import { zhCN } from '../locale';
+import { indentEditor, TitleNode } from '../title';
+import type { CreateExtensionsOptions } from '../types';
+
+const lowlight = createLowlight(common);
+
+/** Tab：列表下沉 / 正文插入缩进；并吞掉默认焦点切换（避免跳到标题 input） */
+const TabIndent = Extension.create({
+	name: 'tabIndent',
+	priority: 1000,
+	addKeyboardShortcuts() {
+		return {
+			Tab: ({ editor }) => {
+				if (editor.isActive('codeBlock')) return false;
+				return indentEditor(editor);
+			},
+			'Shift-Tab': ({ editor }) => {
+				if (editor.isActive('codeBlock')) return false;
+				if (editor.commands.liftListItem('listItem')) return true;
+				if (editor.commands.liftListItem('taskItem')) return true;
+				return true;
+			},
+		};
+	},
+});
+
+/** 首位固定 title，其后至少一段正文（避免仅有 atom 时 GapCursor 无法输入） */
+const CustomDocument = Document.extend({
+	content: 'title block+',
+});
+
+/** 组装默认扩展；业务可通过 extensions / extraExtensions 覆盖或追加 */
+export function createExtensions(
+	options: CreateExtensionsOptions = {},
+): Extensions {
+	if (options.extensions) return options.extensions;
+
+	const placeholder = options.placeholder ?? zhCN.placeholder;
+	const resolveImageSrcRef = options.resolveImageSrcRef ?? {
+		current: fileToDataUrl,
+	};
+
+	return [
+		CustomDocument,
+		TitleNode,
+		TabIndent,
+		StarterKit.configure({
+			document: false,
+			trailingNode: {
+				node: 'paragraph',
+			},
+			heading: { levels: [1, 2, 3, 4, 5] },
+			codeBlock: false,
+			link: {
+				openOnClick: false,
+				autolink: true,
+				defaultProtocol: 'https',
+				HTMLAttributes: {
+					rel: 'noopener noreferrer',
+					target: '_blank',
+				},
+			},
+		}),
+		CodeBlockLowlight.configure({
+			lowlight,
+			defaultLanguage: 'javascript',
+			enableTabIndentation: true,
+			tabSize: 2,
+			HTMLAttributes: { class: 'hljs' },
+		}),
+		Placeholder.configure({
+			placeholder: ({ editor, node }) => {
+				// 常驻 title NodeView 用自身 data-placeholder；此处只处理正文
+				if (node.type.name === 'title') return '';
+				if (node.type.name === 'heading') {
+					return `${zhCN.placeholderHeading} ${node.attrs.level}`;
+				}
+				void editor;
+				return placeholder;
+			},
+			emptyEditorClass: 'is-editor-empty',
+			emptyNodeClass: 'is-empty',
+			showOnlyCurrent: true,
+			showOnlyWhenEditable: true,
+		}),
+		Highlight.configure({ multicolor: true }),
+		TextAlign.configure({
+			types: ['heading', 'paragraph'],
+			alignments: ['left', 'center', 'right', 'justify'],
+		}),
+		Image.configure({
+			inline: false,
+			allowBase64: true,
+			HTMLAttributes: { class: 'rich-editor-image' },
+			resize: {
+				enabled: true,
+				alwaysPreserveAspectRatio: true,
+			},
+		}),
+		ImageUpload.configure({ resolveSrcRef: resolveImageSrcRef }),
+		TableKit.configure({
+			table: { resizable: true },
+		}),
+		TaskList,
+		TaskItem.configure({ nested: true }),
+		CharacterCount.configure({
+			limit: options.maxLength ?? null,
+			// 中文按字素计长；西文词 + CJK 字合计为「词」
+			textCounter: (text) =>
+				[...new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text)]
+					.length,
+			wordCounter: (text) => {
+				const cjk =
+					text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g)?.length ?? 0;
+				const latin = text
+					.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
+					.split(/\s+/)
+					.filter(Boolean).length;
+				return cjk + latin;
+			},
+		}),
+		...(options.extraExtensions ?? []),
+	];
+}

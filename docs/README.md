@@ -60,6 +60,7 @@
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/ebook-plugin-ideas-list.md](./ebook/ebook-plugin-ideas-list.md)                                                                                    |
 | 后端 Remote 静态资源服务（serveRemote / uploads/remotes）           | [ops/remote-static-resources.md](./ops/remote-static-resources.md)                                                                                        |
 | 英语学习「学习笔记」空白或 CORS                                     | [english/learning-notes-remote.md](./english/learning-notes-remote.md)                                                                                    |
+| 学习笔记富文本编辑器（Tiptap 升级 / HTML 存储）                     | [english/learning-notes-rich-editor.md](./english/learning-notes-rich-editor.md)                                                                          |
 | `createLlm` / 400                                                 | [llm/create-llm.md](./llm/create-llm.md)                                                                                                                 |
 | 图片 OCR / 附件识图                                               | [llm/ocr-create-llm-glm.md](./llm/ocr-create-llm-glm.md)                                                                                                 |
 | 知识库向量 404 / 400 入库失败                                     | [knowledge/siliconflow-vector-full-url.md](./knowledge/siliconflow-vector-full-url.md)                                                                   |

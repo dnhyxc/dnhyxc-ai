@@ -1398,6 +1398,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'在英语学习专区新增学习笔记入口（/english-learning/notes）。笔记界面由独立模块加载；模块未就绪时页面会提示并可手动重试，不影响其它英语学习功能。',
 			},
+			{
+				id: 's24-51',
+				title: '学习笔记富文本编辑',
+				dateLabel: '2026-07-22',
+				description:
+					'学习笔记升级为富文本编辑器，支持格式化文本、高亮标记、列表等编辑能力，记录学习收获时可更灵活地排版与标注。',
+			},
 		],
 	},
 	{

@@ -921,6 +921,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'English Learning adds a Learning notes entry (/english-learning/notes). The notes UI loads from an independent module; if it is not ready, the page shows a message with manual retry without breaking other English Learning features.',
 	},
+	's24-51': {
+		title: 'Rich-text editing for learning notes',
+		description:
+			'Learning notes upgraded to a rich-text editor with formatting, highlight markers, lists, and other editing capabilities, making it easier to format and annotate learning notes.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

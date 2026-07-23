@@ -347,7 +347,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-18': {
 		title: '13.18 Learning notes',
 		description:
-			'Entry: open Learning notes from the English Learning sidebar, or go to /english-learning/notes. Usage: the page shows the notes module (loaded from an independent feature module). If the module is unavailable, check the network and tap Reload; other English Learning pages are unaffected.',
+			'Entry: open Learning notes from the English Learning sidebar, or go to /english-learning/notes. Usage: the page shows the notes module (loaded from an independent feature module). If the module is unavailable, check the network and tap Reload; other English Learning pages are unaffected. Rich-text editing: the notes editor supports text formatting (bold, italic, strikethrough, inline code, etc.), highlight markers, ordered/unordered lists, and code blocks for flexible formatting and annotation while taking notes. Split layout: left side shows the note list, right side has the editor and preview; list width is draggable, and the list can be collapsed so the editor takes full width. Auto-save: edits are auto-saved to your account and persist across devices; new note titles are extracted from the first heading in the editor.',
 	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',

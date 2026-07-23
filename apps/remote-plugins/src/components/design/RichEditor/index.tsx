@@ -1,0 +1,244 @@
+import type { Editor } from '@tiptap/react';
+import {
+	EditorContent,
+	EditorContext,
+	useEditor,
+	useEditorState,
+} from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import { useEffect, useMemo, useRef } from 'react';
+import { cn } from '@/lib/utils';
+import { createExtensions } from './extensions';
+import { fileToDataUrl, type ResolveImageSrc } from './image';
+import { LinkForm, useLinkEditor } from './link';
+import { type RichEditorLocale, zhCN } from './locale';
+import './styles.css';
+import { getDocTitleText, normalizeNoteContent } from './title';
+import { FormatBubble, Toolbar } from './toolbar';
+import type { RichEditorProps } from './types';
+
+function mergeLocale(partial?: Partial<RichEditorLocale>): RichEditorLocale {
+	return { ...zhCN, ...partial };
+}
+
+function CharCount({
+	editor,
+	locale,
+	maxLength,
+}: {
+	editor: Editor;
+	locale: RichEditorLocale;
+	maxLength?: number;
+}) {
+	const count = useEditorState({
+		editor,
+		selector: ({ editor: e }) => {
+			const storage = e.storage.characterCount as
+				| { characters: () => number; words: () => number }
+				| undefined;
+			return {
+				chars: storage?.characters() ?? 0,
+				words: storage?.words() ?? 0,
+			};
+		},
+	});
+
+	const over = maxLength != null && count.chars >= maxLength;
+
+	return (
+		<div className={cn('rich-editor-footer', over && 'is-limit')}>
+			<span>
+				{count.words} {locale.words}
+			</span>
+			<span>
+				{count.chars}
+				{maxLength != null ? ` / ${maxLength}` : ''} {locale.chars}
+				{over ? ` · ${locale.limitReached}` : ''}
+			</span>
+		</div>
+	);
+}
+
+/**
+ * TipTap 二次封装富文本编辑器。
+ * - 默认中文 UI
+ * - 内置 Formatting / 表格 / 本地图片(选图·粘贴·拖放) / 任务 / 字数 / RTL
+ * - 通过 extraExtensions / toolbarExtra / onUploadImage 扩展
+ */
+export function RichEditor({
+	content,
+	defaultContent = '',
+	onChange,
+	editable = true,
+	autofocus = true,
+	placeholder,
+	className,
+	editorClassName,
+	maxLength,
+	textDirection = 'auto',
+	showToolbar = true,
+	showBubbleMenu = true,
+	showCharCount = true,
+	locale: localePartial,
+	extensions,
+	extraExtensions,
+	toolbarExtra,
+	onUploadImage,
+	onCreate,
+}: RichEditorProps) {
+	const locale = useMemo(() => mergeLocale(localePartial), [localePartial]);
+
+	const resolveImageSrcRef = useRef<ResolveImageSrc>(fileToDataUrl);
+	resolveImageSrcRef.current = async (file) => {
+		if (onUploadImage) return onUploadImage(file);
+		return fileToDataUrl(file);
+	};
+
+	const editor = useEditor({
+		immediatelyRender: false,
+		extensions: createExtensions({
+			placeholder: placeholder ?? locale.placeholder,
+			maxLength,
+			extensions,
+			extraExtensions,
+			resolveImageSrcRef,
+		}),
+		content: normalizeNoteContent(content ?? defaultContent),
+		editable,
+		autofocus,
+		textDirection,
+		editorProps: {
+			attributes: {
+				class: cn('tiptap focus:outline-none', editorClassName),
+				lang: 'zh-CN',
+			},
+		},
+		onCreate: ({ editor: e }) => {
+			// 空文档时把选区放进正文首段，避免落在 title atom 旁的 GapCursor
+			const title = e.state.doc.firstChild;
+			if (title?.type.name === 'title') {
+				const pos = title.nodeSize + 1;
+				if (pos <= e.state.doc.content.size) {
+					e.commands.setTextSelection(pos);
+				}
+			}
+			onCreate?.(e);
+		},
+		onUpdate: ({ editor: e }) => {
+			onChange?.({
+				html: e.getHTML(),
+				json: e.getJSON(),
+				text: e.getText({ blockSeparator: '\n\n' }),
+				title: getDocTitleText(e.state.doc),
+			});
+		},
+	});
+
+	const link = useLinkEditor(editor);
+
+	useEffect(() => {
+		if (!editor) return;
+		editor.setEditable(editable);
+	}, [editor, editable]);
+
+	// 受控同步：仅在外部 content 与当前不一致时写入，避免打断输入
+	useEffect(() => {
+		if (!editor || content === undefined) return;
+		const next =
+			typeof content === 'string' ? content : JSON.stringify(content);
+		const current =
+			typeof content === 'string'
+				? editor.getHTML()
+				: JSON.stringify(editor.getJSON());
+		if (next === current) return;
+		editor.commands.setContent(normalizeNoteContent(content), {
+			emitUpdate: false,
+		});
+	}, [editor, content]);
+
+	const ctx = useMemo(() => ({ editor }), [editor]);
+
+	if (!editor) return null;
+
+	const extra =
+		typeof toolbarExtra === 'function' ? toolbarExtra(editor) : toolbarExtra;
+
+	return (
+		<EditorContext.Provider value={ctx}>
+			<div className={cn('rich-editor', className)} lang="zh-CN">
+				{showToolbar && (
+					<Toolbar
+						editor={editor}
+						locale={locale}
+						onUploadImage={onUploadImage}
+						onOpenLink={link.open}
+						linkOpen={!!link.draft}
+						extra={extra}
+					/>
+				)}
+
+				{link.draft && (
+					<LinkForm
+						locale={locale}
+						href={link.draft.href}
+						onHrefChange={link.setHref}
+						onApply={link.apply}
+						onRemove={link.remove}
+						onClose={link.close}
+						hint={link.draft.range ? undefined : locale.linkEmptyHint}
+					/>
+				)}
+
+				{showBubbleMenu && (
+					<BubbleMenu
+						editor={editor}
+						options={{ placement: 'top', offset: 8, flip: true }}
+						shouldShow={({ editor: e, state }) => {
+							if (link.draft) return false;
+							const { empty } = state.selection;
+							return !empty && !e.isActive('image') && !e.isActive('codeBlock');
+						}}
+					>
+						<FormatBubble
+							editor={editor}
+							locale={locale}
+							onOpenLink={link.open}
+						/>
+					</BubbleMenu>
+				)}
+
+				<div className="rich-editor-body">
+					<EditorContent editor={editor} spellCheck="false" />
+				</div>
+
+				{showCharCount && (
+					<CharCount editor={editor} locale={locale} maxLength={maxLength} />
+				)}
+			</div>
+		</EditorContext.Provider>
+	);
+}
+
+export default RichEditor;
+export type { Editor } from '@tiptap/react';
+export type { CodeLanguage } from './code';
+export { CODE_LANGUAGES } from './code';
+export { createExtensions } from './extensions';
+export type { ResolveImageSrc } from './image';
+export { fileToDataUrl, pickImageFile } from './image';
+export type { RichEditorLocale } from './locale';
+export { zhCN } from './locale';
+export {
+	EMPTY_NOTE_DOC,
+	getDocTitleText,
+	normalizeNoteContent,
+	TitleNode,
+} from './title';
+export { Btn } from './toolbar';
+export type {
+	CreateExtensionsOptions,
+	RichEditorChangePayload,
+	RichEditorContent,
+	RichEditorProps,
+	TextDirection,
+} from './types';
