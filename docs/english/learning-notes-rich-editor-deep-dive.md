@@ -1370,12 +1370,14 @@ export const TitleNode = Node.create({
 						// 满足以下任一即需要修正：
 						//  1) 是 GapCursor（块与块之间的间隙光标，无法输入）
 						//  2) 是空选区但父节点不是 textblock（也是一种间隙光标状态）
-						//  3) 正文为空但光标不在正文段内（避免无可见光标却仍能输入的诡异状态）
+						//  3) 正文为空且塌缩光标不在正文段内（避免无可见光标却仍能输入的诡异状态）
+						// 注意：有 range 选区时不干预，避免 Cmd+A 全选被清掉
 						// 相比旧版只判断 isGap，新版多了「正文空却不在段内」这一分支
+						// 本轮迭代又在第三个条件前加了 sel.empty，保护非塌缩的 range 选区
 						const needsFix =
 							sel instanceof GapCursor ||
 							(sel.empty && !$from.parent.isTextblock) ||
-							(bodyEmpty && !caretInBody);
+							(bodyEmpty && sel.empty && !caretInBody);
 
 						// 需要修正且位置合法时，把选区钉回正文
 						if (needsFix && titleSize + 1 <= nextDoc.content.size) {
@@ -1400,6 +1402,43 @@ export const TitleNode = Node.create({
 				},
 			}),
 		];
+	},
+
+	// 键盘快捷键扩展
+	addKeyboardShortcuts() {
+		// 返回快捷键映射表
+		return {
+			// Cmd/Ctrl + A：全选
+			// 全选只覆盖正文，避开 title NodeView，让浏览器能画出原生选区高亮
+			'Mod-a': ({ editor }) => {
+				// 获取当前文档
+				const { doc } = editor.state;
+				// 取第一个子节点（应该是 title）
+				const title = doc.firstChild;
+				// 第一个节点不是 title（异常情况）→ 交给默认行为
+				if (title?.type.name !== 'title') return false;
+
+				// title 节点之后的正文起始位置
+				const start = title.nodeSize + 1;
+				// 起始位置越界（理论上不会发生，因为有正文保证）→ 直接返回 true 吃掉事件
+				if (start >= doc.content.size) return true;
+
+				// 找到 start 之后最近的文本位置（作为选区起点）
+				// TextSelection.near(dir=1) 表示向后（文档末尾方向）找最近的可放文本选区的位置
+				const from = TextSelection.near(doc.resolve(start), 1).from;
+				// 选区终点：文档末尾位置
+				const to = Selection.atEnd(doc).to;
+				// 起点在终点之前 → 设置首尾选区
+				if (from < to) {
+					editor.commands.setTextSelection({ from, to });
+				// 起点等于/超过终点（空文档）→ 只设塌缩光标
+				} else {
+					editor.commands.setTextSelection(from);
+				}
+				// 返回 true 表示已处理，阻止默认全选行为
+				return true;
+			},
+		};
 	},
 });
 
@@ -3820,6 +3859,8 @@ export function Toolbar({
 
 8. **链接表单部分注释**：`.rich-editor-link-form` 的 `flex-wrap: wrap` 被注释，改为单行布局。
 
+9. **选区高亮样式新增**：新增 `.rich-editor-body .tiptap ::selection` 规则，用 `color-mix(in oklab, var(--theme-color, ...) 42%, transparent)` 计算主题色 42% 透明作为选区背景色，支持 `--theme-selection-bg` / `--theme-selection-fg` CSS 变量覆盖，让全选/文本选中的视觉与应用主题一致。
+
 ### 15.3 保留的样式要点
 
 1. **编辑器 min-height**：`.rich-editor-body .tiptap` 设置 `min-height: 8rem`，保证内容很少时也可点击
@@ -4194,6 +4235,14 @@ export default NotePreview;
 | 保存 | 工具栏「保存」 | `editingId` 存在 → `update`，否则 `save` | 刷新列表 + toast |
 | 删除 | 列表/预览「删除」 | 打开 `Confirm` → `notesApi.remove` | 清理预览/草稿 + 刷新列表 |
 
+**保存函数 useCallback 化**：
+
+`onSave` 用 `useCallback` 包裹，依赖数组为 `[draft, editingId, notesApi, refreshList, toast]`。这样做有两个原因：一是 `onSave` 需要作为 `useEffect` 的依赖（快捷键监听），稳定的引用可以避免每次渲染都重新绑定/解绑键盘事件；二是避免子组件（如 `toolbarExtra` 中保存按钮）因 `onSave` 引用变化而产生不必要的重渲染。
+
+**Cmd/Ctrl+S 快捷键保存**：
+
+通过 `useEffect` 在 `window` 上全局监听 `keydown` 事件，当检测到 `metaKey`（macOS 的 ⌘）或 `ctrlKey`（Windows/Linux 的 Ctrl）+ `s` 时触发保存。有三重保护：① 预览态（`preview` 存在）直接忽略，因为预览没有草稿可保存；② 调用 `e.preventDefault()` 阻止浏览器默认的「保存页面」弹窗；③ `saving` 为 true 时不重复触发，避免并发保存请求。保存按钮的 tooltip 也同步加上 `⌘S` 提示，让用户知晓快捷键的存在。
+
 **编辑器重建机制**：
 
 `RichEditor` 是受 `key` 控制的非受控组件——一旦挂载，`defaultContent` 的变更不会生效。因此在「新建」和「编辑」时都通过 `setEditorSeed((n) => n + 1)` 递增 `editorSeed`，配合 `key={editorSeed}` 强制 React 卸载旧实例、挂载新实例，从而把新的 `editorInitial`（空文档或笔记 HTML）注入编辑器。
@@ -4380,8 +4429,8 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		}
 	};
 
-	// 保存（新建或更新）
-	const onSave = async () => {
+	// 保存（新建或更新）：用 useCallback 缓存，便于在快捷键 useEffect 中作为稳定依赖
+	const onSave = useCallback(async () => {
 		// 标题/内容校验，缺失则 info 提示并中断
 		if (!draft.title.trim()) return toast('请先输入标题', 'info');
 		if (!draft.text.trim()) return toast('请先输入内容', 'info');
@@ -4411,7 +4460,28 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		} finally {
 			setSaving(false);
 		}
-	};
+	}, [draft, editingId, notesApi, refreshList, toast]);
+
+	// Cmd/Ctrl+S 快捷键保存：监听全局键盘事件，编辑态下触发保存
+	useEffect(() => {
+		// 键盘按下事件处理函数
+		const onKeyDown = (e: KeyboardEvent) => {
+			// 不是 metaKey(Command) 也不是 ctrlKey，或者按键不是 s，则直接返回
+			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+			// 预览态不处理快捷键（预览时没有草稿可保存）
+			if (preview) return;
+			// 阻止浏览器默认的保存页面行为
+			e.preventDefault();
+			// 正在保存中则不重复触发，避免并发请求
+			if (saving) return;
+			// 触发保存
+			void onSave();
+		};
+		// 挂载时在 window 上注册键盘监听
+		window.addEventListener('keydown', onKeyDown);
+		// 卸载时移除监听，防止内存泄漏
+		return () => window.removeEventListener('keydown', onKeyDown);
+	}, [onSave, preview, saving]);
 
 	// 删除入口：记录待删 id 并打开确认弹层
 	const onDelete = (id: string) => {
@@ -4465,9 +4535,9 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 				<Btn title="新建笔记" onClick={openNew}>
 					<FilePenLine size={15} />
 				</Btn>
-				{/* 保存/更新按钮：saving 时禁用，文案随 editingId 变化 */}
+				{/* 保存/更新按钮：saving 时禁用，文案随 editingId 变化，tooltip 显示快捷键提示 */}
 				<Btn
-					title={saving ? '保存中…' : editingId ? '更新笔记' : '保存笔记'}
+					title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记 ⌘S'}
 					onClick={() => void onSave()}
 					disabled={saving}
 				>
@@ -4513,7 +4583,7 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 								{/* 列表头：标题 + 新建按钮 */}
 								<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
 									<span className="text-textcolor/85">
-										笔记列表{loading ? '…' : ''}
+										笔记列表
 									</span>
 									<Btn title="新建笔记" onClick={openNew}>
 										<FilePenLine size={15} />

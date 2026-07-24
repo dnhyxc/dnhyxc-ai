@@ -131,6 +131,18 @@
 	min-height: 8rem;
 }
 
+.rich-editor-body .tiptap ::selection {
+	background-color: var(
+		--theme-selection-bg,
+		color-mix(
+			in oklab,
+			var(--theme-color, oklch(0.55 0.18 250)) 42%,
+			transparent
+		)
+	);
+	color: var(--theme-selection-fg, inherit);
+}
+
 .rich-editor-body .tiptap p {
 	/* margin: 0.75em 0; */
 	line-height: 1.9;

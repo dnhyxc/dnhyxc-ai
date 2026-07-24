@@ -237,7 +237,7 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		}
 	};
 
-	const onSave = async () => {
+	const onSave = useCallback(async () => {
 		if (!draft.title.trim()) return toast('请先输入标题', 'info');
 		if (!draft.text.trim()) return toast('请先输入内容', 'info');
 		if (!notesApi) return toast('未授权 HTTP，无法保存', 'error');
@@ -262,7 +262,20 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		} finally {
 			setSaving(false);
 		}
-	};
+	}, [draft, editingId, notesApi, refreshList, toast]);
+
+	// Cmd/Ctrl+S：编辑态保存或更新（预览态不处理）
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+			if (preview) return;
+			e.preventDefault();
+			if (saving) return;
+			void onSave();
+		};
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	}, [onSave, preview, saving]);
 
 	const onDelete = (id: string) => {
 		setPendingDeleteId(id);
@@ -310,7 +323,7 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 					<FilePenLine size={15} />
 				</Btn>
 				<Btn
-					title={saving ? '保存中…' : editingId ? '更新笔记' : '保存笔记'}
+					title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记 ⌘S'}
 					onClick={() => void onSave()}
 					disabled={saving}
 				>
@@ -349,9 +362,7 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 						>
 							<aside className="border-r mb-3 border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 								<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
-									<span className="text-textcolor/85">
-										笔记列表{loading ? '…' : ''}
-									</span>
+									<span className="text-textcolor/85">笔记列表</span>
 									<Btn title={scrollTitle} onClick={onScrollFabClick}>
 										{displayMode === 'bottom' ? (
 											<ChevronDown size={18} />

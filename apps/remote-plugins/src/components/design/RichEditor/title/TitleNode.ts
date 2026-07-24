@@ -127,11 +127,12 @@ export const TitleNode = Node.create({
 							sel.empty &&
 							$from.parent.isTextblock &&
 							$from.pos > titleSize;
-						// GapCursor / 非正文块 / 正文已空却不在段内 → 钉回首段，避免无可见光标仍能输入
+						// GapCursor / 非正文块 / 塌缩光标不在正文 → 钉回首段
+						// 有 range 选区时不干预，避免 Cmd+A 被清掉
 						const needsFix =
 							sel instanceof GapCursor ||
 							(sel.empty && !$from.parent.isTextblock) ||
-							(bodyEmpty && !caretInBody);
+							(bodyEmpty && sel.empty && !caretInBody);
 
 						if (needsFix && titleSize + 1 <= nextDoc.content.size) {
 							const nextSel = bodyEmpty
@@ -146,6 +147,29 @@ export const TitleNode = Node.create({
 				},
 			}),
 		];
+	},
+
+	addKeyboardShortcuts() {
+		return {
+			/** 全选只覆盖正文，避开 title NodeView，让浏览器能画出原生选区高亮 */
+			'Mod-a': ({ editor }) => {
+				const { doc } = editor.state;
+				const title = doc.firstChild;
+				if (title?.type.name !== 'title') return false;
+
+				const start = title.nodeSize + 1;
+				if (start >= doc.content.size) return true;
+
+				const from = TextSelection.near(doc.resolve(start), 1).from;
+				const to = Selection.atEnd(doc).to;
+				if (from < to) {
+					editor.commands.setTextSelection({ from, to });
+				} else {
+					editor.commands.setTextSelection(from);
+				}
+				return true;
+			},
+		};
 	},
 });
 

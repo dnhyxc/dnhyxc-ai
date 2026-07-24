@@ -14,12 +14,12 @@
 
 ## 2. 改动范围
 
-- `apps/remote-plugins/src/components/design/RichEditor/title/TitleNode.ts` — `appendTransaction` GapCursor 修正逻辑重写，新增 `Selection` 导入。
+- `apps/remote-plugins/src/components/design/RichEditor/title/TitleNode.ts` — `appendTransaction` GapCursor 修正逻辑重写，新增 `Selection` 导入；**本轮追加**：`needsFix` 新增 `sel.empty` 前置条件，新增 `addKeyboardShortcuts()` 重写全选。
 - `apps/remote-plugins/src/components/design/RichEditor/index.tsx` — `onCreate` 改用 `requestAnimationFrame` 两帧 + `focusBodyEnd`；`shouldShowBubble` 提取为 `useCallback` 并补全判断；`EditorContent` 改由 `ScrollArea` 包裹。
 - `apps/remote-plugins/src/components/design/RichEditor/toolbar/Toolbar.tsx` — 溢出计算重写：`MORE_RESERVE` → `MORE_W`，新增 `fits(toolsW, withMore)` 闭包；JSX 新增 `rich-editor-toolbar-start` 包裹 `toolbar-main` + `toolbar-more`。
 - `apps/remote-plugins/src/components/design/RichEditor/link/LinkForm.tsx` — 迁移到 `Button`/`Input` UI 组件 + Tailwind 原子类。
 - `apps/remote-plugins/src/components/design/RichEditor/title/Title.tsx` — 标签条与 Input placeholder 样式微调。
-- `apps/remote-plugins/src/components/design/RichEditor/styles.css` — 工具栏/正文/链接相关样式调整。
+- `apps/remote-plugins/src/components/design/RichEditor/styles.css` — 工具栏/正文/链接相关样式调整；**本轮追加**：新增 `::selection` 选区高亮样式，支持主题色变量。
 - `apps/remote-plugins/src/components/design/NotePreview/index.tsx` — 外层与 header 样式微调。
 
 ## 3. 实现思路
@@ -33,6 +33,8 @@
 7. **`toolbar-start` 包裹 `main + more`**：`main` 改 `flex: 0 1 auto` 不抢剩余空间，`start` 抢 `flex: 1 1 auto`，More 紧跟最后一个可见按钮，extra 始终右贴。
 8. **LinkForm 迁移 `Button`/`Input`**：移除 `rich-editor-link-input`/`rich-editor-link-action` 自定义样式，统一由 UI 组件库承担视觉；容器改用 Tailwind 原子类。
 9. **`ScrollArea` 接管正文滚动**：`rich-editor-body` 去掉 `overflow-y`/`overscroll-behavior`，由外层 `ScrollArea` 提供与列表一致的滚动条。
+10. **全选只覆盖正文，避开 title NodeView**：重写 `Mod-a` 快捷键，从 title 后面第一个 textblock 选到文档末尾，让浏览器能画出原生选区高亮。
+11. **`needsFix` 增加 `sel.empty` 前置条件**：有 range 选区时不干预光标修正，保护 Cmd+A 全选不被 `appendTransaction` 清掉。
 
 ## 4. 关键代码对比与注释
 
@@ -1102,6 +1104,99 @@ return (
 
 **变更摘要**：外层容器去掉 `note-preview` class、加 `rounded-r-md`；header 去掉 `bg-theme-background`，`pl-4 pr-2` → `pl-3 pr-1.5`。
 
+### 4.10 `needsFix` 条件迭代（`TitleNode.ts` appendTransaction 内）
+
+**对比范围**：`needsFix` 条件及其注释（仅包含 `needsFix` 赋值的那几行）。
+
+**改动前** · `apps/remote-plugins/src/components/design/RichEditor/title/TitleNode.ts`（基线，约 L119–L122）
+
+```typescript
+// GapCursor / 非正文块 / 正文已空却不在段内 → 钉回首段，避免无可见光标仍能输入
+const needsFix =
+    sel instanceof GapCursor ||
+    (sel.empty && !$from.parent.isTextblock) ||
+    (bodyEmpty && !caretInBody);
+```
+
+**改动后** · `apps/remote-plugins/src/components/design/RichEditor/title/TitleNode.ts`（当前，约 L130–L135）
+
+```typescript
+// GapCursor / 非正文块 / 塌缩光标不在正文 → 钉回首段
+// 有 range 选区时不干预，避免 Cmd+A 被清掉
+const needsFix =
+    sel instanceof GapCursor ||
+    (sel.empty && !$from.parent.isTextblock) ||
+    (bodyEmpty && sel.empty && !caretInBody);
+```
+
+**变更摘要**：第三个条件增加 `sel.empty` 前置判断，有 range 选区时不触发修正；注释同步更新，明确「不干预 Cmd+A 全选」的保护语义。
+
+### 4.11 `addKeyboardShortcuts` 全选重写（`TitleNode.ts`）
+
+**对比范围**：`addKeyboardShortcuts()` 方法完整定义。  
+**说明**：纯新增方法，按例外规则只贴「改动后」一块。
+
+**改动后** · `apps/remote-plugins/src/components/design/RichEditor/title/TitleNode.ts`（当前，约 L152–L173）
+
+```typescript
+// 注册键盘快捷键：重写全选行为，避开 title NodeView
+addKeyboardShortcuts() {
+    return {
+        // Mod-a = Cmd+A（macOS）/ Ctrl+A（Windows/Linux）
+        'Mod-a': ({ editor }) => {
+            // 取当前文档
+            const { doc } = editor.state;
+            // 取首节点
+            const title = doc.firstChild;
+            // 首节点不是 title 则不接管，交给默认行为
+            if (title?.type.name !== 'title') return false;
+
+            // 正文起点：跳过 title atom，+1 进入第一个 textblock 内部
+            const start = title.nodeSize + 1;
+            // 正文起点已超出文档末尾则不选（理论上不会发生）
+            if (start >= doc.content.size) return true;
+
+            // 用 TextSelection.near 找到最接近的有效文本选区起点（向前搜索）
+            const from = TextSelection.near(doc.resolve(start), 1).from;
+            // 选区终点：文档末尾
+            const to = Selection.atEnd(doc).to;
+            // 起点 < 终点才设置范围选区，否则退化为塌缩光标
+            if (from < to) {
+                editor.commands.setTextSelection({ from, to });
+            } else {
+                editor.commands.setTextSelection(from);
+            }
+            // 拦截默认全选
+            return true;
+        },
+    };
+},
+```
+
+**变更摘要**：新增 `addKeyboardShortcuts()` 方法，重写 `Mod-a` 全选；只选 title 之后的正文部分，避开 title NodeView，让浏览器能画出原生选区高亮。
+
+### 4.12 选区高亮样式（`styles.css`）
+
+**对比范围**：`::selection` 伪元素规则块。  
+**说明**：纯新增规则，按例外规则只贴「改动后」一块。
+
+**改动后** · `apps/remote-plugins/src/components/design/RichEditor/styles.css`（当前，约 L134–L140）
+
+```css
+/* 正文选区高亮：用主题色 42% 透明作为背景，支持 CSS 变量覆盖 */
+.rich-editor-body .tiptap ::selection {
+    /* 选区背景色：优先用 --theme-selection-bg 变量，否则用 color-mix 计算主题色 42% 透明 */
+    background-color: var(
+        --theme-selection-bg,
+        color-mix(in oklab, var(--theme-color, oklch(0.55 0.18 250)) 42%, transparent)
+    );
+    /* 选区前景色（文字颜色）：优先用 --theme-selection-fg 变量，否则继承 */
+    color: var(--theme-selection-fg, inherit);
+}
+```
+
+**变更摘要**：新增 `.rich-editor-body .tiptap ::selection` 选择器；用 `color-mix` 计算主题色 42% 透明作为选区背景；支持 `--theme-selection-bg` 和 `--theme-selection-fg` CSS 变量自定义。
+
 ## 5. 兼容性与影响
 
 - **选区行为**：`appendTransaction` 不再把「正文非空但光标在 GapCursor」的场景一刀切钉回首段，改为钉到正文末尾，已有内容正文的光标语义更自然；空正文仍钉首段，输入体验不变。
@@ -1111,7 +1206,9 @@ return (
 - **链接表单**：`LinkForm` 视觉与项目其它表单统一；移除 `rich-editor-link-input` 自定义样式后，旧的 `.rich-editor-link-input` CSS 已删除，不会影响其它引用（仅本组件使用）。
 - **正文滚动**：`rich-editor-body` 不再自带滚动，由 `ScrollArea` 接管，滚动条风格与左侧笔记列表一致；`NotePreview` 同样依赖 `ScrollArea`，行为不变。
 - **样式**：`.rich-editor` 的 `color` 注释掉后，正文文字颜色由上层主题继承，需确认各使用场景上层已提供 `--theme-textcolor`/`foreground`。
-- **回归建议**：重点验证①空笔记新建后光标位置与可直接输入；②已有内容笔记打开后光标在正文末尾；③选中文本才弹气泡、点击空白/失焦不弹；④工具栏在窄宽下 More 正确出现且不裁切；⑤链接表单输入/Enter/Esc/应用/解链；⑥Tauri 与 Web 两种运行环境。
+- **全选行为**：`Mod-a` 重写后只选正文部分（避开 title NodeView），浏览器原生选区高亮能正常显示；`needsFix` 增加 `sel.empty` 前置条件，有 range 选区时 `appendTransaction` 不再干预，保护 Cmd+A 全选不被清掉。
+- **选区高亮样式**：新增 `::selection` 规则，默认用主题色 42% 透明作为选区背景；支持 `--theme-selection-bg` / `--theme-selection-fg` CSS 变量覆盖，各主题可自定义选区颜色。
+- **回归建议**：重点验证①空笔记新建后光标位置与可直接输入；②已有内容笔记打开后光标在正文末尾；③选中文本才弹气泡、点击空白/失焦不弹；④工具栏在窄宽下 More 正确出现且不裁切；⑤链接表单输入/Enter/Esc/应用/解链；⑥Cmd+A 全选仅覆盖正文、浏览器原生选区高亮正常显示；⑦Tauri 与 Web 两种运行环境。
 
 ## 6. 相关源码路径
 

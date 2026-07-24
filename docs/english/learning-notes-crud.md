@@ -13,7 +13,7 @@
 
 ## 2. 改动范围
 
-- `apps/remote-plugins/src/views/learning-notes/index.tsx` — 主应用大改：布局重构、CRUD、Confirm 删除。
+- `apps/remote-plugins/src/views/learning-notes/index.tsx` — 主应用大改：布局重构、CRUD、Confirm 删除（本轮迭代追加：快捷键保存、useCallback 优化、tooltip 与列表标题微调）。
 - `apps/remote-plugins/src/views/learning-notes/api.ts` — **纯新增**：API 层（`createNotesApi` 工厂、`HostHttp` / `Note` / `NoteRecord` 类型）。
 - `apps/remote-plugins/src/components/design/Confirm/index.tsx` — **纯新增**：确认对话框组件。
 - `apps/backend/src/app.module.ts` — 注册 `LearningNotesModule`。
@@ -32,6 +32,8 @@
 5. **删除走 `Confirm` 二次确认**：`onDelete` 仅记录 `pendingDeleteId` 并打开弹层，`onConfirmDelete` 才真正调接口；失败时弹层已关但 toast 提示错误，列表 `refreshList` 兜底回滚视觉态。
 6. **列表项不带正文，编辑前先拉详情**：`/list` 接口为瘦身不返回 `content`，故 `openEditById` 先 `notesApi.detail(id)` 拿到 `html` 再进编辑；而 `openEdit(note)` 接收已含 `html` 的 `Note`（来自预览态）直接进入编辑。
 7. **`independent` 属性**：为 `LearningNotesApp` / `IdeasListApp` 的 `HostBridgeProps` 增加 `independent?` 标记，供独立运行场景（不显示列表 / 不绑定书籍）使用，是后续嵌入主站英语学习页的预留开关。
+8. **保存操作改为 `useCallback` 稳定引用**：将 `onSave` 从普通函数改为 `useCallback` 包裹并显式声明依赖数组（`draft` / `editingId` / `notesApi` / `refreshList` / `toast`），配合下方快捷键 `useEffect` 的依赖项，避免闭包捕获旧值导致保存时读到过期草稿。
+9. **新增 Cmd/Ctrl+S 快捷键保存**：通过 `useEffect` 注册全局 `keydown` 监听，`metaKey`/`ctrlKey` + `s` 触发保存；预览态（有 `preview`）不处理，`saving` 进行中不重复触发（防抖）；同时在保存按钮 tooltip 追加 `⌘S` 提示，列表标题去掉 loading 省略号以保持视觉简洁。
 
 ## 4. 关键代码对比与注释
 
@@ -1490,13 +1492,193 @@ type HostBridgeProps = {
 
 **变更摘要**：本地 `HostBridgeProps.http` 补齐 `put` / `delete`，并新增 `independent?` 属性，与学习笔记侧契约对齐。
 
+### 4.10 快捷键保存与交互细节优化（`apps/remote-plugins/src/views/learning-notes/index.tsx`）
+
+本文件本轮迭代追加 4 处改动，拆成 3 个对比组：A `onSave` 改 `useCallback`、B 新增 Cmd/Ctrl+S 快捷键、C 保存按钮 tooltip 与列表标题微调。
+
+#### 对比组 A：`onSave` 改为 `useCallback`
+
+**对比范围**：`onSave` 函数完整定义（从函数签名到闭合）。
+
+**改动前** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（基线，约 L143–L172）
+
+```typescript
+// 保存：新建走 save，已有 id 走 update（普通函数声明，每次渲染重建）
+const onSave = async () => {
+	// 标题为空提示并中断
+	if (!draft.title.trim()) return toast('请先输入标题', 'info');
+	// 正文为空提示并中断
+	if (!draft.text.trim()) return toast('请先输入内容', 'info');
+	// 未授权 HTTP 提示并中断
+	if (!notesApi) return toast('未授权 HTTP，无法保存', 'error');
+	// 置保存中
+	setSaving(true);
+	try {
+		// 组装保存载荷
+		const payload = {
+			// 标题空则占位
+			title: draft.title.trim() || '无标题笔记',
+			// 草稿 html
+			html: draft.html,
+		};
+		// 有编辑 id 走更新分支
+		if (editingId) {
+			// 调 update 返回更新后的 Note
+			const updated = await notesApi.update(editingId, payload);
+			// 同步编辑 id（后端可能规范化）
+			setEditingId(updated.id);
+			// toast 更新成功
+			toast('已更新笔记', 'success');
+		} else {
+			// 新建分支：save 返回新 id
+			const { id } = await notesApi.save(payload);
+			// 写入编辑 id（后续保存变更新）
+			setEditingId(id);
+			// toast 保存成功
+			toast('已保存笔记', 'success');
+		}
+		// 保存后刷新列表
+		await refreshList();
+	} catch (e) {
+		// 失败 toast
+		toast(errMsg(e), 'error');
+	} finally {
+		// 关闭保存中
+		setSaving(false);
+	}
+};
+```
+
+**改动后** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（当前，约 L240–L265）
+
+```typescript
+// 保存：新建走 save，已有 id 走 update（useCallback 包裹，依赖不变则引用稳定）
+const onSave = useCallback(async () => {
+	// 标题为空提示并中断
+	if (!draft.title.trim()) return toast('请先输入标题', 'info');
+	// 正文为空提示并中断
+	if (!draft.text.trim()) return toast('请先输入内容', 'info');
+	// 未授权 HTTP 提示并中断
+	if (!notesApi) return toast('未授权 HTTP，无法保存', 'error');
+	// 置保存中
+	setSaving(true);
+	try {
+		// 组装保存载荷
+		const payload = {
+			// 标题空则占位
+			title: draft.title.trim() || '无标题笔记',
+			// 草稿 html
+			html: draft.html,
+		};
+		// 有编辑 id 走更新分支
+		if (editingId) {
+			// 调 update 返回更新后的 Note
+			const updated = await notesApi.update(editingId, payload);
+			// 同步编辑 id（后端可能规范化）
+			setEditingId(updated.id);
+			// toast 更新成功
+			toast('已更新笔记', 'success');
+		} else {
+			// 新建分支：save 返回新 id
+			const { id } = await notesApi.save(payload);
+			// 写入编辑 id（后续保存变更新）
+			setEditingId(id);
+			// toast 保存成功
+			toast('已保存笔记', 'success');
+		}
+		// 保存后刷新列表
+		await refreshList();
+	} catch (e) {
+		// 失败 toast
+		toast(errMsg(e), 'error');
+	} finally {
+		// 关闭保存中
+		setSaving(false);
+	}
+	// 依赖数组：所有外部用到的响应式值，变化则重建函数
+}, [draft, editingId, notesApi, refreshList, toast]);
+```
+
+**变更摘要**：`onSave` 从普通函数改为 `useCallback` 包裹，显式声明 `[draft, editingId, notesApi, refreshList, toast]` 依赖，保证引用稳定，供下方快捷键 `useEffect` 安全依赖。
+
+#### 对比组 B：Cmd/Ctrl+S 快捷键（新增 `useEffect`）
+
+**对比范围**：`onSave` 之后、`onDelete` 之前新增的 `keydown` 监听 `useEffect`（改动前无此段）。
+
+**改动前** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（基线，约 L174 前后）
+
+```typescript
+// （改动前：无快捷键监听，直接接 onDelete）
+```
+
+**改动后** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（当前，约 L267–L278）
+
+```typescript
+// Cmd/Ctrl+S：编辑态保存或更新（预览态不处理）
+useEffect(() => {
+	// 键盘按下事件处理函数
+	const onKeyDown = (e: KeyboardEvent) => {
+		// 不是 meta+S 也不是 ctrl+S 则直接返回（不处理）
+		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+		// 预览态不处理（预览时没有编辑器，保存无意义）
+		if (preview) return;
+		// 阻止浏览器默认保存行为
+		e.preventDefault();
+		// 保存中则不重复触发（简单防抖）
+		if (saving) return;
+		// 调用保存函数（void 显式忽略 Promise）
+		void onSave();
+	};
+	// 注册全局 keydown 监听
+	window.addEventListener('keydown', onKeyDown);
+	// 清理：卸载或依赖变化时移除监听
+	return () => window.removeEventListener('keydown', onKeyDown);
+	// 依赖项：onSave 引用变化则重新注册监听；preview/saving 变化也需重新绑定以拿到最新值
+}, [onSave, preview, saving]);
+```
+
+**变更摘要**：新增全局 `keydown` 监听 `useEffect`，Cmd/Ctrl+S 触发保存；预览态跳过、`saving` 中防抖；依赖 `onSave` / `preview` / `saving`，保证回调内读到最新状态。
+
+#### 对比组 C：保存按钮 tooltip + 列表标题
+
+**对比范围**：`toolbarExtra` 中保存按钮的 `title` 属性 + 列表头标题的 `loading` 省略号。
+
+**改动前** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（基线，约 L110–L112 / L196–L198）
+
+```typescript
+// 保存按钮 tooltip：仅显示保存/更新/保存中，无快捷键提示
+title={saving ? '保存中…' : editingId ? '更新笔记' : '保存笔记'}
+```
+
+```typescript
+// 列表标题：loading 时追加省略号
+<span className="text-textcolor/85">
+	笔记列表{loading ? '…' : ''}
+</span>
+```
+
+**改动后** · `apps/remote-plugins/src/views/learning-notes/index.tsx`（当前，约 L325–L327 / L364–L366）
+
+```typescript
+// 保存按钮 tooltip：保存/更新文案后追加 ⌘S 提示，告知用户有快捷键
+title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记 ⌘S'}
+```
+
+```typescript
+// 列表标题：去掉 loading 省略号，保持视觉简洁（加载态已有空列表占位 + 后续条目渐入）
+<span className="text-textcolor/85">笔记列表</span>
+```
+
+**变更摘要**：保存按钮 tooltip 追加 `⌘S` 快捷键提示；列表标题去掉 `loading` 状态的省略号，简化视觉。
+
 ## 5. 兼容性与影响
 
 - **HostBridge 契约向后兼容**：`put` / `delete` 是 `http?` 对象上的新增成员，旧插件不会因缺实现而崩溃（未用到即不调）；但旧版本的 `iframeHostClient` / `attachIframeBridge` 若未升级，调用 `put` / `delete` 会命中 `UNKNOWN_RPC`，因此 iframe 隔离插件升级 `put/delete` 时须同步升级 host 端分发。
 - **权限位未新增**：仍复用 `http:plugin-api`，已授权该权限的插件自动获得 `put` / `delete` 能力；若需更细粒度需后续单独引入权限位。
 - **学习笔记数据持久化**：旧版内存种子数据被移除，首次进入会从后端拉取；无后端或未授权 HTTP 时列表为空并 toast 提示，不影响编辑器输入（但无法保存）。
 - **编辑器重挂载**：`key={editorSeed}` 会在新建/编辑切换时卸载重建 Tiptap 实例，草稿不会跨笔记串扰；但 `autofocus="end"` 会在每次重建后抢焦点。
-- **回归建议**：测新建→保存→列表出现；编辑→更新→列表时间刷新；删除确认→列表消失；预览态编辑/删除；列表关闭/打开按钮；未授权 HTTP 的降级提示；iframe 隔离插件下 `put/delete` RPC 链路。
+- **Cmd/Ctrl+S 快捷键**：全局 `keydown` 监听绑定在 `window` 上，仅在编辑态（无 `preview`）触发，预览态静默跳过；`saving` 进行中不重复触发（简单防抖）；不会与浏览器默认保存冲突（已 `preventDefault`）；若组件外层还有其他快捷键监听，注意事件冒泡顺序——当前未做 `stopPropagation`，若有冲突可后续加作用域判断。
+- **回归建议**：测新建→保存→列表出现；编辑→更新→列表时间刷新；删除确认→列表消失；预览态编辑/删除；列表关闭/打开按钮；未授权 HTTP 的降级提示；iframe 隔离插件下 `put/delete` RPC 链路；Cmd/Ctrl+S 编辑态保存、预览态不触发、连按不重复提交。
 
 ## 6. 相关源码路径
 

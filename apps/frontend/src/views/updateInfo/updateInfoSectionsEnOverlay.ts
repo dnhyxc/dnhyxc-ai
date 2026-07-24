@@ -934,7 +934,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's24-53': {
 		title: 'Rich-text editor UX improvements',
 		description:
-			'Cursor placement is more precise (empty docs auto-focus at the end of the body; GapCursor correction refined). The selection bubble menu only appears when real text is selected, avoiding false triggers on empty paragraphs. Toolbar overflow uses precise pixel measurement so buttons clip more accurately on narrow screens. The link editing panel now uses a unified UI component for consistent look and interaction.',
+			'Cursor placement is more precise (empty docs auto-focus at the end of the body; GapCursor correction refined). The selection bubble menu only appears when real text is selected, avoiding false triggers on empty paragraphs. Toolbar overflow uses precise pixel measurement so buttons clip more accurately on narrow screens. The link editing panel now uses a unified UI component for consistent look and interaction. Select All (⌘/Ctrl+A) only covers the body content, skipping the title area, with theme-colored selection highlight. Learning notes support ⌘/Ctrl+S shortcut to save.',
 	},
 	's25-1': {
 		title: 'E-book bookshelf',
