@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 import '@/styles.css';
 import { createNotesApi, type HostHttp, type Note } from './api';
 
+const SCROLL_EDGE_PX = 16;
+
 /** 笔记列表滚动：同一按钮循环 底 → 顶 → 当前（无选中时底 → 顶） */
 type NoteScrollMode = 'bottom' | 'top' | 'current';
 
@@ -79,8 +81,10 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	// 当前选中项 DOM：用于「滚到当前」
 	const activeItemRef = useRef<HTMLDivElement>(null);
-	// 三态滚动：默认先「滚到底」
+	// 三态滚动状态机：底 → 顶 → 当前 → 底（不被滚动位置修改）
 	const [scrollMode, setScrollMode] = useState<NoteScrollMode>('bottom');
+	// 实际滚动位置边界：仅用于图标显示派生，不影响状态机
+	const [scrollEdge, setScrollEdge] = useState<'top' | 'bottom' | null>(null);
 
 	const toast = useCallback(
 		(message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -108,14 +112,33 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		void refreshList();
 	}, [refreshList]);
 
-	// 列表打开时重置为「滚到底」，避免沿用上次态
+	// 有无选中项：预览或编辑中任一即为有选中
+	const hasActive = !!(preview?.id ?? editingId);
+
+	// 滚动监听：仅记录实际滚动边界位置，用于图标显示派生，不修改状态机
+	const handleScroll = useCallback(() => {
+		const el = scrollViewportRef.current;
+		if (!el) return;
+		const { scrollTop, scrollHeight, clientHeight } = el;
+		if (scrollTop <= SCROLL_EDGE_PX) {
+			setScrollEdge('top');
+		} else if (scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX) {
+			setScrollEdge('bottom');
+		} else {
+			setScrollEdge(null);
+		}
+	}, []);
+
+	// 列表打开时重置为「滚到底」并绑定滚动监听，同时立即读取一次位置
 	useEffect(() => {
 		if (!listOpen) return;
 		setScrollMode('bottom');
-	}, [listOpen]);
-
-	// 有无选中项：预览或编辑中任一即为有选中
-	const hasActive = !!(preview?.id ?? editingId);
+		const el = scrollViewportRef.current;
+		if (!el) return;
+		el.addEventListener('scroll', handleScroll);
+		handleScroll();
+		return () => el.removeEventListener('scroll', handleScroll);
+	}, [listOpen, handleScroll]);
 
 	// 选中项从有到无时，若当前是 current 态则重置为 bottom
 	useEffect(() => {
@@ -135,26 +158,56 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 	// 点击滚动按钮：执行当前态滚动，再切到下一态
 	const onScrollFabClick = useCallback(() => {
 		const vp = scrollViewportRef.current;
-		if (scrollMode === 'bottom') {
-			vp?.scrollTo({ top: vp?.scrollHeight ?? 0, behavior: 'smooth' });
-		} else if (scrollMode === 'top') {
-			vp?.scrollTo({ top: 0, behavior: 'smooth' });
+		if (!vp) return;
+
+		// 先校正：已在底部时 bottom→top，已在顶部时 top→bottom，避免无效滚动
+		const { scrollTop, scrollHeight, clientHeight } = vp;
+		const atTop = scrollTop <= SCROLL_EDGE_PX;
+		const atBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX;
+		let mode = scrollMode;
+		if (mode === 'bottom' && atBottom) {
+			mode = 'top';
+		} else if (mode === 'top' && atTop) {
+			mode = 'bottom';
+		}
+
+		if (mode === 'bottom') {
+			vp.scrollTo({ top: vp.scrollHeight, behavior: 'auto' });
+		} else if (mode === 'top') {
+			vp.scrollTo({ top: 0, behavior: 'auto' });
 		} else {
 			activeItemRef.current?.scrollIntoView({
 				block: 'center',
-				behavior: 'smooth',
+				behavior: 'auto',
 			});
 		}
 
 		// 下一态：无选中时底→顶→底循环；有选中时底→顶→当前→底循环
-		if (scrollMode === 'bottom') {
+		if (mode === 'bottom') {
 			setScrollMode('top');
-		} else if (scrollMode === 'top') {
+		} else if (mode === 'top') {
 			setScrollMode(hasActive ? 'current' : 'bottom');
 		} else {
 			setScrollMode('bottom');
 		}
 	}, [scrollMode, hasActive]);
+
+	// 图标显示模式：状态机值 + 实际滚动位置派生（与点击校正逻辑一致）
+	// 在底部时 bottom→top，在顶部时 top→bottom，否则保持状态机值
+	const displayMode: NoteScrollMode =
+		scrollMode === 'bottom' && scrollEdge === 'bottom'
+			? 'top'
+			: scrollMode === 'top' && scrollEdge === 'top'
+				? 'bottom'
+				: scrollMode;
+
+	// 滚动按钮标题
+	const scrollTitle =
+		displayMode === 'bottom'
+			? '滚动到底部'
+			: displayMode === 'top'
+				? '滚动到顶部'
+				: '滚动到当前选中';
 
 	const openPreview = async (id: string) => {
 		if (!notesApi) return;
@@ -299,20 +352,11 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 									<span className="text-textcolor/85">
 										笔记列表{loading ? '…' : ''}
 									</span>
-									<Btn
-										title={
-											scrollMode === 'bottom'
-												? '滚动到底部'
-												: scrollMode === 'top'
-													? '滚动到顶部'
-													: '滚动到当前选中'
-										}
-										onClick={onScrollFabClick}
-									>
-										{scrollMode === 'bottom' ? (
-											<ChevronDown size={15} />
-										) : scrollMode === 'top' ? (
-											<ChevronUp size={15} />
+									<Btn title={scrollTitle} onClick={onScrollFabClick}>
+										{displayMode === 'bottom' ? (
+											<ChevronDown size={18} />
+										) : displayMode === 'top' ? (
+											<ChevronUp size={18} />
 										) : (
 											<LocateFixed size={15} />
 										)}
