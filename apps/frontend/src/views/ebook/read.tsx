@@ -2981,7 +2981,7 @@ function EbookReadPage() {
 					title={t('ebook.read.ideasList.title')}
 					open={ideasListOpen}
 					onOpenChange={setIdeasListOpen}
-					bodyClassName="pt-1.5 pb-2"
+					bodyClassName="pt-2 pb-2 pl-0"
 					contentStyle={epubSurfaceProps?.chromeStyle}
 				>
 					<div className="relative flex h-full min-h-0 flex-col">

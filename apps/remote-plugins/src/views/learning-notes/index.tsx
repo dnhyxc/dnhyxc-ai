@@ -1,7 +1,19 @@
 import { NotePreview } from '@design/NotePreview';
-import { Btn, type Editor, RichEditor } from '@design/RichEditor';
-import { NotebookText, PenLine, Save } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import {
+	Btn,
+	type Editor,
+	EMPTY_NOTE_DOC,
+	RichEditor,
+} from '@design/RichEditor';
+import {
+	FilePenLine,
+	NotebookText,
+	Save,
+	SquarePen,
+	Trash2,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Confirm from '@/components/design/Confirm';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -10,12 +22,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import '@/styles.css';
-
-type Note = { id: string; title: string; html: string; at: number };
+import { createNotesApi, type HostHttp, type Note } from './api';
 
 type HostBridgeProps = {
 	api: {
 		theme: 'light' | 'dark';
+		http?: HostHttp;
 		ui?: {
 			showToast: (options: {
 				message: string;
@@ -24,40 +36,156 @@ type HostBridgeProps = {
 		};
 	};
 	plugin: { id: string; version: string; routePath: string };
+	// 是否独立运行，独立运行时不会显示笔记列表
+	independent?: boolean;
 };
 
+function errMsg(e: unknown): string {
+	if (e instanceof Error && e.message) return e.message;
+	if (e && typeof e === 'object' && 'message' in e) {
+		const m = (e as { message?: unknown }).message;
+		if (typeof m === 'string' && m.trim()) return m;
+	}
+	return '请求失败';
+}
+
 export default function LearningNotesApp({ api }: HostBridgeProps) {
+	const notesApi = useMemo(
+		() => (api.http ? createNotesApi(api.http) : null),
+		[api.http],
+	);
+
 	const [draft, setDraft] = useState({ html: '', text: '', title: '' });
-	const [listOpen, setListOpen] = useState(false);
+	const [listOpen, setListOpen] = useState(true);
 	const [preview, setPreview] = useState<Note | null>(null);
-	const [notes, setNotes] = useState<Note[]>(() => [
-		{
-			id: 'seed',
-			title: '示例笔记',
-			html: '<p>示例：今天复习了 present perfect 与过去时的区别</p>',
-			at: Date.now() - 60_000,
+	const [notes, setNotes] = useState<Note[]>([]);
+	const [editingId, setEditingId] = useState<string | null>(null);
+	const [editorSeed, setEditorSeed] = useState(0);
+	const [editorInitial, setEditorInitial] = useState<
+		string | typeof EMPTY_NOTE_DOC
+	>(EMPTY_NOTE_DOC);
+	const [loading, setLoading] = useState(false);
+	const [saving, setSaving] = useState(false);
+	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+	const toast = useCallback(
+		(message: string, type: 'success' | 'error' | 'info' = 'info') => {
+			api.ui?.showToast({ message, type });
 		},
-	]);
+		[api.ui],
+	);
 
-	const sorted = useMemo(() => [...notes].sort((a, b) => b.at - a.at), [notes]);
+	const refreshList = useCallback(async () => {
+		if (!notesApi) {
+			toast('未授权 HTTP，无法同步笔记', 'error');
+			return;
+		}
+		setLoading(true);
+		try {
+			setNotes(await notesApi.list());
+		} catch (e) {
+			toast(errMsg(e), 'error');
+		} finally {
+			setLoading(false);
+		}
+	}, [notesApi, toast]);
 
-	const onSubmit = (e: MouseEvent) => {
-		e.preventDefault();
-		if (!draft.text.trim() && !draft.title.trim()) return;
-		setNotes((list) => [
-			{
-				id: `${Date.now()}`,
+	useEffect(() => {
+		void refreshList();
+	}, [refreshList]);
+
+	const openNew = () => {
+		setPreview(null);
+		setEditingId(null);
+		setDraft({ html: '', text: '', title: '' });
+		setEditorInitial(EMPTY_NOTE_DOC);
+		setEditorSeed((n) => n + 1);
+	};
+
+	const openPreview = async (id: string) => {
+		if (!notesApi) return;
+		try {
+			const note = await notesApi.detail(id);
+			setPreview(note);
+		} catch (e) {
+			toast(errMsg(e), 'error');
+		}
+	};
+
+	const openEdit = (note: Note) => {
+		setPreview(null);
+		setEditingId(note.id);
+		setDraft({ html: note.html, text: '', title: note.title });
+		setEditorInitial(note.html || EMPTY_NOTE_DOC);
+		setEditorSeed((n) => n + 1);
+	};
+
+	/** 列表项无正文：先拉详情再进编辑 */
+	const openEditById = async (id: string) => {
+		if (!notesApi) return;
+		try {
+			openEdit(await notesApi.detail(id));
+		} catch (e) {
+			toast(errMsg(e), 'error');
+		}
+	};
+
+	const onSave = async () => {
+		if (!draft.title.trim()) return toast('请先输入标题', 'info');
+		if (!draft.text.trim()) return toast('请先输入内容', 'info');
+		if (!notesApi) return toast('未授权 HTTP，无法保存', 'error');
+		setSaving(true);
+		try {
+			const payload = {
 				title: draft.title.trim() || '无标题笔记',
 				html: draft.html,
-				at: Date.now(),
-			},
-			...list,
-		]);
-		api.ui?.showToast({ message: '已添加学习笔记' });
+			};
+			if (editingId) {
+				const updated = await notesApi.update(editingId, payload);
+				setEditingId(updated.id);
+				toast('已更新笔记', 'success');
+			} else {
+				const { id } = await notesApi.save(payload);
+				setEditingId(id);
+				toast('已保存笔记', 'success');
+			}
+			await refreshList();
+		} catch (e) {
+			toast(errMsg(e), 'error');
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const onDelete = (id: string) => {
+		setPendingDeleteId(id);
+		setConfirmOpen(true);
+	};
+
+	const onConfirmDelete = async () => {
+		const id = pendingDeleteId;
+		if (!notesApi || !id) return;
+		try {
+			await notesApi.remove(id);
+			// 仅当左侧正展示被删笔记时关掉预览；编辑草稿同理，不误伤其它预览
+			if (preview?.id === id) setPreview(null);
+			if (editingId === id) {
+				setEditingId(null);
+				setDraft({ html: '', text: '', title: '' });
+				setEditorInitial(EMPTY_NOTE_DOC);
+				setEditorSeed((n) => n + 1);
+			}
+			toast('已删除', 'success');
+			await refreshList();
+		} catch (e) {
+			toast(errMsg(e), 'error');
+		} finally {
+			setPendingDeleteId(null);
+		}
 	};
 
 	const toggleNotesList = () => setListOpen((o) => !o);
-	const backToEdit = () => setPreview(null);
 
 	const listToggleBtn = () => (
 		<Btn
@@ -71,35 +199,129 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 	const toolbarExtra = (editor: Editor) => {
 		void editor;
 		return (
-			<div className="rich-editor-toolbar-group">
-				<Btn title="保存笔记" onClick={(e) => onSubmit(e as MouseEvent)}>
+			<>
+				<Btn title="新建笔记" onClick={openNew}>
+					<FilePenLine size={15} />
+				</Btn>
+				<Btn
+					title={saving ? '保存中…' : editingId ? '更新笔记' : '保存笔记'}
+					onClick={() => void onSave()}
+					disabled={saving}
+				>
 					<Save size={15} />
 				</Btn>
 				{listToggleBtn()}
-			</div>
+			</>
 		);
 	};
 
 	return (
 		<div
 			className={cn(
-				'bg-theme-background text-textcolor flex h-full min-h-0 min-w-0 flex-col text-sm rounded-md',
+				'bg-theme/5 text-textcolor flex h-full min-h-0 min-w-0 flex-col text-sm rounded-md',
 			)}
 		>
-			{/* ponytail: 关闭时不挂右栏，避免 collapse 留白；对齐 EbookReadSplitLayout */}
+			<Confirm
+				open={confirmOpen}
+				onOpenChange={setConfirmOpen}
+				title="确定删除这条笔记？"
+				description="删除后将无法恢复"
+				onConfirm={() => void onConfirmDelete()}
+			/>
 			<ResizablePanelGroup
 				id="learning-notes-split"
 				orientation="horizontal"
 				className="h-full min-h-0 min-w-0 flex-1"
 			>
+				{listOpen ? (
+					<>
+						<ResizablePanel
+							id="learning-notes-list"
+							defaultSize={35}
+							minSize={0}
+							className="min-h-0 min-w-0"
+						>
+							<aside className="border-r mb-3 border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+								<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
+									<span className="text-textcolor/85">
+										笔记列表{loading ? '…' : ''}
+									</span>
+									<Btn title="新建笔记" onClick={openNew}>
+										<FilePenLine size={15} />
+									</Btn>
+								</div>
+								{/* 与主项目英语学习侧栏一致：内边距写在 ScrollArea Root，滚动条样式跟主项目组件默认 */}
+								<ScrollArea className="min-h-0 flex-1 p-3">
+									<div className="flex flex-col gap-3">
+										{notes.length === 0 && !loading ? (
+											<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
+												暂无笔记，保存一条试试
+											</p>
+										) : null}
+										{notes.map((n) => {
+											// 预览优先：避免 preview 与 editingId 同时高亮两条
+											const active = (preview?.id ?? editingId) === n.id;
+											return (
+												<div
+													key={n.id}
+													className={cn(
+														'hover:bg-theme/10 bg-theme/5 group relative w-full rounded-md px-3 py-2.5 text-left transition-colors',
+														active && 'bg-theme/15',
+													)}
+												>
+													<div
+														className="w-full text-left"
+														onClick={() => void openPreview(n.id)}
+													>
+														{/* 动态调整 padding-right，配合 transition-[padding] 实现平滑过渡 */}
+														<div className="text-textcolor truncate text-base font-semibold pr-0 transition-[padding] duration-200 group-hover:pr-14">
+															{n.title}
+														</div>
+														<div className="text-textcolor/45 mt-1.5 text-xs">
+															{new Date(n.at).toLocaleString()}
+														</div>
+													</div>
+													<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+														<button
+															type="button"
+															title="编辑"
+															className="w-7 h-7 text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10 flex cursor-pointer items-center justify-center rounded-md p-1"
+															onClick={(e) => {
+																e?.stopPropagation();
+																void openEditById(n.id);
+															}}
+														>
+															<SquarePen size={15} />
+														</button>
+														<button
+															type="button"
+															title="删除"
+															className="w-7 h-7 text-textcolor/80 hover:text-destructive hover:bg-destructive/10 flex cursor-pointer items-center justify-center rounded-md p-1"
+															onClick={(e) => {
+																e?.stopPropagation();
+																onDelete(n.id);
+															}}
+														>
+															<Trash2 size={15} />
+														</button>
+													</div>
+												</div>
+											);
+										})}
+									</div>
+								</ScrollArea>
+							</aside>
+						</ResizablePanel>
+						<ResizableHandle withHandle className="w-0" />
+					</>
+				) : null}
 				<ResizablePanel
 					id="learning-notes-editor"
-					defaultSize={listOpen ? 58 : 100}
-					minSize={30}
+					defaultSize={listOpen ? 65 : 100}
+					minSize={50}
 					className="min-h-0 min-w-0"
 				>
-					<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-						{/* 预览时隐藏编辑器，保留挂载以免草稿丢失 */}
+					<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 						<div
 							className={cn(
 								'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
@@ -107,14 +329,16 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 							)}
 						>
 							<RichEditor
-								defaultContent=""
+								key={editorSeed}
+								defaultContent={editorInitial}
+								autofocus="end"
 								placeholder="记下今天的单词、语法或口语收获…"
 								showCharCount={false}
 								onChange={({ html, text, title }) =>
 									setDraft({ html, text, title })
 								}
 								className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
-								editorClassName="min-h-[6rem] text-sm"
+								editorClassName="min-h-[6rem]"
 								toolbarExtra={toolbarExtra}
 							/>
 						</div>
@@ -122,11 +346,16 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 							<NotePreview
 								title={preview.title}
 								html={preview.html}
-								// meta={new Date(preview.at).toLocaleString()}
 								headerExtra={
 									<>
-										<Btn title="返回编辑" onClick={backToEdit}>
-											<PenLine size={15} />
+										<Btn title="新建笔记" onClick={openNew}>
+											<FilePenLine size={15} />
+										</Btn>
+										<Btn title="编辑" onClick={() => openEdit(preview)}>
+											<SquarePen size={15} />
+										</Btn>
+										<Btn title="删除" onClick={() => onDelete(preview.id)}>
+											<Trash2 size={15} />
 										</Btn>
 										{listToggleBtn()}
 									</>
@@ -135,60 +364,13 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 						) : null}
 					</div>
 				</ResizablePanel>
-				{listOpen ? (
-					<>
-						<ResizableHandle withHandle className="w-0" />
-						<ResizablePanel
-							id="learning-notes-list"
-							defaultSize={42}
-							minSize={0}
-							className="min-h-0 min-w-0"
-						>
-							<aside className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l">
-								<div className="text-textcolor/80 mb-2 flex h-10 shrink-0 items-center border-b border-theme/10 px-3.5 font-medium tracking-wide">
-									笔记列表
-								</div>
-								<ScrollArea
-									className="min-h-0 flex-1"
-									viewportClassName="px-2"
-									scrollbarClassName="border-l-0 pr-0 right-0"
-								>
-									<div className="flex flex-col gap-2.5 pb-2">
-										{sorted.map((n) => {
-											const active = preview?.id === n.id;
-											return (
-												<button
-													key={n.id}
-													type="button"
-													onClick={() => setPreview(n)}
-													className={cn(
-														'border-theme/10 bg-theme/5 hover:bg-theme/10 w-full rounded-md border px-3 py-2.5 text-left transition-colors',
-														active &&
-															'border-theme/40 bg-theme/15 ring-theme/30 ring-1',
-													)}
-												>
-													<div className="text-textcolor truncate text-sm font-semibold">
-														{n.title}
-													</div>
-													<div className="text-textcolor/45 mt-1.5 text-xs">
-														{new Date(n.at).toLocaleString()}
-													</div>
-												</button>
-											);
-										})}
-									</div>
-								</ScrollArea>
-							</aside>
-						</ResizablePanel>
-					</>
-				) : null}
 			</ResizablePanelGroup>
 		</div>
 	);
 }
 
 export async function activate() {
-	// ponytail: 本地 demo 态，无远程拉取
+	// 列表在组件 mount 时拉取
 }
 
 export async function deactivate() {

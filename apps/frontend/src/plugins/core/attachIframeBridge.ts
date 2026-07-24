@@ -43,6 +43,12 @@ async function dispatchRpc(
 		case 'http.post':
 			if (!api.http) throw new Error('HTTP_DENIED');
 			return api.http.post(String(args[0] ?? ''), args[1]);
+		case 'http.put':
+			if (!api.http) throw new Error('HTTP_DENIED');
+			return api.http.put(String(args[0] ?? ''), args[1]);
+		case 'http.delete':
+			if (!api.http) throw new Error('HTTP_DENIED');
+			return api.http.delete(String(args[0] ?? ''));
 		case 'ui.showToast':
 			if (!api.ui) throw new Error('UI_DENIED');
 			api.ui.showToast(

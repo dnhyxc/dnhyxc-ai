@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button, Input } from '@/components/ui';
 import type { RichEditorLocale } from '../locale';
 import {
 	applyLinkToRange,
@@ -44,7 +45,7 @@ export function LinkForm({
 
 	return (
 		<div
-			className="rich-editor-link-form"
+			className="flex items-center gap-1 p-3 pb-2"
 			role="dialog"
 			aria-label={t.link}
 			onMouseDown={(e) => {
@@ -52,13 +53,13 @@ export function LinkForm({
 				e.preventDefault();
 			}}
 		>
-			<span className="rich-editor-link-label">{t.linkPrompt}</span>
-			<input
+			{/* <span className="text-sm text-textcolor/60">{t.linkPrompt}</span> */}
+			<Input
 				ref={inputRef}
 				type="text"
 				inputMode="url"
 				autoComplete="url"
-				className="rich-editor-link-input"
+				className="text-textcolor/80 flex-1 shadow-none border-theme/15 focus-visible:border-theme/30 focus-visible:ring-0"
 				placeholder={t.linkPlaceholder}
 				value={href}
 				onChange={(e) => onHrefChange(e.target.value)}
@@ -74,28 +75,15 @@ export function LinkForm({
 				}}
 			/>
 			{hint ? <span className="rich-editor-link-hint">{hint}</span> : null}
-			<button
-				type="button"
-				className="rich-editor-link-action"
-				disabled={!!hint}
-				onClick={onApply}
-			>
+			<Button type="button" disabled={!!hint} onClick={onApply}>
 				{t.linkApply}
-			</button>
-			<button
-				type="button"
-				className="rich-editor-link-action"
-				onClick={onRemove}
-			>
+			</Button>
+			<Button type="button" onClick={onRemove}>
 				{t.unlink}
-			</button>
-			<button
-				type="button"
-				className="rich-editor-link-action ghost"
-				onClick={onClose}
-			>
+			</Button>
+			<Button type="button" onClick={onClose}>
 				{t.linkCancel}
-			</button>
+			</Button>
 		</div>
 	);
 }

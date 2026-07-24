@@ -14,6 +14,8 @@ type HostBridgeProps = {
 		http?: {
 			get: <T = unknown>(url: string) => Promise<T>;
 			post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			put: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			delete: <T = unknown>(url: string) => Promise<T>;
 		};
 		ui?: {
 			showToast: (options: {
@@ -104,6 +106,9 @@ export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
 							get: (url) => rpc('http.get', [url]) as Promise<never>,
 							post: (url, body) =>
 								rpc('http.post', [url, body]) as Promise<never>,
+							put: (url, body) =>
+								rpc('http.put', [url, body]) as Promise<never>,
+							delete: (url) => rpc('http.delete', [url]) as Promise<never>,
 						},
 						ui: {
 							showToast: (options) => {

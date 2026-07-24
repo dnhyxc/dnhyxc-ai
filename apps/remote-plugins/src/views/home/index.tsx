@@ -15,7 +15,7 @@ const pages = [
 
 export default function Home() {
 	return (
-		<div className="mx-auto flex max-w-lg flex-col gap-4">
+		<div className="w-full h-full p-4 mx-auto flex max-w-lg flex-col gap-4">
 			<div>
 				<h1 className="text-lg font-medium">插件独立预览</h1>
 				<p className="text-textcolor/55 mt-1 text-sm">

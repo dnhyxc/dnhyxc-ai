@@ -34,12 +34,12 @@ export default function TitleView({
 			contentEditable={false}
 		>
 			<div className="relative flex flex-col gap-2 p-3 pt-9 border border-theme/5 bg-theme/5 rounded-md">
-				<div className="absolute top-0 bg-theme/20 text-theme/80 rounded-tl-md rounded-br-md pl-3 py-3 left-0 w-25 h-6 flex items-center gap-2">
+				<div className="absolute -inset-0.5 bg-theme/20 border border-theme/5 text-theme/80 rounded-tl-md rounded-br-md pl-3 py-3.5 w-26 h-6 flex items-center gap-2">
 					<NotebookPen className="size-4" />
-					<span className="text-sm font-medium">笔记标题</span>
+					<span className="text-sm font-medium pb-0.5">笔记标题</span>
 				</div>
 				<Input
-					className="h-12 size-full px-0 py-0 md:text-xl rounded-none border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-lg placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
+					className="h-12 size-full px-0 py-0 md:text-xl rounded-none border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-lg placeholder:text-textcolor/35 focus-visible:border-0 focus-visible:ring-0"
 					value={value}
 					placeholder={zhCN.placeholderHeadingHint}
 					maxLength={100}

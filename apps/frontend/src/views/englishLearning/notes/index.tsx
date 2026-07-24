@@ -11,13 +11,11 @@ export default function EnglishLearningNotesPage() {
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col">
-				<div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
+				<div className="min-h-0 flex-1 overflow-auto px-5.5 pb-5.5">
 					{enabled ? (
 						<PluginHostPage pluginId="learningNotes" />
 					) : (
-						<p className="text-textcolor/55 text-sm">
-							{t('plugins.host.delisted')}
-						</p>
+						<p className="text-textcolor/55">{t('plugins.host.delisted')}</p>
 					)}
 				</div>
 			</div>

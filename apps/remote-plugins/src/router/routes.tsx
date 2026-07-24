@@ -17,6 +17,7 @@ export const routes: RouteObject[] = [
 				path: 'english-learning/notes',
 				element: (
 					<LearningNotesApp
+						independent
 						api={mockApi()}
 						plugin={mockPlugin('learningNotes', '/english-learning/notes')}
 					/>
@@ -26,11 +27,12 @@ export const routes: RouteObject[] = [
 				path: 'ebook/plugins/ideas-list',
 				element: (
 					<IdeasListApp
+						independent
 						api={mockApi({
 							modules: {
 								ebook: {
 									getBookId: () => null,
-									getBookTitle: () => '独立预览（无书籍）',
+									getBookTitle: () => '',
 									navigateToCfi: () => undefined,
 									openThought: () => undefined,
 								},

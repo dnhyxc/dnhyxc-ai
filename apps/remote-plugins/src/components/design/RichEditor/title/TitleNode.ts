@@ -1,7 +1,7 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 import { mergeAttributes, Node } from '@tiptap/core';
 import { GapCursor } from '@tiptap/pm/gapcursor';
-import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import { Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import TitleView from './Title';
 
@@ -113,15 +113,31 @@ export const TitleNode = Node.create({
 					}
 
 					const nextDoc = changed ? tr.doc : state.doc;
-					const sel = changed ? tr.selection : state.selection;
-					// 仅纠正 GapCursor：看起来有光标但父节点不是 textblock，无法输入
-					const isGap =
-						sel instanceof GapCursor ||
-						(sel.empty && !sel.$from.parent.isTextblock);
-					if (isGap && nextDoc.firstChild?.type.name === 'title') {
-						const pos = nextDoc.firstChild.nodeSize + 1;
-						if (pos <= nextDoc.content.size) {
-							tr = tr.setSelection(TextSelection.create(nextDoc, pos));
+					const titleNode = nextDoc.firstChild;
+					if (titleNode?.type.name === 'title') {
+						const titleSize = titleNode.nodeSize;
+						const sel = changed ? tr.selection : state.selection;
+						const bodyEmpty = !nextDoc.textBetween(
+							titleSize,
+							nextDoc.content.size,
+						).length;
+						const $from = sel.$from;
+						const caretInBody =
+							sel instanceof TextSelection &&
+							sel.empty &&
+							$from.parent.isTextblock &&
+							$from.pos > titleSize;
+						// GapCursor / 非正文块 / 正文已空却不在段内 → 钉回首段，避免无可见光标仍能输入
+						const needsFix =
+							sel instanceof GapCursor ||
+							(sel.empty && !$from.parent.isTextblock) ||
+							(bodyEmpty && !caretInBody);
+
+						if (needsFix && titleSize + 1 <= nextDoc.content.size) {
+							const nextSel = bodyEmpty
+								? TextSelection.create(nextDoc, titleSize + 1)
+								: Selection.atEnd(nextDoc);
+							tr = tr.setSelection(nextSel);
 							changed = true;
 						}
 					}

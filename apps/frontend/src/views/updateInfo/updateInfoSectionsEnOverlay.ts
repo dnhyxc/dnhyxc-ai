@@ -926,6 +926,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Learning notes upgraded to a rich-text editor with formatting, highlight markers, lists, and other editing capabilities, making it easier to format and annotate learning notes.',
 	},
+	's24-52': {
+		title: 'Learning notes cloud sync & CRUD',
+		description:
+			'Learning notes move from a local-only experience to cloud persistence. You can create, edit, and delete notes (with confirmation); the list auto-loads and sorts by time. Click a note in the left list to preview it; hover for quick edit or delete; the divider between the list and the editor is draggable.',
+	},
+	's24-53': {
+		title: 'Rich-text editor UX improvements',
+		description:
+			'Cursor placement is more precise (empty docs auto-focus at the end of the body; GapCursor correction refined). The selection bubble menu only appears when real text is selected, avoiding false triggers on empty paragraphs. Toolbar overflow uses precise pixel measurement so buttons clip more accurately on narrow screens. The link editing panel now uses a unified UI component for consistent look and interaction.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

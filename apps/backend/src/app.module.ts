@@ -20,6 +20,7 @@ import { EbookAssistantModule } from './services/ebook-assistant/ebook-assistant
 import { EnglishLearningModule } from './services/english-learning/english-learning.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
 import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
+import { LearningNotesModule } from './services/learning-notes/learning-notes.module';
 import { LlmConfigModule } from './services/llm-config/llm-config.module';
 import { LogsModule } from './services/logs/logs.module';
 import { MailModule } from './services/mail/mail.module';
@@ -93,6 +94,7 @@ const connections = new Map();
 		OcrModule,
 		SpeechTranscriptionModule,
 		EnglishLearningModule,
+		LearningNotesModule,
 		EbookModule,
 		EbookAssistantModule,
 		WebSearchModule,

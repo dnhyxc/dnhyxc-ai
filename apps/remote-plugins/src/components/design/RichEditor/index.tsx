@@ -1,3 +1,4 @@
+import { isTextSelection } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 import {
 	EditorContent,
@@ -6,7 +7,8 @@ import {
 	useEditorState,
 } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { createExtensions } from './extensions';
 import { fileToDataUrl, type ResolveImageSrc } from './image';
@@ -114,14 +116,18 @@ export function RichEditor({
 			},
 		},
 		onCreate: ({ editor: e }) => {
-			// 空文档时把选区放进正文首段，避免落在 title atom 旁的 GapCursor
-			const title = e.state.doc.firstChild;
-			if (title?.type.name === 'title') {
-				const pos = title.nodeSize + 1;
-				if (pos <= e.state.doc.content.size) {
-					e.commands.setTextSelection(pos);
+			const focusBodyEnd = () => {
+				if (e.isDestroyed) return;
+				if (e.state.doc.firstChild?.type.name === 'title') {
+					e.commands.focus('end');
 				}
-			}
+			};
+			focusBodyEnd();
+			// Title NodeView 挂载可能打乱选区，下一帧再钉到末尾
+			requestAnimationFrame(() => {
+				focusBodyEnd();
+				requestAnimationFrame(focusBodyEnd);
+			});
 			onCreate?.(e);
 		},
 		onUpdate: ({ editor: e }) => {
@@ -135,6 +141,43 @@ export function RichEditor({
 	});
 
 	const link = useLinkEditor(editor);
+	const linkDraftRef = useRef(link.draft);
+	linkDraftRef.current = link.draft;
+
+	/** 仅有真实文本选区时显示；补回 TipTap 默认的空块判断，避免空段落误显 */
+	const shouldShowBubble = useCallback(
+		({
+			editor: e,
+			view,
+			state,
+			from,
+			to,
+		}: {
+			editor: Editor;
+			view: { hasFocus: () => boolean };
+			state: {
+				doc: { textBetween: (a: number, b: number) => string };
+				selection: { empty: boolean };
+			};
+			from: number;
+			to: number;
+		}) => {
+			if (linkDraftRef.current || !e.isEditable) return false;
+			if (!view.hasFocus()) return false;
+			const { doc, selection } = state;
+			if (
+				!isTextSelection(selection) ||
+				selection.empty ||
+				from === to ||
+				!doc.textBetween(from, to).length
+			) {
+				return false;
+			}
+			if (e.isActive('image') || e.isActive('codeBlock')) return false;
+			return true;
+		},
+		[],
+	);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -165,7 +208,7 @@ export function RichEditor({
 
 	return (
 		<EditorContext.Provider value={ctx}>
-			<div className={cn('rich-editor', className)} lang="zh-CN">
+			<div className={cn('rich-editor rounded-r-md', className)} lang="zh-CN">
 				{showToolbar && (
 					<Toolbar
 						editor={editor}
@@ -192,12 +235,8 @@ export function RichEditor({
 				{showBubbleMenu && (
 					<BubbleMenu
 						editor={editor}
+						shouldShow={shouldShowBubble}
 						options={{ placement: 'top', offset: 8, flip: true }}
-						shouldShow={({ editor: e, state }) => {
-							if (link.draft) return false;
-							const { empty } = state.selection;
-							return !empty && !e.isActive('image') && !e.isActive('codeBlock');
-						}}
 					>
 						<FormatBubble
 							editor={editor}
@@ -207,9 +246,9 @@ export function RichEditor({
 					</BubbleMenu>
 				)}
 
-				<div className="rich-editor-body">
+				<ScrollArea className="rich-editor-body">
 					<EditorContent editor={editor} spellCheck="false" />
-				</div>
+				</ScrollArea>
 
 				{showCharCount && (
 					<CharCount editor={editor} locale={locale} maxLength={maxLength} />

@@ -59,11 +59,11 @@ export function NotePreview({
 	return (
 		<div
 			className={cn(
-				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
+				'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
 				className,
 			)}
 		>
-			<header className="h-10 border-theme/10 bg-theme-background flex shrink-0 items-center gap-3 border-b pl-4 pr-2 py-2.5">
+			<header className="h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
 				<div className="min-w-0 flex-1">
 					<h1 className="text-textcolor truncate text-base font-semibold leading-snug">
 						{title.trim() || '无标题笔记'}

@@ -9,6 +9,8 @@
 | [learning-notes-remote.md](./learning-notes-remote.md) | **学习笔记 MF Remote**：`/english-learning/notes`、`remotePlugins/LearningNotes`（:9008）、`injectRoute: false` |
 | [learning-notes-rich-editor.md](./learning-notes-rich-editor.md) | **学习笔记富文本编辑器**：升级 Tiptap 至 3.28.0、支持格式化文本、高亮、列表等功能 |
 | [learning-notes-rich-editor-deep-dive.md](./learning-notes-rich-editor-deep-dive.md) | **富文本编辑器源码级详解**：13 个模块逐行注释、架构/调用链/设计决策全景 |
+| [rich-editor-core-fixes.md](./rich-editor-core-fixes.md) | **富文本编辑器核心优化**：appendTransaction GapCursor 精细化、onCreate 两帧 rAF 选区、shouldShowBubble 提取、工具栏 fits 溢出重算、LinkForm 迁 UI 组件、ScrollArea 接管滚动 |
+| [learning-notes-crud.md](./learning-notes-crud.md) | **学习笔记 CRUD 与 API 集成**：列表左/编辑器右布局重构、`createNotesApi` 工厂、`Confirm` 删除确认、HostBridge 扩展 `put/delete` 全链路 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |
 | [english-learning-impl-overview.md](./english-learning-impl-overview.md) | 产品能力总览 |
 | [english-learning-backend-implementation.md](./english-learning-backend-implementation.md) | 后端模块总览 |

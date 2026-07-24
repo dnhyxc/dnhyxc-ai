@@ -35,7 +35,7 @@ export default function Layout() {
 					独立预览 · :9008
 				</span>
 			</header>
-			<main className="min-h-0 flex-1 overflow-auto p-4">
+			<main className="min-h-0 flex-1 overflow-auto">
 				<Outlet />
 			</main>
 		</div>

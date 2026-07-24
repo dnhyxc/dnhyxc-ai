@@ -14,6 +14,7 @@ interface ScrollAreaProps
 	onWheel?: React.WheelEventHandler<HTMLDivElement>;
 	onWheelCapture?: React.WheelEventHandler<HTMLDivElement>;
 	onPointerDownCapture?: React.PointerEventHandler<HTMLDivElement>;
+	/** Radix 须挂载对应 Scrollbar 才开启该方向滚动；Markdown 预览等需 both 以免撑破 flex 父级 */
 	scrollbars?: ScrollAreaScrollbars;
 }
 
@@ -52,6 +53,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 					data-slot="scroll-area-viewport"
 					className={cn(
 						'focus-visible:ring-ring/50 size-full max-w-full min-w-0 rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1',
+						// Radix 在 Viewport 内用内联 display:table 包裹子节点；子树无法按视口高度撑开，flex 垂直居中等布局会失效。用 flex + min-h-full 覆盖（需 ! 压过内联 table）
 						'[&>div]:flex! [&>div]:min-h-full! [&>div]:min-w-full! [&>div]:flex-col!',
 						viewportClassName,
 					)}

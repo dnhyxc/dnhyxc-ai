@@ -69,6 +69,8 @@ export function createHostBridge(
 			get: <T = unknown>(url: string) => http.get<T>(url),
 			post: <T = unknown>(url: string, body?: unknown) =>
 				http.post<T>(url, body),
+			put: <T = unknown>(url: string, body?: unknown) => http.put<T>(url, body),
+			delete: <T = unknown>(url: string) => http.delete<T>(url),
 		});
 	}
 

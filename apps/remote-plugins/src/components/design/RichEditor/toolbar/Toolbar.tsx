@@ -76,8 +76,8 @@ type ToolItem = {
 };
 
 const ICON = 15;
-/** More 按钮预留宽度（含间距） */
-const MORE_RESERVE = 36;
+/** More 按钮自身宽度（1.75rem + ml-0.5），不含 flex gap */
+const MORE_W = 30;
 
 export function Btn({
 	title,
@@ -893,9 +893,22 @@ export function Toolbar({
 		if (!root || !measure) return;
 
 		const recalc = () => {
+			const cs = getComputedStyle(root);
+			const padX =
+				(parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+			const gap = parseFloat(cs.columnGap || cs.gap) || 0;
+			const contentW = root.clientWidth - padX;
 			const extraW = extraRef.current?.offsetWidth ?? 0;
-			const gap = 4;
-			const avail = root.clientWidth - extraW - gap;
+
+			/** [start=tools+more][+extra] 是否放得进 contentW */
+			const fits = (toolsW: number, withMore: boolean) => {
+				const startW = toolsW + (withMore ? MORE_W : 0);
+				let used = startW;
+				if (extraW > 0) used += extraW + gap;
+				// 偏保守，避免亚像素导致多塞一项被裁切
+				return used <= contentW - 0.5;
+			};
+
 			const nodes = [...measure.children] as HTMLElement[];
 			if (nodes.length === 0) {
 				setVisibleCount(0);
@@ -906,21 +919,19 @@ export function Toolbar({
 			const total = widths.reduce((a, b) => a + b, 0);
 
 			// 全放下：不显示 More
-			if (total <= avail) {
+			if (fits(total, false)) {
 				setVisibleCount(widths.length);
 				return;
 			}
 
-			const budget = avail - MORE_RESERVE;
 			let used = 0;
 			let count = 0;
 			for (const w of widths) {
-				if (used + w > budget) break;
+				if (!fits(used + w, true)) break;
 				used += w;
 				count += 1;
 			}
-			// 至少留 0；避免 More 占满后一个都没有仍显示空主区
-			setVisibleCount(Math.max(0, count));
+			setVisibleCount(count);
 		};
 
 		recalc();
@@ -938,7 +949,7 @@ export function Toolbar({
 		<div
 			ref={rootRef}
 			className={cn(
-				'rich-editor-toolbar flex h-10 items-center justify-between border-b border-theme/10',
+				'rich-editor-toolbar px-1.5 flex h-10 items-center justify-between border-b border-theme/10',
 				className,
 			)}
 			role="toolbar"
@@ -953,38 +964,43 @@ export function Toolbar({
 				))}
 			</div>
 
-			<div className="rich-editor-toolbar-main">
-				{visible.map((item) => (
-					<span key={item.id} className="inline-flex shrink-0">
-						{item.node}
-					</span>
-				))}
+			<div className="rich-editor-toolbar-start">
+				<div className="rich-editor-toolbar-main">
+					{visible.map((item) => (
+						<span key={item.id} className="inline-flex shrink-0">
+							{item.node}
+						</span>
+					))}
+				</div>
+
 				{showMore ? (
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<button
-								type="button"
-								title="更多"
-								aria-label="更多"
-								className="rich-editor-btn ml-0.5"
-								onMouseDown={(e) => e.preventDefault()}
+					<span className="rich-editor-toolbar-more inline-flex shrink-0">
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<button
+									type="button"
+									title="更多"
+									aria-label="更多"
+									className="rich-editor-btn ml-0.5"
+									onMouseDown={(e) => e.preventDefault()}
+								>
+									<MoreHorizontal size={ICON} />
+								</button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								align="end"
+								sideOffset={8}
+								className="min-w-40"
+								onCloseAutoFocus={(e) => e.preventDefault()}
 							>
-								<MoreHorizontal size={ICON} />
-							</button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent
-							align="end"
-							sideOffset={8}
-							className="min-w-40"
-							onCloseAutoFocus={(e) => e.preventDefault()}
-						>
-							<DropdownMenuGroup>
-								{overflow.map((item) => (
-									<Fragment key={item.id}>{item.menu}</Fragment>
-								))}
-							</DropdownMenuGroup>
-						</DropdownMenuContent>
-					</DropdownMenu>
+								<DropdownMenuGroup>
+									{overflow.map((item) => (
+										<Fragment key={item.id}>{item.menu}</Fragment>
+									))}
+								</DropdownMenuGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</span>
 				) : null}
 			</div>
 

@@ -39,6 +39,8 @@ type HostBridgeProps = {
 		http?: {
 			get: <T = unknown>(url: string) => Promise<T>;
 			post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			put: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			delete: <T = unknown>(url: string) => Promise<T>;
 		};
 		ui?: {
 			showToast: (options: {
@@ -49,6 +51,8 @@ type HostBridgeProps = {
 		modules?: Readonly<Record<string, unknown>>;
 	};
 	plugin: { id: string; version: string; routePath: string };
+	// 是否独立运行
+	independent?: boolean;
 };
 
 type ThoughtPage = {
@@ -180,7 +184,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 	return (
 		<div className="text-textcolor flex h-full min-h-0 flex-col text-sm">
 			{bookTitle ? (
-				<div className="text-textcolor/55 border-theme-border mb-1 shrink-0 border-b px-2 pb-2.5 text-xs">
+				<div className="text-textcolor/55 border-theme/10 mb-1 shrink-0 border-b px-3.5 pb-2.5 text-xs">
 					{bookTitle}
 					{total > 0 ? (
 						<span className="text-textcolor/40 ml-2">共 {total} 条</span>
@@ -191,7 +195,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 			{/* 与 EbookTocDrawer 一致：ScrollArea pr-1.5，条目左右 px-2 */}
 			<ScrollArea
 				ref={viewportRef}
-				className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
+				className="box-border flex min-h-0 flex-1 flex-col px-1.5"
 			>
 				{loading ? (
 					<p className="text-textcolor/55 px-2 py-2">加载中…</p>
