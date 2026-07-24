@@ -6,13 +6,16 @@ import {
 	RichEditor,
 } from '@design/RichEditor';
 import {
+	ChevronDown,
+	ChevronUp,
 	FilePenLine,
+	LocateFixed,
 	NotebookText,
 	Save,
 	SquarePen,
 	Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Confirm from '@/components/design/Confirm';
 import {
 	ResizableHandle,
@@ -23,6 +26,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import '@/styles.css';
 import { createNotesApi, type HostHttp, type Note } from './api';
+
+/** 笔记列表滚动：同一按钮循环 底 → 顶 → 当前（无选中时底 → 顶） */
+type NoteScrollMode = 'bottom' | 'top' | 'current';
 
 type HostBridgeProps = {
 	api: {
@@ -69,6 +75,13 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
+	// ScrollArea viewport：程序化滚到顶/底
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	// 当前选中项 DOM：用于「滚到当前」
+	const activeItemRef = useRef<HTMLDivElement>(null);
+	// 三态滚动：默认先「滚到底」
+	const [scrollMode, setScrollMode] = useState<NoteScrollMode>('bottom');
+
 	const toast = useCallback(
 		(message: string, type: 'success' | 'error' | 'info' = 'info') => {
 			api.ui?.showToast({ message, type });
@@ -95,6 +108,22 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		void refreshList();
 	}, [refreshList]);
 
+	// 列表打开时重置为「滚到底」，避免沿用上次态
+	useEffect(() => {
+		if (!listOpen) return;
+		setScrollMode('bottom');
+	}, [listOpen]);
+
+	// 有无选中项：预览或编辑中任一即为有选中
+	const hasActive = !!(preview?.id ?? editingId);
+
+	// 选中项从有到无时，若当前是 current 态则重置为 bottom
+	useEffect(() => {
+		if (!hasActive && scrollMode === 'current') {
+			setScrollMode('bottom');
+		}
+	}, [hasActive, scrollMode]);
+
 	const openNew = () => {
 		setPreview(null);
 		setEditingId(null);
@@ -102,6 +131,30 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		setEditorInitial(EMPTY_NOTE_DOC);
 		setEditorSeed((n) => n + 1);
 	};
+
+	// 点击滚动按钮：执行当前态滚动，再切到下一态
+	const onScrollFabClick = useCallback(() => {
+		const vp = scrollViewportRef.current;
+		if (scrollMode === 'bottom') {
+			vp?.scrollTo({ top: vp?.scrollHeight ?? 0, behavior: 'smooth' });
+		} else if (scrollMode === 'top') {
+			vp?.scrollTo({ top: 0, behavior: 'smooth' });
+		} else {
+			activeItemRef.current?.scrollIntoView({
+				block: 'center',
+				behavior: 'smooth',
+			});
+		}
+
+		// 下一态：无选中时底→顶→底循环；有选中时底→顶→当前→底循环
+		if (scrollMode === 'bottom') {
+			setScrollMode('top');
+		} else if (scrollMode === 'top') {
+			setScrollMode(hasActive ? 'current' : 'bottom');
+		} else {
+			setScrollMode('bottom');
+		}
+	}, [scrollMode, hasActive]);
 
 	const openPreview = async (id: string) => {
 		if (!notesApi) return;
@@ -246,12 +299,30 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 									<span className="text-textcolor/85">
 										笔记列表{loading ? '…' : ''}
 									</span>
-									<Btn title="新建笔记" onClick={openNew}>
-										<FilePenLine size={15} />
+									<Btn
+										title={
+											scrollMode === 'bottom'
+												? '滚动到底部'
+												: scrollMode === 'top'
+													? '滚动到顶部'
+													: '滚动到当前选中'
+										}
+										onClick={onScrollFabClick}
+									>
+										{scrollMode === 'bottom' ? (
+											<ChevronDown size={15} />
+										) : scrollMode === 'top' ? (
+											<ChevronUp size={15} />
+										) : (
+											<LocateFixed size={15} />
+										)}
 									</Btn>
 								</div>
 								{/* 与主项目英语学习侧栏一致：内边距写在 ScrollArea Root，滚动条样式跟主项目组件默认 */}
-								<ScrollArea className="min-h-0 flex-1 p-3">
+								<ScrollArea
+									ref={scrollViewportRef}
+									className="min-h-0 flex-1 p-3"
+								>
 									<div className="flex flex-col gap-3">
 										{notes.length === 0 && !loading ? (
 											<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
@@ -264,6 +335,7 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 											return (
 												<div
 													key={n.id}
+													ref={active ? activeItemRef : undefined}
 													className={cn(
 														'hover:bg-theme/10 bg-theme/5 group relative w-full rounded-md px-3 py-2.5 text-left transition-colors',
 														active && 'bg-theme/15',
