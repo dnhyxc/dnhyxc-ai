@@ -730,8 +730,8 @@ body {
 			var(--theme-seed) 50%,
 			color-mix(in oklch, var(--theme-seed) 96%, black) 100%
 		);
-	--theme-selection-bg: color-mix(in oklch, var(--theme-seed) 58%, white);
-	--theme-selection-fg: color-mix(in oklch, white 96%, var(--theme-seed));
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 80%, black);
+	--theme-selection-fg: oklch(0.98 0.01 264);
 	--theme-ring: color-mix(in oklch, white 48%, var(--theme-seed));
 	--theme-caret: color-mix(in oklch, white 55%, var(--theme-seed));
 }
