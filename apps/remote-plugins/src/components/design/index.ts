@@ -1,3 +1,4 @@
+export * from './Loading';
 export type { NotePreviewProps } from './NotePreview';
 export { NotePreview, stripNoteTitleHtml } from './NotePreview';
 export type {

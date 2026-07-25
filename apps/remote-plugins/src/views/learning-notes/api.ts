@@ -9,6 +9,9 @@ export type HostHttp = {
 
 const BASE = '/english-learning/notes';
 
+/** 列表默认每页条数 */
+export const NOTES_PAGE_SIZE = 10;
+
 export type NoteRecord = {
 	id: string;
 	title: string | null;
@@ -25,6 +28,13 @@ export type Note = {
 	title: string;
 	html: string;
 	at: number;
+};
+
+export type NoteListPage = {
+	list: Note[];
+	total: number;
+	pageNo: number;
+	pageSize: number;
 };
 
 function unwrapData<T>(res: unknown): T {
@@ -49,11 +59,18 @@ function toNote(row: NoteListItem | NoteRecord): Note {
 
 export function createNotesApi(http: HostHttp) {
 	return {
-		async list(pageSize = 100): Promise<Note[]> {
-			const res = await http.get(`${BASE}/list?pageNo=1&pageSize=${pageSize}`);
+		async list(pageNo = 1, pageSize = NOTES_PAGE_SIZE): Promise<NoteListPage> {
+			const res = await http.get(
+				`${BASE}/list?pageNo=${pageNo}&pageSize=${pageSize}`,
+			);
 			const page = unwrapData<{ list: NoteListItem[]; total: number }>(res);
-			const list = Array.isArray(page?.list) ? page.list : [];
-			return list.map(toNote).sort((a, b) => b.at - a.at);
+			const rows = Array.isArray(page?.list) ? page.list : [];
+			return {
+				list: rows.map(toNote),
+				total: typeof page?.total === 'number' ? page.total : rows.length,
+				pageNo,
+				pageSize,
+			};
 		},
 
 		async detail(id: string): Promise<Note> {

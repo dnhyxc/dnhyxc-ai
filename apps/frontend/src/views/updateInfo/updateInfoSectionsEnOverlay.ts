@@ -936,6 +936,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Cursor placement is more precise (empty docs auto-focus at the end of the body; GapCursor correction refined). The selection bubble menu only appears when real text is selected, avoiding false triggers on empty paragraphs. Toolbar overflow uses precise pixel measurement so buttons clip more accurately on narrow screens. The link editing panel now uses a unified UI component for consistent look and interaction. Select All (⌘/Ctrl+A) only covers the body content, skipping the title area, with theme-colored selection highlight. Learning notes support ⌘/Ctrl+S shortcut to save.',
 	},
+	's24-54': {
+		title: 'Learning notes pagination & scroll-to-load',
+		description:
+			'Notes list now loads in pages (10 per page by default), with automatic next-page loading when you scroll to the bottom. Status hints at the bottom show "Loading…" and "No more notes". Previewing a note now shows a loading state for smoother interaction.',
+	},
+	's24-55': {
+		title: 'Desktop rich-text copy/paste fix',
+		description:
+			'Fixed an issue where Cmd/Ctrl+C/V/X occasionally did not work in the learning notes rich-text editor on Tauri desktop. Both the title input and the body editor are now supported; Select All remains handled by the editor itself.',
+	},
+	's24-56': {
+		title: 'Plugin error page polish',
+		description:
+			'The error page shown when a plugin is unavailable now has a centered layout and uses unified button styling for a more consistent look.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

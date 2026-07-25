@@ -1,8 +1,8 @@
 import { isTauriRuntime } from './runtime';
 
 /**
- * Tauri WebView 内系统级复制/粘贴有时无法作用到普通 input/textarea，
- * 通过剪贴板插件 + selectionStart/End 显式处理。
+ * Tauri WebView 内系统级复制/粘贴有时无法作用到普通 input/textarea / TipTap contenteditable，
+ * 通过剪贴板插件 + selectionStart/End（或 insertText）显式处理。
  * Monaco/CodeMirror 有各自实现或内部模型，此处一律跳过；Cmd/Ctrl+Z 不拦截，保留原生撤销栈。
  */
 
@@ -126,8 +126,8 @@ function dispatchInputForReact(
 	}
 }
 
-/** 事件路径是否落在 Monaco / CodeMirror 等富编辑器内 */
-function richEditorInEventPath(event: KeyboardEvent): boolean {
+/** 事件路径是否落在 Monaco / CodeMirror（自有剪贴板方案，此处不接管） */
+function monacoOrCodeMirrorInEventPath(event: KeyboardEvent): boolean {
 	for (const n of event.composedPath()) {
 		if (!(n instanceof Element)) continue;
 		if (n.closest?.('.monaco-editor, .monaco-diff-editor, .cm-editor')) {
@@ -139,6 +139,21 @@ function richEditorInEventPath(event: KeyboardEvent): boolean {
 		}
 	}
 	return false;
+}
+
+/**
+ * TipTap / ProseMirror 正文 contenteditable（非标题原生 input）。
+ * Tauri WebView 下系统 Cmd+C/V 往往无法作用到该类节点。
+ */
+function tipTapBodyInEventPath(event: KeyboardEvent): HTMLElement | null {
+	for (const n of event.composedPath()) {
+		if (!(n instanceof Element)) continue;
+		const el = n.closest?.(
+			'.tiptap.ProseMirror, .ProseMirror.tiptap, .rich-editor .tiptap[contenteditable="true"]',
+		);
+		if (el instanceof HTMLElement && el.isContentEditable) return el;
+	}
+	return null;
 }
 
 function isPlainTextField(
@@ -173,7 +188,8 @@ function editableInEventPath(event: KeyboardEvent): boolean {
 }
 
 /**
- * 仅在 Tauri 下挂载：为普通 input/textarea 接管 Cmd/Ctrl+A/C/V/X（走插件剪贴板），不拦截 Z。
+ * 仅在 Tauri 下挂载：为普通 input/textarea 与 TipTap 正文接管 Cmd/Ctrl+C/V/X（走插件剪贴板），不拦截 Z。
+ * Monaco / CodeMirror 有各自实现，此处跳过。
  * @returns 卸载函数
  */
 export function attachTauriPlainFieldClipboardShortcuts(): () => void {
@@ -190,7 +206,8 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 		// 撤销交给 WebView 原生，避免破坏输入栈
 		if (key === 'z') return;
 
-		if (richEditorInEventPath(event)) return;
+		// Monaco / CodeMirror：自有 Tauri 剪贴板扩展
+		if (monacoOrCodeMirrorInEventPath(event)) return;
 
 		/**
 		 * 兜底：普通页面文本（非输入框/非富编辑器）选区复制
@@ -207,7 +224,47 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 			}
 		}
 
-		const el = document.activeElement;
+		const active = document.activeElement;
+
+		// TipTap 正文：与 Sandpack CM 一样显式读写系统剪贴板
+		// 标题区是原生 input，走下方 plain field 分支
+		const tipTapBody = tipTapBodyInEventPath(event);
+		if (tipTapBody && !isPlainTextField(active)) {
+			if (key === 'a') return; // 全选由编辑器自身快捷键处理
+
+			if (key === 'c') {
+				const text = window.getSelection()?.toString() ?? '';
+				if (!text) return;
+				event.preventDefault();
+				void writeClipText(text);
+				return;
+			}
+
+			if (key === 'x') {
+				const text = window.getSelection()?.toString() ?? '';
+				if (!text) return;
+				event.preventDefault();
+				void writeClipText(text);
+				tipTapBody.focus();
+				document.execCommand('delete');
+				return;
+			}
+
+			if (key === 'v') {
+				event.preventDefault();
+				const root = tipTapBody;
+				void (async () => {
+					const text = await readClipText();
+					if (!text || !root.isConnected) return;
+					root.focus();
+					// ProseMirror 仍响应 insertText，避免自造选区破坏事务
+					document.execCommand('insertText', false, text);
+				})();
+			}
+			return;
+		}
+
+		const el = active;
 		if (!isPlainTextField(el)) return;
 		if (el.disabled) return;
 

@@ -96,11 +96,21 @@ export function RichEditor({
 		return fileToDataUrl(file);
 	};
 
+	const onChangeRef = useRef(onChange);
+	onChangeRef.current = onChange;
+
+	const onCreateRef = useRef(onCreate);
+	onCreateRef.current = onCreate;
+
+	// 无字数 UI 且无上限时不挂 CharacterCount，避免每键 Segmenter
+	const enableCharacterCount = showCharCount || maxLength != null;
+
 	const editor = useEditor({
 		immediatelyRender: false,
 		extensions: createExtensions({
 			placeholder: placeholder ?? locale.placeholder,
 			maxLength,
+			characterCount: enableCharacterCount,
 			extensions,
 			extraExtensions,
 			resolveImageSrcRef,
@@ -128,12 +138,14 @@ export function RichEditor({
 				focusBodyEnd();
 				requestAnimationFrame(focusBodyEnd);
 			});
-			onCreate?.(e);
+			onCreateRef.current?.(e);
 		},
 		onUpdate: ({ editor: e }) => {
-			onChange?.({
+			const cb = onChangeRef.current;
+			if (!cb) return;
+			// 热路径不做 getJSON（学习笔记等只用 html/text/title）
+			cb({
 				html: e.getHTML(),
-				json: e.getJSON(),
 				text: e.getText({ blockSeparator: '\n\n' }),
 				title: getDocTitleText(e.state.doc),
 			});
@@ -201,10 +213,14 @@ export function RichEditor({
 
 	const ctx = useMemo(() => ({ editor }), [editor]);
 
-	if (!editor) return null;
+	const extra = useMemo(() => {
+		if (!editor) return null;
+		return typeof toolbarExtra === 'function'
+			? toolbarExtra(editor)
+			: toolbarExtra;
+	}, [editor, toolbarExtra]);
 
-	const extra =
-		typeof toolbarExtra === 'function' ? toolbarExtra(editor) : toolbarExtra;
+	if (!editor) return null;
 
 	return (
 		<EditorContext.Provider value={ctx}>

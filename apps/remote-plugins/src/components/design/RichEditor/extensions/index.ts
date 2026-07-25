@@ -53,6 +53,8 @@ export function createExtensions(
 	const resolveImageSrcRef = options.resolveImageSrcRef ?? {
 		current: fileToDataUrl,
 	};
+	// 默认开启；显式 false 时跳过（无字数 UI 且无上限）
+	const withCharCount = options.characterCount !== false;
 
 	return [
 		CustomDocument,
@@ -117,22 +119,30 @@ export function createExtensions(
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),
-		CharacterCount.configure({
-			limit: options.maxLength ?? null,
-			// 中文按字素计长；西文词 + CJK 字合计为「词」
-			textCounter: (text) =>
-				[...new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text)]
-					.length,
-			wordCounter: (text) => {
-				const cjk =
-					text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g)?.length ?? 0;
-				const latin = text
-					.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
-					.split(/\s+/)
-					.filter(Boolean).length;
-				return cjk + latin;
-			},
-		}),
+		...(withCharCount
+			? [
+					CharacterCount.configure({
+						limit: options.maxLength ?? null,
+						// 中文按字素计长；西文词 + CJK 字合计为「词」
+						textCounter: (text) =>
+							[
+								...new Intl.Segmenter('zh', {
+									granularity: 'grapheme',
+								}).segment(text),
+							].length,
+						wordCounter: (text) => {
+							const cjk =
+								text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g)
+									?.length ?? 0;
+							const latin = text
+								.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
+								.split(/\s+/)
+								.filter(Boolean).length;
+							return cjk + latin;
+						},
+					}),
+				]
+			: []),
 		...(options.extraExtensions ?? []),
 	];
 }

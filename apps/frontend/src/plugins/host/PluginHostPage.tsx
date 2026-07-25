@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import Loading from '@/components/design/Loading';
+import { Button } from '@/components/ui';
 import { attachIframeBridge } from '../core/attachIframeBridge';
 import { pluginManager } from '../core/PluginManager';
 import type { HostBridgeProps } from '../core/types';
@@ -139,23 +141,35 @@ export function PluginHostPage({ pluginId }: Props) {
 		error ||
 		loaded?.error ||
 		(busy || loaded?.status === 'loading'
-			? '加载中…'
+			? '正在加载中...'
 			: '未加载（请确认 Remote 已启动后重试）');
 
 	return (
-		<div className="text-muted-foreground flex flex-col gap-3 p-6 text-sm">
-			<p>
-				插件「{pluginId}」不可用
-				{detail ? `：${detail}` : ''}
-			</p>
-			<button
-				type="button"
-				className="border-border text-foreground hover:bg-muted w-fit rounded-md border px-3 py-1.5"
-				disabled={busy || loaded?.status === 'loading'}
-				onClick={() => setRetryKey((n) => n + 1)}
-			>
-				{busy || loaded?.status === 'loading' ? '加载中…' : '重新加载'}
-			</button>
+		<div className="mx-auto text-muted-foreground h-full flex flex-col gap-3 p-5.5 pt-0">
+			<div className="bg-theme-background h-full p-4.5 rounded-md">
+				{busy || loaded?.status === 'loading' ? (
+					<Loading
+						text={`插件「${pluginId}」正在加载中...`}
+						className="flex items-center h-full"
+					/>
+				) : (
+					<div className="flex flex-col gap-3">
+						插件「{pluginId}」不可用
+						{detail ? `：${detail}` : ''}
+						{error || loaded?.error ? (
+							<Button
+								type="button"
+								variant={busy ? 'loading' : 'default'}
+								className="w-fit"
+								disabled={busy}
+								onClick={() => setRetryKey((n) => n + 1)}
+							>
+								重新加载
+							</Button>
+						) : null}
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }

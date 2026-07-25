@@ -9,7 +9,8 @@ export type RichEditorContent = string | JSONContent;
 
 export type RichEditorChangePayload = {
 	html: string;
-	json: JSONContent;
+	/** 按需；热路径默认不序列化 JSON */
+	json?: JSONContent;
 	text: string;
 	/** 文档首位 title 节点纯文本 */
 	title: string;
@@ -19,6 +20,8 @@ export type CreateExtensionsOptions = {
 	placeholder?: string;
 	/** CharacterCount 上限；不传则只统计不限制 */
 	maxLength?: number;
+	/** 为 false 时不挂 CharacterCount（无字数 UI 且无上限时关掉，避免每键 Segmenter） */
+	characterCount?: boolean;
 	/** 粘贴/拖放图片解析（默认 FileReader → data URL） */
 	resolveImageSrcRef?: { current: ResolveImageSrc };
 	/** 追加扩展（在默认扩展之后） */

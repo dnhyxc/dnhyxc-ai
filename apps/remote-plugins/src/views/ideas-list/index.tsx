@@ -2,6 +2,7 @@ import { Button, ScrollArea } from '@ui/index';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import '@/styles.css';
+import Loading from '@design/Loading';
 
 const PAGE_SIZE = 50;
 
@@ -183,69 +184,72 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 
 	return (
 		<div className="text-textcolor flex h-full min-h-0 flex-col text-sm">
-			{bookTitle ? (
+			{bookTitle && !loading ? (
 				<div className="text-textcolor/55 border-theme/10 mb-1 shrink-0 border-b px-3.5 pb-2.5 text-xs">
 					{bookTitle}
 					{total > 0 ? (
-						<span className="text-textcolor/40 ml-2">共 {total} 条</span>
+						<span className="text-textcolor/40 ml-2">
+							已加载 {items.length} 条/共 {total} 条
+						</span>
 					) : null}
 				</div>
 			) : null}
 
-			{/* 与 EbookTocDrawer 一致：ScrollArea pr-1.5，条目左右 px-2 */}
-			<ScrollArea
-				ref={viewportRef}
-				className="box-border flex min-h-0 flex-1 flex-col px-1.5"
-			>
-				{loading ? (
-					<p className="text-textcolor/55 px-2 py-2">加载中…</p>
-				) : error ? (
-					<p className="text-destructive px-2 py-2">{error}</p>
-				) : items.length === 0 ? (
-					<p className="text-textcolor/55 px-2 py-4">暂无想法</p>
-				) : (
-					<div className="flex min-h-0 w-full flex-1 flex-col gap-1">
-						{items.map((thought) => (
-							<div key={thought.id}>
-								<Button
-									type="button"
-									variant="ghost"
-									onClick={() => onOpen(thought)}
-									className={cn(
-										'h-auto w-full flex-col items-stretch gap-0 rounded-md px-2 py-2 text-left font-normal whitespace-normal',
-										'hover:bg-theme/10',
-									)}
-								>
-									{thought.quote ? (
-										<p className="text-textcolor/55 mb-1.5 line-clamp-2 text-justify text-xs">
-											「{thought.quote}」
+			{loading ? (
+				<Loading className="h-full" />
+			) : (
+				<ScrollArea
+					ref={viewportRef}
+					className="box-border flex min-h-0 flex-1 flex-col px-1.5"
+				>
+					{error ? (
+						<p className="text-destructive px-2 py-2">{error}</p>
+					) : items.length === 0 ? (
+						<p className="text-textcolor/55 px-2 py-4">暂无想法</p>
+					) : (
+						<div className="flex min-h-0 w-full flex-1 flex-col gap-1">
+							{items.map((thought) => (
+								<div key={thought.id}>
+									<Button
+										type="button"
+										variant="ghost"
+										onClick={() => onOpen(thought)}
+										className={cn(
+											'h-auto w-full flex-col items-stretch gap-0 rounded-md px-2 py-2 text-left font-normal whitespace-normal',
+											'hover:bg-theme/10',
+										)}
+									>
+										{thought.quote ? (
+											<p className="text-textcolor/55 mb-1.5 line-clamp-2 text-justify text-xs">
+												「{thought.quote}」
+											</p>
+										) : null}
+										<p className="text-textcolor line-clamp-3 text-justify leading-snug">
+											{thought.content || '（无正文）'}
 										</p>
-									) : null}
-									<p className="text-textcolor line-clamp-3 text-justify leading-snug">
-										{thought.content || '（无正文）'}
-									</p>
-									<p className="text-textcolor/45 mt-1.5 text-left text-[11px]">
-										{[thought.username, formatTime(thought.createdAt)]
-											.filter(Boolean)
-											.join(' · ')}
-									</p>
-								</Button>
-							</div>
-						))}
-						<div ref={sentinelRef} className="h-1 w-full" aria-hidden />
-						{loadingMore ? (
-							<p className="text-textcolor/45 py-2 text-center text-xs">
-								加载更多…
-							</p>
-						) : null}
-						{!hasMore && items.length > 0 ? (
-							<p className="text-textcolor/35 py-2 text-center text-xs">
-								已加载全部
-							</p>
-						) : null}
-					</div>
-				)}
-			</ScrollArea>
+										<p className="text-textcolor/45 mt-1.5 text-left text-[11px]">
+											{[thought.username, formatTime(thought.createdAt)]
+												.filter(Boolean)
+												.join(' · ')}
+										</p>
+									</Button>
+								</div>
+							))}
+							<div ref={sentinelRef} className="h-1 w-full" aria-hidden />
+							{loadingMore ? (
+								<p className="text-textcolor/45 py-2 text-center text-xs">
+									加载更多…
+								</p>
+							) : null}
+							{!hasMore && items.length > 0 ? (
+								<p className="text-textcolor/35 py-2 text-center text-xs">
+									已加载全部
+								</p>
+							) : null}
+						</div>
+					)}
+				</ScrollArea>
+			)}
 		</div>
 	);
 }

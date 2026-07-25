@@ -1,6 +1,5 @@
 import { motion, Variants } from 'framer-motion';
 import { FC, useMemo } from 'react';
-import { useI18n } from '@/hooks';
 
 interface LoadingProps {
 	text?: string;
@@ -10,8 +9,6 @@ interface LoadingProps {
 	 * 默认 75px
 	 */
 	size?: number;
-	animate?: boolean;
-	children?: React.ReactNode;
 }
 
 // 动画变体定义
@@ -30,11 +27,8 @@ const Loading: FC<LoadingProps> = ({
 	text = '正在奋力加载中...',
 	className = '',
 	size = 75,
-	animate = true,
-	children,
 }) => {
 	const textArray = text.split('');
-	const { t } = useI18n();
 	// 核心逻辑：优化尺寸计算，解决中心点太小的问题
 	const config = useMemo(() => {
 		const scale = size / 80;
@@ -99,7 +93,7 @@ const Loading: FC<LoadingProps> = ({
 						className="w-full h-full"
 						viewBox="0 0 100 100"
 						role="img"
-						aria-label={t('common.loading')}
+						aria-label="正在奋力加载中..."
 						preserveAspectRatio="xMidYMid meet"
 					>
 						<defs>
@@ -184,34 +178,31 @@ const Loading: FC<LoadingProps> = ({
 
 				{/* 文字波浪动画 */}
 				<div className="flex justify-center text-textcolor text-md font-medium tracking-wider">
-					{animate
-						? textArray.map((char, index) => (
-								<motion.span
-									key={index}
-									className="inline-block" // 确保 transform 生效
-									animate={{
-										y: [0, -8, 0], // 增大浮动幅度
-										scale: [1, 1.1, 1], // 弹性缩放
-										opacity: [0.6, 1, 0.6], // 呼吸透明度
-									}}
-									transition={{
-										duration: 1.5,
-										ease: 'easeInOut',
-										repeat: Infinity,
-										delay: index * 0.08,
-									}}
-									// 新增：文字拖尾/发光效果
-									style={{
-										filter: `drop-shadow(0 0 1px currentColor)`,
-									}}
-								>
-									{char === ' ' ? '\u00A0' : char}
-								</motion.span>
-							))
-						: text}
+					{textArray.map((char, index) => (
+						<motion.span
+							key={index}
+							className="inline-block" // 确保 transform 生效
+							animate={{
+								y: [0, -8, 0], // 增大浮动幅度
+								scale: [1, 1.1, 1], // 弹性缩放
+								opacity: [0.6, 1, 0.6], // 呼吸透明度
+							}}
+							transition={{
+								duration: 1.5,
+								ease: 'easeInOut',
+								repeat: Infinity,
+								delay: index * 0.08,
+							}}
+							// 新增：文字拖尾/发光效果
+							style={{
+								filter: `drop-shadow(0 0 1px currentColor)`,
+							}}
+						>
+							{char === ' ' ? '\u00A0' : char}
+						</motion.span>
+					))}
 				</div>
 			</div>
-			{children && <div className="mt-4">{children}</div>}
 		</div>
 	);
 };
