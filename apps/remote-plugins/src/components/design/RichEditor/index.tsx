@@ -81,6 +81,7 @@ export function RichEditor({
 	showToolbar = true,
 	showBubbleMenu = true,
 	showCharCount = true,
+	showTitle = true,
 	locale: localePartial,
 	extensions,
 	extraExtensions,
@@ -114,8 +115,11 @@ export function RichEditor({
 			extensions,
 			extraExtensions,
 			resolveImageSrcRef,
+			showTitle,
 		}),
-		content: normalizeNoteContent(content ?? defaultContent),
+		content: showTitle
+			? normalizeNoteContent(content ?? defaultContent)
+			: (content ?? defaultContent ?? ''),
 		editable,
 		autofocus,
 		textDirection,

@@ -1,0 +1,24 @@
+.note-preview-editor {
+	background: transparent;
+}
+
+.note-preview-editor .rich-editor-body {
+	padding: 0.75rem;
+	padding-top: 0.28rem;
+	text-align: justify;
+}
+
+.note-preview-tiptap {
+	cursor: default;
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+.note-preview-editor .rich-editor-note-title,
+.note-preview-editor [data-node-view-wrapper].rich-editor-note-title {
+	display: none !important;
+}
+
+.note-preview-editor .ProseMirror > *:first-child {
+	margin-top: 0;
+}

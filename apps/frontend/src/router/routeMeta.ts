@@ -1,5 +1,6 @@
 import { matchPath } from 'react-router';
-import routes, { type RouteConfig } from '@/router/routes';
+import { buildRoutes } from '@/router/buildRoutes';
+import { type RouteConfig } from '@/router/routes';
 
 const pathMatches = (pattern: string, pathname: string) =>
 	matchPath({ path: pattern, end: true }, pathname) != null;
@@ -82,6 +83,7 @@ export function resolveRoutePageTitleKeys(pathname: string): string[] {
 		return undefined;
 	};
 
+	const routes = buildRoutes();
 	const rawTrail = findBreadcrumbTrail(routes, pathname, '', []) ?? [];
 	const trail = dedupeAdjacentTitleKeys(rawTrail.map((item) => item.titleKey));
 	if (trail.length > 0) return trail;

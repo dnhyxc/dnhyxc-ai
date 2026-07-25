@@ -2,7 +2,9 @@ import { ChevronRight, Languages, Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
 import { useI18n, useStorageInfo } from '@/hooks';
-import routes, { type RouteConfig } from '@/router/routes';
+import { routeInjector } from '@/plugins';
+import { buildRoutes } from '@/router/buildRoutes';
+import { type RouteConfig } from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
 interface Iprops {
@@ -18,12 +20,20 @@ const pathMatches = (pattern: string, pathname: string) =>
 
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
+	/** 插件路由注入后重建标题解析（与 router 的 routeEpoch 同源） */
+	const [routeEpoch, setRouteEpoch] = useState(0);
 
 	const { storageInfo } = useStorageInfo('autoUpdate');
 	const { t, toggleLocale } = useI18n();
 
 	useEffect(() => {
 		checkUpdate();
+	}, []);
+
+	useEffect(() => {
+		return routeInjector.subscribe(() => {
+			setRouteEpoch((n) => n + 1);
+		});
 	}, []);
 
 	const checkUpdate = async () => {
@@ -50,6 +60,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const location = useLocation();
 
 	const { breadcrumbTrail, headerTitleKey } = useMemo(() => {
+		const routes = buildRoutes();
 		const metaOf = (r: RouteConfig) => r.meta?.titleKey || r.meta?.title;
 
 		/** 将当前 route 与父级前缀拼成绝对 pathname（与 React Router 嵌套路由一致） */
@@ -167,12 +178,10 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			};
 		}
 
-		const single =
-			findRouteTitle(routes, location.pathname, '') ??
-			routes.find((i) => i.path === '/chat/:id?')?.meta?.title;
-
+		// 无匹配时不回落到聊天标题；插件页依赖 buildRoutes 注入的 meta
+		const single = findRouteTitle(routes, location.pathname, '');
 		return { breadcrumbTrail: null, headerTitleKey: single };
-	}, [location.pathname]);
+	}, [location.pathname, routeEpoch]);
 
 	const toSetting = () => {
 		navigate('/setting');
@@ -224,11 +233,9 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 								</span>
 							))}
 						</nav>
-					) : (
-						<div className="cursor-default truncate">
-							{headerTitleKey ? t(headerTitleKey) : t('common.appTitle')}
-						</div>
-					)}
+					) : headerTitleKey ? (
+						<div className="cursor-default truncate">{t(headerTitleKey)}</div>
+					) : null}
 				</div>
 				{actions ? (
 					<div

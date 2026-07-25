@@ -28,6 +28,8 @@ export type CreateExtensionsOptions = {
 	extraExtensions?: Extensions;
 	/** 完全替换默认扩展列表 */
 	extensions?: Extensions;
+	/** 是否显示笔记标题节点（默认 true） */
+	showTitle?: boolean;
 };
 
 export type RichEditorProps = {
@@ -48,6 +50,8 @@ export type RichEditorProps = {
 	showToolbar?: boolean;
 	showBubbleMenu?: boolean;
 	showCharCount?: boolean;
+	/** 是否显示笔记标题节点（默认 true） */
+	showTitle?: boolean;
 	/** 覆盖 / 合并文案（默认中文） */
 	locale?: Partial<RichEditorLocale>;
 	/** 完全替换默认扩展 */

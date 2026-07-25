@@ -55,13 +55,14 @@ export function createExtensions(
 	};
 	// 默认开启；显式 false 时跳过（无字数 UI 且无上限）
 	const withCharCount = options.characterCount !== false;
+	// 默认显示标题
+	const withTitle = options.showTitle !== false;
 
-	return [
-		CustomDocument,
-		TitleNode,
+	const baseExtensions: Extensions = [
+		...(withTitle ? [CustomDocument, TitleNode] : []),
 		TabIndent,
 		StarterKit.configure({
-			document: false,
+			document: withTitle ? false : undefined,
 			trailingNode: {
 				node: 'paragraph',
 			},
@@ -86,8 +87,7 @@ export function createExtensions(
 		}),
 		Placeholder.configure({
 			placeholder: ({ editor, node }) => {
-				// 常驻 title NodeView 用自身 data-placeholder；此处只处理正文
-				if (node.type.name === 'title') return '';
+				if (withTitle && node.type.name === 'title') return '';
 				if (node.type.name === 'heading') {
 					return `${zhCN.placeholderHeading} ${node.attrs.level}`;
 				}
@@ -123,7 +123,6 @@ export function createExtensions(
 			? [
 					CharacterCount.configure({
 						limit: options.maxLength ?? null,
-						// 中文按字素计长；西文词 + CJK 字合计为「词」
 						textCounter: (text) =>
 							[
 								...new Intl.Segmenter('zh', {
@@ -145,4 +144,6 @@ export function createExtensions(
 			: []),
 		...(options.extraExtensions ?? []),
 	];
+
+	return baseExtensions;
 }

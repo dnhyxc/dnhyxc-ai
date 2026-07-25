@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import RichEditor from '../RichEditor';
 import '../RichEditor/styles.css';
+import './styles.css';
 
 export type NotePreviewProps = {
 	/** 顶栏标题（替代编辑器 toolbar） */
 	title: string;
-	/** TipTap HTML；会去掉笔记 title 节点，避免与顶栏重复 */
+	/** TipTap HTML 或 JSON 内容 */
 	html?: string;
 	/** 顶栏标题旁/下方的次要信息（时间、标签等） */
 	meta?: ReactNode;
@@ -20,7 +21,7 @@ export type NotePreviewProps = {
 	emptyText?: string;
 };
 
-/** 去掉文档内嵌的 title NodeView，正文只渲染 block 内容 */
+/** 去掉文档内嵌的 title NodeView，正文只渲染 block 内容（兼容旧 API） */
 export function stripNoteTitleHtml(html: string): string {
 	if (!html) return '';
 	if (typeof DOMParser === 'undefined') {
@@ -38,7 +39,8 @@ export function stripNoteTitleHtml(html: string): string {
 
 /**
  * 笔记只读预览：顶栏标题 + 可滚动正文。
- * - 默认吃 title/html，够用
+ * - 使用 RichEditor 只读模式渲染，与编辑效果完全一致
+ * - schema 层面禁用 title 节点，并用 stripNoteTitleHtml 预处理内容
  * - children / headerExtra / footer / meta 可扩展
  */
 export function NotePreview({
@@ -53,17 +55,15 @@ export function NotePreview({
 	emptyText = '暂无内容',
 }: NotePreviewProps) {
 	const bodyHtml = html ? stripNoteTitleHtml(html) : '';
-	const hasBody =
-		children != null || bodyHtml.replace(/<[^>]+>/g, '').trim().length > 0;
 
 	return (
 		<div
 			className={cn(
-				'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
+				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
 				className,
 			)}
 		>
-			<header className="h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
+			<header className="note-preview-header h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
 				<div className="min-w-0 flex-1">
 					<h1 className="text-textcolor truncate text-base font-semibold leading-snug">
 						{title.trim() || '无标题笔记'}
@@ -81,26 +81,25 @@ export function NotePreview({
 				) : null}
 			</header>
 
-			<ScrollArea className="min-h-0 flex-1" viewportClassName="h-full">
-				<div
-					className={cn(
-						'rich-editor-body note-preview-body min-h-full',
-						bodyClassName,
-					)}
-				>
-					{children != null ? (
-						children
-					) : hasBody ? (
-						<div
-							className="tiptap text-sm"
-							// ponytail: 预览信任本机 TipTap 产出的 HTML
-							dangerouslySetInnerHTML={{ __html: bodyHtml }}
-						/>
-					) : (
-						<p className="text-textcolor/45 text-sm">{emptyText}</p>
-					)}
-				</div>
-			</ScrollArea>
+			<div className="note-preview-body min-h-0 flex-1">
+				{children != null ? (
+					children
+				) : bodyHtml ? (
+					<RichEditor
+						content={bodyHtml}
+						editable={false}
+						autofocus={false}
+						showToolbar={false}
+						showBubbleMenu={false}
+						showCharCount={false}
+						showTitle={false}
+						className={cn('note-preview-editor', bodyClassName)}
+						editorClassName="note-preview-tiptap"
+					/>
+				) : (
+					<p className="text-textcolor/45 p-3 text-sm">{emptyText}</p>
+				)}
+			</div>
 
 			{footer ? <div className="shrink-0">{footer}</div> : null}
 		</div>

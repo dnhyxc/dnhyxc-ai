@@ -145,7 +145,7 @@ export function PluginHostPage({ pluginId }: Props) {
 			: '未加载（请确认 Remote 已启动后重试）');
 
 	return (
-		<div className="mx-auto text-muted-foreground h-full flex flex-col gap-3 p-5.5 pt-0">
+		<div className="mx-auto text-muted-foreground h-full flex flex-col gap-3 5 pt-0">
 			<div className="bg-theme-background h-full p-4.5 rounded-md">
 				{busy || loaded?.status === 'loading' ? (
 					<Loading
