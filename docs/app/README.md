@@ -20,6 +20,7 @@
 | [login-password-secret-input-tab.md](./login-password-secret-input-tab.md) | **登录页密码显隐 + 全局 Tab 仅输入框**：`SecretInput` 接入登录/注册/找回密码、`useInputsOnlyTab` Hook |
 | [wechat-mini-program-login-bind.md](./wechat-mini-program-login-bind.md) | **微信小程序登录与账号关联**：code2session、bind_token/link_code 双 token、JWT 解绑吊销、Web 端绑定面板 |
 | [mf-plugin-host.md](./mf-plugin-host.md) | **Module Federation 动态插件 Host**：registry、校验、loadRemote、路由/侧栏注入、失败不闪烁 |
+| [mf-plugin-locale-sync.md](./mf-plugin-locale-sync.md) | **MF 插件语言同步与远程插件 i18n 完整接入**：`api.t` → `api.locale`、`withLiveLocale`/`eventBus`/`postMessage` 三路同步、`iframeHostClient` 接收 `applyHostLocale`、`learningNotes` store 注入 `t`、Layout 语言切换按钮（含改动前/后对比与逐行注释） |
 | [mf-implementation-guide.md](./mf-implementation-guide.md) | **MF 实现过程总文档**：Vite 配置、运行时 API、PluginManager、RouteInjector、SidebarInjector、HostBridge、插件验证、Registry、iframe 隔离等 |
 | [dynamic-plugin-system.md](./dynamic-plugin-system.md) | **动态插件系统核心实现**：Vite MF 配置、App 组件初始化、buildRoutes 动态路由合并、PluginManager 生命周期、Sidebar 动态菜单注入（含改动前/后对比与逐行注释） |
 | [plugin-development-guide.md](./plugin-development-guide.md) | **子项目/插件开发手册**：环境准备、Vite 配置、组件规范、全局样式隔离、HostBridge API、权限声明、生命周期、iframe 隔离模式、调试与发布 |

@@ -84,8 +84,9 @@ export type RichEditorContent = string | JSONContent;
 export type RichEditorChangePayload = {
 	// HTML 字符串格式：方便直接渲染到预览或存储
 	html: string;
+	// 按需；热路径默认不序列化 JSON
 	// JSON 对象格式：ProseMirror 的 JSON 表示，结构化数据便于操作
-	json: JSONContent;
+	json?: JSONContent;
 	// 纯文本格式：用于空值判断、字数统计、搜索等
 	text: string;
 	// 文档首位 title 节点的纯文本：笔记标题，单独提取方便列表展示
@@ -98,12 +99,17 @@ export type CreateExtensionsOptions = {
 	placeholder?: string;
 	// 字符数上限；不传则只统计不限制
 	maxLength?: number;
+	// 为 false 时不挂 CharacterCount（无字数 UI 且无上限时关掉，避免每键 Segmenter）
+	characterCount?: boolean;
 	// 粘贴/拖放图片的解析函数引用（用 ref 包一层，避免扩展重建）
 	resolveImageSrcRef?: { current: ResolveImageSrc };
 	// 追加扩展：在默认扩展列表之后追加，不覆盖默认扩展
 	extraExtensions?: Extensions;
 	// 完全替换默认扩展列表：传入后默认扩展全部不用
 	extensions?: Extensions;
+	// 是否显示笔记标题节点（默认 true）
+	// 为 false 时不挂 CustomDocument 和 TitleNode，StarterKit 用默认 document
+	showTitle?: boolean;
 };
 
 // RichEditor 组件的 Props 类型定义
@@ -134,6 +140,9 @@ export type RichEditorProps = {
 	showBubbleMenu?: boolean;
 	// 是否显示底部字数统计
 	showCharCount?: boolean;
+	// 是否显示笔记标题节点（默认 true）
+	// 透传给 createExtensions 的 showTitle 选项
+	showTitle?: boolean;
 	// 覆盖/合并文案：默认中文，可传入部分字段覆盖
 	locale?: Partial<RichEditorLocale>;
 	// 完全替换默认扩展：传入后所有默认扩展都不用
@@ -831,12 +840,12 @@ export function LinkForm({
 		// 改用 Tailwind 原子类：flex 横向排列、items-center 垂直居中、gap-1 间距、p-3 pb-2 内边距
 		<div
 			className="flex items-center gap-1 p-3 pb-2"
-			// 语义化角色：对话框
+			{/* 语义化角色：对话框 */}
 			role="dialog"
-			// aria 标签
+			{/* aria 标签 */}
 			aria-label={t.link}
-			// 阻止在非交互元素上的鼠标按下事件
-			// 防止点击表单空白处导致编辑器失焦或选区变化
+			{/* 阻止在非交互元素上的鼠标按下事件 */}
+			{/* 防止点击表单空白处导致编辑器失焦或选区变化 */}
 			onMouseDown={(e) => {
 				// 如果点击的是 input 或 button 等交互元素，不拦截
 				if ((e.target as HTMLElement).closest('input,button')) return;
@@ -844,31 +853,31 @@ export function LinkForm({
 				e.preventDefault();
 			}}
 		>
-			// 【变更】链接地址标签已被注释掉，不再渲染 label 文案
+			{/* 【变更】链接地址标签已被注释掉，不再渲染 label 文案 */}
 			{/* <span className="text-sm text-textcolor/60">{t.linkPrompt}</span> */}
-			// 链接地址输入框
-			// 【变更】改用 UI 组件库的 Input 组件，替代原生 <input>
-			// 【变更】不再使用 rich-editor-link-input 自定义 class
-			// 样式改为 Tailwind 原子类：文字色 text-textcolor/80、flex-1 自适应宽度、
-			// shadow-none 去阴影、border-theme/15 主题色边框、聚焦时边框加深且去除聚焦环
+			{/* 链接地址输入框 */}
+			{/* 【变更】改用 UI 组件库的 Input 组件，替代原生 <input> */}
+			{/* 【变更】不再使用 rich-editor-link-input 自定义 class */}
+			{/* 样式改为 Tailwind 原子类：文字色 text-textcolor/80、flex-1 自适应宽度、*/}
+			{/* shadow-none 去阴影、border-theme/15 主题色边框、聚焦时边框加深且去除聚焦环 */}
 			<Input
-				// 挂载 ref
+				{/* 挂载 ref */}
 				ref={inputRef}
-				// 文本类型
+				{/* 文本类型 */}
 				type="text"
-				// 输入模式：url（移动端显示优化）
+				{/* 输入模式：url（移动端显示优化） */}
 				inputMode="url"
-				// 自动填充：url
+				{/* 自动填充：url */}
 				autoComplete="url"
-				// 样式类名：Tailwind 原子类，由主题变量驱动配色
+				{/* 样式类名：Tailwind 原子类，由主题变量驱动配色 */}
 				className="text-textcolor/80 flex-1 shadow-none border-theme/15 focus-visible:border-theme/30 focus-visible:ring-0"
-				// 占位符
+				{/* 占位符 */}
 				placeholder={t.linkPlaceholder}
-				// 当前值（受控）
+				{/* 当前值（受控） */}
 				value={href}
-				// 输入时回调
+				{/* 输入时回调 */}
 				onChange={(e) => onHrefChange(e.target.value)}
-				// 键盘事件：Enter 应用，Esc 取消
+				{/* 键盘事件：Enter 应用，Esc 取消 */}
 				onKeyDown={(e) => {
 					// 按 Enter
 					if (e.key === 'Enter') {
@@ -886,35 +895,35 @@ export function LinkForm({
 					}
 				}}
 			/>
-			// 有提示时显示（比如空行无法设链的提示）
+			{/* 有提示时显示（比如空行无法设链的提示） */}
 			{hint ? <span className="rich-editor-link-hint">{hint}</span> : null}
-			// 确定按钮
-			// 【变更】改用 UI 组件库的 Button 组件，替代原生 <button>
-			// 【变更】不再有 rich-editor-link-action class
+			{/* 确定按钮 */}
+			{/* 【变更】改用 UI 组件库的 Button 组件，替代原生 <button> */}
+			{/* 【变更】不再有 rich-editor-link-action class */}
 			<Button
 				type="button"
-				// 有 hint 时禁用（空行无法设链）
+				{/* 有 hint 时禁用（空行无法设链） */}
 				disabled={!!hint}
-				// 点击应用
+				{/* 点击应用 */}
 				onClick={onApply}
 			>
 				{t.linkApply}
 			</Button>
-			// 移除链接按钮
-			// 【变更】同样改用 Button 组件，无 rich-editor-link-action class
+			{/* 移除链接按钮 */}
+			{/* 【变更】同样改用 Button 组件，无 rich-editor-link-action class */}
 			<Button
 				type="button"
-				// 点击移除
+				{/* 点击移除 */}
 				onClick={onRemove}
 			>
 				{t.unlink}
 			</Button>
-			// 取消按钮
-			// 【变更】改用 Button 组件；不再使用 rich-editor-link-action ghost 变体
-			// 三个按钮统一走 Button 默认变体，样式由设计系统统一管理
+			{/* 取消按钮 */}
+			{/* 【变更】改用 Button 组件；不再使用 rich-editor-link-action ghost 变体 */}
+			{/* 三个按钮统一走 Button 默认变体，样式由设计系统统一管理 */}
 			<Button
 				type="button"
-				// 点击关闭
+				{/* 点击关闭 */}
 				onClick={onClose}
 			>
 				{t.linkCancel}
@@ -1069,15 +1078,15 @@ function Btn({
 		// 按钮元素
 		<button
 			type="button"
-			// 复用工具栏按钮样式
+			{/* 复用工具栏按钮样式 */}
 			className="rich-editor-btn"
-			// title 属性，悬停时显示提示
+			{/* title 属性，悬停时显示提示 */}
 			title={title}
-			// aria 标签，辅助技术使用
+			{/* aria 标签，辅助技术使用 */}
 			aria-label={title}
-			// 阻止鼠标按下默认行为：避免点击按钮时编辑器失焦
+			{/* 阻止鼠标按下默认行为：避免点击按钮时编辑器失焦 */}
 			onMouseDown={(e) => e.preventDefault()}
-			// 点击事件
+			{/* 点击事件 */}
 			onClick={onClick}
 		>
 			{children}
@@ -1093,7 +1102,7 @@ export function FormatBubble({ editor, locale: t, onOpenLink }: Props) {
 			{/* 粗体按钮 */}
 			<Btn
 				title={t.bold}
-				// 点击：聚焦 → 切换粗体 → 执行
+				{/* 点击：聚焦 → 切换粗体 → 执行 */}
 				onClick={() => editor.chain().focus().toggleBold().run()}
 			>
 				<Bold size={14} />
@@ -1593,49 +1602,49 @@ export default function TitleView({
 		// NodeViewWrapper 是 Tiptap 提供的节点视图包装器
 		// 它会自动处理一些 ProseMirror 相关的 DOM 绑定
 		<NodeViewWrapper
-			// 渲染为 div 标签
+			{/* 渲染为 div 标签 */}
 			as="div"
-			// 样式类：flex 布局，列方向，间距 2，下边距 2
+			{/* 样式类：flex 布局，列方向，间距 2，下边距 2 */}
 			className="flex flex-col gap-2 mb-2"
-			// 内容不可编辑（标题用原生 input，不用 contenteditable）
+			{/* 内容不可编辑（标题用原生 input，不用 contenteditable） */}
 			contentEditable={false}
 		>
-			// 标题卡片容器：相对定位，flex 列布局，内边距，边框，背景色，圆角
+			{/* 标题卡片容器：相对定位，flex 列布局，内边距，边框，背景色，圆角 */}
 			<div className="relative flex flex-col gap-2 p-3 pt-9 border border-theme/5 bg-theme/5 rounded-md">
-				// 左上角标签：绝对定位（-inset-0.5 略微外扩覆盖卡片边框），主题色背景，细边框，圆角，flex 布局，图标+文字
+				{/* 左上角标签：绝对定位（-inset-0.5 略微外扩覆盖卡片边框），主题色背景，细边框，圆角，flex 布局，图标+文字 */}
 				<div className="absolute -inset-0.5 bg-theme/20 border border-theme/5 text-theme/80 rounded-tl-md rounded-br-md pl-3 py-3.5 w-26 h-6 flex items-center gap-2">
-					// 笔记本笔图标，尺寸 4（16px）
+					{/* 笔记本笔图标，尺寸 4（16px） */}
 					<NotebookPen className="size-4" />
-					// 标签文字：笔记标题（pb-0.5 微调垂直对齐，使文字与图标视觉居中）
+					{/* 标签文字：笔记标题（pb-0.5 微调垂直对齐，使文字与图标视觉居中） */}
 					<span className="text-sm font-medium pb-0.5">笔记标题</span>
 				</div>
-				// 标题输入框
+				{/* 标题输入框 */}
 				<Input
-					// 自定义样式：高度 48px，全宽，无内边距，大字号，无边框，透明背景
-					// placeholder 透明度 35（更淡，避免抢占视觉焦点）
+					{/* 自定义样式：高度 48px，全宽，无内边距，大字号，无边框，透明背景 */}
+					{/* placeholder 透明度 35（更淡，避免抢占视觉焦点） */}
 					className="h-12 size-full px-0 py-0 md:text-xl rounded-none border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-lg placeholder:text-textcolor/35 focus-visible:border-0 focus-visible:ring-0"
-					// 当前值（受控）
+					{/* 当前值（受控） */}
 					value={value}
-					// 占位符文本（从国际化字典取）
+					{/* 占位符文本（从国际化字典取） */}
 					placeholder={zhCN.placeholderHeadingHint}
-					// 最大长度 100 字符
+					{/* 最大长度 100 字符 */}
 					maxLength={100}
-					// 不进 Tab 序，避免正文按 Tab 时焦点跳到标题
+					{/* 不进 Tab 序，避免正文按 Tab 时焦点跳到标题 */}
 					tabIndex={-1}
-					// 阻止鼠标按下事件冒泡：避免点击标题时 ProseMirror 改变选区
+					{/* 阻止鼠标按下事件冒泡：避免点击标题时 ProseMirror 改变选区 */}
 					onMouseDown={(e) => e.stopPropagation()}
-					// IME 开始：标记组字中
+					{/* IME 开始：标记组字中 */}
 					onCompositionStart={() => {
 						composing.current = true;
 					}}
-					// IME 结束（确认输入）：标记组字结束，提交最终值
+					{/* IME 结束（确认输入）：标记组字结束，提交最终值 */}
 					onCompositionEnd={(e) => {
 						composing.current = false;
 						commit(e.currentTarget.value);
 					}}
-					// 输入变化：提交当前值
+					{/* 输入变化：提交当前值 */}
 					onChange={(e) => commit(e.target.value)}
-					// 键盘事件
+					{/* 键盘事件 */}
 					onKeyDown={(e) => {
 						// 正在组字时不处理（避免拼音输入时误触发）
 						if (e.nativeEvent.isComposing) return;
@@ -1649,7 +1658,7 @@ export default function TitleView({
 					}}
 				/>
 			</div>
-			// 预留的底部装饰条（当前注释掉，保留以备后续启用）
+			{/* 预留的底部装饰条（当前注释掉，保留以备后续启用） */}
 			{/* <div className="h-2 w-full rounded-md bg-theme/10" /> */}
 		</NodeViewWrapper>
 	);
@@ -1687,6 +1696,11 @@ export default function TitleView({
 
 **为什么把 codeBlock 从 StarterKit 里关掉？**
 因为要用 `@tiptap/extension-code-block-lowlight` 替代，它支持语法高亮。
+
+**showTitle 开关（条件挂载）**：
+- `showTitle !== false` 时（默认）：挂载 `CustomDocument`（content: `title block+`）+ `TitleNode`，StarterKit 的 `document` 设为 `false` 避免冲突，Placeholder 对 title 节点返回空串
+- `showTitle === false` 时：不挂 CustomDocument 和 TitleNode，StarterKit 用默认 `document`（`undefined`），Placeholder 不会遇到 title 节点
+- 这样编辑器既可作为「带标题的笔记编辑器」使用，也可作为「普通富文本编辑器」使用
 
 ### 12.3 完整代码与逐行注释
 
@@ -1786,6 +1800,11 @@ export function createExtensions(
 	// 如果传了自定义 extensions，直接使用（完全覆盖默认）
 	if (options.extensions) return options.extensions;
 
+	// 默认开启；显式 false 时跳过（无字数 UI 且无上限）
+	const withCharCount = options.characterCount !== false;
+	// 默认显示标题；显式 false 时不挂 CustomDocument 和 TitleNode
+	const withTitle = options.showTitle !== false;
+
 	// 占位符文本：默认用中文的
 	const placeholder = options.placeholder ?? zhCN.placeholder;
 	// 图片 src 解析 ref：默认用 base64
@@ -1795,16 +1814,14 @@ export function createExtensions(
 
 	// 返回扩展数组
 	return [
-		// 自定义文档结构
-		CustomDocument,
-		// 自定义标题节点
-		TitleNode,
+		// 自定义文档结构 + 自定义标题节点（条件挂载：showTitle 为 false 时跳过）
+		...(withTitle ? [CustomDocument, TitleNode] : []),
 		// 自定义 Tab 缩进
 		TabIndent,
 		// StarterKit 基础套件（标题、段落、粗体、斜体、列表、链接等）
 		StarterKit.configure({
-			// 关掉默认 document，用我们自定义的
-			document: false,
+			// 有自定义 document 时关掉默认的；否则用默认 document
+			document: withTitle ? false : undefined,
 			// 末尾节点：始终保证最后有一个段落（方便继续输入）
 			trailingNode: {
 				node: 'paragraph',
@@ -1847,8 +1864,8 @@ export function createExtensions(
 		Placeholder.configure({
 			// 动态占位符：根据节点类型返回不同文本
 			placeholder: ({ editor, node }) => {
-				// title 节点用自己的 placeholder（input 原生的），这里返回空
-				if (node.type.name === 'title') return '';
+				// 有 title 节点时，title 用自己的 placeholder（input 原生的），这里返回空
+				if (withTitle && node.type.name === 'title') return '';
 				// 标题节点：显示「标题 1」、「标题 2」等
 				if (node.type.name === 'heading') {
 					return `${zhCN.placeholderHeading} ${node.attrs.level}`;
@@ -1903,29 +1920,36 @@ export function createExtensions(
 		TaskList,
 		// 任务项：支持嵌套
 		TaskItem.configure({ nested: true }),
-		// 字符计数
-		CharacterCount.configure({
-			// 最大长度限制，null 表示不限制
-			limit: options.maxLength ?? null,
-			// 字符计数：用 Intl.Segmenter 按字素（grapheme）计数
-			// 这样中文每个字算 1，表情符号也算 1，更符合直觉
-			textCounter: (text) =>
-				[...new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text)]
-					.length,
-			// 词计数：中文按字算，西文按词算
-			wordCounter: (text) => {
-				// 匹配所有 CJK 字符（中文、日文、韩文等）
-				const cjk =
-					text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g)?.length ?? 0;
-				// 把 CJK 字符替换成空格，然后按空白分割，数西文单词数
-				const latin = text
-					.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
-					.split(/\s+/)
-					.filter(Boolean).length;
-				// 合计：中文字数 + 西文单词数
-				return cjk + latin;
-			},
-		}),
+		// 字符计数（条件开启：显式 false 时跳过）
+		...(withCharCount
+			? [
+					CharacterCount.configure({
+						// 最大长度限制，null 表示不限制
+						limit: options.maxLength ?? null,
+						// 字符计数：用 Intl.Segmenter 按字素（grapheme）计数
+						// 这样中文每个字算 1，表情符号也算 1，更符合直觉
+						textCounter: (text) =>
+							[
+								...new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text),
+							].length,
+						// 词计数：中文按字算，西文按词算
+						wordCounter: (text) => {
+							// 匹配所有 CJK 字符（中文、日文、韩文等）
+							const cjk =
+								text.match(
+									/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g,
+								)?.length ?? 0;
+							// 把 CJK 字符替换成空格，然后按空白分割，数西文单词数
+							const latin = text
+								.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
+								.split(/\s+/)
+								.filter(Boolean).length;
+							// 合计：中文字数 + 西文单词数
+							return cjk + latin;
+						},
+					}),
+				]
+			: []),
 		// 额外扩展：展开追加
 		...(options.extraExtensions ?? []),
 	];
@@ -2042,18 +2066,18 @@ function CharCount({
 	const over = maxLength != null && count.chars >= maxLength;
 
 	return (
-		// 底部字数栏；超限时加 is-limit 类（红色警告）
+		{/* 底部字数栏；超限时加 is-limit 类（红色警告） */}
 		<div className={cn('rich-editor-footer', over && 'is-limit')}>
-			// 左侧：词数
+			{/* 左侧：词数 */}
 			<span>
 				{count.words} {locale.words}
 			</span>
-			// 右侧：字符数 / 最大限制 · 超限提示
+			{/* 右侧：字符数 / 最大限制 · 超限提示 */}
 			<span>
 				{count.chars}
-				// 有最大限制时显示 / maxLength
+				{/* 有最大限制时显示 / maxLength */}
 				{maxLength != null ? ` / ${maxLength}` : ''} {locale.chars}
-				// 超限时显示「已达上限」提示
+				{/* 超限时显示「已达上限」提示 */}
 				{over ? ` · ${locale.limitReached}` : ''}
 			</span>
 		</div>
@@ -2093,6 +2117,8 @@ export function RichEditor({
 	showBubbleMenu = true,
 	// 是否显示字数统计
 	showCharCount = true,
+	// 是否显示笔记标题节点（默认 true）
+	showTitle = true,
 	// 国际化字典（部分覆盖）
 	locale: localePartial,
 	// 自定义扩展（完全覆盖默认）
@@ -2122,6 +2148,26 @@ export function RichEditor({
 		return fileToDataUrl(file);
 	};
 
+	// onChange 回调的 ref
+	// 为什么用 ref？因为扩展只在编辑器创建时组装一次
+	// 如果直接把函数传进扩展，onChange 变化时不会生效
+	// 用 ref 的话，onUpdate 里读 onChangeRef.current，永远是最新的
+	const onChangeRef = useRef(onChange);
+	// 每次渲染都更新 ref.current，确保始终是最新的
+	onChangeRef.current = onChange;
+
+	// onCreate 回调的 ref
+	// 同理：用 ref 保存最新回调，避免编辑器重建
+	const onCreateRef = useRef(onCreate);
+	// 每次渲染都更新 ref.current，确保始终是最新的
+	onCreateRef.current = onCreate;
+
+	// 是否启用字数统计扩展
+	// 无字数 UI 且无上限时不挂 CharacterCount，避免每键 Segmenter
+	// Segmenter 是 Intl.Segmenter，用于按字符/词分割，性能开销较大
+	// 如果既不显示字数也没有最大长度限制，就不需要这个扩展
+	const enableCharacterCount = showCharCount || maxLength != null;
+
 	// 创建编辑器实例
 	const editor = useEditor({
 		// 不立即渲染：等 React 准备好再渲染，避免 SSR 问题
@@ -2132,6 +2178,10 @@ export function RichEditor({
 			placeholder: placeholder ?? locale.placeholder,
 			// 最大长度
 			maxLength,
+			// 是否启用字数统计扩展
+			characterCount: enableCharacterCount,
+			// 是否显示标题节点
+			showTitle,
 			// 自定义扩展（覆盖默认）
 			extensions,
 			// 额外扩展（追加）
@@ -2139,8 +2189,10 @@ export function RichEditor({
 			// 图片解析 ref
 			resolveImageSrcRef,
 		}),
-		// 初始内容：归一化处理（空内容 → 默认空笔记结构）
-		content: normalizeNoteContent(content ?? defaultContent),
+		// 初始内容：有 title 时归一化（空内容 → 默认空笔记结构）；无 title 时直接用传入内容
+		content: showTitle
+			? normalizeNoteContent(content ?? defaultContent)
+			: (content ?? defaultContent ?? ''),
 		// 是否可编辑
 		editable,
 		// 是否自动聚焦
@@ -2181,22 +2233,26 @@ export function RichEditor({
 				// 第二帧：保险起见再钉一次，彻底稳定选区
 				requestAnimationFrame(focusBodyEnd);
 			});
-			// 调用用户的 onCreate 回调
-			onCreate?.(e);
+			// 调用用户的 onCreate 回调（通过 ref 读取最新函数）
+			onCreateRef.current?.(e);
 		},
 		// 内容更新回调
 		onUpdate: ({ editor: e }) => {
+			// 通过 ref 读取最新的 onChange 回调
+			const cb = onChangeRef.current;
+			// 没有回调就直接返回，避免不必要的计算
+			if (!cb) return;
 			// 调用 onChange，传出多种格式
-			onChange?.({
+			cb({
 				// HTML 格式
 				html: e.getHTML(),
-				// JSON 格式
-				json: e.getJSON(),
 				// 纯文本格式（段落之间用两个换行分隔）
 				text: e.getText({ blockSeparator: '\n\n' }),
 				// 标题文本
 				title: getDocTitleText(e.state.doc),
 			});
+			// 热路径不做 getJSON（学习笔记等只用 html/text/title）
+			// 如果需要 JSON 格式，外部可以自己通过 editor 实例获取
 		},
 	});
 
@@ -2305,23 +2361,29 @@ export function RichEditor({
 	// EditorContext 的 value：用 useMemo 缓存，避免不必要的重渲染
 	const ctx = useMemo(() => ({ editor }), [editor]);
 
+	// 工具栏额外内容：用 useMemo 缓存，避免每次渲染都重新计算
+	// 如果是函数，传 editor 调用；否则直接用
+	// 依赖：editor 实例和 toolbarExtra prop
+	const extra = useMemo(() => {
+		// 编辑器不存在时返回 undefined
+		if (!editor) return undefined;
+		// 根据 toolbarExtra 类型决定是调用还是直接使用
+		return typeof toolbarExtra === 'function' ? toolbarExtra(editor) : toolbarExtra;
+	}, [editor, toolbarExtra]);
+
 	// 编辑器还没创建好 → 返回 null
 	if (!editor) return null;
-
-	// 工具栏额外内容：如果是函数，传 editor 调用；否则直接用
-	const extra =
-		typeof toolbarExtra === 'function' ? toolbarExtra(editor) : toolbarExtra;
 
 	// 渲染编辑器
 	return (
 		// 提供 EditorContext，子组件可以通过 useCurrentEditor() 获取实例
 		<EditorContext.Provider value={ctx}>
-			// 外层容器（新增 rounded-r-md：右侧圆角，配合左侧工具栏的整体视觉）
+			{/* 外层容器（新增 rounded-r-md：右侧圆角，配合左侧工具栏的整体视觉） */}
 			<div
 				className={cn('rich-editor rounded-r-md', className)}
 				lang="zh-CN"
 			>
-				// 工具栏（可配置是否显示）
+				{/* 工具栏（可配置是否显示） */}
 				{showToolbar && (
 					<Toolbar
 						editor={editor}
@@ -2333,7 +2395,7 @@ export function RichEditor({
 					/>
 				)}
 
-				// 链接表单：有草稿时显示（在工具栏下面，编辑器上面）
+				{/* 链接表单：有草稿时显示（在工具栏下面，编辑器上面） */}
 				{link.draft && (
 					<LinkForm
 						locale={locale}
@@ -2342,21 +2404,21 @@ export function RichEditor({
 						onApply={link.apply}
 						onRemove={link.remove}
 						onClose={link.close}
-						// 没有目标范围（空行）时显示提示
+						{/* 没有目标范围（空行）时显示提示 */}
 						hint={link.draft.range ? undefined : locale.linkEmptyHint}
 					/>
 				)}
 
-				// 气泡菜单（选中文本时浮动显示）
+				{/* 气泡菜单（选中文本时浮动显示） */}
 				{showBubbleMenu && (
 					<BubbleMenu
 						editor={editor}
-						// shouldShow 提取为稳定的 useCallback（见上方 shouldShowBubble）
+						{/* shouldShow 提取为稳定的 useCallback（见上方 shouldShowBubble） */}
 						shouldShow={shouldShowBubble}
-						// 配置：在上方，偏移 8px，空间不够时翻转
+						{/* 配置：在上方，偏移 8px，空间不够时翻转 */}
 						options={{ placement: 'top', offset: 8, flip: true }}
 					>
-						// 气泡菜单内容：格式化按钮
+						{/* 气泡菜单内容：格式化按钮 */}
 						<FormatBubble
 							editor={editor}
 							locale={locale}
@@ -2365,13 +2427,13 @@ export function RichEditor({
 					</BubbleMenu>
 				)}
 
-				// 编辑器主体区域（改用 ScrollArea 包裹，提供原生滚动条样式）
+				{/* 编辑器主体区域（改用 ScrollArea 包裹，提供原生滚动条样式） */}
 				<ScrollArea className="rich-editor-body">
-					// 编辑器内容渲染组件
+					{/* 编辑器内容渲染组件 */}
 					<EditorContent editor={editor} spellCheck="false" />
 				</ScrollArea>
 
-				// 字数统计（可配置是否显示）
+				{/* 字数统计（可配置是否显示） */}
 				{showCharCount && (
 					<CharCount editor={editor} locale={locale} maxLength={maxLength} />
 				)}
@@ -2648,24 +2710,24 @@ export function Btn({
 	return (
 		// 原生 button 元素
 		<button
-			// type="button" 避免触发表单提交
+			{/* type="button" 避免触发表单提交 */}
 			type="button"
-			// 悬停提示
+			{/* 悬停提示 */}
 			title={title}
-			// 无障碍标签
+			{/* 无障碍标签 */}
 			aria-label={title}
-			// 标记按钮按下/激活状态，供屏幕阅读器识别
+			{/* 标记按钮按下/激活状态，供屏幕阅读器识别 */}
 			aria-pressed={active}
-			// 禁用属性
+			{/* 禁用属性 */}
 			disabled={disabled}
-			// 样式：基础按钮 + 左外边距 + 激活态 + 自定义类
+			{/* 样式：基础按钮 + 左外边距 + 激活态 + 自定义类 */}
 			className={cn('rich-editor-btn ml-0.5', active && 'is-active', className)}
-			// 阻止默认 mousedown，避免点击按钮时编辑器失焦
+			{/* 阻止默认 mousedown，避免点击按钮时编辑器失焦 */}
 			onMouseDown={(e) => e.preventDefault()}
-			// 点击时调用回调（把 React 事件转成 MouseEvent）
+			{/* 点击时调用回调（把 React 事件转成 MouseEvent） */}
 			onClick={(e) => onClick(e as unknown as MouseEvent)}
 		>
-			// 渲染子节点（图标）
+			{/* 渲染子节点（图标） */}
 			{children}
 		</button>
 	);
@@ -2696,20 +2758,20 @@ function MenuRow({
 	return (
 		// 下拉菜单项组件
 		<DropdownMenuItem
-			// 禁用态
+			{/* 禁用态 */}
 			disabled={disabled}
-			// 提示文字
+			{/* 提示文字 */}
 			title={title}
-			// 激活时加浅色背景
+			{/* 激活时加浅色背景 */}
 			className={cn(active && 'bg-theme/10')}
-			// 选中回调
+			{/* 选中回调 */}
 			onSelect={onSelect}
 		>
-			// 行内布局：flex 全宽居中，间距 2
+			{/* 行内布局：flex 全宽居中，间距 2 */}
 			<div className="flex w-full items-center gap-2">
-				// 图标内容
+				{/* 图标内容 */}
 				{children}
-				// 标题文字
+				{/* 标题文字 */}
 				<span className="text-sm text-textcolor/90">{title}</span>
 			</div>
 		</DropdownMenuItem>
@@ -2847,16 +2909,16 @@ export function Toolbar({
 				node: (
 					// 撤销按钮
 					<Btn
-						// 提示文案
+						{/* 提示文案 */}
 						title={t.undo}
-						// 不可撤销时禁用
+						{/* 不可撤销时禁用 */}
 						disabled={!state.canUndo}
-						// 去掉左外边距（首个按钮）
+						{/* 去掉左外边距（首个按钮） */}
 						className="ml-0"
-						// focus 后执行撤销
+						{/* focus 后执行撤销 */}
 						onClick={() => editor.chain().focus().undo().run()}
 					>
-						// 撤销图标
+						{/* 撤销图标 */}
 						<Undo2 size={ICON} />
 					</Btn>
 				),
@@ -2866,7 +2928,7 @@ export function Toolbar({
 					<MenuRow
 						title={t.undo}
 						disabled={!state.canUndo}
-						// 选中后执行撤销
+						{/* 选中后执行撤销 */}
 						onSelect={() => editor.chain().focus().undo().run()}
 					>
 						<Undo2 size={ICON} />
@@ -2880,11 +2942,11 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.redo}
-						// 不可重做时禁用
+						{/* 不可重做时禁用 */}
 						disabled={!state.canRedo}
 						onClick={() => editor.chain().focus().redo().run()}
 					>
-						// 重做图标
+						{/* 重做图标 */}
 						<Redo2 size={ICON} />
 					</Btn>
 				),
@@ -2904,11 +2966,11 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.bold}
-						// 当前是否粗体
+						{/* 当前是否粗体 */}
 						active={state.bold}
 						onClick={() => editor.chain().focus().toggleBold().run()}
 					>
-						// 粗体图标
+						{/* 粗体图标 */}
 						<Bold size={ICON} />
 					</Btn>
 				),
@@ -2931,7 +2993,7 @@ export function Toolbar({
 						active={state.italic}
 						onClick={() => editor.chain().focus().toggleItalic().run()}
 					>
-						// 斜体图标
+						{/* 斜体图标 */}
 						<Italic size={ICON} />
 					</Btn>
 				),
@@ -2954,7 +3016,7 @@ export function Toolbar({
 						active={state.underline}
 						onClick={() => editor.chain().focus().toggleUnderline().run()}
 					>
-						// 下划线图标
+						{/* 下划线图标 */}
 						<Underline size={ICON} />
 					</Btn>
 				),
@@ -2977,7 +3039,7 @@ export function Toolbar({
 						active={state.strike}
 						onClick={() => editor.chain().focus().toggleStrike().run()}
 					>
-						// 删除线图标
+						{/* 删除线图标 */}
 						<Strikethrough size={ICON} />
 					</Btn>
 				),
@@ -3000,7 +3062,7 @@ export function Toolbar({
 						active={state.highlight}
 						onClick={() => editor.chain().focus().toggleHighlight().run()}
 					>
-						// 高亮图标
+						{/* 高亮图标 */}
 						<Highlighter size={ICON} />
 					</Btn>
 				),
@@ -3020,12 +3082,12 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.clearFormat}
-						// 清除所有 marks 并清空节点格式
+						{/* 清除所有 marks 并清空节点格式 */}
 						onClick={() =>
 							editor.chain().focus().unsetAllMarks().clearNodes().run()
 						}
 					>
-						// 清除格式图标
+						{/* 清除格式图标 */}
 						<RemoveFormatting size={ICON} />
 					</Btn>
 				),
@@ -3046,41 +3108,41 @@ export function Toolbar({
 				// 内联节点是一个下拉菜单
 				node: (
 					<DropdownMenu>
-						// 触发器：显示当前激活级别的图标
+						{/* 触发器：显示当前激活级别的图标 */}
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
-								// 提示：当前激活级别标题或默认「标题级别」
+								{/* 提示：当前激活级别标题或默认「标题级别」 */}
 								title={activeHeading?.title ?? '标题级别'}
 								aria-label={activeHeading?.title ?? '标题级别'}
-								// 样式：基础按钮 + 左外边距，激活时高亮
+								{/* 样式：基础按钮 + 左外边距，激活时高亮 */}
 								className={cn(
 									'rich-editor-btn ml-0.5',
 									activeHeading && 'is-active',
 								)}
-								// 阻止失焦
+								{/* 阻止失焦 */}
 								onMouseDown={(e) => e.preventDefault()}
 							>
-								// 当前标题级别图标（或默认 Heading 图标）
+								{/* 当前标题级别图标（或默认 Heading 图标） */}
 								<HeadingTriggerIcon size={ICON} />
 							</button>
 						</DropdownMenuTrigger>
-						// 下拉内容
+						{/* 下拉内容 */}
 						<DropdownMenuContent
-							// 居中对齐触发器
+							{/* 居中对齐触发器 */}
 							align="center"
-							// 距触发器 8px
+							{/* 距触发器 8px */}
 							sideOffset={8}
 							className="w-20"
-							// 关闭时不把焦点收回触发器，避免编辑器失焦
+							{/* 关闭时不把焦点收回触发器，避免编辑器失焦 */}
 							onCloseAutoFocus={(e) => e.preventDefault()}
 						>
 							<DropdownMenuGroup>
-								// 分组标签
+								{/* 分组标签 */}
 								<DropdownMenuLabel className="text-textcolor/90">
 									标题级别
 								</DropdownMenuLabel>
-								// 遍历各级标题生成菜单项
+								{/* 遍历各级标题生成菜单项 */}
 								{HEADING_LEVELS.map(({ level, icon: Icon, title }) => {
 									// 当前级别是否激活
 									const active = state[`h${level}` as const];
@@ -3088,15 +3150,15 @@ export function Toolbar({
 										<DropdownMenuItem
 											key={level}
 											title={title}
-											// 激活时浅色背景
+											{/* 激活时浅色背景 */}
 											className={cn(active && 'bg-theme/10')}
-											// 选中后切换到该级别
+											{/* 选中后切换到该级别 */}
 											onSelect={() => handleHeading(level)}
 										>
 											<div className="flex w-full items-center justify-between">
-												// 级别图标
+												{/* 级别图标 */}
 												<Icon size={ICON} className="text-textcolor" />
-												// 级别文案
+												{/* 级别文案 */}
 												<span className="text-sm text-textcolor/90">
 													{title}
 												</span>
@@ -3111,11 +3173,11 @@ export function Toolbar({
 				// 「更多」菜单内：直接铺开各级标题
 				menu: (
 					<>
-						// 分组标签
+						{/* 分组标签 */}
 						<DropdownMenuLabel className="text-textcolor/90">
 							标题级别
 						</DropdownMenuLabel>
-						// 遍历各级标题生成菜单行
+						{/* 遍历各级标题生成菜单行 */}
 						{HEADING_LEVELS.map(({ level, icon: Icon, title }) => {
 							const active = state[`h${level}` as const];
 							return (
@@ -3141,7 +3203,7 @@ export function Toolbar({
 						active={state.bullet}
 						onClick={() => editor.chain().focus().toggleBulletList().run()}
 					>
-						// 无序列表图标
+						{/* 无序列表图标 */}
 						<List size={ICON} />
 					</Btn>
 				),
@@ -3164,7 +3226,7 @@ export function Toolbar({
 						active={state.ordered}
 						onClick={() => editor.chain().focus().toggleOrderedList().run()}
 					>
-						// 有序列表图标
+						{/* 有序列表图标 */}
 						<ListOrdered size={ICON} />
 					</Btn>
 				),
@@ -3187,7 +3249,7 @@ export function Toolbar({
 						active={state.task}
 						onClick={() => editor.chain().focus().toggleTaskList().run()}
 					>
-						// 任务列表图标
+						{/* 任务列表图标 */}
 						<CheckSquare size={ICON} />
 					</Btn>
 				),
@@ -3210,7 +3272,7 @@ export function Toolbar({
 						active={state.quote}
 						onClick={() => editor.chain().focus().toggleBlockquote().run()}
 					>
-						// 引用块图标
+						{/* 引用块图标 */}
 						<Quote size={ICON} />
 					</Btn>
 				),
@@ -3231,7 +3293,7 @@ export function Toolbar({
 					<Btn
 						title={t.codeBlock}
 						active={state.codeBlock}
-						// 切换代码块，附带当前/默认语言
+						{/* 切换代码块，附带当前/默认语言 */}
 						onClick={() =>
 							editor
 								.chain()
@@ -3242,7 +3304,7 @@ export function Toolbar({
 								.run()
 						}
 					>
-						// 代码块图标
+						{/* 代码块图标 */}
 						<Code size={ICON} />
 					</Btn>
 				),
@@ -3276,11 +3338,11 @@ export function Toolbar({
 						className="rich-editor-lang"
 						title={t.codeLanguage}
 						aria-label={t.codeLanguage}
-						// 当前语言
+						{/* 当前语言 */}
 						value={state.codeLanguage}
-						// 阻止 mousedown 冒泡，避免触发菜单关闭等
+						{/* 阻止 mousedown 冒泡，避免触发菜单关闭等 */}
 						onMouseDown={(e) => e.stopPropagation()}
-						// 切换语言：更新 codeBlock 的 language 属性
+						{/* 切换语言：更新 codeBlock 的 language 属性 */}
 						onChange={(e) => {
 							editor
 								.chain()
@@ -3289,7 +3351,7 @@ export function Toolbar({
 								.run();
 						}}
 					>
-						// 遍历语言列表生成 option
+						{/* 遍历语言列表生成 option */}
 						{CODE_LANGUAGES.map((lang) => (
 							<option key={lang.value} value={lang.value}>
 								{lang.label}
@@ -3300,7 +3362,7 @@ export function Toolbar({
 				// 「更多」菜单内：铺开所有语言为菜单行
 				menu: (
 					<>
-						// 分组标签
+						{/* 分组标签 */}
 						<DropdownMenuLabel className="text-textcolor/90">
 							{t.codeLanguage}
 						</DropdownMenuLabel>
@@ -3308,7 +3370,7 @@ export function Toolbar({
 							<MenuRow
 								key={lang.value}
 								title={lang.label}
-								// 当前语言高亮
+								{/* 当前语言高亮 */}
 								active={state.codeLanguage === lang.value}
 								onSelect={() =>
 									editor
@@ -3334,10 +3396,10 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.horizontalRule}
-						// 插入水平分割线
+						{/* 插入水平分割线 */}
 						onClick={() => editor.chain().focus().setHorizontalRule().run()}
 					>
-						// 分割线图标
+						{/* 分割线图标 */}
 						<Minus size={ICON} />
 					</Btn>
 				),
@@ -3359,7 +3421,7 @@ export function Toolbar({
 						active={state.alignLeft}
 						onClick={() => editor.chain().focus().setTextAlign('left').run()}
 					>
-						// 左对齐图标
+						{/* 左对齐图标 */}
 						<AlignLeft size={ICON} />
 					</Btn>
 				),
@@ -3382,7 +3444,7 @@ export function Toolbar({
 						active={state.alignCenter}
 						onClick={() => editor.chain().focus().setTextAlign('center').run()}
 					>
-						// 居中对齐图标
+						{/* 居中对齐图标 */}
 						<AlignCenter size={ICON} />
 					</Btn>
 				),
@@ -3405,7 +3467,7 @@ export function Toolbar({
 						active={state.alignRight}
 						onClick={() => editor.chain().focus().setTextAlign('right').run()}
 					>
-						// 右对齐图标
+						{/* 右对齐图标 */}
 						<AlignRight size={ICON} />
 					</Btn>
 				),
@@ -3428,7 +3490,7 @@ export function Toolbar({
 						active={state.alignJustify}
 						onClick={() => editor.chain().focus().setTextAlign('justify').run()}
 					>
-						// 两端对齐图标
+						{/* 两端对齐图标 */}
 						<AlignJustify size={ICON} />
 					</Btn>
 				),
@@ -3450,12 +3512,12 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.link}
-						// 链接激活或链接表单打开时高亮
+						{/* 链接激活或链接表单打开时高亮 */}
 						active={state.link || !!linkOpen}
-						// 打开链接表单（不直接设链，由 LinkForm 处理）
+						{/* 打开链接表单（不直接设链，由 LinkForm 处理） */}
 						onClick={onOpenLink}
 					>
-						// 链接图标
+						{/* 链接图标 */}
 						<Link2 size={ICON} />
 					</Btn>
 				),
@@ -3475,11 +3537,11 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.unlink}
-						// 当前没有链接时禁用
+						{/* 当前没有链接时禁用 */}
 						disabled={!state.link}
 						onClick={() => editor.chain().focus().unsetLink().run()}
 					>
-						// 取消链接图标
+						{/* 取消链接图标 */}
 						<Link2Off size={ICON} />
 					</Btn>
 				),
@@ -3499,10 +3561,10 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.imagePick}
-						// 触发插入图片异步流程
+						{/* 触发插入图片异步流程 */}
 						onClick={() => void insertImage()}
 					>
-						// 图片图标
+						{/* 图片图标 */}
 						<ImageIcon size={ICON} />
 					</Btn>
 				),
@@ -3518,7 +3580,7 @@ export function Toolbar({
 				node: (
 					<Btn
 						title={t.table}
-						// 插入 3×3 表格，带表头行
+						{/* 插入 3×3 表格，带表头行 */}
 						onClick={() =>
 							editor
 								.chain()
@@ -3527,7 +3589,7 @@ export function Toolbar({
 								.run()
 						}
 					>
-						// 表格图标
+						{/* 表格图标 */}
 						<Table size={ICON} />
 					</Btn>
 				),
@@ -3558,9 +3620,9 @@ export function Toolbar({
 						<Btn
 							title={t.addColumnAfter}
 							onClick={() => editor.chain().focus().addColumnAfter().run()}
-						>
-							// 文字按钮：「+列」
-							<span className="text-[10px] font-semibold">+列</span>
+					>
+						{/* 文字按钮：「+列」 */}
+						<span className="text-[10px] font-semibold">+列</span>
 						</Btn>
 					),
 					menu: (
@@ -3579,9 +3641,9 @@ export function Toolbar({
 						<Btn
 							title={t.addRowAfter}
 							onClick={() => editor.chain().focus().addRowAfter().run()}
-						>
-							// 文字按钮：「+行」
-							<span className="text-[10px] font-semibold">+行</span>
+					>
+						{/* 文字按钮：「+行」 */}
+						<span className="text-[10px] font-semibold">+行</span>
 						</Btn>
 					),
 					menu: (
@@ -3600,9 +3662,9 @@ export function Toolbar({
 						<Btn
 							title={t.deleteTable}
 							onClick={() => editor.chain().focus().deleteTable().run()}
-						>
-							// 文字按钮：「删表」
-							<span className="text-[10px] font-semibold">删表</span>
+					>
+						{/* 文字按钮：「删表」 */}
+						<span className="text-[10px] font-semibold">删表</span>
 						</Btn>
 					),
 					menu: (
@@ -3720,18 +3782,18 @@ export function Toolbar({
 		// 根容器
 		<div
 			ref={rootRef}
-			// 样式：工具栏基础类 + flex + 高度 40px + 两端对齐 + 底部边框
+			{/* 样式：工具栏基础类 + flex + 高度 40px + 两端对齐 + 底部边框 */}
 			className={cn(
 				'rich-editor-toolbar px-1.5 flex h-10 items-center justify-between border-b border-theme/10',
 				className,
 			)}
-			// 无障碍角色：工具栏
+			{/* 无障碍角色：工具栏 */}
 			role="toolbar"
 			aria-label="格式工具栏"
 		>
-			// 隐形测量行：与真实按钮同构，用于算每项宽度（视觉隐藏，aria-hidden）
+			{/* 隐形测量行：与真实按钮同构，用于算每项宽度（视觉隐藏，aria-hidden） */}
 			<div ref={measureRef} className="rich-editor-toolbar-measure" aria-hidden>
-				// 渲染所有工具项的 node 用于测量
+				{/* 渲染所有工具项的 node 用于测量 */}
 				{tools.map((item) => (
 					<span key={item.id} className="inline-flex shrink-0">
 						{item.node}
@@ -3739,11 +3801,11 @@ export function Toolbar({
 				))}
 			</div>
 
-			// 左侧主区：可见按钮 + 更多菜单
+			{/* 左侧主区：可见按钮 + 更多菜单 */}
 			<div className="rich-editor-toolbar-start">
-				// 主按钮组
+				{/* 主按钮组 */}
 				<div className="rich-editor-toolbar-main">
-					// 只渲染可见的工具项
+					{/* 只渲染可见的工具项 */}
 					{visible.map((item) => (
 						<span key={item.id} className="inline-flex shrink-0">
 							{item.node}
@@ -3751,35 +3813,35 @@ export function Toolbar({
 					))}
 				</div>
 
-				// 有溢出时渲染「更多」下拉菜单
+				{/* 有溢出时渲染「更多」下拉菜单 */}
 				{showMore ? (
 					<span className="rich-editor-toolbar-more inline-flex shrink-0">
 						<DropdownMenu>
-							// 触发器：三个点按钮
+							{/* 触发器：三个点按钮 */}
 							<DropdownMenuTrigger asChild>
 								<button
 									type="button"
 									title="更多"
 									aria-label="更多"
 									className="rich-editor-btn ml-0.5"
-									// 阻止失焦
+									{/* 阻止失焦 */}
 									onMouseDown={(e) => e.preventDefault()}
 								>
-									// 更多图标
+									{/* 更多图标 */}
 									<MoreHorizontal size={ICON} />
 								</button>
 							</DropdownMenuTrigger>
-							// 下拉内容
+							{/* 下拉内容 */}
 							<DropdownMenuContent
-								// 右对齐触发器
+								{/* 右对齐触发器 */}
 								align="end"
 								sideOffset={8}
 								className="min-w-40"
-								// 关闭时不收回焦点
+								{/* 关闭时不收回焦点 */}
 								onCloseAutoFocus={(e) => e.preventDefault()}
 							>
 								<DropdownMenuGroup>
-									// 渲染溢出项的 menu 节点
+									{/* 渲染溢出项的 menu 节点 */}
 									{overflow.map((item) => (
 										// 用 Fragment 包裹，key 放在 Fragment 上
 										<Fragment key={item.id}>{item.menu}</Fragment>
@@ -3791,7 +3853,7 @@ export function Toolbar({
 				) : null}
 			</div>
 
-			// 右侧 extra 扩展区（若有）
+			{/* 右侧 extra 扩展区（若有） */}
 			{extra != null && (
 				<div ref={extraRef} className="rich-editor-toolbar-extra shrink-0">
 					<div className="rich-editor-toolbar-group">{extra}</div>
@@ -3977,7 +4039,8 @@ design/
 │       ├── Toolbar.tsx    # 工具栏主组件
 │       └── FormatBubble.tsx # 选区气泡菜单
 └── NotePreview/           # 笔记预览组件
-    └── index.tsx          # NotePreview + stripNoteTitleHtml
+    ├── index.tsx          # NotePreview + stripNoteTitleHtml
+    └── styles.css         # 预览态样式（透明背景、padding、文本选中）
 ```
 
 ### 17.2 设计原则：按功能域分目录
@@ -4008,14 +4071,14 @@ design/
 
 ## 18. 笔记预览组件 NotePreview
 
-**来源**：`apps/remote-plugins/src/components/design/NotePreview/index.tsx`（共 110 行）
+**来源**：`apps/remote-plugins/src/components/design/NotePreview/index.tsx`（共 109 行）+ `styles.css`（共 24 行）
 
 ### 18.1 模块职责
 
 笔记的**只读预览**组件，用于：
 - 笔记列表中点击某条笔记后，在右侧查看详情
 - 顶栏显示标题（替代编辑器 toolbar）
-- 正文用 `dangerouslySetInnerHTML` 渲染 Tiptap 产出的 HTML
+- 正文用 **RichEditor 只读模式**渲染，与编辑效果完全一致（代码高亮、表格、图片等都能正确显示）
 - 自动剥离 HTML 中的 title 节点，避免与顶栏标题重复
 - 支持 `headerExtra`、`footer`、`meta`、`children` 等扩展插槽
 
@@ -4026,28 +4089,35 @@ design/
 2. **标题不重复**：编辑器里 title 是文档的第一个节点，预览时标题在顶栏，所以要从 HTML 里剥离 title 节点
 3. **可扩展**：headerExtra / footer / meta / children 四个扩展位，适配不同场景
 
+**为什么用 RichEditor 只读模式而不是 dangerouslySetInnerHTML？**
+1. **渲染一致性**：代码块高亮、表格、任务列表、图片缩放等自定义节点的样式和行为在预览中完全一致
+2. **NodeView 渲染**：TipTap 的 NodeView（如代码块高亮）无法通过纯 HTML 复现，必须走 ProseMirror 渲染
+3. **样式复用**：直接复用 RichEditor 的样式体系，不需要单独维护预览样式
+4. **showTitle={false}**：预览时不需要标题节点（标题在顶栏），通过 `showTitle={false}` 在 schema 层面禁用 title 节点
+
 **安全考虑**：
-- 用 `dangerouslySetInnerHTML` 渲染本机 TipTap 产出的 HTML
-- 注释明确说明「预览信任本机 TipTap 产出的 HTML」
+- 内容来自本机 TipTap 产出，经过 `stripNoteTitleHtml` 预处理（剥离 title 节点）
 - 如果是外部用户输入的 HTML，应先做 XSS 清洗
 
 ### 18.3 完整代码与逐行注释
 
 ```typescript
-// 导入 ReactNode 类型
+// 导入 ReactNode 类型（React 节点，用于插槽/children）
 import type { ReactNode } from 'react';
-// 导入 ScrollArea 组件
-import { ScrollArea } from '@/components/ui/scroll-area';
-// 导入 classnames 工具
+// 导入 classnames 工具（合并类名）
 import { cn } from '@/lib/utils';
+// 导入 RichEditor 组件（预览用只读模式渲染，保证渲染一致性）
+import RichEditor from '../RichEditor';
 // 导入 RichEditor 的样式（预览也复用编辑器的内容样式）
 import '../RichEditor/styles.css';
+// 导入 NotePreview 专属样式（预览态的样式微调）
+import './styles.css';
 
 // NotePreview 组件的 Props 类型
 export type NotePreviewProps = {
 	// 顶栏标题（替代编辑器 toolbar）
 	title: string;
-	// TipTap HTML；会去掉笔记 title 节点，避免与顶栏重复
+	// TipTap HTML 或 JSON 内容
 	html?: string;
 	// 顶栏标题旁/下方的次要信息（时间、标签等）
 	meta?: ReactNode;
@@ -4065,7 +4135,7 @@ export type NotePreviewProps = {
 	emptyText?: string;
 };
 
-// 去掉文档内嵌的 title NodeView，正文只渲染 block 内容
+// 去掉文档内嵌的 title NodeView，正文只渲染 block 内容（兼容旧 API）
 // 为什么要剥离？因为预览时标题在顶栏显示，正文里再显示一遍就重复了
 export function stripNoteTitleHtml(html: string): string {
 	// 空 HTML 直接返回空串
@@ -4092,52 +4162,57 @@ export function stripNoteTitleHtml(html: string): string {
 
 /**
  * 笔记只读预览：顶栏标题 + 可滚动正文。
- * - 默认吃 title/html，够用
+ * - 使用 RichEditor 只读模式渲染，与编辑效果完全一致
+ * - schema 层面禁用 title 节点，并用 stripNoteTitleHtml 预处理内容
  * - children / headerExtra / footer / meta 可扩展
  */
 export function NotePreview({
 	// 解构 props
 	title,
+	// TipTap HTML 内容
 	html,
+	// 顶栏次要信息
 	meta,
+	// 顶栏右侧操作
 	headerExtra,
+	// 自定义正文
 	children,
+	// 底部插槽
 	footer,
+	// 外层容器类名
 	className,
+	// 正文区域类名
 	bodyClassName,
 	// 空内容默认提示
 	emptyText = '暂无内容',
 }: NotePreviewProps) {
 	// 处理后的正文 HTML（已剥离 title 节点）
 	const bodyHtml = html ? stripNoteTitleHtml(html) : '';
-	// 是否有正文内容：有 children 或者 HTML 去掉标签后还有文字
-	const hasBody =
-		children != null || bodyHtml.replace(/<[^>]+>/g, '').trim().length > 0;
 
 	return (
-		// 外层容器：flex 列布局，占满高度，隐藏溢出，右侧圆角贴合左邻面板
+		{/* 外层容器：flex 列布局，占满高度，隐藏溢出，右侧圆角贴合左邻面板 */}
 		<div
 			className={cn(
-				'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
+				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
 				className,
 			)}
 		>
-			// 顶栏：固定高度 40px，底部边框，flex 横向布局（去掉 bg-theme-background，收窄 padding）
-			<header className="h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
-				// 左侧：标题 + meta，flex-1 占满剩余空间
+			{/* 顶栏：固定高度 40px，底部边框，flex 横向布局 */}
+			<header className="note-preview-header h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
+				{/* 左侧：标题 + meta，flex-1 占满剩余空间 */}
 				<div className="min-w-0 flex-1">
-					// 标题：截断显示，字体稍大，加粗
+					{/* 标题：截断显示，字体稍大，加粗 */}
 					<h1 className="text-textcolor truncate text-base font-semibold leading-snug">
 						{title.trim() || '无标题笔记'}
 					</h1>
-					// 有 meta 时显示：次要文字，小字号
+					{/* 有 meta 时显示：次要文字，小字号 */}
 					{meta ? (
 						<div className="text-textcolor/45 mt-0.5 truncate text-xs">
 							{meta}
 						</div>
 					) : null}
 				</div>
-				// 右侧操作区：headerExtra 插槽
+				{/* 右侧操作区：headerExtra 插槽 */}
 				{headerExtra ? (
 					<div className="flex shrink-0 items-center gap-0.5">
 						{headerExtra}
@@ -4145,34 +4220,41 @@ export function NotePreview({
 				) : null}
 			</header>
 
-			// 正文滚动区域：占满剩余空间
-			<ScrollArea className="min-h-0 flex-1" viewportClassName="h-full">
-				// 正文容器：复用 rich-editor-body 样式，保证内容样式一致
-				<div
-					className={cn(
-						'rich-editor-body note-preview-body min-h-full',
-						bodyClassName,
-					)}
-				>
-					// 有 children 时优先渲染 children（自定义内容）
-					{children != null ? (
-						children
-					// 否则有正文内容时渲染 HTML
-					) : hasBody ? (
-						// 用 tiptap 类名包裹，保证内容样式与编辑器一致
-						<div
-							className="tiptap text-sm"
-							// ponytail: 预览信任本机 TipTap 产出的 HTML
-							dangerouslySetInnerHTML={{ __html: bodyHtml }}
-						/>
-					// 空内容显示提示
-					) : (
-						<p className="text-textcolor/45 text-sm">{emptyText}</p>
-					)}
-				</div>
-			</ScrollArea>
+			{/* 正文区域：占满剩余空间 */}
+			<div className="note-preview-body min-h-0 flex-1">
+				{/* 有 children 时优先渲染 children（自定义内容） */}
+				{children != null ? (
+					children
+				{/* 有正文 HTML 时用 RichEditor 只读模式渲染 */}
+				) : bodyHtml ? (
+					{/* RichEditor 只读模式：与编辑效果完全一致 */}
+					<RichEditor
+						{/* 内容为剥离 title 后的 HTML */}
+						content={bodyHtml}
+						{/* 只读模式 */}
+						editable={false}
+						{/* 不自动聚焦 */}
+						autofocus={false}
+						{/* 不显示工具栏 */}
+						showToolbar={false}
+						{/* 不显示气泡菜单 */}
+						showBubbleMenu={false}
+						{/* 不显示字数统计 */}
+						showCharCount={false}
+						{/* 不显示标题节点（标题在顶栏） */}
+						showTitle={false}
+						{/* 容器类名 */}
+						className={cn('note-preview-editor', bodyClassName)}
+						{/* 编辑器正文类名 */}
+						editorClassName="note-preview-tiptap"
+					/>
+				{/* 空内容显示提示 */}
+				) : (
+					<p className="text-textcolor/45 p-3 text-sm">{emptyText}</p>
+				)}
+			</div>
 
-			// 底部插槽：有 footer 时显示
+			{/* 底部插槽：有 footer 时显示 */}
 			{footer ? <div className="shrink-0">{footer}</div> : null}
 		</div>
 	);
@@ -4182,18 +4264,62 @@ export function NotePreview({
 export default NotePreview;
 ```
 
+### 18.4 预览样式文件（styles.css）
+
+**来源**：`apps/remote-plugins/src/components/design/NotePreview/styles.css`（共 24 行）
+
+```css
+/* 预览编辑器外层：透明背景（不需要编辑器的白色底） */
+.note-preview-editor {
+	background: transparent;
+}
+
+/* 预览正文区域：复用 rich-editor-body 但调整 padding 和对齐 */
+.note-preview-editor .rich-editor-body {
+	/* 内边距：上窄下宽，适配预览场景 */
+	padding: 0.75rem;
+	/* 顶部收紧，避免与 header 间距过大 */
+	padding-top: 0.28rem;
+	/* 两端对齐，阅读体验更好 */
+	text-align: justify;
+}
+
+/* 预览 TipTap 区域：只读光标 + 文本可选中 */
+.note-preview-tiptap {
+	/* 只读光标（不显示文本插入光标） */
+	cursor: default;
+	/* 允许用户选中文本（Safari 需要 -webkit 前缀） */
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+/* 兜底：隐藏残留的 title NodeView（schema 层面已禁用，这里再保险一层） */
+.note-preview-editor .rich-editor-note-title,
+.note-preview-editor [data-node-view-wrapper].rich-editor-note-title {
+	/* 强制隐藏，防止 title 节点渲染出来 */
+	display: none !important;
+}
+
+/* 预览正文首个子节点：去掉顶部 margin，避免与 header 间距过大 */
+.note-preview-editor .ProseMirror > *:first-child {
+	margin-top: 0;
+}
+```
+
 ---
 
 ## 19. 主应用分栏布局（LearningNotesApp）
 
-**来源**：`apps/remote-plugins/src/views/learning-notes/index.tsx`（约 380 行）
+**来源**：`apps/remote-plugins/src/views/learning-notes/index.tsx`（约 430 行）
 
 ### 19.1 模块职责
 
 学习笔记插件的主应用组件，是整个插件运行时的入口视图，负责：
 - **分栏布局**：左侧笔记列表（35%）+ 右侧编辑器/预览（65%），可拖拽调整
-- **CRUD 流程编排**：通过 `createNotesApi(api.http)` 创建数据层，串联 list / detail / save / update / remove
-- **编辑器生命周期管理**：用 `key={editorSeed}` 在新建/编辑切换时强制重建 RichEditor
+- **MobX 状态管理**：通过 `learningNotesStore` 集中管理所有业务状态（列表、预览、编辑、加载态等），组件用 `observer` 包裹响应式更新
+- **分页加载**：滚动到底部时自动触发 `loadMore()`，支持无限滚动，列表头部显示「已加载 N 条/共 M 条」
+- **CRUD 流程编排**：通过 store 封装数据层，串联 list / detail / save / update / remove / loadMore
+- **编辑器生命周期管理**：用 `key={store.editorSeed}` 在新建/编辑切换时强制重建 RichEditor
 - **预览/编辑切换**：点击列表项进入预览，编辑按钮回到编辑态；预览时编辑器用 `hidden` 保留挂载
 - **删除确认**：用 `Confirm` 组件二次确认，避免误删
 - **toast 通知**：通过 `api.ui?.showToast` 反馈操作结果
@@ -4210,71 +4336,117 @@ export default NotePreview;
 │  [Confirm 删除确认弹层（全局）]              │
 ├───────────────┬─────────────────────────────┤
 │  笔记列表 35% │  编辑器 / 预览 65%          │
-│  ┌─────────┐  │  ┌────────────────────┐    │
-│  │ 标题+新建│  │  │ toolbarExtra:      │    │
-│  ├─────────┤  │  │  [新建][保存][列表] │    │
-│  │ 列表项   │  │  ├────────────────────┤    │
-│  │ hover→  │  │  │  RichEditor        │    │
-│  │ [编][删]│  │  │  或 NotePreview    │    │
-│  └─────────┘  │  └────────────────────┘    │
+│  ┌──────────────┐ │  ┌────────────────────┐ │
+│  │ 标题+加载统计│ │  │ toolbarExtra:      │ │
+│  │ 已加载 N/共 M│ │  │  [新建][保存][列表] │ │
+│  ├──────────────┤ │  ├────────────────────┤ │
+│  │ 列表项        │ │  │  RichEditor        │ │
+│  │ hover→       │ │  │  或 NotePreview    │ │
+│  │ [编][删]     │ │  └────────────────────┘ │
+│  ├──────────────┤ │                           │
+│  │ 加载中/没有更多│ │                           │
+│  └──────────────┘ │                           │
 └───────────────┴─────────────────────────────┘
 ```
 
-**API 层注入**：
+**MobX 状态管理重构**：
 
-主应用不直接 fetch，而是通过 `createNotesApi(api.http)` 拿到一个封装好的 `notesApi` 对象，包含 `list / detail / save / update / remove` 五个方法。`notesApi` 用 `useMemo` 缓存，依赖 `api.http`；当 host 未提供 HTTP 能力时为 `null`，所有操作都会走 toast 报错分支。
+原实现用十多个 `useState` 分散管理状态（draft、listOpen、preview、notes、editingId、editorSeed、editorInitial、loading、saving、confirmOpen、pendingDeleteId），组件内充斥着 setState 调用，数据流不清晰。重构后全部收敛到 `learningNotesStore` 中，组件用 `observer` 包裹实现响应式更新：
+
+| 状态分类 | store 中的状态 | 说明 |
+|---------|--------------|------|
+| 列表相关 | `list`、`total`、`loading`、`loadingMore`、`hasMore` | 分页列表数据与加载态 |
+| 视图切换 | `listOpen`、`preview`、`loadingDetail` | 列表开关、预览数据、详情加载态 |
+| 编辑相关 | `editingId`、`editorSeed`、`editorInitial`、`saving` | 编辑态标识、编辑器重建种子、保存态 |
+| 交互确认 | `confirmOpen`、`pendingDeleteId` | 删除确认弹层与待删 id |
+| 衍生状态 | `hasActive` | 是否有活跃的预览或编辑项 |
+
+组件层只保留 UI 相关的本地状态：滚动位置（`scrollMode`、`scrollEdge`）、编辑器 ref（`editorRef`）、用于快捷键判断的 ref（`savingRef`、`previewRef`）。业务逻辑全部下沉到 store，组件只负责「从 store 取状态 + 调 store 方法 + 渲染」。
+
+**store 绑定与初始化**：
+
+通过 `store.bind(api.http, toast)` 把宿主 HTTP 客户端和 toast 函数注入 store，store 内部封装所有 CRUD 与分页逻辑。组件 mount 时调用 `void store.refreshList()` 拉取第一页数据。`bind` 方法的存在让 store 可以是单例（在 `useStore` 中创建），同时又能在组件挂载时动态绑定宿主能力——因为宿主能力是通过 props 传入的，store 创建时拿不到。
+
+**分页加载（无限滚动）**：
+
+列表从「一次性加载全部」改为分页加载，每页 `NOTES_PAGE_SIZE` 条：
+
+1. **初始加载**：`refreshList()` 拉取第 1 页，重置 `list`、`total`、`hasMore`
+2. **滚动触发**：`handleScroll` 中检测滚动到底部前 3 倍 `SCROLL_EDGE_PX` 时，调用 `void store.loadMore()`
+3. **加载更多**：`loadMore()` 根据当前已加载数量计算下一页 page，追加到 `list`，更新 `hasMore`
+4. **底部提示**：列表底部显示三种状态——`loadingMore` 时「加载中…」、已加载完时「没有更多了」、其他情况不显示
+5. **头部统计**：列表标题右侧显示「已加载 N 条/共 M 条」，让用户知道整体规模
+
+**防重复加载**：`loadMore` 内部通过 `loadingMore` 和 `hasMore` 双重判断，避免滚动抖动时重复发请求。
 
 **CRUD 流程**：
 
 | 操作 | 入口 | 调用 | 副作用 |
 |------|------|------|--------|
-| 拉列表 | mount / 增删改后 | `notesApi.list()` | 写入 `notes` |
-| 预览 | 点击列表项 | `notesApi.detail(id)` | 写入 `preview` |
-| 新建 | 工具栏「新建」 | 重置草稿 + `editorSeed++` | 编辑器重建为空文档 |
-| 编辑 | 列表 hover「编辑」 | `notesApi.detail(id)` → `openEdit` | 写入 `editingId` + 重建编辑器 |
-| 保存 | 工具栏「保存」 | `editingId` 存在 → `update`，否则 `save` | 刷新列表 + toast |
-| 删除 | 列表/预览「删除」 | 打开 `Confirm` → `notesApi.remove` | 清理预览/草稿 + 刷新列表 |
+| 拉列表 | mount / 增删改后 | `store.refreshList()` | 重置分页 + 写入 `list` / `total` |
+| 加载更多 | 滚动到底部 | `store.loadMore()` | 追加 `list` + 更新 `hasMore` |
+| 预览 | 点击列表项 | `store.openPreview(id)` | 写入 `preview` / `loadingDetail` |
+| 新建 | 工具栏「新建」 | `store.openNew()` | 重置编辑态 + `editorSeed++` |
+| 编辑 | 列表 hover「编辑」 | `store.openEditById(id)` | 拉详情 + 写入编辑态 + 重建编辑器 |
+| 保存 | 工具栏「保存」 | `store.saveNote(payload)` | 保存 + 刷新列表 + toast |
+| 删除请求 | 列表/预览「删除」 | `store.requestDelete(id)` | 打开确认弹层 |
+| 删除确认 | Confirm 确认 | `store.confirmDelete()` | 执行删除 + 清理 + 刷新列表 |
 
 **保存函数 useCallback 化**：
 
-`onSave` 用 `useCallback` 包裹，依赖数组为 `[draft, editingId, notesApi, refreshList, toast]`。这样做有两个原因：一是 `onSave` 需要作为 `useEffect` 的依赖（快捷键监听），稳定的引用可以避免每次渲染都重新绑定/解绑键盘事件；二是避免子组件（如 `toolbarExtra` 中保存按钮）因 `onSave` 引用变化而产生不必要的重渲染。
+`onSave` 用 `useCallback` 包裹，依赖数组为 `[store]`。它从 `editorRef.current` 实时读取编辑器内容（title、text、html），然后调用 `store.saveNote()`。这样做有两个原因：一是 `onSave` 需要作为 `useEffect` 的依赖（快捷键监听），稳定的引用可以避免每次渲染都重新绑定/解绑键盘事件；二是避免子组件（如 `toolbarExtra` 中保存按钮）因 `onSave` 引用变化而产生不必要的重渲染。
+
+**编辑器 ref 化（从 onChange 到 onCreate）**：
+
+旧版通过 `onChange` 回调把编辑器内容实时同步到 `draft` state，再在保存时从 state 读。新版改为持有 `editorRef`，只在保存时从 `editorRef.current` 读取最新内容。好处：① 减少每一次编辑都触发 React 重渲染的开销；② 状态来源唯一（编辑器实例就是真值），避免 state 与编辑器不同步的问题；③ 组件代码更简洁，不需要维护 draft 状态。`onCreate` 回调在编辑器实例创建时把引用存到 `editorRef`。
+
+**ref 同步 store 状态（快捷键判断用）**：
+
+快捷键监听的 `useEffect` 依赖 `onSave`，但 `onSave` 是稳定引用（依赖 store），effect 不会因 `saving` / `preview` 变化而重新绑定。为了让键盘事件处理器能拿到最新的 `saving` 和 `preview` 值，用 `savingRef` 和 `previewRef` 两个 ref 同步 store 状态——每次渲染时都把 `store.saving` 和 `store.preview` 写入 ref，事件处理器从 ref 读取，避免闭包陈旧值问题。
 
 **Cmd/Ctrl+S 快捷键保存**：
 
-通过 `useEffect` 在 `window` 上全局监听 `keydown` 事件，当检测到 `metaKey`（macOS 的 ⌘）或 `ctrlKey`（Windows/Linux 的 Ctrl）+ `s` 时触发保存。有三重保护：① 预览态（`preview` 存在）直接忽略，因为预览没有草稿可保存；② 调用 `e.preventDefault()` 阻止浏览器默认的「保存页面」弹窗；③ `saving` 为 true 时不重复触发，避免并发保存请求。保存按钮的 tooltip 也同步加上 `⌘S` 提示，让用户知晓快捷键的存在。
+通过 `useEffect` 在 `window` 上全局监听 `keydown` 事件，当检测到 `metaKey`（macOS 的 ⌘）或 `ctrlKey`（Windows/Linux 的 Ctrl）+ `s` 时触发保存。有三重保护：① 预览态（`previewRef.current` 存在）直接忽略，因为预览没有草稿可保存；② 调用 `e.preventDefault()` 阻止浏览器默认的「保存页面」弹窗；③ `savingRef.current` 为 true 时不重复触发，避免并发保存请求。保存按钮的 tooltip 也同步加上 `⌘S` 提示，让用户知晓快捷键的存在。
 
 **编辑器重建机制**：
 
-`RichEditor` 是受 `key` 控制的非受控组件——一旦挂载，`defaultContent` 的变更不会生效。因此在「新建」和「编辑」时都通过 `setEditorSeed((n) => n + 1)` 递增 `editorSeed`，配合 `key={editorSeed}` 强制 React 卸载旧实例、挂载新实例，从而把新的 `editorInitial`（空文档或笔记 HTML）注入编辑器。
+`RichEditor` 是受 `key` 控制的非受控组件——一旦挂载，`defaultContent` 的变更不会生效。因此在「新建」和「编辑」时都通过 store 内部递增 `editorSeed`，配合 `key={store.editorSeed}` 强制 React 卸载旧实例、挂载新实例，从而把新的 `editorInitial`（空文档或笔记 HTML）注入编辑器。
 
 **Confirm 删除确认**：
 
-删除不再直接执行，而是先把 `id` 存到 `pendingDeleteId` 并打开 `Confirm`，用户确认后才真正调用 `notesApi.remove`。删除后会判断当前预览/编辑是否正是被删笔记，是则同步清空，避免界面残留。
+删除不再直接执行，而是先调用 `store.requestDelete(id)` 把 id 存到 store 并打开 `Confirm`，用户确认后调 `store.confirmDelete()` 真正执行删除。删除后 store 内部会判断当前预览/编辑是否正是被删笔记，是则同步清空，避免界面残留。
 
 ### 19.3 完整代码与逐行注释
 
 ```typescript
-// 引入二次确认弹层组件，用于删除前确认
-import Confirm from '@/components/design/Confirm';
+// 引入 Loading 加载动画组件，用于列表和详情加载态
+import Loading from '@design/Loading';
 // 从 design 统一出口引入 NotePreview 预览组件
 import { NotePreview } from '@design/NotePreview';
-// 从 design 统一出口引入 RichEditor、Btn 按钮、EMPTY_NOTE_DOC 空文档常量、Editor 类型
+// 从 design 统一出口引入 RichEditor、Btn 按钮、getDocTitleText 工具、Editor 类型
 import {
 	Btn,
-	EMPTY_NOTE_DOC,
 	type Editor,
+	getDocTitleText,
 	RichEditor,
 } from '@design/RichEditor';
-// 引入 lucide 图标：FilePenLine 新建、NotebookText 列表、Save 保存、SquarePen 编辑、Trash2 删除
+// 引入 lucide 图标：ChevronDown/ChevronUp 上下箭头、FilePenLine 新建、LocateFixed 定位、NotebookText 列表、Save 保存、SquarePen 编辑、Trash2 删除
 import {
+	ChevronDown,
+	ChevronUp,
 	FilePenLine,
+	LocateFixed,
 	NotebookText,
 	Save,
 	SquarePen,
 	Trash2,
 } from 'lucide-react';
-// 引入 React hooks
-import { useCallback, useEffect, useMemo, useState } from 'react';
+// 引入 mobx-react 的 observer，让组件成为响应式观察者
+import { observer } from 'mobx-react';
+// 引入 React hooks：useCallback 回调缓存、useEffect 副作用、useMemo 计算缓存、useRef 引用、useState 状态
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// 引入二次确认弹层组件，用于删除前确认
+import Confirm from '@/components/design/Confirm';
 // 引入 react-resizable-panels 的分栏组件
 import {
 	ResizableHandle,
@@ -4285,10 +4457,18 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 // 引入 cn 类名合并工具
 import { cn } from '@/lib/utils';
+// 引入全局 store hook，获取学习笔记 store
+import useStore from '@/store';
+// 从同目录 api.ts 引入 HostHttp 类型
+import type { HostHttp } from './api';
 // 引入插件样式
 import '@/styles.css';
-// 从同目录 api.ts 引入 createNotesApi 工厂、HostHttp 类型、Note 类型
-import { createNotesApi, type HostHttp, type Note } from './api';
+
+// 滚动边缘判定像素值：距离顶部/底部多少像素内视为「到达边缘」
+const SCROLL_EDGE_PX = 16;
+
+/** 笔记列表滚动：同一按钮循环 底 → 顶 → 当前（无选中时底 → 顶） */
+type NoteScrollMode = 'bottom' | 'top' | 'current';
 
 // 主应用接收的 HostBridge 属性类型
 type HostBridgeProps = {
@@ -4310,51 +4490,30 @@ type HostBridgeProps = {
 	independent?: boolean;
 };
 
-// 把任意错误转成可读字符串的工具函数
-function errMsg(e: unknown): string {
-	// 优先取 Error.message
-	if (e instanceof Error && e.message) return e.message;
-	// 兼容 { message } 形式的对象
-	if (e && typeof e === 'object' && 'message' in e) {
-		const m = (e as { message?: unknown }).message;
-		if (typeof m === 'string' && m.trim()) return m;
-	}
-	// 兜底文案
-	return '请求失败';
-}
+// 主应用组件函数（内部实现），最后用 observer 包裹后导出
+function LearningNotesApp({ api }: HostBridgeProps) {
+	// 从全局 store 中获取学习笔记 store 实例
+	const { learningNotesStore: store } = useStore();
 
-// 主应用组件：默认导出
-export default function LearningNotesApp({ api }: HostBridgeProps) {
-	// 用 useMemo 创建 notesApi：只有 api.http 存在才创建，依赖 api.http 缓存
-	const notesApi = useMemo(
-		() => (api.http ? createNotesApi(api.http) : null),
-		[api.http],
-	);
+	// 编辑器实例引用：通过 onCreate 回调获取，保存时从中读取内容
+	const editorRef = useRef<Editor | null>(null);
+	// 保存中状态的 ref 副本：用于快捷键事件处理器读取最新值，避免闭包陈旧值
+	const savingRef = useRef(false);
+	// 预览状态的 ref 副本：用于快捷键事件处理器判断是否处于预览态
+	const previewRef = useRef(store.preview);
+	// 每次渲染都同步 savingRef 为最新的 store.saving 值
+	savingRef.current = store.saving;
+	// 每次渲染都同步 previewRef 为最新的 store.preview 值
+	previewRef.current = store.preview;
 
-	// 草稿：html 富文本、text 纯文本、title 标题，由 RichEditor onChange 回写
-	const [draft, setDraft] = useState({ html: '', text: '', title: '' });
-	// 列表是否展开（默认展开）
-	const [listOpen, setListOpen] = useState(true);
-	// 当前预览的笔记；null 表示处于编辑模式
-	const [preview, setPreview] = useState<Note | null>(null);
-	// 笔记列表数据
-	const [notes, setNotes] = useState<Note[]>([]);
-	// 当前正在编辑的笔记 id；null 表示新建态
-	const [editingId, setEditingId] = useState<string | null>(null);
-	// 编辑器重建种子：递增即可强制 RichEditor 卸载重建
-	const [editorSeed, setEditorSeed] = useState(0);
-	// 编辑器初始内容：新建为 EMPTY_NOTE_DOC，编辑为笔记 html
-	const [editorInitial, setEditorInitial] = useState<
-		string | typeof EMPTY_NOTE_DOC
-	>(EMPTY_NOTE_DOC);
-	// 列表加载中标记
-	const [loading, setLoading] = useState(false);
-	// 保存中标记（禁用保存按钮 + 文案变化）
-	const [saving, setSaving] = useState(false);
-	// 删除确认弹层开关
-	const [confirmOpen, setConfirmOpen] = useState(false);
-	// 待删除的笔记 id，确认后才真正执行删除
-	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+	// ScrollArea viewport：程序化滚到顶/底（纯 UI，不进 store）
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	// 当前选中的列表项元素引用：用于滚动到当前选中项
+	const activeItemRef = useRef<HTMLDivElement>(null);
+	// 滚动模式状态：底 → 顶 → 当前（循环）
+	const [scrollMode, setScrollMode] = useState<NoteScrollMode>('bottom');
+	// 滚动边缘状态：到达顶部/底部时记录，用于滚动按钮图标切换
+	const [scrollEdge, setScrollEdge] = useState<'top' | 'bottom' | null>(null);
 
 	// toast 封装：统一走 api.ui?.showToast，依赖 api.ui
 	const toast = useCallback(
@@ -4364,103 +4523,146 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		[api.ui],
 	);
 
-	// 刷新列表：拉取后端数据并按时间倒序
-	const refreshList = useCallback(async () => {
-		// 没有 HTTP 能力时直接报错返回
-		if (!notesApi) {
-			toast('未授权 HTTP，无法同步笔记', 'error');
-			return;
-		}
-		setLoading(true);
-		try {
-			// 调用 list()，内部已排序
-			setNotes(await notesApi.list());
-		} catch (e) {
-			toast(errMsg(e), 'error');
-		} finally {
-			setLoading(false);
-		}
-	}, [notesApi, toast]);
-
-	// 挂载时拉一次列表
+	// 组件挂载时：绑定宿主能力到 store，并刷新列表（拉第一页）
 	useEffect(() => {
-		void refreshList();
-	}, [refreshList]);
+		// 把 HTTP 客户端和 toast 函数注入 store
+		store.bind(api.http, toast);
+		// 拉取第一页列表数据
+		void store.refreshList();
+	}, [api.http, store, toast]);
 
-	// 新建笔记：清空草稿 + 重置编辑器为空文档 + 递增 seed 重建
-	const openNew = () => {
-		setPreview(null);
-		setEditingId(null);
-		setDraft({ html: '', text: '', title: '' });
-		setEditorInitial(EMPTY_NOTE_DOC);
-		setEditorSeed((n) => n + 1);
-	};
-
-	// 预览：按 id 拉详情后写入 preview
-	const openPreview = async (id: string) => {
-		if (!notesApi) return;
-		try {
-			const note = await notesApi.detail(id);
-			setPreview(note);
-		} catch (e) {
-			toast(errMsg(e), 'error');
+	// 滚动事件处理：检测滚动边缘 + 触底加载更多
+	const handleScroll = useCallback(() => {
+		// 获取滚动容器元素
+		const el = scrollViewportRef.current;
+		// 容器不存在则直接返回
+		if (!el) return;
+		// 解构滚动位置、总高度、可视高度
+		const { scrollTop, scrollHeight, clientHeight } = el;
+		// 到达顶部边缘（SCROLL_EDGE_PX 以内）
+		if (scrollTop <= SCROLL_EDGE_PX) {
+			setScrollEdge('top');
+		// 到达底部边缘（SCROLL_EDGE_PX 以内）
+		} else if (scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX) {
+			setScrollEdge('bottom');
+		// 中间区域
+		} else {
+			setScrollEdge(null);
 		}
-	};
-
-	// 编辑：已持有完整 note 时直接进入编辑态
-	const openEdit = (note: Note) => {
-		setPreview(null);
-		setEditingId(note.id);
-		// 草稿用 note 的 html / title 初始化
-		setDraft({ html: note.html, text: '', title: note.title });
-		// 编辑器初始内容设为笔记 html（兜底空文档）
-		setEditorInitial(note.html || EMPTY_NOTE_DOC);
-		// 递增 seed 重建编辑器以加载新初始内容
-		setEditorSeed((n) => n + 1);
-	};
-
-	/** 列表项只存摘要没有正文：先拉详情再进编辑 */
-	const openEditById = async (id: string) => {
-		if (!notesApi) return;
-		try {
-			openEdit(await notesApi.detail(id));
-		} catch (e) {
-			toast(errMsg(e), 'error');
+		// 距离底部还有 3 倍边缘距离时，提前触发加载更多
+		if (scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX * 3) {
+			void store.loadMore();
 		}
-	};
+	}, [store]);
 
-	// 保存（新建或更新）：用 useCallback 缓存，便于在快捷键 useEffect 中作为稳定依赖
+	// 列表展开时绑定滚动监听，并初始化滚动位置
+	useEffect(() => {
+		// 列表关闭时不处理
+		if (!store.listOpen) return;
+		// 重置滚动模式为底部
+		setScrollMode('bottom');
+		// 获取滚动容器
+		const el = scrollViewportRef.current;
+		// 容器不存在则返回
+		if (!el) return;
+		// 绑定滚动事件监听
+		el.addEventListener('scroll', handleScroll);
+		// 立即执行一次，初始化 scrollEdge 状态
+		handleScroll();
+		// 卸载时移除监听，防止内存泄漏
+		return () => el.removeEventListener('scroll', handleScroll);
+	}, [store.listOpen, handleScroll]);
+
+	// 没有活跃项但 scrollMode 是 current 时，回退到 bottom
+	useEffect(() => {
+		// 没有活跃的预览或编辑项，且当前滚动模式是「滚动到当前」
+		if (!store.hasActive && scrollMode === 'current') {
+			// 回退到底部模式
+			setScrollMode('bottom');
+		}
+	}, [store.hasActive, scrollMode]);
+
+	// 滚动浮动按钮点击：在 底 → 顶 → 当前 之间循环切换
+	const onScrollFabClick = useCallback(() => {
+		// 获取滚动视口元素
+		const vp = scrollViewportRef.current;
+		// 元素不存在则返回
+		if (!vp) return;
+
+		// 解构滚动位置、总高度、可视高度
+		const { scrollTop, scrollHeight, clientHeight } = vp;
+		// 是否在顶部
+		const atTop = scrollTop <= SCROLL_EDGE_PX;
+		// 是否在底部
+		const atBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX;
+		// 当前滚动模式
+		let mode = scrollMode;
+		// 底部模式且已在底部 → 切到顶部模式
+		if (mode === 'bottom' && atBottom) {
+			mode = 'top';
+		// 顶部模式且已在顶部 → 切到底部模式
+		} else if (mode === 'top' && atTop) {
+			mode = 'bottom';
+		}
+
+		// 底部模式：滚到底部
+		if (mode === 'bottom') {
+			vp.scrollTo({ top: vp.scrollHeight, behavior: 'auto' });
+		// 顶部模式：滚到顶部
+		} else if (mode === 'top') {
+			vp.scrollTo({ top: 0, behavior: 'auto' });
+		// 当前模式：滚动到当前选中项
+		} else {
+			activeItemRef.current?.scrollIntoView({
+				block: 'center',
+				behavior: 'auto',
+			});
+		}
+
+		// 更新下一次的滚动模式：底部 → 顶部
+		if (mode === 'bottom') {
+			setScrollMode('top');
+		// 顶部 → 当前（有活跃项）或底部（无活跃项）
+		} else if (mode === 'top') {
+			setScrollMode(store.hasActive ? 'current' : 'bottom');
+		// 当前 → 底部
+		} else {
+			setScrollMode('bottom');
+		}
+	}, [scrollMode, store.hasActive]);
+
+	// 计算实际显示的滚动模式（考虑当前已在边缘的情况，图标显示下一个目标）
+	const displayMode: NoteScrollMode =
+		// 底部模式且已在底部 → 显示顶部（下一步要去顶部）
+		scrollMode === 'bottom' && scrollEdge === 'bottom'
+			? 'top'
+			: // 顶部模式且已在顶部 → 显示底部（下一步要去底部）
+			scrollMode === 'top' && scrollEdge === 'top'
+				? 'bottom'
+				: // 其他情况显示当前模式
+				scrollMode;
+
+	// 滚动按钮的 tooltip 文案
+	const scrollTitle =
+		displayMode === 'bottom'
+			? '滚动到底部'
+			: displayMode === 'top'
+				? '滚动到顶部'
+				: '滚动到当前选中';
+
+	// 保存笔记：从 editorRef 读取内容，调用 store.saveNote
 	const onSave = useCallback(async () => {
-		// 标题/内容校验，缺失则 info 提示并中断
-		if (!draft.title.trim()) return toast('请先输入标题', 'info');
-		if (!draft.text.trim()) return toast('请先输入内容', 'info');
-		if (!notesApi) return toast('未授权 HTTP，无法保存', 'error');
-		setSaving(true);
-		try {
-			// 组装 payload：标题兜底「无标题笔记」
-			const payload = {
-				title: draft.title.trim() || '无标题笔记',
-				html: draft.html,
-			};
-			if (editingId) {
-				// 编辑态：调 update，回写 id 并提示「已更新」
-				const updated = await notesApi.update(editingId, payload);
-				setEditingId(updated.id);
-				toast('已更新笔记', 'success');
-			} else {
-				// 新建态：调 save，拿到新 id 写入 editingId，提示「已保存」
-				const { id } = await notesApi.save(payload);
-				setEditingId(id);
-				toast('已保存笔记', 'success');
-			}
-			// 保存后刷新列表
-			await refreshList();
-		} catch (e) {
-			toast(errMsg(e), 'error');
-		} finally {
-			setSaving(false);
-		}
-	}, [draft, editingId, notesApi, refreshList, toast]);
+		// 获取编辑器实例
+		const editor = editorRef.current;
+		// 编辑器不存在或已销毁则返回
+		if (!editor || editor.isDestroyed) return;
+		// 调用 store 的保存方法，传入标题、纯文本、HTML
+		await store.saveNote({
+			title: getDocTitleText(editor.state.doc).trim(),
+			text: editor.getText({ blockSeparator: '\n\n' }).trim(),
+			html: editor.getHTML(),
+		});
+	}, [store]);
 
 	// Cmd/Ctrl+S 快捷键保存：监听全局键盘事件，编辑态下触发保存
 	useEffect(() => {
@@ -4468,12 +4670,12 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		const onKeyDown = (e: KeyboardEvent) => {
 			// 不是 metaKey(Command) 也不是 ctrlKey，或者按键不是 s，则直接返回
 			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
-			// 预览态不处理快捷键（预览时没有草稿可保存）
-			if (preview) return;
+			// 预览态不处理快捷键（预览时没有草稿可保存）——从 ref 读最新值
+			if (previewRef.current) return;
 			// 阻止浏览器默认的保存页面行为
 			e.preventDefault();
-			// 正在保存中则不重复触发，避免并发请求
-			if (saving) return;
+			// 正在保存中则不重复触发，避免并发请求——从 ref 读最新值
+			if (savingRef.current) return;
 			// 触发保存
 			void onSave();
 		};
@@ -4481,73 +4683,49 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		window.addEventListener('keydown', onKeyDown);
 		// 卸载时移除监听，防止内存泄漏
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [onSave, preview, saving]);
+	}, [onSave]);
 
-	// 删除入口：记录待删 id 并打开确认弹层
-	const onDelete = (id: string) => {
-		setPendingDeleteId(id);
-		setConfirmOpen(true);
-	};
-
-	// 确认删除：真正调用 remove
-	const onConfirmDelete = async () => {
-		const id = pendingDeleteId;
-		if (!notesApi || !id) return;
-		try {
-			await notesApi.remove(id);
-			// 仅当左侧正展示被删笔记时关掉预览；编辑草稿同理，不误伤其它预览
-			if (preview?.id === id) setPreview(null);
-			if (editingId === id) {
-				// 正在编辑的被删了：清空草稿 + 重建空编辑器
-				setEditingId(null);
-				setDraft({ html: '', text: '', title: '' });
-				setEditorInitial(EMPTY_NOTE_DOC);
-				setEditorSeed((n) => n + 1);
-			}
-			toast('已删除', 'success');
-			await refreshList();
-		} catch (e) {
-			toast(errMsg(e), 'error');
-		} finally {
-			setPendingDeleteId(null);
-		}
-	};
-
-	// 切换列表展开/收起
-	const toggleNotesList = () => setListOpen((o) => !o);
-
-	// 列表开关按钮（在工具栏与预览头部复用）
-	const listToggleBtn = () => (
-		<Btn
-			title={listOpen ? '关闭笔记列表' : '打开笔记列表'}
-			onClick={toggleNotesList}
-		>
-			<NotebookText size={15} />
-		</Btn>
+	// 列表开关按钮组件（在工具栏与预览头部复用）
+	const listToggleBtn = useCallback(
+		() => (
+			<Btn
+				title={store.listOpen ? '关闭笔记列表' : '打开笔记列表'}
+				onClick={() => store.toggleListOpen()}
+			>
+				<NotebookText size={15} />
+			</Btn>
+		),
+		[store, store.listOpen],
 	);
 
 	// 工具栏额外按钮：新建 + 保存 + 列表开关
-	const toolbarExtra = (editor: Editor) => {
-		void editor; // editor 参数为类型兼容保留，本组件未直接使用
-		return (
+	const toolbarExtra = useMemo(
+		() => (
 			<>
 				{/* 新建笔记按钮 */}
-				<Btn title="新建笔记" onClick={openNew}>
+				<Btn title="新建笔记" onClick={() => store.openNew()}>
 					<FilePenLine size={15} />
 				</Btn>
 				{/* 保存/更新按钮：saving 时禁用，文案随 editingId 变化，tooltip 显示快捷键提示 */}
 				<Btn
-					title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记 ⌘S'}
+					title={
+						store.saving
+							? '保存中…'
+							: store.editingId
+								? '更新笔记 ⌘S'
+								: '保存笔记 ⌘S'
+					}
 					onClick={() => void onSave()}
-					disabled={saving}
+					disabled={store.saving}
 				>
 					<Save size={15} />
 				</Btn>
-				{/* 列表开关 */}
+				{/* 列表开关按钮 */}
 				{listToggleBtn()}
 			</>
-		);
-	};
+		),
+		[listToggleBtn, onSave, store, store.editingId, store.saving],
+	);
 
 	// 根容器：纵向 flex，圆角 + 主题背景
 	return (
@@ -4556,13 +4734,13 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 				'bg-theme/5 text-textcolor flex h-full min-h-0 min-w-0 flex-col text-sm rounded-md',
 			)}
 		>
-			{/* 删除确认弹层：全局挂载，由 confirmOpen 控制 */}
+			{/* 删除确认弹层：全局挂载，由 store.confirmOpen 控制 */}
 			<Confirm
-				open={confirmOpen}
-				onOpenChange={setConfirmOpen}
+				open={store.confirmOpen}
+				onOpenChange={(open) => store.setConfirmOpen(open)}
 				title="确定删除这条笔记？"
 				description="删除后将无法恢复"
-				onConfirm={() => void onConfirmDelete()}
+				onConfirm={() => void store.confirmDelete()}
 			/>
 			{/* 水平分栏：左列表 + 右编辑器/预览 */}
 			<ResizablePanelGroup
@@ -4570,89 +4748,134 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 				orientation="horizontal"
 				className="h-full min-h-0 min-w-0 flex-1"
 			>
-				{/* 列表栏：仅 listOpen 时渲染 */}
-				{listOpen ? (
+				{/* 列表栏：仅 store.listOpen 时渲染 */}
+				{store.listOpen ? (
 					<>
 						<ResizablePanel
 							id="learning-notes-list"
-							defaultSize={35} // 默认占 35%
-							minSize={0} // 允许收窄到 0
+							{/* 默认占 35% */}
+							defaultSize={35}
+							{/* 允许收窄到 0 */}
+							minSize={0}
 							className="min-h-0 min-w-0"
 						>
 							<aside className="border-r mb-3 border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-								{/* 列表头：标题 + 新建按钮 */}
+								{/* 列表头：标题 + 加载统计 + 滚动按钮 */}
 								<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
-									<span className="text-textcolor/85">
+									<div className="text-textcolor/85">
+										{/* 列表标题 */}
 										笔记列表
-									</span>
-									<Btn title="新建笔记" onClick={openNew}>
-										<FilePenLine size={15} />
+										{/* 加载统计：已加载 N 条/共 M 条 */}
+										<span className="ml-3 text-xs text-textcolor/60">
+											已加载 {store.list.length} 条/共 {store.total} 条
+										</span>
+									</div>
+									{/* 滚动模式切换按钮 */}
+									<Btn title={scrollTitle} onClick={onScrollFabClick}>
+										{/* 底部模式显示向下箭头 */}
+										{displayMode === 'bottom' ? (
+											<ChevronDown size={18} />
+										// 顶部模式显示向上箭头
+										) : displayMode === 'top' ? (
+											<ChevronUp size={18} />
+										// 当前模式显示定位图标
+										) : (
+											<LocateFixed size={15} />
+										)}
 									</Btn>
 								</div>
 								{/* 可滚动列表：内边距写在 ScrollArea，与主项目英语学习侧栏一致 */}
-								<ScrollArea className="min-h-0 flex-1 p-3">
-									<div className="flex flex-col gap-3">
-										{/* 空态提示 */}
-										{notes.length === 0 && !loading ? (
-											<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
-												暂无笔记，保存一条试试
-											</p>
-										) : null}
-										{notes.map((n) => {
-											// 高亮判定：预览优先，其次编辑态，避免两条同时高亮
-											const active = (preview?.id ?? editingId) === n.id;
-											return (
-												<div
-													key={n.id}
-													className={cn(
-														'hover:bg-theme/10 bg-theme/5 group relative w-full rounded-md px-3 py-2.5 text-left transition-colors',
-														active && 'bg-theme/15',
-													)}
-												>
-													{/* 主按钮：点击进入预览 */}
-													<button
-														type="button"
-														className="w-full text-left"
-														onClick={() => void openPreview(n.id)}
+								<ScrollArea
+									ref={scrollViewportRef}
+									className="min-h-0 flex-1 p-3"
+								>
+									{/* 列表加载中：显示 Loading 动画 */}
+									{store.loading ? (
+										<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
+											<Loading />
+										</div>
+									) : (
+										<div className="flex flex-col gap-3">
+											{/* 空态提示：列表为空且不在加载中时显示 */}
+											{store.list.length === 0 && !store.loading ? (
+												<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
+													暂无笔记，保存一条试试
+												</p>
+											) : null}
+											{/* 列表项遍历：用 store.list 替代原 notes */}
+											{store.list.map((n) => {
+												// 高亮判定：预览优先，其次编辑态，避免两条同时高亮
+												const active =
+													(store.preview?.id ?? store.editingId) === n.id;
+												return (
+													<div
+														key={n.id}
+														{/* 活跃项挂载 activeItemRef，用于滚动到当前 */}
+														ref={active ? activeItemRef : undefined}
+														className={cn(
+															'hover:bg-theme/10 bg-theme/5 group relative w-full rounded-md px-3 py-2.5 text-left transition-colors',
+															active && 'bg-theme/15',
+														)}
 													>
-														{/* 标题：hover 时右移给操作按钮腾位 */}
-														<div className="text-textcolor truncate text-base font-semibold pr-0 transition-[padding] duration-200 group-hover:pr-14">
-															{n.title}
-														</div>
-														{/* 时间 */}
-														<div className="text-textcolor/45 mt-1.5 text-xs">
-															{new Date(n.at).toLocaleString()}
-														</div>
-													</button>
-													{/* hover 操作区：编辑 + 删除 */}
-													<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-														<button
-															type="button"
-															title="编辑"
-															className="w-7 h-7 text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10 flex cursor-pointer items-center justify-center rounded-md p-1"
-															onClick={(e) => {
-																e.stopPropagation();
-																void openEditById(n.id);
-															}}
+														{/* 主区域：点击进入预览 */}
+														<div
+															className="w-full text-left"
+															onClick={() => void store.openPreview(n.id)}
 														>
-															<SquarePen size={15} />
-														</button>
-														<button
-															type="button"
-															title="删除"
-															className="w-7 h-7 text-textcolor/80 hover:text-destructive hover:bg-destructive/10 flex cursor-pointer items-center justify-center rounded-md p-1"
-															onClick={(e) => {
-																e.stopPropagation();
-																onDelete(n.id);
-															}}
-														>
-															<Trash2 size={15} />
-														</button>
+															{/* 标题：hover 时右移给操作按钮腾位 */}
+															<div className="text-textcolor truncate text-base font-semibold pr-0 transition-[padding] duration-200 group-hover:pr-14">
+																{n.title}
+															</div>
+															{/* 时间 */}
+															<div className="text-textcolor/45 mt-1.5 text-xs">
+																{new Date(n.at).toLocaleString()}
+															</div>
+														</div>
+														{/* hover 操作区：编辑 + 删除 */}
+														<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+															<button
+																type="button"
+																title="编辑"
+																className="w-7 h-7 text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10 flex cursor-pointer items-center justify-center rounded-md p-1"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	void store.openEditById(n.id);
+																}}
+															>
+																<SquarePen size={15} />
+															</button>
+															<button
+																type="button"
+																title="删除"
+																className="w-7 h-7 text-textcolor/80 hover:text-destructive hover:bg-destructive/10 flex cursor-pointer items-center justify-center rounded-md p-1"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	store.requestDelete(n.id);
+																}}
+															>
+																<Trash2 size={15} />
+															</button>
+														</div>
 													</div>
-												</div>
-											);
-										})}
-									</div>
+												);
+											})}
+											{/* 加载更多中：显示「加载中…」提示 */}
+											{store.loadingMore ? (
+												<p className="text-textcolor/45 py-2 text-center text-xs">
+													加载中…
+												</p>
+											) : null}
+											{/* 没有更多了：已加载全部且列表非空时显示 */}
+											{!store.loading &&
+											!store.loadingMore &&
+											store.list.length > 0 &&
+											!store.hasMore ? (
+												<p className="text-textcolor/35 py-2 text-center text-xs">
+													没有更多了
+												</p>
+											) : null}
+										</div>
+									)}
 								</ScrollArea>
 							</aside>
 						</ResizablePanel>
@@ -4663,7 +4886,8 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 				{/* 右栏：编辑器 / 预览 */}
 				<ResizablePanel
 					id="learning-notes-editor"
-					defaultSize={listOpen ? 65 : 100} // 列表关闭时占满
+					{/* 列表关闭时占满 */}
+					defaultSize={store.listOpen ? 65 : 100}
 					minSize={50}
 					className="min-h-0 min-w-0"
 				>
@@ -4672,43 +4896,68 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 						<div
 							className={cn(
 								'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
-								preview && 'hidden',
+								store.preview && 'hidden',
 							)}
 						>
 							<RichEditor
-								key={editorSeed} // 递增即重建，用于切换新建/编辑
-								defaultContent={editorInitial}
-								autofocus="end" // 自动聚焦到文末
+								{/* 递增即重建，用于切换新建/编辑 */}
+								key={store.editorSeed}
+								defaultContent={store.editorInitial}
+								{/* 自动聚焦到文末 */}
+								autofocus="end"
 								placeholder="记下今天的单词、语法或口语收获…"
 								showCharCount={false}
-								onChange={({ html, text, title }) =>
-									setDraft({ html, text, title })
-								}
+								{/* onCreate 回调：编辑器实例创建后把引用存到 editorRef */}
+								onCreate={(e) => {
+									editorRef.current = e;
+								}}
 								className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
 								editorClassName="min-h-[6rem]"
 								toolbarExtra={toolbarExtra}
 							/>
 						</div>
-						{/* 预览组件：有 preview 时显示，header 含新建/编辑/删除/列表开关 */}
-						{preview ? (
-							<NotePreview
-								title={preview.title}
-								html={preview.html}
-								headerExtra={
-									<>
-										<Btn title="新建笔记" onClick={openNew}>
-											<FilePenLine size={15} />
-										</Btn>
-										<Btn title="编辑" onClick={() => openEdit(preview)}>
-											<SquarePen size={15} />
-										</Btn>
-										<Btn title="删除" onClick={() => onDelete(preview.id)}>
-											<Trash2 size={15} />
-										</Btn>
-										{listToggleBtn()}
-									</>
-								}
-							/>
+						{/* 预览组件：有 store.preview 时显示，header 含新建/编辑/删除/列表开关 */}
+						{store.preview ? (
+							// 详情加载中：显示 Loading 动画
+							store.loadingDetail ? (
+								<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
+									<Loading />
+								</div>
+							) : (
+								<NotePreview
+									title={store.preview.title}
+									html={store.preview.html}
+									headerExtra={
+										<>
+											{/* 新建笔记按钮 */}
+											<Btn title="新建笔记" onClick={() => store.openNew()}>
+												<FilePenLine size={15} />
+											</Btn>
+											{/* 编辑按钮 */}
+											<Btn
+												title="编辑"
+												onClick={() => {
+													if (store.preview) store.openEdit(store.preview);
+												}}
+											>
+												<SquarePen size={15} />
+											</Btn>
+											{/* 删除按钮 */}
+											<Btn
+												title="删除"
+												onClick={() => {
+													if (store.preview)
+														store.requestDelete(store.preview.id);
+												}}
+											>
+												<Trash2 size={15} />
+											</Btn>
+											{/* 列表开关按钮 */}
+											{listToggleBtn()}
+										</>
+									}
+								/>
+							)
 						) : null}
 					</div>
 				</ResizablePanel>
@@ -4716,6 +4965,9 @@ export default function LearningNotesApp({ api }: HostBridgeProps) {
 		</div>
 	);
 }
+
+// 用 observer 包裹组件，使其响应 MobX store 变化而更新
+export default observer(LearningNotesApp);
 
 // 插件激活钩子（列表在组件 mount 时拉取，这里留空）
 export async function activate() {
@@ -4757,6 +5009,9 @@ export type HostHttp = {
 	delete: <T = unknown>(url: string) => Promise<T>;
 };
 
+// 列表默认每页条数：统一分页大小，避免各处硬编码不一致
+export const NOTES_PAGE_SIZE = 10;
+
 // 接口前缀：所有笔记接口都在该路径下
 const BASE = '/english-learning/notes';
 
@@ -4779,6 +5034,18 @@ export type Note = {
 	title: string; // 已兜底为非空字符串
 	html: string; // 由 content 映射而来
 	at: number; // 毫秒时间戳，用于排序与展示
+};
+
+// 分页结果类型：列表页统一返回结构，含数据列表、总条数、当前页码、每页条数
+export type NoteListPage = {
+	// 当前页的笔记列表
+	list: Note[];
+	// 总条数：用于计算总页数和分页控件展示
+	total: number;
+	// 当前页码：从 1 开始
+	pageNo: number;
+	// 每页条数：与请求参数一致，便于前端校验
+	pageSize: number;
 };
 
 // 解包后端响应：兼容 { data: ... } 包裹与裸返回两种风格
@@ -4810,13 +5077,22 @@ function toNote(row: NoteListItem | NoteRecord): Note {
 // 工厂：传入 host 的 http，返回封装好的笔记 CRUD API
 export function createNotesApi(http: HostHttp) {
 	return {
-		// 列表：默认拉 100 条，转成 Note 后按时间倒序
-		async list(pageSize = 100): Promise<Note[]> {
-			const res = await http.get(`${BASE}/list?pageNo=1&pageSize=${pageSize}`);
+		// 列表：支持分页，默认第 1 页，每页 NOTES_PAGE_SIZE 条，返回分页对象
+		async list(pageNo = 1, pageSize = NOTES_PAGE_SIZE): Promise<NoteListPage> {
+			const res = await http.get(`${BASE}/list?pageNo=${pageNo}&pageSize=${pageSize}`);
 			const page = unwrapData<{ list: NoteListItem[]; total: number }>(res);
 			// 兜底：page.list 可能不是数组
-			const list = Array.isArray(page?.list) ? page.list : [];
-			return list.map(toNote).sort((a, b) => b.at - a.at);
+			const rows = Array.isArray(page?.list) ? page.list : [];
+			return {
+				// 将后端行转成前端 Note 视图模型
+				list: rows.map(toNote),
+				// 总条数：优先用后端返回的 total，没有则用当前页条数兜底
+				total: typeof page?.total === 'number' ? page.total : rows.length,
+				// 当前页码：回显传入的 pageNo，便于调用方确认
+				pageNo,
+				// 每页条数：回显传入的 pageSize，便于调用方确认
+				pageSize,
+			};
 		},
 
 		// 详情：按 id 拉单条，返回完整 Note（含 html 正文）
@@ -4874,6 +5150,9 @@ design 组件库的**统一出口**，外部使用时只需要从 `@/components/
 ### 21.2 完整代码与逐行注释
 
 ```typescript
+// 导入 Loading 组件默认导出，用于后续重新导出
+import Loading from './Loading';
+
 // 重新导出 RichEditor 的所有类型
 export type {
 	CodeLanguage,
@@ -4901,6 +5180,9 @@ export type { NotePreviewProps } from './NotePreview';
 
 // 重新导出 NotePreview 组件和工具函数
 export { NotePreview, stripNoteTitleHtml } from './NotePreview';
+
+// 重新导出 Loading 模块的所有命名导出
+export * from './Loading';
 ```
 
 ### 21.3 使用方式

@@ -1,8 +1,8 @@
 /** 独立预览用假 HostBridge；嵌入主站时由 Host 注入真 api */
 export function mockApi(extra?: Record<string, unknown>) {
 	return {
-		t: (k: string) => k,
 		theme: 'light' as const,
+		// 不传 locale：独立预览用本地 useI18n；插件模式由 Host 注入
 		event: {
 			on: () => undefined,
 			off: () => undefined,

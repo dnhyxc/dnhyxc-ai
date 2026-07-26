@@ -4,6 +4,7 @@ import {
 	useEffect,
 	useState,
 } from 'react';
+import { useI18n } from '@/hooks';
 import { connectIframeHost } from '@/utils/iframeHostClient';
 import IdeasListApp from '@/views/ideas-list';
 import LearningNotesApp from '@/views/learning-notes';
@@ -25,6 +26,7 @@ function EmbedShell({
 	pluginId: string;
 	App: ComponentType<Bridge>;
 }) {
+	const { t } = useI18n();
 	const [bridge, setBridge] = useState<Bridge | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +56,9 @@ function EmbedShell({
 	}
 	if (!bridge) {
 		return (
-			<div className="text-textcolor/55 h-full p-3 text-sm">连接 Host…</div>
+			<div className="text-textcolor/55 h-full p-3 text-sm">
+				{t('common.connectingHost')}
+			</div>
 		);
 	}
 

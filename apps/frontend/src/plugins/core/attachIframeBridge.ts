@@ -1,3 +1,5 @@
+import { getActiveLocale, type Locale } from '@/i18n';
+import { onListen } from '@/utils';
 import type { HostBridgeProps } from './types';
 
 export const MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
@@ -92,11 +94,32 @@ export function attachIframeBridge(
 				channel: MF_IFRAME_CHANNEL,
 				type: 'init',
 				theme: bridge.api.theme,
+				locale: getActiveLocale(),
 				plugin: bridge.plugin,
 			},
 			targetOrigin,
 		);
 	};
+
+	const pushLocale = (locale: Locale) => {
+		const w = win();
+		if (!w) return;
+		w.postMessage(
+			{
+				channel: MF_IFRAME_CHANNEL,
+				type: 'locale',
+				locale,
+			},
+			targetOrigin,
+		);
+	};
+
+	let unlistenLocale: (() => void) | undefined;
+	void onListen<Locale>('locale', (next) => {
+		if (next === 'zh-CN' || next === 'en-US') pushLocale(next);
+	}).then((fn) => {
+		unlistenLocale = fn;
+	});
 
 	const onMessage = (ev: MessageEvent) => {
 		if (ev.source !== win()) return;
@@ -155,5 +178,6 @@ export function attachIframeBridge(
 	return () => {
 		window.removeEventListener('message', onMessage);
 		iframe.removeEventListener('load', onLoad);
+		unlistenLocale?.();
 	};
 }

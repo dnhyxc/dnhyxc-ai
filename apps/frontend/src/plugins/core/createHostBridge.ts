@@ -1,4 +1,5 @@
 import { Toast } from '@ui/sonner';
+import { getActiveLocale, type Locale } from '@/i18n';
 import { http } from '@/utils/fetch';
 import { deepFreeze } from '../host-api/deepFreeze';
 import { eventBus } from '../host-api/EventBus';
@@ -23,6 +24,11 @@ function readTheme(): 'light' | 'dark' {
 	return 'light';
 }
 
+function readLocale(): Locale {
+	const locale = getActiveLocale();
+	return locale === 'en-US' ? 'en-US' : 'zh-CN';
+}
+
 /** 按 permissions 组装并密封；未授权能力不存在 */
 export function createHostBridge(
 	d: PluginDescriptor,
@@ -30,8 +36,8 @@ export function createHostBridge(
 ): HostBridgeProps {
 	const allow = new Set(d.permissions);
 	const api: Record<string, unknown> = {
-		t: (key: string) => key,
 		theme: readTheme(),
+		locale: readLocale(),
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) =>
 				eventBus.on(d.id, event, handler),

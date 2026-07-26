@@ -9,8 +9,8 @@ import AudioPlayer, {
 
 type HostBridgeProps = {
 	api: {
-		t: (key: string, params?: Record<string, unknown>) => string;
 		theme: 'light' | 'dark';
+		locale?: 'zh-CN' | 'en-US';
 		navigate: (to: string) => void;
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) => void;

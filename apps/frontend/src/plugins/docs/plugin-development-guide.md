@@ -3,6 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -14,14 +15,15 @@
 4. [组件实现规范](#4-组件实现规范)
 5. [样式处理规范](#5-样式处理规范)
 6. [HostBridge API 使用](#6-hostbridge-api-使用)
-7. [权限声明](#7-权限声明)
-8. [生命周期钩子](#8-生命周期钩子)
-9. [独立预览配置](#9-独立预览配置)
-10. [iframe 隔离模式开发](#10-iframe-隔离模式开发)
-11. [调试技巧](#11-调试技巧)
-12. [发布流程](#12-发布流程)
-13. [验收清单](#13-验收清单)
-14. [常见问题](#14-常见问题)
+7. [插件内 i18n 与 Host locale](#7-插件内-i18n-与-host-locale)
+8. [权限声明](#8-权限声明)
+9. [生命周期钩子](#9-生命周期钩子)
+10. [独立预览配置](#10-独立预览配置)
+11. [iframe 隔离模式开发](#11-iframe-隔离模式开发)
+12. [调试技巧](#12-调试技巧)
+13. [发布流程](#13-发布流程)
+14. [验收清单](#14-验收清单)
+15. [常见问题](#15-常见问题)
 
 ---
 
@@ -41,7 +43,8 @@
 
 ```bash
 # 开发环境 Remote 公共 origin（与 Host registry entry 一致）
-VITE_REMOTE_PUBLIC_ORIGIN=http://127.0.0.1:9005
+# remote-plugins 默认 9008；remote-demo 默认 9007
+VITE_REMOTE_PUBLIC_ORIGIN=http://127.0.0.1:9008
 
 # React Refresh Host：指向 Host 开发服务器
 VITE_REACT_REFRESH_HOST=http://127.0.0.1:9002
@@ -80,6 +83,8 @@ plugin-demo/
 │   ├── views/               # 页面组件（多 expose 时使用）
 │   │   └── home/
 │   │       └── index.tsx
+│   ├── hooks/               # useI18n / useHostLocale
+│   ├── i18n/                # 插件自有文案字典（与 Host 隔离）
 │   ├── utils/               # 工具函数
 │   │   ├── mockHost.ts      # mock HostBridge（独立预览用）
 │   │   └── iframeHostClient.ts  # iframe 通信客户端（untrusted 用）
@@ -210,7 +215,7 @@ function clearMfViteDepCache(): Plugin {
 }
 
 const host = '127.0.0.1';
-const port = 9005;
+const port = 9008;
 const devOrigin = `http://${host}:${port}`;
 
 export default defineConfig(({ mode }) => {
@@ -321,11 +326,13 @@ export default defineConfig(({ mode }) => {
 **文件路径**：`src/App.tsx`
 
 ```typescript
-// 必须：定义 HostBridgeProps 类型
+import { useHostLocale, useI18n } from '@/hooks';
+
+// 与 Host HostBridgeProps 对齐（无 api.t）
 type HostBridgeProps = {
 	api: {
-		t: (key: string, params?: Record<string, unknown>) => string;
 		theme: 'light' | 'dark';
+		locale?: 'zh-CN' | 'en-US';
 		navigate?: (to: string) => void;
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) => void;
@@ -335,6 +342,8 @@ type HostBridgeProps = {
 		http?: {
 			get: <T = unknown>(url: string) => Promise<T>;
 			post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			put: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+			delete: <T = unknown>(url: string) => Promise<T>;
 		};
 		ui?: {
 			showToast: (options: {
@@ -349,16 +358,18 @@ type HostBridgeProps = {
 
 // 必须：default 导出 React 组件
 export default function App({ api, plugin }: HostBridgeProps) {
+	const { t } = useI18n();
+	useHostLocale(api); // 插件模式跟随 Host；独立预览无 locale 时无操作
+
 	return (
-		// 必须：根元素带 data-plugin-root 属性
 		<div className="plugin-standalone" data-plugin-root>
-			<h1>插件 {plugin.id} v{plugin.version}</h1>
-			<p>当前主题：{api.theme}</p>
+			<h1>{t('home.title')} · {plugin.id} v{plugin.version}</h1>
+			<p>theme={api.theme} · locale={api.locale}</p>
 			<button
 				type="button"
 				onClick={() => api.ui?.showToast({ message: 'Hello!' })}
 			>
-				显示 Toast
+				{t('common.toast')}
 			</button>
 		</div>
 	);
@@ -391,128 +402,43 @@ export async function deactivate() {
 
 ## 5. 样式处理规范
 
-### 5.1 样式文件配置
+### 5.1 现行模型（Host 隔离）
 
-**文件路径**：`src/styles.css`
+| 信任等级 | 谁负责隔离 | Remote 可以做什么 |
+|----------|------------|-------------------|
+| `first-party` / `partner` | Host `styleIsolation.ts` 运行时 `@scope([data-mf-plugin])` | 正常 `@import "tailwindcss"`（含 Preflight） |
+| `untrusted` | iframe | 独立文档样式，互不影响 |
+
+详见 `apps/remote-plugins/plugin-info.md` 与 `docs/ideas/mf-css-isolation.md`。
+
+### 5.2 样式文件示例
+
+**文件路径**：`src/styles.css`（对齐 `apps/remote-plugins`）
 
 ```css
-/*
- * 生产者侧样式隔离（强制要求）：
- * - 禁止 @import "tailwindcss" 全家桶（含 Preflight）
- * - utilities 挂在 [data-plugin-root] 下实现 scoped
- */
-@layer theme, base, components, utilities;
-
-/* 只引入主题和动画，不引入 Preflight */
-@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss";
 @import "tw-animate-css";
 
-/* Tailwind v4：嵌套实现 scoped */
-[data-plugin-root] {
-	@import "tailwindcss/utilities.css" layer(utilities);
-}
-
-/* 只在插件根内做表单控件 reset */
-@layer base {
-	[data-plugin-root] :where(button, input, textarea, select) {
-		appearance: none;
-		background-color: transparent;
-		border-style: solid;
-		border-width: 0;
-		border-color: transparent;
-		color: inherit;
-		font: inherit;
-		letter-spacing: inherit;
-		margin: 0;
-		padding: 0;
-	}
-}
-
-/* 独立预览时的默认变量 */
-.plugin-standalone {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.15 0.02 264.665);
-	--muted: oklch(0.98 0.005 264.665);
-	--muted-foreground: oklch(0.551 0.027 264.364);
-	--accent: oklch(0.967 0.003 264.542);
-	--border: oklch(0.95 0.00845 271.331);
-	--destructive: oklch(0.577 0.245 27.325);
-	--ring: oklch(0.707 0.022 261.325);
-	--radius: 0.625rem;
-	--theme-color: oklch(0.15 0.02 264.665);
-	--theme-background: oklch(1 0 0);
-	--theme-border: oklch(0.95 0.00845 271.331);
-	--theme-textcolor: oklch(0.15 0.02 264.665);
-	box-sizing: border-box;
-	font-family: ui-sans-serif, system-ui, sans-serif;
-	color: var(--theme-textcolor);
-	background-color: var(--theme-background);
-}
-
-/* 深色主题变量 */
-.plugin-standalone[data-theme='dark'] {
-	--background: oklch(0.125 0.011 272);
-	--foreground: oklch(92.46% 0.012 255.8);
-	--muted: color-mix(in oklch, oklch(0.125 0.011 272) 90%, white);
-	--muted-foreground: oklch(0.7 0.01 264);
-	--accent: color-mix(in oklch, oklch(0.125 0.011 272) 92%, white);
-	--border: color-mix(
-		in oklch,
-		color-mix(in oklch, oklch(0.125 0.011 272) 72%, white) 22%,
-		transparent
-	);
-	--theme-background: var(--background);
-	--theme-border: var(--border);
-	--theme-textcolor: var(--foreground);
-}
-
-/* 确保 box-sizing 正确 */
-.plugin-standalone *,
-.plugin-standalone *::before,
-.plugin-standalone *::after {
-	box-sizing: border-box;
-}
-
-/* 自定义主题变量（与 Tailwind CSS 对齐） */
-@theme inline {
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
-	--radius-xl: calc(var(--radius) + 4px);
-	--color-background: var(--background);
-	--color-foreground: var(--foreground);
-	--color-muted: var(--muted);
-	--color-muted-foreground: var(--muted-foreground);
-	--color-accent: var(--accent);
-	--color-border: var(--border);
-	--color-destructive: var(--destructive);
-	--color-ring: var(--ring);
-	--color-theme: var(--theme-color);
-	--color-theme-background: var(--theme-background);
-	--color-theme-border: var(--theme-border);
-	--color-textcolor: var(--theme-textcolor);
-}
+@custom-variant dark (&:where(.dark, .dark *));
+/* :root / .dark token、#root 等按 shadcn 配置即可 */
 ```
 
-### 5.2 样式规范检查表
+### 5.3 组件根节点
 
-| 要求 | 是否必须 | 说明 |
-|------|---------|------|
-| 禁止 `@import "tailwindcss"` | ✅ | 会引入 Preflight 污染 Host |
-| 只引入 `tailwindcss/theme.css` | ✅ | 只引入主题，不含 Preflight |
-| utilities 挂在 `[data-plugin-root]` 下 | ✅ | 实现 scoped 隔离 |
-| 表单控件局部 reset | ✅ | 只在插件根内做 reset |
-| CSS 变量定义 | ✅ | 浅色/深色主题变量 |
-| `@theme inline` | ✅ | 与 Tailwind CSS 对齐 |
+```tsx
+// Host 会包一层 data-mf-plugin；Remote 根仍建议 data-plugin-root 兼容旧选择器
+<div className="plugin-standalone h-full" data-plugin-root>
+  {/* ... */}
+</div>
+```
 
-### 5.3 样式违规后果
+### 5.4 检查表
 
-| 违规行为 | 后果 |
-|---------|------|
-| 引入完整 Tailwind Preflight | Host 全局样式被污染（字体、边距等） |
-| 无作用域 utilities | `.text-red-500` 等类名全局生效 |
-| 修改 `html`/`body` 样式 | 影响 Host 页面整体布局 |
-| 不做表单控件 reset | 按钮、输入框显示浏览器默认样式 |
+| 要求 | 说明 |
+|------|------|
+| 普通 Tailwind 工程配置 | ✅ 推荐；不必再禁用 Preflight |
+| 独立预览样式自洽 | ✅ `:root` / `.dark` token 完整 |
+| 不依赖 Host 未公开的全局类名 | ✅ 主题变量可继承 Host，但勿耦合私有 class |
 
 ---
 
@@ -522,14 +448,14 @@ export async function deactivate() {
 
 | API | 权限要求 | 说明 |
 |-----|---------|------|
-| `api.t(key)` | 无 | 国际化翻译函数 |
-| `api.theme` | 无 | 当前主题（light/dark） |
+| `api.theme` | 无 | 主题快照（无热更新） |
+| `api.locale` | 无 | `zh-CN` \| `en-US`；插件用自有 `t()` |
 | `api.navigate(to)` | `nav:subtree` | 子路由导航 |
-| `api.event.on/off/emit` | 无 | 事件总线 |
-| `api.http.get/post` | `http:plugin-api` | HTTP 请求 |
+| `api.event.on/off/emit` | 无 | 事件总线（MF 下可收 `locale`） |
+| `api.http.get/post/put/delete` | `http:plugin-api` | HTTP 请求 |
 | `api.ui.showToast` | `ui:toast` | 显示 Toast |
 | `api.modules.ebook` | `modules:ebook` | 电子书模块 API |
-| `api.modules.chat` | `modules:chat` | 聊天模块 API |
+| `api.modules.openThread` | `modules:chat` | 打开聊天线程 |
 
 ### 6.2 API 使用示例
 
@@ -562,10 +488,13 @@ export default function App({ api, plugin }: HostBridgeProps) {
 		});
 	};
 
+	const { t } = useI18n();
+	useHostLocale(api);
+
 	return (
 		<div className="plugin-standalone" data-plugin-root>
-			<h1>{api.t('plugin.title')}</h1>
-			<p>主题：{api.theme}</p>
+			<h1>{t('plugin.title')}</h1>
+			<p>主题：{api.theme} · 语言：{api.locale}</p>
 			<button onClick={handleFetch}>获取数据</button>
 			<button onClick={handleNavigate}>导航到详情</button>
 			<button onClick={handleToast}>显示 Toast</button>
@@ -590,9 +519,63 @@ await api.http.get('/api/data'); // TypeError: api.http is undefined
 
 ---
 
-## 7. 权限声明
+## 7. 插件内 i18n 与 Host locale
 
-### 7.1 权限列表
+Host **不**注入 `api.t`。插件维护自己的字典，只跟随 `api.locale`。
+
+### 7.1 推荐目录
+
+```
+src/i18n/
+  types.ts          # Locale = 'zh-CN' | 'en-US'
+  locales/zh-CN.ts
+  locales/en-US.ts
+  index.ts          # getActiveLocale / translateSync / applyHostLocale
+src/hooks/
+  i18n.ts           # useI18n()
+  useHostLocale.ts  # 跟随 Host
+```
+
+storage / runtime key 须与 Host 隔离（例：`remote_plugins_locale_bootstrap`）。
+
+### 7.2 `useHostLocale`
+
+```typescript
+// apps/remote-plugins/src/hooks/useHostLocale.ts
+export function useHostLocale(api?: {
+	locale?: Locale;
+	event?: {
+		on: (event: string, handler: (data?: unknown) => void) => void;
+		off: (event: string, handler: (data?: unknown) => void) => void;
+	};
+}) {
+	useEffect(() => {
+		if (isLocale(api?.locale)) applyHostLocale(api.locale);
+	}, [api?.locale]);
+
+	useEffect(() => {
+		const event = api?.event;
+		if (!event) return;
+		const onLocale = (data?: unknown) => {
+			if (isLocale(data)) applyHostLocale(data);
+		};
+		event.on('locale', onLocale);
+		return () => event.off('locale', onLocale);
+	}, [api?.event]);
+}
+```
+
+| 模式 | locale 来源 |
+|------|-------------|
+| 独立预览 | URL `?lang=` / localStorage；`mockApi` **不传** locale |
+| MF 嵌入 | props `api.locale` + `event('locale')` |
+| iframe | `init.locale` + `type:'locale'` 消息（`applyHostLocale`） |
+
+---
+
+## 8. 权限声明
+
+### 8.1 权限列表
 
 | 权限 | 说明 | 用途 |
 |------|------|------|
@@ -602,7 +585,7 @@ await api.http.get('/api/data'); // TypeError: api.http is undefined
 | `modules:chat` | 允许聊天模块 | 打开聊天线程 |
 | `modules:ebook` | 允许电子书模块 | 获取书籍信息、导航等 |
 
-### 7.2 权限配置示例
+### 8.2 权限配置示例
 
 在 Registry 中配置权限：
 
@@ -613,7 +596,7 @@ await api.http.get('/api/data'); // TypeError: api.http is undefined
 }
 ```
 
-### 7.3 权限最佳实践
+### 8.3 权限最佳实践
 
 | 原则 | 说明 |
 |------|------|
@@ -623,16 +606,16 @@ await api.http.get('/api/data'); // TypeError: api.http is undefined
 
 ---
 
-## 8. 生命周期钩子
+## 9. 生命周期钩子
 
-### 8.1 钩子说明
+### 9.1 钩子说明
 
 | 钩子 | 调用时机 | 参数 | 返回值 |
 |------|---------|------|--------|
 | `activate` | 模块加载后 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate` | 模块卸载前 | 无 | `Promise<void>` 或 `void` |
 
-### 8.2 钩子使用示例
+### 9.2 钩子使用示例
 
 ```typescript
 export default function App({ api }: HostBridgeProps) {
@@ -664,7 +647,7 @@ export async function deactivate() {
 }
 ```
 
-### 8.3 钩子注意事项
+### 9.3 钩子注意事项
 
 | 注意事项 | 说明 |
 |---------|------|
@@ -674,9 +657,9 @@ export async function deactivate() {
 
 ---
 
-## 9. 独立预览配置
+## 10. 独立预览配置
 
-### 9.1 预览入口
+### 10.1 预览入口
 
 **文件路径**：`src/main.tsx`
 
@@ -711,19 +694,23 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-### 9.2 Mock Host 工具
+### 10.2 Mock Host 工具
 
 **文件路径**：`src/utils/mockHost.ts`
 
 ```typescript
+/** 独立预览用假 HostBridge；嵌入主站时由 Host 注入真 api */
 export function mockApi(extra?: Record<string, unknown>) {
 	return {
-		t: (k: string) => k,
 		theme: 'light' as const,
+		// 不传 locale：独立预览用本地 useI18n；插件模式由 Host 注入
 		event: {
 			on: () => undefined,
 			off: () => undefined,
 			emit: () => undefined,
+		},
+		ui: {
+			showToast: (o: { message: string }) => console.info('[toast]', o.message),
 		},
 		...extra,
 	};
@@ -734,7 +721,7 @@ export function mockPlugin(id: string, routePath: string, version = '1.0.0') {
 }
 ```
 
-### 9.3 package.json 脚本
+### 10.3 package.json 脚本
 
 ```json
 {
@@ -746,216 +733,57 @@ export function mockPlugin(id: string, routePath: string, version = '1.0.0') {
 }
 ```
 
-### 9.4 预览访问
+### 10.4 预览访问
 
 ```bash
 pnpm dev
 ```
 
-访问 `http://127.0.0.1:9005/` 查看独立预览效果。
+访问 `http://127.0.0.1:9008/` 查看独立预览效果。
 
 ---
 
-## 10. iframe 隔离模式开发
+## 11. iframe 隔离模式开发
 
-### 10.1 适用场景
+### 11.1 适用场景
 
 | 场景 | 是否需要 iframe |
 |------|----------------|
-| 第三方插件 | ✅ |
-| 引入完整 Tailwind Preflight | ✅ |
-| 需要操作 `document`/`window` | ✅ |
-| 需要独立网络环境 | ✅ |
-| 第一方/合作方插件 | ❌（使用 MF 嵌入） |
+| `trust: untrusted` / 第三方不可信 | ✅ |
+| 需要强隔离（独立 JS/CSS 文档） | ✅ |
+| 需要操作顶层 `document`/`window` 且不能污染 Host | ✅ |
+| 第一方/合作方（`first-party` / `partner`） | ❌（MF 嵌入；样式由 Host `@scope` 隔离） |
 
-### 10.2 iframe 客户端
+### 11.2 iframe 客户端
 
-**文件路径**：`src/utils/iframeHostClient.ts`
+**文件路径**：`src/utils/iframeHostClient.ts`（对齐 `apps/remote-plugins`）
 
-```typescript
-export const MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
+协议 channel：`dnhyxc-mf-iframe`。公开 API：`connectIframeHost(pluginId): Promise<HostBridgeProps>`。
 
-type HostBridgeProps = {
-	api: {
-		t: (key: string, params?: Record<string, unknown>) => string;
-		theme: 'light' | 'dark';
-		event: {
-			on: (event: string, handler: (data?: unknown) => void) => void;
-			off: (event: string, handler: (data?: unknown) => void) => void;
-			emit: (event: string, data?: unknown) => void;
-		};
-		http?: {
-			get: <T = unknown>(url: string) => Promise<T>;
-			post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
-		};
-		ui?: {
-			showToast: (options: {
-				message: string;
-				type?: 'success' | 'error' | 'info';
-			}) => void;
-		};
-		modules?: Readonly<Record<string, unknown>>;
-	};
-	plugin: { id: string; version: string; routePath: string };
-};
+| 消息 | 方向 | 说明 |
+|------|------|------|
+| `ready` | → Host | 握手（400ms 重试） |
+| `init` | ← Host | `{ theme, locale, plugin }` |
+| `locale` | ← Host | 语言热更新 → `applyHostLocale` |
+| `rpc` / `rpc-result` | 双向 | `http.*` / `ui.showToast` / `ebook.*` |
 
-type Pending = {
-	resolve: (v: unknown) => void;
-	reject: (e: Error) => void;
-};
+要点：
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-	return !!v && typeof v === 'object';
-}
+- 无 `api.t`；`api.locale` + `applyHostLocale`
+- `api.event` 为 no-op（locale 不靠 event）
+- `http` 含 get/post/put/delete
+- IdeasList：`getBookId`/`getBookTitle` 在 init 后 RPC 预取并改写为同步 getter
 
-export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
-	if (window.parent === window) {
-		return Promise.reject(new Error('embed 页须在 Host iframe 内打开'));
-	}
+完整实现见仓库 `apps/remote-plugins/src/utils/iframeHostClient.ts`。
 
-	const pending = new Map<string, Pending>();
-	let seq = 0;
-
-	const rpc = (method: string, args: unknown[] = []) =>
-		new Promise<unknown>((resolve, reject) => {
-			const id = `r${++seq}`;
-			pending.set(id, { resolve, reject });
-			window.parent.postMessage(
-				{ channel: MF_IFRAME_CHANNEL, type: 'rpc', id, method, args },
-				'*',
-			);
-		});
-
-	return new Promise((resolve, reject) => {
-		let settled = false;
-		const timeout = window.setTimeout(() => {
-			teardown();
-			if (!settled) {
-				settled = true;
-				reject(new Error('等待 Host init 超时'));
-			}
-		}, 15_000);
-
-		const teardown = () => {
-			window.clearTimeout(timeout);
-			window.clearInterval(retry);
-			window.removeEventListener('message', onMessage);
-		};
-
-		const onMessage = (ev: MessageEvent) => {
-			const data = ev.data;
-			if (!isRecord(data) || data.channel !== MF_IFRAME_CHANNEL) return;
-
-			if (data.type === 'init') {
-				window.clearInterval(retry);
-				window.clearTimeout(timeout);
-				const theme =
-					data.theme === 'dark' || data.theme === 'light' ? data.theme : 'light';
-				const plugin =
-					isRecord(data.plugin) && typeof data.plugin.id === 'string'
-						? {
-								id: String(data.plugin.id),
-								version: String(data.plugin.version ?? '0'),
-								routePath: String(data.plugin.routePath ?? ''),
-							}
-						: { id: pluginId, version: '0', routePath: '' };
-
-				document.documentElement.dataset.theme = theme;
-
-				const bridge: HostBridgeProps = {
-					api: {
-						t: (k) => k,
-						theme,
-						event: { on: () => undefined, off: () => undefined, emit: () => undefined },
-						http: {
-							get: (url) => rpc('http.get', [url]) as Promise<never>,
-							post: (url, body) => rpc('http.post', [url, body]) as Promise<never>,
-						},
-						ui: { showToast: (options) => void rpc('ui.showToast', [options]) },
-						modules: {
-							ebook: {
-								getBookId: () => null,
-								getBookTitle: () => null,
-								navigateToCfi: (cfi) => rpc('ebook.navigateToCfi', [cfi]),
-								openThought: (thought) => rpc('ebook.openThought', [thought]),
-								closeIdeasList: () => rpc('ebook.closeIdeasList'),
-							},
-						},
-					},
-					plugin,
-				};
-
-				void (async () => {
-					try {
-						const [bookId, bookTitle] = await Promise.all([
-							rpc('ebook.getBookId'),
-							rpc('ebook.getBookTitle'),
-						]);
-						const ebook = bridge.api.modules!.ebook as {
-							getBookId: () => string | null;
-							getBookTitle: () => string | null;
-						};
-						ebook.getBookId = () =>
-							typeof bookId === 'string' || bookId === null ? bookId : null;
-						ebook.getBookTitle = () =>
-							typeof bookTitle === 'string' || bookTitle === null ? bookTitle : null;
-						if (!settled) {
-							settled = true;
-							resolve(bridge);
-						}
-					} catch (e) {
-						teardown();
-						if (!settled) {
-							settled = true;
-							reject(e instanceof Error ? e : new Error(String(e)));
-						}
-					}
-				})();
-				return;
-			}
-
-			if (data.type === 'rpc-result' && typeof data.id === 'string') {
-				const p = pending.get(data.id);
-				if (!p) return;
-				pending.delete(data.id);
-				if (data.ok) p.resolve(data.value);
-				else p.reject(new Error(String(data.error ?? 'rpc failed')));
-			}
-		};
-
-		const ping = () =>
-			window.parent.postMessage(
-				{ channel: MF_IFRAME_CHANNEL, type: 'ready', pluginId },
-				'*',
-			);
-
-		window.addEventListener('message', onMessage);
-		ping();
-		const retry = window.setInterval(ping, 400);
-	});
-}
-```
-
-### 10.3 Embed 页面
+### 11.3 Embed 页面
 
 **文件路径**：`src/views/embed/index.tsx`
 
 ```typescript
-import { useEffect, useState, type ComponentType } from 'react';
-import App from '@/App';
-import { connectIframeHost } from '@/utils/iframeHostClient';
-
-type Bridge = {
-	api: {
-		t: (key: string) => string;
-		theme: 'light' | 'dark';
-		http?: { get: <T>(url: string) => Promise<T>; post: <T>(url: string, body?: unknown) => Promise<T> };
-		ui?: { showToast: (options: { message: string; type?: 'success' | 'error' | 'info' }) => void };
-	};
-	plugin: { id: string; version: string; routePath: string };
-};
-
-function EmbedShell({ pluginId, AppComponent }: { pluginId: string; AppComponent: ComponentType<Bridge> }) {
+// 对齐 apps/remote-plugins：无预览壳；connectIframeHost 后把 bridge 传给业务组件
+function EmbedShell({ pluginId, App }: { pluginId: string; App: ComponentType<Bridge> }) {
+	const { t } = useI18n();
 	const [bridge, setBridge] = useState<Bridge | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -967,35 +795,23 @@ function EmbedShell({ pluginId, AppComponent }: { pluginId: string; AppComponent
 		return () => { cancelled = true; };
 	}, [pluginId]);
 
-	if (error) {
-		return (
-			<div className="plugin-standalone text-destructive h-full p-3 text-sm" data-plugin-root>
-				{error}
-			</div>
-		);
-	}
-
-	if (!bridge) {
-		return (
-			<div className="plugin-standalone text-textcolor/55 h-full p-3 text-sm" data-plugin-root>
-				连接 Host…
-			</div>
-		);
-	}
-
+	if (error) return <div className="text-destructive h-full p-3 text-sm">{error}</div>;
+	if (!bridge) return <div className="h-full p-3 text-sm">{t('common.connectingHost')}</div>;
 	return (
-		<div className="plugin-standalone h-full min-h-0" data-plugin-root data-theme={bridge.api.theme}>
-			<AppComponent {...bridge} />
+		<div className="h-full min-h-0">
+			<App {...bridge} />
 		</div>
 	);
 }
 
-export function EmbedApp() {
-	return <EmbedShell pluginId="myPlugin" AppComponent={App} />;
+export function EmbedLearningNotes() {
+	return <EmbedShell pluginId="learningNotes" App={LearningNotesApp} />;
 }
 ```
 
-### 10.4 iframe 路由配置
+Registry `iframeUrl` 必须指向 **/embed/...** 路径，不要指向带导航壳的预览路由。
+
+### 11.4 iframe 路由配置
 
 **文件路径**：`src/router/routes.tsx`
 
@@ -1024,9 +840,9 @@ export const routes = [
 
 ---
 
-## 11. 调试技巧
+## 12. 调试技巧
 
-### 11.1 开发环境调试
+### 12.1 开发环境调试
 
 | 工具 | 用途 |
 |------|------|
@@ -1035,7 +851,7 @@ export const routes = [
 | Network 面板 | 查看 `remoteEntry.js` 和模块加载 |
 | Console | 查看 `pluginManager.list()` 输出 |
 
-### 11.2 常用调试命令
+### 12.2 常用调试命令
 
 ```javascript
 // 在 Host 控制台查看已加载插件
@@ -1051,7 +867,7 @@ pluginManager.get('myPlugin')?.meta;
 localStorage.removeItem('dnhyxc.plugin.registry.dev.v1');
 ```
 
-### 11.3 常见错误排查
+### 12.3 常见错误排查
 
 | 错误 | 原因 | 解决方案 |
 |------|------|---------|
@@ -1063,19 +879,19 @@ localStorage.removeItem('dnhyxc.plugin.registry.dev.v1');
 
 ---
 
-## 12. 发布流程
+## 13. 发布流程
 
-### 12.1 构建
+### 13.1 构建
 
 ```bash
 # 设置生产环境 origin
-VITE_REMOTE_PUBLIC_ORIGIN=https://your-domain.com:9005
+VITE_REMOTE_PUBLIC_ORIGIN=https://your-domain.com:9008
 
 # 构建
 pnpm build
 ```
 
-### 12.2 部署
+### 13.2 部署
 
 将 `dist` 目录部署到静态服务器（如 Nginx）。
 
@@ -1083,7 +899,7 @@ pnpm build
 
 ```nginx
 server {
-	listen 9005 ssl;
+	listen 9008 ssl;
 	server_name your-domain.com;
 	
 	ssl_certificate /path/to/cert.pem;
@@ -1105,7 +921,7 @@ server {
 }
 ```
 
-### 12.3 Registry 注册
+### 13.3 Registry 注册
 
 联系 Host 管理员添加 Registry 配置：
 
@@ -1115,7 +931,7 @@ server {
 	"titleKey": "plugin.myPlugin.title",
 	"description": "我的插件",
 	"routePath": "/my-plugin",
-	"entry": "https://your-domain.com:9005/mf-manifest.json",
+	"entry": "https://your-domain.com:9008/mf-manifest.json",
 	"version": "1.0.0",
 	"hostApiRange": "^1.0.0",
 	"menu": {
@@ -1131,21 +947,23 @@ server {
 
 ---
 
-## 13. 验收清单
+## 14. 验收清单
 
-### 13.1 功能验收
+### 14.1 功能验收
 
 | 检查项 | 验收标准 |
 |--------|---------|
 | Vite 配置 | `shared.singleton: true`、`optimizeDeps.exclude` React |
 | 组件导出 | 有 `default` 导出，接收 `HostBridgeProps` |
-| 样式隔离 | 无 Preflight，utilities 挂在 `[data-plugin-root]` 下 |
+| 自有 i18n | 有插件字典；MF 下调用 `useHostLocale(api)` |
+| 无 `api.t` | 不依赖 Host 翻译函数 |
+| 样式 | MF 可用完整 Tailwind；隔离由 Host `@scope` 负责 |
 | API 使用 | 使用受限 API 前检查权限 |
 | 独立预览 | 可通过 `pnpm dev` 独立运行 |
 | Host 集成 | 可通过 Registry 加载并正常显示 |
 | 路由导航 | 配置正确，可正常访问 |
 
-### 13.2 安全验收
+### 14.2 安全验收
 
 | 检查项 | 验收标准 |
 |--------|---------|
@@ -1154,7 +972,7 @@ server {
 | CORS 配置 | 生产环境配置正确 |
 | 无全局污染 | 不修改 `html`/`body` 全局样式 |
 
-### 13.3 性能验收
+### 14.3 性能验收
 
 | 检查项 | 验收标准 |
 |--------|---------|
@@ -1164,7 +982,7 @@ server {
 
 ---
 
-## 14. 常见问题
+## 15. 常见问题
 
 ### Q1：为什么我的插件无法加载？
 
@@ -1182,22 +1000,20 @@ server {
 
 ### Q2：为什么我的样式影响了 Host 页面？
 
-**可能原因**：
-- 引入了完整 Tailwind Preflight
-- 修改了 `html`/`body` 样式
-- 使用了无作用域的 CSS 类名
+**先确认**：`first-party` / `partner` 下 Host 应对 Remote 注入的 CSS 做 `@scope([data-mf-plugin])`。若仍污染：
 
-**解决方案**：
-- 只引入 `tailwindcss/theme.css` 和 scoped utilities
-- 使用 `[data-plugin-root]` 限定样式范围
-- 不修改全局样式
+- Host 未走到 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（检查 `PluginHostPage` 与 `PluginManager.runLoad`）
+- 插件用了绕过 head 注入的方式写全局样式
+- 实际是 `untrusted` 却误配成了 MF 嵌入
+
+**Remote 侧**：可继续用 `@import "tailwindcss"`；独立预览勿依赖 Host 私有 class。
 
 ### Q3：如何在插件中使用 shadcn/ui？
 
 **步骤**：
 1. 在插件项目中初始化 shadcn：`pnpm dlx shadcn@latest init`
 2. 添加组件：`pnpm dlx shadcn@latest add button`
-3. 确保样式文件遵循样式隔离规范
+3. 对齐 `apps/remote-plugins` 的 `components.json` / `styles.css` token
 
 ### Q4：iframe 模式下如何调试？
 
@@ -1225,9 +1041,10 @@ server {
 ### B. 参考文档
 
 - [mf-implementation-guide.md](./mf-implementation-guide.md)：实现过程文档
-- [mf-css-isolation.md](../ideas/mf-css-isolation.md)：CSS 隔离方案
-- [third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)：第三方插件接入指南
+- [host-plugin-integration-guide.md](./host-plugin-integration-guide.md)：主项目接入手册
+- `docs/ideas/mf-css-isolation.md`：CSS 隔离方案
+- `docs/ideas/third-party-mf-plugin-onboarding.md`：第三方插件接入指南
 
 ### C. 示例项目
 
-参考 `apps/remote-plugins` 和 `apps/remote-demo` 作为开发模板。
+参考 `apps/remote-plugins`（多 expose，端口 9008）和 `apps/remote-demo`（最小插件，端口 9007）。

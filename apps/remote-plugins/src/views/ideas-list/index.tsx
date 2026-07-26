@@ -1,8 +1,10 @@
+import Loading from '@design/Loading';
 import { Button, ScrollArea } from '@ui/index';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useHostLocale, useI18n } from '@/hooks';
+import type { Locale } from '@/i18n';
 import { cn } from '@/lib/utils';
 import '@/styles.css';
-import Loading from '@design/Loading';
 
 const PAGE_SIZE = 50;
 
@@ -29,8 +31,8 @@ type EbookModules = {
 
 type HostBridgeProps = {
 	api: {
-		t: (key: string, params?: Record<string, unknown>) => string;
 		theme: 'light' | 'dark';
+		locale?: Locale;
 		navigate?: (to: string) => void;
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) => void;
@@ -52,7 +54,6 @@ type HostBridgeProps = {
 		modules?: Readonly<Record<string, unknown>>;
 	};
 	plugin: { id: string; version: string; routePath: string };
-	// 是否独立运行
 	independent?: boolean;
 };
 
@@ -84,14 +85,17 @@ function unwrapPage(res: unknown): ThoughtPage {
 	return { list: [], total: 0, pageNo: 1, pageSize: PAGE_SIZE };
 }
 
-function formatTime(iso?: string): string {
+function formatTime(iso: string | undefined, locale: Locale): string {
 	if (!iso) return '';
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
-	return d.toLocaleString();
+	return d.toLocaleString(locale);
 }
 
 export default function IdeasListApp({ api }: HostBridgeProps) {
+	const { t, locale } = useI18n();
+	useHostLocale(api);
+
 	const ebook = api.modules?.ebook as EbookModules | undefined;
 	const bookId = ebook?.getBookId() ?? null;
 	const bookTitle = ebook?.getBookTitle() ?? null;
@@ -153,11 +157,11 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 			setItems([]);
 			setTotal(0);
 			setPageNo(0);
-			setError(bookId ? null : '未绑定当前书籍');
+			setError(bookId ? null : t('ideasList.unboundBook'));
 			return;
 		}
 		void fetchPage(1, false);
-	}, [api.http, bookId, fetchPage]);
+	}, [api.http, bookId, fetchPage, t]);
 
 	useEffect(() => {
 		const root = viewportRef.current;
@@ -189,7 +193,10 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 					{bookTitle}
 					{total > 0 ? (
 						<span className="text-textcolor/40 ml-2">
-							已加载 {items.length} 条/共 {total} 条
+							{t('common.loadedCount', {
+								loaded: items.length,
+								total,
+							})}
 						</span>
 					) : null}
 				</div>
@@ -205,7 +212,9 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 					{error ? (
 						<p className="text-destructive px-2 py-2">{error}</p>
 					) : items.length === 0 ? (
-						<p className="text-textcolor/55 px-2 py-4">暂无想法</p>
+						<p className="text-textcolor/55 px-2 py-4">
+							{t('ideasList.empty')}
+						</p>
 					) : (
 						<div className="flex min-h-0 w-full flex-1 flex-col gap-1">
 							{items.map((thought) => (
@@ -225,10 +234,10 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 											</p>
 										) : null}
 										<p className="text-textcolor line-clamp-3 text-justify leading-snug">
-											{thought.content || '（无正文）'}
+											{thought.content || t('ideasList.noBody')}
 										</p>
 										<p className="text-textcolor/45 mt-1.5 text-left text-[11px]">
-											{[thought.username, formatTime(thought.createdAt)]
+											{[thought.username, formatTime(thought.createdAt, locale)]
 												.filter(Boolean)
 												.join(' · ')}
 										</p>
@@ -238,12 +247,12 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 							<div ref={sentinelRef} className="h-1 w-full" aria-hidden />
 							{loadingMore ? (
 								<p className="text-textcolor/45 py-2 text-center text-xs">
-									加载更多…
+									{t('common.loadingMore')}
 								</p>
 							) : null}
 							{!hasMore && items.length > 0 ? (
 								<p className="text-textcolor/35 py-2 text-center text-xs">
-									已加载全部
+									{t('common.allLoaded')}
 								</p>
 							) : null}
 						</div>

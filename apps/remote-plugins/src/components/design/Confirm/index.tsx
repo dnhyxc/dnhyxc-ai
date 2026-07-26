@@ -2,6 +2,7 @@ import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
 interface ConfirmProps {
@@ -41,8 +42,8 @@ const Confirm = ({
 	title,
 	description,
 	descriptionClassName,
-	confirmText = '确认',
-	cancelText = '取消',
+	confirmText,
+	cancelText,
 	confirmVariant = 'default',
 	closeOnConfirm = true,
 	confirmOnEnter = false,
@@ -55,6 +56,10 @@ const Confirm = ({
 	onCancel,
 	className,
 }: ConfirmProps) => {
+	const { t } = useI18n();
+	const confirmLabel = confirmText ?? t('common.confirm');
+	const cancelLabel = cancelText ?? t('common.cancel');
+
 	const handleConfirm = useCallback(() => {
 		onConfirm();
 		if (closeOnConfirm) {
@@ -121,7 +126,7 @@ const Confirm = ({
 							onClick={handleCancel}
 							className={cn(buttonVariants({ variant: 'outline' }))}
 						>
-							{cancelText}
+							{cancelLabel}
 						</AlertDialogPrimitive.Cancel>
 						{secondaryActionText && onSecondaryAction ? (
 							<Button
@@ -145,7 +150,7 @@ const Confirm = ({
 							onClick={handleConfirm}
 							className={cn(buttonVariants({ variant: confirmVariant }))}
 						>
-							{confirmText}
+							{confirmLabel}
 						</AlertDialogPrimitive.Action>
 					</div>
 				</AlertDialogPrimitive.Content>

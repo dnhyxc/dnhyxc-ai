@@ -1693,6 +1693,13 @@ export const zhCN = {
 	'plugins.card.trust': '信任',
 	'plugins.card.noDesc': '暂无说明',
 	'plugins.host.delisted': '该插件已下架，可在「插件中心」重新上架。',
+	'plugins.host.missingIframeUrl': '插件「{id}」为 untrusted，但缺少 iframeUrl',
+	'plugins.host.loading': '正在加载中…',
+	'plugins.host.loadingNamed': '插件「{id}」正在加载中…',
+	'plugins.host.notLoaded': '未加载（请确认 Remote 已启动后重试）',
+	'plugins.host.unavailable': '插件「{id}」不可用',
+	'plugins.host.reload': '重新加载',
+	'plugins.host.loadFailed': '插件「{id}」加载失败',
 	'plugins.desc.remoteDemo':
 		'Module Federation 接入演示：验证 Host 动态加载、侧栏入口与共享 React。',
 	'plugins.desc.learningNotes':

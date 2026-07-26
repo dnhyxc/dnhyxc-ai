@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import RichEditor from '../RichEditor';
 import '../RichEditor/styles.css';
@@ -52,9 +53,11 @@ export function NotePreview({
 	footer,
 	className,
 	bodyClassName,
-	emptyText = '暂无内容',
+	emptyText,
 }: NotePreviewProps) {
+	const { t } = useI18n();
 	const bodyHtml = html ? stripNoteTitleHtml(html) : '';
+	const empty = emptyText ?? t('common.emptyContent');
 
 	return (
 		<div
@@ -66,7 +69,7 @@ export function NotePreview({
 			<header className="note-preview-header h-10 border-theme/10 flex shrink-0 items-center gap-3 border-b pl-3 pr-1.5 py-2.5">
 				<div className="min-w-0 flex-1">
 					<h1 className="text-textcolor truncate text-base font-semibold leading-snug">
-						{title.trim() || '无标题笔记'}
+						{title.trim() || t('common.untitledNote')}
 					</h1>
 					{meta ? (
 						<div className="text-textcolor/45 mt-0.5 truncate text-xs">
@@ -97,7 +100,7 @@ export function NotePreview({
 						editorClassName="note-preview-tiptap"
 					/>
 				) : (
-					<p className="text-textcolor/45 p-3 text-sm">{emptyText}</p>
+					<p className="text-textcolor/45 p-3 text-sm">{empty}</p>
 				)}
 			</div>
 

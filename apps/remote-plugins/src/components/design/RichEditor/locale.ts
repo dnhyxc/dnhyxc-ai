@@ -55,6 +55,69 @@ export const zhCN = {
 	limitReached: '已达字数上限',
 } as const;
 
-export type RichEditorLocale = typeof zhCN;
+export const enUS: { [K in keyof typeof zhCN]: string } = {
+	placeholder: 'Start typing…',
+	placeholderHeadingHint: 'Enter note title',
+	placeholderHeading: 'Title',
+	bold: 'Bold',
+	italic: 'Italic',
+	underline: 'Underline',
+	strike: 'Strikethrough',
+	code: 'Inline code',
+	highlight: 'Highlight',
+	h1: 'Heading 1',
+	h2: 'Heading 2',
+	h3: 'Heading 3',
+	h4: 'Heading 4',
+	h5: 'Heading 5',
+	bulletList: 'Bullet list',
+	orderedList: 'Numbered list',
+	taskList: 'Task list',
+	blockquote: 'Quote',
+	codeBlock: 'Code block',
+	codeLanguage: 'Language',
+	horizontalRule: 'Divider',
+	alignLeft: 'Align left',
+	alignCenter: 'Align center',
+	alignRight: 'Align right',
+	alignJustify: 'Justify',
+	dirLtr: 'Left to right',
+	dirRtl: 'Right to left',
+	dirAuto: 'Auto direction',
+	link: 'Link',
+	unlink: 'Remove link',
+	linkPrompt: 'URL',
+	linkPlaceholder: 'https://example.com',
+	linkApply: 'Apply',
+	linkCancel: 'Cancel',
+	linkEmptyHint:
+		'Select text first, or place the caret where the link should go',
+	image: 'Image',
+	imagePick: 'Choose image',
+	table: 'Insert table',
+	addColumnBefore: 'Insert column before',
+	addColumnAfter: 'Insert column after',
+	deleteColumn: 'Delete column',
+	addRowBefore: 'Insert row above',
+	addRowAfter: 'Insert row below',
+	deleteRow: 'Delete row',
+	mergeCells: 'Merge cells',
+	splitCell: 'Split cell',
+	deleteTable: 'Delete table',
+	undo: 'Undo',
+	redo: 'Redo',
+	clearFormat: 'Clear formatting',
+	chars: 'chars',
+	words: 'words',
+	limitReached: 'Character limit reached',
+};
+
+export type RichEditorLocale = { [K in keyof typeof zhCN]: string };
 
 export type LocaleKey = keyof RichEditorLocale;
+
+export function richEditorLocaleOf(
+	appLocale: 'zh-CN' | 'en-US',
+): RichEditorLocale {
+	return appLocale === 'en-US' ? enUS : zhCN;
+}

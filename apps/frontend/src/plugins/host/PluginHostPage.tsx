@@ -1,13 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Loading from '@/components/design/Loading';
 import { Button } from '@/components/ui';
+import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { attachIframeBridge } from '../core/attachIframeBridge';
 import { pluginManager } from '../core/PluginManager';
-import type { HostBridgeProps } from '../core/types';
+import type { HostBridgeProps, HostLocale } from '../core/types';
+import { eventBus } from '../host-api/EventBus';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
 import { attachPluginStyleIsolation } from './styleIsolation';
 
-type Props = { pluginId: string };
+type Props = { pluginId: string; className?: string };
+
+/** 用 Host 当前语言覆盖 bridge 快照；插件自维护 t，只同步 locale */
+function withLiveLocale(
+	bridge: HostBridgeProps,
+	locale: HostLocale,
+): HostBridgeProps {
+	return {
+		...bridge,
+		api: {
+			...bridge.api,
+			locale,
+		},
+	};
+}
 
 function UntrustedIframe({
 	pluginId,
@@ -45,7 +62,8 @@ function UntrustedIframe({
 	);
 }
 
-export function PluginHostPage({ pluginId }: Props) {
+export function PluginHostPage({ pluginId, className }: Props) {
+	const { locale, t } = useI18n();
 	const [retryKey, setRetryKey] = useState(0);
 	const [busy, setBusy] = useState(
 		() => pluginManager.get(pluginId)?.status === 'loading',
@@ -102,16 +120,28 @@ export function PluginHostPage({ pluginId }: Props) {
 		return attachPluginStyleIsolation(pluginId, entry);
 	}, [pluginId, status, entry, trust]);
 
+	// 已激活插件经 eventBus 收 locale（与 bridge.api.locale 热更新互补）
+	useEffect(() => {
+		if (status !== 'activated') return;
+		eventBus.emit(pluginId, 'locale', locale);
+	}, [pluginId, status, locale]);
+
+	const liveBridge = useMemo(
+		() => (loaded?.bridge ? withLiveLocale(loaded.bridge, locale) : null),
+		[loaded?.bridge, locale],
+	);
+
 	if (loaded?.status === 'activated') {
 		if (loaded.meta.trust === 'untrusted') {
 			const src = loaded.meta.iframeUrl?.trim();
 			if (!src) {
 				return (
 					<div className="text-muted-foreground p-6 text-sm">
-						插件「{pluginId}」为 untrusted，但缺少 iframeUrl
+						{t('plugins.host.missingIframeUrl', { id: pluginId })}
 					</div>
 				);
 			}
+			// iframe 语言靠 attachIframeBridge 的 init + onListen('locale') 推送，勿用 liveBridge 以免重挂
 			return (
 				<PluginErrorBoundary pluginId={pluginId}>
 					<UntrustedIframe
@@ -123,6 +153,7 @@ export function PluginHostPage({ pluginId }: Props) {
 			);
 		}
 
+		if (!liveBridge) return null;
 		const Comp = loaded.mod.default;
 		return (
 			<PluginErrorBoundary pluginId={pluginId}>
@@ -131,7 +162,7 @@ export function PluginHostPage({ pluginId }: Props) {
 					data-mf-plugin={pluginId}
 					data-plugin-root
 				>
-					<Comp {...loaded.bridge} />
+					<Comp {...liveBridge} />
 				</div>
 			</PluginErrorBoundary>
 		);
@@ -141,21 +172,28 @@ export function PluginHostPage({ pluginId }: Props) {
 		error ||
 		loaded?.error ||
 		(busy || loaded?.status === 'loading'
-			? '正在加载中...'
-			: '未加载（请确认 Remote 已启动后重试）');
+			? t('plugins.host.loading')
+			: t('plugins.host.notLoaded'));
 
 	return (
-		<div className="mx-auto text-muted-foreground h-full flex flex-col gap-3 5 pt-0">
+		<div
+			className={cn(
+				'mx-auto text-muted-foreground h-full flex flex-col gap-3 p-5.5 pt-0',
+				className,
+			)}
+		>
 			<div className="bg-theme-background h-full p-4.5 rounded-md">
 				{busy || loaded?.status === 'loading' ? (
 					<Loading
-						text={`插件「${pluginId}」正在加载中...`}
+						text={t('plugins.host.loadingNamed', { id: pluginId })}
 						className="flex items-center h-full"
 					/>
 				) : (
 					<div className="flex flex-col gap-3">
-						插件「{pluginId}」不可用
-						{detail ? `：${detail}` : ''}
+						<span>
+							{t('plugins.host.unavailable', { id: pluginId })}
+							{detail ? `: ${detail}` : ''}
+						</span>
 						{error || loaded?.error ? (
 							<Button
 								type="button"
@@ -164,7 +202,7 @@ export function PluginHostPage({ pluginId }: Props) {
 								disabled={busy}
 								onClick={() => setRetryKey((n) => n + 1)}
 							>
-								重新加载
+								{t('plugins.host.reload')}
 							</Button>
 						) : null}
 					</div>

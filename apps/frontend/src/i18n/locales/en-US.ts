@@ -1843,6 +1843,14 @@ export const enUS = {
 	'plugins.card.trust': 'Trust',
 	'plugins.card.noDesc': 'No description',
 	'plugins.host.delisted': 'This plugin is delisted. Re-list it from Plugins.',
+	'plugins.host.missingIframeUrl':
+		'Plugin "{id}" is untrusted but iframeUrl is missing',
+	'plugins.host.loading': 'Loading…',
+	'plugins.host.loadingNamed': 'Loading plugin "{id}"…',
+	'plugins.host.notLoaded': 'Not loaded (start the Remote and retry)',
+	'plugins.host.unavailable': 'Plugin "{id}" is unavailable',
+	'plugins.host.reload': 'Reload',
+	'plugins.host.loadFailed': 'Failed to load plugin "{id}"',
 	'plugins.desc.remoteDemo':
 		'Module Federation demo: verifies host dynamic load, sidebar entry, and shared React.',
 	'plugins.desc.learningNotes':

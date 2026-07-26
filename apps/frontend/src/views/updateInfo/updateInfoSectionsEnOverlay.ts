@@ -150,6 +150,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'A new Plugin Center page lists every available module as a card with a switch. Toggle it on to enable (publish) a module—state is persisted to your account and takes effect immediately: the sidebar entry appears and the module is usable. Toggle it off to disable (unpublish)—the entry disappears and any open page is unloaded. A registry editor page (sign-in required) lets you view and edit the raw module list (JSON); saving it reloads the configuration automatically.',
 	},
+	's3-9': {
+		title: 'Plugin UI follows host language',
+		description:
+			'Remote plugin UIs (including Learning Notes and Ideas List) now switch between Chinese and English to match the host app’s interface language. Changes take effect immediately without reloading the plugin. Standalone preview mode also has a manual language toggle.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:

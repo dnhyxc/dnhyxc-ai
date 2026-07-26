@@ -2,7 +2,8 @@ import { type NodeViewProps, NodeViewWrapper } from '@tiptap/react';
 import { NotebookPen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui';
-import { zhCN } from '../locale';
+import { useI18n } from '@/hooks';
+import { richEditorLocaleOf } from '../locale';
 import { focusAfterTitle } from './TitleNode';
 
 /**
@@ -14,6 +15,8 @@ export default function TitleView({
 	updateAttributes,
 	editor,
 }: NodeViewProps) {
+	const { locale, t } = useI18n();
+	const editorLocale = richEditorLocaleOf(locale);
 	const composing = useRef(false);
 	const [value, setValue] = useState(String(node.attrs.value ?? ''));
 
@@ -36,12 +39,14 @@ export default function TitleView({
 			<div className="relative flex flex-col gap-2 p-3 pr-0 pt-9 border border-theme/5 bg-theme/5 rounded-md">
 				<div className="absolute -inset-0.5 bg-theme/20 border border-theme/5 text-theme/80 rounded-tl-md rounded-br-md pl-3 py-3.5 w-26 h-6 flex items-center gap-2">
 					<NotebookPen className="size-4" />
-					<span className="text-sm font-medium pb-0.5">笔记标题</span>
+					<span className="text-sm font-medium pb-0.5">
+						{t('learningNotes.titleBadge')}
+					</span>
 				</div>
 				<Input
-					className="h-12 size-full px-0 py-0 md:text-xl rounded-none border-0 bg-transparent text-textcolor shadow-none placeholder:text-lg placeholder:text-textcolor/35 focus-visible:border-0 focus-visible:ring-0"
+					className="h-12 size-full px-0 py-0 text-xl md:text-xl rounded-none border-0 bg-transparent text-textcolor shadow-none placeholder:text-lg placeholder:text-textcolor/35 focus-visible:border-0 focus-visible:ring-0"
 					value={value}
-					placeholder={zhCN.placeholderHeadingHint}
+					placeholder={editorLocale.placeholderHeadingHint}
 					maxLength={50}
 					showCount
 					// 不进 Tab 序，避免正文按 Tab 时焦点跳到标题
@@ -64,7 +69,6 @@ export default function TitleView({
 					}}
 				/>
 			</div>
-			{/* <div className="h-2 w-full rounded-md bg-theme/10" /> */}
 		</NodeViewWrapper>
 	);
 }

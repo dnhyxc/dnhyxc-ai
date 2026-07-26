@@ -13,9 +13,11 @@ export type {
 export {
 	CODE_LANGUAGES,
 	createExtensions,
+	enUS,
 	getDocTitleText,
 	RichEditor as default,
 	RichEditor,
+	richEditorLocaleOf,
 	TitleNode,
 	zhCN,
 } from './RichEditor';

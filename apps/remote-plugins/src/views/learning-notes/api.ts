@@ -1,5 +1,7 @@
 /** 学习笔记：经 HostBridge 调用主站 `/english-learning/notes/*` */
 
+import { translateSync } from '@/i18n';
+
 export type HostHttp = {
 	get: <T = unknown>(url: string) => Promise<T>;
 	post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
@@ -51,7 +53,7 @@ function toNote(row: NoteListItem | NoteRecord): Note {
 	const at = atRaw ? new Date(atRaw).getTime() : Date.now();
 	return {
 		id: row.id,
-		title: (row.title ?? '').trim() || '无标题笔记',
+		title: (row.title ?? '').trim() || translateSync('common.untitledNote'),
 		html,
 		at: Number.isFinite(at) ? at : Date.now(),
 	};

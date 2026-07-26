@@ -19,8 +19,11 @@ import { getDocTitleText, normalizeNoteContent } from './title';
 import { FormatBubble, Toolbar } from './toolbar';
 import type { RichEditorProps } from './types';
 
-function mergeLocale(partial?: Partial<RichEditorLocale>): RichEditorLocale {
-	return { ...zhCN, ...partial };
+function mergeLocale(
+	partial?: Partial<RichEditorLocale>,
+	base: RichEditorLocale = zhCN,
+): RichEditorLocale {
+	return { ...base, ...partial };
 }
 
 function CharCount({
@@ -286,7 +289,7 @@ export { createExtensions } from './extensions';
 export type { ResolveImageSrc } from './image';
 export { fileToDataUrl, pickImageFile } from './image';
 export type { RichEditorLocale } from './locale';
-export { zhCN } from './locale';
+export { enUS, richEditorLocaleOf, zhCN } from './locale';
 export {
 	EMPTY_NOTE_DOC,
 	getDocTitleText,

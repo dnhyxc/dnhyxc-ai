@@ -57,10 +57,16 @@ export interface PluginRegistry {
 	plugins: PluginDescriptor[];
 }
 
+export type HostLocale = 'zh-CN' | 'en-US';
+
 export interface HostBridgeProps {
 	api: Readonly<{
-		t: (key: string, params?: Record<string, unknown>) => string;
 		theme: 'light' | 'dark';
+		/**
+		 * 与 Host 顶栏语言一致；插件自维护文案字典，仅跟随此 locale。
+		 * 切换后由 PluginHostPage / iframe / eventBus 推送更新。
+		 */
+		locale: HostLocale;
 		navigate?: (to: string) => void;
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) => void;

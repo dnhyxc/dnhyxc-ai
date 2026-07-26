@@ -3,6 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离）。若不一致，以源码为准。
 
 ---
 
@@ -21,7 +22,8 @@
 11. [路由系统与插件协同](#11-路由系统与插件协同)
 12. [插件状态管理](#12-插件状态管理)
 13. [HostBridge API 提供](#13-hostbridge-api-提供)
-14. [常见问题](#14-常见问题)
+14. [语言（locale）同步](#14-语言locale同步)
+15. [常见问题](#15-常见问题)
 
 ---
 
@@ -61,8 +63,9 @@ Host 应用
 │   │   ├── RouteInjector.ts     # 路由注入器
 │   │   └── SidebarInjector.ts   # 侧栏注入器
 │   ├── host/
-│   │   ├── PluginHostPage.tsx   # 插件宿主页面
-│   │   └── PluginErrorBoundary.tsx # 错误边界
+│   │   ├── PluginHostPage.tsx   # 插件宿主页面（MF / iframe / locale 热更新）
+│   │   ├── PluginErrorBoundary.tsx # 错误边界
+│   │   └── styleIsolation.ts    # Remote CSS @scope 隔离
 │   ├── host-api/
 │   │   ├── EventBus.ts          # 事件总线
 │   │   ├── ebookHostApi.ts      # 电子书模块 API
@@ -353,85 +356,72 @@ private async runLoad(meta: PluginDescriptor) {
 }
 ```
 
-**PluginHostPage 中 iframe 渲染**（需补充 iframe 渲染逻辑）：
+**PluginHostPage 中 iframe / MF 渲染**（与源码一致的关键路径）：
 
 ```tsx
-export function PluginHostPage({ pluginId }: Props) {
-	// ...
-	const loaded = pluginManager.get(pluginId);
-
-	// untrusted 插件：渲染 iframe
-	if (loaded?.meta.trust === "untrusted" && loaded?.meta.iframeUrl) {
-		return (
-			<iframe
-				src={loaded.meta.iframeUrl}
-				className="h-full w-full border-0"
-				sandbox="allow-scripts allow-same-origin"
-			/>
-		);
-	}
-
-	// 正常 MF 插件渲染
-	if (loaded?.status === "activated") {
-		const Comp = loaded.mod.default;
+// apps/frontend/src/plugins/host/PluginHostPage.tsx（摘录）
+if (loaded?.status === 'activated') {
+	if (loaded.meta.trust === 'untrusted') {
+		const src = loaded.meta.iframeUrl?.trim();
+		// 缺 iframeUrl → 展示 plugins.host.missingIframeUrl
+		// iframe 语言靠 attachIframeBridge 的 init + onListen('locale')，勿传 liveBridge（避免重挂）
 		return (
 			<PluginErrorBoundary pluginId={pluginId}>
-				<div className={`plugin-${pluginId} h-full w-full`}>
-					<Comp {...loaded.bridge} />
-				</div>
+				<UntrustedIframe pluginId={pluginId} src={src} bridge={loaded.bridge} />
 			</PluginErrorBoundary>
 		);
 	}
-	// ...
+	// MF：withLiveLocale(bridge, locale) + data-mf-plugin 包装 + 样式隔离
+	return (
+		<PluginErrorBoundary pluginId={pluginId}>
+			<div className={`plugin-${pluginId} h-full w-full`} data-mf-plugin={pluginId} data-plugin-root>
+				<Comp {...liveBridge} />
+			</div>
+		</PluginErrorBoundary>
+	);
 }
 ```
 
+`UntrustedIframe` 在 `useEffect` 里调用 `attachIframeBridge(el, bridge, origin)`；sandbox 为  
+`allow-scripts allow-same-origin allow-forms allow-popups`。
+
 ### 5.4 iframe Bridge 通信
 
-**attachIframeBridge.ts**：
+**协议 channel**：`dnhyxc-mf-iframe`
+
+| type | 方向 | 载荷 | 用途 |
+|------|------|------|------|
+| `ready` | iframe → Host | `{ pluginId }` | 握手；Host 回 `init` |
+| `init` | Host → iframe | `{ theme, locale, plugin }` | 初始上下文 |
+| `locale` | Host → iframe | `{ locale }` | Host 顶栏语言热更新 |
+| `rpc` | iframe → Host | `{ id, method, args }` | 能力调用 |
+| `rpc-result` | Host → iframe | `{ id, ok, value?/error? }` | RPC 响应 |
+
+**RPC 白名单**：`http.get|post|put|delete`、`ui.showToast`、`ebook.getBookId|getBookTitle|navigateToCfi|openThought|closeIdeasList`  
+（是否真正可用仍取决于 bridge 上 permissions 是否注入了对应能力）
 
 ```typescript
-export const MF_IFRAME_CHANNEL = "dnhyxc-mf-iframe";
-
+// apps/frontend/src/plugins/core/attachIframeBridge.ts（摘录）
 export function attachIframeBridge(
 	iframe: HTMLIFrameElement,
 	bridge: HostBridgeProps,
 	targetOrigin: string,
 ): () => void {
-	const win = () => iframe.contentWindow;
-
 	const sendInit = () => {
-		const w = win();
-		if (!w) return;
-		w.postMessage(
+		iframe.contentWindow?.postMessage(
 			{
 				channel: MF_IFRAME_CHANNEL,
-				type: "init",
+				type: 'init',
 				theme: bridge.api.theme,
+				locale: getActiveLocale(),
 				plugin: bridge.plugin,
 			},
 			targetOrigin,
 		);
 	};
-
-	const onMessage = (ev: MessageEvent) => {
-		if (ev.source !== win()) return;
-		if (targetOrigin !== "*" && ev.origin !== targetOrigin) return;
-
-		const data = ev.data;
-		if (!isRecord(data) || data.channel !== MF_IFRAME_CHANNEL) return;
-
-		if (data.type === "ready") {
-			sendInit();
-			return;
-		}
-
-		if (data.type !== "rpc") return;
-		// 处理 RPC 请求...
-	};
-
-	window.addEventListener("message", onMessage);
-	return () => window.removeEventListener("message", onMessage);
+	// onListen('locale') → postMessage { type: 'locale', locale }
+	// ready → sendInit；rpc → dispatchRpc → rpc-result
+	// ...
 }
 ```
 
@@ -1326,77 +1316,60 @@ await pluginManager.setEnabled("myPlugin", false);
 **文件路径**：`apps/frontend/src/plugins/core/createHostBridge.ts`
 
 ```typescript
+// apps/frontend/src/plugins/core/createHostBridge.ts（摘录）
 export function createHostBridge(
 	d: PluginDescriptor,
 	navigate: (to: string) => void,
 ): HostBridgeProps {
 	const allow = new Set(d.permissions);
-
 	const api: Record<string, unknown> = {
-		t: (key: string) => key,
-		theme: readTheme(),
+		theme: readTheme(),           // 创建时快照；MF 无 theme 热推送
+		locale: readLocale(),         // zh-CN | en-US；插件自维护文案，只跟 locale
 		event: {
-			on: (event: string, handler: (data?: unknown) => void) =>
-				eventBus.on(d.id, event, handler),
-			off: (event: string, handler: (data?: unknown) => void) =>
-				eventBus.off(d.id, event, handler),
-			emit: (event: string, data?: unknown) => eventBus.emit(d.id, event, data),
+			on: (event, handler) => eventBus.on(d.id, event, handler),
+			off: (event, handler) => eventBus.off(d.id, event, handler),
+			emit: (event, data?) => eventBus.emit(d.id, event, data),
 		},
 	};
-
-	// 根据权限裁剪能力
-	if (allow.has("ui:toast")) {
-		api.ui = Object.freeze({
-			showToast: (options: {
-				message: string;
-				type?: "success" | "error" | "info";
-			}) => {
-				Toast({ type: options.type ?? "info", title: options.message });
-			},
-		});
-	}
-
-	if (allow.has("nav:subtree")) {
-		api.navigate = (to: string) => {
-			if (!to.startsWith(d.routePath)) {
-				throw new Error(`NAV_OUT_OF_SCOPE: ${to}`);
-			}
-			navigate(to);
-		};
-	}
-
-	if (allow.has("http:plugin-api")) {
-		api.http = Object.freeze({
-			get: <T = unknown>(url: string) => http.get<T>(url),
-			post: <T = unknown>(url: string, body?: unknown) =>
-				http.post<T>(url, body),
-		});
-	}
-
-	if (allow.has("modules:ebook")) {
-		api.modules = { ebook: createEbookModulesApi() };
-	}
-
-	return deepFreeze({
-		api,
-		plugin: { id: d.id, version: d.version, routePath: d.routePath },
-	});
+	// 按 permissions 注入 ui / navigate / http(get|post|put|delete) / modules.*
+	// 未授权字段不存在；返回 deepFreeze(...)
 }
 ```
 
+**始终提供（无需 permission）**：`api.theme`、`api.locale`、`api.event`。
+
 ### 13.2 权限说明
 
-| 权限              | 提供的 API               | 说明                                  |
-| ----------------- | ------------------------ | ------------------------------------- |
-| `ui:toast`        | `api.ui.showToast`       | 显示 Toast 通知                       |
-| `nav:subtree`     | `api.navigate`           | 子路由导航（限制在 routePath 范围内） |
-| `http:plugin-api` | `api.http.get/post`      | HTTP 请求                             |
-| `modules:chat`    | `api.modules.openThread` | 打开聊天线程                          |
-| `modules:ebook`   | `api.modules.ebook.*`    | 电子书相关 API                        |
+| 权限 | 提供的 API | 说明 |
+|------|-----------|------|
+| （无） | `api.theme` / `api.locale` / `api.event` | 主题快照、语言、插件域事件总线 |
+| `ui:toast` | `api.ui.showToast` | Toast |
+| `nav:subtree` | `api.navigate` | 仅允许 `to.startsWith(routePath)` |
+| `http:plugin-api` | `api.http.get/post/put/delete` | 经 Host `@/utils/fetch` |
+| `modules:chat` | `api.modules.openThread` | 打开 `/chat/c/:id` |
+| `modules:ebook` | `api.modules.ebook.*` | 阅读页绑定的 ebook Host API |
+
+> **注意**：Host **不再**注入 `api.t`。插件用自有 i18n 字典，只跟随 `api.locale`（见下一节）。
 
 ---
 
-## 14. 常见问题
+## 14. 语言（locale）同步
+
+设计原则：**Host 只同步 locale 枚举，不传翻译字符串**；插件维护自己的 `t()`。
+
+| 模式 | 机制 |
+|------|------|
+| MF（first-party / partner） | `PluginHostPage` 用 `withLiveLocale` 覆盖 props；并 `eventBus.emit(pluginId, 'locale', locale)` |
+| iframe（untrusted） | `attachIframeBridge`：`init.locale` + `onListen('locale')` → `postMessage type:'locale'` |
+| Remote 侧 | `useHostLocale(api)`：读 `api.locale` + 订阅 `api.event.on('locale')` → `applyHostLocale` |
+
+Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → `onEmit('locale', next)`。
+
+**Theme**：仅 bridge 创建时快照（iframe 仅 `init` 一次）；**无** theme 热同步。
+
+---
+
+## 15. 常见问题
 
 ### Q1：如何在新页面中接入插件？
 
@@ -1488,7 +1461,14 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 | `learningNotes`  | 业务内手动挂载 | 英语学习笔记页          | `injectRoute: false`        |
 | `remoteDemo`     | 自动路由注入   | 独立页面 `/demo`        | `injectRoute: true`（默认） |
 
-### B. 参考文档
+### B. 样式隔离（Host 责任）
+
+`first-party` / `partner`：Host `styleIsolation.ts` 在 loadRemote / 挂载期间把 Remote 注入的 CSS 包进  
+`@scope ([data-mf-plugin="id"])`。Remote **可用**正常 `@import "tailwindcss"`。  
+`untrusted` 走 iframe，天然隔离。
+
+### C. 参考文档
 
 - [mf-implementation-guide.md](./mf-implementation-guide.md)：实现过程文档
 - [plugin-development-guide.md](./plugin-development-guide.md)：插件开发手册
+- 源码旁副本：`apps/frontend/src/plugins/docs/` 下同名文件（以源码为准）

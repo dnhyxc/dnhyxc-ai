@@ -5,6 +5,7 @@ import {
 	type Editor,
 	getDocTitleText,
 	RichEditor,
+	richEditorLocaleOf,
 } from '@design/RichEditor';
 import {
 	ChevronDown,
@@ -25,6 +26,8 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useHostLocale, useI18n } from '@/hooks';
+import type { Locale } from '@/i18n';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import type { HostHttp } from './api';
@@ -38,6 +41,12 @@ type NoteScrollMode = 'bottom' | 'top' | 'current';
 type HostBridgeProps = {
 	api: {
 		theme: 'light' | 'dark';
+		locale?: Locale;
+		event?: {
+			on: (event: string, handler: (data?: unknown) => void) => void;
+			off: (event: string, handler: (data?: unknown) => void) => void;
+			emit: (event: string, data?: unknown) => void;
+		};
 		http?: HostHttp;
 		ui?: {
 			showToast: (options: {
@@ -47,12 +56,13 @@ type HostBridgeProps = {
 		};
 	};
 	plugin: { id: string; version: string; routePath: string };
-	// 是否独立运行，独立运行时不会显示笔记列表
 	independent?: boolean;
 };
 
 function LearningNotesApp({ api }: HostBridgeProps) {
 	const { learningNotesStore: store } = useStore();
+	const { t, locale } = useI18n();
+	useHostLocale(api);
 
 	const editorRef = useRef<Editor | null>(null);
 	const savingRef = useRef(false);
@@ -60,7 +70,6 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 	savingRef.current = store.saving;
 	previewRef.current = store.preview;
 
-	// ScrollArea viewport：程序化滚到顶/底（纯 UI，不进 store）
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const activeItemRef = useRef<HTMLDivElement>(null);
 	const [scrollMode, setScrollMode] = useState<NoteScrollMode>('bottom');
@@ -74,9 +83,9 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 	);
 
 	useEffect(() => {
-		store.bind(api.http, toast);
+		store.bind(api.http, toast, t);
 		void store.refreshList();
-	}, [api.http, store, toast]);
+	}, [api.http, store, toast, t]);
 
 	const handleScroll = useCallback(() => {
 		const el = scrollViewportRef.current;
@@ -153,10 +162,10 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 
 	const scrollTitle =
 		displayMode === 'bottom'
-			? '滚动到底部'
+			? t('learningNotes.scrollBottom')
 			: displayMode === 'top'
-				? '滚动到顶部'
-				: '滚动到当前选中';
+				? t('learningNotes.scrollTop')
+				: t('learningNotes.scrollCurrent');
 
 	const onSave = useCallback(async () => {
 		const editor = editorRef.current;
@@ -183,28 +192,32 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 	const listToggleBtn = useCallback(
 		() => (
 			<Btn
-				title={store.listOpen ? '关闭笔记列表' : '打开笔记列表'}
+				title={
+					store.listOpen
+						? t('learningNotes.closeList')
+						: t('learningNotes.openList')
+				}
 				onClick={() => store.toggleListOpen()}
 			>
 				<NotebookText size={15} />
 			</Btn>
 		),
-		[store, store.listOpen],
+		[store, store.listOpen, t],
 	);
 
 	const toolbarExtra = useMemo(
 		() => (
 			<>
-				<Btn title="新建笔记" onClick={() => store.openNew()}>
+				<Btn title={t('learningNotes.new')} onClick={() => store.openNew()}>
 					<FilePenLine size={15} />
 				</Btn>
 				<Btn
 					title={
 						store.saving
-							? '保存中…'
+							? t('learningNotes.saving')
 							: store.editingId
-								? '更新笔记 ⌘S'
-								: '保存笔记 ⌘S'
+								? t('learningNotes.update')
+								: t('learningNotes.save')
 					}
 					onClick={() => void onSave()}
 					disabled={store.saving}
@@ -214,8 +227,10 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 				{listToggleBtn()}
 			</>
 		),
-		[listToggleBtn, onSave, store, store.editingId, store.saving],
+		[listToggleBtn, onSave, store, store.editingId, store.saving, t],
 	);
+
+	const editorLocale = useMemo(() => richEditorLocaleOf(locale), [locale]);
 
 	return (
 		<div
@@ -226,8 +241,8 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 			<Confirm
 				open={store.confirmOpen}
 				onOpenChange={(open) => store.setConfirmOpen(open)}
-				title="确定删除这条笔记？"
-				description="删除后将无法恢复"
+				title={t('learningNotes.deleteConfirmTitle')}
+				description={t('learningNotes.deleteConfirmDesc')}
 				onConfirm={() => void store.confirmDelete()}
 			/>
 			<ResizablePanelGroup
@@ -246,9 +261,12 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 							<aside className="border-r mb-3 border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 								<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
 									<div className="text-textcolor/85">
-										笔记列表
+										{t('learningNotes.listTitle')}
 										<span className="ml-3 text-xs text-textcolor/60">
-											已加载 {store.list.length} 条/共 {store.total} 条
+											{t('common.loadedCount', {
+												loaded: store.list.length,
+												total: store.total,
+											})}
 										</span>
 									</div>
 									<Btn title={scrollTitle} onClick={onScrollFabClick}>
@@ -273,7 +291,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 										<div className="flex flex-col gap-3">
 											{store.list.length === 0 && !store.loading ? (
 												<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
-													暂无笔记，保存一条试试
+													{t('learningNotes.empty')}
 												</p>
 											) : null}
 											{store.list.map((n) => {
@@ -296,13 +314,13 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 																{n.title}
 															</div>
 															<div className="text-textcolor/45 mt-1.5 text-xs">
-																{new Date(n.at).toLocaleString()}
+																{new Date(n.at).toLocaleString(locale)}
 															</div>
 														</div>
 														<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
 															<button
 																type="button"
-																title="编辑"
+																title={t('learningNotes.edit')}
 																className="w-7 h-7 text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10 flex cursor-pointer items-center justify-center rounded-md p-1"
 																onClick={(e) => {
 																	e.stopPropagation();
@@ -313,7 +331,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 															</button>
 															<button
 																type="button"
-																title="删除"
+																title={t('learningNotes.delete')}
 																className="w-7 h-7 text-textcolor/80 hover:text-destructive hover:bg-destructive/10 flex cursor-pointer items-center justify-center rounded-md p-1"
 																onClick={(e) => {
 																	e.stopPropagation();
@@ -328,7 +346,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 											})}
 											{store.loadingMore ? (
 												<p className="text-textcolor/45 py-2 text-center text-xs">
-													加载中…
+													{t('common.loading')}
 												</p>
 											) : null}
 											{!store.loading &&
@@ -336,7 +354,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 											store.list.length > 0 &&
 											!store.hasMore ? (
 												<p className="text-textcolor/35 py-2 text-center text-xs">
-													没有更多了
+													{t('common.noMore')}
 												</p>
 											) : null}
 										</div>
@@ -361,10 +379,11 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 							)}
 						>
 							<RichEditor
-								key={store.editorSeed}
+								key={`${store.editorSeed}:${locale}`}
 								defaultContent={store.editorInitial}
 								autofocus="end"
-								placeholder="记下今天的单词、语法或口语收获…"
+								placeholder={t('learningNotes.placeholder')}
+								locale={editorLocale}
 								showCharCount={false}
 								onCreate={(e) => {
 									editorRef.current = e;
@@ -385,11 +404,14 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 									html={store.preview.html}
 									headerExtra={
 										<>
-											<Btn title="新建笔记" onClick={() => store.openNew()}>
+											<Btn
+												title={t('learningNotes.new')}
+												onClick={() => store.openNew()}
+											>
 												<FilePenLine size={15} />
 											</Btn>
 											<Btn
-												title="编辑"
+												title={t('learningNotes.edit')}
 												onClick={() => {
 													if (store.preview) store.openEdit(store.preview);
 												}}
@@ -397,7 +419,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 												<SquarePen size={15} />
 											</Btn>
 											<Btn
-												title="删除"
+												title={t('learningNotes.delete')}
 												onClick={() => {
 													if (store.preview)
 														store.requestDelete(store.preview.id);

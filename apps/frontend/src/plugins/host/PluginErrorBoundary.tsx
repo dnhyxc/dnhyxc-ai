@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useI18n } from '@/hooks';
 
 type Props = {
 	pluginId: string;
@@ -6,6 +7,24 @@ type Props = {
 };
 
 type State = { error: Error | null };
+
+function PluginErrorFallback({
+	pluginId,
+	message,
+}: {
+	pluginId: string;
+	message: string;
+}) {
+	const { t } = useI18n();
+	return (
+		<div className="p-6 text-sm text-muted-foreground">
+			<p className="font-medium text-foreground mb-1">
+				{t('plugins.host.loadFailed', { id: pluginId })}
+			</p>
+			<p className="opacity-70">{message}</p>
+		</div>
+	);
+}
 
 export class PluginErrorBoundary extends Component<Props, State> {
 	state: State = { error: null };
@@ -21,12 +40,10 @@ export class PluginErrorBoundary extends Component<Props, State> {
 	render() {
 		if (this.state.error) {
 			return (
-				<div className="p-6 text-sm text-muted-foreground">
-					<p className="font-medium text-foreground mb-1">
-						插件「{this.props.pluginId}」加载失败
-					</p>
-					<p className="opacity-70">{this.state.error.message}</p>
-				</div>
+				<PluginErrorFallback
+					pluginId={this.props.pluginId}
+					message={this.state.error.message}
+				/>
 			);
 		}
 		return this.props.children;

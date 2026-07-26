@@ -13,7 +13,7 @@ export default function EnglishLearningNotesPage() {
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col">
 				<div className="min-h-0 flex-1 overflow-auto px-5.5 pb-5.5">
 					{enabled ? (
-						<PluginHostPage pluginId="learningNotes" />
+						<PluginHostPage pluginId="learningNotes" className="p-0" />
 					) : (
 						<p className="text-textcolor/55">{t('plugins.host.delisted')}</p>
 					)}

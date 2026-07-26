@@ -1,11 +1,13 @@
 /** 与 Host `attachIframeBridge` 协议一致；untrusted embed 用 */
 
+import { applyHostLocale, isLocale, type Locale } from '@/i18n';
+
 export const MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
 
 type HostBridgeProps = {
 	api: {
-		t: (key: string, params?: Record<string, unknown>) => string;
 		theme: 'light' | 'dark';
+		locale: Locale;
 		event: {
 			on: (event: string, handler: (data?: unknown) => void) => void;
 			off: (event: string, handler: (data?: unknown) => void) => void;
@@ -75,6 +77,11 @@ export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
 			const data = ev.data;
 			if (!isRecord(data) || data.channel !== MF_IFRAME_CHANNEL) return;
 
+			if (data.type === 'locale' && isLocale(data.locale)) {
+				applyHostLocale(data.locale);
+				return;
+			}
+
 			if (data.type === 'init') {
 				window.clearInterval(retry);
 				window.clearTimeout(timeout);
@@ -82,6 +89,7 @@ export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
 					data.theme === 'dark' || data.theme === 'light'
 						? data.theme
 						: 'light';
+				const locale: Locale = isLocale(data.locale) ? data.locale : 'zh-CN';
 				const plugin =
 					isRecord(data.plugin) && typeof data.plugin.id === 'string'
 						? {
@@ -92,11 +100,12 @@ export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
 						: { id: pluginId, version: '0', routePath: '' };
 
 				document.documentElement.dataset.theme = theme;
+				applyHostLocale(locale);
 
 				const bridge: HostBridgeProps = {
 					api: {
-						t: (k) => k,
 						theme,
+						locale,
 						event: {
 							on: () => undefined,
 							off: () => undefined,
