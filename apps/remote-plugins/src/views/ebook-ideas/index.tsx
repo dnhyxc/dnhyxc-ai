@@ -5,6 +5,7 @@ import { useHostLocale, useI18n } from '@/hooks';
 import type { Locale } from '@/i18n';
 import { cn } from '@/lib/utils';
 import '@/styles.css';
+import { Quote } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -229,14 +230,14 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 										)}
 									>
 										{thought.quote ? (
-											<p className="text-textcolor/55 mb-1.5 line-clamp-2 text-justify text-xs">
-												「{thought.quote}」
+											<p className="flex items-start gap-1 text-textcolor/65 mb-1.5 line-clamp-2 text-justify text-sm">
+												<Quote />「{thought.quote}」
 											</p>
 										) : null}
 										<p className="text-textcolor line-clamp-3 text-justify leading-snug">
 											{thought.content || t('ideasList.noBody')}
 										</p>
-										<p className="text-textcolor/45 mt-1.5 text-left text-[11px]">
+										<p className="text-textcolor/50 mt-1.5 text-left text-xs">
 											{[thought.username, formatTime(thought.createdAt, locale)]
 												.filter(Boolean)
 												.join(' · ')}
@@ -246,12 +247,12 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 							))}
 							<div ref={sentinelRef} className="h-1 w-full" aria-hidden />
 							{loadingMore ? (
-								<p className="text-textcolor/45 py-2 text-center text-xs">
+								<p className="text-textcolor/45 pb-3 text-center text-xs">
 									{t('common.loadingMore')}
 								</p>
 							) : null}
 							{!hasMore && items.length > 0 ? (
-								<p className="text-textcolor/35 py-2 text-center text-xs">
+								<p className="text-textcolor/35 pb-3 text-center text-xs">
 									{t('common.allLoaded')}
 								</p>
 							) : null}
