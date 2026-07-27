@@ -1532,8 +1532,8 @@ export const zhCN = {
 	'ebook.read.sourceOnline': '在线',
 	'ebook.read.backShelf': '返回书架',
 	'ebook.read.toc': '书籍目录',
-	'ebook.read.ideasList.title': '全书想法',
-	'ebook.read.ideasList.open': '全书想法列表',
+	'ebook.read.ebookIdeas.title': '全书想法',
+	'ebook.read.ebookIdeas.open': '全书想法列表',
 	'ebook.read.tocEmpty': '该文件没有书籍目录。',
 	'ebook.read.tocScrollToBottom': '滚动到底部',
 	'ebook.read.tocScrollToTop': '滚动到顶部',
@@ -1704,7 +1704,7 @@ export const zhCN = {
 		'Module Federation 接入演示：验证 Host 动态加载、侧栏入口与共享 React。',
 	'plugins.desc.learningNotes':
 		'在英语学习中记录单词、语法与口语收获，支持本地添加笔记。',
-	'plugins.desc.ebookIdeasList':
+	'plugins.desc.ebookIdeas':
 		'在 EPUB 阅读页浏览本书全部想法，点击可跳转到对应划线位置。',
 	'plugins.registry.noChanges': '内容未修改，无需保存',
 	'route.setting.about': '关于应用',

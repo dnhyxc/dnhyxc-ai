@@ -1,10 +1,14 @@
 import { Toast } from '@ui/sonner';
 import { getActiveLocale, type Locale } from '@/i18n';
+import { downloadBlob, isTauriRuntime } from '@/utils';
 import { http } from '@/utils/fetch';
 import { deepFreeze } from '../host-api/deepFreeze';
 import { eventBus } from '../host-api/EventBus';
 import { createEbookModulesApi } from '../host-api/ebookHostApi';
 import type { HostBridgeProps, PluginDescriptor } from './types';
+
+const DOCX_MIME =
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 function readTheme(): 'light' | 'dark' {
 	try {
@@ -57,6 +61,37 @@ export function createHostBridge(
 					type: options.type ?? 'info',
 					title: options.message,
 				});
+			},
+			/** 与主站收藏导出同源：Web / Tauri2 统一落盘 */
+			downloadBlob: async (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => {
+				const mime = options.mimeType?.trim() || DOCX_MIME;
+				const raw = options.data;
+				const bytes =
+					raw instanceof ArrayBuffer
+						? new Uint8Array(raw)
+						: new Uint8Array(raw);
+				const blob = new Blob([bytes], { type: mime });
+				const result = await downloadBlob(
+					{
+						file_name: options.fileName || 'download',
+						id: `plugin-${d.id}-${Date.now()}`,
+						overwrite: true,
+					},
+					blob,
+				);
+				const hostToasted = isTauriRuntime();
+				if (result.success !== 'success') {
+					return {
+						ok: false as const,
+						hostToasted,
+						message: result.message || '下载失败',
+					};
+				}
+				return { ok: true as const, hostToasted };
 			},
 		});
 	}

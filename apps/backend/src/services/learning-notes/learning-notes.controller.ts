@@ -10,11 +10,12 @@ import {
 	Put,
 	Query,
 	Req,
+	Res,
 	UnauthorizedException,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { QueryLearningNoteDto } from './dto/query-learning-note.dto';
@@ -44,6 +45,26 @@ export class LearningNotesController {
 	@Get('list')
 	async list(@Req() req: AuthedRequest, @Query() query: QueryLearningNoteDto) {
 		return this.notesService.findPage(this.userId(req), query);
+	}
+
+	/** 导出单篇笔记 DOCX（原始二进制；与列表分页无关） */
+	@Get('export-docx/:id')
+	async exportDocx(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Res() res: Response,
+	): Promise<void> {
+		const buf = await this.notesService.exportDocxBuffer(this.userId(req), id);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="learning-note.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
 	}
 
 	@Get('detail/:id')

@@ -29,7 +29,7 @@ Module Federation（MF）远程插件运行在独立的 `remote-plugins` 子应�
 - `src/utils/mockHost.ts` — 删除 mock `t`。
 - `src/layout/index.tsx` — 导航与品牌名走 `useI18n`；新增语言切换按钮。
 - `src/views/home/index.tsx`、`src/views/embed/index.tsx` — 全量 i18n。
-- `src/views/ideas-list/index.tsx`、`src/views/learning-notes/index.tsx` — i18n + `useHostLocale` + `richEditorLocaleOf`。
+- `src/views/ebook-ideas/index.tsx`、`src/views/learning-notes/index.tsx` — i18n + `useHostLocale` + `richEditorLocaleOf`。
 - `src/views/learning-notes/api.ts` — `translateSync` 兜底「无标题笔记」。
 - `src/store/learningNotes.ts` — `bind(http, toast, t)` 注入；`errMsg` 与所有 Toast 文案改 `t(...)`。
 - `src/components/design/Confirm/index.tsx`、`NotePreview/index.tsx` — i18n。
@@ -1692,7 +1692,7 @@ export default function Layout() {
 | Remote layout | `apps/remote-plugins/src/layout/index.tsx` |
 | Remote home 视图 | `apps/remote-plugins/src/views/home/index.tsx` |
 | Remote embed 视图 | `apps/remote-plugins/src/views/embed/index.tsx` |
-| Remote ideas-list 视图 | `apps/remote-plugins/src/views/ideas-list/index.tsx` |
+| Remote ideas-list 视图 | `apps/remote-plugins/src/views/ebook-ideas/index.tsx` |
 | Remote learning-notes 视图 | `apps/remote-plugins/src/views/learning-notes/index.tsx` |
 | Remote learning-notes api | `apps/remote-plugins/src/views/learning-notes/api.ts` |
 | Remote learningNotes store | `apps/remote-plugins/src/store/learningNotes.ts` |

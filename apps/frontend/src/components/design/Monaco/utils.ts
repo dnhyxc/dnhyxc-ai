@@ -410,17 +410,19 @@ function interpolateMonotone(
  * - 新方案直接用 `getScrollTop()`（连续值）作为折线自变量，更贴近用户真实阅读位置
  *
  * 行为：
- * - 若快照缺失或失效：现场 `buildMarkdownScrollSyncSnapshot` 并写回 `snapshotRef`
+ * - 若快照缺失或失效：默认现场 `buildMarkdownScrollSyncSnapshot`；`preferRatioWhenInvalid` 时仅比例跟滚
  * - 若无模型：退化为整篇比例映射
  *
  * @param editor Monaco 编辑器实例
  * @param viewport 预览滚动容器
  * @param snapshotRef 快照引用（mutable ref，可变引用）：用于跨渲染缓存冷路径测量结果
+ * @param options.preferRatioWhenInvalid 快照失效时仅比例跟滚，避免 scroll 热路径全量测标题
  */
 export function syncPreviewScrollFromMarkdownEditor(
 	editor: MonacoEditorInstance,
 	viewport: HTMLElement,
 	snapshotRef: { current: MarkdownScrollSyncSnapshot | null },
+	options?: { preferRatioWhenInvalid?: boolean },
 ): void {
 	const model = editor.getModel();
 	if (!model) {
@@ -453,6 +455,11 @@ export function syncPreviewScrollFromMarkdownEditor(
 		return;
 	}
 
+	if (options?.preferRatioWhenInvalid) {
+		setPreviewVerticalScrollRatio(viewport, editorVerticalScrollRatio(editor));
+		return;
+	}
+
 	const built = buildMarkdownScrollSyncSnapshot(editor, viewport);
 	snapshotRef.current = built;
 	if (built.useRatioFallback) {
@@ -478,11 +485,13 @@ export function syncPreviewScrollFromMarkdownEditor(
  * @param editor Monaco 编辑器实例
  * @param viewport 预览滚动容器
  * @param snapshotRef 快照引用（mutable ref，可变引用）
+ * @param options.preferRatioWhenInvalid 快照失效时仅比例跟滚，避免 scroll 热路径全量测标题
  */
 export function syncEditorScrollFromMarkdownPreview(
 	editor: MonacoEditorInstance,
 	viewport: HTMLElement,
 	snapshotRef: { current: MarkdownScrollSyncSnapshot | null },
+	options?: { preferRatioWhenInvalid?: boolean },
 ): void {
 	const model = editor.getModel();
 	if (!model) return;
@@ -505,6 +514,12 @@ export function syncEditorScrollFromMarkdownPreview(
 		}
 		const next = interpolateMonotone(snap.previewY, snap.editorY, y, maxEditor);
 		applyEditorScrollTop(editor, next);
+		return;
+	}
+
+	if (options?.preferRatioWhenInvalid) {
+		const ratio = maxPreview <= 0 ? 0 : clamp01(y / maxPreview);
+		applyEditorScrollTop(editor, ratio * maxEditor);
 		return;
 	}
 

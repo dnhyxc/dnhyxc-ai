@@ -9,6 +9,10 @@ import { QueryLearningNoteDto } from './dto/query-learning-note.dto';
 import { SaveLearningNoteDto } from './dto/save-learning-note.dto';
 import { UpdateLearningNoteDto } from './dto/update-learning-note.dto';
 import { EnglishLearningNote } from './english-learning-note.entity';
+import {
+	buildLearningNoteDocxBuffer,
+	NOTE_DOCX_HTML_MAX_CHARS,
+} from './learning-note-docx.builder';
 
 export type LearningNoteListItem = Pick<
 	EnglishLearningNote,
@@ -85,6 +89,28 @@ export class LearningNotesService {
 		});
 
 		return { list, total };
+	}
+
+	/**
+	 * 导出单篇笔记为 DOCX（保留正文图片；超大图缩小显示，极端体积才跳过）。
+	 */
+	async exportDocxBuffer(userId: number, id: string): Promise<Buffer> {
+		const row = await this.requireOwned(userId, id);
+		const html = row.content ?? '';
+		if (html.length > NOTE_DOCX_HTML_MAX_CHARS) {
+			throw new BadRequestException(
+				`笔记内容过大（>${NOTE_DOCX_HTML_MAX_CHARS} 字符），请精简后再导出`,
+			);
+		}
+		try {
+			return await buildLearningNoteDocxBuffer({
+				title: row.title?.trim() || '无标题笔记',
+				html,
+			});
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			throw new BadRequestException(msg || '导出失败');
+		}
 	}
 
 	private async requireOwned(

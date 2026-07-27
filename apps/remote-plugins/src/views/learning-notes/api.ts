@@ -80,6 +80,21 @@ export function createNotesApi(http: HostHttp) {
 			return toNote(unwrapData<NoteRecord>(res));
 		},
 
+		/** 拉取单篇笔记 DOCX 二进制（服务端生成） */
+		async exportDocx(id: string): Promise<ArrayBuffer> {
+			const res = await http.get(`${BASE}/export-docx/${id}`);
+			const data = unwrapData<unknown>(res);
+			if (data instanceof ArrayBuffer) return data;
+			if (ArrayBuffer.isView(data)) {
+				const v = data as ArrayBufferView;
+				return v.buffer.slice(
+					v.byteOffset,
+					v.byteOffset + v.byteLength,
+				) as ArrayBuffer;
+			}
+			throw new Error(translateSync('learningNotes.toast.exportInvalid'));
+		},
+
 		async save(input: {
 			title: string;
 			html: string;

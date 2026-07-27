@@ -8,6 +8,7 @@
 ## 延伸阅读
 
 - [knowledge-preview-assistant-pane-perf.md](../Influence-point/knowledge-preview-assistant-pane-perf.md) — 影响面与回归清单
+- [knowledge-scroll-jank-fix-steps.md](./knowledge-scroll-jank-fix-steps.md) — **滚动层详细解决步骤**（FAB/memo/吸顶条/贴底；S0–S6）
 - [knowledge-editor-long-text-perf.md](../knowledge/knowledge-editor-long-text-perf.md) — 第一轮：长文 edit 停喂隐藏预览、Store 派生 boolean
 - [knowledge-editor-long-text-perf.md](../Influence-point/knowledge-editor-long-text-perf.md) — 第一轮影响点
 - [knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md) — 助手会话、`documentKey`、持久化

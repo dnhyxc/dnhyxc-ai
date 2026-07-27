@@ -1,9 +1,9 @@
 import { Link, type RouteObject } from 'react-router';
 import Layout from '@/layout';
 import { mockApi, mockPlugin } from '@/utils/mockHost';
+import IdeasListApp from '@/views/ebook-ideas';
 import { EmbedIdeasList, EmbedLearningNotes } from '@/views/embed';
 import Home from '@/views/home';
-import IdeasListApp from '@/views/ideas-list';
 import LearningNotesApp from '@/views/learning-notes';
 
 /** 独立预览路由；path 与主站 registry / 业务树对齐 */
@@ -38,7 +38,7 @@ export const routes: RouteObject[] = [
 								},
 							},
 						})}
-						plugin={mockPlugin('ebookIdeasList', '/ebook/plugins/ideas-list')}
+						plugin={mockPlugin('ebookIdeas', '/ebook/plugins/ebook-ideas')}
 					/>
 				),
 			},

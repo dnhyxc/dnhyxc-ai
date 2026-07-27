@@ -1674,8 +1674,8 @@ export const enUS = {
 	'ebook.read.sourceOnline': 'Online',
 	'ebook.read.backShelf': 'Back to shelf',
 	'ebook.read.toc': 'Book contents',
-	'ebook.read.ideasList.title': 'All ideas',
-	'ebook.read.ideasList.open': 'Ideas for this book',
+	'ebook.read.ebookIdeas.title': 'All ideas',
+	'ebook.read.ebookIdeas.open': 'Ideas for this book',
 	'ebook.read.tocEmpty': 'This file has no book contents.',
 	'ebook.read.tocScrollToBottom': 'Scroll to bottom',
 	'ebook.read.tocScrollToTop': 'Scroll to top',
@@ -1855,7 +1855,7 @@ export const enUS = {
 		'Module Federation demo: verifies host dynamic load, sidebar entry, and shared React.',
 	'plugins.desc.learningNotes':
 		'Capture vocabulary, grammar, and speaking notes in English Learning.',
-	'plugins.desc.ebookIdeasList':
+	'plugins.desc.ebookIdeas':
 		'Browse all ideas for the current EPUB and jump to the matching highlight.',
 	'plugins.registry.noChanges': 'No changes, no need to save',
 	'route.setting.about': 'About',

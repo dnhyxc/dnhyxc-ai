@@ -56,11 +56,13 @@ import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
 import {
 	buildMarkdownScrollSyncSnapshot,
+	editorVerticalScrollRatio,
 	isMarkdownDiffEntryEligible,
 	type MarkdownDiffBaselineSource,
 	type MarkdownScrollSyncSnapshot,
 	type MonacoEditorInstance,
 	normalizeMonacoEol,
+	setPreviewVerticalScrollRatio,
 	syncEditorScrollFromMarkdownPreview,
 	syncPreviewScrollFromMarkdownEditor,
 } from './utils';
@@ -373,6 +375,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
 	/** split→全屏预览：右侧预览 DOM 与左栏不同实例，仅拷贝 scrollTop */
 	const pendingSplitPreviewScrollTopRef = useRef<number | null>(null);
+	/**
+	 * preview→edit：edit 态会清空左栏预览正文，须在 setViewMode 时（仍有预览 DOM）算出目标，
+	 * 再于 layout / mount 后写回编辑器（助手+preview 卸载 Monaco 时仅有 ratio）。
+	 */
+	const pendingPreviewToEditorScrollTopRef = useRef<number | null>(null);
+	const pendingPreviewToEditorScrollRatioRef = useRef<number | null>(null);
+	/**
+	 * edit→preview：助手同开会卸载 Monaco，且左栏预览可能 deferred 晚一帧才有正文；
+	 * 切换前记下编辑器垂直比例，预览可滚后再写入。
+	 */
+	const pendingEditorToPreviewScrollRatioRef = useRef<number | null>(null);
 	// 将底部操作栏快捷键的注册收敛到 useMarkdownBottomBarShortcuts：
 	// - chord 读取与热更新在 hook 内完成
 	// - window keydown(capture) 绑定在 hook 内完成
@@ -458,6 +471,34 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				if (prev === 'split' && resolved === 'preview') {
 					pendingSplitPreviewScrollTopRef.current =
 						previewViewportRef.current?.scrollTop ?? null;
+				}
+				// 须在本帧清空 leftPreviewMarkdown 之前采样，否则 sync 读到空预览会把编辑器顶到顶
+				if (prev === 'preview' && resolved === 'edit') {
+					const ed = editorRef.current;
+					const vp = previewViewportRef.current;
+					if (vp && ed?.getModel()) {
+						markdownScrollSyncSnapshotRef.current = null;
+						syncEditorScrollFromMarkdownPreview(
+							ed,
+							vp,
+							markdownScrollSyncSnapshotRef,
+						);
+						pendingPreviewToEditorScrollTopRef.current = ed.getScrollTop();
+						pendingPreviewToEditorScrollRatioRef.current = null;
+					} else if (vp) {
+						const maxP = Math.max(0, vp.scrollHeight - vp.clientHeight);
+						pendingPreviewToEditorScrollTopRef.current = null;
+						pendingPreviewToEditorScrollRatioRef.current =
+							maxP <= 0 ? 0 : vp.scrollTop / maxP;
+					}
+				}
+				// 须在卸载 Monaco / deferred 清空前采样；layout 时编辑器可能已没了
+				if (prev === 'edit' && resolved === 'preview') {
+					const ed = editorRef.current;
+					if (ed?.getModel()) {
+						pendingEditorToPreviewScrollRatioRef.current =
+							editorVerticalScrollRatio(ed);
+					}
 				}
 				return resolved;
 			});
@@ -805,6 +846,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	useLayoutEffect(() => {
 		markdownScrollSyncSnapshotRef.current = null;
 		pendingSplitPreviewScrollTopRef.current = null;
+		pendingPreviewToEditorScrollTopRef.current = null;
+		pendingPreviewToEditorScrollRatioRef.current = null;
+		pendingEditorToPreviewScrollRatioRef.current = null;
 		const vp = previewViewportRef.current;
 		if (vp) {
 			vp.scrollTop = 0;
@@ -942,7 +986,58 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		flushEditorScrollToPreviewSync();
 	}, [flushEditorScrollToPreviewSync]);
 
-	// ponytail: 左栏双挂载 + 分屏同款 sync；preview→edit 须在 focusEditor microtask 之后再跑一次
+	/** 将 setViewMode 时缓存的 preview→edit 滚动目标写回 Monaco（layout 后可能需再刷一次） */
+	const applyPendingPreviewToEditorScroll = useCallback(
+		(clearPending = false) => {
+			const ed = editorRef.current;
+			if (!ed?.getModel()) return false;
+			const top = pendingPreviewToEditorScrollTopRef.current;
+			const ratio = pendingPreviewToEditorScrollRatioRef.current;
+			if (top == null && ratio == null) return false;
+			applyEditorLayoutRef.current?.();
+			suppressEditorScrollEchoRef.current = true;
+			try {
+				if (top != null) {
+					ed.setScrollTop(top);
+				} else if (ratio != null) {
+					const layout = ed.getLayoutInfo();
+					const maxEditor = Math.max(0, ed.getContentHeight() - layout.height);
+					ed.setScrollTop(ratio * maxEditor);
+				}
+				if (clearPending) {
+					pendingPreviewToEditorScrollTopRef.current = null;
+					pendingPreviewToEditorScrollRatioRef.current = null;
+				}
+			} finally {
+				scheduleClearSuppressEditorEcho();
+			}
+			return true;
+		},
+		[scheduleClearSuppressEditorEcho],
+	);
+
+	/** 将 edit→preview 缓存的垂直比例写回预览（正文 deferred / 异步增高后可能需再试） */
+	const applyPendingEditorToPreviewScroll = useCallback(
+		(clearPending = false) => {
+			const ratio = pendingEditorToPreviewScrollRatioRef.current;
+			const vp = previewViewportRef.current;
+			if (ratio == null || !vp) return false;
+			if (vp.scrollHeight <= vp.clientHeight) return false;
+			suppressPreviewScrollEchoRef.current = true;
+			try {
+				setPreviewVerticalScrollRatio(vp, ratio);
+				if (clearPending) {
+					pendingEditorToPreviewScrollRatioRef.current = null;
+				}
+			} finally {
+				scheduleClearSuppressPreviewEcho();
+			}
+			return true;
+		},
+		[scheduleClearSuppressPreviewEcho],
+	);
+
+	// ponytail: 左栏双挂载 + 分屏同款 sync；preview→edit 用切换前缓存，勿对已清空的预览再 sync
 	useLayoutEffect(() => {
 		const prev = prevViewModeRef.current;
 		if (prev === viewMode) return;
@@ -950,36 +1045,38 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		const runSync = () => {
 			const ed = editorRef.current;
 			const vp = previewViewportRef.current;
+
+			if (prev === 'preview' && viewMode === 'edit') {
+				applyPendingPreviewToEditorScroll(false);
+				return;
+			}
+
+			if (prev === 'edit' && viewMode === 'preview') {
+				// 助手同开时 Monaco 已卸：只能用切换前 ratio；否则优先标题折线 sync
+				if (ed?.getModel() && vp && vp.scrollHeight > vp.clientHeight) {
+					applyEditorLayoutRef.current?.();
+					markdownScrollSyncSnapshotRef.current = null;
+					suppressPreviewScrollEchoRef.current = true;
+					try {
+						syncPreviewScrollFromMarkdownEditor(
+							ed,
+							vp,
+							markdownScrollSyncSnapshotRef,
+						);
+						pendingEditorToPreviewScrollRatioRef.current = null;
+					} finally {
+						scheduleClearSuppressPreviewEcho();
+					}
+				} else {
+					applyPendingEditorToPreviewScroll(false);
+				}
+				return;
+			}
+
 			if (!ed?.getModel() || !vp) return;
 			applyEditorLayoutRef.current?.();
 			markdownScrollSyncSnapshotRef.current = null;
 
-			if (prev === 'preview' && viewMode === 'edit') {
-				suppressEditorScrollEchoRef.current = true;
-				try {
-					syncEditorScrollFromMarkdownPreview(
-						ed,
-						vp,
-						markdownScrollSyncSnapshotRef,
-					);
-				} finally {
-					scheduleClearSuppressEditorEcho();
-				}
-				return;
-			}
-			if (prev === 'edit' && viewMode === 'preview') {
-				suppressPreviewScrollEchoRef.current = true;
-				try {
-					syncPreviewScrollFromMarkdownEditor(
-						ed,
-						vp,
-						markdownScrollSyncSnapshotRef,
-					);
-				} finally {
-					scheduleClearSuppressPreviewEcho();
-				}
-				return;
-			}
 			if (prev === 'split' && viewMode === 'preview') {
 				const top = pendingSplitPreviewScrollTopRef.current;
 				pendingSplitPreviewScrollTopRef.current = null;
@@ -992,7 +1089,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		if (prev === 'preview' && viewMode === 'edit') {
 			queueMicrotask(() => {
 				runSync();
-				requestAnimationFrame(runSync);
+				requestAnimationFrame(() => {
+					applyPendingPreviewToEditorScroll(true);
+				});
+			});
+			return;
+		}
+		if (prev === 'edit' && viewMode === 'preview') {
+			queueMicrotask(() => {
+				runSync();
+				requestAnimationFrame(() => {
+					runSync();
+					applyPendingEditorToPreviewScroll(true);
+				});
 			});
 			return;
 		}
@@ -1001,9 +1110,24 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	}, [
 		viewMode,
 		leftPreviewMarkdown,
-		scheduleClearSuppressEditorEcho,
+		applyPendingPreviewToEditorScroll,
+		applyPendingEditorToPreviewScroll,
 		scheduleClearSuppressPreviewEcho,
 	]);
+
+	// deferred / 异步渲染后预览才可滚：mode 已是 preview 时仍需消化 pending ratio
+	useLayoutEffect(() => {
+		if (viewMode !== 'preview') return;
+		if (pendingEditorToPreviewScrollRatioRef.current == null) return;
+		if (!leftPreviewMarkdown) return;
+		const tryApply = () => {
+			if (applyPendingEditorToPreviewScroll(true)) return;
+			requestAnimationFrame(() => {
+				applyPendingEditorToPreviewScroll(true);
+			});
+		};
+		queueMicrotask(tryApply);
+	}, [viewMode, leftPreviewMarkdown, applyPendingEditorToPreviewScroll]);
 
 	const syncEditorFromPreview = useCallback(() => {
 		if (viewModeRef.current === 'splitDiff') return;
@@ -1602,7 +1726,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			queueMicrotask(() => {
 				applyEditorLayoutFromHost();
-				requestAnimationFrame(() => applyEditorLayoutFromHost());
+				applyPendingPreviewToEditorScroll(false);
+				requestAnimationFrame(() => {
+					applyEditorLayoutFromHost();
+					applyPendingPreviewToEditorScroll(true);
+				});
 			});
 
 			if (viewModeRef.current !== 'preview') {
@@ -1613,6 +1741,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			getMarkdownFromEditorRef,
 			formatMarkdownBeforeSaveRef,
 			syncPreviewFromEditor,
+			applyPendingPreviewToEditorScroll,
 			placeholder,
 		],
 	);
@@ -1906,6 +2035,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							</ResizablePanel>
 							<ResizableHandle
 								withHandle
+								disabled={!markdownRightPaneVisible}
 								className={cn(
 									'w-0',
 									markdownRightPaneVisible

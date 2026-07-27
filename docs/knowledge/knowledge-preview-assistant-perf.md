@@ -1,7 +1,7 @@
 # 知识库预览 + 助手同开性能优化
 
 > **文档角色**：本轮 diff 的**主实现文档**（写路径 + 改动前后对比 + 逐行注释）。  
-> **延伸阅读**：[knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md)（M1 长文 edit 隔离）、[../ideas/knowledge-preview-assistant-perf.md](../ideas/knowledge-preview-assistant-perf.md)（规划态思路）、[../Influence-point/knowledge-preview-assistant-pane-perf.md](../Influence-point/knowledge-preview-assistant-pane-perf.md)（影响面与回归清单）、[knowledge-assistant-complete.md](./knowledge-assistant-complete.md)（助手总览）。
+> **延伸阅读**：[knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md)（M1 长文 edit 隔离）、[knowledge-preview-scroll-jank.md](./knowledge-preview-scroll-jank.md)（预览滚动 FAB/memo/toolbar/贴底 rAF）、[../ideas/knowledge-preview-assistant-perf.md](../ideas/knowledge-preview-assistant-perf.md)（规划态思路）、[../Influence-point/knowledge-preview-assistant-pane-perf.md](../Influence-point/knowledge-preview-assistant-pane-perf.md)（影响面与回归清单）、[knowledge-assistant-complete.md](./knowledge-assistant-complete.md)（助手总览）。
 
 ---
 

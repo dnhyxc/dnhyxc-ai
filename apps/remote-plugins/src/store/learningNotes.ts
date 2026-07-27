@@ -12,6 +12,15 @@ import {
 type ToastFn = (message: string, type?: 'success' | 'error' | 'info') => void;
 type TFn = (key: string, params?: Record<string, unknown>) => string;
 
+type HostDownloadBlob = (options: {
+	fileName: string;
+	data: ArrayBuffer | Uint8Array;
+	mimeType?: string;
+}) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
+
+const DOCX_MIME =
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
 function errMsg(e: unknown, t: TFn): string {
 	if (e instanceof Error && e.message) return e.message;
 	if (e && typeof e === 'object' && 'message' in e) {
@@ -29,6 +38,8 @@ class LearningNotesStore {
 	private api: NotesApi | null = null;
 	private toast: ToastFn = () => {};
 	private t: TFn = translateSync;
+	/** Host 透传的 downloadBlob（Web / Tauri2）；独立预览可由 mock 注入 */
+	private downloadBlob: HostDownloadBlob | null = null;
 
 	/** 列表（分页累积） */
 	list: Note[] = [];
@@ -47,14 +58,21 @@ class LearningNotesStore {
 	saving = false;
 	confirmOpen = false;
 	pendingDeleteId: string | null = null;
+	exportingDocx = false;
 
 	constructor() {
 		makeAutoObservable(this, {}, { autoBind: true });
 	}
 
-	bind(http: HostHttp | undefined, toast: ToastFn, t?: TFn) {
+	bind(
+		http: HostHttp | undefined,
+		toast: ToastFn,
+		t?: TFn,
+		downloadBlob?: HostDownloadBlob,
+	) {
 		this.api = http ? createNotesApi(http) : null;
 		this.toast = toast;
+		this.downloadBlob = downloadBlob ?? null;
 		if (t) this.t = t;
 	}
 
@@ -136,14 +154,30 @@ class LearningNotesStore {
 
 	async openPreview(id: string): Promise<void> {
 		if (!this.api) return;
-		this.loadingDetail = true;
+		const listHit = this.list.find((n) => n.id === id);
+		// 立刻进入预览壳：卸掉编辑器，避免与即将挂载的预览双实例并存
+		runInAction(() => {
+			this.loadingDetail = true;
+			this.preview = {
+				id,
+				title: listHit?.title ?? this.preview?.title ?? '',
+				html: this.preview?.id === id ? this.preview.html : '',
+				at: listHit?.at ?? this.preview?.at ?? Date.now(),
+			};
+		});
 		try {
 			const note = await this.api.detail(id);
 			runInAction(() => {
-				this.preview = note;
+				// 慢网下用户可能已点开另一篇
+				if (this.preview?.id === id) this.preview = note;
 			});
 		} catch (e) {
 			this.toast(errMsg(e, this.t), 'error');
+			runInAction(() => {
+				if (this.preview?.id === id && !this.preview.html) {
+					this.preview = null;
+				}
+			});
 		} finally {
 			runInAction(() => {
 				this.loadingDetail = false;
@@ -155,6 +189,7 @@ class LearningNotesStore {
 		this.preview = null;
 		this.editingId = note.id;
 		this.editorInitial = note.html || EMPTY_NOTE_DOC;
+		// 预览态编辑器已卸载，重新挂载时用 editorInitial；seed 保证同 key 残留实例也被清掉
 		this.editorSeed += 1;
 	}
 
@@ -220,6 +255,58 @@ class LearningNotesStore {
 	requestDelete(id: string) {
 		this.pendingDeleteId = id;
 		this.confirmOpen = true;
+	}
+
+	/** 导出当前预览笔记为 DOCX（服务端生成 + Host downloadBlob 落盘） */
+	async exportPreviewDocx(): Promise<void> {
+		const note = this.preview;
+		if (!note?.id) {
+			this.toast(this.t('learningNotes.toast.exportEmpty'), 'info');
+			return;
+		}
+		if (!this.api) {
+			this.toast(this.t('learningNotes.toast.httpDeniedExport'), 'error');
+			return;
+		}
+		if (!this.downloadBlob) {
+			this.toast(this.t('learningNotes.toast.exportNoDownload'), 'error');
+			return;
+		}
+		if (this.exportingDocx) return;
+		this.exportingDocx = true;
+		try {
+			const buf = await this.api.exportDocx(note.id);
+			const safe =
+				note.title
+					.replace(/[\\/:*?"<>|]+/g, '_')
+					.trim()
+					.slice(0, 60) || 'learning-note';
+			const result = await this.downloadBlob({
+				fileName: `${safe}-${Date.now()}.docx`,
+				data: buf,
+				mimeType: DOCX_MIME,
+			});
+			if (!result.ok) {
+				// 对齐收藏导出：Tauri 失败时 Host 已 Toast
+				if (!result.hostToasted) {
+					this.toast(
+						result.message || this.t('learningNotes.toast.exportFail'),
+						'error',
+					);
+				}
+				return;
+			}
+			// Tauri：downloadBlob 内已成功 Toast；Web：由插件提示
+			if (!result.hostToasted) {
+				this.toast(this.t('learningNotes.toast.exportOk'), 'success');
+			}
+		} catch (e) {
+			this.toast(errMsg(e, this.t), 'error');
+		} finally {
+			runInAction(() => {
+				this.exportingDocx = false;
+			});
+		}
 	}
 
 	async confirmDelete(): Promise<void> {

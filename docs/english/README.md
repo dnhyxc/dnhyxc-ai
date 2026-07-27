@@ -8,6 +8,11 @@
 |------|------|
 | [learning-notes-remote.md](./learning-notes-remote.md) | **学习笔记 MF Remote**：`/english-learning/notes`、`remotePlugins/LearningNotes`（:9008）、`injectRoute: false` |
 | [learning-notes-rich-editor.md](./learning-notes-rich-editor.md) | **学习笔记富文本编辑器**：升级 Tiptap 至 3.28.0、支持格式化文本、高亮、列表等功能 |
+| [learning-notes-export-perf.md](./learning-notes-export-perf.md) | **学习笔记导出 Word 与长文性能优化**：DOCX 导出全链路（后端→HostBridge→插件）、TitleNode 选区修复、RichEditor opt-in 扩展、openPreview 乐观预览、Toolbar ResizeObserver deps 修复 |
+| [learning-notes-docx-builder.md](./learning-notes-docx-builder.md) | **DOCX Builder 端到端实现手册**：后端 `learning-note-docx.builder.ts` 全 28 个符号（HTML→DOCX 转换、sharp 懒加载转 JPEG、foreign/webp 兼容、本机 uploads 读盘、ImageBudget 图片预算、表格/列表/代码块转换、`buildLearningNoteDocxBuffer` 主入口） |
+| [learning-notes-large-note-editor.md](./learning-notes-large-note-editor.md) | **长文笔记编辑器（LargeNoteEditor）**：切块窗口化挂载、`LargeNoteDoc` 模型、`flushWindow` 写回、`originForScroll` 滞回换窗、入场贴底、`NotesListPanel` 列表隔离 |
+| [learning-notes-windowed-preview.md](./learning-notes-windowed-preview.md) | **长文窗口化预览（WindowedPreviewBody）**：`previewHtml.ts` 全正则化 HTML 处理（剥标题/补空段/图片懒加载/切块）、预览窗口化挂载、`NotePreview` 改造 `children` 插槽 |
+| [learning-notes-editor-polish.md](./learning-notes-editor-polish.md) | **富文本编辑器打磨**：`TitleNode.appendTransaction` GapCursor 二次修正、`EmptyParagraphDelete` 扩展、`NoteTitleField` 抽取、`fileToDataUrl` 非 DOCX 安全 MIME 转 JPEG、GapCursor CSS、`mountEditor` 延迟挂载 |
 | [learning-notes-rich-editor-deep-dive.md](./learning-notes-rich-editor-deep-dive.md) | **富文本编辑器源码级详解**：13 个模块逐行注释、架构/调用链/设计决策全景 |
 | [rich-editor-core-fixes.md](./rich-editor-core-fixes.md) | **富文本编辑器核心优化**：appendTransaction GapCursor 精细化、onCreate 两帧 rAF 选区、shouldShowBubble 提取、工具栏 fits 溢出重算、LinkForm 迁 UI 组件、ScrollArea 接管滚动 |
 | [richeditor-performance-tuning.md](./richeditor-performance-tuning.md) | **RichEditor 性能优化**：JSON 懒序列化、回调 ref 化、CharacterCount 按需挂载、toolbarExtra useMemo |

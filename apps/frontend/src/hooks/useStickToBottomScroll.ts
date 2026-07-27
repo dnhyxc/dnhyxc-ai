@@ -94,6 +94,8 @@ export function useStickToBottomScroll(
 	const suppressStickFromViewportScrollRef = useRef(false);
 	const lastViewportScrollTopRef = useRef<number | null>(null);
 	const idleFlushAppliedKeyRef = useRef<string | null>(null);
+	/** 流式 contentRevision 高频变化时合并为每帧最多一次贴底 */
+	const streamFlushRafRef = useRef(0);
 
 	useEffect(() => {
 		if (resetKey === undefined || resetKey === null) return;
@@ -102,6 +104,15 @@ export function useStickToBottomScroll(
 		userPinnedAwayRef.current = false;
 		lastViewportScrollTopRef.current = null;
 	}, [resetKey]);
+
+	useEffect(() => {
+		return () => {
+			if (streamFlushRafRef.current) {
+				cancelAnimationFrame(streamFlushRafRef.current);
+				streamFlushRafRef.current = 0;
+			}
+		};
+	}, []);
 
 	const flushScrollToBottom = useCallback((options?: { force?: boolean }) => {
 		const vp = viewportRef.current;
@@ -213,14 +224,20 @@ export function useStickToBottomScroll(
 	useLayoutEffect(() => {
 		if (!isStreaming) return;
 		if (!stickToBottomRef.current) return;
-		suppressStickFromViewportScrollRef.current = true;
-		flushScrollToBottom();
-		requestAnimationFrame(() => {
-			if (stickToBottomRef.current) {
-				flushScrollToBottom();
-			}
+		// 合并同帧多次 revision，避免每 token 双 rAF 贴底抢主线程
+		if (streamFlushRafRef.current) return;
+		streamFlushRafRef.current = requestAnimationFrame(() => {
+			streamFlushRafRef.current = 0;
+			if (!stickToBottomRef.current) return;
+			suppressStickFromViewportScrollRef.current = true;
+			flushScrollToBottom();
 			requestAnimationFrame(() => {
-				suppressStickFromViewportScrollRef.current = false;
+				if (stickToBottomRef.current) {
+					flushScrollToBottom();
+				}
+				requestAnimationFrame(() => {
+					suppressStickFromViewportScrollRef.current = false;
+				});
 			});
 		});
 	}, [contentRevision, isStreaming, flushScrollToBottom]);

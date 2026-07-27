@@ -939,7 +939,10 @@ export function Toolbar({
 		ro.observe(root);
 		if (extraRef.current) ro.observe(extraRef.current);
 		return () => ro.disconnect();
-	}, [tools]);
+		// ponytail: 勿依赖 tools 引用——每键 state 变都会新数组，触发全量 getBoundingClientRect
+		// 按钮槽位数 / 文案 / 右侧插槽变化时才需要重测
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- tools.length 足够代表槽位变化
+	}, [tools.length, t, linkOpen]);
 
 	const visible = tools.slice(0, visibleCount);
 	const overflow = tools.slice(visibleCount);

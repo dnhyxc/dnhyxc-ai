@@ -1,5 +1,5 @@
 import type { Editor, Extensions, JSONContent } from '@tiptap/react';
-import type { ReactNode } from 'react';
+import type { ReactNode, UIEventHandler } from 'react';
 import type { ResolveImageSrc } from './image';
 import type { RichEditorLocale } from './locale';
 
@@ -30,6 +30,10 @@ export type CreateExtensionsOptions = {
 	extensions?: Extensions;
 	/** 是否显示笔记标题节点（默认 true） */
 	showTitle?: boolean;
+	/** 图片拖拽缩放（默认 false：长文下 NodeView/监听开销大） */
+	imageResize?: boolean;
+	/** 表格列宽拖拽（默认 false：同上） */
+	tableResizable?: boolean;
 };
 
 export type RichEditorProps = {
@@ -52,6 +56,10 @@ export type RichEditorProps = {
 	showCharCount?: boolean;
 	/** 是否显示笔记标题节点（默认 true） */
 	showTitle?: boolean;
+	/** 图片拖拽缩放（默认 false） */
+	imageResize?: boolean;
+	/** 表格列宽拖拽（默认 false） */
+	tableResizable?: boolean;
 	/** 覆盖 / 合并文案（默认中文） */
 	locale?: Partial<RichEditorLocale>;
 	/** 完全替换默认扩展 */
@@ -66,4 +74,8 @@ export type RichEditorProps = {
 	 */
 	onUploadImage?: ResolveImageSrc;
 	onCreate?: (editor: Editor) => void;
+	/** 正文 ScrollArea 滚动 */
+	onBodyScroll?: UIEventHandler<HTMLDivElement>;
+	/** 自定义包裹 EditorContent（长文外层虚拟滚动用） */
+	renderBody?: (editorContent: ReactNode) => ReactNode;
 };

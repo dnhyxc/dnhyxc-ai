@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useRef,
 } from 'react';
 import ChatCodeToolbarFloating from '@/components/design/ChatCodeToolBar';
 import { ChatI18nT } from '@/types/chat';
@@ -15,6 +16,11 @@ const emptyDeps: DependencyList = [];
 let chatCodeFloatingToolbarHookMountCount = 0;
 
 export type UseChatCodeFloatingToolbarOptions = {
+	/**
+	 * 为 false 时不挂监听、不测 layout（预览+助手等同屏争用场景关闭吸顶条）。
+	 * 默认 true。
+	 */
+	enabled?: boolean;
 	/**
 	 * Markdown / 消息等变化后补算吸顶条（`requestAnimationFrame` + `useLayoutEffect`）。
 	 * 请传入稳定依赖（如 `[chatData]`、`[markdown]`），勿每次 render 新建数组。
@@ -42,41 +48,57 @@ export function useChatCodeFloatingToolbar(
 	viewportRef: RefObject<HTMLElement | null>,
 	options?: UseChatCodeFloatingToolbarOptions,
 ): { relayout: () => void } {
+	const enabled = options?.enabled ?? true;
 	const layoutDeps = options?.layoutDeps ?? emptyDeps;
 	const passiveScrollDeps = options?.passiveScrollDeps ?? emptyDeps;
 	const passiveScrollLayout = options?.passiveScrollLayout ?? false;
+	const scrollLayoutRafRef = useRef(0);
 
 	const relayout = useCallback(() => {
+		if (!enabled) return;
 		layoutChatCodeToolbars(viewportRef.current);
-	}, [viewportRef]);
+	}, [viewportRef, enabled]);
 
-	// 在全局范围追踪当前活跃的 useChatCodeFloatingToolbar 实例数量。
-	// 设计缘由：多实例共用同一 ScrollArea viewport 时，只有当**所有**相关组件都卸载后，才需要将悬浮工具栏全局同步置空（否则出现 Markdown 或 ScrollArea 父子嵌套时，中间某一子树卸载会导致吸顶条闪烁/消失）。
-	// 详见「多实例共用」场景，如分享页外层 ScrollArea + Markdown 嵌入父滚动。
+	/** scroll 热路径合并到单帧，避免 React onScroll + passive 双通道同帧双测 */
+	const relayoutOnScroll = useCallback(() => {
+		if (!enabled) return;
+		if (scrollLayoutRafRef.current) return;
+		scrollLayoutRafRef.current = requestAnimationFrame(() => {
+			scrollLayoutRafRef.current = 0;
+			layoutChatCodeToolbars(viewportRef.current);
+		});
+	}, [viewportRef, enabled]);
+
 	useEffect(() => {
-		// 组件挂载时，活跃实例数 +1
+		return () => {
+			if (scrollLayoutRafRef.current) {
+				cancelAnimationFrame(scrollLayoutRafRef.current);
+				scrollLayoutRafRef.current = 0;
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!enabled) return;
 		chatCodeFloatingToolbarHookMountCount += 1;
 		return () => {
-			// 组件卸载时，活跃实例数 -1
 			chatCodeFloatingToolbarHookMountCount -= 1;
-			// 只有当所有相关组件都卸载后，才清除 chat code 工具栏浮层
 			if (chatCodeFloatingToolbarHookMountCount <= 0) {
-				// 兜底保证不小于 0，防守式写法
 				chatCodeFloatingToolbarHookMountCount = 0;
-				// 调用 layoutChatCodeToolbars(null) 显式清空全局浮层 DOM/状态
 				layoutChatCodeToolbars(null);
 			}
 		};
-		// 只在初次挂载、卸载时运行一次，无依赖
-	}, []);
+	}, [enabled]);
 
 	useEffect(() => {
+		if (!enabled) return;
 		const onResize = () => layoutChatCodeToolbars(viewportRef.current);
 		window.addEventListener('resize', onResize);
 		return () => window.removeEventListener('resize', onResize);
-	}, []);
+	}, [enabled, viewportRef]);
 
 	useEffect(() => {
+		if (!enabled) return;
 		let ro: ResizeObserver | null = null;
 		let cancelled = false;
 		let raf = 0;
@@ -104,37 +126,44 @@ export function useChatCodeFloatingToolbar(
 			cancelAnimationFrame(raf);
 			ro?.disconnect();
 		};
-		// 与 layoutDeps 同步：首帧 ref 常为空，内容挂载后需重新 observe
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [relayout, ...layoutDeps]);
+	}, [enabled, relayout, ...layoutDeps]);
 
 	useEffect(() => {
+		if (!enabled) return;
 		relayout();
 		const id = requestAnimationFrame(() => relayout());
 		return () => cancelAnimationFrame(id);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- layoutDeps 由调用方传入
-	}, [relayout, ...layoutDeps]);
+	}, [enabled, relayout, ...layoutDeps]);
 
 	useLayoutEffect(() => {
+		if (!enabled) return;
 		const el = viewportRef.current;
 		if (!el) return;
 		layoutChatCodeToolbars(el);
 		const id = requestAnimationFrame(() => layoutChatCodeToolbars(el));
 		return () => cancelAnimationFrame(id);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [relayout, ...layoutDeps]);
+	}, [enabled, relayout, ...layoutDeps]);
 
 	useLayoutEffect(() => {
-		if (!passiveScrollLayout) return;
+		if (!enabled || !passiveScrollLayout) return;
 		const vp = viewportRef.current;
 		if (!vp) return;
-		const onScroll = () => layoutChatCodeToolbars(vp);
+		const onScroll = () => relayoutOnScroll();
 		vp.addEventListener('scroll', onScroll, { passive: true });
 		return () => vp.removeEventListener('scroll', onScroll);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [passiveScrollLayout, viewportRef, ...passiveScrollDeps]);
+	}, [
+		enabled,
+		passiveScrollLayout,
+		viewportRef,
+		relayoutOnScroll,
+		...passiveScrollDeps,
+	]);
 
-	return { relayout };
+	return { relayout: relayoutOnScroll };
 }
 
 /**

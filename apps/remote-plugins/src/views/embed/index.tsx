@@ -6,7 +6,7 @@ import {
 } from 'react';
 import { useI18n } from '@/hooks';
 import { connectIframeHost } from '@/utils/iframeHostClient';
-import IdeasListApp from '@/views/ideas-list';
+import IdeasListApp from '@/views/ebook-ideas';
 import LearningNotesApp from '@/views/learning-notes';
 
 type Bridge = {
@@ -70,7 +70,7 @@ function EmbedShell({
 }
 
 export function EmbedIdeasList() {
-	return <EmbedShell pluginId="ebookIdeasList" App={IdeasListApp} />;
+	return <EmbedShell pluginId="ebookIdeas" App={IdeasListApp} />;
 }
 
 export function EmbedLearningNotes() {

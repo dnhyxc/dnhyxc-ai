@@ -77,39 +77,43 @@ export const TitleNode = Node.create({
 			new Plugin({
 				key: new PluginKey('singleNoteTitle'),
 				appendTransaction(transactions, _old, state) {
-					if (!transactions.some((tr) => tr.docChanged || tr.selectionSet))
-						return null;
+					const docChanged = transactions.some((tr) => tr.docChanged);
+					const selectionSet = transactions.some((tr) => tr.selectionSet);
+					if (!docChanged && !selectionSet) return null;
 
 					let tr = state.tr;
 					let changed = false;
 
-					// 去掉多余 title
-					const extras: { pos: number; nodeSize: number }[] = [];
-					let seen = 0;
-					state.doc.forEach((node, offset) => {
-						if (node.type.name !== 'title') return;
-						seen += 1;
-						if (seen > 1) extras.push({ pos: offset, nodeSize: node.nodeSize });
-					});
-					for (let i = extras.length - 1; i >= 0; i--) {
-						const { pos, nodeSize } = extras[i];
-						tr.replaceWith(
-							pos,
-							pos + nodeSize,
-							state.schema.nodes.paragraph.create(),
-						);
-						changed = true;
-					}
+					// 结构修复只在 doc 变化时做（选区变化不必扫多余 title）
+					if (docChanged) {
+						const extras: { pos: number; nodeSize: number }[] = [];
+						let seen = 0;
+						state.doc.forEach((node, offset) => {
+							if (node.type.name !== 'title') return;
+							seen += 1;
+							if (seen > 1)
+								extras.push({ pos: offset, nodeSize: node.nodeSize });
+						});
+						for (let i = extras.length - 1; i >= 0; i--) {
+							const { pos, nodeSize } = extras[i];
+							tr.replaceWith(
+								pos,
+								pos + nodeSize,
+								state.schema.nodes.paragraph.create(),
+							);
+							changed = true;
+						}
 
-					const doc = changed ? tr.doc : state.doc;
-					const title = doc.firstChild;
-					// 没有正文块时补一段（atom 旁 GapCursor 看起来像有光标但输不进字）
-					if (title?.type.name === 'title' && doc.childCount < 2) {
-						tr = tr.insert(
-							title.nodeSize,
-							state.schema.nodes.paragraph.create(),
-						);
-						changed = true;
+						const doc = changed ? tr.doc : state.doc;
+						const title = doc.firstChild;
+						// 没有正文块时补一段（atom 旁 GapCursor 看起来像有光标但输不进字）
+						if (title?.type.name === 'title' && doc.childCount < 2) {
+							tr = tr.insert(
+								title.nodeSize,
+								state.schema.nodes.paragraph.create(),
+							);
+							changed = true;
+						}
 					}
 
 					const nextDoc = changed ? tr.doc : state.doc;
@@ -117,22 +121,31 @@ export const TitleNode = Node.create({
 					if (titleNode?.type.name === 'title') {
 						const titleSize = titleNode.nodeSize;
 						const sel = changed ? tr.selection : state.selection;
-						const bodyEmpty = !nextDoc.textBetween(
-							titleSize,
-							nextDoc.content.size,
-						).length;
 						const $from = sel.$from;
 						const caretInBody =
 							sel instanceof TextSelection &&
 							sel.empty &&
 							$from.parent.isTextblock &&
 							$from.pos > titleSize;
-						// GapCursor / 非正文块 / 塌缩光标不在正文 → 钉回首段
-						// 有 range 选区时不干预，避免 Cmd+A 被清掉
-						const needsFix =
-							sel instanceof GapCursor ||
-							(sel.empty && !$from.parent.isTextblock) ||
-							(bodyEmpty && sel.empty && !caretInBody);
+
+						// 仅「空正文」或非法非文本选区才纠正。
+						// 正文里的 GapCursor（如图片前）合法——旧逻辑一律 atEnd，导致无法在图前输入。
+						const bodyEmpty =
+							nextDoc.childCount < 2 ||
+							(nextDoc.childCount === 2 &&
+								nextDoc.child(1).isTextblock &&
+								nextDoc.child(1).content.size === 0);
+
+						let needsFix = false;
+						if (bodyEmpty && sel.empty && !caretInBody) {
+							needsFix = true;
+						} else if (
+							sel.empty &&
+							!(sel instanceof GapCursor) &&
+							!$from.parent.isTextblock
+						) {
+							needsFix = true;
+						}
 
 						if (needsFix && titleSize + 1 <= nextDoc.content.size) {
 							const nextSel = bodyEmpty

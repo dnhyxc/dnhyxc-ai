@@ -14,15 +14,17 @@ interface Data<T> {
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor {
 	constructor() {}
-	intercept(
-		_context: ExecutionContext,
-		next: CallHandler,
-	): Observable<Data<T>> {
-		// const req = context.switchToHttp().getRequest();
-		// 这会在拦截器之前执行
+	intercept(context: ExecutionContext, next: CallHandler): Observable<Data<T>> {
+		const httpRes = context.switchToHttp().getResponse<{
+			headersSent?: boolean;
+			writableEnded?: boolean;
+		}>();
 		return next.handle().pipe(
 			map((data) => {
-				// 这里会在拦截器之后执行
+				// @Res() 已写完二进制（如 DOCX）时勿再包一层 JSON
+				if (httpRes?.headersSent || httpRes?.writableEnded) {
+					return data as Data<T>;
+				}
 				return {
 					data,
 					code: HttpStatus.OK,

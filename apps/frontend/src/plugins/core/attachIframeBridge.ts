@@ -60,6 +60,22 @@ async function dispatchRpc(
 				},
 			);
 			return null;
+		case 'ui.downloadBlob': {
+			if (!api.ui?.downloadBlob) throw new Error('UI_DENIED');
+			const opt = args[0] as {
+				fileName?: string;
+				data?: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			};
+			if (!opt?.fileName || opt.data == null) {
+				throw new Error('INVALID_DOWNLOAD_ARGS');
+			}
+			return api.ui.downloadBlob({
+				fileName: String(opt.fileName),
+				data: opt.data,
+				mimeType: opt.mimeType,
+			});
+		}
 		case 'ebook.getBookId':
 			return ebook?.getBookId() ?? null;
 		case 'ebook.getBookTitle':

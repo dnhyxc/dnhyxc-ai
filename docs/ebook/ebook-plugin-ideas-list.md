@@ -16,7 +16,7 @@
 | `apps/frontend/src/views/ebook/read.tsx` | 右侧面板新增"想法"Tab，接入 `PluginHostPage`；注册电子书 Host API |
 | `apps/frontend/src/plugins/host-api/ebookHostApi.ts` | 新增：电子书模块 Host API 注册与查询 |
 | `apps/frontend/src/plugins/hooks/usePluginEnabled.ts` | 新增：Hook 订阅本地上架状态（read.tsx 中使用） |
-| `apps/remote-plugins/src/views/ideas-list/index.tsx` | 新增：想法列表插件组件（Remote） |
+| `apps/remote-plugins/src/views/ebook-ideas/index.tsx` | 新增：想法列表插件组件（Remote） |
 | `apps/frontend/src/plugins/core/types.ts` | 新增 `modules:ebook` 权限与 `EbookHostThought` 类型 |
 
 ## 3. 实现思路
@@ -402,11 +402,11 @@ export function createEbookModulesApi() {
 
 ---
 
-### 4.4 插件侧使用电子书 API（`apps/remote-plugins/src/views/ideas-list/index.tsx`）
+### 4.4 插件侧使用电子书 API（`apps/remote-plugins/src/views/ebook-ideas/index.tsx`）
 
 **说明**：纯新增文件（Remote 插件），无改动前代码。摘录插件组件内使用 `api.modules.ebook` 的片段。
 
-**改动后** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（当前，插件侧使用 API 片段）
+**改动后** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（当前，插件侧使用 API 片段）
 
 ```typescript
 // 插件组件接收 HostBridgeProps
@@ -471,7 +471,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 | 电子书阅读页（接入点） | `apps/frontend/src/views/ebook/read.tsx` |
 | 电子书 Host API | `apps/frontend/src/plugins/host-api/ebookHostApi.ts` |
 | 插件上架状态 Hook | `apps/frontend/src/plugins/hooks/usePluginEnabled.ts` |
-| 想法列表插件（Remote） | `apps/remote-plugins/src/views/ideas-list/index.tsx` |
+| 想法列表插件（Remote） | `apps/remote-plugins/src/views/ebook-ideas/index.tsx` |
 | 插件宿主页面 | `apps/frontend/src/plugins/host/PluginHostPage.tsx` |
 
 ---

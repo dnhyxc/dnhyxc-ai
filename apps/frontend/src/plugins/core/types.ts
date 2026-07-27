@@ -84,6 +84,19 @@ export interface HostBridgeProps {
 				message: string;
 				type?: 'success' | 'error' | 'info';
 			}) => void;
+			/**
+			 * 统一落盘（Web `<a download>` / Tauri `download_blob`）。
+			 * Tauri 成功/失败时 Host 已 Toast，`hostToasted: true` 时插件勿再弹成功提示。
+			 */
+			downloadBlob?: (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => Promise<{
+				ok: boolean;
+				hostToasted: boolean;
+				message?: string;
+			}>;
 		};
 		modules?: Readonly<Record<string, (...args: unknown[]) => unknown>>;
 	}>;

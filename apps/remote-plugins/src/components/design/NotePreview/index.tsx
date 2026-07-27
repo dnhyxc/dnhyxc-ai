@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import RichEditor from '../RichEditor';
 import '../RichEditor/styles.css';
+import { preparePreviewBody } from './previewHtml';
 import './styles.css';
+import { Component } from 'lucide-react';
 
 export type NotePreviewProps = {
 	/** 顶栏标题（替代编辑器 toolbar） */
@@ -20,29 +22,19 @@ export type NotePreviewProps = {
 	className?: string;
 	bodyClassName?: string;
 	emptyText?: string;
+	loading?: boolean;
 };
 
-/** 去掉文档内嵌的 title NodeView，正文只渲染 block 内容（兼容旧 API） */
-export function stripNoteTitleHtml(html: string): string {
-	if (!html) return '';
-	if (typeof DOMParser === 'undefined') {
-		return html.replace(
-			/<div[^>]*data-type=["']note-title["'][^>]*>[\s\S]*?<\/div>/i,
-			'',
-		);
-	}
-	const doc = new DOMParser().parseFromString(html, 'text/html');
-	for (const el of doc.querySelectorAll('[data-type="note-title"]')) {
-		el.remove();
-	}
-	return doc.body.innerHTML;
-}
+export {
+	decoratePreviewHtml,
+	preparePreviewBody,
+	preserveEmptyParagraphs,
+	splitPreviewBlocks,
+	stripNoteTitleHtml,
+} from './previewHtml';
 
 /**
- * 笔记只读预览：顶栏标题 + 可滚动正文。
- * - 使用 RichEditor 只读模式渲染，与编辑效果完全一致
- * - schema 层面禁用 title 节点，并用 stripNoteTitleHtml 预处理内容
- * - children / headerExtra / footer / meta 可扩展
+ * 笔记只读预览：与编辑态同一套 ScrollArea + RichEditor 正文样式（静态 HTML，不挂 TipTap）。
  */
 export function NotePreview({
 	title,
@@ -54,15 +46,20 @@ export function NotePreview({
 	className,
 	bodyClassName,
 	emptyText,
+	loading,
 }: NotePreviewProps) {
 	const { t } = useI18n();
-	const bodyHtml = html ? stripNoteTitleHtml(html) : '';
 	const empty = emptyText ?? t('common.emptyContent');
+	const bodyHtml = useMemo(
+		() => (html ? preparePreviewBody(html) : ''),
+		[html],
+	);
 
 	return (
 		<div
 			className={cn(
-				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md',
+				// contain：预览大 DOM 不参与左侧列表滚动时的布局/绘制连锁
+				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md contain-[layout_paint_style]',
 				className,
 			)}
 		>
@@ -84,25 +81,27 @@ export function NotePreview({
 				) : null}
 			</header>
 
-			<div className="note-preview-body min-h-0 flex-1">
-				{children != null ? (
-					children
-				) : bodyHtml ? (
-					<RichEditor
-						content={bodyHtml}
-						editable={false}
-						autofocus={false}
-						showToolbar={false}
-						showBubbleMenu={false}
-						showCharCount={false}
-						showTitle={false}
-						className={cn('note-preview-editor', bodyClassName)}
-						editorClassName="note-preview-tiptap"
+			{children != null ? (
+				children
+			) : bodyHtml ? (
+				<ScrollArea
+					className={cn(
+						'rich-editor-body note-preview-static text-textcolor min-h-0 flex-1',
+						bodyClassName,
+					)}
+				>
+					<div
+						className="tiptap note-preview-tiptap ProseMirror"
+						// tipTap 导出 HTML；预览只读
+						dangerouslySetInnerHTML={{ __html: bodyHtml }}
 					/>
-				) : (
-					<p className="text-textcolor/45 p-3 text-sm">{empty}</p>
-				)}
-			</div>
+				</ScrollArea>
+			) : loading ? null : (
+				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
+					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />
+					<div className="text-sm text-textcolor/80">{empty}</div>
+				</div>
+			)}
 
 			{footer ? <div className="shrink-0">{footer}</div> : null}
 		</div>

@@ -62,6 +62,9 @@
 | 后端 Remote 静态资源服务（serveRemote / uploads/remotes）           | [ops/remote-static-resources.md](./ops/remote-static-resources.md)                                                                                        |
 | 英语学习「学习笔记」空白或 CORS                                     | [english/learning-notes-remote.md](./english/learning-notes-remote.md)                                                                                    |
 | 学习笔记富文本编辑器（Tiptap 升级 / HTML 存储）                     | [english/learning-notes-rich-editor.md](./english/learning-notes-rich-editor.md)                                                                          |
+| 学习笔记导出 Word / 长文性能优化（TitleNode / opt-in 扩展 / 乐观预览） | [english/learning-notes-export-perf.md](./english/learning-notes-export-perf.md)                                                                          |
+| 学习笔记编辑/预览卡顿（长文窗口化 / 列表隔离）                       | [ideas/learning-notes-editor-preview-jank.md](./ideas/learning-notes-editor-preview-jank.md)                                                              |
+| 学习笔记 DOCX 插图导出 + 长文编辑打磨（sharp / 落点 / 空段）         | [ideas/learning-notes-export-and-editor-polish.md](./ideas/learning-notes-export-and-editor-polish.md)                                                    |
 | Tauri 桌面端 TipTap 复制粘贴失效                                    | [english/tauri-clipboard-tiptap.md](./english/tauri-clipboard-tiptap.md)                                                                                  |
 | 学习笔记列表分页 / 滚动加载更多                                     | [english/learning-notes-mobx-store.md](./english/learning-notes-mobx-store.md)                                                                            |
 | `createLlm` / 400                                                 | [llm/create-llm.md](./llm/create-llm.md)                                                                                                                 |
@@ -75,7 +78,8 @@
 | 保存知识库后 `Invalid array length` / Node OOM                    | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md)                                                       |
 | 云端保存知识库报「请求体过大」/ PayloadTooLarge                   | [knowledge/knowledge-save-body-limit.md](./knowledge/knowledge-save-body-limit.md)                                                                       |
 | 知识库长文编辑卡顿（标题/正文/助手输入）                          | [knowledge/knowledge-editor-long-text-perf.md](./knowledge/knowledge-editor-long-text-perf.md)                                                             |
-| 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/knowledge-preview-assistant-perf.md](./knowledge/knowledge-preview-assistant-perf.md)                                                             |
+| 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/knowledge-preview-assistant-perf.md](./knowledge/knowledge-preview-assistant-perf.md) · [knowledge/knowledge-preview-scroll-jank.md](./knowledge/knowledge-preview-scroll-jank.md) |
+| 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/knowledge-preview-scroll-jank.md](./knowledge/knowledge-preview-scroll-jank.md) · [ideas/knowledge-scroll-jank-fix-steps.md](./ideas/knowledge-scroll-jank-fix-steps.md) |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md)                                                                                         |
@@ -170,7 +174,8 @@
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
 | 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |
 | 知识库纯预览右侧空「预览内容为空」/ 双预览占位                    | [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md)                                                                           |
-| 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) · [monaco/markdown-split-scroll-sync.md](./monaco/markdown-split-scroll-sync.md) |
+| 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md) · [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) |
+| 预览切编辑丢位置 / 助手开时编辑切预览总在文首                     | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md)                                                       |
 
 ---
 

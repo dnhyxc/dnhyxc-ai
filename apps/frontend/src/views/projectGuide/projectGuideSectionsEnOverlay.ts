@@ -262,7 +262,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s12-5': {
 		title: 'Preview/edit & document assistant',
 		description:
-			'Full-width preview; with the assistant open, toggling preview/edit keeps the panel and switches the left pane while preserving scroll when possible; leaving split for full preview also keeps scroll where feasible.',
+			'Full-width preview; with the assistant open, toggling preview/edit keeps the panel and switches the left pane while restoring scroll in both directions when possible; leaving split for full preview also keeps scroll where feasible. Long or diagram-heavy docs keep preview and assistant scrolling responsive; during streaming you can scroll up to read history and only resume follow-bottom after scrolling back down.',
 	},
 	'pg-s13-1': {
 		title: '13.1 Word packs and classic lines (streaming)',

@@ -381,7 +381,12 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's6-27': {
 		title: 'Smoother preview + assistant together',
 		description:
-			'When the left Markdown preview or split view and the right doc assistant are both open during streaming replies, typing, scrolling, and the typewriter output feel more responsive. Preview may briefly show “Loading content…” while catching up, instead of a false empty state. Complements §6 long-form editing and §7 preview/assistant panel behavior.',
+			'When the left Markdown preview or split view and the right doc assistant are both open during streaming replies, typing, scrolling, and the typewriter output feel more responsive. Preview may briefly show “Loading content…” while catching up, instead of a false empty state. Also reduces dual-pane scroll jank via FAB mode dedupe, cached parse for diagram-heavy docs, coalesced stick-to-bottom, and a hard-off path for the floating code toolbar. Complements §6 long-form editing and §7 preview/assistant panel behavior.',
+	},
+	's6-28': {
+		title: 'Bidirectional scroll restore between preview and edit',
+		description:
+			'Switching between Markdown preview and edit in the knowledge base keeps your reading position when possible (including with the doc assistant open). Previously edit→preview was more reliable; preview→edit, or edit→preview with the assistant open, often jumped back to the top.',
 	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
@@ -421,7 +426,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's7-8': {
 		title: 'Preview/edit & document assistant panel',
 		description:
-			'Full-width preview without an empty right pane; with the assistant open, preview stays on the left in preview mode and the editor in edit mode; toggling preview/edit keeps the panel open and preserves scroll position where possible.',
+			'Full-width preview without an empty right pane; with the assistant open, preview stays on the left in preview mode and the editor in edit mode; toggling preview/edit keeps the panel open and restores scroll position in both directions when possible (including edit→preview while the assistant is open).',
 	},
 	's8-1': {
 		title: 'Mermaid interaction',
@@ -950,6 +955,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Desktop rich-text copy/paste fix',
 		description:
 			'Fixed an issue where Cmd/Ctrl+C/V/X occasionally did not work in the learning notes rich-text editor on Tauri desktop. Both the title input and the body editor are now supported; Select All remains handled by the editor itself.',
+	},
+	's24-57': {
+		title: 'Learning notes Word export & long-form perf',
+		description:
+			'Learning notes can now be exported as Word (.docx) files, preserving body formatting and images; downloads work on both desktop and browser. Also improved editing and preview performance for very long notes—lazy editor mount, windowed preview rendering for large notes, and streamlined title node selection fix paths to reduce jank.',
 	},
 	's24-56': {
 		title: 'Plugin error page polish',

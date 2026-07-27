@@ -22,7 +22,7 @@
 - `apps/remote-plugins/src/components/ui/scroll-area.tsx`
 - `apps/frontend/src/views/ebook/read.tsx`
 - `apps/frontend/src/views/englishLearning/notes/index.tsx`
-- `apps/remote-plugins/src/views/ideas-list/index.tsx`
+- `apps/remote-plugins/src/views/ebook-ideas/index.tsx`
 
 ## 3. 实现思路
 
@@ -466,11 +466,11 @@ return (
 
 **变更摘要**：内层容器 padding 由 `px-4 pb-4` 改为 `px-5.5 pb-5.5`；下架提示 `<p>` 去掉 `text-sm` 并合并为单行。
 
-### 4.10 想法列表（`apps/remote-plugins/src/views/ideas-list/index.tsx`）
+### 4.10 想法列表（`apps/remote-plugins/src/views/ebook-ideas/index.tsx`）
 
 **对比范围**：`HostBridgeProps` 类型中 `http` 字段与 `plugin` 字段后的 `independent` 字段；以及渲染部分的书名标题栏 `<div>` 与 `ScrollArea` 的 `className`。
 
-**改动前** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（基线，约 L39–L43、L53、L187、L198）
+**改动前** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（基线，约 L39–L43、L53、L187、L198）
 
 ```typescript
 // 旧版 http 仅支持 get/post
@@ -500,7 +500,7 @@ return (
 			>
 ```
 
-**改动后** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（当前，约 L39–L44、L53–L55、L187、L198）
+**改动后** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（当前，约 L39–L44、L53–L55、L187、L198）
 
 ```typescript
 // 新版 http 补齐 put/delete
@@ -563,7 +563,7 @@ return (
 | ScrollArea 组件（补注释） | `apps/remote-plugins/src/components/ui/scroll-area.tsx` |
 | 电子书阅读页想法列表抽屉（bodyClassName 微调） | `apps/frontend/src/views/ebook/read.tsx` |
 | 英语学习笔记页（padding 微调） | `apps/frontend/src/views/englishLearning/notes/index.tsx` |
-| 想法列表插件页（http 补 put/delete + independent + 样式对齐） | `apps/remote-plugins/src/views/ideas-list/index.tsx` |
+| 想法列表插件页（http 补 put/delete + independent + 样式对齐） | `apps/remote-plugins/src/views/ebook-ideas/index.tsx` |
 
 ---
 

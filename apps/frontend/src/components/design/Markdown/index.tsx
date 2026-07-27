@@ -118,26 +118,29 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		embedInParentScroll && viewportRef ? viewportRef : localViewportRef;
 	const [previewScrollFabMode, setPreviewScrollFabMode] =
 		useState<PreviewScrollCornerFabMode>('hidden');
+	const previewScrollFabModeRef = useRef<PreviewScrollCornerFabMode>('hidden');
 
 	const { theme } = useTheme();
 
 	const refreshPreviewScrollFab = useCallback(() => {
 		if (!showPreviewScrollCornerFab) {
-			setPreviewScrollFabMode('hidden');
+			if (previewScrollFabModeRef.current !== 'hidden') {
+				previewScrollFabModeRef.current = 'hidden';
+				setPreviewScrollFabMode('hidden');
+			}
 			return;
 		}
 		const vp = effectiveScrollViewportRef.current;
 		if (!vp) return;
 		const { scrollTop, scrollHeight, clientHeight } = vp;
 		const maxScroll = scrollHeight - clientHeight;
-		if (maxScroll <= 4) {
-			setPreviewScrollFabMode('hidden');
-			return;
+		let next: PreviewScrollCornerFabMode = 'hidden';
+		if (maxScroll > 4) {
+			next = scrollTop >= maxScroll - 8 ? 'toTop' : 'toBottom';
 		}
-		const threshold = 8;
-		setPreviewScrollFabMode(
-			scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom',
-		);
+		if (previewScrollFabModeRef.current === next) return;
+		previewScrollFabModeRef.current = next;
+		setPreviewScrollFabMode(next);
 	}, [showPreviewScrollCornerFab, effectiveScrollViewportRef]);
 
 	useLayoutEffect(() => {
@@ -217,6 +220,16 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return parser.render(markdown, { enableMermaid });
 	}, [hasMermaidIslandLayout, parser, markdown, enableMermaid]);
 
+	/** 岛屿布局下预渲染 markdown 段 HTML，避免 scroll FAB setState 时整篇重 parse */
+	const mermaidIslandMarkdownHtml = useMemo(() => {
+		if (!hasMermaidIslandLayout) return null;
+		return fenceParts.map((part) => {
+			if (part.type !== 'markdown') return null;
+			const rawHtml = parser.render(part.text, { enableMermaid: false });
+			return shiftMarkdownPreviewHeadingLineAttrs(rawHtml, part.lineBase0);
+		});
+	}, [hasMermaidIslandLayout, fenceParts, parser]);
+
 	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
 	const mermaidRootScanParser = useMemo(
 		() => ({
@@ -286,7 +299,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		effectiveScrollViewportRef,
-		enableCodeFloatingToolbar ? { layoutDeps: [markdown] } : undefined,
+		{
+			enabled: enableCodeFloatingToolbar,
+			layoutDeps: [markdown],
+		},
 	);
 
 	// 同步滚动区域的度量数据（比如触发代码工具栏重新布局）。
@@ -305,22 +321,18 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		effectiveScrollViewportRef, // 依赖：滚动视口引用
 	]);
 
-	// 处理滚动视口滚动事件
+	// 处理滚动视口滚动事件（FAB 仅在 mode 变化时 setState，避免滚动重渲染触发整篇 parse）
 	const handleViewportScroll = useCallback(
-		// _e: UIEvent<HTMLDivElement> 为滚动事件对象，这里没有使用
 		(_e: UIEvent<HTMLDivElement>) => {
-			// 同步滚动区域的各种度量（比如用于代码工具栏的重新定位）
 			syncScrollMetrics();
-			// 若有传入 onViewportScrollFollow 回调，则调用（通常用于触底保持跟随等逻辑）
 			onViewportScrollFollow?.();
-			// 如果显示右下角滚动浮动按钮（如置顶/置底），刷新其展示状态
 			if (showPreviewScrollCornerFab) refreshPreviewScrollFab();
 		},
 		[
-			syncScrollMetrics, // 依赖：度量同步函数
-			onViewportScrollFollow, // 依赖：自定义滚动跟随回调
-			showPreviewScrollCornerFab, // 依赖：是否展示滚动浮动按钮
-			refreshPreviewScrollFab, // 依赖：刷新浮动按钮显示的回调
+			syncScrollMetrics,
+			onViewportScrollFollow,
+			showPreviewScrollCornerFab,
+			refreshPreviewScrollFab,
 		],
 	);
 
@@ -331,9 +343,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return () => cancelAnimationFrame(id);
 	}, [markdown, syncScrollMetrics, enableCodeFloatingToolbar]);
 
-	// 正文变化 / 视口尺寸变化时更新「是否可滚、是否触底」
 	useEffect(() => {
 		if (!showPreviewScrollCornerFab) {
+			previewScrollFabModeRef.current = 'hidden';
 			setPreviewScrollFabMode('hidden');
 			return;
 		}
@@ -396,19 +408,13 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				// 如果存在 Mermaid 岛布局，则遍历分离出来的各个块分别渲染
 				fenceParts.map((part, i) => {
 					if (part.type === 'markdown') {
-						// 处理普通 markdown 块，禁用 mermaid，避免二次渲染
-						const rawHtml = parser.render(part.text, {
-							enableMermaid: false,
-						});
+						const segmentHtml = mermaidIslandMarkdownHtml?.[i];
+						if (!segmentHtml) return null;
 						return (
 							<div
 								key={`pv-${i}`}
 								dangerouslySetInnerHTML={{
-									// 对当前段落的 heading data-md-heading-line 属性进行校正（+part.lineBase0 偏移）
-									__html: shiftMarkdownPreviewHeadingLineAttrs(
-										rawHtml,
-										part.lineBase0,
-									),
+									__html: segmentHtml,
 								}}
 							/>
 						);

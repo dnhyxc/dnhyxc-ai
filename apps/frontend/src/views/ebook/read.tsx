@@ -242,7 +242,7 @@ function EbookReadPage() {
 	const epubListenBar = chapterListen;
 
 	// 想法列表插件是否启用
-	const ideasListEnabled = usePluginEnabled('ebookIdeasList');
+	const ebookIdeasEnabled = usePluginEnabled('ebookIdeas');
 
 	/** 听书倍速：默认全局；勾选后仅本书 */
 	const [listenRateBookOnly, setListenRateBookOnly] = useState(false);
@@ -407,8 +407,8 @@ function EbookReadPage() {
 	} | null>(null);
 
 	useEffect(() => {
-		if (!ideasListEnabled && ideasListOpen) setIdeasListOpen(false);
-	}, [ideasListEnabled, ideasListOpen]);
+		if (!ebookIdeasEnabled && ideasListOpen) setIdeasListOpen(false);
+	}, [ebookIdeasEnabled, ideasListOpen]);
 
 	useEffect(() => {
 		quoteShareOpenRef.current = quoteShareOpen;
@@ -2469,13 +2469,13 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
-				{ideasListEnabled ? (
+				{ebookIdeasEnabled ? (
 					<Tooltip
 						side="bottom"
 						sideOffset={6}
 						delayDuration={200}
 						shadow
-						content={t('ebook.read.ideasList.open')}
+						content={t('ebook.read.ebookIdeas.open')}
 					>
 						<Button
 							type="button"
@@ -2487,7 +2487,7 @@ function EbookReadPage() {
 									: 'text-textcolor/80 hover:text-teal-500',
 							)}
 							aria-pressed={ideasListOpen}
-							aria-label={t('ebook.read.ideasList.open')}
+							aria-label={t('ebook.read.ebookIdeas.open')}
 							onClick={() => setIdeasListOpen(true)}
 						>
 							<Lightbulb className="size-4" />
@@ -2976,18 +2976,16 @@ function EbookReadPage() {
 				/>
 			) : null}
 
-			{book?.fmt === 'epub' && ideasListEnabled ? (
+			{book?.fmt === 'epub' && ebookIdeasEnabled ? (
 				<Drawer
-					title={t('ebook.read.ideasList.title')}
+					title={t('ebook.read.ebookIdeas.title')}
 					open={ideasListOpen}
 					onOpenChange={setIdeasListOpen}
 					bodyClassName="pt-2 pb-2 pl-0"
 					contentStyle={epubSurfaceProps?.chromeStyle}
 				>
 					<div className="relative flex h-full min-h-0 flex-col">
-						{ideasListOpen ? (
-							<PluginHostPage pluginId="ebookIdeasList" />
-						) : null}
+						{ideasListOpen ? <PluginHostPage pluginId="ebookIdeas" /> : null}
 					</div>
 				</Drawer>
 			) : null}

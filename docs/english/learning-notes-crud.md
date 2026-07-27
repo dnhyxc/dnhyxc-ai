@@ -21,7 +21,7 @@
 - `apps/frontend/src/plugins/core/createHostBridge.ts` — 新增 `put` / `delete` 方法。
 - `apps/frontend/src/plugins/core/types.ts` — `HostBridgeProps.api.http` 类型新增 `put` / `delete`。
 - `apps/remote-plugins/src/utils/iframeHostClient.ts` — 新增 `put` / `delete` RPC 与本地类型。
-- `apps/remote-plugins/src/views/ideas-list/index.tsx` — 本地 `HostBridgeProps` 类型新增 `put` / `delete` + `independent` 属性。
+- `apps/remote-plugins/src/views/ebook-ideas/index.tsx` — 本地 `HostBridgeProps` 类型新增 `put` / `delete` + `independent` 属性。
 
 ## 3. 实现思路
 
@@ -1421,11 +1421,11 @@ import { LlmConfigModule } from './services/llm-config/llm-config.module';
 
 **变更摘要**：新增 `LearningNotesModule` 的 import 与 `@Global() @Module.imports` 注册（紧随 `EnglishLearningModule`）。
 
-### 4.9 ideas-list 本地类型同步（`apps/remote-plugins/src/views/ideas-list/index.tsx`）
+### 4.9 ideas-list 本地类型同步（`apps/remote-plugins/src/views/ebook-ideas/index.tsx`）
 
 **对比范围**：`IdeasListApp` 本地 `HostBridgeProps` 类型（与主契约同步 put/delete + 新增 `independent`）。
 
-**改动前** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（基线，约 L29–L53）
+**改动前** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（基线，约 L29–L53）
 
 ```typescript
 // IdeasList 本地 HostBridgeProps：旧版 http 仅 get/post、无 independent
@@ -1454,7 +1454,7 @@ type HostBridgeProps = {
 };
 ```
 
-**改动后** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（当前，约 L29–L56）
+**改动后** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（当前，约 L29–L56）
 
 ```typescript
 // IdeasList 本地 HostBridgeProps：新版补齐 put/delete + independent
@@ -1691,7 +1691,7 @@ title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记
 | HostBridge 装配 | `apps/frontend/src/plugins/core/createHostBridge.ts` |
 | iframe RPC 分发 | `apps/frontend/src/plugins/core/attachIframeBridge.ts` |
 | embed 端 iframe host client | `apps/remote-plugins/src/utils/iframeHostClient.ts` |
-| ideas-list 本地类型同步 | `apps/remote-plugins/src/views/ideas-list/index.tsx` |
+| ideas-list 本地类型同步 | `apps/remote-plugins/src/views/ebook-ideas/index.tsx` |
 | 后端模块注册 | `apps/backend/src/app.module.ts` |
 | 学习笔记后端模块 | `apps/backend/src/services/learning-notes/learning-notes.module.ts` |
 

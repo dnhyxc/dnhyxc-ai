@@ -15,6 +15,7 @@ import { fileToDataUrl, ImageUpload } from '../image';
 import { zhCN } from '../locale';
 import { indentEditor, TitleNode } from '../title';
 import type { CreateExtensionsOptions } from '../types';
+import { EmptyParagraphDelete } from './EmptyParagraphDelete';
 
 const lowlight = createLowlight(common);
 
@@ -61,6 +62,7 @@ export function createExtensions(
 	const baseExtensions: Extensions = [
 		...(withTitle ? [CustomDocument, TitleNode] : []),
 		TabIndent,
+		EmptyParagraphDelete,
 		StarterKit.configure({
 			document: withTitle ? false : undefined,
 			trailingNode: {
@@ -68,6 +70,8 @@ export function createExtensions(
 			},
 			heading: { levels: [1, 2, 3, 4, 5] },
 			codeBlock: false,
+			// TipTap 3：undoRedo（非 history）；长文降低深度，减轻内存与事务
+			undoRedo: { depth: 50 },
 			link: {
 				openOnClick: false,
 				autolink: true,
@@ -108,14 +112,18 @@ export function createExtensions(
 			inline: false,
 			allowBase64: true,
 			HTMLAttributes: { class: 'rich-editor-image' },
-			resize: {
-				enabled: true,
-				alwaysPreserveAspectRatio: true,
-			},
+			...(options.imageResize
+				? {
+						resize: {
+							enabled: true,
+							alwaysPreserveAspectRatio: true,
+						},
+					}
+				: {}),
 		}),
 		ImageUpload.configure({ resolveSrcRef: resolveImageSrcRef }),
 		TableKit.configure({
-			table: { resizable: true },
+			table: { resizable: options.tableResizable === true },
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),

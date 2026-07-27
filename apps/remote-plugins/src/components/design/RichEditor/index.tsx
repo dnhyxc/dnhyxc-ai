@@ -85,12 +85,16 @@ export function RichEditor({
 	showBubbleMenu = true,
 	showCharCount = true,
 	showTitle = true,
+	imageResize = false,
+	tableResizable = false,
 	locale: localePartial,
 	extensions,
 	extraExtensions,
 	toolbarExtra,
 	onUploadImage,
 	onCreate,
+	onBodyScroll,
+	renderBody,
 }: RichEditorProps) {
 	const locale = useMemo(() => mergeLocale(localePartial), [localePartial]);
 
@@ -119,6 +123,8 @@ export function RichEditor({
 			extraExtensions,
 			resolveImageSrcRef,
 			showTitle,
+			imageResize,
+			tableResizable,
 		}),
 		content: showTitle
 			? normalizeNoteContent(content ?? defaultContent)
@@ -135,7 +141,11 @@ export function RichEditor({
 		onCreate: ({ editor: e }) => {
 			const focusBodyEnd = () => {
 				if (e.isDestroyed) return;
-				if (e.state.doc.firstChild?.type.name === 'title') {
+				// 有 title 节点，或显式 autofocus=end：都钉到正文末尾
+				if (
+					autofocus === 'end' ||
+					e.state.doc.firstChild?.type.name === 'title'
+				) {
 					e.commands.focus('end');
 				}
 			};
@@ -269,8 +279,12 @@ export function RichEditor({
 					</BubbleMenu>
 				)}
 
-				<ScrollArea className="rich-editor-body">
-					<EditorContent editor={editor} spellCheck="false" />
+				<ScrollArea className="rich-editor-body" onScroll={onBodyScroll}>
+					{renderBody ? (
+						renderBody(<EditorContent editor={editor} spellCheck="false" />)
+					) : (
+						<EditorContent editor={editor} spellCheck="false" />
+					)}
 				</ScrollArea>
 
 				{showCharCount && (
@@ -293,6 +307,7 @@ export { enUS, richEditorLocaleOf, zhCN } from './locale';
 export {
 	EMPTY_NOTE_DOC,
 	getDocTitleText,
+	NoteTitleField,
 	normalizeNoteContent,
 	TitleNode,
 } from './title';

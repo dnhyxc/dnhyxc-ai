@@ -1,12 +1,68 @@
 import type { Editor } from '@tiptap/react';
 
-/** 本地文件 → data URL（默认插图方式，兼容 Tauri WebView） */
+const DOCX_SAFE = new Set([
+	'image/jpeg',
+	'image/jpg',
+	'image/png',
+	'image/gif',
+]);
+
+/** 把浏览器能解码的图统一成 JPEG data URL（避免 webp/avif 线上导出失败） */
+function bitmapToJpegDataUrl(
+	source: ImageBitmap | HTMLImageElement,
+	quality = 0.9,
+): string {
+	const canvas = document.createElement('canvas');
+	canvas.width = Math.max(1, source.width);
+	canvas.height = Math.max(1, source.height);
+	const ctx = canvas.getContext('2d');
+	if (!ctx) throw new Error('canvas unsupported');
+	ctx.drawImage(source, 0, 0);
+	return canvas.toDataURL('image/jpeg', quality);
+}
+
+async function fileToJpegDataUrl(file: File): Promise<string> {
+	if (typeof createImageBitmap === 'function') {
+		const bmp = await createImageBitmap(file);
+		try {
+			return bitmapToJpegDataUrl(bmp);
+		} finally {
+			bmp.close();
+		}
+	}
+	const objectUrl = URL.createObjectURL(file);
+	try {
+		const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+			const el = new Image();
+			el.onload = () => resolve(el);
+			el.onerror = () => reject(new Error('image decode failed'));
+			el.src = objectUrl;
+		});
+		return bitmapToJpegDataUrl(img);
+	} finally {
+		URL.revokeObjectURL(objectUrl);
+	}
+}
+
+/** 本地文件 → data URL；非 jpeg/png/gif 先转 JPEG，兼容 DOCX 导出 */
 export function fileToDataUrl(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(String(reader.result));
-		reader.onerror = () => reject(reader.error ?? new Error('read failed'));
-		reader.readAsDataURL(file);
+	const type = (file.type || '').toLowerCase();
+	if (DOCX_SAFE.has(type)) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+			reader.readAsDataURL(file);
+		});
+	}
+	return fileToJpegDataUrl(file).catch(() => {
+		// 浏览器解不了（如部分 heic）时退回原始 data URL，交给服务端 sharp
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+			reader.readAsDataURL(file);
+		});
 	});
 }
 

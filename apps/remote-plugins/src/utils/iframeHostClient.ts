@@ -24,6 +24,15 @@ type HostBridgeProps = {
 				message: string;
 				type?: 'success' | 'error' | 'info';
 			}) => void;
+			downloadBlob?: (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => Promise<{
+				ok: boolean;
+				hostToasted: boolean;
+				message?: string;
+			}>;
 		};
 		modules?: Readonly<Record<string, unknown>>;
 	};
@@ -123,6 +132,12 @@ export function connectIframeHost(pluginId: string): Promise<HostBridgeProps> {
 							showToast: (options) => {
 								void rpc('ui.showToast', [options]);
 							},
+							downloadBlob: (options) =>
+								rpc('ui.downloadBlob', [options]) as Promise<{
+									ok: boolean;
+									hostToasted: boolean;
+									message?: string;
+								}>,
 						},
 						modules: {
 							ebook: {

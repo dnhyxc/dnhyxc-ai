@@ -8,10 +8,10 @@ UI 与主站对齐：**Tailwind CSS v4 + shadcn/ui**（`src/components/ui`、`@`
 
 **隔离由 Host 负责**（`plugins/host/styleIsolation.ts`：运行时 `@scope([data-mf-plugin])`）。
 
-| Remote 可正常做 | Host 保证 |
-|------|------|
-| `@import "tailwindcss"` 全家桶（含 Preflight） | Remote 注入的 CSS 不会污染主站 |
-| 普通 Vite + Tailwind 工程配置 | 插件页包装 `data-mf-plugin` 作为 scope 根 |
+| Remote 可正常做                                | Host 保证                                 |
+| ---------------------------------------------- | ----------------------------------------- |
+| `@import "tailwindcss"` 全家桶（含 Preflight） | Remote 注入的 CSS 不会污染主站            |
+| 普通 Vite + Tailwind 工程配置                  | 插件页包装 `data-mf-plugin` 作为 scope 根 |
 
 `trust: untrusted` 仍走 iframe（见 `docs/ideas/mf-css-isolation.md`）。
 
@@ -25,13 +25,13 @@ pnpm -C apps/remote-plugins dev
 
 浏览器打开 `http://127.0.0.1:9008/`：
 
-| 路径 | 页面 |
-|------|------|
-| `/` | 插件目录（带预览壳） |
-| `/english-learning/notes` | 学习笔记（预览壳） |
-| `/ebook/plugins/ideas-list` | EPUB 想法列表（预览壳，mock Host） |
+| 路径                              | 页面                                                     |
+| --------------------------------- | -------------------------------------------------------- |
+| `/`                               | 插件目录（带预览壳）                                     |
+| `/english-learning/notes`         | 学习笔记（预览壳）                                       |
+| `/ebook/plugins/ideas-list`       | EPUB 想法列表（预览壳，mock Host）                       |
 | `/embed/ebook/plugins/ideas-list` | **Host `iframeUrl` 用这个**：无壳，postMessage 接真 Host |
-| `/embed/english-learning/notes` | 同上，学习笔记 embed |
+| `/embed/english-learning/notes`   | 同上，学习笔记 embed                                     |
 
 `trust: untrusted` 时 registry 示例：
 
@@ -54,7 +54,7 @@ src/
   views/                   # 页面与 MF expose
     home/                  # 插件目录首页
     embed/                 # untrusted iframe 落地页
-    ideas-list/            # expose ./IdeasList
+    ebook-ideas/           # expose ./IdeasList
     learning-notes/        # expose ./LearningNotes
   utils/                   # mockHost、iframeHostClient
   components/ui/           # shadcn（可扩展 design/）
@@ -66,10 +66,10 @@ src/
 
 ## Expose
 
-| expose | 说明 | registry `id` |
-|--------|------|----------------|
-| `./IdeasList` | EPUB 全书想法列表（右侧抽屉，滚动分页） | `ebookIdeasList` |
-| `./LearningNotes` | 英语学习 · 学习笔记（业务页内嵌） | `learningNotes` |
+| expose            | 说明                                    | registry `id`   |
+| ----------------- | --------------------------------------- | --------------- |
+| `./IdeasList`     | EPUB 全书想法列表（右侧抽屉，滚动分页） | `ebookIdeas`    |
+| `./LearningNotes` | 英语学习 · 学习笔记（业务页内嵌）       | `learningNotes` |
 
 后续新插件：在 `src/views/<name>/` 加模块，并在 `vite.config.ts` `exposes` 与 `plugins-registry.json` 各加一条（共用 `remoteName: "remotePlugins"` + 同一 `entry`）。
 
@@ -77,14 +77,14 @@ src/
 
 ```json
 {
-  "id": "learningNotes",
-  "remoteName": "remotePlugins",
-  "expose": "./LearningNotes",
-  "entry": "http://127.0.0.1:9008/mf-manifest.json",
-  "injectRoute": false,
-  "permissions": ["ui:toast", "nav:subtree"],
-  "enabled": true,
-  "trust": "first-party"
+	"id": "learningNotes",
+	"remoteName": "remotePlugins",
+	"expose": "./LearningNotes",
+	"entry": "http://127.0.0.1:9008/mf-manifest.json",
+	"injectRoute": false,
+	"permissions": ["ui:toast", "nav:subtree"],
+	"enabled": true,
+	"trust": "first-party"
 }
 ```
 

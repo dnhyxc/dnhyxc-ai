@@ -46,7 +46,7 @@
 | `apps/remote-plugins/src/styles.css` | 修改 | 恢复标准 Tailwind 用法，移除生产者侧 scoped 配置 |
 | `apps/remote-plugins/src/views/embed/index.tsx` | 修改 | 简化 EmbedShell，新增主题同步到 `documentElement` |
 | `apps/remote-plugins/src/layout/index.tsx` | 修改 | 移除 `data-plugin-root` 与 `plugin-standalone` 类 |
-| `apps/remote-plugins/src/views/ideas-list/index.tsx` | 修改 | 移除根节点 `data-plugin-root` 属性 |
+| `apps/remote-plugins/src/views/ebook-ideas/index.tsx` | 修改 | 移除根节点 `data-plugin-root` 属性 |
 | `apps/remote-plugins/src/views/learning-notes/index.tsx` | 修改 | 移除根节点 `data-plugin-root` 属性 |
 
 ---
@@ -1390,7 +1390,7 @@ export default function Layout() {
 }
 ```
 
-**改动前** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（`IdeasListApp` 根节点，约 L180–L183）
+**改动前** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（`IdeasListApp` 根节点，约 L180–L183）
 
 ```tsx
 	// 组件 return 根节点
@@ -1402,7 +1402,7 @@ export default function Layout() {
 		>
 ```
 
-**改动后** · `apps/remote-plugins/src/views/ideas-list/index.tsx`（`IdeasListApp` 根节点，约 L180–L182）
+**改动后** · `apps/remote-plugins/src/views/ebook-ideas/index.tsx`（`IdeasListApp` 根节点，约 L180–L182）
 
 ```tsx
 	// 组件 return 根节点
@@ -1512,7 +1512,7 @@ export default function Layout() {
 | 子项目全局样式（标准 Tailwind） | `apps/remote-plugins/src/styles.css` |
 | iframe 模式外壳（主题同步） | `apps/remote-plugins/src/views/embed/index.tsx` |
 | 独立预览布局 | `apps/remote-plugins/src/layout/index.tsx` |
-| 想法列表插件页面 | `apps/remote-plugins/src/views/ideas-list/index.tsx` |
+| 想法列表插件页面 | `apps/remote-plugins/src/views/ebook-ideas/index.tsx` |
 | 学习笔记插件页面 | `apps/remote-plugins/src/views/learning-notes/index.tsx` |
 
 ---

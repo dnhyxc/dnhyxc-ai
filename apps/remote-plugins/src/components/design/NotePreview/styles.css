@@ -2,7 +2,8 @@
 	background: transparent;
 }
 
-.note-preview-editor .rich-editor-body {
+.note-preview-editor .rich-editor-body,
+.note-preview-static.rich-editor-body {
 	padding: 0.75rem;
 	padding-top: 0.28rem;
 	text-align: justify;
@@ -19,6 +20,23 @@
 	display: none !important;
 }
 
-.note-preview-editor .ProseMirror > *:first-child {
+.note-preview-editor .ProseMirror > *:first-child,
+.note-preview-static .ProseMirror > *:first-child,
+.note-preview-static.rich-editor-body > .tiptap > *:first-child {
 	margin-top: 0;
+}
+
+/* 静态预览：todo 勾选仅展示，避免误点 */
+.note-preview-static ul[data-type="taskList"] label {
+	pointer-events: none;
+}
+
+/* 空段兜底高度（与编辑态 line-height: 1.9 对齐） */
+.note-preview-static .tiptap p:empty {
+	min-height: 1.9em;
+}
+
+/* 分帧挂载中：不挡交互，略提示仍在填充 */
+.note-preview-filling {
+	opacity: 0.98;
 }
