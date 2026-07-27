@@ -15,30 +15,28 @@ import { cn } from '@/lib/utils';
 import {
 	fetchPluginRegistry,
 	type PluginDescriptor,
+	pickPluginLocaleText,
 	pluginManager,
 } from '@/plugins';
 
-function pluginTitle(p: PluginDescriptor, t: (k: string) => string) {
-	const key = p.titleKey ?? p.menu?.nameKey;
-	if (key) {
-		const label = t(key);
-		if (label && label !== key) return label;
-	}
-	return p.id;
+/** 标题只认 registry.title[locale]，缺省回退 id */
+function pluginTitle(p: PluginDescriptor, locale: string) {
+	return pickPluginLocaleText(p.title, locale) || p.id;
 }
 
-function pluginBlurb(p: PluginDescriptor, t: (k: string) => string) {
-	// 有 descriptionKey 时优先走 i18n，避免 registry 里残留的中文 description 锁死文案
-	if (p.descriptionKey) {
-		const label = t(p.descriptionKey);
-		if (label && label !== p.descriptionKey) return label;
-	}
-	if (p.description?.trim()) return p.description.trim();
-	return t('plugins.card.noDesc');
+/** 描述只认 registry.description，缺省占位文案 */
+function pluginBlurb(
+	p: PluginDescriptor,
+	locale: string,
+	t: (k: string) => string,
+) {
+	return (
+		pickPluginLocaleText(p.description, locale) || t('plugins.card.noDesc')
+	);
 }
 
 export default function PluginsPage() {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	const navigate = useNavigate();
 	const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
 	const [busyId, setBusyId] = useState<string | null>(null);
@@ -110,7 +108,7 @@ export default function PluginsPage() {
 									<CardHeader className="grid-cols-1 gap-2 px-4 [.border-b]:pb-0">
 										<div className="flex items-center justify-between gap-3">
 											<CardTitle className="min-w-0 flex-1 text-base">
-												{pluginTitle(p, t)}
+												{pluginTitle(p, locale)}
 											</CardTitle>
 											<div className="flex shrink-0 items-center gap-2">
 												<span className="text-textcolor/55 text-xs whitespace-nowrap">
@@ -127,7 +125,7 @@ export default function PluginsPage() {
 											</div>
 										</div>
 										<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
-											{pluginBlurb(p, t)}
+											{pluginBlurb(p, locale, t)}
 										</CardDescription>
 									</CardHeader>
 									<CardContent className="px-4 text-xs text-textcolor/45">

@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、Host `@scope` 样式隔离。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、Host `@scope` 样式隔离；Registry 插件名/描述用内嵌 `title`/`description` locale map（**无** `titleKey` / `descriptionKey` / `menu.nameKey`，不绑 Host i18n）。若与源码不一致，以源码为准。
 
 ---
 
@@ -47,6 +47,7 @@
 - **幂等注入**：路由和侧栏注入支持幂等，避免重复注入导致闪烁
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
+- **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
 - **样式隔离**：Host 运行时 `@scope([data-mf-plugin])`；`untrusted` 走 iframe
 
 ---
@@ -349,18 +350,21 @@ export type PluginPermission =
  * 插件描述符 - 定义插件在 registry 中的元数据
  * Host 通过此描述符加载和管理插件
  */
+/** registry 内嵌多语言文案（与 Host `locale` 对齐）；见 `localeText.ts` */
+export type PluginLocaleMap = Partial<Record<'zh-CN' | 'en-US', string>>;
+
 export interface PluginDescriptor {
 	/** 插件唯一标识，与 MF remote name / loadRemote(`${id}/App`) 对齐 */
 	id: string;
-	
-	/** 插件标题的 i18n key */
-	titleKey?: string;
-	
-	/** 插件作用说明的 i18n key（插件中心卡片展示） */
-	descriptionKey?: string;
-	
-	/** 明文说明（第三方无 Host i18n 时用） */
-	description?: string;
+
+	/**
+	 * 多语言插件名（插件中心 / 注入路由标题）。
+	 * 新增或改名只改 registry，不必改 Host i18n。
+	 */
+	title?: PluginLocaleMap;
+
+	/** 多语言说明，或旧版单语字符串 */
+	description?: string | PluginLocaleMap;
 	
 	/** 路由 path（顶层注入或业务内路径） */
 	routePath: string;
@@ -374,8 +378,8 @@ export interface PluginDescriptor {
 	/** Host API 兼容范围，如 ^1.0.0 */
 	hostApiRange: string;
 	
-	/** 可选侧栏菜单配置 */
-	menu?: { order: number; icon?: string; nameKey?: string };
+	/** 可选侧栏菜单配置（仅 icon + order；文案不走 Host i18n） */
+	menu?: { order: number; icon?: string };
 	
 	/**
 	 * 是否由 PluginManager 注入顶层路由
@@ -506,15 +510,25 @@ export interface LoadedPlugin {
 	error?: string;            // 错误信息（失败时）
 }
 
-/** 插件侧栏菜单项 */
+/** 插件侧栏菜单项（侧栏只渲染 icon；nameKey 为稳定 id，默认等于 pluginId） */
 export interface PluginSidebarItem {
 	pluginId: string;          // 插件 ID
 	path: string;              // 路由路径
-	nameKey: string;           // 名称 i18n key
+	nameKey: string;           // 稳定标识（非 Host i18n key）
 	icon: string;              // 图标名称
 	order: number;             // 排序序号
 	requiresAuth?: boolean;    // 是否需要认证
 }
+```
+
+**文案解析辅助**（`apps/frontend/src/plugins/core/localeText.ts`）：
+
+```typescript
+/** 优先当前 locale → zh-CN → en-US → 空串；纯字符串则原样返回 */
+export function pickPluginLocaleText(
+	value: PluginLocaleMap | string | undefined | null,
+	locale: string,
+): string;
 ```
 
 ---
@@ -551,7 +565,8 @@ function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 		path: meta.routePath,
 		Component: Page,
 		meta: {
-			titleKey: meta.titleKey ?? meta.menu?.nameKey,
+			/** Header / 面包屑按 Host locale 从 title 解析，不绑 Host i18n key */
+			titleI18n: meta.title,
 			title: meta.id,
 		},
 	};
@@ -641,7 +656,8 @@ class PluginManagerImpl {
 			sidebarInjector.add({
 				pluginId: meta.id,
 				path: meta.routePath,
-				nameKey: meta.menu.nameKey ?? meta.titleKey ?? meta.id,
+				// 侧栏仅用 icon；nameKey 仅作稳定 id，不再指向 Host i18n
+				nameKey: meta.id,
 				icon: meta.menu.icon ?? 'Puzzle',
 				order: meta.menu.order,
 			});
@@ -2731,16 +2747,21 @@ export const routes: RouteObject[] = [
 	"plugins": [
 		{
 			"id": "thirdPartyPlugin",
-			"titleKey": "plugin.thirdparty.title",
-			"description": "第三方插件（iframe 隔离）",
+			"title": {
+				"zh-CN": "第三方插件",
+				"en-US": "Third-party plugin"
+			},
+			"description": {
+				"zh-CN": "第三方插件（iframe 隔离）",
+				"en-US": "Third-party plugin (iframe isolation)"
+			},
 			"routePath": "/third-party",
 			"entry": "https://example.com:9009/mf-manifest.json",
 			"version": "1.0.0",
 			"hostApiRange": "^1.0.0",
 			"menu": {
 				"order": 20,
-				"icon": "ExternalLink",
-				"nameKey": "plugin.thirdparty.name"
+				"icon": "ExternalLink"
 			},
 			"permissions": ["ui:toast", "http:plugin-api"],
 			"enabled": true,
@@ -2856,20 +2877,25 @@ add_header Access-Control-Allow-Credentials "true";
 
 ```json
 {
-	"updatedAt": "2024-01-15T10:00:00Z",
+	"updatedAt": "2026/07/27 15:45:00",
 	"plugins": [
 		{
 			"id": "remoteDemo",
-			"titleKey": "plugin.demo.title",
-			"description": "演示插件",
-			"routePath": "/demo",
-			"entry": "http://127.0.0.1:9005/mf-manifest.json",
+			"title": {
+				"zh-CN": "插件演示",
+				"en-US": "Plugin demo"
+			},
+			"description": {
+				"zh-CN": "Module Federation 接入演示。",
+				"en-US": "Module Federation demo."
+			},
+			"routePath": "/remote-demo",
+			"entry": "http://127.0.0.1:9007/mf-manifest.json",
 			"version": "1.0.0",
 			"hostApiRange": "^1.0.0",
 			"menu": {
-				"order": 10,
-				"icon": "Sparkles",
-				"nameKey": "plugin.demo.name"
+				"order": 90,
+				"icon": "Puzzle"
 			},
 			"permissions": ["ui:toast", "nav:subtree"],
 			"preload": "route",
@@ -2877,15 +2903,23 @@ add_header Access-Control-Allow-Credentials "true";
 			"trust": "first-party"
 		},
 		{
-			"id": "ideasList",
-			"titleKey": "plugin.ideas.title",
-			"routePath": "/ideas",
+			"id": "ebookIdeas",
+			"title": {
+				"zh-CN": "全书想法",
+				"en-US": "All ideas"
+			},
+			"description": {
+				"zh-CN": "在 EPUB 阅读页浏览本书全部想法。",
+				"en-US": "Browse all ideas for the current EPUB."
+			},
+			"routePath": "/ebook/plugins/ebook-ideas",
 			"entry": "http://127.0.0.1:9008/mf-manifest.json",
 			"version": "1.0.0",
 			"hostApiRange": "^1.0.0",
 			"remoteName": "remotePlugins",
-			"expose": "./IdeasList",
-			"permissions": ["ui:toast", "http:plugin-api"],
+			"expose": "./EbookIdeas",
+			"injectRoute": false,
+			"permissions": ["ui:toast", "http:plugin-api", "modules:ebook"],
 			"enabled": true,
 			"trust": "first-party"
 		}
@@ -2904,9 +2938,9 @@ add_header Access-Control-Allow-Credentials "true";
 | `hostApiRange` | string | ✅ | Host API 兼容范围 |
 | `enabled` | boolean | ✅ | 是否启用 |
 | `trust` | PluginTrust | ✅ | 信任等级 |
-| `titleKey` | string | ❌ | 标题 i18n key |
-| `description` | string | ❌ | 明文描述 |
-| `menu` | object | ❌ | 侧栏菜单配置 |
+| `title` | `PluginLocaleMap` | ❌ | 多语言插件名（插件中心 / 注入路由面包屑） |
+| `description` | `string \| PluginLocaleMap` | ❌ | 多语言说明（或旧版单语字符串） |
+| `menu` | `{ order, icon? }` | ❌ | 侧栏入口（仅 icon；无 nameKey） |
 | `injectRoute` | boolean | ❌ | 是否注入顶层路由 |
 | `remoteName` | string | ❌ | MF remote name |
 | `expose` | string | ❌ | MF expose 路径 |
@@ -2914,6 +2948,8 @@ add_header Access-Control-Allow-Credentials "true";
 | `preload` | string | ❌ | 加载时机 |
 | `integrity` | string | ❌ | SRI 校验 |
 | `signature` | string | ❌ | 签名 |
+
+> **注意**：不要再写 `titleKey` / `descriptionKey` / `menu.nameKey`。业务 Host 路由（如英语学习笔记页）仍可用自己的 `route.*.titleKey`，那是业务路由 meta，不是 registry 字段。
 
 ---
 

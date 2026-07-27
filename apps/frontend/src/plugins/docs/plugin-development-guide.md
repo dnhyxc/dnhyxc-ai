@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map 展示插件名（开发者**不必**、也**不应**再提供 Host `titleKey`）。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -923,27 +923,40 @@ server {
 
 ### 13.3 Registry 注册
 
-联系 Host 管理员添加 Registry 配置：
+联系 Host 管理员添加 Registry 配置（**只改 registry，不必改 Host 语言包**）：
 
 ```json
 {
 	"id": "myPlugin",
-	"titleKey": "plugin.myPlugin.title",
-	"description": "我的插件",
+	"title": {
+		"zh-CN": "我的插件",
+		"en-US": "My plugin"
+	},
+	"description": {
+		"zh-CN": "插件一句话说明。",
+		"en-US": "One-line plugin description."
+	},
 	"routePath": "/my-plugin",
 	"entry": "https://your-domain.com:9008/mf-manifest.json",
 	"version": "1.0.0",
 	"hostApiRange": "^1.0.0",
 	"menu": {
 		"order": 10,
-		"icon": "Puzzle",
-		"nameKey": "plugin.myPlugin.name"
+		"icon": "Puzzle"
 	},
 	"permissions": ["ui:toast", "http:plugin-api"],
 	"enabled": true,
 	"trust": "first-party"
 }
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `title` | 插件中心与注入路由面包屑的多语言名 |
+| `description` | 插件中心卡片说明（locale map 或单语字符串） |
+| `menu` | 可选；仅 `order` + `icon`（侧栏不展示文字） |
+
+> 不要写 `titleKey` / `descriptionKey` / `menu.nameKey`。插件**内部** UI 文案仍用插件自己的字典 + `api.locale`，与 registry 标题是两套东西。
 
 ---
 
@@ -961,6 +974,7 @@ server {
 | API 使用 | 使用受限 API 前检查权限 |
 | 独立预览 | 可通过 `pnpm dev` 独立运行 |
 | Host 集成 | 可通过 Registry 加载并正常显示 |
+| Registry 文案 | 配了 `title`/`description` locale map；**无** `titleKey` / `descriptionKey` / `menu.nameKey` |
 | 路由导航 | 配置正确，可正常访问 |
 
 ### 14.2 安全验收

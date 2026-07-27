@@ -1700,12 +1700,6 @@ export const zhCN = {
 	'plugins.host.unavailable': '插件「{id}」不可用',
 	'plugins.host.reload': '重新加载',
 	'plugins.host.loadFailed': '插件「{id}」加载失败',
-	'plugins.desc.remoteDemo':
-		'Module Federation 接入演示：验证 Host 动态加载、侧栏入口与共享 React。',
-	'plugins.desc.learningNotes':
-		'在英语学习中记录单词、语法与口语收获，支持本地添加笔记。',
-	'plugins.desc.ebookIdeas':
-		'在 EPUB 阅读页浏览本书全部想法，点击可跳转到对应划线位置。',
 	'plugins.registry.noChanges': '内容未修改，无需保存',
 	'route.setting.about': '关于应用',
 	'route.setting.theme': '主题设置',

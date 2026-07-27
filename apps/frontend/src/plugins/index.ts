@@ -9,6 +9,8 @@ export {
 	isPluginEnabled,
 	subscribePluginEnabled,
 } from './core/enabledOverrides';
+export type { PluginLocaleMap } from './core/localeText';
+export { pickPluginLocaleText } from './core/localeText';
 export { loadRemoteApp, registerRemote } from './core/mf';
 export { pluginManager } from './core/PluginManager';
 export { satisfiesRange, verifyPlugin } from './core/PluginVerifier';

@@ -18,7 +18,8 @@ function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 		path: meta.routePath,
 		Component: Page,
 		meta: {
-			titleKey: meta.titleKey ?? meta.menu?.nameKey,
+			/** 面包屑按当前 Host locale 从 title 解析，不绑 Host i18n key */
+			titleI18n: meta.title,
 			title: meta.id,
 		},
 	};
@@ -70,7 +71,8 @@ class PluginManagerImpl {
 			sidebarInjector.add({
 				pluginId: meta.id,
 				path: meta.routePath,
-				nameKey: meta.menu.nameKey ?? meta.titleKey ?? meta.id,
+				// 侧栏仅用 icon；nameKey 仅作稳定 id，不再指向 Host i18n
+				nameKey: meta.id,
 				icon: meta.menu.icon ?? 'Puzzle',
 				order: meta.menu.order,
 			});

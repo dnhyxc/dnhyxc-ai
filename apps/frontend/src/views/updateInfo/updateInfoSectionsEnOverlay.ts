@@ -153,7 +153,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's3-9': {
 		title: 'Plugin UI follows host language',
 		description:
-			'Remote plugin UIs (including Learning Notes and Ideas List) now switch between Chinese and English to match the host app’s interface language. Changes take effect immediately without reloading the plugin. Standalone preview mode also has a manual language toggle.',
+			'Remote plugin UIs (including Learning Notes and Ideas List) now switch between Chinese and English to match the host app’s interface language. Changes take effect immediately without reloading the plugin. Standalone preview mode also has a manual language toggle. Added: Plugin Center card titles/descriptions and header breadcrumbs now resolve from the plugin’s own multilingual registry, no longer depending on the host’s built-in copy; adding or renaming a plugin only requires editing the registry.',
 	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',

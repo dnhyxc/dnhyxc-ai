@@ -57,6 +57,8 @@ export interface RouteMeta {
 	title?: string;
 	/** 多语言标题 key；优先于 title 渲染 */
 	titleKey?: string;
+	/** 插件 registry 内嵌多语言标题（优先于 titleKey） */
+	titleI18n?: Partial<Record<'zh-CN' | 'en-US', string>>;
 }
 
 export interface RouteConfig {

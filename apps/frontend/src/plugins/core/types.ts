@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { PluginLocaleMap } from './localeText';
 
 /** Host 插件契约 semver；破坏性变更才升 major */
 export const HOST_API_VERSION = '1.0.0';
@@ -15,16 +16,20 @@ export type PluginPermission =
 
 export interface PluginDescriptor {
 	id: string;
-	titleKey?: string;
-	/** 插件作用说明的 i18n key（插件中心卡片展示） */
-	descriptionKey?: string;
-	/** 明文说明（第三方无 Host i18n 时用；有 descriptionKey 时以 key 为准） */
-	description?: string;
+	/**
+	 * 多语言插件名（插件中心 / 注入路由标题）。
+	 * 新增或改名只改 registry，不必改 Host i18n。
+	 */
+	title?: PluginLocaleMap;
+	/**
+	 * 多语言说明，或旧版单语字符串。
+	 */
+	description?: string | PluginLocaleMap;
 	routePath: string;
 	entry: string;
 	version: string;
 	hostApiRange: string;
-	menu?: { order: number; icon?: string; nameKey?: string };
+	menu?: { order: number; icon?: string };
 	/**
 	 * 是否由 PluginManager 注入顶层路由。
 	 * false：宿主已在业务路由树（如英语学习子路由）挂好 PluginHostPage，只负责 loadRemote。

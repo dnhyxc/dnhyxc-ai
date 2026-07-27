@@ -1851,12 +1851,6 @@ export const enUS = {
 	'plugins.host.unavailable': 'Plugin "{id}" is unavailable',
 	'plugins.host.reload': 'Reload',
 	'plugins.host.loadFailed': 'Failed to load plugin "{id}"',
-	'plugins.desc.remoteDemo':
-		'Module Federation demo: verifies host dynamic load, sidebar entry, and shared React.',
-	'plugins.desc.learningNotes':
-		'Capture vocabulary, grammar, and speaking notes in English Learning.',
-	'plugins.desc.ebookIdeas':
-		'Browse all ideas for the current EPUB and jump to the matching highlight.',
 	'plugins.registry.noChanges': 'No changes, no need to save',
 	'route.setting.about': 'About',
 	'route.setting.theme': 'Theme',

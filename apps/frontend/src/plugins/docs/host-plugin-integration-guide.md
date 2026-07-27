@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离）。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离；Registry `title`/`description` locale map，无 `titleKey`）。若不一致，以源码为准。
 
 ---
 
@@ -54,6 +54,7 @@ Host 应用
 │   │   ├── mf.ts             # MF Runtime API
 │   │   ├── PluginManager.ts  # 插件生命周期管理
 │   │   ├── types.ts          # 类型定义
+│   │   ├── localeText.ts     # registry title/description 多语言解析
 │   │   ├── registry.ts       # Registry 拉取/缓存
 │   │   ├── createHostBridge.ts  # HostBridge 构建
 │   │   ├── PluginVerifier.ts    # 插件验证
@@ -110,20 +111,29 @@ flowchart TD
 ```json
 {
 	"id": "remoteDemo",
-	"routePath": "/demo",
-	"entry": "http://127.0.0.1:9005/mf-manifest.json",
+	"title": {
+		"zh-CN": "插件演示",
+		"en-US": "Plugin demo"
+	},
+	"description": {
+		"zh-CN": "Module Federation 接入演示。",
+		"en-US": "Module Federation demo."
+	},
+	"routePath": "/remote-demo",
+	"entry": "http://127.0.0.1:9007/mf-manifest.json",
 	"version": "1.0.0",
 	"hostApiRange": "^1.0.0",
 	"menu": {
-		"order": 10,
-		"icon": "Sparkles",
-		"nameKey": "plugin.demo.name"
+		"order": 90,
+		"icon": "Puzzle"
 	},
 	"permissions": ["ui:toast", "nav:subtree"],
 	"enabled": true,
 	"trust": "first-party"
 }
 ```
+
+> 插件中心标题、注入路由面包屑都读 `title` locale map；侧栏只显示 icon，不必也不应配置 `menu.nameKey` / Host i18n key。
 
 ### 3.3 自动注入的代码流程
 
@@ -141,7 +151,7 @@ private mountShell(meta: PluginDescriptor) {
 		sidebarInjector.add({
 			pluginId: meta.id,
 			path: meta.routePath,
-			nameKey: meta.menu.nameKey ?? meta.titleKey ?? meta.id,
+			nameKey: meta.id,
 			icon: meta.menu.icon ?? 'Puzzle',
 			order: meta.menu.order,
 		});
@@ -159,7 +169,7 @@ function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 		path: meta.routePath,
 		Component: Page,
 		meta: {
-			titleKey: meta.titleKey ?? meta.menu?.nameKey,
+			titleI18n: meta.title,
 			title: meta.id,
 		},
 	};
@@ -204,14 +214,22 @@ export function buildRoutes(): RouteConfig[] {
 
 ```json
 {
-	"id": "ebookIdeasList",
-	"routePath": "/ebook/plugins/ideas-list",
+	"id": "ebookIdeas",
+	"title": {
+		"zh-CN": "全书想法",
+		"en-US": "All ideas"
+	},
+	"description": {
+		"zh-CN": "在 EPUB 阅读页浏览本书全部想法。",
+		"en-US": "Browse all ideas for the current EPUB."
+	},
+	"routePath": "/ebook/plugins/ebook-ideas",
 	"entry": "http://127.0.0.1:9008/mf-manifest.json",
 	"version": "1.0.0",
 	"hostApiRange": "^1.0.0",
 	"remoteName": "remotePlugins",
-	"expose": "./IdeasList",
-	"injectRoute": false, // 不自动注入路由
+	"expose": "./EbookIdeas",
+	"injectRoute": false,
 	"permissions": ["ui:toast", "http:plugin-api", "modules:ebook"],
 	"enabled": true,
 	"trust": "first-party"
@@ -315,14 +333,21 @@ export function isPluginEnabled(id: string): boolean {
 ```json
 {
 	"id": "thirdPartyPlugin",
+	"title": {
+		"zh-CN": "第三方插件",
+		"en-US": "Third-party plugin"
+	},
+	"description": {
+		"zh-CN": "第三方插件（iframe 隔离）",
+		"en-US": "Third-party plugin (iframe isolation)"
+	},
 	"routePath": "/third-party",
 	"entry": "https://example.com:9009/mf-manifest.json",
 	"version": "1.0.0",
 	"hostApiRange": "^1.0.0",
 	"menu": {
 		"order": 20,
-		"icon": "ExternalLink",
-		"nameKey": "plugin.thirdparty.name"
+		"icon": "ExternalLink"
 	},
 	"permissions": ["ui:toast", "http:plugin-api"],
 	"enabled": true,
@@ -734,6 +759,7 @@ export default function EnglishLearningNotesPage() {
 - 展示所有已注册的插件
 - 支持上架/下架插件（本地上架/下架覆盖）
 - 显示插件信息（ID、版本、路由、信任等级等）
+- 标题/说明只读 registry 的 `title` / `description` locale map（`pickPluginLocaleText`），**不**查 Host i18n
 
 ### 8.2 完整代码
 
@@ -757,31 +783,28 @@ import { cn } from "@/lib/utils";
 import {
 	fetchPluginRegistry,
 	type PluginDescriptor,
+	pickPluginLocaleText,
 	pluginManager,
 } from "@/plugins";
 
-/** 获取插件标题：优先 i18n， fallback 到 id */
-function pluginTitle(p: PluginDescriptor, t: (k: string) => string) {
-	const key = p.titleKey ?? p.menu?.nameKey;
-	if (key) {
-		const label = t(key);
-		if (label && label !== key) return label;
-	}
-	return p.id;
+/** 标题只认 registry.title[locale]，缺省回退 id */
+function pluginTitle(p: PluginDescriptor, locale: string) {
+	return pickPluginLocaleText(p.title, locale) || p.id;
 }
 
-/** 获取插件描述：优先 i18n，其次 description，最后默认文案 */
-function pluginBlurb(p: PluginDescriptor, t: (k: string) => string) {
-	if (p.descriptionKey) {
-		const label = t(p.descriptionKey);
-		if (label && label !== p.descriptionKey) return label;
-	}
-	if (p.description?.trim()) return p.description.trim();
-	return t("plugins.card.noDesc");
+/** 描述只认 registry.description，缺省占位文案 */
+function pluginBlurb(
+	p: PluginDescriptor,
+	locale: string,
+	t: (k: string) => string,
+) {
+	return (
+		pickPluginLocaleText(p.description, locale) || t("plugins.card.noDesc")
+	);
 }
 
 export default function PluginsPage() {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	const navigate = useNavigate();
 	const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
 	const [busyId, setBusyId] = useState<string | null>(null);
@@ -857,7 +880,7 @@ export default function PluginsPage() {
 									<CardHeader className="grid-cols-1 gap-2 px-4">
 										<div className="flex items-center justify-between gap-3">
 											<CardTitle className="min-w-0 flex-1 text-base">
-												{pluginTitle(p, t)}
+												{pluginTitle(p, locale)}
 											</CardTitle>
 											<div className="flex shrink-0 items-center gap-2">
 												<span className="text-textcolor/55 text-xs">
@@ -873,7 +896,7 @@ export default function PluginsPage() {
 											</div>
 										</div>
 										<CardDescription className="text-textcolor/70 line-clamp-3 text-sm">
-											{pluginBlurb(p, t)}
+											{pluginBlurb(p, locale, t)}
 										</CardDescription>
 									</CardHeader>
 									<CardContent className="px-4 text-xs text-textcolor/45">
@@ -1094,7 +1117,7 @@ const Sidebar = observer(() => {
 	const visibleMenus = useMemo(() => {
 		const loggedIn = hasValidAuthToken();
 		const dynamic = pluginMenus.map((m) => ({
-			nameKey: m.nameKey,
+			nameKey: m.nameKey, // 稳定 id（插件 id），侧栏不展示文案
 			icon: m.icon,
 			path: m.path,
 			requiresAuth: m.requiresAuth,
@@ -1449,6 +1472,10 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 2. 保存 Registry（会自动调用 `pluginManager.init()`）
 3. PluginManager 会检测到版本变化并重新加载
 
+### Q6：新增/改名插件要改 Host 语言包吗？
+
+**不必。** 在 Registry 里写 `title` / `description` 的 `zh-CN` / `en-US` 即可。插件中心与 `injectRoute` 注入页的面包屑都会用 `pickPluginLocaleText` 按当前 locale 解析。业务自有路由（如 `injectRoute: false` 的英语学习笔记）若 Header 标题来自 Host `routes.ts` 的 `titleKey`，那是业务路由配置，与插件 registry 无关。
+
 ---
 
 ## 附录
@@ -1457,9 +1484,9 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 
 | 插件 ID          | 接入模式       | 所在页面                | Registry 配置               |
 | ---------------- | -------------- | ----------------------- | --------------------------- |
-| `ebookIdeasList` | 业务内手动挂载 | 电子书阅读页（右侧Tab） | `injectRoute: false`        |
+| `ebookIdeas`     | 业务内手动挂载 | 电子书阅读页（右侧Tab） | `injectRoute: false`        |
 | `learningNotes`  | 业务内手动挂载 | 英语学习笔记页          | `injectRoute: false`        |
-| `remoteDemo`     | 自动路由注入   | 独立页面 `/demo`        | `injectRoute: true`（默认） |
+| `remoteDemo`     | 自动路由注入   | 独立页面 `/remote-demo` | `injectRoute: true`（默认） |
 
 ### B. 样式隔离（Host 责任）
 

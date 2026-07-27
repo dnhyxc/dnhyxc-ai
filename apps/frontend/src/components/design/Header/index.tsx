@@ -4,6 +4,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router';
 import { useI18n, useStorageInfo } from '@/hooks';
 import { routeInjector } from '@/plugins';
 import { buildRoutes } from '@/router/buildRoutes';
+import { resolveRouteMetaLabel } from '@/router/routeMeta';
 import { type RouteConfig } from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
@@ -12,8 +13,8 @@ interface Iprops {
 	ccustomActions?: React.ReactNode;
 }
 
-/** 顶栏面包屑单项：titleKey 走 i18n，path 为可导航的绝对 pathname */
-type HeaderBreadcrumbCrumb = { titleKey: string; path: string };
+/** 顶栏面包屑单项：label 已按 locale 解析，path 可导航 */
+type HeaderBreadcrumbCrumb = { label: string; path: string };
 
 const pathMatches = (pattern: string, pathname: string) =>
 	matchPath({ path: pattern, end: true }, pathname) != null;
@@ -24,7 +25,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [routeEpoch, setRouteEpoch] = useState(0);
 
 	const { storageInfo } = useStorageInfo('autoUpdate');
-	const { t, toggleLocale } = useI18n();
+	const { t, locale, toggleLocale } = useI18n();
 
 	useEffect(() => {
 		checkUpdate();
@@ -59,9 +60,10 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { breadcrumbTrail, headerTitleKey } = useMemo(() => {
+	const { breadcrumbTrail, headerTitle } = useMemo(() => {
 		const routes = buildRoutes();
-		const metaOf = (r: RouteConfig) => r.meta?.titleKey || r.meta?.title;
+		const labelOf = (r: RouteConfig) =>
+			resolveRouteMetaLabel(r.meta, locale, t);
 
 		/** 将当前 route 与父级前缀拼成绝对 pathname（与 React Router 嵌套路由一致） */
 		const resolveAbsolute = (
@@ -92,7 +94,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			for (const route of routeList) {
 				const absolute = resolveAbsolute(route, parentBase);
 				if (absolute && pathMatches(absolute, pathname)) {
-					const m = metaOf(route);
+					const m = labelOf(route);
 					if (m) return m;
 				}
 				if (route.children?.length) {
@@ -104,11 +106,11 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			return undefined;
 		};
 
-		/** 相邻两级 meta 标题相同（如 layout 与 index 同 titleKey）时只保留一项 */
-		const dedupeAdjacentTitleKeys = (items: HeaderBreadcrumbCrumb[]) => {
+		/** 相邻两级 meta 标题相同（如 layout 与 index）时只保留一项 */
+		const dedupeAdjacent = (items: HeaderBreadcrumbCrumb[]) => {
 			const out: HeaderBreadcrumbCrumb[] = [];
 			for (const it of items) {
-				if (out.length > 0 && out[out.length - 1].titleKey === it.titleKey) {
+				if (out.length > 0 && out[out.length - 1].label === it.label) {
 					continue;
 				}
 				out.push(it);
@@ -128,11 +130,11 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		): HeaderBreadcrumbCrumb[] | null => {
 			for (const route of routeList) {
 				const absolute = resolveAbsolute(route, parentBase);
-				const titleK = metaOf(route);
+				const label = labelOf(route);
 				const parentCrumb =
-					titleK && absolute
+					label && absolute
 						? ({
-								titleKey: titleK,
+								label,
 								path: absolute,
 							} satisfies HeaderBreadcrumbCrumb)
 						: null;
@@ -151,11 +153,11 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					if (hit) return hit;
 				}
 
-				if (absolute && titleK && pathMatches(absolute, pathname)) {
+				if (absolute && label && pathMatches(absolute, pathname)) {
 					return [
 						...prefix,
 						{
-							titleKey: titleK,
+							label,
 							path: absolute,
 						} satisfies HeaderBreadcrumbCrumb,
 					];
@@ -166,22 +168,22 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 
 		const rawTrail =
 			findBreadcrumbTrail(routes, location.pathname, '', []) ?? [];
-		const trail = dedupeAdjacentTitleKeys(rawTrail);
+		const trail = dedupeAdjacent(rawTrail);
 
 		if (trail.length >= 2) {
-			return { breadcrumbTrail: trail, headerTitleKey: undefined };
+			return { breadcrumbTrail: trail, headerTitle: undefined };
 		}
 		if (trail.length === 1) {
 			return {
 				breadcrumbTrail: null,
-				headerTitleKey: trail[0].titleKey,
+				headerTitle: trail[0].label,
 			};
 		}
 
 		// 无匹配时不回落到聊天标题；插件页依赖 buildRoutes 注入的 meta
 		const single = findRouteTitle(routes, location.pathname, '');
-		return { breadcrumbTrail: null, headerTitleKey: single };
-	}, [location.pathname, routeEpoch]);
+		return { breadcrumbTrail: null, headerTitle: single };
+	}, [location.pathname, routeEpoch, locale, t]);
 
 	const toSetting = () => {
 		navigate('/setting');
@@ -208,7 +210,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 						>
 							{breadcrumbTrail.map((c, i) => (
 								<span
-									key={`${c.path}:${c.titleKey}:${i}`}
+									key={`${c.path}:${c.label}:${i}`}
 									className="flex min-w-0 items-center gap-0.5"
 								>
 									{i > 0 ? (
@@ -223,18 +225,18 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 											className="cursor-pointer truncate border-0 bg-transparent p-0 font-['手札体-简'] text-xl font-bold text-theme/80 transition-colors hover:text-theme"
 											onClick={() => void navigate(c.path)}
 										>
-											{t(c.titleKey)}
+											{c.label}
 										</button>
 									) : (
 										<span className="cursor-default truncate text-theme">
-											{t(c.titleKey)}
+											{c.label}
 										</span>
 									)}
 								</span>
 							))}
 						</nav>
-					) : headerTitleKey ? (
-						<div className="cursor-default truncate">{t(headerTitleKey)}</div>
+					) : headerTitle ? (
+						<div className="cursor-default truncate">{headerTitle}</div>
 					) : null}
 				</div>
 				{actions ? (

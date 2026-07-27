@@ -21,7 +21,7 @@ import { isTauriRuntime } from '@/utils/runtime';
 const Layout = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	/** 避免 React Strict Mode 或依赖抖动导致同一次拦截连续弹出多条 Toast */
 	const authRedirectToastShownRef = useRef(false);
 
@@ -41,7 +41,7 @@ const Layout = () => {
 				type: 'warning',
 				title: t('route.guard.needLoginTitle'),
 				message: t('route.guard.needLoginMessage', {
-					page: formatRoutePageLabel(location.pathname, t),
+					page: formatRoutePageLabel(location.pathname, t, locale),
 				}),
 			});
 		}
