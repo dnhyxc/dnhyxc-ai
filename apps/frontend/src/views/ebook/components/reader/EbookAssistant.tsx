@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import ebookAssistantStore from '@/store/ebookAssistant';
 import type { Message } from '@/types/chat';
+import { EPUB_ASSISTANT_INPUT_ID } from '../../utils/common/epubThoughtComposeInput';
 import {
 	epubReaderChromeTextareaClass,
 	epubReaderSurfaceOverlayClass,
@@ -35,8 +36,6 @@ export type EbookAssistantProps = {
 	bookTitle: string;
 	input?: string;
 	onInputChange?: (value: string) => void;
-	/** 递增时在 input 同步后聚焦输入框并将光标置于末尾 */
-	focusInputAtEndKey?: number;
 };
 
 const selectEbookMessageByChatId: SelectMessageByChatId = (chatId) =>
@@ -47,7 +46,6 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 	bookTitle,
 	input: inputProp,
 	onInputChange,
-	focusInputAtEndKey = 0,
 }: EbookAssistantProps) {
 	const { userStore, knowledgeStore } = useStore();
 	const navigate = useNavigate();
@@ -197,7 +195,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 			) : (
 				<ChatEntry
 					t={t}
-					focusInputAtEndKey={focusInputAtEndKey}
+					textareaId={EPUB_ASSISTANT_INPUT_ID}
 					input={input}
 					setInput={setInput}
 					className="w-full px-0 pb-4"

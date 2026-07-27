@@ -14,6 +14,8 @@ interface ScrollAreaProps
 	onWheel?: React.WheelEventHandler<HTMLDivElement>;
 	onWheelCapture?: React.WheelEventHandler<HTMLDivElement>;
 	onPointerDownCapture?: React.PointerEventHandler<HTMLDivElement>;
+	/** Radix Viewport 默认可能被聚焦；想法侧栏等场景应传 -1 避免抢走输入框焦点 */
+	viewportTabIndex?: number;
 	/** Radix 须挂载对应 Scrollbar 才开启该方向滚动；Markdown 预览等需 both 以免撑破 flex 父级 */
 	scrollbars?: ScrollAreaScrollbars;
 }
@@ -30,6 +32,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 			onWheel,
 			onWheelCapture,
 			onPointerDownCapture,
+			viewportTabIndex,
 			scrollbars = 'vertical',
 			...props
 		},
@@ -49,6 +52,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 			>
 				<ScrollAreaPrimitive.Viewport
 					ref={ref}
+					tabIndex={viewportTabIndex}
 					data-tauri-drag-region={dataTauriDragRegion}
 					data-slot="scroll-area-viewport"
 					className={cn(

@@ -98,6 +98,14 @@ function readSelectionText(win: Window): string {
 
 /** 清除 rendition 各 iframe 及顶层的文字选区 */
 export function clearEpubTextSelection(rend: Rendition): void {
+	// removeAllRanges 常把焦点打进 iframe；若原先在父页面（侧栏/按钮），清完还回去
+	const prev = document.activeElement;
+	const restore =
+		prev instanceof HTMLElement &&
+		prev.isConnected &&
+		prev.ownerDocument === document &&
+		!(prev instanceof HTMLIFrameElement);
+
 	const raw = rend.getContents();
 	const list: EpubIframeContents[] = Array.isArray(raw)
 		? (raw as EpubIframeContents[])
@@ -117,6 +125,16 @@ export function clearEpubTextSelection(rend: Rendition): void {
 	} catch {
 		// ignore
 	}
+
+	if (!restore || document.activeElement === prev) return;
+	for (const contents of list) {
+		try {
+			(contents.window.frameElement as HTMLElement | null)?.blur();
+		} catch {
+			// ignore
+		}
+	}
+	prev.focus({ preventScroll: true });
 }
 
 function toIframeViewportOffset(win: Window): { x: number; y: number } {

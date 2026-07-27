@@ -54,6 +54,10 @@ import {
 	attachTocCfis,
 	navigateEpubTocHref,
 } from '../../utils/epub/reader/epubTocNavigate';
+import {
+	captureEpubViewportPin,
+	restoreEpubViewportPin,
+} from '../../utils/epub/reader/epubViewportPin';
 
 type NavApi = {
 	prev: () => Promise<void>;
@@ -554,20 +558,21 @@ export function EpubPane({
 
 		// 实际尺寸应用及高亮样式恢复
 		const applyHostResize = () => {
+			const host = hostRef.current;
 			// 节点未就绪或渲染器尚未 Ready 时直接忽略
-			if (!hostRef.current || !readyRef.current || !rendRef.current) return;
-			const w = Math.max(hostRef.current.clientWidth, 320);
-			const h = Math.max(hostRef.current.clientHeight, 320);
+			if (!host || !readyRef.current || !rendRef.current) return;
+			const w = Math.max(host.clientWidth, 320);
+			const h = Math.max(host.clientHeight, 320);
 			const rend = rendRef.current;
-			// 优先使用 softResize 尝试温和调整（部分内容重排避免闪屏）
+			const pin = captureEpubViewportPin(rend);
 			if (!softResizeEpubRendition(rend, w, h)) {
 				try {
-					rend.resize(w, h); // 兜底：完整 resize
+					rend.resize(w, h);
 				} catch {
 					// 忽略 resize 闪断异常
 				}
 			}
-			// soft resize 可能令高亮失色/划线消失，需立即恢复批注样式
+			restoreEpubViewportPin(rend, pin);
 			patchEpubReadingAnnotations(rend, { sync: true });
 			relayoutListenMarkHighlight(rend);
 			checkEpubListenFollowAfterLayout(rend);
@@ -666,6 +671,7 @@ export function EpubPane({
 			{err ? <p className="text-destructive p-4 text-sm">{err}</p> : null}
 			<div
 				ref={hostRef}
+				data-epub-reader-host=""
 				className={cn(
 					'h-full min-h-0 w-full overflow-hidden ring-1 ring-theme/10',
 					readerSettings.pageFlow === 'paginated' && 'min-h-[320px]',

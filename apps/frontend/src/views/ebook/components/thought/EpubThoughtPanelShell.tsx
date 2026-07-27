@@ -21,11 +21,15 @@ export const EpubThoughtPanelShell = forwardRef<HTMLDivElement, Props>(
 		ref,
 	) {
 		return (
-			<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+			<div
+				data-epub-thought-root
+				className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+			>
 				<ScrollArea
 					ref={ref}
 					className="min-h-0 flex-1 border-0"
 					viewportClassName={EPUB_THOUGHT_PANEL_SCROLL_VIEWPORT_CLASS}
+					viewportTabIndex={-1}
 					scrollbarClassName="w-2 pr-px"
 					onWheel={onWheel}
 					onWheelCapture={onWheelCapture}

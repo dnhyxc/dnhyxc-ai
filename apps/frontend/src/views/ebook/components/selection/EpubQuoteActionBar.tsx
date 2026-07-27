@@ -10,6 +10,7 @@ import {
 	Strikethrough,
 } from 'lucide-react';
 import {
+	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
@@ -67,6 +68,9 @@ const PRESERVE_SELECTION_ACTIONS = new Set<ActionId>([
 	'removeUnderline',
 	'share',
 	'listen',
+	// 写想法/问书在各自 handler 里于聚焦后再清选区，避免 onAnyAction 抢焦
+	'writeThought',
+	'askBook',
 ]);
 
 const ACTION_ORDER: Record<BarVariant, ActionId[]> = {
@@ -182,12 +186,14 @@ function QuoteActionItem({
 	variant,
 	label,
 	onClick,
+	onMouseDown,
 	copied,
 	children,
 }: {
 	variant: BarVariant;
 	label: string;
 	onClick?: () => void;
+	onMouseDown?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
 	copied?: boolean;
 	children: ReactNode;
 }) {
@@ -195,6 +201,7 @@ function QuoteActionItem({
 		<button
 			type="button"
 			onClick={onClick}
+			onMouseDown={onMouseDown}
 			style={variant === 'floating' ? { width: 70 } : undefined}
 			className={cn(
 				ITEM_BUTTON_CLASS[variant],
@@ -367,12 +374,20 @@ export function EpubQuoteActionBar({
 				const handler = handlerProp ? actionHandlers[handlerProp] : undefined;
 				const onClick = buildOnClick(slot, handler);
 				const isCopy = slot === 'copy';
+				const primeComposeFocus =
+					slot === 'writeThought'
+						? (e: ReactMouseEvent<HTMLButtonElement>) => {
+								// 避免按钮在 mousedown 抢焦；交焦由 read 页 settle 后统一处理
+								e.preventDefault();
+							}
+						: undefined;
 				return (
 					<QuoteActionItem
 						key={slot}
 						variant={variant}
 						label={isCopy && copySucceeded ? copiedLabel : labels[slot]}
 						onClick={onClick}
+						onMouseDown={primeComposeFocus}
 						copied={isCopy && copySucceeded}
 					>
 						{renderActionIcon(slot, variant, isCopy && copySucceeded)}

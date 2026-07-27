@@ -4,7 +4,9 @@
 
 **增量专题**：打开或关闭 **读书想法** 右侧分栏（列表 / 写想法 / 详情）时，左侧 EPUB 正文因分栏宽度变化会 **soft resize 重排**，原先选中的 **引用段落** 容易滚出当前屏幕；本轮在分栏布局稳定后按 **CFI 锚点** 对连续滚动容器做 **最小 scrollTop 修正**，使引用内容始终留在视口内。
 
-**延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)。
+> **2026-07 更新**：通用「当前阅读行」保持已改由 [epub-viewport-pin.md](./epub-viewport-pin.md) 在每次 `applyHostResize` 完成；本文档的 CFI scroll 仍适用于 **侧栏已开、宽度不变** 时切换引用（`ensureQuoteCfiInViewport`）。侧栏输入焦点见 [epub-side-panel-input-focus.md](./epub-side-panel-input-focus.md)。
+
+**延伸阅读**：[epub-viewport-pin.md](./epub-viewport-pin.md)、[epub-side-panel-input-focus.md](./epub-side-panel-input-focus.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)。
 
 ---
 

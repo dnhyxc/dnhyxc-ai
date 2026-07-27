@@ -165,7 +165,9 @@
 | 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
 | MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁 / 删最后一条后未全宽 | [ebook/epub-read-split-panel.md](./ebook/epub-read-split-panel.md)                                                                                       |
 | 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |
-| 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |
+| 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md) · 通用阅读位 [ebook/epub-viewport-pin.md](./ebook/epub-viewport-pin.md)   |
+| 开侧栏 / 拖分栏后正文阅读位置跳动                                 | [ebook/epub-viewport-pin.md](./ebook/epub-viewport-pin.md)                                                                                               |
+| PopBar 写想法/问书输入框闪焦后丢失                                | [ebook/epub-side-panel-input-focus.md](./ebook/epub-side-panel-input-focus.md)                                                                           |
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 粉/米背景下按钮、边框或听书菜单看不清                        | [ebook/epub-reader-chrome-contrast.md](./ebook/epub-reader-chrome-contrast.md) · [ebook/epub-chrome-list-active-theme.md](./ebook/epub-chrome-list-active-theme.md) |
 | EPUB 放大/全屏后正文贴左、需刷新才居中                            | [ebook/epub-window-resize-relayout.md](./ebook/epub-window-resize-relayout.md)                                                                           |

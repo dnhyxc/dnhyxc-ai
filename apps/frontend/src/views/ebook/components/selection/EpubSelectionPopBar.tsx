@@ -1,5 +1,5 @@
-import { Popover, PopoverAnchor, PopoverContent } from '@ui/index';
-import { type CSSProperties, useLayoutEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
 import type { EpubReaderBgTheme } from '../../utils/epub/reader/epubReaderSettings';
@@ -37,9 +37,13 @@ type Props = {
 	readerBgTheme?: EpubReaderBgTheme;
 };
 
+const EDGE = 8;
+const GAP = 10;
+
 /**
- * 选区上方浮动操作条（Pop Sidebar）。
- * 锚点 + Radix Popover 碰撞检测，与 EpubReaderContextMenu 相同，避免贴边溢出。
+ * 选区上方浮动操作条。
+ * 不用 Radix Popover：其 FocusScope 在卸载时 setTimeout(0) 把焦点还回打开前的
+ * EPUB iframe，发生在侧栏输入框 useLayoutEffect 聚焦之后，表现为闪焦后丢失。
  */
 export function EpubSelectionPopBar({
 	state,
@@ -61,25 +65,11 @@ export function EpubSelectionPopBar({
 	chromeStyle,
 	readerBgTheme = 'default',
 }: Props) {
+	const open = Boolean(state?.open);
 	const [visible, setVisible] = useState(false);
 
-	const anchorStyle = useMemo(
-		() =>
-			state
-				? ({
-						position: 'fixed',
-						left: state.x,
-						top: state.y,
-						width: 1,
-						height: 1,
-						pointerEvents: 'none',
-					} as const)
-				: undefined,
-		[state],
-	);
-
 	useLayoutEffect(() => {
-		if (!state?.open) {
+		if (!open) {
 			setVisible(false);
 			return;
 		}
@@ -88,59 +78,62 @@ export function EpubSelectionPopBar({
 			requestAnimationFrame(() => setVisible(true));
 		});
 		return () => cancelAnimationFrame(id);
-	}, [state?.open, state?.x, state?.y]);
+	}, [open, state?.x, state?.y]);
 
 	if (!state?.open) return null;
 
-	return (
-		<Popover open={state.open}>
-			<PopoverAnchor asChild>
-				<span aria-hidden style={anchorStyle} />
-			</PopoverAnchor>
-			<PopoverContent
-				side="top"
-				align="center"
-				sideOffset={10}
-				collisionPadding={12}
-				className={cn(
-					'group/pop z-50 w-auto border-0 bg-transparent p-0 shadow-none outline-none',
-					!visible && 'pointer-events-none opacity-0',
-				)}
-				style={chromeStyle}
-				onOpenAutoFocus={(e) => e.preventDefault()}
-				onCloseAutoFocus={(e) => e.preventDefault()}
-				onMouseDown={(e) => {
-					const el = e.target as HTMLElement;
-					if (
-						el.closest(
-							'input, textarea, select, [data-slot=popover-content], [data-slot=select-content]',
-						)
-					) {
-						return;
-					}
-					e.preventDefault();
-				}}
-			>
-				<EpubSelectionPopBarPanel
-					labels={labels}
-					selectionFullyHighlighted={selectionFullyHighlighted}
-					selectionHasHighlight={selectionHasHighlight}
-					highlightStyle={highlightStyle}
-					highlightColor={highlightColor}
-					onHighlightStyleChange={onHighlightStyleChange}
-					onHighlightColorChange={onHighlightColorChange}
-					onCopy={onCopy}
-					onApplyHighlight={onApplyHighlight}
-					onRemoveHighlight={onRemoveHighlight}
-					onWriteThought={onWriteThought}
-					onAskBook={onAskBook}
-					onShare={onShare}
-					onListen={onListen}
-					onClearSelection={onClearSelection}
-					caretAnchorX={state.x}
-					readerBgTheme={readerBgTheme}
-				/>
-			</PopoverContent>
-		</Popover>
+	const placeAbove = state.y > 72;
+	const left = Math.min(
+		Math.max(state.x, EDGE),
+		(typeof window !== 'undefined' ? window.innerWidth : state.x) - EDGE,
+	);
+	const top = placeAbove ? Math.max(EDGE, state.y - GAP) : state.y + GAP;
+
+	return createPortal(
+		<div
+			data-side={placeAbove ? 'top' : 'bottom'}
+			className={cn(
+				'group/pop fixed z-50 w-auto border-0 bg-transparent p-0 shadow-none outline-none',
+				!visible && 'pointer-events-none opacity-0',
+			)}
+			style={{
+				...chromeStyle,
+				left,
+				top,
+				transform: placeAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+			}}
+			onMouseDown={(e) => {
+				const el = e.target as HTMLElement;
+				if (
+					el.closest(
+						'button, a, input, textarea, select, [role="button"], [data-slot=select-content]',
+					)
+				) {
+					return;
+				}
+				e.preventDefault();
+			}}
+		>
+			<EpubSelectionPopBarPanel
+				labels={labels}
+				selectionFullyHighlighted={selectionFullyHighlighted}
+				selectionHasHighlight={selectionHasHighlight}
+				highlightStyle={highlightStyle}
+				highlightColor={highlightColor}
+				onHighlightStyleChange={onHighlightStyleChange}
+				onHighlightColorChange={onHighlightColorChange}
+				onCopy={onCopy}
+				onApplyHighlight={onApplyHighlight}
+				onRemoveHighlight={onRemoveHighlight}
+				onWriteThought={onWriteThought}
+				onAskBook={onAskBook}
+				onShare={onShare}
+				onListen={onListen}
+				onClearSelection={onClearSelection}
+				caretAnchorX={state.x}
+				readerBgTheme={readerBgTheme}
+			/>
+		</div>,
+		document.body,
 	);
 }

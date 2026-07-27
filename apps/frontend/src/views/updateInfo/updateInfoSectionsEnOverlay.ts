@@ -1431,4 +1431,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While speech is loading, the bottom bar’s sentence list, previous/next chapter, and speed controls stay available; an open speed panel no longer closes when the next sentence starts loading.',
 	},
+	's25-94': {
+		title: 'EPUB side-panel Write note / MK ask input focus',
+		description:
+			'Opening Write note or MK ask-about-selection from the selection bar focuses the right-panel input after the split settles, so you can type immediately; switching between notes and ask also refocuses the visible panel’s input—no more brief focus that disappears.',
+	},
+	's25-95': {
+		title: 'EPUB keeps reading position when the side panel opens or closes',
+		description:
+			'When you open or close the right panel, drag the split handle, or resize the window, the current reading line on the left stays in view as much as possible instead of jumping away as the reader width changes.',
+	},
 };
