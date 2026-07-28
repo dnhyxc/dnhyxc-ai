@@ -63,11 +63,7 @@ type Props = {
 
 type RateRulerTick = { index: number; major: boolean };
 
-const SENTENCE_SCROLL_NEXT: Record<SentenceScrollMode, SentenceScrollMode> = {
-	bottom: 'top',
-	top: 'current',
-	current: 'bottom',
-};
+const SCROLL_EDGE_PX = 16;
 
 function formatListenRate(value: number): string {
 	return `${value.toFixed(1)} X`;
@@ -359,13 +355,27 @@ function VirtualSentenceMenuList({
 	const viewportRef = useRef<HTMLDivElement>(null);
 	const userScrolledRef = useRef(false);
 	const programmaticScrollRef = useRef(false);
+	const scrollRafRef = useRef(0);
 	const activeIndexRef = useRef(activeIndex);
 	activeIndexRef.current = activeIndex;
 	const [scrollTop, setScrollTop] = useState(0);
 	const [scrollMode, setScrollMode] = useState<SentenceScrollMode>('bottom');
+	const [scrollEdge, setScrollEdge] = useState<'top' | 'bottom' | null>(null);
 	const { t } = useI18n();
 	const total = labels.length;
+	const hasActive = total > 0 && activeIndex >= 0;
 	const listHeight = total * SENTENCE_ROW_STRIDE_PX;
+
+	const syncScrollEdge = useCallback((el?: HTMLDivElement | null) => {
+		const viewport = el ?? viewportRef.current;
+		if (!viewport) return;
+		const { scrollTop: top, scrollHeight, clientHeight } = viewport;
+		let edge: 'top' | 'bottom' | null = null;
+		if (top <= SCROLL_EDGE_PX) edge = 'top';
+		else if (top + clientHeight >= scrollHeight - SCROLL_EDGE_PX)
+			edge = 'bottom';
+		setScrollEdge((prev) => (prev === edge ? prev : edge));
+	}, []);
 
 	const markProgrammaticScroll = useCallback(() => {
 		programmaticScrollRef.current = true;
@@ -384,8 +394,9 @@ function VirtualSentenceMenuList({
 			markProgrammaticScroll();
 			scrollSentenceIndexIntoView(viewport, index, total);
 			setScrollTop(viewport.scrollTop);
+			syncScrollEdge(viewport);
 		},
-		[markProgrammaticScroll, total],
+		[markProgrammaticScroll, syncScrollEdge, total],
 	);
 
 	const scrollToEdge = useCallback(
@@ -397,8 +408,9 @@ function VirtualSentenceMenuList({
 			const maxScroll = Math.max(0, listHeight - viewport.clientHeight);
 			viewport.scrollTop = edge === 'top' ? 0 : maxScroll;
 			setScrollTop(viewport.scrollTop);
+			syncScrollEdge(viewport);
 		},
-		[listHeight, markProgrammaticScroll],
+		[listHeight, markProgrammaticScroll, syncScrollEdge],
 	);
 
 	const scrollToCurrent = useCallback(() => {
@@ -406,19 +418,39 @@ function VirtualSentenceMenuList({
 		scrollToIndex(activeIndexRef.current, { force: true });
 	}, [scrollToIndex]);
 
+	const displayMode: SentenceScrollMode =
+		scrollMode === 'bottom' && scrollEdge === 'bottom'
+			? 'top'
+			: scrollMode === 'top' && scrollEdge === 'top'
+				? 'bottom'
+				: scrollMode;
+
 	const scrollLabel =
-		scrollMode === 'bottom'
+		displayMode === 'bottom'
 			? t('ebook.read.tocScrollToBottom')
-			: scrollMode === 'top'
+			: displayMode === 'top'
 				? t('ebook.read.tocScrollToTop')
 				: t('ebook.read.listenBook.scrollToCurrentSentence');
 
 	const onScrollFabClick = useCallback(() => {
-		if (scrollMode === 'bottom') scrollToEdge('bottom');
-		else if (scrollMode === 'top') scrollToEdge('top');
+		const vp = viewportRef.current;
+		if (!vp) return;
+
+		const { scrollTop: top, scrollHeight, clientHeight } = vp;
+		const atTop = top <= SCROLL_EDGE_PX;
+		const atBottom = top + clientHeight >= scrollHeight - SCROLL_EDGE_PX;
+		let mode = scrollMode;
+		if (mode === 'bottom' && atBottom) mode = 'top';
+		else if (mode === 'top' && atTop) mode = 'bottom';
+
+		if (mode === 'bottom') scrollToEdge('bottom');
+		else if (mode === 'top') scrollToEdge('top');
 		else scrollToCurrent();
-		setScrollMode(SENTENCE_SCROLL_NEXT[scrollMode]);
-	}, [scrollMode, scrollToCurrent, scrollToEdge]);
+
+		if (mode === 'bottom') setScrollMode('top');
+		else if (mode === 'top') setScrollMode(hasActive ? 'current' : 'bottom');
+		else setScrollMode('bottom');
+	}, [hasActive, scrollMode, scrollToCurrent, scrollToEdge]);
 
 	// 仅菜单打开时滚到当前句（勿依赖 activeIndex，避免切句时重复触发）
 	useEffect(() => {
@@ -451,8 +483,15 @@ function VirtualSentenceMenuList({
 			cancelled = true;
 			window.clearTimeout(t1);
 			window.clearTimeout(t2);
+			if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
 		};
 	}, [menuOpen, total, scrollToIndex]);
+
+	useEffect(() => {
+		if (!hasActive && scrollMode === 'current') {
+			setScrollMode('bottom');
+		}
+	}, [hasActive, scrollMode]);
 
 	// 听书切句：用户未手动滚列表时才跟随
 	useEffect(() => {
@@ -460,11 +499,21 @@ function VirtualSentenceMenuList({
 		scrollToIndex(activeIndex);
 	}, [menuOpen, activeIndex, total, scrollToIndex]);
 
-	const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-		setScrollTop(e.currentTarget.scrollTop);
-		if (programmaticScrollRef.current) return;
-		userScrolledRef.current = true;
-	}, []);
+	const handleScroll = useCallback(
+		(e: React.UIEvent<HTMLDivElement>) => {
+			const el = e.currentTarget;
+			setScrollTop(el.scrollTop);
+			if (!scrollRafRef.current) {
+				scrollRafRef.current = requestAnimationFrame(() => {
+					scrollRafRef.current = 0;
+					syncScrollEdge(el);
+				});
+			}
+			if (programmaticScrollRef.current) return;
+			userScrolledRef.current = true;
+		},
+		[syncScrollEdge],
+	);
 
 	const first = Math.max(
 		0,
@@ -500,9 +549,9 @@ function VirtualSentenceMenuList({
 									onScrollFabClick();
 								}}
 							>
-								{scrollMode === 'bottom' ? (
+								{displayMode === 'bottom' ? (
 									<ChevronDown className="size-3.5" aria-hidden />
-								) : scrollMode === 'top' ? (
+								) : displayMode === 'top' ? (
 									<ChevronUp className="size-3.5" aria-hidden />
 								) : (
 									<LocateFixed className="size-3.5" aria-hidden />

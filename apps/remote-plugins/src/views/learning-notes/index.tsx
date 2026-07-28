@@ -301,7 +301,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 										/>
 									)
 								) : null}
-								{editorReady ? (
+								{!editorReady ? (
 									<div className="rounded-md bg-theme/5 absolute inset-0 z-10 flex items-center justify-center">
 										<Loading />
 									</div>

@@ -5,7 +5,7 @@ import { Drawer } from '@design/Drawer';
 import { Button, ScrollArea } from '@ui/index';
 import { ChevronDown, ChevronUp, LocateFixed } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EbookTocItem } from '../../types';
@@ -14,14 +14,10 @@ import {
 	epubReaderChromeListItemIdleClass,
 } from '../../utils/epub/reader/epubReaderSettings';
 
-/** 目录列表滚动：同一按钮循环 底 → 顶 → 当前 */
+/** 与学习笔记列表一致：同一按钮循环 底 → 顶 → 当前 */
 type TocScrollMode = 'bottom' | 'top' | 'current';
 
-const TOC_SCROLL_NEXT: Record<TocScrollMode, TocScrollMode> = {
-	bottom: 'top',
-	top: 'current',
-	current: 'bottom',
-};
+const SCROLL_EDGE_PX = 16;
 
 export type EbookTocDrawerProps = {
 	open: boolean;
@@ -45,42 +41,97 @@ export function EbookTocDrawer({
 	const { t } = useI18n();
 	const activeItemRef = useRef<HTMLButtonElement>(null);
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const scrollRafRef = useRef(0);
 	const [scrollMode, setScrollMode] = useState<TocScrollMode>('bottom');
+	const [scrollEdge, setScrollEdge] = useState<'top' | 'bottom' | null>(null);
+	const hasActive = activeIndex >= 0;
+
+	const syncScrollEdge = useCallback(() => {
+		const el = scrollViewportRef.current;
+		if (!el) return;
+		const { scrollTop, scrollHeight, clientHeight } = el;
+		let edge: 'top' | 'bottom' | null = null;
+		if (scrollTop <= SCROLL_EDGE_PX) edge = 'top';
+		else if (scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX)
+			edge = 'bottom';
+		setScrollEdge((prev) => (prev === edge ? prev : edge));
+	}, []);
+
+	const onViewportScroll = useCallback(() => {
+		if (scrollRafRef.current) return;
+		scrollRafRef.current = requestAnimationFrame(() => {
+			scrollRafRef.current = 0;
+			syncScrollEdge();
+		});
+	}, [syncScrollEdge]);
 
 	useEffect(() => {
 		if (!open) return;
 		setScrollMode('bottom');
-	}, [open]);
+		const id = requestAnimationFrame(() => syncScrollEdge());
+		return () => {
+			cancelAnimationFrame(id);
+			if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+		};
+	}, [open, syncScrollEdge]);
+
+	useEffect(() => {
+		if (!hasActive && scrollMode === 'current') {
+			setScrollMode('bottom');
+		}
+	}, [hasActive, scrollMode]);
 
 	useEffect(() => {
 		if (!open || activeIndex < 0) return;
 		const id = requestAnimationFrame(() => {
 			activeItemRef.current?.scrollIntoView({ block: 'nearest' });
+			syncScrollEdge();
 		});
 		return () => cancelAnimationFrame(id);
-	}, [open, activeIndex, items]);
+	}, [open, activeIndex, items, syncScrollEdge]);
 
-	const scrollLabel =
-		scrollMode === 'bottom'
-			? t('ebook.read.tocScrollToBottom')
-			: scrollMode === 'top'
-				? t('ebook.read.tocScrollToTop')
-				: t('ebook.read.tocScrollToCurrent');
-
-	const onScrollFabClick = () => {
+	const onScrollFabClick = useCallback(() => {
 		const vp = scrollViewportRef.current;
-		if (scrollMode === 'bottom') {
-			vp?.scrollTo({ top: vp.scrollHeight, behavior: 'smooth' });
-		} else if (scrollMode === 'top') {
-			vp?.scrollTo({ top: 0, behavior: 'smooth' });
+		if (!vp) return;
+
+		const { scrollTop, scrollHeight, clientHeight } = vp;
+		const atTop = scrollTop <= SCROLL_EDGE_PX;
+		const atBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX;
+		let mode = scrollMode;
+		if (mode === 'bottom' && atBottom) mode = 'top';
+		else if (mode === 'top' && atTop) mode = 'bottom';
+
+		if (mode === 'bottom') {
+			vp.scrollTo({ top: vp.scrollHeight, behavior: 'auto' });
+		} else if (mode === 'top') {
+			vp.scrollTo({ top: 0, behavior: 'auto' });
 		} else {
 			activeItemRef.current?.scrollIntoView({
 				block: 'center',
-				behavior: 'smooth',
+				behavior: 'auto',
 			});
 		}
-		setScrollMode(TOC_SCROLL_NEXT[scrollMode]);
-	};
+
+		if (mode === 'bottom') setScrollMode('top');
+		else if (mode === 'top') setScrollMode(hasActive ? 'current' : 'bottom');
+		else setScrollMode('bottom');
+
+		requestAnimationFrame(() => syncScrollEdge());
+	}, [hasActive, scrollMode, syncScrollEdge]);
+
+	const displayMode: TocScrollMode =
+		scrollMode === 'bottom' && scrollEdge === 'bottom'
+			? 'top'
+			: scrollMode === 'top' && scrollEdge === 'top'
+				? 'bottom'
+				: scrollMode;
+
+	const scrollLabel =
+		displayMode === 'bottom'
+			? t('ebook.read.tocScrollToBottom')
+			: displayMode === 'top'
+				? t('ebook.read.tocScrollToTop')
+				: t('ebook.read.tocScrollToCurrent');
 
 	return (
 		<Drawer
@@ -96,6 +147,7 @@ export function EbookTocDrawer({
 				requestAnimationFrame(() => {
 					activeItemRef.current?.focus({ preventScroll: true });
 					activeItemRef.current?.scrollIntoView({ block: 'nearest' });
+					syncScrollEdge();
 				});
 			}}
 		>
@@ -103,6 +155,7 @@ export function EbookTocDrawer({
 				<ScrollArea
 					ref={scrollViewportRef}
 					className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
+					onScroll={onViewportScroll}
 				>
 					<div className="flex min-h-0 w-full flex-1 flex-col gap-1 text-sm">
 						{items.length === 0 ? (
@@ -154,9 +207,9 @@ export function EbookTocDrawer({
 						aria-label={scrollLabel}
 						onClick={onScrollFabClick}
 					>
-						{scrollMode === 'bottom' ? (
+						{displayMode === 'bottom' ? (
 							<ChevronDown className="size-4" aria-hidden />
-						) : scrollMode === 'top' ? (
+						) : displayMode === 'top' ? (
 							<ChevronUp className="size-4" aria-hidden />
 						) : (
 							<LocateFixed className="size-4" aria-hidden />
