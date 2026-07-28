@@ -78,13 +78,14 @@ export function EbookReadHostPlugins({
 				{toolbarPlugins.map((p) => (
 					<div
 						key={p.id}
-						className="flex max-w-[min(280px,40vw)] min-w-0 shrink items-center"
+						className="flex min-w-0 shrink items-center"
 						data-ebook-host-slot="toolbar"
 						data-plugin-id={p.id}
 					>
 						<PluginHostPage
 							pluginId={p.id}
 							className="h-auto! min-h-0 w-full max-w-full"
+							part={part}
 						/>
 					</div>
 				))}
@@ -141,11 +142,13 @@ export function EbookReadHostPlugins({
 			onOpenChange={(open) => {
 				if (!open) onOpenPluginIdChange?.(null);
 			}}
-			bodyClassName="pt-2 pb-2 pl-0"
+			bodyClassName="py-2 pl-0"
 			contentStyle={chromeStyle}
 		>
 			<div className="relative flex h-full min-h-0 flex-col">
-				{openPluginId ? <PluginHostPage pluginId={openPluginId} /> : null}
+				{openPluginId ? (
+					<PluginHostPage pluginId={openPluginId} part={part} />
+				) : null}
 			</div>
 		</Drawer>
 	);

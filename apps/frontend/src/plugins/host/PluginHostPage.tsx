@@ -1,6 +1,8 @@
+import Tooltip from '@design/Tooltip';
+import { CircleQuestionMark } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Loading from '@/components/design/Loading';
-import { Button } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { attachIframeBridge } from '../core/attachIframeBridge';
@@ -10,7 +12,11 @@ import { eventBus } from '../host-api/EventBus';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
 import { attachPluginStyleIsolation } from './styleIsolation';
 
-type Props = { pluginId: string; className?: string };
+type Props = {
+	pluginId: string;
+	className?: string;
+	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
+};
 
 /** 用 Host 当前语言覆盖 bridge 快照；插件自维护 t，只同步 locale */
 function withLiveLocale(
@@ -62,7 +68,7 @@ function UntrustedIframe({
 	);
 }
 
-export function PluginHostPage({ pluginId, className }: Props) {
+export function PluginHostPage({ pluginId, className, part }: Props) {
 	const { locale, t } = useI18n();
 	const [retryKey, setRetryKey] = useState(0);
 	const [busy, setBusy] = useState(
@@ -175,7 +181,7 @@ export function PluginHostPage({ pluginId, className }: Props) {
 			? t('plugins.host.loading')
 			: t('plugins.host.notLoaded'));
 
-	return (
+	return part !== 'toolbar' ? (
 		<div
 			className={cn(
 				'mx-auto text-muted-foreground h-full flex flex-col gap-3 p-5.5 pt-0',
@@ -208,6 +214,59 @@ export function PluginHostPage({ pluginId, className }: Props) {
 					</div>
 				)}
 			</div>
+		</div>
+	) : (
+		<div className="text-muted-foreground h-full w-full flex items-center justify-center">
+			{busy || loaded?.status === 'loading' ? (
+				<div className="flex items-center gap-2 px-2">
+					<Spinner className="text-muted-foreground size-4" />
+					loading...
+				</div>
+			) : (
+				<div className="flex items-center justify-center text-muted-foreground">
+					<span className="text-sm pl-2 text-textcolor/80">
+						{t('plugins.host.loadingNamed', { id: pluginId })}
+					</span>
+					<Tooltip
+						side="bottom"
+						sideOffset={-2}
+						delayDuration={200}
+						shadow
+						content={
+							<div className="flex flex-col gap-3 pt-1 pb-2 text-textcolor">
+								<div className="text-sm max-w-[280px] whitespace-normal wrap-break-word">
+									<div className="text-sm">
+										{t('plugins.host.unavailable', { id: pluginId })}
+									</div>
+									<div className="text-sm mt-2 text-rose-400">
+										{detail ? detail : ''}
+									</div>
+								</div>
+								{error || loaded?.error ? (
+									<Button
+										type="button"
+										variant={busy ? 'loading' : 'default'}
+										className="w-fit"
+										disabled={busy}
+										onClick={() => setRetryKey((n) => n + 1)}
+									>
+										{t('plugins.host.reload')}
+									</Button>
+								) : null}
+							</div>
+						}
+					>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							className="text-orange-500"
+						>
+							<CircleQuestionMark className="size-4" />
+						</Button>
+					</Tooltip>
+				</div>
+			)}
 		</div>
 	);
 }

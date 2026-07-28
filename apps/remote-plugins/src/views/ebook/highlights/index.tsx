@@ -1,6 +1,5 @@
 import Loading from '@design/Loading';
 import { Button, ScrollArea } from '@ui/index';
-import { Highlighter } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHostLocale, useI18n } from '@/hooks';
 import type { Locale } from '@/i18n';
@@ -210,7 +209,7 @@ export default function EbookHighlightsApp({ api }: HostBridgeProps) {
 					className="box-border flex min-h-0 flex-1 flex-col px-1.5"
 				>
 					{error ? (
-						<p className="text-destructive px-2 py-2">{error}</p>
+						<p className="text-textcolor px-2 py-2">{error}</p>
 					) : items.length === 0 ? (
 						<p className="text-textcolor/55 px-2 py-4">
 							{t('highlightsList.empty')}
@@ -228,11 +227,8 @@ export default function EbookHighlightsApp({ api }: HostBridgeProps) {
 											'hover:bg-theme/10',
 										)}
 									>
-										<p className="mb-1.5 flex items-start gap-1 text-justify text-sm text-textcolor/65">
-											<Highlighter className="mt-0.5 size-3.5 shrink-0 opacity-70" />
-											<span className="line-clamp-3">
-												{row.quote?.trim() || t('highlightsList.noQuote')}
-											</span>
+										<p className="mb-1.5 flex items-start gap-1 text-justify text-sm text-textcolor line-clamp-3">
+											{row.quote?.trim() || t('highlightsList.noQuote')}
 										</p>
 										<p className="text-textcolor/50 text-left text-xs">
 											{[

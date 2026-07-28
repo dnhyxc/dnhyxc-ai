@@ -301,8 +301,8 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 										/>
 									)
 								) : null}
-								{!editorReady ? (
-									<div className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center">
+								{editorReady ? (
+									<div className="rounded-md bg-theme/5 absolute inset-0 z-10 flex items-center justify-center">
 										<Loading />
 									</div>
 								) : null}
@@ -329,7 +329,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 									/>
 								)}
 								{store.loadingDetail ? (
-									<div className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center">
+									<div className="w-full h-full bg-theme/5 absolute inset-0 z-10 flex items-center justify-center">
 										<Loading />
 									</div>
 								) : null}

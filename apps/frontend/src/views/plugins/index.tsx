@@ -9,6 +9,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -70,8 +71,8 @@ export default function PluginsPage() {
 
 	return (
 		<div className="box-border flex h-full min-h-0 w-full flex-col p-5.5 pt-0">
-			<div className="p-4 pt-1.5 flex-1 bg-theme-background rounded-md">
-				<div className="mb-2 flex shrink-0 items-center justify-between gap-3">
+			<div className="bg-theme-background flex min-h-0 flex-1 flex-col overflow-hidden rounded-md">
+				<div className="mb-2 flex shrink-0 items-center justify-between gap-3 px-4 pt-1.5">
 					<p className="text-textcolor/55 min-w-0 flex-1 text-sm leading-relaxed">
 						{t('plugins.page.desc')}
 					</p>
@@ -87,62 +88,66 @@ export default function PluginsPage() {
 					</Button>
 				</div>
 				{error ? (
-					<p className="text-destructive mb-3 text-sm">{error}</p>
+					<p className="text-destructive mb-3 shrink-0 px-4 text-sm">{error}</p>
 				) : null}
 
 				{plugins.length === 0 ? (
-					<p className="text-textcolor/55 text-sm">{t('plugins.page.empty')}</p>
+					<p className="text-textcolor/55 px-4 text-sm">
+						{t('plugins.page.empty')}
+					</p>
 				) : (
-					<div className="grid min-h-0 grid-cols-1 gap-4 overflow-auto sm:grid-cols-2 xl:grid-cols-3">
-						{plugins.map((p) => {
-							const onShelf = p.enabled;
-							const busy = busyId === p.id;
-							return (
-								<Card
-									key={p.id}
-									className={cn(
-										'gap-2 py-4 flex flex-col justify-around border border-theme/5 bg-theme/5',
-										!onShelf && 'opacity-80',
-									)}
-								>
-									<CardHeader className="grid-cols-1 gap-2 px-4 [.border-b]:pb-0">
-										<div className="flex items-center justify-between gap-3">
-											<CardTitle className="min-w-0 flex-1 text-base">
-												{pluginTitle(p, locale)}
-											</CardTitle>
-											<div className="flex shrink-0 items-center gap-2">
-												<span className="text-textcolor/55 text-xs whitespace-nowrap">
-													{onShelf
-														? t('plugins.shelf.on')
-														: t('plugins.shelf.off')}
-												</span>
-												<Switch
-													checked={onShelf}
-													disabled={busy}
-													onCheckedChange={(v) => void onToggle(p.id, v)}
-													aria-label={t('plugins.shelf.toggle')}
-												/>
+					<ScrollArea className="min-h-0 flex-1">
+						<div className="grid grid-cols-1 gap-4 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3">
+							{plugins.map((p) => {
+								const onShelf = p.enabled;
+								const busy = busyId === p.id;
+								return (
+									<Card
+										key={p.id}
+										className={cn(
+											'gap-2 py-4 flex flex-col justify-around border border-theme/5 bg-theme/5',
+											!onShelf && 'opacity-80',
+										)}
+									>
+										<CardHeader className="grid-cols-1 gap-2 px-4 [.border-b]:pb-0">
+											<div className="flex items-center justify-between gap-3">
+												<CardTitle className="min-w-0 flex-1 text-base">
+													{pluginTitle(p, locale)}
+												</CardTitle>
+												<div className="flex shrink-0 items-center gap-2">
+													<span className="text-textcolor/55 text-xs whitespace-nowrap">
+														{onShelf
+															? t('plugins.shelf.on')
+															: t('plugins.shelf.off')}
+													</span>
+													<Switch
+														checked={onShelf}
+														disabled={busy}
+														onCheckedChange={(v) => void onToggle(p.id, v)}
+														aria-label={t('plugins.shelf.toggle')}
+													/>
+												</div>
 											</div>
-										</div>
-										<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
-											{pluginBlurb(p, locale, t)}
-										</CardDescription>
-									</CardHeader>
-									<CardContent className="px-4 text-xs text-textcolor/45">
-										<p className="font-mono">
-											{p.id} · v{p.version}
-										</p>
-										<p className="mt-1 truncate" title={p.routePath}>
-											{t('plugins.card.route')}: {p.routePath}
-										</p>
-										<p className="mt-1">
-											{t('plugins.card.trust')}: {p.trust}
-										</p>
-									</CardContent>
-								</Card>
-							);
-						})}
-					</div>
+											<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
+												{pluginBlurb(p, locale, t)}
+											</CardDescription>
+										</CardHeader>
+										<CardContent className="px-4 text-xs text-textcolor/45">
+											<p className="font-mono">
+												{p.id} · v{p.version}
+											</p>
+											<p className="mt-1 truncate" title={p.routePath}>
+												{t('plugins.card.route')}: {p.routePath}
+											</p>
+											<p className="mt-1">
+												{t('plugins.card.trust')}: {p.trust}
+											</p>
+										</CardContent>
+									</Card>
+								);
+							})}
+						</div>
+					</ScrollArea>
 				)}
 			</div>
 		</div>

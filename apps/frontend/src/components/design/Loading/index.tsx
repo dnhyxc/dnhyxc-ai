@@ -88,7 +88,9 @@ const Loading: FC<LoadingProps> = ({
 	}, [size]);
 
 	return (
-		<div className={`flex flex-col items-center justify-center ${className}`}>
+		<div
+			className={`rounded-md supports-[backdrop-filter:blur(0)]:backdrop-blur-[2px] w-full h-full flex flex-col items-center justify-center ${className}`}
+		>
 			<div className="flex flex-col items-center gap-4">
 				{/* 动态容器 */}
 				<div

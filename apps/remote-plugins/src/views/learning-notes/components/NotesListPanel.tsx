@@ -145,8 +145,8 @@ export const NotesListPanel = observer(function NotesListPanel({
 				onScroll={onViewportScroll}
 			>
 				{store.loading ? (
-					<div className="flex min-h-full flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
-						<Loading />
+					<div className="w-full h-full flex min-h-full flex-1 flex-col items-center justify-center text-center text-sm text-textcolor/60">
+						<Loading className="flex-1" />
 					</div>
 				) : (
 					<div className="flex flex-col gap-3">
