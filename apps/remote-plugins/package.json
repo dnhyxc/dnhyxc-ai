@@ -9,7 +9,7 @@
 		"preview": "vite preview",
 		"publish": "dnhyxc-ci publish remotePlugins",
 		"deploy": "pnpm run build && pnpm run publish",
-		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart main'"
+		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart server'"
 	},
 	"dependencies": {
 		"@radix-ui/react-scroll-area": "^1.2.10",

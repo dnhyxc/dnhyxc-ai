@@ -96,58 +96,60 @@ export default function PluginsPage() {
 						{t('plugins.page.empty')}
 					</p>
 				) : (
-					<ScrollArea className="min-h-0 flex-1">
-						<div className="grid grid-cols-1 gap-4 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3">
-							{plugins.map((p) => {
-								const onShelf = p.enabled;
-								const busy = busyId === p.id;
-								return (
-									<Card
-										key={p.id}
-										className={cn(
-											'gap-2 py-4 flex flex-col justify-around border border-theme/5 bg-theme/5',
-											!onShelf && 'opacity-80',
-										)}
-									>
-										<CardHeader className="grid-cols-1 gap-2 px-4 [.border-b]:pb-0">
-											<div className="flex items-center justify-between gap-3">
-												<CardTitle className="min-w-0 flex-1 text-base">
-													{pluginTitle(p, locale)}
-												</CardTitle>
-												<div className="flex shrink-0 items-center gap-2">
-													<span className="text-textcolor/55 text-xs whitespace-nowrap">
-														{onShelf
-															? t('plugins.shelf.on')
-															: t('plugins.shelf.off')}
-													</span>
-													<Switch
-														checked={onShelf}
-														disabled={busy}
-														onCheckedChange={(v) => void onToggle(p.id, v)}
-														aria-label={t('plugins.shelf.toggle')}
-													/>
+					<div className="h-full flex flex-col overflow-auto pb-4">
+						<ScrollArea className="min-h-0 flex-1">
+							<div className="grid grid-cols-1 gap-4 px-4 sm:grid-cols-2 xl:grid-cols-3">
+								{plugins.map((p) => {
+									const onShelf = p.enabled;
+									const busy = busyId === p.id;
+									return (
+										<Card
+											key={p.id}
+											className={cn(
+												'gap-2 py-4 flex flex-col justify-around bg-theme/5 shadow-none',
+												!onShelf && 'opacity-80',
+											)}
+										>
+											<CardHeader className="grid-cols-1 gap-2 px-4 [.border-b]:pb-0">
+												<div className="flex items-center justify-between gap-3">
+													<CardTitle className="min-w-0 flex-1 text-base">
+														{pluginTitle(p, locale)}
+													</CardTitle>
+													<div className="flex shrink-0 items-center gap-2">
+														<span className="text-textcolor/55 text-xs whitespace-nowrap">
+															{onShelf
+																? t('plugins.shelf.on')
+																: t('plugins.shelf.off')}
+														</span>
+														<Switch
+															checked={onShelf}
+															disabled={busy}
+															onCheckedChange={(v) => void onToggle(p.id, v)}
+															aria-label={t('plugins.shelf.toggle')}
+														/>
+													</div>
 												</div>
-											</div>
-											<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
-												{pluginBlurb(p, locale, t)}
-											</CardDescription>
-										</CardHeader>
-										<CardContent className="px-4 text-xs text-textcolor/45">
-											<p className="font-mono">
-												{p.id} · v{p.version}
-											</p>
-											<p className="mt-1 truncate" title={p.routePath}>
-												{t('plugins.card.route')}: {p.routePath}
-											</p>
-											<p className="mt-1">
-												{t('plugins.card.trust')}: {p.trust}
-											</p>
-										</CardContent>
-									</Card>
-								);
-							})}
-						</div>
-					</ScrollArea>
+												<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
+													{pluginBlurb(p, locale, t)}
+												</CardDescription>
+											</CardHeader>
+											<CardContent className="px-4 text-xs text-textcolor/45">
+												<p className="font-mono">
+													{p.id} · v{p.version}
+												</p>
+												<p className="mt-1 truncate">
+													{t('plugins.card.route')}: {p.routePath}
+												</p>
+												<p className="mt-1">
+													{t('plugins.card.trust')}: {p.trust}
+												</p>
+											</CardContent>
+										</Card>
+									);
+								})}
+							</div>
+						</ScrollArea>
+					</div>
 				)}
 			</div>
 		</div>

@@ -473,8 +473,7 @@ export const enUS = {
 	'monaco.autoSaveInterval.minutes': '{m} min',
 	'monaco.bottomBar.aria.toolbar': 'Markdown bottom bar',
 	'monaco.bottomBar.aria.view': 'Markdown view',
-	'monaco.bottomBar.tip.drag':
-		'Drag to reposition the bottom bar (stays within editor)',
+	'monaco.bottomBar.tip.drag': 'Drag to reposition the bottom bar',
 	'monaco.bottomBar.aria.drag': 'Drag bottom bar position',
 	'monaco.bottomBar.tip.edit': 'Edit source',
 	'monaco.bottomBar.aria.edit': 'Edit source',

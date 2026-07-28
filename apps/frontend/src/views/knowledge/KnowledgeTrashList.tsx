@@ -63,7 +63,7 @@ const TrashRow = (props: TrashRowProps) => {
 			onKeyDown={onKeyDown}
 			onClick={() => void onActivate(item)}
 			className={cn(
-				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
+				'group relative w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md transition-colors',
 				// 与知识库列表一致：当前预览项使用相同的选中底色
 				selected
 					? 'bg-theme/10'
@@ -72,43 +72,37 @@ const TrashRow = (props: TrashRowProps) => {
 						: 'hover:bg-theme/10',
 			)}
 		>
-			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
-				<div className="flex min-w-0 flex-1 items-start gap-2">
-					<Checkbox
-						checked={checked}
-						aria-label={
-							checked
-								? t('knowledge.trash.checkbox.unselect')
-								: t('knowledge.trash.checkbox.select')
-						}
-						className="mt-0.5 shrink-0 cursor-pointer"
-						onClick={(e) => {
-							e.stopPropagation();
-						}}
-						onCheckedChange={() => onToggleChecked(item.id)}
-					/>
-					<div className="flow-root -mt-0.5 flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
-						{item.title?.trim() || t('knowledge.common.untitled')}
-					</div>
+			{/* 与学习笔记/知识库列表一致：非 hover 时 title 占满；删除 absolute 不占位 */}
+			<div className="flex min-w-0 w-full items-start gap-2">
+				<Checkbox
+					checked={checked}
+					aria-label={
+						checked
+							? t('knowledge.trash.checkbox.unselect')
+							: t('knowledge.trash.checkbox.select')
+					}
+					className="mt-0.5 shrink-0 cursor-pointer"
+					onClick={(e) => {
+						e.stopPropagation();
+					}}
+					onCheckedChange={() => onToggleChecked(item.id)}
+				/>
+				<div className="-mt-0.5 min-w-0 flex-1 truncate font-medium pr-0 group-hover:pr-8">
+					{item.title?.trim() || t('knowledge.common.untitled')}
 				</div>
-				<div
+			</div>
+			<div className="absolute top-2 right-2 flex items-center opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
+				<button
+					type="button"
+					aria-label={t('knowledge.trash.deleteForever')}
 					className={cn(
-						'flex h-7 w-7 shrink-0 items-center justify-center transition-opacity duration-150',
-						'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+						'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+						'hover:text-destructive hover:bg-destructive/10',
 					)}
+					onClick={(e) => onDeleteClick(e, item)}
 				>
-					<button
-						type="button"
-						aria-label={t('knowledge.trash.deleteForever')}
-						className={cn(
-							'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
-							'hover:text-destructive hover:bg-destructive/10',
-						)}
-						onClick={(e) => onDeleteClick(e, item)}
-					>
-						<Trash2 size={16} />
-					</button>
-				</div>
+					<Trash2 size={16} />
+				</button>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
 				{t('knowledge.trash.deletedAt', {

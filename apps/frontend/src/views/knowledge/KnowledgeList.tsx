@@ -80,72 +80,69 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		}
 	};
 
+	const showOpenEditor =
+		showOpenInExternalEditor &&
+		!!item.localAbsolutePath &&
+		!!onOpenInExternalEditorClick;
+
 	return (
 		<div
 			onClick={() => void onActivate(item)}
 			onKeyDown={onKeyDown}
 			className={cn(
-				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
+				'group relative w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md transition-colors',
 				selected ? 'bg-theme/10' : 'hover:bg-theme/10',
 			)}
 		>
-			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
-				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
-					{item.title?.trim() || t('knowledge.common.untitled')}
-				</div>
-				<div
-					className={cn(
-						'flex shrink-0 items-center h-7 gap-0 transition-opacity duration-150',
-						'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-						showOpenInExternalEditor &&
-							item.localAbsolutePath &&
-							onOpenInExternalEditorClick
-							? 'w-15'
-							: 'w-7',
-					)}
-				>
-					{showOpenInExternalEditor &&
-					item.localAbsolutePath &&
-					onOpenInExternalEditorClick ? (
-						<Tooltip
-							side="left"
-							sideOffset={6}
-							delayDuration={200}
-							shadow
-							content={t('knowledge.list.openInEditor')}
-						>
-							<button
-								type="button"
-								aria-label={t('knowledge.list.openInEditor')}
-								className={cn(
-									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
-									'hover:text-teal-500 hover:bg-teal-500/10',
-								)}
-								onClick={(e) => {
-									e.stopPropagation();
-									onOpenInExternalEditorClick(e, item);
-								}}
-							>
-								<Code2 size={16} />
-							</button>
-						</Tooltip>
-					) : null}
-					<button
-						type="button"
-						aria-label={
-							item.localAbsolutePath
-								? t('knowledge.list.deleteLocalMdAria')
-								: t('knowledge.list.deleteFromLibraryAria')
-						}
-						className={cn(
-							'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
-							'hover:text-destructive hover:bg-destructive/10',
-						)}
-						onClick={(e) => onTrashClick(e, item)}
+			{/* 与学习笔记列表一致：非 hover 时 title 占满；操作区 absolute 不占位 */}
+			<div
+				className={cn(
+					'min-w-0 w-full truncate font-medium pr-0',
+					showOpenEditor ? 'group-hover:pr-14' : 'group-hover:pr-8',
+				)}
+			>
+				{item.title?.trim() || t('knowledge.common.untitled')}
+			</div>
+			<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
+				{showOpenEditor ? (
+					<Tooltip
+						side="left"
+						sideOffset={6}
+						delayDuration={200}
+						shadow
+						content={t('knowledge.list.openInEditor')}
 					>
-						<Trash2 size={16} />
-					</button>
-				</div>
+						<button
+							type="button"
+							aria-label={t('knowledge.list.openInEditor')}
+							className={cn(
+								'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+								'hover:text-teal-500 hover:bg-teal-500/10',
+							)}
+							onClick={(e) => {
+								e.stopPropagation();
+								onOpenInExternalEditorClick?.(e, item);
+							}}
+						>
+							<Code2 size={16} />
+						</button>
+					</Tooltip>
+				) : null}
+				<button
+					type="button"
+					aria-label={
+						item.localAbsolutePath
+							? t('knowledge.list.deleteLocalMdAria')
+							: t('knowledge.list.deleteFromLibraryAria')
+					}
+					className={cn(
+						'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+						'hover:text-destructive hover:bg-destructive/10',
+					)}
+					onClick={(e) => onTrashClick(e, item)}
+				>
+					<Trash2 size={16} />
+				</button>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
 				{t('knowledge.list.updatedAt', {
