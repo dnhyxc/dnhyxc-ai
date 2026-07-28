@@ -1,4 +1,3 @@
-import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
@@ -8,7 +7,6 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Headphones,
-	Lightbulb,
 	List,
 	Minus,
 	Plus,
@@ -25,12 +23,7 @@ import {
 import { useNavigate, useParams } from 'react-router';
 import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
-import {
-	type EbookHostThought,
-	PluginHostPage,
-	setEbookHostHandlers,
-	usePluginEnabled,
-} from '@/plugins';
+import { type EbookHostThought, setEbookHostHandlers } from '@/plugins';
 import {
 	createEbookHighlight,
 	createEbookThought,
@@ -53,6 +46,7 @@ import { EbookReadSplitLayout } from './components/layout/EbookReadSplitLayout';
 import { EbookTocDrawer } from './components/layout/EbookTocDrawer';
 import { EpubListenFollowFab } from './components/listen/EpubListenFollowFab';
 import { EpubListenPlayerBar } from './components/listen/EpubListenPlayerBar';
+import { EbookReadHostPlugins } from './components/plugins/EbookReadHostPlugins';
 import { EbookAssistant } from './components/reader/EbookAssistant';
 import { EpubPane } from './components/reader/EpubPane';
 import {
@@ -247,9 +241,6 @@ function EbookReadPage() {
 	/** 听当前切入听书后共用底栏（切章等能力可用） */
 	const epubListenBar = chapterListen;
 
-	// 想法列表插件是否启用
-	const ebookIdeasEnabled = usePluginEnabled('ebookIdeas');
-
 	/** 听书倍速：默认全局；勾选后仅本书 */
 	const [listenRateBookOnly, setListenRateBookOnly] = useState(false);
 	const listenRateBookOnlyRef = useRef(false);
@@ -366,7 +357,9 @@ function EbookReadPage() {
 	>('create');
 	const [thoughtSaving, setThoughtSaving] = useState(false);
 	const [thoughtListOpen, setThoughtListOpen] = useState(false);
-	const [ideasListOpen, setIdeasListOpen] = useState(false);
+	const [hostDrawerPluginId, setHostDrawerPluginId] = useState<string | null>(
+		null,
+	);
 	const [thoughtComposeScrollKey, setThoughtComposeScrollKey] = useState(0);
 
 	const focusThoughtCompose = useCallback(() => {
@@ -419,10 +412,6 @@ function EbookReadPage() {
 		page: number;
 		percent?: number;
 	} | null>(null);
-
-	useEffect(() => {
-		if (!ebookIdeasEnabled && ideasListOpen) setIdeasListOpen(false);
-	}, [ebookIdeasEnabled, ideasListOpen]);
 
 	useEffect(() => {
 		quoteShareOpenRef.current = quoteShareOpen;
@@ -1116,7 +1105,7 @@ function EbookReadPage() {
 			getBookTitle: () => bookTitle,
 			navigateToCfi: (cfi) => ensureQuoteCfiInViewport(cfi),
 			openThought: openHostThought,
-			closeIdeasList: () => setIdeasListOpen(false),
+			closeIdeasList: () => setHostDrawerPluginId(null),
 		});
 		return () => setEbookHostHandlers(null);
 	}, [
@@ -2519,31 +2508,12 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
-				{ebookIdeasEnabled ? (
-					<Tooltip
-						side="bottom"
-						sideOffset={6}
-						delayDuration={200}
-						shadow
-						content={t('ebook.read.ebookIdeas.open')}
-					>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							className={cn(
-								ideasListOpen
-									? 'bg-theme/15 text-teal-500'
-									: 'text-textcolor/80 hover:text-teal-500',
-							)}
-							aria-pressed={ideasListOpen}
-							aria-label={t('ebook.read.ebookIdeas.open')}
-							onClick={() => setIdeasListOpen(true)}
-						>
-							<Lightbulb className="size-4" />
-						</Button>
-					</Tooltip>
-				) : null}
+				<EbookReadHostPlugins
+					part="drawer-triggers"
+					openPluginId={hostDrawerPluginId}
+					onOpenPluginIdChange={setHostDrawerPluginId}
+				/>
+				<EbookReadHostPlugins part="toolbar" />
 				{canSetPublic && book ? (
 					<EbookBookVisibilitySwitch
 						book={book}
@@ -3025,18 +2995,13 @@ function EbookReadPage() {
 				/>
 			) : null}
 
-			{book?.fmt === 'epub' && ebookIdeasEnabled ? (
-				<Drawer
-					title={t('ebook.read.ebookIdeas.title')}
-					open={ideasListOpen}
-					onOpenChange={setIdeasListOpen}
-					bodyClassName="pt-2 pb-2 pl-0"
-					contentStyle={epubSurfaceProps?.chromeStyle}
-				>
-					<div className="relative flex h-full min-h-0 flex-col">
-						{ideasListOpen ? <PluginHostPage pluginId="ebookIdeas" /> : null}
-					</div>
-				</Drawer>
+			{book?.fmt === 'epub' ? (
+				<EbookReadHostPlugins
+					part="drawer"
+					openPluginId={hostDrawerPluginId}
+					onOpenPluginIdChange={setHostDrawerPluginId}
+					chromeStyle={epubSurfaceProps?.chromeStyle}
+				/>
 			) : null}
 		</EbookPageShell>
 	);

@@ -14,6 +14,7 @@
 - [`assistant-stream-end-scroll-pin.md`](./assistant-stream-end-scroll-pin.md)：修复知识库 / 电子书 MOKE / 英语学习助手在流式中上滑打断贴底后，流式结束仍被拽回底部（`userPinnedAwayRef`、`idleFlushKey` 去 `chatId`、`flushScrollToBottom` 门禁）。
 - [`knowledge-preview-assistant-perf.md`](./knowledge-preview-assistant-perf.md)：左栏 Markdown 预览/分屏与右栏助手同开且流式时输入/滚动卡顿（SSE rAF 合并、消息列 observer 隔离、`assistantPaneBusy` latch、预览加载态）。
 - `knowledge-preview-scroll-jank.md`：长预览滚动卡顿 / 预览+助手双侧滚动卡顿（FAB ref 去重、岛屿 HTML memo、吸顶条 enabled 硬关、流式贴底 rAF 合并）
+- `knowledge-preview-code-toolbar-scroll.md`：长文多代码块预览持续滚动（吸顶栏块列表缓存、二分定位、O(1) 清 pinned；2026-07-28）
 
 ---
 

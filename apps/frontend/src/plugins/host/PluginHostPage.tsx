@@ -158,7 +158,7 @@ export function PluginHostPage({ pluginId, className }: Props) {
 		return (
 			<PluginErrorBoundary pluginId={pluginId}>
 				<div
-					className={`plugin-${pluginId} h-full w-full`}
+					className={cn(`plugin-${pluginId} h-full w-full`, className)}
 					data-mf-plugin={pluginId}
 					data-plugin-root
 				>

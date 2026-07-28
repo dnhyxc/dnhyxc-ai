@@ -17,6 +17,8 @@ const enUS: Record<string, string> = {
 	'layout.home': 'Home',
 	'layout.learningNotes': 'Learning notes',
 	'layout.ideasList': 'EPUB ideas',
+	'layout.ebookHighlights': 'All highlights',
+	'layout.ebookTestBookInfo': 'Book info test',
 	'layout.previewHint': 'Standalone preview · :9008',
 
 	'home.title': 'Plugin standalone preview',
@@ -26,6 +28,12 @@ const enUS: Record<string, string> = {
 	'home.learningNotes.desc': 'expose ./LearningNotes · registry learningNotes',
 	'home.ideasList.title': 'EPUB ideas list',
 	'home.ideasList.desc': 'expose ./EbookIdeas · registry ebookIdeas',
+	'home.ebookHighlights.title': 'All highlights',
+	'home.ebookHighlights.desc':
+		'expose ./EbookHighlights · registry ebookHighlights',
+	'home.ebookTestBookInfo.title': 'Book info test',
+	'home.ebookTestBookInfo.desc':
+		'expose ./EbookTestBookInfo · registry ebookTestBookInfo',
 
 	'learningNotes.listTitle': 'Notes',
 	'learningNotes.titleBadge': 'Note title',
@@ -65,6 +73,23 @@ const enUS: Record<string, string> = {
 	'ideasList.unboundBook': 'No book bound',
 	'ideasList.empty': 'No ideas yet',
 	'ideasList.noBody': '(No body)',
+
+	'highlightsList.unboundBook': 'No book bound',
+	'highlightsList.empty': 'No highlights yet',
+	'highlightsList.noQuote': '(No quote)',
+	'highlightsList.style.highlight': 'Highlight',
+	'highlightsList.style.underline': 'Underline',
+	'highlightsList.style.wavy': 'Wavy',
+
+	'ebookTest.bookInfo.blurb':
+		'Host toolbar-slot test: inline book info in the reader header.',
+	'ebookTest.bookInfo.bookId': 'bookId',
+	'ebookTest.bookInfo.bookTitle': 'bookTitle',
+	'ebookTest.bookInfo.unbound': '(unbound)',
+	'ebookTest.bookInfo.ping': 'Toast',
+	'ebookTest.bookInfo.toastOk': 'Current book: {id}',
+	'ebookTest.bookInfo.toastUnbound':
+		'No book bound (common in standalone preview)',
 };
 
 export default enUS;

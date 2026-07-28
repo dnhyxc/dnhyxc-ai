@@ -35,6 +35,18 @@ export interface PluginDescriptor {
 	 * false：宿主已在业务路由树（如英语学习子路由）挂好 PluginHostPage，只负责 loadRemote。
 	 */
 	injectRoute?: boolean;
+	/**
+	 * 业务页自动挂载声明。有此项后，对应 Host 页面按 surface/slot 渲染，不必硬编码 pluginId。
+	 * - drawer：顶栏图标 + Drawer 内挂 PluginHostPage
+	 * - toolbar：顶栏内联挂载 PluginHostPage（适合小块信息/操作）
+	 */
+	host?: {
+		surface: 'ebook.read';
+		slot: 'drawer' | 'toolbar';
+		/** lucide 图标名，缺省 Puzzle（drawer 用） */
+		icon?: string;
+		order?: number;
+	};
 	/** MF registerRemotes.name；默认 `id`。多插件共享同一 Remote 时填 federation name */
 	remoteName?: string;
 	/** MF expose 路径；默认 `./App`（如 `./IdeasList`） */

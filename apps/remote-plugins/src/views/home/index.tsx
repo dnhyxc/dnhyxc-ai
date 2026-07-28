@@ -15,6 +15,16 @@ export default function Home() {
 			title: t('home.ideasList.title'),
 			desc: t('home.ideasList.desc'),
 		},
+		{
+			to: '/ebook/plugins/highlights',
+			title: t('home.ebookHighlights.title'),
+			desc: t('home.ebookHighlights.desc'),
+		},
+		{
+			to: '/ebook/plugins/toolbar-test',
+			title: t('home.ebookTestBookInfo.title'),
+			desc: t('home.ebookTestBookInfo.desc'),
+		},
 	] as const;
 
 	return (

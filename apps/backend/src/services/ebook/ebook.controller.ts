@@ -37,6 +37,7 @@ import { CreateEbookHighlightDto } from './dto/create-ebook-highlight.dto';
 import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
+import { QueryEbookListHighlightsDto } from './dto/query-ebook-list-highlights.dto';
 import { QueryEbookListThoughtsDto } from './dto/query-ebook-list-thoughts.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { QueryEbookThoughtChangesDto } from './dto/query-ebook-thought-changes.dto';
@@ -445,8 +446,14 @@ export class EbookController {
 	async listHighlights(
 		@Req() req: AuthedRequest,
 		@Param('bookId', ParseUUIDPipe) bookId: string,
+		@Query() query: QueryEbookListHighlightsDto,
 	) {
-		return this.ebookService.listHighlights(this.userId(req), bookId);
+		const paginate = query.pageNo != null || query.pageSize != null;
+		return this.ebookService.listHighlights(
+			this.userId(req),
+			bookId,
+			paginate ? { pageNo: query.pageNo, pageSize: query.pageSize } : undefined,
+		);
 	}
 
 	@Post('highlights')

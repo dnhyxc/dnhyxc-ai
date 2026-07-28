@@ -662,7 +662,7 @@ export function createEbookModulesApi() {
 
 ### 6.5 插件端使用电子书 API
 
-**文件路径**：`apps/remote-plugins/src/views/ebook-ideas/index.tsx`（简化版）
+**文件路径**：`apps/remote-plugins/src/views/ebook/ideas/index.tsx`（简化版）
 
 ```typescript
 export default function IdeasListApp({ api }: HostBridgeProps) {

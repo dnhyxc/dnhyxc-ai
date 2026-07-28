@@ -54,7 +54,10 @@ src/
   views/                   # 页面与 MF expose
     home/                  # 插件目录首页
     embed/                 # untrusted iframe 落地页
-    ebook-ideas/           # expose ./IdeasList
+    ebook/
+      ideas/               # expose ./EbookIdeas
+      highlights/          # expose ./EbookHighlights
+      toolbar-test/        # expose ./EbookTestBookInfo
     learning-notes/        # expose ./LearningNotes
   utils/                   # mockHost、iframeHostClient
   components/ui/           # shadcn（可扩展 design/）
@@ -66,10 +69,12 @@ src/
 
 ## Expose
 
-| expose            | 说明                                    | registry `id`   |
-| ----------------- | --------------------------------------- | --------------- |
-| `./IdeasList`     | EPUB 全书想法列表（右侧抽屉，滚动分页） | `ebookIdeas`    |
-| `./LearningNotes` | 英语学习 · 学习笔记（业务页内嵌）       | `learningNotes` |
+| expose                | 说明                               | registry `id`       |
+| --------------------- | ---------------------------------- | ------------------- |
+| `./EbookIdeas`        | EPUB 全书想法列表（阅读页抽屉）    | `ebookIdeas`        |
+| `./EbookHighlights`   | EPUB 全书划线列表（滚动分页）      | `ebookHighlights`   |
+| `./EbookTestBookInfo` | 阅读页 Host 槽测试：书信息 + Toast | `ebookTestBookInfo` |
+| `./LearningNotes`     | 英语学习 · 学习笔记（业务页内嵌）  | `learningNotes`     |
 
 后续新插件：在 `src/views/<name>/` 加模块，并在 `vite.config.ts` `exposes` 与 `plugins-registry.json` 各加一条（共用 `remoteName: "remotePlugins"` + 同一 `entry`）。
 

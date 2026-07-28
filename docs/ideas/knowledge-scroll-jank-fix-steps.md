@@ -1,14 +1,15 @@
 # 知识库预览 / 助手滚动卡顿 — 详细解决步骤
 
-> **状态**：已落地（2026-07）  
-> **日期**：2026-07-26  
-> **需求摘要**：知识库左栏长/复杂 Markdown 预览滚动卡顿，以及预览 + 右侧助手同开（尤其流式）时双侧滚动与整页卡顿，在不改业务语义与 UI 的前提下收敛主线程争用。
+> **状态**：已落地（2026-07；**2026-07-28** 增补 S7 吸顶栏热路径）  
+> **日期**：2026-07-26 / 2026-07-28  
+> **需求摘要**：知识库左栏长/复杂 Markdown 预览滚动卡顿，以及预览 + 右侧助手同开（尤其流式）时双侧滚动与整页卡顿，在不改业务语义与 UI 的前提下收敛主线程争用。**补充**：长文多代码块时「一直滚都卡」→ 优化 `layoutChatCodeToolbars` 滚动热路径。
 
 ## 延伸阅读
 
 | 文档 | 角色 |
 |------|------|
 | [knowledge-preview-scroll-jank.md](../knowledge/knowledge-preview-scroll-jank.md) | **滚动层正式归档**（改动前后 + 逐行注释） |
+| [knowledge-preview-code-toolbar-scroll.md](../knowledge/knowledge-preview-code-toolbar-scroll.md) | **S7 正式归档**：长文多代码块吸顶栏热路径 |
 | [knowledge-preview-assistant-perf.md](../knowledge/knowledge-preview-assistant-perf.md) | Store / observer / busy latch 正式归档 |
 | [knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md) | 首轮「写路径合并 + 读路径隔离」规划思路 |
 | [knowledge-editor-long-text-perf.md](../knowledge/knowledge-editor-long-text-perf.md) | 长文 edit 停喂隐藏预览 |
@@ -21,8 +22,8 @@
 - **问题拆解**：卡顿不是单一 bug，而是「预览 scroll 热路径重渲染 / 重 parse」+「助手流式贴底 / 吸顶条 layout」+「双侧同开主线程争用」叠加。
 - **一句话方案**：先切断滚动触发的 React/parse，再关掉助手同开时左栏无用 layout，再把流式贴底从「每 token」降到「每帧」。
 - **怎么落地**：按下方 **S0→S6** 顺序做；每一步含 **问题 → 代码 → 意图 → 为何有效**。
-- **禁止项**：不要对 `.markdown-body` 子节点开 `content-visibility:auto`（实测加重卡顿）。
-- **验收**：仅预览长文滚动、预览+助手双侧滚动、流式时双侧滚动，功能与 UI 与改前一致。
+- **禁止项**：不要对 `.markdown-body` 子节点开 `content-visibility:auto`（实测加重卡顿）；不要用预览 DOM 窗口化 / 纯预览一律卸 Monaco 当作本问题的默认解（2026-07-28 实测失败已回退）。
+- **验收**：仅预览长文滚动、预览+助手双侧滚动、流式时双侧滚动，功能与 UI 与改前一致；**长文多代码块持续滚动**对照 S7。
 
 ---
 
@@ -64,6 +65,7 @@
 | S4 | scroll layout 单帧合并 | React + passive 双通道不双倍测 | `useChatCodeFloatingToolbar` |
 | S5 | 流式贴底 rAF 合并 | token 频率 → 帧频率 | `useStickToBottomScroll` |
 | S6 | **禁止** content-visibility | 避免布局抖动加重卡顿 | （回退记录） |
+| S7 | 吸顶栏热路径减负 | 长文多代码块持续滚动不卡 | `chatCodeToolbar` + `chatCodeFencePinSearch` + hook |
 
 ---
 
@@ -75,7 +77,8 @@
 | busy 布尔 | `hooks/useAssistantPaneBusy.ts` | S0：忙时冻结左栏预览正文 |
 | 消息列 observer | `KnowledgeAssistantMessageList.tsx` | S0：流式只重渲消息列 |
 | 预览 Pane | `components/design/Markdown/index.tsx` | S1/S2 主战场 |
-| 吸顶条 | `hooks/useChatCodeFloatingToolbar.tsx` | S3/S4 |
+| 吸顶条 | `hooks/useChatCodeFloatingToolbar.tsx` + `utils/chatCodeToolbar.ts` | S3/S4；**S7** 缓存/二分 |
+| 二分定位 | `utils/chatCodeFencePinSearch.ts` | S7 |
 | 贴底 | `hooks/useStickToBottomScroll.ts` | S5 |
 | 助手侧 FAB 去重 | `hooks/useAssistantScroll.ts` | 对照模式：预览侧对齐 |
 
@@ -454,8 +457,24 @@ useLayoutEffect(() => {
 | M3 | S3+S4 吸顶条 | 助手开时左栏无 layout；助手关时吸顶正常 |
 | M4 | S5 贴底合并 | 流式 + 双侧滚动可接受 |
 | M5 | 回归与文档 | 对照正式归档文；勿启用 content-visibility |
+| M6 | S7 吸顶热路径 | 长文多代码块仅预览滚动 Profiler 无全文 querySelectorAll 尖峰 |
 
 ---
+
+## 9.1 S7 详细步骤（2026-07-28）
+
+**问题**：仅预览、文档很长且大量代码块时，**一直滚都卡**。S3 只在助手同开时关掉左栏吸顶；仅预览仍每帧对 **全部** 代码块 `querySelectorAll` + `getBoundingClientRect`，并全文清 pinned、隐藏态仍 `emit`。
+
+**做法**：
+
+1. WeakMap 缓存代码块根列表；滚动不 refresh，正文 `layoutDeps` 才 `invalidate` + `refreshBlocks`。
+2. `findFirstBlockNotAboveViewportTop` 二分跳过视口顶上方块。
+3. 自 start 向下扫至 `br.top >= topY` 停止。
+4. `clearLastPinnedMarkers` O(1)；`hideToolbar` / 几何相等短路避免无意义 emit。
+
+**正式归档（改动前后 + 逐行注释）**：[../knowledge/knowledge-preview-code-toolbar-scroll.md](../knowledge/knowledge-preview-code-toolbar-scroll.md)。
+
+**否决**：窗口化预览 DOM、纯预览一律卸 Monaco（同轮实测失败）。
 
 ## 10. 风险与验收
 
@@ -485,7 +504,8 @@ useLayoutEffect(() => {
 | 主题 | 路径 |
 |------|------|
 | FAB 去重 / 岛屿 memo | `apps/frontend/src/components/design/Markdown/index.tsx` |
-| 吸顶条 enabled / rAF | `apps/frontend/src/hooks/useChatCodeFloatingToolbar.tsx` |
+| 吸顶条 enabled / rAF / **S7 缓存分流** | `apps/frontend/src/hooks/useChatCodeFloatingToolbar.tsx` |
+| 吸顶布局 / **S7 二分** | `apps/frontend/src/utils/chatCodeToolbar.ts`、`chatCodeFencePinSearch.ts` |
 | 流式贴底合并 | `apps/frontend/src/hooks/useStickToBottomScroll.ts` |
 | 助手开时关左栏吸顶 | `apps/frontend/src/components/design/Monaco/index.tsx`（`enableCodeFloatingToolbar`） |
 | SSE 写合并 | `apps/frontend/src/utils/scheduleStreamingMobxPatch.ts` |

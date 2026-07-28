@@ -208,6 +208,13 @@ export type EbookHighlightDto = {
 	updatedAt: string;
 };
 
+export type EbookHighlightPageDto = {
+	list: EbookHighlightDto[];
+	total: number;
+	pageNo: number;
+	pageSize: number;
+};
+
 type EbookThoughtUserInfo = {
 	username: string;
 	avatar: string;
@@ -1695,13 +1702,32 @@ export class EbookService {
 	async listHighlights(
 		userId: number,
 		bookId: string,
-	): Promise<EbookHighlightDto[]> {
+		page?: { pageNo?: number; pageSize?: number },
+	): Promise<EbookHighlightDto[] | EbookHighlightPageDto> {
 		await this.assertBookOwned(userId, bookId);
-		const rows = await this.highlightRepo.find({
+		const paginate = page?.pageNo != null || page?.pageSize != null;
+		if (!paginate) {
+			const rows = await this.highlightRepo.find({
+				where: { userId, bookId },
+				order: { createdAt: 'DESC' },
+			});
+			return rows.map((row) => this.toHighlightDto(row));
+		}
+
+		const pageNo = page?.pageNo ?? 1;
+		const pageSize = Math.min(Math.max(page?.pageSize ?? 50, 1), 100);
+		const [rows, total] = await this.highlightRepo.findAndCount({
 			where: { userId, bookId },
 			order: { createdAt: 'DESC' },
+			skip: (pageNo - 1) * pageSize,
+			take: pageSize,
 		});
-		return rows.map((row) => this.toHighlightDto(row));
+		return {
+			list: rows.map((row) => this.toHighlightDto(row)),
+			total,
+			pageNo,
+			pageSize,
+		};
 	}
 
 	async createHighlight(

@@ -1,7 +1,7 @@
 # 知识库长预览与助手同开滚动卡顿收敛
 
 > **文档角色**：长/复杂 Markdown 预览滚动、预览+助手（尤其流式）主线程争用卡顿的**滚动层专项实现**（改动前后对比 + 逐行注释）。  
-> **延伸阅读**：[../ideas/knowledge-scroll-jank-fix-steps.md](../ideas/knowledge-scroll-jank-fix-steps.md)（**逐步解决手册**：问题→代码→意图→为何有效）、[knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md)（SSE rAF 合并、消息列隔离、busy latch）、[../monaco/markdown-preview-edit-scroll-restore.md](../monaco/markdown-preview-edit-scroll-restore.md)（编辑↔预览滚动同步）、[knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md)（长文 edit 停喂预览）。
+> **延伸阅读**：[../ideas/knowledge-scroll-jank-fix-steps.md](../ideas/knowledge-scroll-jank-fix-steps.md)（**逐步解决手册**：问题→代码→意图→为何有效）、[knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md)（**2026-07-28**：长文多代码块吸顶栏热路径减负）、[knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md)（SSE rAF 合并、消息列隔离、busy latch）、[../monaco/markdown-preview-edit-scroll-restore.md](../monaco/markdown-preview-edit-scroll-restore.md)（编辑↔预览滚动同步）、[knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md)（长文 edit 停喂预览）。
 
 ---
 
@@ -604,6 +604,12 @@ export function useChatCodeFloatingToolbar(
 | **scroll 路径强制 `preferRatioWhenInvalid`** | `Monaco/utils.ts` 已暴露 `preferRatioWhenInvalid`，快照失效时仅比例跟滚；实测主瓶颈在 FAB parse 与 toolbar，热路径**未**默认开启，避免标题锚点同步精度回退。 |
 | **debounce 重建 scroll 快照** | 曾考虑 scroll 时 debounce `buildMarkdownScrollSyncSnapshot`；与 edit↔preview 跟手冲突，未采用。 |
 | **助手 busy 期间停更预览** | 属 [knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md) latch 范畴，本篇不重复。 |
+| **预览 DOM 窗口化** | 2026-07-28 尝试：影响锚点/高度/既有预览逻辑且未解决卡顿 → **已回退**；长文多代码块改走吸顶栏热路径，见 [knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md)。 |
+| **纯预览一律卸 Monaco / 超大围栏跳过 hljs** | 同轮实测加重或收益不足 → **已回退**。 |
+
+### 5.1 后续增量（2026-07-28）
+
+长文 **持续滚动** 且含 **大量代码块** 时，瓶颈在 `layoutChatCodeToolbars` 每帧全文 query + 全量几何（本篇 S3/S4 已关助手侧左栏，但 **仅预览** 仍开吸顶）。专项实现见 **[knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md)**（块列表缓存、二分定位、O(1) 清 pinned、隐藏态不 emit）。
 
 ---
 
@@ -636,6 +642,7 @@ export function useChatCodeFloatingToolbar(
 | 文档 | 关系 |
 |------|------|
 | [knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md) | 同场景 **MobX/SSE/消息列/busy latch** 主文档 |
+| [knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md) | **长文多代码块**吸顶栏热路径（2026-07-28） |
 | [../monaco/markdown-preview-edit-scroll-restore.md](../monaco/markdown-preview-edit-scroll-restore.md) | 编辑↔预览滚动快照与恢复 |
 | [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) | 长文纯 edit 停喂预览 |
 | [assistant-stream-end-scroll-pin.md](./assistant-stream-end-scroll-pin.md) | 流式结束误滚底 |

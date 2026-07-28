@@ -17,6 +17,8 @@ const zhCN: Record<string, string> = {
 	'layout.home': '首页',
 	'layout.learningNotes': '学习笔记',
 	'layout.ideasList': 'EPUB 想法列表',
+	'layout.ebookHighlights': '全书划线',
+	'layout.ebookTestBookInfo': '书信息测试',
 	'layout.previewHint': '独立预览 · :9008',
 
 	'home.title': '插件独立预览',
@@ -26,6 +28,12 @@ const zhCN: Record<string, string> = {
 	'home.learningNotes.desc': 'expose ./LearningNotes · registry learningNotes',
 	'home.ideasList.title': 'EPUB 想法列表',
 	'home.ideasList.desc': 'expose ./EbookIdeas · registry ebookIdeas',
+	'home.ebookHighlights.title': '全书划线',
+	'home.ebookHighlights.desc':
+		'expose ./EbookHighlights · registry ebookHighlights',
+	'home.ebookTestBookInfo.title': '书信息测试',
+	'home.ebookTestBookInfo.desc':
+		'expose ./EbookTestBookInfo · registry ebookTestBookInfo',
 
 	'learningNotes.listTitle': '笔记列表',
 	'learningNotes.titleBadge': '笔记标题',
@@ -63,6 +71,21 @@ const zhCN: Record<string, string> = {
 	'ideasList.unboundBook': '未绑定当前书籍',
 	'ideasList.empty': '暂无想法',
 	'ideasList.noBody': '（无正文）',
+
+	'highlightsList.unboundBook': '未绑定当前书籍',
+	'highlightsList.empty': '暂无划线',
+	'highlightsList.noQuote': '（无摘录）',
+	'highlightsList.style.highlight': '高亮',
+	'highlightsList.style.underline': '下划线',
+	'highlightsList.style.wavy': '波浪线',
+
+	'ebookTest.bookInfo.blurb': 'Host toolbar 槽测试：顶栏内联展示当前书籍信息。',
+	'ebookTest.bookInfo.bookId': 'bookId',
+	'ebookTest.bookInfo.bookTitle': 'bookTitle',
+	'ebookTest.bookInfo.unbound': '（未绑定）',
+	'ebookTest.bookInfo.ping': 'Toast',
+	'ebookTest.bookInfo.toastOk': '当前书籍：{id}',
+	'ebookTest.bookInfo.toastUnbound': '未绑定书籍（独立预览常见）',
 };
 
 export default zhCN;

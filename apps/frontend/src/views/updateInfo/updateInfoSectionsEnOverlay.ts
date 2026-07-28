@@ -381,7 +381,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's6-27': {
 		title: 'Smoother preview + assistant together',
 		description:
-			'When the left Markdown preview or split view and the right doc assistant are both open during streaming replies, typing, scrolling, and the typewriter output feel more responsive. Preview may briefly show “Loading content…” while catching up, instead of a false empty state. Also reduces dual-pane scroll jank via FAB mode dedupe, cached parse for diagram-heavy docs, coalesced stick-to-bottom, and a hard-off path for the floating code toolbar. Complements §6 long-form editing and §7 preview/assistant panel behavior.',
+			'When the left Markdown preview or split view and the right doc assistant are both open during streaming replies, typing, scrolling, and the typewriter output feel more responsive. Preview may briefly show “Loading content…” while catching up, instead of a false empty state. Also reduces dual-pane scroll jank via FAB mode dedupe, cached parse for diagram-heavy docs, coalesced stick-to-bottom, and a hard-off path for the floating code toolbar. Further: very long docs with many code fences scroll more smoothly in preview-only mode (lighter floating code-toolbar work; copy/download and when the sticky bar appears stay the same). Complements §6 long-form editing and §7 preview/assistant panel behavior.',
 	},
 	's6-28': {
 		title: 'Bidirectional scroll restore between preview and edit',
@@ -1440,5 +1440,10 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'EPUB keeps reading position when the side panel opens or closes',
 		description:
 			'When you open or close the right panel, drag the split handle, or resize the window, the current reading line on the left stays in view as much as possible instead of jumping away as the reader width changes.',
+	},
+	's25-96': {
+		title: 'EPUB reader plugins: all ideas & all highlights',
+		description:
+			'While reading an EPUB, the toolbar now has All ideas (lightbulb) and All highlights (highlighter) buttons. Tap to browse every idea or highlight in the current book in a bottom drawer with scroll pagination; tap an item to jump to its position and open the detail. Requires sign-in. EPUB only; PDF not supported.',
 	},
 };

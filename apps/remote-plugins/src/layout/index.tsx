@@ -10,6 +10,11 @@ export default function Layout() {
 		{ to: '/', label: t('layout.home'), end: true },
 		{ to: '/english-learning/notes', label: t('layout.learningNotes') },
 		{ to: '/ebook/plugins/ideas-list', label: t('layout.ideasList') },
+		{ to: '/ebook/plugins/highlights', label: t('layout.ebookHighlights') },
+		{
+			to: '/ebook/plugins/toolbar-test',
+			label: t('layout.ebookTestBookInfo'),
+		},
 	];
 
 	return (

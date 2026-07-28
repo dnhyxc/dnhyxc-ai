@@ -26,6 +26,8 @@
 | [dynamic-plugin-system.md](./dynamic-plugin-system.md) | **动态插件系统核心实现**：Vite MF 配置、App 组件初始化、buildRoutes 动态路由合并、PluginManager 生命周期、Sidebar 动态菜单注入（含改动前/后对比与逐行注释） |
 | [plugin-development-guide.md](./plugin-development-guide.md) | **子项目/插件开发手册**：环境准备、Vite 配置、组件规范、全局样式隔离、HostBridge API、权限声明、生命周期、iframe 隔离模式、调试与发布 |
 | [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | **主项目接入插件方式**：自动路由注入、业务内手动挂载、iframe 隔离；电子书/英语学习接入示例、插件中心管理、Registry 配置、侧栏菜单注入 |
+| [ebook-host-surface-plugins.md](./ebook-host-surface-plugins.md) | **Ebook 阅读页插件动态接入（Host Surface 发现机制）**：`PluginDescriptor.host` 声明、`listHostSurfacePlugins`/`useHostSurfacePlugins` 同步枚举、`EbookReadHostPlugins` 三 part 槽位、阅读页去硬编码、后端 highlights 分页端点、remote 仓 ebook 视图重组与新增 expose（含改动前/后对比与逐行注释） |
+| [plugin-docs-update.md](./plugin-docs-update.md) | **插件开发文档路径同步**：`ebook-ideas` → `ebook/ideas` 目录重组后，同步 host-plugin-integration-guide / mf-implementation-guide 两份文档中的文件路径引用 |
 | [plugin-shelf-toggle.md](./plugin-shelf-toggle.md) | **插件上架/下架实现**：PluginManager.setEnabled、persistPluginEnabled 持久化、enabledOverrides 订阅、usePluginEnabled Hook、插件中心 Switch、Registry 编辑页、后端 PUT /upload/remotes（含改动前/后对比与逐行注释） |
 | [style-isolation-tech-overview.md](./style-isolation-tech-overview.md) | **主项目样式隔离技术说明**：5 分钟快速了解 @scope 原理、两层捕获机制、trusted/untrusted 两种模式、主子项目各自关注点、常见问题 FAQ |
 | [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |

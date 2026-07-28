@@ -44,7 +44,9 @@ export default defineConfig(({ mode }) => {
 				filename: 'remoteEntry.js',
 				manifest: true,
 				exposes: {
-					'./EbookIdeas': './src/views/ebook-ideas/index.tsx',
+					'./EbookIdeas': './src/views/ebook/ideas/index.tsx',
+					'./EbookHighlights': './src/views/ebook/highlights/index.tsx',
+					'./EbookTestBookInfo': './src/views/ebook/toolbar-test/book-info.tsx',
 					'./LearningNotes': './src/views/learning-notes/index.tsx',
 				},
 				shared: {

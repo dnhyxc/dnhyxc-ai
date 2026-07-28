@@ -6,7 +6,7 @@ import {
 } from 'react';
 import { useI18n } from '@/hooks';
 import { connectIframeHost } from '@/utils/iframeHostClient';
-import IdeasListApp from '@/views/ebook-ideas';
+import IdeasListApp from '@/views/ebook/ideas';
 import LearningNotesApp from '@/views/learning-notes';
 
 type Bridge = {

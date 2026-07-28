@@ -14,6 +14,7 @@
 | [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) | **Markdown 预览/编辑与助手 Panel**：布局 co-mount、开助手不再强制 split、纯预览全宽对 split/Diff/知识库助手的影响 |
 | [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) | **知识库长文编辑性能**：纯 edit 停喂隐藏预览、Store 派生 boolean、助手输入内化与标题区渲染隔离 |
 | [knowledge-preview-assistant-pane-perf.md](./knowledge-preview-assistant-pane-perf.md) | **预览+助手同开性能**：Monaco 预览态卸载/冻结、非受控轻量输入条、`KnowledgeMarkdownPane` 隔离 |
+| [knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md) | **长文多代码块预览滚动**：吸顶栏缓存/二分/O(1) 清理对预览·聊天·行内工具栏的影响 |
 | [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) | **本机 Web Speech cancel 后 50ms settle**：听当前首句修复、全站本机/回退路径起播延迟与云端无影响 |
 | [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md) | **连续滚动听书逐 iframe 节间衔接**：`runScrollSectionLoop` / `advanceScrollListenSection` 对分页听书、播放条切句、听当前互斥的影响 |
 | [epub-window-resize-relayout.md](./epub-window-resize-relayout.md) | **窗口放大/全屏 EPUB 居中**：`relayoutEpubViews` + `window.resize` settle 对分栏 soft resize、划线 sync、听书背景的影响 |

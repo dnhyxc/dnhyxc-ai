@@ -8,7 +8,10 @@ import {
 } from 'react';
 import ChatCodeToolbarFloating from '@/components/design/ChatCodeToolBar';
 import { ChatI18nT } from '@/types/chat';
-import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
+import {
+	invalidateChatCodeFenceBlockCache,
+	layoutChatCodeToolbars,
+} from '@/utils/chatCodeToolbar';
 
 const emptyDeps: DependencyList = [];
 
@@ -43,6 +46,7 @@ export type UseChatCodeFloatingToolbarOptions = {
  * - 可选：passive scroll 补帧
  *
  * 返回的 `relayout` 可在业务自己的 `onScroll` / `syncScrollMetrics` 中再调一次（幂等）。
+ * 滚动热路径不 refresh 块列表；正文变化（layoutDeps）才 invalidate + refresh。
  */
 export function useChatCodeFloatingToolbar(
 	viewportRef: RefObject<HTMLElement | null>,
@@ -54,12 +58,14 @@ export function useChatCodeFloatingToolbar(
 	const passiveScrollLayout = options?.passiveScrollLayout ?? false;
 	const scrollLayoutRafRef = useRef(0);
 
-	const relayout = useCallback(() => {
+	const relayoutAfterContent = useCallback(() => {
 		if (!enabled) return;
-		layoutChatCodeToolbars(viewportRef.current);
+		const vp = viewportRef.current;
+		invalidateChatCodeFenceBlockCache(vp);
+		layoutChatCodeToolbars(vp, { refreshBlocks: true });
 	}, [viewportRef, enabled]);
 
-	/** scroll 热路径合并到单帧，避免 React onScroll + passive 双通道同帧双测 */
+	/** scroll 热路径合并到单帧；复用块列表缓存，勿 refreshBlocks */
 	const relayoutOnScroll = useCallback(() => {
 		if (!enabled) return;
 		if (scrollLayoutRafRef.current) return;
@@ -107,7 +113,9 @@ export function useChatCodeFloatingToolbar(
 			const el = viewportRef.current;
 			if (!el || cancelled) return false;
 			ro?.disconnect();
-			ro = new ResizeObserver(() => relayout());
+			ro = new ResizeObserver(() =>
+				layoutChatCodeToolbars(viewportRef.current),
+			);
 			ro.observe(el);
 			return true;
 		};
@@ -127,25 +135,28 @@ export function useChatCodeFloatingToolbar(
 			ro?.disconnect();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [enabled, relayout, ...layoutDeps]);
+	}, [enabled, relayoutAfterContent, ...layoutDeps]);
 
 	useEffect(() => {
 		if (!enabled) return;
-		relayout();
-		const id = requestAnimationFrame(() => relayout());
+		relayoutAfterContent();
+		const id = requestAnimationFrame(() => relayoutAfterContent());
 		return () => cancelAnimationFrame(id);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- layoutDeps 由调用方传入
-	}, [enabled, relayout, ...layoutDeps]);
+	}, [enabled, relayoutAfterContent, ...layoutDeps]);
 
 	useLayoutEffect(() => {
 		if (!enabled) return;
 		const el = viewportRef.current;
 		if (!el) return;
-		layoutChatCodeToolbars(el);
-		const id = requestAnimationFrame(() => layoutChatCodeToolbars(el));
+		invalidateChatCodeFenceBlockCache(el);
+		layoutChatCodeToolbars(el, { refreshBlocks: true });
+		const id = requestAnimationFrame(() =>
+			layoutChatCodeToolbars(el, { refreshBlocks: true }),
+		);
 		return () => cancelAnimationFrame(id);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [enabled, relayout, ...layoutDeps]);
+	}, [enabled, relayoutAfterContent, ...layoutDeps]);
 
 	useLayoutEffect(() => {
 		if (!enabled || !passiveScrollLayout) return;

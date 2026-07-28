@@ -1,10 +1,22 @@
 import { Link, type RouteObject } from 'react-router';
 import Layout from '@/layout';
 import { mockApi, mockPlugin } from '@/utils/mockHost';
-import IdeasListApp from '@/views/ebook-ideas';
+import EbookHighlightsApp from '@/views/ebook/highlights';
+import IdeasListApp from '@/views/ebook/ideas';
+import EbookTestBookInfoApp from '@/views/ebook/toolbar-test/book-info';
 import { EmbedIdeasList, EmbedLearningNotes } from '@/views/embed';
 import Home from '@/views/home';
 import LearningNotesApp from '@/views/learning-notes';
+
+const mockEbookModules = {
+	ebook: {
+		getBookId: () => 'preview-book',
+		getBookTitle: () => 'Standalone preview book',
+		navigateToCfi: () => undefined,
+		openThought: () => undefined,
+		closeIdeasList: () => undefined,
+	},
+};
 
 /** 独立预览路由；path 与主站 registry / 业务树对齐 */
 export const routes: RouteObject[] = [
@@ -28,17 +40,31 @@ export const routes: RouteObject[] = [
 				element: (
 					<IdeasListApp
 						independent
-						api={mockApi({
-							modules: {
-								ebook: {
-									getBookId: () => null,
-									getBookTitle: () => '',
-									navigateToCfi: () => undefined,
-									openThought: () => undefined,
-								},
-							},
-						})}
+						api={mockApi({ modules: mockEbookModules })}
 						plugin={mockPlugin('ebookIdeas', '/ebook/plugins/ebook-ideas')}
+					/>
+				),
+			},
+			{
+				path: 'ebook/plugins/highlights',
+				element: (
+					<EbookHighlightsApp
+						independent
+						api={mockApi({ modules: mockEbookModules })}
+						plugin={mockPlugin('ebookHighlights', '/ebook/plugins/highlights')}
+					/>
+				),
+			},
+			{
+				path: 'ebook/plugins/toolbar-test',
+				element: (
+					<EbookTestBookInfoApp
+						independent
+						api={mockApi({ modules: mockEbookModules })}
+						plugin={mockPlugin(
+							'ebookTestBookInfo',
+							'/ebook/plugins/toolbar-test',
+						)}
 					/>
 				),
 			},
@@ -55,7 +81,6 @@ export const routes: RouteObject[] = [
 			},
 		],
 	},
-	/** Host untrusted iframe：无预览壳，经 postMessage 接 Host bridge */
 	{
 		path: '/embed/ebook/plugins/ideas-list',
 		element: <EmbedIdeasList />,

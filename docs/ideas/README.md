@@ -10,7 +10,7 @@
 | [epub-scroll-multi-iframe-listen.md](./epub-scroll-multi-iframe-listen.md)   | **EPUB 连续滚动多 iframe 听书续播**（已上线）：问题根因、逐点改动清单、架构/时序/复现步骤、类似问题通用套路                                                     |
 | [ebook-reading-progress-save.md](./ebook-reading-progress-save.md)           | **阅读进度保存**（已上线）：EPUB CFI / PDF 页码、三层防抖、keepalive flush、端到端架构与时序                                                                   |
 | [knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md) | **知识库预览+助手同开卡顿**（已上线）：规划态思路；**归档见** [knowledge/knowledge-preview-assistant-perf.md](../knowledge/knowledge-preview-assistant-perf.md) |
-| [knowledge-scroll-jank-fix-steps.md](./knowledge-scroll-jank-fix-steps.md) | **知识库预览/助手滚动卡顿详细解决步骤**（已上线）：S0–S6 逐步问题→代码→意图→为何有效；**归档见** [knowledge/knowledge-preview-scroll-jank.md](../knowledge/knowledge-preview-scroll-jank.md) |
+| [knowledge-scroll-jank-fix-steps.md](./knowledge-scroll-jank-fix-steps.md) | **知识库预览/助手滚动卡顿详细解决步骤**（已上线）：S0–S7 逐步问题→代码→意图→为何有效；**归档见** [knowledge/knowledge-preview-scroll-jank.md](../knowledge/knowledge-preview-scroll-jank.md)、[knowledge/knowledge-preview-code-toolbar-scroll.md](../knowledge/knowledge-preview-code-toolbar-scroll.md) |
 | [epub-public-thought-underline-overlay-fix.md](./epub-public-thought-underline-overlay-fix.md) | **公开书多人想法虚线叠层 bug**（已落地）：断续/双线根因、CFI 投影扣减、rank 叠层、排查手册 |
 | [epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md) | **EPUB 连续滚动卡顿**（已上线）：双轨 patch 调度、rect 快路径、relocated 80ms 合并、叠层投影缓存、复杂度对比与调试手册 |
 | [ebook-public-thought-live-sync.md](./ebook-public-thought-live-sync.md) | **公开书想法实时同步**（核心已上线）：/sync 增量、双轨触发、点击列表聚类 → **归档** [epub-public-thought-live-sync.md](../ebook/epub-public-thought-live-sync.md) |
@@ -28,6 +28,7 @@
 | [learning-notes-list-export.md](./learning-notes-list-export.md) | **学习笔记列表导出 Word**（规划）：后端拉全量笔记合成单个 .docx、复用单篇 HTML→DOCX 管线、200 篇上限 + 图片预算共享、M1–M2 分阶段 |
 | [learning-notes-export-and-editor-polish.md](./learning-notes-export-and-editor-polish.md) | **DOCX 插图导出可靠化 + 长文编辑打磨**（核心已落地）：sharp@0.33.5 懒加载、foreign/webp→JPEG、长文自然高度/末窗落点、GapCursor/空段删除；含 C1–C13 改动点对照 |
 | [learning-notes-docx-export-handbook.md](./learning-notes-docx-export-handbook.md) | **学习笔记富文本导出 Word（DOCX）端到端实现手册**（已上线）：从零复刻教学手册；M1–M14 全链路（DB→builder→Service→Controller→拦截器短路→Host downloadBlob→HostBridge→iframe RPC→插件 API→MobX action→按钮 UI→TipTap 富文本→长文性能优化），含完整源码 + 逐行注释 + 验收清单 + 常见坑排查 |
+| [ebook-plugin-dynamic-integration.md](./ebook-plugin-dynamic-integration.md) | **主项目 Ebook 插件动态接入**（核心已上线）：从零复刻端到端实现手册；Host Surface 发现机制、模块级单例 handlers 冻结代理、MF runtime + 共享 React 单例、PluginManager 生命周期、createHostBridge 按权限装配、Iframe RPC + 同步 getter 预取改写、`@scope` 样式隔离、i18n 双轨同步；M1–M8 分阶段 + 23 章节 + 完整源码逐行注释 + 验收清单 + 排查手册 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

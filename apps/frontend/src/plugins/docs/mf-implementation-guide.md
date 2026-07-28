@@ -2118,7 +2118,7 @@ federation({
 	filename: 'remoteEntry.js',
 	manifest: true,
 	exposes: {                      // 暴露多个模块
-		'./IdeasList': './src/views/ebook-ideas/index.tsx',
+		'./IdeasList': './src/views/ebook/ideas/index.tsx',
 		'./LearningNotes': './src/views/learning-notes/index.tsx',
 	},
 	shared: {
@@ -2609,7 +2609,7 @@ export function connectIframeHost(
 
 ```typescript
 import { useEffect, useState, type ComponentProps, type ComponentType } from 'react';
-import IdeasListApp from '@/views/ebook-ideas';
+import IdeasListApp from '@/views/ebook/ideas';
 import LearningNotesApp from '@/views/learning-notes';
 import { connectIframeHost } from '@/utils/iframeHostClient';
 

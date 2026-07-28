@@ -9,6 +9,8 @@ export {
 	isPluginEnabled,
 	subscribePluginEnabled,
 } from './core/enabledOverrides';
+export type { PluginHostSurface } from './core/hostSurface';
+export { listHostSurfacePlugins } from './core/hostSurface';
 export type { PluginLocaleMap } from './core/localeText';
 export { pickPluginLocaleText } from './core/localeText';
 export { loadRemoteApp, registerRemote } from './core/mf';
@@ -33,6 +35,7 @@ export type {
 	PluginSidebarItem,
 } from './core/types';
 export { HOST_API_VERSION } from './core/types';
+export { useHostSurfacePlugins } from './hooks/useHostSurfacePlugins';
 export { usePluginEnabled } from './hooks/usePluginEnabled';
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
