@@ -108,9 +108,9 @@ export function clipboardHasTextContent(event: ClipboardEvent): boolean {
 	const data = event.clipboardData;
 	if (!data) return false;
 	const html = data.getData('text/html');
-	if (html && html.trim()) return true;
+	if (html?.trim()) return true;
 	const text = data.getData('text/plain');
-	if (text && text.trim()) return true;
+	if (text?.trim()) return true;
 	return false;
 }
 
