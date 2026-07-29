@@ -1,8 +1,12 @@
 import type React from 'react';
 import type { PluginLocaleMap } from './localeText';
 
-/** Host 插件契约 semver；破坏性变更才升 major */
-export const HOST_API_VERSION = '1.0.0';
+/**
+ * Host 插件契约 semver；破坏性变更才升 major。
+ * 优先读 `VITE_HOST_API_VERSION`，缺省 `1.0.0`。
+ */
+export const HOST_API_VERSION =
+	import.meta.env.VITE_HOST_API_VERSION?.trim() || '1.0.0';
 
 export type PluginTrust = 'first-party' | 'partner' | 'untrusted';
 
@@ -139,6 +143,8 @@ export interface LoadedPlugin {
 	mod: PluginModule;
 	status: PluginStatus;
 	error?: string;
+	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
+	bust?: string;
 }
 
 export interface PluginSidebarItem {

@@ -1,0 +1,24 @@
+{
+	"serverInfo": {
+		"host": "101.43.50.15",
+		"username": "root",
+		"port": "22"
+	},
+	"nginxInfo": {
+		"remoteFilePath": "/usr/local/nginx/conf",
+		"restartPath": "/usr/local/nginx/sbin"
+	},
+	"serviceInfo": {
+		"restartPath": "/usr/local/dnhyxc-ai/server"
+	},
+	"restartScript": "pm2 restart server",
+	"remoteDemo": {
+		"name": "remote-demo",
+		"localFilePath": {
+			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/remote-demo",
+			"windows": "E:\\code\\dnhyxc-ai\\apps\\remote-demo"
+		},
+		"remoteFilePath": "/usr/local/nginx/remote",
+		"isServer": false
+	}
+}

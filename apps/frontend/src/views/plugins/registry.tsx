@@ -1,18 +1,18 @@
 import { Toast } from '@ui/sonner';
-import { FileJson2, ListRestart, Save } from 'lucide-react';
+import { ListRestart, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button } from '@/components/ui/button';
 import { useI18n, useTheme } from '@/hooks';
 import {
 	fetchPluginRegistryRawText,
-	formatRegistryUpdatedAt,
 	PLUGIN_REGISTRY_FILENAME,
 	type PluginRegistry,
 	pluginManager,
 	savePluginRegistry,
 } from '@/plugins';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
+import { RegistryFieldsHelp } from './RegistryFieldsHelp';
 
 export default function PluginRegistryEditorPage() {
 	const { t } = useI18n();
@@ -34,7 +34,10 @@ export default function PluginRegistryEditorPage() {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	/** 递增以强制 Monaco 在仍有焦点时也写入外部 value（含保存后的 updatedAt） */
+	const [docEpoch, setDocEpoch] = useState(0);
 	const textRef = useRef<string>(text);
+	const getEditorTextRef = useRef<(() => string) | null>(null);
 
 	const jsonParseError = useMemo(() => {
 		if (!text.trim()) return true;
@@ -57,10 +60,12 @@ export default function PluginRegistryEditorPage() {
 			const raw = await fetchPluginRegistryRawText();
 			setText(raw);
 			textRef.current = raw;
+			setDocEpoch((n) => n + 1);
 		} catch (e) {
 			setLoadError(e instanceof Error ? e.message : String(e));
 			setText('');
 			textRef.current = '';
+			setDocEpoch((n) => n + 1);
 		} finally {
 			setLoading(false);
 		}
@@ -70,15 +75,28 @@ export default function PluginRegistryEditorPage() {
 		void load();
 	}, [load]);
 
-	const onSave = async () => {
-		if (!textDiff) {
+	const onSave = useCallback(async () => {
+		if (loading || saving) return;
+		// 从 Monaco 刷出最新正文（onChange 有 rAF 合并，父级 text 可能滞后）
+		const latest = getEditorTextRef.current?.() ?? text;
+		if (latest === textRef.current) {
 			Toast({
 				type: 'info',
 				title: t('plugins.registry.noChanges'),
 			});
 			return;
 		}
-		if (jsonParseError) {
+		let data: PluginRegistry;
+		try {
+			data = JSON.parse(latest) as PluginRegistry;
+		} catch {
+			Toast({
+				type: 'warning',
+				title: t('plugins.registry.invalidJson'),
+			});
+			return;
+		}
+		if (!Array.isArray(data.plugins)) {
 			Toast({
 				type: 'warning',
 				title: t('plugins.registry.invalidJson'),
@@ -87,12 +105,12 @@ export default function PluginRegistryEditorPage() {
 		}
 		setSaving(true);
 		try {
-			const data = JSON.parse(text) as PluginRegistry;
-			data.updatedAt = formatRegistryUpdatedAt();
+			// updatedAt 由 savePluginRegistry 统一写成当前时间
 			const saved = await savePluginRegistry(data);
 			const payload = `${JSON.stringify(saved, null, 2)}\n`;
 			setText(payload);
 			textRef.current = payload;
+			setDocEpoch((n) => n + 1);
 			await pluginManager.init();
 			Toast({
 				type: 'success',
@@ -101,12 +119,26 @@ export default function PluginRegistryEditorPage() {
 		} catch (e) {
 			Toast({
 				type: 'error',
-				title: e instanceof Error ? e.message : t('plugins.registry.saveFail'),
+				title: t('plugins.registry.saveFail'),
+				message:
+					e instanceof Error ? e.message : t('plugins.registry.saveFail'),
 			});
 		} finally {
 			setSaving(false);
 		}
-	};
+	}, [loading, saving, t, text]);
+
+	// ⌘/Ctrl+S → 保存到服务器（捕获阶段，避免 Monaco/浏览器默认另存为）
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+			if (e.key.toLowerCase() !== 's') return;
+			e.preventDefault();
+			void onSave();
+		};
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
+	}, [onSave]);
 
 	return (
 		<div className="box-border flex h-full min-h-0 w-full flex-col p-5.5 pt-0">
@@ -134,7 +166,8 @@ export default function PluginRegistryEditorPage() {
 							language="json"
 							theme={monacoTheme}
 							height="100%"
-							documentIdentity="plugins-registry-editor"
+							documentIdentity={`plugins-registry-editor-${docEpoch}`}
+							getMarkdownFromEditorRef={getEditorTextRef}
 							placeholder=""
 							enableMarkdownBottomBar={false}
 							showTabBar={false}
@@ -142,18 +175,10 @@ export default function PluginRegistryEditorPage() {
 							clipboardAdapter={monacoClipboardAdapter}
 							t={t}
 							title={
-								<div className="flex flex-1 items-center justify-between gap-2 pl-3">
-									<div className=" flex items-center gap-2.5">
-										<div className="relative">
-											<FileJson2 size={16} className="text-textcolor" />
-											{textDiff ? (
-												<span
-													className="pointer-events-none absolute -right-0.5 -top-0.5 size-2 rounded-full bg-orange-500"
-													aria-hidden
-												/>
-											) : null}
-										</div>
-										<span className="text-textcolor text-sm font-medium">
+								<div className="flex flex-1 items-center justify-between gap-2 pl-1.5">
+									<div className="flex min-w-0 items-center gap-1.5">
+										<RegistryFieldsHelp dirty={textDiff} />
+										<span className="text-textcolor truncate base font-medium">
 											{PLUGIN_REGISTRY_FILENAME}
 										</span>
 									</div>

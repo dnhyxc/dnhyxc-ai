@@ -1685,6 +1685,60 @@ export const zhCN = {
 	'plugins.registry.invalidJson': 'JSON 无效：须可解析且包含 plugins 数组',
 	'plugins.registry.saveOk': '已保存到 remotes',
 	'plugins.registry.saveFail': '保存失败',
+	'plugins.registry.noChanges': '内容未修改，无需保存',
+	'plugins.registry.missingHostApiRange': '插件 {id} 缺少 hostApiRange',
+	'plugins.registry.hostApiIncompatible':
+		'插件 {id} 的 hostApiRange「{range}」与当前 Host API {hostApi} 不兼容。破缓存请只改 version，保持 hostApiRange 为 ^{hostApi}',
+	'plugins.registry.pluginNotFound': 'registry 中无插件 {id}',
+	'plugins.registry.help.triggerAria': '字段说明',
+	'plugins.registry.help.panelTitle': 'plugins-registry 字段说明',
+	'plugins.registry.help.footnote':
+		'发版破缓存请只改 version；hostApiRange 须覆盖当前 Host API（见 VITE_HOST_API_VERSION）。',
+	'plugins.registry.help.sectionRoot': '根字段',
+	'plugins.registry.help.sectionBasic': '插件基础',
+	'plugins.registry.help.sectionMf': '加载与权限',
+	'plugins.registry.help.sectionHost': '挂载与安全',
+	'plugins.registry.help.updatedAt':
+		'配置最近更新时间；保存时由 Host 自动写入。',
+	'plugins.registry.help.plugins': '插件描述符数组；每一项对应一个可上架插件。',
+	'plugins.registry.help.id': '插件唯一 ID；Host 用其挂路由/侧栏与本地状态。',
+	'plugins.registry.help.fieldTitle':
+		'多语言名称对象（zh-CN / en-US）；插件中心与面包屑展示。',
+	'plugins.registry.help.description':
+		'多语言说明，或旧版单语字符串；插件中心卡片描述。',
+	'plugins.registry.help.routePath':
+		'插件路由路径，如 /english-learning/notes。',
+	'plugins.registry.help.entry':
+		'MF 入口 URL，优先 mf-manifest.json；生产须 https，开发可用 localhost。',
+	'plugins.registry.help.version':
+		'插件自身版本。发版/破缓存时 bump 此字段即可，勿与 hostApiRange 混淆。',
+	'plugins.registry.help.hostApiRange':
+		'要求的 Host API 版本范围（如 ^1.0.0）。须覆盖当前 Host；仅 Host 契约升级时再改。',
+	'plugins.registry.help.enabled':
+		'是否上架；false 时 Host 不加载且隐藏业务入口。',
+	'plugins.registry.help.trust':
+		'信任等级：first-party / partner / untrusted（后者走 iframe，不 loadRemote）。',
+	'plugins.registry.help.remoteName':
+		'MF registerRemotes.name；默认等于 id。多插件共用同一 Remote 时填 federation name。',
+	'plugins.registry.help.expose':
+		'MF expose 路径，默认 ./App；如 ./LearningNotes、./EbookIdeas。',
+	'plugins.registry.help.injectRoute':
+		'是否由 PluginManager 注入顶层路由。false 表示宿主业务树已挂好 PluginHostPage。',
+	'plugins.registry.help.preload':
+		'加载时机：route/idle（默认懒加载）或 eager（启动后后台预拉，一般勿用）。',
+	'plugins.registry.help.permissions':
+		'权限声明，如 ui:toast、nav:subtree、http:plugin-api、modules:ebook。',
+	'plugins.registry.help.menu':
+		'侧栏入口：order 排序、icon 为 lucide 图标名（可选）。',
+	'plugins.registry.help.host':
+		'业务页自动挂载：surface（如 ebook.read）、slot（drawer/toolbar）、icon、order。',
+	'plugins.registry.help.iframeUrl':
+		'trust 为 untrusted 时必填：独立 HTTPS 页，Host 用 iframe 打开。',
+	'plugins.registry.help.integrity': '可选：entry 资源的 sha384 完整性校验。',
+	'plugins.registry.help.signature':
+		'可选：签名标记；值为 invalid 时拒绝加载。',
+	'plugins.verify.hostApiIncompatible':
+		'插件 {id}：Host API 当前为 {hostApi}，与 hostApiRange「{range}」不兼容。发版破缓存请只改 version；hostApiRange 仅在 Host 契约升级时再改',
 	'plugins.shelf.on': '已上架',
 	'plugins.shelf.off': '已下架',
 	'plugins.shelf.toggle': '上架 / 下架',
@@ -1700,7 +1754,6 @@ export const zhCN = {
 	'plugins.host.unavailable': '插件「{id}」不可用',
 	'plugins.host.reload': '重新加载',
 	'plugins.host.loadFailed': '插件「{id}」加载失败',
-	'plugins.registry.noChanges': '内容未修改，无需保存',
 	'route.setting.about': '关于应用',
 	'route.setting.theme': '主题设置',
 	'route.setting.llm': '大模型配置',

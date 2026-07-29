@@ -155,6 +155,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Remote plugin UIs (including Learning Notes and Ideas List) now switch between Chinese and English to match the host app’s interface language. Changes take effect immediately without reloading the plugin. Standalone preview mode also has a manual language toggle. Added: Plugin Center card titles/descriptions and header breadcrumbs now resolve from the plugin’s own multilingual registry, no longer depending on the host’s built-in copy; adding or renaming a plugin only requires editing the registry.',
 	},
+	's3-10': {
+		title: 'More reliable desktop plugin updates',
+		description:
+			'After publishing a new module version, the desktop app loads the latest entry by registry version and update time instead of easily sticking to an old module; the module list itself is also no longer long-cached. If you still see an old version, update to the latest desktop app and try again.',
+	},
+	's3-11': {
+		title: 'Plugin Center blank-screen fix',
+		description:
+			'Fixes a blank Plugin Center page in some production environments caused by a broken router context.',
+	},
+	's3-12': {
+		title: 'Safer registry editing',
+		description:
+			'The registry page adds a field help entry; saving checks each module’s Host API compatibility range so mistaken edits do not break loading. Supports ⌘/Ctrl+S; an orange dot on the save control indicates unsaved changes.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:
@@ -960,6 +975,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Learning notes Word export & long-form perf',
 		description:
 			'Learning notes can now be exported as Word (.docx) files, preserving body formatting and images; downloads work on both desktop and browser. Also improved editing and preview performance for very long notes—lazy editor mount, windowed preview rendering for large notes, and streamlined title node selection fix paths to reduce jank.',
+	},
+	's24-58': {
+		title: 'Learning notes unsaved indicator',
+		description:
+			'When note content differs from the last save, an orange dot appears on the toolbar Save icon; it clears after a successful save.',
 	},
 	's24-56': {
 		title: 'Plugin error page polish',

@@ -73,8 +73,10 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 	const pagedSaveRef = useRef<LargeNoteSaveApi | null>(null);
 	const savingRef = useRef(false);
 	const previewRef = useRef(store.preview);
+	const baselineHtmlRef = useRef('');
 	const [readyKey, setReadyKey] = useState<string | null>(null);
 	const [mountEditor, setMountEditor] = useState(false);
+	const [dirty, setDirty] = useState(false);
 	savingRef.current = store.saving;
 	previewRef.current = store.preview;
 
@@ -85,6 +87,23 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 		[api.ui],
 	);
 
+	const currentHtml = useCallback(() => {
+		const paged = pagedSaveRef.current;
+		if (paged) return paged.getHTML();
+		const editor = editorRef.current;
+		if (!editor || editor.isDestroyed) return '';
+		return editor.getHTML();
+	}, []);
+
+	const markClean = useCallback(() => {
+		baselineHtmlRef.current = currentHtml();
+		setDirty(false);
+	}, [currentHtml]);
+
+	const syncDirty = useCallback(() => {
+		setDirty(currentHtml() !== baselineHtmlRef.current);
+	}, [currentHtml]);
+
 	useEffect(() => {
 		store.bind(api.http, toast, t, api.ui?.downloadBlob);
 		void store.refreshList();
@@ -93,21 +112,23 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 	const onSave = useCallback(async () => {
 		const paged = pagedSaveRef.current;
 		if (paged) {
-			await store.saveNote({
+			const ok = await store.saveNote({
 				title: paged.getTitle(),
 				text: paged.getText(),
 				html: paged.getHTML(),
 			});
+			if (ok) markClean();
 			return;
 		}
 		const editor = editorRef.current;
 		if (!editor || editor.isDestroyed) return;
-		await store.saveNote({
+		const ok = await store.saveNote({
 			title: getDocTitleText(editor.state.doc).trim(),
 			text: editor.getText({ blockSeparator: '\n\n' }).trim(),
 			html: editor.getHTML(),
 		});
-	}, [store]);
+		if (ok) markClean();
+	}, [markClean, store]);
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -153,13 +174,20 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 					}
 					onClick={() => void onSave()}
 					disabled={store.saving}
+					className="relative"
 				>
 					<Save size={15} />
+					{dirty ? (
+						<span
+							className="pointer-events-none absolute right-0 top-0 size-2 rounded-full bg-orange-500"
+							aria-hidden
+						/>
+					) : null}
 				</Btn>
 				{listToggleBtn()}
 			</>
 		),
-		[listToggleBtn, onSave, store, store.editingId, store.saving, t],
+		[dirty, listToggleBtn, onSave, store, store.editingId, store.saving, t],
 	);
 
 	const previewHeaderExtra = useMemo(
@@ -276,8 +304,11 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 											onReady={(e, save) => {
 												editorRef.current = e;
 												pagedSaveRef.current = save;
+												baselineHtmlRef.current = save.getHTML();
+												setDirty(false);
 												setReadyKey(editorKey);
 											}}
+											onChange={syncDirty}
 											className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
 											editorClassName="min-h-[6rem]"
 											toolbarExtra={toolbarExtra}
@@ -293,8 +324,11 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 											onCreate={(e) => {
 												editorRef.current = e;
 												pagedSaveRef.current = null;
+												baselineHtmlRef.current = e.getHTML();
+												setDirty(false);
 												setReadyKey(editorKey);
 											}}
+											onChange={syncDirty}
 											className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
 											editorClassName="min-h-[6rem]"
 											toolbarExtra={toolbarExtra}
@@ -343,11 +377,3 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 }
 
 export default observer(LearningNotesApp);
-
-export async function activate() {
-	// 列表在组件 mount 时拉取
-}
-
-export async function deactivate() {
-	// no-op
-}

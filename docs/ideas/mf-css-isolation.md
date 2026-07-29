@@ -2,7 +2,7 @@
 
 > **状态**：已落地（**Host 运行时 @scope 隔离** + untrusted iframe）  
 > **日期**：2026-07-22（Host 侧接管；子应用恢复正常 Tailwind）  
-> **关联**：[`mf-plugin-host.md`](../app/mf-plugin-host.md)、[`style-isolation-implementation.md`](../app/style-isolation-implementation.md)（完整实现手册）、[`style-isolation-tech-overview.md`](../app/style-isolation-tech-overview.md)（技术概览）、[`apps/frontend/src/plugins/host/styleIsolation.ts`](../../apps/frontend/src/plugins/host/styleIsolation.ts)、[`apps/remote-plugins/src/styles.css`](../../apps/remote-plugins/src/styles.css)
+> **关联**：[`mf-plugin-host.md`](../app/mf-plugin-host.md)、[`style-isolation-implementation.md`](../app/style-isolation-implementation.md)、[`style-isolation-tech-overview.md`](../app/style-isolation-tech-overview.md)、**实现指南详解** [`mf-implementation-guide.md` §2.10.2](../../apps/frontend/src/plugins/docs/mf-implementation-guide.md)、[`styleIsolation.ts`](../../apps/frontend/src/plugins/host/styleIsolation.ts)、[`styles.css`](../../apps/remote-plugins/src/styles.css)
 
 ---
 

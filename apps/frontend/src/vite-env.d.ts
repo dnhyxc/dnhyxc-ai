@@ -18,6 +18,8 @@ interface ImportMetaEnv {
 	readonly VITE_MINIMAX_MODEL_NAME?: string;
 	/** 浏览器独立运行时的版本展示（可选） */
 	readonly VITE_APP_VERSION?: string;
+	/** Host 插件契约 semver；与 registry 的 hostApiRange 对齐，缺省 1.0.0 */
+	readonly VITE_HOST_API_VERSION?: string;
 	/** 插件 registry 完整 URL；留空则走 resolveUploadedFileUrl(/remotes/plugins-registry.json) */
 	readonly VITE_PLUGIN_REGISTRY_URL?: string;
 }

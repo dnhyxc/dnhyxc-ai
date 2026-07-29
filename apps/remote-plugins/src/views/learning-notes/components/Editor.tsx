@@ -41,6 +41,8 @@ type Props = {
 	className?: string;
 	editorClassName?: string;
 	onReady: (editor: Editor, save: LargeNoteSaveApi) => void;
+	/** 标题或正文变更时回调（用于未保存标记） */
+	onChange?: () => void;
 };
 
 function bootLargeNote(defaultContent: string) {
@@ -76,6 +78,7 @@ export function LargeNoteEditor({
 	className,
 	editorClassName,
 	onReady,
+	onChange,
 }: Props) {
 	const boot = useRef(bootLargeNote(defaultContent));
 	const docRef = useRef<LargeNoteDoc>(boot.current.doc);
@@ -90,6 +93,8 @@ export function LargeNoteEditor({
 	const scrollRafRef = useRef(0);
 	const onReadyRef = useRef(onReady);
 	onReadyRef.current = onReady;
+	const onChangeRef = useRef(onChange);
+	onChangeRef.current = onChange;
 
 	const [blockCount, setBlockCount] = useState(boot.current.doc.blocks.length);
 	const [offsetY, setOffsetY] = useState(boot.current.doc.origin * EST_BLOCK_H);
@@ -127,6 +132,12 @@ export function LargeNoteEditor({
 
 	const focusBody = useCallback(() => {
 		editorRef.current?.commands.focus('start');
+	}, []);
+
+	const onTitleChange = useCallback((next: string) => {
+		titleRef.current = next;
+		setTitle(next);
+		onChangeRef.current?.();
 	}, []);
 
 	const applyOrigin = useCallback((editor: Editor, nextOrigin: number) => {
@@ -195,7 +206,7 @@ export function LargeNoteEditor({
 				<div ref={titleWrapRef} className="relative z-1">
 					<NoteTitleField
 						value={title}
-						onChange={setTitle}
+						onChange={onTitleChange}
 						onContinue={focusBody}
 					/>
 				</div>
@@ -213,7 +224,7 @@ export function LargeNoteEditor({
 				)}
 			</div>
 		),
-		[bodyH, focusBody, offsetY, title, windowed],
+		[bodyH, focusBody, offsetY, onTitleChange, title, windowed],
 	);
 
 	return (
@@ -228,6 +239,7 @@ export function LargeNoteEditor({
 				showBubbleMenu={false}
 				onBodyScroll={onBodyScroll}
 				renderBody={renderBody}
+				onChange={() => onChangeRef.current?.()}
 				onCreate={(e) => {
 					editorRef.current = e;
 					docRef.current.origin = originRef.current;

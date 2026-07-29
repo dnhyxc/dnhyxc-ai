@@ -7,6 +7,7 @@
 | 文档 | 说明 |
 |------|------|
 | [learning-notes-remote.md](./learning-notes-remote.md) | **学习笔记 MF Remote**：`/english-learning/notes`、`remotePlugins/LearningNotes`（:9008）、`injectRoute: false` |
+| [learning-notes-dirty-save.md](./learning-notes-dirty-save.md) | **学习笔记未保存橙点**：编辑有 diff 时保存图标显示脏标记 |
 | [learning-notes-rich-editor.md](./learning-notes-rich-editor.md) | **学习笔记富文本编辑器**：升级 Tiptap 至 3.28.0、支持格式化文本、高亮、列表等功能 |
 | [learning-notes-export-perf.md](./learning-notes-export-perf.md) | **学习笔记导出 Word 与长文性能优化**：DOCX 导出全链路（后端→HostBridge→插件）、TitleNode 选区修复、RichEditor opt-in 扩展、openPreview 乐观预览、Toolbar ResizeObserver deps 修复 |
 | [learning-notes-docx-builder.md](./learning-notes-docx-builder.md) | **DOCX Builder 端到端实现手册**：后端 `learning-note-docx.builder.ts` 全 28 个符号（HTML→DOCX 转换、sharp 懒加载转 JPEG、foreign/webp 兼容、本机 uploads 读盘、ImageBudget 图片预算、表格/列表/代码块转换、`buildLearningNoteDocxBuffer` 主入口） |

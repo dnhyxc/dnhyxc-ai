@@ -1,5 +1,7 @@
 # 学习笔记富文本编辑器与分栏布局
 
+> **延伸阅读（后续增量）**：[learning-notes-dirty-save.md](./learning-notes-dirty-save.md)（保存图标未保存橙点）；[../app/remote-plugin-hmr.md](../app/remote-plugin-hmr.md)（勿在入口同文件导出空 `activate`；tiptap `optimizeDeps.include`）。
+
 ## 1. 背景与目标
 
 将英语学习笔记从纯文本输入升级为富文本编辑器（Tiptap），同时重构界面为左右分栏布局：左侧为编辑区/预览区，右侧为笔记列表。支持标题、格式化文本、高亮标记、列表等富文本编辑能力，记录学习收获时可更灵活地排版与标注；分栏布局提升笔记浏览与切换效率。

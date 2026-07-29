@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离；Registry `title`/`description` locale map，无 `titleKey`）。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`）。若不一致，以源码为准。
 
 ---
 
@@ -1078,15 +1078,23 @@ export default function PluginRegistryEditorPage() {
 
 ### 9.3 保存流程
 
+> **现行实现（以源码为准）**：`apps/frontend/src/views/plugins/registry.tsx` 调用 `savePluginRegistry(data)`，内部会：
+> 1. `assertRegistryHostApiCompatible`——每个插件 `hostApiRange` 须覆盖 `HOST_API_VERSION`（`VITE_HOST_API_VERSION`，默认 `1.0.0`）
+> 2. 自动写入 `updatedAt`
+> 3. PUT 到 remotes 并刷新本地缓存
+>
+> 编辑页另有：字段说明（`RegistryFieldsHelp`）、未保存橙点、⌘/Ctrl+S。勿把插件 **`version`** 误改成 **`hostApiRange`**。上文示例里「手写 `updatedAt` + `putUploadRemoteJson`」为早期示意，**请改用 `savePluginRegistry`**。
+
 ```mermaid
 flowchart TD
-    A[编辑 Registry JSON] --> B[点击保存]
+    A[编辑 Registry JSON] --> B[点击保存 / ⌘S]
     B --> C[JSON 格式校验]
-    C --> D[添加 updatedAt 时间戳]
-    D --> E[putUploadRemoteJson 上传到服务器]
-    E --> F[clearPluginRegistryCache 清除本地缓存]
-    F --> G[pluginManager.init 重新初始化]
-    G --> H[Toast 提示保存成功]
+    C -->|失败| D[提示 invalidJson]
+    C -->|通过| E[assertRegistryHostApiCompatible]
+    E -->|hostApi 不兼容| F[提示错误，不写入]
+    E -->|通过| G[savePluginRegistry 写 updatedAt + PUT]
+    G --> H[clearPluginRegistryCache + pluginManager.init]
+    H --> I[完成；entry bust 用 version@updatedAt]
 ```
 
 ---
@@ -1292,6 +1300,24 @@ export const routeInjector = new RouteInjectorImpl();
 
 ## 12. 插件状态管理
 
+### 12.0 加载缓存破坏（必读）
+
+发版后桌面仍显示旧插件，通常不是「没上传」，而是：
+
+1. MF 把真正 `import()` 的地址改写成**无 query** 的 `remoteEntry.js`，WKWebView 强缓存；
+2. 旧 Host「已 activated 就 return」，不比对 registry。
+
+**现行方案（Host）**：
+
+- bust = `version@registry.updatedAt`
+- `registerRemote` 给 manifest 加 `?v=`；Runtime `afterResolve` 再给 `remoteEntry.js` 加 `?v=`
+- `ensurePlugin` / `loadPlugin` 用 `LoadedPlugin.bust` 决定是否重载
+- force 拉 registry 加 `?t=`；服务端 `/remotes` 为 `no-store`
+
+**完整思路 + 全量代码**：见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案) 与仓库 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
+
+**运维要点**：更新 `version` 或保存 registry（刷新 `updatedAt`）；**桌面必须发含该逻辑的壳**。
+
 ### 12.1 PluginManager 状态机
 
 ```
@@ -1313,12 +1339,14 @@ console.log(plugin?.status); // 'registered' | 'loading' | 'activated' | 'failed
 // 获取所有已加载插件
 const allPlugins = pluginManager.list();
 
-// 确保插件可用（按需加载）
+// 确保插件可用（按需加载；内部 force 拉 registry，按 version@updatedAt bust 判断是否重载）
 await pluginManager.ensurePlugin("myPlugin");
 
 // 强制重新加载
 await pluginManager.ensurePlugin("myPlugin", { force: true });
 ```
+
+> **注意**：仅 `status === 'activated'` **不再**跳过加载；须 `LoadedPlugin.bust` 与当前 registry 的 `pluginBust(meta, updatedAt)` 一致才会复用。发新版时更新 registry 的 `version` 或保存以刷新 `updatedAt`，并确保桌面 Host 壳含 bust 逻辑。
 
 ### 12.3 上架/下架
 
@@ -1468,9 +1496,21 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 
 ### Q5：插件版本更新后如何生效？
 
-1. 更新 Registry 中的 `version` 字段
-2. 保存 Registry（会自动调用 `pluginManager.init()`）
-3. PluginManager 会检测到版本变化并重新加载
+1. 部署新 Remote 静态资源
+2. 更新 Registry 的 **`version`** 和/或保存一次以刷新 **`updatedAt`**（`savePluginRegistry` 会校验 `hostApiRange`）
+3. Host 用 `version@updatedAt` 作为 MF entry `?v=`；`afterResolve` 给改写后的 `remoteEntry.js` 再补 bust
+4. **桌面生产**：须发布含上述逻辑的 Host 壳；只发插件不发壳仍可能吃旧 entry
+5. 后端 `/remotes` 为 `no-store`
+
+细节与完整代码：[mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)。
+
+### Q5.1：`hostApi 1.0.0 not in ^1.0.1`？
+
+`hostApiRange` 是 **Host 契约**兼容范围，不是插件 `version`。Host 默认 `VITE_HOST_API_VERSION=1.0.0`，range 须覆盖它（如 `^1.0.0`）。保存 registry 时会校验；勿把 bump 插件 version 误写成 `hostApiRange`。
+
+### Q5.2：线上 `/plugins` 白屏 / `useLocation` 无 Router？
+
+Host federation **不要** `shared` `react-router`（易双实例）。用 `resolve.dedupe` 即可。须重新构建部署 Host。
 
 ### Q6：新增/改名插件要改 Host 语言包吗？
 

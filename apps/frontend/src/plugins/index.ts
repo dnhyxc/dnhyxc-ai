@@ -13,10 +13,11 @@ export type { PluginHostSurface } from './core/hostSurface';
 export { listHostSurfacePlugins } from './core/hostSurface';
 export type { PluginLocaleMap } from './core/localeText';
 export { pickPluginLocaleText } from './core/localeText';
-export { loadRemoteApp, registerRemote } from './core/mf';
+export { loadRemoteApp, pluginBust, registerRemote } from './core/mf';
 export { pluginManager } from './core/PluginManager';
 export { satisfiesRange, verifyPlugin } from './core/PluginVerifier';
 export {
+	assertRegistryHostApiCompatible,
 	clearPluginRegistryCache,
 	fetchPluginRegistry,
 	fetchPluginRegistryRawText,

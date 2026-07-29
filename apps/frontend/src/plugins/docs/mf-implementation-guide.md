@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、Host `@scope` 样式隔离；Registry 插件名/描述用内嵌 `title`/`description` locale map（**无** `titleKey` / `descriptionKey` / `menu.nameKey`，不绑 Host i18n）。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry 用 `version@updatedAt` bust + `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
 
 ---
 
@@ -20,19 +20,22 @@
    - 2.8 插件验证器 (`PluginVerifier.ts`)
    - 2.9 Registry 管理 (`registry.ts`)
    - 2.10 插件宿主页面 (`PluginHostPage.tsx`)
-   - 2.10.1 错误边界与样式隔离
+   - 2.10.1 错误边界
+   - **2.10.2 主子样式隔离（原理与完整实现）**
    - 2.11 路由构建与初始化 (`buildRoutes.ts` / `router/index.tsx`)
    - 2.12 语言（locale）同步
+   - **2.13 插件/子应用加载缓存破坏（完整方案）**
 3. [子项目/插件接入](#3-子项目插件接入)
    - 3.1 Vite 配置
    - 3.2 组件实现规范
-   - 3.3 全局样式处理
+   - **3.3 全局样式处理（Remote 侧约定）**
    - 3.4 多插件共享 Remote
    - 3.5 不安全插件（untrusted）接入
    - 3.6 CORS 配置
    - 3.7 Registry 配置示例
 4. [完整数据流](#4-完整数据流)
 5. [常见问题与解决方案](#5-常见问题与解决方案)
+   - 5.7 样式隔离相关
 
 ---
 
@@ -48,7 +51,9 @@
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
-- **样式隔离**：Host 运行时 `@scope([data-mf-plugin])`；`untrusted` 走 iframe
+- **样式隔离**：Host 运行时 `@scope([data-mf-plugin])` + head 劫持 + MutationObserver（详解 §2.10.2）；`untrusted` 走 iframe
+- **entry 缓存破坏**：`pluginBust = version@registryUpdatedAt`；`registerRemotes` 与 `afterResolve` 均给 entry / `remoteEntry.js` 补 `?v=`（WKWebView 固定名 ESM 强缓存）
+- **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
 
 ---
 
@@ -104,9 +109,9 @@ export default defineConfig(({ mode }) => {
 						singleton: true,
 						requiredVersion: '^19.1.0',
 					},
-					'react-router': {            // React Router 共享
-						singleton: true,
-					},
+					// 勿 shared react-router：生产 loadShare 易与 react-router/dom 拆成双实例，
+					// 导致 useLocation 找不到 Router context（线上 /plugins 白屏）。Remote 也未共享它。
+					// 仍用 resolve.dedupe 收敛 react-router 单实例。
 				},
 				// 关键：避免默认 html 注入把任意 ts 打成无 export bootstrap
 				hostInitInjectLocation: 'entry',
@@ -122,7 +127,7 @@ export default defineConfig(({ mode }) => {
 				'@ui': '/src/components/ui',
 				'@design': '/src/components/design',
 			},
-			dedupe: ['react', 'react-dom', 'react-router'],  // 去重
+			dedupe: ['react', 'react-dom', 'react-router'],  // 去重（含 router，但不进 MF shared）
 		},
 		optimizeDeps: {
 			// 禁止把 shared 依赖打进 .vite/deps（否则会 import virtual:mf 且解析失败）
@@ -153,7 +158,8 @@ export default defineConfig(({ mode }) => {
 
 | 配置项 | 作用 | 为什么重要 |
 |--------|------|-----------|
-| `shared.singleton: true` | 强制共享单例 | 避免 Host 和 Remote 各加载一份 React |
+| `shared.singleton: true` | 强制共享单例（仅 react / react-dom） | 避免 Host 和 Remote 各加载一份 React |
+| **勿** `shared['react-router']` | 不进 MF shared | 避免生产双 Router / `useLocation` 白屏；用 `dedupe` 即可 |
 | `hostInitInjectLocation: 'entry'` | 注入位置改为 entry | 避免默认 html 注入导致 bootstrap 无 export |
 | `optimizeDeps.exclude` | 排除 React 相关 | 避免预打包写入 virtual:mf 后重启解析失败 |
 | `clearMfViteDepCachePlugin` | 启动清缓存 | 解决 mf_owner 递增后 .vite/deps 失效问题 |
@@ -170,6 +176,7 @@ import {
 	createInstance,
 	getInstance,
 	type ModuleFederation,
+	type ModuleFederationRuntimePlugin,
 } from '@module-federation/enhanced/runtime';
 
 // 引入 React 和 ReactDOM，用于 registerShared
@@ -184,6 +191,12 @@ let mf: ModuleFederation | null = null;
 
 // shared 是否已注册的标志位
 let sharedReady = false;
+
+// afterResolve 插件是否已注册
+let bustPluginReady = false;
+
+/** remoteName → bust token；afterResolve 给改写后的 remoteEntry.js 补上 */
+const bustByRemote = new Map<string, string>();
 
 /**
  * 获取或创建 Host MF 实例
@@ -271,23 +284,77 @@ function exposeBaseOf(d: PluginDescriptor) {
 }
 
 /**
+ * 给任意 URL 写入/覆盖 `v=`（manifest 与 remoteEntry 共用）
+ * - 空 bust 不改动 URL
+ * - 绝对 URL 用 URLSearchParams；相对路径手工拼 query
+ */
+export function withBust(url: string, bust: string): string {
+	const token = bust.trim();
+	if (!token) return url;
+	try {
+		const u = new URL(url);
+		u.searchParams.set('v', token);
+		return u.href;
+	} catch {
+		const hashIdx = url.indexOf('#');
+		const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+		const noHash = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+		const qIdx = noHash.indexOf('?');
+		const base = qIdx >= 0 ? noHash.slice(0, qIdx) : noHash;
+		const params = new URLSearchParams(qIdx >= 0 ? noHash.slice(qIdx + 1) : '');
+		params.set('v', token);
+		return `${base}?${params.toString()}${hash}`;
+	}
+}
+
+/** bust token：`version` 或 `version@registryUpdatedAt` */
+export function pluginBust(
+	meta: Pick<PluginDescriptor, 'version'>,
+	registryUpdatedAt?: string,
+): string {
+	return [meta.version.trim(), registryUpdatedAt?.trim()]
+		.filter(Boolean)
+		.join('@');
+}
+
+/**
+ * MF snapshot 会把 entry 改写成无 query 的 `.../remoteEntry.js`，
+ * WKWebView 对固定名 ESM 强缓存。本钩子在 afterResolve 再补 `?v=`。
+ */
+const bustRemoteEntryPlugin: ModuleFederationRuntimePlugin = {
+	name: 'bust-remote-entry',
+	async afterResolve(args) {
+		const name = args.remoteInfo?.name;
+		const bust = name ? bustByRemote.get(name) : undefined;
+		if (bust && args.remoteInfo?.entry) {
+			args.remoteInfo.entry = withBust(args.remoteInfo.entry, bust);
+		}
+		return args;
+	},
+};
+
+/**
  * 注册远程模块
  * @param d - 插件描述符
- * - 确保 shared 已注册
- * - 使用 registerRemotes 注册远程模块
+ * @param bust - 可选；默认用 version。通常传入 pluginBust(meta, registry.updatedAt)
+ * - entry 先 withBust；同时写入 bustByRemote 供 afterResolve 使用
  * - force: true 允许覆盖已注册的 remote
  */
-export function registerRemote(d: PluginDescriptor) {
+export function registerRemote(d: PluginDescriptor, bust?: string) {
 	ensureShared();
+	ensureBustPlugin();
+	const token = (bust ?? d.version).trim();
+	const name = remoteNameOf(d);
+	if (token) bustByRemote.set(name, token);
 	getMf().registerRemotes(
 		[
 			{
-				name: remoteNameOf(d),    // remote 名称
-				entry: d.entry,           // entry URL（通常为 mf-manifest.json）
-				type: 'module',           // 模块类型
+				name,
+				entry: withBust(d.entry, token),
+				type: 'module',
 			},
 		],
-		{ force: true },  // 强制覆盖，支持热更新
+		{ force: true },
 	);
 }
 
@@ -295,32 +362,25 @@ export function registerRemote(d: PluginDescriptor) {
  * 加载远程应用
  * @param d - 插件描述符
  * @returns 加载的插件模块
- * - 确保 shared 已注册
- * - 使用 loadRemote 加载远程模块
- * - 检查 default 导出是否存在
  */
 export async function loadRemoteApp(
 	d: PluginDescriptor,
 ): Promise<PluginModule> {
 	ensureShared();
-	
-	// 获取 remoteName 和 expose 名称
+	ensureBustPlugin();
 	const name = remoteNameOf(d);
 	const expose = exposeBaseOf(d);
-	
-	// 加载远程模块，格式为 `${remoteName}/${expose}`
 	const mod = await getMf().loadRemote<PluginModule>(`${name}/${expose}`);
-	
-	// 检查 default 导出是否存在
 	if (!mod?.default) {
 		throw new Error(
 			`plugin ${d.id}: expose ./${expose} missing default export`,
 		);
 	}
-	
 	return mod;
 }
 ```
+
+> **说明**：文件顶部维护 `bustByRemote: Map<string, string>` 与 `ensureBustPlugin()`（只 `registerPlugins` 一次）。完整源码见 `apps/frontend/src/plugins/core/mf.ts`。
 
 ---
 
@@ -331,8 +391,12 @@ export async function loadRemoteApp(
 ```typescript
 import type React from 'react';
 
-/** Host 插件契约 semver 版本号；只有破坏性变更才升级 major */
-export const HOST_API_VERSION = '1.0.0';
+/**
+ * Host 插件契约 semver；破坏性变更才升 major。
+ * 优先读 `VITE_HOST_API_VERSION`，缺省 `1.0.0`。
+ */
+export const HOST_API_VERSION =
+	import.meta.env.VITE_HOST_API_VERSION?.trim() || '1.0.0';
 
 /** 插件信任等级 */
 export type PluginTrust = 'first-party' | 'partner' | 'untrusted';
@@ -508,6 +572,8 @@ export interface LoadedPlugin {
 	mod: PluginModule;         // 插件模块
 	status: PluginStatus;      // 当前状态
 	error?: string;            // 错误信息（失败时）
+	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
+	bust?: string;
 }
 
 /** 插件侧栏菜单项（侧栏只渲染 icon；nameKey 为稳定 id，默认等于 pluginId） */
@@ -540,16 +606,16 @@ export function pickPluginLocaleText(
 ```typescript
 import { type ComponentType, createElement } from 'react';
 import type { RouteConfig } from '@/router/routes';
-import { eventBus } from '../host-api/EventBus';
 import { PluginHostPage } from '../host/PluginHostPage';
+import { beginPluginStyleCapture } from '../host/styleIsolation';
+import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
 import { createHostBridge } from './createHostBridge';
-import { setEnabledOverride } from './enabledOverrides';
-import { loadRemoteApp, registerRemote } from './mf';
-import { fetchPluginRegistry } from './registry';
-import type { LoadedPlugin, PluginDescriptor } from './types';
+import { loadRemoteApp, pluginBust, registerRemote } from './mf';
 import { verifyPlugin } from './PluginVerifier';
+import { fetchPluginRegistry, persistPluginEnabled } from './registry';
+import type { LoadedPlugin, PluginDescriptor } from './types';
 
 /**
  * 创建插件路由配置
@@ -637,7 +703,9 @@ class PluginManagerImpl {
 		
 		// 在微任务中后台预拉，不阻塞主应用启动
 		queueMicrotask(() => {
-			void Promise.all(eager.map((p) => this.loadPlugin(p)));
+			void Promise.all(
+				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
+			);
 		});
 	}
 
@@ -669,51 +737,43 @@ class PluginManagerImpl {
 	 * @param id - 插件 ID
 	 * @param opts - 选项（force: 强制重新加载）
 	 * @returns 已激活的插件
-	 * - 已激活：直接返回
-	 * - 已失败且未强制：抛出错误
-	 * - 正在加载：等待加载完成
-	 * - 未加载：从 registry 获取元数据并加载
+	 * - 先 force 拉 registry，算 bust = version@updatedAt
+	 * - 已激活且 bust 未变且未 force：直接返回
+	 * - bust 已变：继续重载（即使 status 仍是 activated）
 	 */
 	async ensurePlugin(id: string, opts?: { force?: boolean }) {
-		// 获取当前插件状态
+		const registry = await fetchPluginRegistry({ force: true });
+		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+		if (!meta) {
+			throw new Error(`registry 中无启用插件 ${id}`);
+		}
+		const bust = pluginBust(meta, registry.updatedAt);
 		const cur = this.plugins.get(id);
-		
-		// 已激活：直接返回
-		if (cur?.status === 'activated') return cur;
-		
-		// 已失败且未强制：抛出错误
-		if (cur?.status === 'failed' && !opts?.force) {
+
+		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
+			return cur;
+		}
+		if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
 			throw new Error(cur.error || `加载 ${id} 失败`);
 		}
 
-		// 正在加载：等待加载完成
 		const pending = this.inflight.get(id);
 		if (pending && !opts?.force) {
 			await pending;
 			const after = this.plugins.get(id);
-			if (after?.status === 'activated') return after;
-			throw new Error(after?.error || `加载 ${id} 失败`);
+			if (after?.status === 'activated' && after.bust === bust) return after;
+			if (after?.status !== 'activated') {
+				throw new Error(after?.error || `加载 ${id} 失败`);
+			}
+			/* bust 已变，继续往下重载 */
 		}
 
-		// 从 registry 获取插件元数据
-		const registry = await fetchPluginRegistry({ force: true });
-		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
-		
-		// 未找到启用的插件：抛出错误
-		if (!meta) {
-			throw new Error(`registry 中无启用插件 ${id}`);
-		}
-		
-		// 挂载壳并加载插件
 		this.mountShell(meta);
-		await this.loadPlugin(meta, opts);
-		
-		// 检查加载结果
+		await this.loadPlugin(meta, opts, registry.updatedAt);
 		const next = this.plugins.get(id);
 		if (next?.status !== 'activated') {
 			throw new Error(next?.error || `加载 ${id} 失败`);
 		}
-		
 		return next;
 	}
 
@@ -721,45 +781,37 @@ class PluginManagerImpl {
 	 * 加载插件
 	 * @param meta - 插件描述符
 	 * @param opts - 选项（force: 强制重新加载）
-	 * - 版本未变且已激活：直接返回
-	 * - 已激活但版本变了：先卸载再重新加载
-	 * - 正在加载：等待或强制取消后重新加载
+	 * @param registryUpdatedAt - registry.updatedAt，参与 bust
 	 */
-	async loadPlugin(meta: PluginDescriptor, opts?: { force?: boolean }) {
-		// 获取当前插件状态
+	async loadPlugin(
+		meta: PluginDescriptor,
+		opts?: { force?: boolean },
+		registryUpdatedAt?: string,
+	) {
+		const bust = pluginBust(meta, registryUpdatedAt);
 		const prev = this.plugins.get(meta.id);
-		
-		// 版本未变且已激活：直接返回（幂等）
-		if (
-			prev?.status === 'activated' &&
-			prev.meta.version === meta.version &&
-			!opts?.force
-		) {
+
+		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
 			return;
 		}
-		
-		// 已激活但版本变了：先卸载再重新挂载壳
+
 		if (prev?.status === 'activated') {
 			await this.unloadPlugin(meta.id);
 			this.mountShell(meta);
 		}
 
-		// 检查是否正在加载
 		const existing = this.inflight.get(meta.id);
 		if (existing) {
 			if (!opts?.force) return existing;
-			// 强制：等待现有加载完成（忽略错误）
 			await existing.catch(() => {});
 		}
 
-		// 创建加载 Promise
-		const run = this.runLoad(meta);
+		const run = this.runLoad(meta, bust);
 		this.inflight.set(meta.id, run);
-		
+
 		try {
 			await run;
 		} finally {
-			// 清理 inflight（只清理自己创建的 Promise）
 			if (this.inflight.get(meta.id) === run) {
 				this.inflight.delete(meta.id);
 			}
@@ -769,64 +821,52 @@ class PluginManagerImpl {
 	/**
 	 * 执行实际加载逻辑
 	 * @param meta - 插件描述符
-	 * - 创建加载状态
-	 * - 验证插件
-	 * - 注册 remote
-	 * - 加载远程模块
-	 * - 调用 activate 钩子
-	 * - 更新状态
+	 * @param bust - version@updatedAt，写入 LoadedPlugin 并传给 registerRemote
 	 */
-	private async runLoad(meta: PluginDescriptor) {
-		// 创建导航函数
+	private async runLoad(meta: PluginDescriptor, bust: string) {
 		const nav = (to: string) => this.navigateImpl(to);
-		
-		// 创建加载状态
 		const loading: LoadedPlugin = {
 			meta,
 			bridge: createHostBridge(meta, nav),
 			mod: { default: () => null },
 			status: 'loading',
+			bust,
 		};
-		
-		// 更新插件状态为 loading
 		this.plugins.set(meta.id, loading);
 
 		try {
-			// 验证插件（信任等级、origin、hostApi、integrity 等）
 			await verifyPlugin(meta);
 
-			// untrusted：仅激活壳，由 PluginHostPage 渲染 iframe，不进 MF
 			if (meta.trust === 'untrusted') {
 				this.plugins.set(meta.id, {
 					meta,
 					bridge: createHostBridge(meta, nav),
 					mod: { default: () => null },
 					status: 'activated',
+					bust,
 				});
 				return;
 			}
 
-			// 注册 remote
-			registerRemote(meta);
-			
-			// 加载远程模块
-			const mod = await loadRemoteApp(meta);
-			
-			// 创建 HostBridge
+			registerRemote(meta, bust);
+			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
+			try {
+				mod = await loadRemoteApp(meta);
+			} finally {
+				endCapture();
+			}
 			const bridge = createHostBridge(meta, nav);
-			
-			// 调用 activate 钩子（如果存在）
 			await mod.activate?.(bridge.api);
 
-			// 更新状态为 activated
 			this.plugins.set(meta.id, {
 				meta,
 				bridge,
 				mod,
 				status: 'activated',
+				bust,
 			});
 		} catch (e) {
-			// 捕获错误，更新状态为 failed
 			const message = e instanceof Error ? e.message : String(e);
 			console.error(`[PluginManager] load ${meta.id} failed`, e);
 			this.plugins.set(meta.id, {
@@ -1544,8 +1584,10 @@ async function fetchRegistryText(url: string, force?: boolean): Promise<string> 
 	const doFetch = /^https?:\/\//i.test(url)
 		? await getPlatformFetch()
 		: globalThis.fetch.bind(globalThis);
-	
-	const res = await doFetch(url, {
+
+	// force 时 URL 加 ?t= 时间戳，避免桌面/代理仍返回旧 registry
+	const fetchUrl = force ? withCacheBust(url) : url;
+	const res = await doFetch(fetchUrl, {
 		cache: 'no-store',
 		...(force ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
 	});
@@ -1623,7 +1665,8 @@ export async function fetchPluginRegistry(opts?: {
  */
 export async function fetchPluginRegistryRawText(): Promise<string> {
 	const url = registryUrl();
-	const text = await fetchRegistryText(url);
+	// 编辑页始终 force，避免读到缓存旧文
+	const text = await fetchRegistryText(url, true);
 	
 	try {
 		// 格式化输出
@@ -1631,6 +1674,46 @@ export async function fetchPluginRegistryRawText(): Promise<string> {
 	} catch {
 		return text;
 	}
+}
+
+/**
+ * 保存前校验：每个插件的 hostApiRange 必须覆盖当前 HOST_API_VERSION
+ * （避免把插件 version bump 误写成 hostApiRange）
+ */
+export function assertRegistryHostApiCompatible(data: PluginRegistry): void {
+	for (const p of data.plugins) {
+		const range = p.hostApiRange?.trim();
+		if (!range) {
+			throw new Error(
+				translateSync('plugins.registry.missingHostApiRange', { id: p.id }),
+			);
+		}
+		if (!satisfiesRange(HOST_API_VERSION, range)) {
+			throw new Error(
+				translateSync('plugins.registry.hostApiIncompatible', {
+					id: p.id,
+					range,
+					hostApi: HOST_API_VERSION,
+				}),
+			);
+		}
+	}
+}
+
+/** 将整份 registry 写回服务端 remotes，并刷新本地缓存 */
+export async function savePluginRegistry(
+	data: PluginRegistry,
+): Promise<PluginRegistry> {
+	assertRegistryHostApiCompatible(data);
+	const next: PluginRegistry = {
+		...data,
+		updatedAt: formatRegistryUpdatedAt(),
+		plugins: data.plugins,
+	};
+	const payload = `${JSON.stringify(next, null, 2)}\n`;
+	await putUploadRemoteJson(PLUGIN_REGISTRY_FILENAME, payload);
+	writeCache(next);
+	return next;
 }
 
 /**
@@ -1712,14 +1795,424 @@ export function PluginHostPage({ pluginId }: Props) {
 }
 ```
 
-#### 2.10.1 错误边界与样式隔离
+#### 2.10.1 错误边界
 
 | 文件 | 作用 |
 |------|------|
 | `host/PluginErrorBoundary.tsx` | Class 边界；fallback 用 `plugins.host.loadFailed` |
-| `host/styleIsolation.ts` | `beginPluginStyleCapture`（loadRemote 窗口）+ `attachPluginStyleIsolation`（挂载/HMR）；CSS 包进 `@scope ([data-mf-plugin="id"])` |
 
-Remote **无需**去掉 Preflight；隔离责任在 Host。`untrusted` 不走此路径。
+#### 2.10.2 主子样式隔离（原理与完整实现）
+
+> **源码**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
+> **姊妹稿**（技术速览 / 落地手册）：`docs/app/style-isolation-tech-overview.md`、`docs/app/style-isolation-implementation.md`、`docs/ideas/mf-css-isolation.md`  
+> **目标**：隔离责任在 **Host**；Remote 可按普通 Vite + Tailwind 工程开发（含 Preflight），主↔子样式互不破坏。
+
+##### 172.16.0.5 问题与目标
+
+Host 与 Remote **同页共享一个 `document`**：
+
+| 风险 | 表现 |
+|------|------|
+| Preflight / `body`/`html` 全局规则 | Remote Tailwind 改坏 Host 字体、边距、表单 |
+| 同名 utility / 组件库类 | 后加载的 Remote 覆盖 Host，或反过来 |
+| 多插件同仓 | 学习笔记 / 全书想法等共用 `remotePlugins` 时样式互相串 |
+
+**目标**：
+
+1. Remote **零侵入**：正常 `@import "tailwindcss"`，不必禁用 Preflight、不必手写 `[data-plugin-root]` 套 utilities。
+2. Host 运行时把 Remote 注入的 CSS **限制在** `[data-mf-plugin="id"]` 容器内。
+3. 仍能**继承** Host 主题 CSS 变量（视觉统一）。
+4. `untrusted` 继续走 **iframe**（独立 document，不走本方案）。
+
+##### 192.168.1.2 方案选型（为何用 `@scope`）
+
+| 方案 | Remote 改造 | 隔离 | 主题变量继承 | 本项目 |
+|------|-------------|------|--------------|--------|
+| **CSS `@scope` + head 劫持 + MutationObserver** | 零 | 选择器级 | ✅ | ✅ 采用 |
+| Shadow DOM | 中（挂载/事件） | 强 | ❌ 差 | ❌ |
+| 强制 Remote 关 Preflight / 嵌套 utilities | 高 | 弱～中 | ✅ | ❌ 已弃 |
+| qiankun experimentalStyleIsolation（改写选择器） | 低 | 中 | ✅ | ❌（改用原生 `@scope`） |
+| iframe | 低 | 完全 | ❌ | ✅ 仅 `untrusted` |
+
+一句话：**类 qiankun experimentalStyleIsolation 的意图，用浏览器原生 `@scope` 落地。**
+
+##### 192.168.1.2 `@scope` 原理
+
+```css
+/* 只有落在 [data-mf-plugin="learningNotes"] 子树内的元素才会匹配括号里的规则 */
+@scope ([data-mf-plugin="learningNotes"]) {
+  .btn { background: blue; }
+  body { margin: 0; }   /* 不会改 Host 的 body；只在容器内找匹配 */
+  :root { --x: 1; }     /* 不会污染 Host 的 :root */
+}
+```
+
+要点：
+
+- 支持 Chrome 118+ / Firefox 125+ / Safari 17.4+（本项目目标环境已覆盖）。
+- 不改写选择器字符串，性能好；Tailwind / `@keyframes` / CSS 变量均可包进块内。
+- CSS 变量仍可从容器祖先（Host）**继承进来**，主题统一。
+
+宿主必须提供 scope 根（`PluginHostPage`）：
+
+```html
+<div data-mf-plugin="learningNotes" data-plugin-root class="plugin-learningNotes h-full w-full">
+  <!-- Remote default 组件 -->
+</div>
+```
+
+##### 192.168.0.2 两阶段捕获（时序）
+
+```mermaid
+sequenceDiagram
+  participant PM as PluginManager.runLoad
+  participant SI as styleIsolation
+  participant MF as loadRemoteApp
+  participant Head as document.head
+  participant Page as PluginHostPage
+
+  PM->>SI: beginPluginStyleCapture(id, entry)
+  SI->>Head: patch appendChild / insertBefore + MutationObserver
+  PM->>MF: loadRemote（Vite/MF 往 head 注 style/link）
+  Head-->>SI: 同步/异步注入 → wrapWithScope
+  MF-->>PM: module
+  PM->>SI: endCapture()（refcount 归零则卸 patch）
+  Page->>SI: attachPluginStyleIsolation（挂载期再开捕获）
+  Note over Page,SI: 覆盖 HMR / 延迟 import 再注入的 CSS
+  Page-->>Page: 卸载时 disconnect + releaseHeadPatch
+```
+
+| 阶段 | API | 时机 | 捕获什么 |
+|------|-----|------|----------|
+| **初始加载** | `beginPluginStyleCapture` | `registerRemote` 之后、`loadRemoteApp` 前后（`try/finally`） | 入口及依赖首次注入的 CSS |
+| **挂载期** | `attachPluginStyleIsolation`（内部同 `beginPluginStyleCapture`） | `status === 'activated'` 且非 untrusted | HMR、动态 `import()`、晚到的 link |
+
+嵌套安全：`patchDepth` 引用计数；多次 begin 只 patch 一次 head，全部 end 后才恢复原生方法。`active` 栈用 `prev` 恢复外层上下文。
+
+##### 192.168.1.4 如何认出「这是 Remote 的样式」
+
+`looksLikeRemoteStyle` 优先级：
+
+1. `data-mf-style-owner === pluginId`（已认领）
+2. `<link rel="stylesheet">`：`href` 的 **origin === entryOrigin**
+3. `<style data-vite-dev-id>`：匹配 `/remote-plugins|remote-demo|remote-host/i`（dev）
+4. 生产无 vite id：**仅在当前 capture 窗口**（`active.pluginId === ctx.pluginId`）认领
+
+处理策略：
+
+- **style**：把 `textContent` 包进 `@scope (...) { ... }`；Vite 常先插空 style 再写内容 → 对该节点再挂一次 MutationObserver。
+- **link**：`fetch(href, { mode: 'cors' })` → 新建 scoped `<style>` 插在 link 后 → `link.disabled = true`。CORS 失败则**优雅降级**（原样生效，不阻断加载）。
+
+##### 192.168.1.3 Host 接入点（调用方）
+
+**① `PluginManager.runLoad`（初始窗口）** — `apps/frontend/src/plugins/core/PluginManager.ts`
+
+```typescript
+// untrusted 已提前 return，不进 MF，也就不捕获 CSS
+registerRemote(meta, bust);
+// 开启捕获：劫持 head，active = 当前插件
+const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
+try {
+	// MF 拉模块时，Remote CSS 会被注入 head → 被 @scope
+	mod = await loadRemoteApp(meta);
+} finally {
+	// 无论成功失败都结束本轮捕获（refcount -1）
+	endCapture();
+}
+```
+
+**② `PluginHostPage`（挂载期 + 容器属性）** — `apps/frontend/src/plugins/host/PluginHostPage.tsx`
+
+```typescript
+// 已激活且非 iframe：整个页面生命周期持续隔离（HMR）
+useEffect(() => {
+	if (status !== 'activated' || trust === 'untrusted' || !entry) return;
+	return attachPluginStyleIsolation(pluginId, entry);
+}, [pluginId, status, entry, trust]);
+
+// 渲染时必须带 data-mf-plugin，否则 @scope 根不存在，规则匹配不到
+return (
+	<PluginErrorBoundary pluginId={pluginId}>
+		<div
+			className={cn(`plugin-${pluginId} h-full w-full`, className)}
+			data-mf-plugin={pluginId}
+			data-plugin-root
+		>
+			<Comp {...liveBridge} />
+		</div>
+	</PluginErrorBoundary>
+);
+```
+
+##### 10.0.2.5 核心实现（全文 + 逐行说明）
+
+**文件路径**：`apps/frontend/src/plugins/host/styleIsolation.ts`
+
+```typescript
+/**
+ * Host 侧 CSS 隔离（类 qiankun experimentalStyleIsolation）：
+ * 在 Remote 注入 style/link 时用 @scope 包到 [data-mf-plugin="id"]，
+ * 使子应用可用正常 `@import "tailwindcss"`，无需在 Remote 做 scoped 特殊配置。
+ */
+
+/** 当前捕获窗口绑定的插件上下文 */
+type CaptureCtx = {
+	/** 插件 id，同时写入 data-mf-style-owner / 生成 scope 选择器 */
+	pluginId: string;
+	/** entry URL 的 origin，用于识别同域 link 样式表 */
+	entryOrigin: string;
+};
+
+/** 当前活跃捕获；null 表示未在捕获 */
+let active: CaptureCtx | null = null;
+/** head 方法劫持引用计数；归零才恢复原生 appendChild/insertBefore */
+let patchDepth = 0;
+/** 保存的原生 head.appendChild */
+let origAppend: <T extends Node>(node: T) => T;
+/** 保存的原生 head.insertBefore */
+let origInsert: <T extends Node>(node: T, ref: Node | null) => T;
+
+/** 转义插件 id，避免特殊字符破坏属性选择器 */
+function cssEscapeIdent(id: string): string {
+	if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+		return CSS.escape(id);
+	}
+	return id.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+}
+
+/** 生成 @scope 根：与 PluginHostPage 上 data-mf-plugin 对齐 */
+function scopeSelector(pluginId: string): string {
+	return `[data-mf-plugin="${cssEscapeIdent(pluginId)}"]`;
+}
+
+/** 幂等：已包过同一 sel 则不再包 */
+function alreadyScoped(text: string, sel: string): boolean {
+	return text.includes(`@scope (${sel})`) || text.includes(`@scope(${sel})`);
+}
+
+/** 把整段 CSS 包进 @scope (sel) { ... } */
+function wrapWithScope(cssText: string, sel: string): string {
+	const trimmed = cssText.trim();
+	if (!trimmed || alreadyScoped(trimmed, sel)) return cssText;
+	return `@scope (${sel}) {\n${trimmed}\n}\n`;
+}
+
+/** 从 entry 解析 origin；非法 URL 返回 '' */
+function entryOriginOf(entry: string): string {
+	try {
+		return new URL(entry).origin;
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * 判断节点是否属于当前插件的 Remote 样式。
+ * 顺序：已标记 → link origin → vite-dev-id → 捕获窗口认领。
+ */
+function looksLikeRemoteStyle(
+	el: HTMLStyleElement | HTMLLinkElement,
+	ctx: CaptureCtx,
+): boolean {
+	if (el.dataset.mfStyleOwner) {
+		return el.dataset.mfStyleOwner === ctx.pluginId;
+	}
+	if (el instanceof HTMLLinkElement) {
+		if (el.rel !== 'stylesheet' || !el.href) return false;
+		try {
+			return new URL(el.href).origin === ctx.entryOrigin;
+		} catch {
+			return false;
+		}
+	}
+	const viteId = el.getAttribute('data-vite-dev-id') || '';
+	if (viteId) {
+		return /remote-plugins|remote-demo|remote-host/i.test(viteId);
+	}
+	// 生产 MF 注入的 style 常无 vite id：仅在主动 capture 窗口内认领
+	return active?.pluginId === ctx.pluginId;
+}
+
+/** 改写 <style> 文本；空节点等 Vite 填完再处理 */
+function scopeStyleElement(el: HTMLStyleElement, pluginId: string) {
+	if (el.dataset.mfScoped === '1') return;
+	const sel = scopeSelector(pluginId);
+	const text = el.textContent ?? '';
+	if (!text.trim()) {
+		// Vite 常先 append 空 style 再写 textContent
+		const mo = new MutationObserver(() => {
+			if ((el.textContent ?? '').trim()) {
+				mo.disconnect();
+				scopeStyleElement(el, pluginId);
+			}
+		});
+		mo.observe(el, {
+			childList: true,
+			characterData: true,
+			subtree: true,
+		});
+		return;
+	}
+	el.textContent = wrapWithScope(text, sel);
+	el.dataset.mfScoped = '1';
+	el.dataset.mfStyleOwner = pluginId;
+}
+
+/**
+ * 外链 stylesheet：CORS fetch → 旁路插入 scoped style → 禁用原 link。
+ * fetch 失败则保持原样（不抛错）。
+ */
+async function scopeLinkElement(el: HTMLLinkElement, pluginId: string) {
+	if (el.dataset.mfScoped === '1') return;
+	const href = el.href;
+	if (!href) return;
+	try {
+		const res = await fetch(href, { credentials: 'omit', mode: 'cors' });
+		if (!res.ok) return;
+		const css = await res.text();
+		const style = document.createElement('style');
+		style.textContent = wrapWithScope(css, scopeSelector(pluginId));
+		style.dataset.mfScoped = '1';
+		style.dataset.mfStyleOwner = pluginId;
+		style.dataset.mfFromLink = href;
+		el.insertAdjacentElement('afterend', style);
+		el.dataset.mfScoped = '1';
+		el.disabled = true;
+		el.dataset.mfStyleOwner = pluginId;
+	} catch {
+		/* CORS / 离线：无法改写则保持原样（partner 仍建议可 CORS） */
+	}
+}
+
+/** 分发：只处理 style / stylesheet link */
+function processNode(node: Node, ctx: CaptureCtx) {
+	if (!(node instanceof HTMLElement)) return;
+	if (node instanceof HTMLStyleElement) {
+		if (!looksLikeRemoteStyle(node, ctx)) return;
+		scopeStyleElement(node, ctx.pluginId);
+		return;
+	}
+	if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
+		if (!looksLikeRemoteStyle(node, ctx)) return;
+		void scopeLinkElement(node, ctx.pluginId);
+	}
+}
+
+/** 首次调用时劫持 head.appendChild / insertBefore；其后只加 refcount */
+function ensureHeadPatch() {
+	if (patchDepth > 0) {
+		patchDepth += 1;
+		return;
+	}
+	const head = document.head;
+	origAppend = head.appendChild.bind(head) as typeof origAppend;
+	origInsert = head.insertBefore.bind(head) as typeof origInsert;
+
+	head.appendChild = function appendScoped<T extends Node>(node: T): T {
+		const ret = origAppend(node);
+		if (active) processNode(node, active);
+		return ret;
+	};
+
+	head.insertBefore = function insertScoped<T extends Node>(
+		node: T,
+		ref: Node | null,
+	): T {
+		const ret = origInsert(node, ref);
+		if (active) processNode(node, active);
+		return ret;
+	};
+
+	patchDepth = 1;
+}
+
+/** refcount -1；归零恢复原生方法 */
+function releaseHeadPatch() {
+	if (patchDepth <= 0) return;
+	patchDepth -= 1;
+	if (patchDepth > 0) return;
+	document.head.appendChild = origAppend as typeof document.head.appendChild;
+	document.head.insertBefore = origInsert as typeof document.head.insertBefore;
+}
+
+/**
+ * 在 loadRemote 前后包一层：捕获本次注入的 CSS 并 @scope。
+ * 可嵌套调用（refcount patch）。
+ * @returns 结束函数：disconnect Observer + 恢复 active + releaseHeadPatch
+ */
+export function beginPluginStyleCapture(
+	pluginId: string,
+	entry: string,
+): () => void {
+	const ctx: CaptureCtx = {
+		pluginId,
+		entryOrigin: entryOriginOf(entry),
+	};
+	const prev = active;
+	active = ctx;
+	ensureHeadPatch();
+
+	const obs = new MutationObserver((mutations) => {
+		if (!active || active.pluginId !== pluginId) return;
+		for (const m of mutations) {
+			for (const n of m.addedNodes) processNode(n, ctx);
+			// style 先插入再填 textContent
+			if (
+				m.type === 'childList' &&
+				m.target instanceof HTMLStyleElement &&
+				looksLikeRemoteStyle(m.target, ctx)
+			) {
+				scopeStyleElement(m.target, pluginId);
+			}
+		}
+	});
+	obs.observe(document.head, {
+		childList: true,
+		subtree: true,
+		characterData: true,
+	});
+
+	return () => {
+		obs.disconnect();
+		if (active?.pluginId === pluginId) active = prev;
+		releaseHeadPatch();
+	};
+}
+
+/**
+ * 插件页挂载期间继续隔离（HMR / 延迟注入的 CSS）。
+ * 实现上与 beginPluginStyleCapture 相同，语义区分调用场景。
+ */
+export function attachPluginStyleIsolation(
+	pluginId: string,
+	entry: string,
+): () => void {
+	return beginPluginStyleCapture(pluginId, entry);
+}
+```
+
+##### 10.20.0.5 边界与验收
+
+| 场景 | 行为 |
+|------|------|
+| 浏览器不支持 `@scope` | 规则被忽略 → 样式变全局（功能可用，隔离失效）；目标浏览器均已支持 |
+| link CORS 失败 | 原 link 仍生效，可能泄漏全局；partner 应开 CORS 或把 CSS 打进 JS |
+| 忘记 `data-mf-plugin` | scoped 规则匹配不到插件 UI → **子应用看起来没样式** |
+| `untrusted` | 不调用本模块；sandbox iframe |
+| 打开笔记后再进设置 | Host 字体/标签不应被 Remote Preflight 改坏 |
+
+验收（手工）：
+
+1. 英语学习 → 学习笔记：按钮有主题样式。
+2. 再进设置页：主站样式正常。
+3. `apps/remote-plugins` 独立预览（:9008）仍用标准 Tailwind。
+
+##### 10.10.0.5 明确不做
+
+- 不要求 Remote 构建期去掉 Preflight / 嵌套 `@tailwind utilities`。
+- 不恢复「半套 Shadow + 只搬 head」。
+- 不把全体第一方改成 iframe。
 
 ---
 
@@ -1827,6 +2320,536 @@ const App = () => {
 
 ---
 
+### 2.13 插件/子应用加载缓存破坏（完整方案）
+
+> **专题角色**：发版后桌面 / WebView 仍加载旧插件、或 registry 已更新但 `remoteEntry.js` 仍是旧包——根因与端到端修复。  
+> 仓库归档副本：[`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)（与本节同步维护）。
+
+#### 2.13.1 问题现象
+
+| 场景 | 表现 |
+|------|------|
+| 桌面端发了新版插件 | 打开仍是旧 UI / 旧逻辑 |
+| 只改了 `mf-manifest.json` 的 query | 无效：真正 `import()` 的仍是无 query 的 `remoteEntry.js` |
+| 只 bump 了插件 `version`，Host 壳是旧逻辑 | 旧 Host「已 activated 就 return」，内存里不重载 |
+| registry 文件被代理 / WebView 缓存 | Host 读到旧 `updatedAt` / 旧 `entry` |
+
+#### 2.13.2 根因（两层缓存 + 一层短路）
+
+```mermaid
+sequenceDiagram
+  participant Host
+  participant MF as MF Runtime
+  participant Net as WebView/代理缓存
+  participant CDN as Remote 静态资源
+
+  Host->>MF: registerRemotes(entry=mf-manifest.json?v=1.2.0)
+  MF->>CDN: GET mf-manifest.json?v=1.2.0
+  Note over MF: snapshot 解析后改写 entry<br/>变成 .../remoteEntry.js（去掉 ?v=）
+  MF->>Net: import(.../remoteEntry.js)
+  Net-->>MF: 命中固定 URL 的强缓存 → 旧模块
+  Note over Host: 旧 ensurePlugin：status===activated 直接 return<br/>即便 registry 已变也不重载
+```
+
+1. **HTTP / WebView 层**：固定路径的 ESM（`remoteEntry.js`）在 WKWebView 等环境会被强缓存；仅给 manifest 加 `?v=` 不够。
+2. **MF 运行时层**：解析 manifest 后常把 `remoteInfo.entry` **改写成无 query 的 `remoteEntry.js`**。
+3. **Host 业务层**：旧逻辑「已 `activated` 就短路」，不比对 `version` / `updatedAt`，进程内永不重载。
+
+#### 2.13.3 解决思路（四层协同）
+
+| 层 | 手段 | 作用 |
+|----|------|------|
+| A. bust token | `pluginBust = version@registryUpdatedAt` | 资源版本或清单保存任一变化，token 就变 |
+| B. register 时 | `registerRemote(meta, bust)` → `entry = withBust(entry, bust)` + 写入 `bustByRemote` | manifest URL 带 `?v=` |
+| C. resolve 后 | Runtime 插件 `afterResolve` 再对改写后的 `remoteEntry.js` `withBust` | **真正 import 的 URL 也带 `?v=`** |
+| D. 是否重载 | `LoadedPlugin.bust`；`ensurePlugin` / `loadPlugin` 仅 `bust` 相同才跳过 | 内存态与 registry 对齐 |
+| E. registry 拉取 | force 时 URL `?t=Date.now()` + `cache: 'no-store'` | 少读到旧清单 |
+| F. 服务端 | `/remotes` 响应 `Cache-Control: no-store` | 代理 / 浏览器少缓存清单 |
+
+**发版 checklist**：
+
+1. 部署新 Remote 静态资源（新 `remoteEntry.js` 等）。
+2. 更新 registry：`version` 和/或保存一次（自动写 `updatedAt`）；`hostApiRange` 须覆盖 Host API。
+3. **桌面生产必须发含本方案的 Host 壳**（逻辑打在壳里；只发插件不发壳无效）。
+
+#### 2.13.4 端到端数据流
+
+```mermaid
+flowchart TD
+  A[ensurePlugin / init eager] --> B[fetchPluginRegistry force=true<br/>URL 加 ?t=]
+  B --> C[pluginBust version@updatedAt]
+  C --> D{内存 LoadedPlugin.bust<br/>=== 当前 bust?}
+  D -->|是且未 force| E[复用已加载模块]
+  D -->|否| F[unload 旧插件可选]
+  F --> G[registerRemote meta,bust]
+  G --> H[entry 带 ?v=bust<br/>bustByRemote.set]
+  H --> I[loadRemote]
+  I --> J[MF afterResolve]
+  J --> K[remoteEntry.js 再补 ?v=bust]
+  K --> L[原生 import 新 URL]
+  L --> M[activate → status=activated<br/>写入 LoadedPlugin.bust]
+```
+
+#### 2.13.5 完整源码：`mf.ts`（缓存相关 + 全文件）
+
+**路径**：`apps/frontend/src/plugins/core/mf.ts`
+
+```typescript
+import {
+	createInstance,
+	getInstance,
+	type ModuleFederation,
+	type ModuleFederationRuntimePlugin,
+} from '@module-federation/enhanced/runtime';
+import React from 'react';
+import ReactDOM from 'react-dom';
+import type { PluginDescriptor, PluginModule } from './types';
+
+let mf: ModuleFederation | null = null;
+let sharedReady = false;
+// afterResolve 插件是否已 registerPlugins
+let bustPluginReady = false;
+
+/** remoteName → bust；供 afterResolve 在 MF 改写 entry 后补 ?v= */
+const bustByRemote = new Map<string, string>();
+
+/**
+ * MF 一律走 WebView 原生 fetch/import（不走 plugin-http）。
+ * 第三方插件域名不必写进 capabilities；对方对 Host Origin + tauri://localhost 开 CORS 即可。
+ */
+function getMf(): ModuleFederation {
+	if (mf) return mf;
+	try {
+		const existing = getInstance();
+		if (existing) {
+			mf = existing;
+			return mf;
+		}
+	} catch {
+		/* no default instance yet */
+	}
+	mf = createInstance({ name: 'host', remotes: [] });
+	return mf;
+}
+
+/** 给任意 URL 写入/覆盖查询参数 v=（manifest 与 remoteEntry 共用） */
+export function withBust(url: string, bust: string): string {
+	const token = bust.trim();
+	if (!token) return url;
+	try {
+		const u = new URL(url);
+		u.searchParams.set('v', token);
+		return u.href;
+	} catch {
+		// 相对路径或非法绝对 URL：手工拼 query，保留 hash
+		const hashIdx = url.indexOf('#');
+		const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+		const noHash = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+		const qIdx = noHash.indexOf('?');
+		const base = qIdx >= 0 ? noHash.slice(0, qIdx) : noHash;
+		const params = new URLSearchParams(qIdx >= 0 ? noHash.slice(qIdx + 1) : '');
+		params.set('v', token);
+		return `${base}?${params.toString()}${hash}`;
+	}
+}
+
+/**
+ * bust token：插件 version + 可选 registry.updatedAt
+ * 例：1.2.0@2026/07/29 08:00:00
+ */
+export function pluginBust(
+	meta: Pick<PluginDescriptor, 'version'>,
+	registryUpdatedAt?: string,
+): string {
+	return [meta.version.trim(), registryUpdatedAt?.trim()]
+		.filter(Boolean)
+		.join('@');
+}
+
+/**
+ * MF snapshot 常把 entry 改写成无 query 的 .../remoteEntry.js。
+ * WKWebView 对固定名 ESM 强缓存 → 必须在改写之后再补 ?v=。
+ */
+const bustRemoteEntryPlugin: ModuleFederationRuntimePlugin = {
+	name: 'bust-remote-entry',
+	async afterResolve(args) {
+		const name = args.remoteInfo?.name;
+		const bust = name ? bustByRemote.get(name) : undefined;
+		if (bust && args.remoteInfo?.entry) {
+			args.remoteInfo.entry = withBust(args.remoteInfo.entry, bust);
+		}
+		return args;
+	},
+};
+
+function ensureBustPlugin() {
+	if (bustPluginReady) return;
+	getMf().registerPlugins([bustRemoteEntryPlugin]);
+	bustPluginReady = true;
+}
+
+function ensureShared() {
+	if (sharedReady) return;
+	const instance = getMf();
+	instance.registerShared({
+		react: {
+			version: React.version,
+			scope: 'default',
+			get: async () => () => React,
+			shareConfig: {
+				singleton: true,
+				requiredVersion: `^${React.version}`,
+			},
+		},
+		'react-dom': {
+			version: ReactDOM.version || React.version,
+			scope: 'default',
+			get: async () => () => ReactDOM,
+			shareConfig: {
+				singleton: true,
+				requiredVersion: `^${ReactDOM.version || React.version}`,
+			},
+		},
+	});
+	sharedReady = true;
+}
+
+function remoteNameOf(d: PluginDescriptor) {
+	return d.remoteName?.trim() || d.id;
+}
+
+/** `./IdeasList` → `IdeasList` */
+function exposeBaseOf(d: PluginDescriptor) {
+	const raw = (d.expose?.trim() || './App').replace(/^\.\//, '');
+	return raw || 'App';
+}
+
+/**
+ * 注册远程：entry 带 ?v=；写入 bustByRemote；force 覆盖同名 remote
+ * @param bust 通常为 pluginBust(meta, registry.updatedAt)
+ */
+export function registerRemote(d: PluginDescriptor, bust?: string) {
+	ensureShared();
+	ensureBustPlugin();
+	const token = (bust ?? d.version).trim();
+	const name = remoteNameOf(d);
+	if (token) bustByRemote.set(name, token);
+	getMf().registerRemotes(
+		[
+			{
+				name,
+				entry: withBust(d.entry, token),
+				type: 'module',
+			},
+		],
+		{ force: true },
+	);
+}
+
+export async function loadRemoteApp(
+	d: PluginDescriptor,
+): Promise<PluginModule> {
+	ensureShared();
+	ensureBustPlugin();
+	const name = remoteNameOf(d);
+	const expose = exposeBaseOf(d);
+	const mod = await getMf().loadRemote<PluginModule>(`${name}/${expose}`);
+	if (!mod?.default) {
+		throw new Error(
+			`plugin ${d.id}: expose ./${expose} missing default export`,
+		);
+	}
+	return mod;
+}
+```
+
+#### 2.13.6 完整源码：`LoadedPlugin.bust`（`types.ts` 摘录）
+
+**路径**：`apps/frontend/src/plugins/core/types.ts`
+
+```typescript
+export interface LoadedPlugin {
+	meta: PluginDescriptor;
+	bridge: HostBridgeProps;
+	mod: PluginModule;
+	status: PluginStatus;
+	error?: string;
+	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
+	bust?: string;
+}
+```
+
+#### 2.13.7 完整源码：`PluginManager`（重载判定）
+
+**路径**：`apps/frontend/src/plugins/core/PluginManager.ts`（与缓存相关的方法；文件其余见源码）
+
+```typescript
+import { loadRemoteApp, pluginBust, registerRemote } from './mf';
+import { fetchPluginRegistry, persistPluginEnabled } from './registry';
+import type { LoadedPlugin, PluginDescriptor } from './types';
+// ... createPluginRoute / beginPluginStyleCapture / injectors 等同现源码
+
+class PluginManagerImpl {
+	private plugins = new Map<string, LoadedPlugin>();
+	private inflight = new Map<string, Promise<void>>();
+	// ...
+
+	async init() {
+		const registry = await fetchPluginRegistry({ force: true });
+		const enabled = registry.plugins.filter((p) => p.enabled);
+		for (const meta of enabled) {
+			this.mountShell(meta);
+		}
+		const eager = enabled.filter((p) => p.preload === 'eager');
+		if (eager.length === 0) return;
+		queueMicrotask(() => {
+			void Promise.all(
+				// eager 预拉也带 updatedAt，保证 bust 一致
+				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
+			);
+		});
+	}
+
+	async ensurePlugin(id: string, opts?: { force?: boolean }) {
+		// 每次 ensure 强制拉最新 registry（配合 ?t=）
+		const registry = await fetchPluginRegistry({ force: true });
+		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+		if (!meta) {
+			throw new Error(`registry 中无启用插件 ${id}`);
+		}
+		const bust = pluginBust(meta, registry.updatedAt);
+		const cur = this.plugins.get(id);
+
+		// 仅 status+bust 都匹配才短路（旧逻辑只看 activated）
+		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
+			return cur;
+		}
+		if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
+			throw new Error(cur.error || `加载 ${id} 失败`);
+		}
+
+		const pending = this.inflight.get(id);
+		if (pending && !opts?.force) {
+			await pending;
+			const after = this.plugins.get(id);
+			if (after?.status === 'activated' && after.bust === bust) return after;
+			if (after?.status !== 'activated') {
+				throw new Error(after?.error || `加载 ${id} 失败`);
+			}
+			/* bust 已变：不 return，继续重载 */
+		}
+
+		this.mountShell(meta);
+		await this.loadPlugin(meta, opts, registry.updatedAt);
+		const next = this.plugins.get(id);
+		if (next?.status !== 'activated') {
+			throw new Error(next?.error || `加载 ${id} 失败`);
+		}
+		return next;
+	}
+
+	async loadPlugin(
+		meta: PluginDescriptor,
+		opts?: { force?: boolean },
+		registryUpdatedAt?: string,
+	) {
+		const bust = pluginBust(meta, registryUpdatedAt);
+		const prev = this.plugins.get(meta.id);
+		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
+			return;
+		}
+		// bust 变了：先卸再挂，避免旧 mod 残留
+		if (prev?.status === 'activated') {
+			await this.unloadPlugin(meta.id);
+			this.mountShell(meta);
+		}
+
+		const existing = this.inflight.get(meta.id);
+		if (existing) {
+			if (!opts?.force) return existing;
+			await existing.catch(() => {});
+		}
+
+		const run = this.runLoad(meta, bust);
+		this.inflight.set(meta.id, run);
+		try {
+			await run;
+		} finally {
+			if (this.inflight.get(meta.id) === run) {
+				this.inflight.delete(meta.id);
+			}
+		}
+	}
+
+	private async runLoad(meta: PluginDescriptor, bust: string) {
+		const nav = (to: string) => this.navigateImpl(to);
+		const loading: LoadedPlugin = {
+			meta,
+			bridge: createHostBridge(meta, nav),
+			mod: { default: () => null },
+			status: 'loading',
+			bust,
+		};
+		this.plugins.set(meta.id, loading);
+
+		try {
+			await verifyPlugin(meta);
+
+			if (meta.trust === 'untrusted') {
+				this.plugins.set(meta.id, {
+					meta,
+					bridge: createHostBridge(meta, nav),
+					mod: { default: () => null },
+					status: 'activated',
+					bust,
+				});
+				return;
+			}
+
+			// 关键：把 bust 传进 registerRemote
+			registerRemote(meta, bust);
+			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
+			try {
+				mod = await loadRemoteApp(meta);
+			} finally {
+				endCapture();
+			}
+			const bridge = createHostBridge(meta, nav);
+			await mod.activate?.(bridge.api);
+
+			this.plugins.set(meta.id, {
+				meta,
+				bridge,
+				mod,
+				status: 'activated',
+				bust,
+			});
+		} catch (e) {
+			const message = e instanceof Error ? e.message : String(e);
+			console.error(`[PluginManager] load ${meta.id} failed`, e);
+			this.plugins.set(meta.id, {
+				...loading,
+				status: 'failed',
+				error: message,
+			});
+		}
+	}
+
+	// unloadPlugin / setEnabled 见源码全文
+}
+
+export const pluginManager = new PluginManagerImpl();
+```
+
+#### 2.13.8 完整源码：registry 拉取防缓存（摘录）
+
+**路径**：`apps/frontend/src/plugins/core/registry.ts`
+
+```typescript
+/** force 拉取时给 URL 加时间戳，避开中间缓存 */
+function withCacheBust(url: string): string {
+	const sep = url.includes('?') ? '&' : '?';
+	return `${url}${sep}t=${Date.now()}`;
+}
+
+async function fetchRegistryText(
+	url: string,
+	force?: boolean,
+): Promise<string> {
+	const doFetch = /^https?:\/\//i.test(url)
+		? await getPlatformFetch()
+		: globalThis.fetch.bind(globalThis);
+	const fetchUrl = force ? withCacheBust(url) : url;
+	const res = await doFetch(fetchUrl, {
+		cache: 'no-store',
+		...(force ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
+	});
+	if (!res.ok) throw new Error(`registry ${res.status}`);
+	return res.text();
+}
+
+/** 编辑页始终 force */
+export async function fetchPluginRegistryRawText(): Promise<string> {
+	const url = registryUrl();
+	const text = await fetchRegistryText(url, true);
+	try {
+		return `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
+	} catch {
+		return text;
+	}
+}
+
+/**
+ * 保存 registry：自动写 updatedAt → bust 会变 → 下次 ensure 必重载
+ * （另有 assertRegistryHostApiCompatible，见 hostApi 专题）
+ */
+export async function savePluginRegistry(
+	data: PluginRegistry,
+): Promise<PluginRegistry> {
+	assertRegistryHostApiCompatible(data);
+	const next: PluginRegistry = {
+		...data,
+		updatedAt: formatRegistryUpdatedAt(),
+		plugins: data.plugins,
+	};
+	const payload = `${JSON.stringify(next, null, 2)}\n`;
+	await putUploadRemoteJson(PLUGIN_REGISTRY_FILENAME, payload);
+	writeCache(next);
+	return next;
+}
+```
+
+#### 2.13.9 完整源码：后端 remotes `no-store`
+
+**路径**：`apps/backend/src/middleware/serve-upload-static.middleware.ts`（缓存头）
+
+```typescript
+res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+// remotes（registry）禁止缓存，避免桌面/代理继续吃旧版
+res.setHeader(
+	'Cache-Control',
+	folder === 'remotes'
+		? 'no-store, max-age=0, must-revalidate'
+		: 'public, max-age=604800',
+);
+```
+
+**路径**：`apps/backend/src/services/upload/upload-public.controller.ts`
+
+```typescript
+// 公开流式读：/remotes/ 同样 no-store
+res.setHeader(
+	'Cache-Control',
+	decoded.startsWith('/remotes/')
+		? 'no-store, max-age=0, must-revalidate'
+		: 'public, max-age=604800',
+);
+
+// GET /api/upload/remotes/:filename
+res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+```
+
+生产 Nginx 若 `location ^~ /remotes/` 另设了 `expires`，须改为不缓存或与后端一致，否则仍可能吃旧清单。
+
+#### 2.13.10 验收与排障
+
+| 步骤 | 期望 |
+|------|------|
+| DevTools 看 `mf-manifest.json` 与 `remoteEntry.js` | URL 均含 `?v=version@updatedAt`（或等价 token） |
+| 只改 registry `updatedAt` 再进插件 | Host 卸载旧模并重新 `loadRemote` |
+| `curl -i .../remotes/plugins-registry.json` | `Cache-Control` 含 `no-store` |
+| 桌面仍旧 | 确认已安装**含本方案的 Host 壳**，且 Remote 静态资源已部署 |
+
+| 误区 | 正确做法 |
+|------|----------|
+| 只给 manifest 加 query | 必须 `afterResolve` 补 `remoteEntry.js` |
+| 只发插件不发桌面壳 | 生产 Host 逻辑在壳内，必须发壳 |
+| 只改资源不 bump version/不保存 registry | bust 不变 → 仍短路 |
+| 把 `version` 写成 `hostApiRange` | 保存失败或加载报 HOST_API 不兼容 |
+
+---
+
 ## 3. 子项目/插件接入
 
 ### 3.1 Vite 配置
@@ -1848,9 +2871,11 @@ function clearMfViteDepCache(): Plugin {
 	return {
 		name: 'clear-mf-vite-dep-cache',
 		enforce: 'pre',
-		config(config, { command }) {
+		config: (viteConfig, { command }) => {
 			if (command !== 'serve') return;
-			const root = config.root ? path.resolve(config.root) : process.cwd();
+			const root = viteConfig.root
+				? path.resolve(viteConfig.root)
+				: process.cwd();
 			fs.rmSync(path.join(root, 'node_modules/.vite'), {
 				recursive: true,
 				force: true,
@@ -1921,8 +2946,11 @@ export default defineConfig(({ mode }) => {
 			}),
 		],
 		
-		// 避免 optimizeDeps 把 react 打进 .vite/deps 并写入 virtual:mf
 		optimizeDeps: {
+			// 排除 React，避免双实例；含 TipTap 等时建议 include 预打包，避免 HMR 二次 reload
+			include: [
+				// 按实际 import 补齐 '@tiptap/core'、'@tiptap/pm/model' 等
+			],
 			exclude: [
 				'react',
 				'react/jsx-runtime',
@@ -1968,6 +2996,7 @@ export default defineConfig(({ mode }) => {
 | `cors: true` | 允许跨域 | Host 需要跨域加载 Remote |
 | `headers['Access-Control-Allow-Origin']` | CORS 响应头 | 允许所有来源访问 |
 | `optimizeDeps.exclude` | 排除 React | 与 Host 保持一致，避免重复打包 |
+| `optimizeDeps.include` | 预打包重依赖 | 避免 HMR 中途发现 `@tiptap/pm/model` 等再整页 reload |
 
 ---
 
@@ -2037,22 +3066,19 @@ export default function App({ api, plugin }: HostBridgeProps) {
 /**
  * 激活钩子（可选）
  * - 在模块加载后调用
- * - 可用于初始化资源、订阅事件等
- * - 支持 async/await
+ * - **不要**与 React 组件写在同一频繁改动的文件：否则 Fast Refresh 失败 → 整页 reload
+ * - 无副作用时可省略；有副作用时放到 lifecycle.ts 再由入口 re-export
  */
 export async function activate() {
-	// 示例：初始化逻辑
 	console.log('Remote Demo activated');
 }
 
 /**
  * 停用钩子（可选）
  * - 在模块卸载前调用
- * - 可用于清理资源、取消订阅等
- * - 支持 async/await
+ * - 同样建议与组件分文件
  */
 export async function deactivate() {
-	// 示例：清理逻辑
 	console.log('Remote Demo deactivated');
 }
 ```
@@ -2063,25 +3089,33 @@ export async function deactivate() {
 |------|------|
 | `default` 导出 | **必须**有 default 导出，且是 React 组件 |
 | `HostBridgeProps` | 组件接收 `{ api, plugin }` 作为 props |
-| `activate` | 可选生命周期钩子，加载后调用 |
-| `deactivate` | 可选生命周期钩子，卸载前调用 |
-| 样式隔离 | 使用 `plugin-${plugin.id}` 类名前缀 |
+| `activate` / `deactivate` | **可选**；勿与组件同文件空导出；有副作用则拆文件 |
+| 样式隔离 | Host `@scope`；可用正常 Tailwind |
 | API 使用 | 通过 `api` 对象调用 Host 提供的能力 |
 
 ---
 
-### 3.3 全局样式处理
+### 3.3 全局样式处理（Remote 侧约定）
 
-#### 3.3.1 样式隔离原则（Host 责任）
+#### 3.3.1 隔离责任在 Host（Remote 零改造）
 
-**现行模型**（见 `apps/frontend/src/plugins/host/styleIsolation.ts` 与 `docs/ideas/mf-css-isolation.md`）：
+详细原理与 Host 源码见 **§2.10.2**。Remote 开发者只需记住：
 
 | 信任等级 | 隔离方式 | Remote 侧要求 |
 |----------|----------|---------------|
-| `first-party` / `partner` | Host 运行时把 Remote 注入的 CSS 包进 `@scope ([data-mf-plugin="id"])` | **可用**正常 `@import "tailwindcss"`（含 Preflight） |
+| `first-party` / `partner` | Host 运行时 `@scope ([data-mf-plugin="id"])` | **可用**正常 `@import "tailwindcss"`（含 Preflight） |
 | `untrusted` | sandbox iframe | 天然隔离；`iframeUrl` 指向无壳 embed 页 |
 
-`PluginHostPage` 为 MF 插件根节点设置 `data-mf-plugin={pluginId}`（兼 `data-plugin-root` 兼容旧选择器）。
+**不要做**：
+
+- 不要为了「防污染 Host」去关 Preflight、手写 `[data-plugin-root] { @import "tailwindcss/utilities" }` 等特殊构建。
+- 不要假设能写「影响整个 Host 的全局 CSS」——嵌入后一律被 scope 住。
+
+**可以做**：
+
+- 正常 Tailwind / CSS Modules / CSS-in-JS / 第三方组件库。
+- 使用 Host 主题 CSS 变量（自动继承）。
+- 独立预览（:9008）继续用本包 `styles.css` 的 `:root` / `.dark`。
 
 #### 3.3.2 Remote 样式文件（当前 `remote-plugins`）
 
@@ -2091,6 +3125,7 @@ export async function deactivate() {
 /*
  * 常规 Tailwind v4 + shadcn token。
  * 嵌入 Host 时主题变量由主站继承；独立预览 / iframe 用本文件 :root / .dark。
+ * Host 会在注入时用 @scope 包住整段 CSS，不必在此文件手写 data-mf-plugin。
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -2099,12 +3134,20 @@ export async function deactivate() {
 /* ... token / #root 等 ... */
 ```
 
-#### 3.3.3 接入步骤
+#### 3.3.3 接入步骤与注意点
 
-1. Remote 按普通 Vite + Tailwind 工程写样式即可（**不必**再禁用 Preflight / 嵌套 utilities）。
-2. Host 在 `loadRemote` 前后调用 `beginPluginStyleCapture` / 挂载期 `attachPluginStyleIsolation`。
-3. 组件根仍建议带 `data-plugin-root`（兼容）；MF 宿主容器必有 `data-mf-plugin`。
-4. `untrusted` 勿依赖 Host CSS；走 embed + iframe。
+1. Remote 按普通 Vite + Tailwind 工程写样式即可。
+2. Host 已在 `PluginManager.runLoad` / `PluginHostPage` 接入捕获；插件开发者**无需**调用 `beginPluginStyleCapture`。
+3. 组件根仍可带 `data-plugin-root`（兼容旧选择器）；**宿主容器**上的 `data-mf-plugin` 由 Host 设置。
+4. 外链 `<link rel="stylesheet">`：须对 Host 源开 **CORS**，否则无法改写成 scoped style（见 §5.7）。优先把 CSS 打进 JS（Vite 默认注入 `<style>`）。
+5. `untrusted` 勿依赖 Host CSS；走 embed + iframe。
+
+#### 3.3.4 嵌入后样式「看起来丢了」怎么查
+
+1. DevTools 看插件根是否有 `data-mf-plugin="你的id"`。
+2. 看 `document.head` 里 Remote 的 `<style>` 是否已含 `@scope ([data-mf-plugin=...])`。
+3. 若只有未禁用的跨域 `<link>`：检查 CORS / 改打进 bundle。
+4. Host 是否走过 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（untrusted 不会走）。
 
 ---
 
@@ -2968,9 +4011,12 @@ flowchart TD
     I --> J[ensurePlugin]
     J --> K[verifyPlugin]
     K --> L[registerRemote]
-    L --> M[loadRemoteApp]
-    M --> N[mod.activate]
-    N --> O[渲染插件组件]
+    L --> L2[beginPluginStyleCapture]
+    L2 --> M[loadRemoteApp]
+    M --> M2[CSS 注入 head 并 @scope]
+    M2 --> M3[endCapture]
+    M3 --> N[mod.activate]
+    N --> O[渲染 data-mf-plugin + attachPluginStyleIsolation]
     
     P[失败] --> Q[设置 failed 状态]
     Q --> R[显示错误 UI]
@@ -2981,7 +4027,6 @@ flowchart TD
     U --> V[清理路由/侧栏]
     V --> W[设置 unloaded 状态]
 ```
-
 ### 数据流详细说明
 
 1. **应用启动**：App 组件挂载后调用 `pluginManager.init()`
@@ -2989,10 +4034,10 @@ flowchart TD
 3. **挂载壳**：为每个启用的插件注入路由和侧栏（不加载 Remote）
 4. **懒加载**：用户首次访问插件路由时才执行 `loadRemote`
 5. **验证**：检查信任等级、origin、hostApi 版本等
-6. **注册 Remote**：通过 `registerRemotes` 注册远程模块
+6. **注册 Remote**：`registerRemote(meta, bust)`，entry 带 `?v=`；`afterResolve` 再给改写后的 `remoteEntry.js` 补 bust
 7. **加载模块**：通过 `loadRemote` 加载远程组件
 8. **激活**：调用 `activate` 钩子（如果存在）
-9. **渲染**：将插件组件渲染到 `PluginHostPage` 中
+9. **渲染**：将插件组件渲染到 `PluginHostPage` 中；`LoadedPlugin.bust` 供下次 ensure 比对
 
 ---
 
@@ -3006,9 +4051,15 @@ flowchart TD
 
 **解决方案**：
 
-1. Host 和 Remote 都配置 `shared.singleton: true`
+1. Host 和 Remote 都配置 `shared.singleton: true`（**仅** react / react-dom）
 2. `optimizeDeps.exclude` 排除 React 相关依赖
 3. 使用 `clearMfViteDepCachePlugin` 清理缓存
+
+### 5.1.1 线上 `/plugins` `useLocation` 无 Router
+
+**原因**：Host 把 `react-router` 放进 MF `shared`，生产易与 `react-router/dom` 拆成双实例。
+
+**解决方案**：Host `shared` **不要**包含 `react-router`；用 `resolve.dedupe` 收敛。
 
 ### 5.2 `virtual:mf` 解析失败
 
@@ -3042,18 +4093,57 @@ flowchart TD
 1. 检查 Remote 是否启动
 2. 检查 Registry entry URL 是否正确
 3. 检查 CORS 配置
-4. 检查 Host API 版本兼容性
+4. 检查 `hostApiRange` 是否覆盖 Host `VITE_HOST_API_VERSION`（勿把插件 `version` 误写成 range）
 5. 检查信任等级配置
+6. 桌面仍旧版：确认 Host 壳已更新（含 bust / afterResolve）；registry `version` 或 `updatedAt` 已变；`/remotes` 为 `no-store`
 
-### 5.5 HMR 不生效
+### 5.5 HMR 不生效 / 连刷两次
 
-**现象**：修改 Remote 代码后页面不更新
+**现象**：修改 Remote 代码后整页刷两次；Host 报 `Importing a module script failed`
 
 **解决方案**：
 
-1. 确保 Remote 配置 `dev.remoteHmr: true`
-2. 配置 `reactRefreshHost` 指向 Host 开发服务器
-3. 检查端口是否正确
+1. 确保 Remote 配置 `dev.remoteHmr: true` 与 `reactRefreshHost`
+2. **不要**在组件同文件导出空 `activate`/`deactivate`（Fast Refresh 整页 reload）
+3. 重依赖（如 `@tiptap/*`）写入 `optimizeDeps.include` 并**重启** remote `pnpm dev`
+4. 检查端口是否正确
+
+### 5.6 桌面发新版插件仍是旧模块
+
+**原因**：MF 解析后把 entry 改写成无 query 的 `remoteEntry.js`，WKWebView 强缓存。
+
+**解决方案**：Host 使用 `pluginBust` + `afterResolve`（见 §2.2）；发版更新 registry `version`/`updatedAt` 并**发布含该逻辑的桌面壳**。
+
+### 5.7 样式隔离相关
+
+#### 打开插件后 Host 字体/布局被改坏
+
+**原因**：捕获窗口未生效，或识别失败导致 Remote Preflight 仍全局生效。
+
+**排查**：
+
+1. `runLoad` 是否在 `loadRemoteApp` 外包了 `beginPluginStyleCapture` / `finally endCapture`
+2. `PluginHostPage` 是否挂了 `attachPluginStyleIsolation`
+3. head 里 Remote `<style>` 是否已有 `@scope ([data-mf-plugin="..."])`
+4. 是否存在未 `disabled` 的跨域 stylesheet link（CORS 失败降级）
+
+#### 插件 UI 完全无样式
+
+**原因**：有 `@scope`，但页面上没有对应的 `data-mf-plugin` 根；或挂在错误的 portal/宿主外。
+
+**解决方案**：确认 `PluginHostPage`（或等价宿主）渲染了 `data-mf-plugin={pluginId}`；Drawer/Portal 内容仍须落在该属性子树内，或单独再包一层。
+
+#### 外链 CSS 隔离失败
+
+**原因**：`scopeLinkElement` 需 CORS `fetch`；失败则原 link 全局生效。
+
+**解决方案**：Remote/CDN 开 CORS；或把 CSS 打进 JS（推荐）。
+
+#### HMR 后样式又污染 Host
+
+**原因**：仅初始 capture、挂载期未 `attachPluginStyleIsolation`。
+
+**解决方案**：激活态挂载期必须持续捕获（现源码已接）。
 
 ---
 
@@ -3063,10 +4153,12 @@ flowchart TD
 
 - **运行时动态注册**：无需预配置，通过 registry 动态加载插件
 - **懒加载策略**：优化启动性能，按需加载
-- **安全验证**：多层安全闸门，确保插件可信
+- **entry 缓存破坏**：`version@updatedAt` + `afterResolve` 补 `remoteEntry.js?v=`
+- **Host shared 收敛**：仅 shared react / react-dom；勿 shared react-router
+- **主子样式隔离**：Host `@scope` + head 劫持 + MutationObserver（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
+- **安全验证**：hostApiRange 运行时校验 + 保存 registry 前置校验
 - **幂等注入**：避免重复注入导致的闪烁问题
 - **失败重试**：稳定的失败态管理，支持手动重试
 - **多插件共享**：支持一仓多 expose，减少资源消耗
 
-主项目开发者可以参考第 2 章了解完整实现，插件开发者可以参考第 3 章进行接入。
-				
+主项目开发者可以参考第 2 章了解完整实现（样式隔离见 **§2.10.2**），插件开发者可以参考第 3 章与 `plugin-development-guide.md` 进行接入。

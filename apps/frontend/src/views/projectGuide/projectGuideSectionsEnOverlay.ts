@@ -347,7 +347,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-18': {
 		title: '13.18 Learning notes',
 		description:
-			'Entry: open Learning notes from the English Learning sidebar, or go to /english-learning/notes. Usage: the page shows the notes module (loaded from an independent feature module). If the module is unavailable, check the network and tap Reload; other English Learning pages are unaffected. Rich-text editing: the notes editor supports text formatting (bold, italic, strikethrough, inline code, etc.), highlight markers, ordered/unordered lists, and code blocks for flexible formatting and annotation while taking notes. Split layout: left side shows the note list, right side has the editor and preview; list width is draggable, and the list can be collapsed so the editor takes full width. List interactions: the note list auto-loads and sorts by time; click a note to preview it on the right; hover a note for quick edit or delete (delete requires confirmation). Auto-save: edits are auto-saved to your account and persist across devices; new note titles are extracted from the first heading in the editor.',
+			'Entry: open Learning notes from the English Learning sidebar, or go to /english-learning/notes. Usage: the page shows the notes module (loaded from an independent feature module). If the module is unavailable, check the network and tap Reload; other English Learning pages are unaffected. Rich-text editing: the notes editor supports text formatting (bold, italic, strikethrough, inline code, etc.), highlight markers, ordered/unordered lists, and code blocks for flexible formatting and annotation while taking notes. Split layout: left side shows the note list, right side has the editor and preview; list width is draggable, and the list can be collapsed so the editor takes full width. List interactions: the note list auto-loads and sorts by time; click a note to preview it on the right; hover a note for quick edit or delete (delete requires confirmation). Save: click toolbar Save or press ⌘/Ctrl+S to write to your account; an orange dot appears on the Save icon when there are unsaved changes. New note titles are extracted from the first heading in the editor.',
 	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
@@ -442,6 +442,6 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s17-3': {
 		title: '17.3 Registry editor (advanced)',
 		description:
-			'Entry: the registry editor entry inside the plugin center (sign-in required). Purpose: view and edit the raw module list as JSON; saving reloads the configuration automatically. Validation: basic structural checks run on save (e.g. the module list must be an array); invalid content is rejected with a message and not written.',
+			'Entry: the registry editor entry inside the plugin center (sign-in required). Purpose: view and edit the raw module list as JSON; saving reloads the configuration automatically. Field help: the info icon beside the title explains each field (including the difference between version and Host API compatibility range). Shortcuts: ⌘/Ctrl+S saves; an orange dot on the save control indicates unsaved changes. Validation: structural checks run on save, and each module’s Host API compatibility range is verified; invalid content is rejected with a message and not written.',
 	},
 };

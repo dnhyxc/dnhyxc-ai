@@ -1,7 +1,10 @@
 import { Toaster } from '@ui/sonner';
 import { useEffect, useMemo, useState } from 'react';
-import { createBrowserRouter, RouteObject } from 'react-router';
-import { RouterProvider } from 'react-router/dom';
+import {
+	createBrowserRouter,
+	type RouteObject,
+	RouterProvider,
+} from 'react-router';
 import { useInputsOnlyTab } from '@/hooks';
 import { pluginManager, routeInjector } from '@/plugins';
 import {

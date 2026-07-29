@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => {
 				filename: 'remoteEntry.js',
 				manifest: true,
 				exposes: {
-					'./App': './src/App.tsx',
+					'./App': './src/index.ts',
 				},
 				shared: {
 					react: { singleton: true, requiredVersion: '^19.1.0' },

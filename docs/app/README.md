@@ -20,6 +20,10 @@
 | [login-password-secret-input-tab.md](./login-password-secret-input-tab.md) | **登录页密码显隐 + 全局 Tab 仅输入框**：`SecretInput` 接入登录/注册/找回密码、`useInputsOnlyTab` Hook |
 | [wechat-mini-program-login-bind.md](./wechat-mini-program-login-bind.md) | **微信小程序登录与账号关联**：code2session、bind_token/link_code 双 token、JWT 解绑吊销、Web 端绑定面板 |
 | [mf-plugin-host.md](./mf-plugin-host.md) | **Module Federation 动态插件 Host**：registry、校验、loadRemote、路由/侧栏注入、失败不闪烁 |
+| [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md) | **插件 entry 缓存破坏（完整方案）**：根因、四层协同、`mf.ts`/`PluginManager`/`registry`/后端 `no-store` 全量代码、发版验收 |
+| [mf-shared-react-router.md](./mf-shared-react-router.md) | **勿 shared react-router**：避免生产双 Router / `useLocation` 白屏 |
+| [plugin-registry-hostapi.md](./plugin-registry-hostapi.md) | **Registry hostApi 校验与字段说明**：`VITE_HOST_API_VERSION`、保存校验、`RegistryFieldsHelp`、⌘S |
+| [remote-plugin-hmr.md](./remote-plugin-hmr.md) | **Remote 开发态双次刷新**：勿同文件空 `activate`；tiptap `optimizeDeps.include` |
 | [mf-plugin-locale-sync.md](./mf-plugin-locale-sync.md) | **MF 插件语言同步与远程插件 i18n 完整接入**：`api.t` → `api.locale`、`withLiveLocale`/`eventBus`/`postMessage` 三路同步、`iframeHostClient` 接收 `applyHostLocale`、`learningNotes` store 注入 `t`、Layout 语言切换按钮（含改动前/后对比与逐行注释） |
 | [plugin-registry-i18n.md](./plugin-registry-i18n.md) | **插件 Registry i18n 解耦**：插件 registry 自带 `PluginLocaleMap` 多语言 title/description，移除 `titleKey`/`descriptionKey`/`menu.nameKey`；`pickPluginLocaleText` 回退链、`RouteMeta.titleI18n`、`resolveRouteMetaLabel` 统一解析、Header 面包屑与插件中心卡片改用已解析 label（含改动前/后对比与逐行注释） |
 | [mf-implementation-guide.md](./mf-implementation-guide.md) | **MF 实现过程总文档**：Vite 配置、运行时 API、PluginManager、RouteInjector、SidebarInjector、HostBridge、插件验证、Registry、iframe 隔离等 |

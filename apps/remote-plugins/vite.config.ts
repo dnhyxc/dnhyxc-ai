@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
 				exposes: {
 					'./EbookIdeas': './src/views/ebook/ideas/index.tsx',
 					'./EbookHighlights': './src/views/ebook/highlights/index.tsx',
-					'./EbookTestBookInfo': './src/views/ebook/toolbar-test/book-info.tsx',
+					'./EbookTestBookInfo': './src/views/ebook/toolbar-test/index.ts',
 					'./LearningNotes': './src/views/learning-notes/index.tsx',
 				},
 				shared: {
@@ -68,6 +68,26 @@ export default defineConfig(({ mode }) => {
 			},
 		},
 		optimizeDeps: {
+			// 预打包 tiptap，避免 HMR 中途发现新 dep 再整页 reload（会打断 Host 对 remoteEntry 的 import）
+			include: [
+				'@tiptap/core',
+				'@tiptap/pm/gapcursor',
+				'@tiptap/pm/model',
+				'@tiptap/pm/state',
+				'@tiptap/react',
+				'@tiptap/react/menus',
+				'@tiptap/starter-kit',
+				'@tiptap/extension-code-block-lowlight',
+				'@tiptap/extension-document',
+				'@tiptap/extension-highlight',
+				'@tiptap/extension-image',
+				'@tiptap/extension-list',
+				'@tiptap/extension-placeholder',
+				'@tiptap/extension-table',
+				'@tiptap/extension-text-align',
+				'@tiptap/extensions',
+				'lowlight',
+			],
 			exclude: [
 				'react',
 				'react/jsx-runtime',

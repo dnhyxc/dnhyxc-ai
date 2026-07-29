@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map 展示插件名（开发者**不必**、也**不应**再提供 Host `titleKey`）。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -256,8 +256,11 @@ export default defineConfig(({ mode }) => {
 			}),
 		],
 		
-		// 必须：排除 React 相关依赖，避免双 React 问题
+		// 排除 React；含 TipTap 等重依赖时建议 include 预打包，避免 HMR 中途发现新 dep 整页 reload
 		optimizeDeps: {
+			include: [
+				// 按实际 import 补齐，例如 '@tiptap/core'、'@tiptap/pm/model' …
+			],
 			exclude: [
 				'react',
 				'react/jsx-runtime',
@@ -314,6 +317,7 @@ export default defineConfig(({ mode }) => {
 | `federation.shared.react.singleton` | ✅ | 必须为 `true` |
 | `federation.hostInitInjectLocation` | ✅ | 必须为 `entry` |
 | `optimizeDeps.exclude` | ✅ | 必须排除 React 相关 |
+| `optimizeDeps.include` | 推荐 | 预打包重依赖（如 `@tiptap/*`），避免 HMR 二次整页 reload |
 | `server.cors` | ✅ | 必须为 `true` |
 | `server.headers['Access-Control-Allow-Origin']` | ✅ | 必须允许跨域 |
 
@@ -608,6 +612,8 @@ export function useHostLocale(api?: {
 
 ## 9. 生命周期钩子
 
+> **HMR 注意**：`activate` / `deactivate` 为**可选**。与 React 组件写在同一文件会导致 Vite Fast Refresh 整页刷新（开发态易连刷两次，并打断 Host 对 remote 的 `import()`，出现「Importing a module script failed」）。无全局副作用时**不要导出空钩子**；确需钩子时拆到独立文件再由入口 re-export。
+
 ### 9.1 钩子说明
 
 | 钩子 | 调用时机 | 参数 | 返回值 |
@@ -615,45 +621,40 @@ export function useHostLocale(api?: {
 | `activate` | 模块加载后 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate` | 模块卸载前 | 无 | `Promise<void>` 或 `void` |
 
-### 9.2 钩子使用示例
+### 9.2 钩子使用示例（建议拆文件）
 
 ```typescript
+// App.tsx — 仅导出 React 组件
 export default function App({ api }: HostBridgeProps) {
-	// 组件内逻辑
 	return <div className="plugin-standalone" data-plugin-root>...</div>;
 }
 
-// 激活钩子：初始化资源
+// lifecycle.ts — 非组件导出单独放
 export async function activate(api: HostBridgeProps['api']) {
-	console.log('插件激活');
-	
-	// 订阅事件
 	api.event.on('book-changed', (data) => {
 		console.log('书籍变更:', data);
 	});
-	
-	// 初始化数据
 	await api.http?.get('/api/init-data');
 }
 
-// 停用钩子：清理资源
 export async function deactivate() {
-	console.log('插件停用');
-	
-	// 取消事件订阅
-	api.event.off('book-changed');
-	
-	// 清理定时器、取消请求等
+	// 清理订阅 / 定时器
 }
+
+// index.ts — MF expose 入口（尽量少改，以免触发整页 reload）
+export { default } from './App';
+export { activate, deactivate } from './lifecycle';
 ```
 
 ### 9.3 钩子注意事项
 
 | 注意事项 | 说明 |
 |---------|------|
+| 可选 | 无全局副作用可不导出钩子 |
+| 与组件分离 | 勿与频繁改动的组件实现同文件 |
 | 异步支持 | 钩子支持 `async/await` |
 | 错误处理 | 错误会被 Host 捕获并记录 |
-| 资源清理 | `deactivate` 必须清理所有资源 |
+| 资源清理 | 若实现了 `deactivate`，须清理订阅与定时器 |
 
 ---
 
@@ -875,7 +876,8 @@ localStorage.removeItem('dnhyxc.plugin.registry.dev.v1');
 | `Failed to resolve virtual:mf` | 缓存失效 | 删除 `node_modules/.vite` 或使用 `clearMfViteDepCachePlugin` |
 | `Access-Control-Allow-Origin` | CORS 错误 | 检查 `server.cors` 和 Nginx 配置 |
 | `missing default export` | 模块导出错误 | 确保组件有 `default` 导出 |
-| `HOST_API` 版本不兼容 | API 版本冲突 | 更新 `hostApiRange` 或联系 Host 开发者 |
+| `HOST_API` 版本不兼容 | API 版本冲突 | `hostApiRange` 须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）；**不要**把插件 `version` bump 误写成 `hostApiRange` |
+| HMR 整页刷两次 / Importing a module script failed | 同文件混出 `activate` 或中途发现新 dep | 删空钩子或拆 lifecycle；`optimizeDeps.include` 预打包 tiptap 等；重启 remote `pnpm dev` |
 
 ---
 
@@ -923,7 +925,9 @@ server {
 
 ### 13.3 Registry 注册
 
-联系 Host 管理员添加 Registry 配置（**只改 registry，不必改 Host 语言包**）：
+联系 Host 管理员添加 / 更新 Registry 配置（**只改 registry，不必改 Host 语言包**）。
+
+**发版与缓存（重要）**：部署新构建产物后，必须 bump 插件 **`version`**，或走 Host 注册表保存以刷新 **`updatedAt`**。Host 用 `version@updatedAt` 给 `mf-manifest.json` 与改写后的 `remoteEntry.js` 加 `?v=`，并按同一 token 决定是否重载。桌面用户还需安装含该逻辑的 Host 壳。完整方案见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)。
 
 ```json
 {
@@ -954,6 +958,8 @@ server {
 |------|------|
 | `title` | 插件中心与注入路由面包屑的多语言名 |
 | `description` | 插件中心卡片说明（locale map 或单语字符串） |
+| `version` | **插件资源版本**；发版可 bump，与 Host API 无关 |
+| `hostApiRange` | **Host 契约兼容范围**（如 `^1.0.0`）；须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）。保存 registry 时 Host 会校验；**勿**把 `version` 误写成 range |
 | `menu` | 可选；仅 `order` + `icon`（侧栏不展示文字） |
 
 > 不要写 `titleKey` / `descriptionKey` / `menu.nameKey`。插件**内部** UI 文案仍用插件自己的字典 + `api.locale`，与 registry 标题是两套东西。
@@ -966,7 +972,7 @@ server {
 
 | 检查项 | 验收标准 |
 |--------|---------|
-| Vite 配置 | `shared.singleton: true`、`optimizeDeps.exclude` React |
+| Vite 配置 | `shared.singleton: true`（仅 react/react-dom）、`optimizeDeps.exclude` React、重依赖建议 `include` |
 | 组件导出 | 有 `default` 导出，接收 `HostBridgeProps` |
 | 自有 i18n | 有插件字典；MF 下调用 `useHostLocale(api)` |
 | 无 `api.t` | 不依赖 Host 翻译函数 |

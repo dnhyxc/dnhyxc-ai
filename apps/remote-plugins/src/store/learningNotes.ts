@@ -205,23 +205,23 @@ class LearningNotesStore {
 		}
 	}
 
-	/** 由页面从 editor 取出最新内容后调用 */
+	/** 由页面从 editor 取出最新内容后调用；成功返回 true */
 	async saveNote(input: {
 		title: string;
 		html: string;
 		text: string;
-	}): Promise<void> {
+	}): Promise<boolean> {
 		if (!input.title.trim()) {
 			this.toast(this.t('learningNotes.toast.needTitle'), 'info');
-			return;
+			return false;
 		}
 		if (!input.text.trim()) {
 			this.toast(this.t('learningNotes.toast.needContent'), 'info');
-			return;
+			return false;
 		}
 		if (!this.api) {
 			this.toast(this.t('learningNotes.toast.httpDeniedSave'), 'error');
-			return;
+			return false;
 		}
 		this.saving = true;
 		try {
@@ -243,8 +243,10 @@ class LearningNotesStore {
 				this.toast(this.t('learningNotes.toast.saved'), 'success');
 			}
 			await this.refreshList();
+			return true;
 		} catch (e) {
 			this.toast(errMsg(e, this.t), 'error');
+			return false;
 		} finally {
 			runInAction(() => {
 				this.saving = false;

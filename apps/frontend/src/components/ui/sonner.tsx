@@ -120,7 +120,7 @@ const Toast = ({
 					>
 						<X className="size-4" strokeWidth={2} aria-hidden />
 					</button>
-					<div className="flex items-center">
+					<div className="flex items-start">
 						<div className="w-6 flex justify-center items-center">
 							{type === 'success' && (
 								<CircleCheckIcon color="var(--color-green-500)" />

@@ -256,8 +256,11 @@ export default defineConfig(({ mode }) => {
 			}),
 		],
 		
-		// 必须：排除 React 相关依赖，避免双 React 问题
+		// 排除 React；含 TipTap 时建议 include 预打包（见 remote-plugin-hmr.md）
 		optimizeDeps: {
+			include: [
+				// 按实际 import 补齐 @tiptap/*，避免 HMR 中途发现新 dep 整页 reload
+			],
 			exclude: [
 				'react',
 				'react/jsx-runtime',
@@ -314,6 +317,7 @@ export default defineConfig(({ mode }) => {
 | `federation.shared.react.singleton` | ✅ | 必须为 `true` |
 | `federation.hostInitInjectLocation` | ✅ | 必须为 `entry` |
 | `optimizeDeps.exclude` | ✅ | 必须排除 React 相关 |
+| `optimizeDeps.include` | 推荐 | 预打包重依赖（如 `@tiptap/*`），避免 HMR 二次 reload；见 [remote-plugin-hmr.md](./remote-plugin-hmr.md) |
 | `server.cors` | ✅ | 必须为 `true` |
 | `server.headers['Access-Control-Allow-Origin']` | ✅ | 必须允许跨域 |
 
@@ -608,6 +612,8 @@ export function useHostLocale(api?: {
 
 ## 9. 生命周期钩子
 
+> **HMR 注意**：`activate` / `deactivate` 为**可选**。与 React 组件写在同一文件会导致 Vite Fast Refresh 整页刷新（开发态易连刷两次并打断 Host `import()`）。无全局副作用时不要导出空钩子；确需钩子时拆到独立文件再由入口 re-export。详见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)。
+
 ### 9.1 钩子说明
 
 | 钩子 | 调用时机 | 参数 | 返回值 |
@@ -615,45 +621,40 @@ export function useHostLocale(api?: {
 | `activate` | 模块加载后 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate` | 模块卸载前 | 无 | `Promise<void>` 或 `void` |
 
-### 9.2 钩子使用示例
+### 9.2 钩子使用示例（建议拆文件）
 
 ```typescript
+// App.tsx — 仅导出 React 组件
 export default function App({ api }: HostBridgeProps) {
-	// 组件内逻辑
 	return <div className="plugin-standalone" data-plugin-root>...</div>;
 }
 
-// 激活钩子：初始化资源
+// lifecycle.ts — 非组件导出单独放
 export async function activate(api: HostBridgeProps['api']) {
-	console.log('插件激活');
-	
-	// 订阅事件
 	api.event.on('book-changed', (data) => {
 		console.log('书籍变更:', data);
 	});
-	
-	// 初始化数据
 	await api.http?.get('/api/init-data');
 }
 
-// 停用钩子：清理资源
 export async function deactivate() {
-	console.log('插件停用');
-	
-	// 取消事件订阅
-	api.event.off('book-changed');
-	
-	// 清理定时器、取消请求等
+	// 清理订阅 / 定时器
 }
+
+// index.ts — MF expose 入口
+export { default } from './App';
+export { activate, deactivate } from './lifecycle';
 ```
 
 ### 9.3 钩子注意事项
 
 | 注意事项 | 说明 |
 |---------|------|
+| 可选 | 无全局副作用可不导出钩子 |
+| 与组件分离 | 勿与频繁改动的组件实现同文件 |
 | 异步支持 | 钩子支持 `async/await` |
 | 错误处理 | 错误会被 Host 捕获并记录 |
-| 资源清理 | `deactivate` 必须清理所有资源 |
+| 资源清理 | 若实现了 `deactivate`，须清理订阅与定时器 |
 
 ---
 

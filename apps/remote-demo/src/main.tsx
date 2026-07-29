@@ -6,8 +6,8 @@ createRoot(document.getElementById('root')!).render(
 	<StrictMode>
 		<App
 			api={{
-				t: (k) => k,
 				theme: 'light',
+				locale: 'zh-CN',
 				navigate: () => undefined,
 				event: {
 					on: () => undefined,

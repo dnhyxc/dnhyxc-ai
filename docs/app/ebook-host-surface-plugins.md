@@ -1,5 +1,7 @@
 # Ebook 阅读页插件动态接入（Host Surface 发现机制）
 
+> **延伸阅读（后续增量）**：入口勿再同文件导出空 `activate`/`deactivate`（已删），见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)；桌面插件缓存见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。
+
 ## 1. 背景与目标
 
 EPUB 阅读页（`apps/frontend/src/views/ebook/read.tsx`）此前通过硬编码插件 ID（`usePluginEnabled('ebookIdeas')`、`<PluginHostPage pluginId="ebookIdeas" />`）接入「全书想法」插件。每新增一个 ebook 槽位插件（全书划线、书信息测试等）都要回头改 `read.tsx` 的 import、顶栏按钮、Drawer 渲染与开关同步逻辑，扩展性差且易漏改。
@@ -947,17 +949,10 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 	// ...（未改动：与旧版 ebook-ideas/index.tsx 完全一致）
 	// 闭合 IdeasListApp
 }
-// 生命周期桩，列表在 mount 时拉取
-export async function activate() {
-	console.log("IdeasListApp activate");
-}
-// 无全局副作用
-export async function deactivate() {
-	console.log("IdeasListApp deactivate");
-}
+// 无 activate/deactivate：列表在 mount 时拉取；同文件混出非组件导出会破坏 Fast Refresh
 ```
 
-**变更摘要**：`IdeasListApp` 由 `views/ebook-ideas/` 迁到 `views/ebook/ideas/`，与新增的 `highlights/`、`toolbar-test/` 共同组成 `views/ebook/` 目录；文件内容零改动，迁移动机是聚合 ebook 域视图便于 expose 管理。
+**变更摘要**：`IdeasListApp` 由 `views/ebook-ideas/` 迁到 `views/ebook/ideas/`；生命周期空钩子已移除（见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)）。
 
 #### 4.9.2 `EbookHighlightsApp` 全书划线（`apps/remote-plugins/src/views/ebook/highlights/index.tsx`）
 

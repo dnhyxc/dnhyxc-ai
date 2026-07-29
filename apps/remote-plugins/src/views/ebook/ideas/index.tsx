@@ -263,13 +263,3 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 		</div>
 	);
 }
-
-export async function activate() {
-	// ponytail: 列表在组件 mount 时拉取
-	console.log('IdeasListApp activate');
-}
-
-export async function deactivate() {
-	// ponytail: 无全局副作用
-	console.log('IdeasListApp deactivate');
-}

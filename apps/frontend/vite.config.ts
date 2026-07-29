@@ -55,10 +55,11 @@ export default defineConfig(({ mode }) => {
 				name: 'host',
 				filename: 'remoteEntry.js',
 				remotes: {},
+				// 勿 shared react-router：生产 loadShare 易与 react-router/dom 拆成双实例，
+				// 导致 useLocation 找不到 Router context（线上 /plugins 白屏）。Remote 也未共享它。
 				shared: {
 					react: { singleton: true, requiredVersion: '^19.1.0' },
 					'react-dom': { singleton: true, requiredVersion: '^19.1.0' },
-					'react-router': { singleton: true },
 				},
 				// 默认 html：clientInjected 前会把任意 src/*.ts 包成无 export 的 entry bootstrap
 				hostInitInjectLocation: 'entry',

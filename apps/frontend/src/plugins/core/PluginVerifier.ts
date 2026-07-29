@@ -1,3 +1,4 @@
+import { translateSync } from '@/i18n';
 import { HOST_API_VERSION, type PluginDescriptor } from './types';
 
 function parseSemver(v: string): [number, number, number] | null {
@@ -117,7 +118,11 @@ export async function verifyPlugin(d: PluginDescriptor): Promise<void> {
 
 	if (!satisfiesRange(HOST_API_VERSION, d.hostApiRange)) {
 		throw new PluginVerifyError(
-			`plugin ${d.id}: hostApi ${HOST_API_VERSION} not in ${d.hostApiRange}`,
+			translateSync('plugins.verify.hostApiIncompatible', {
+				id: d.id,
+				hostApi: HOST_API_VERSION,
+				range: d.hostApiRange,
+			}),
 			'HOST_API',
 		);
 	}

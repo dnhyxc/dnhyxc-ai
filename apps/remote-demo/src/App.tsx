@@ -95,11 +95,3 @@ export default function App({ api, plugin }: HostBridgeProps) {
 		</div>
 	);
 }
-
-export async function activate() {
-	// ponytail: demo 无需额外激活逻辑
-}
-
-export async function deactivate() {
-	// ponytail: demo 无需清理
-}

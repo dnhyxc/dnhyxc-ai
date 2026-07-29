@@ -64,7 +64,7 @@ export class UploadPublicController {
 		res.setHeader(
 			'Cache-Control',
 			decoded.startsWith('/remotes/')
-				? 'public, max-age=60'
+				? 'no-store, max-age=0, must-revalidate'
 				: 'public, max-age=604800',
 		);
 		createReadStream(absolutePath).pipe(res);
@@ -102,7 +102,7 @@ export class UploadPublicController {
 			MIME_BY_EXT['.json'] ?? 'application/json; charset=utf-8',
 		);
 		res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-		res.setHeader('Cache-Control', 'public, max-age=60');
+		res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
 		createReadStream(absolutePath).pipe(res);
 	}
 }

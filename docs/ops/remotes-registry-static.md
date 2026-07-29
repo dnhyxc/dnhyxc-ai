@@ -27,7 +27,7 @@ Module Federation Host（`:9002`）启动时需拉取插件清单（registry）�
 | 4   | Vite 开发：`proxy['/remotes']` → API 静态源站                             | `http://localhost:9002/remotes/plugins-registry.json` 200 |
 | 5   | Web：fetch **相对路径** `/remotes/...`（同源）                            | DevTools Network 无跨域错误                               |
 | 6   | Tauri：拼 `BASE_URL + /upload/remotes/...`（走已反代的 /api），平台 fetch | 桌面端可读 registry                                       |
-| 7   | remotes 短缓存（60s）；images/files 仍 7d                                 | 响应头 `Cache-Control` 符合预期                           |
+| 7   | remotes **禁止缓存**（`no-store`）；images/files 仍 7d                     | 响应头 `Cache-Control` 符合预期；细节见 [remotes-no-store-cache.md](./remotes-no-store-cache.md) |
 | 8   | Remote 的 `mf-manifest.json` **不**靠 Host 反代第三方                     | 各 Remote 源站自配 CORS（见 §7）                          |
 
 ---
@@ -38,7 +38,7 @@ Module Federation Host（`:9002`）启动时需拉取插件清单（registry）�
 | --------------------------------------------------------------- | ---------------------------------------------------- |
 | `apps/backend/src/utils/upload-paths.ts`                        | 新增 `getUploadRemotesDir`                           |
 | `apps/backend/src/main.ts`                                      | 启动时 `ensureUploadDir(remotes)`；注释含 `/remotes` |
-| `apps/backend/src/middleware/serve-upload-static.middleware.ts` | 匹配 `/remotes`；`.json` MIME；短缓存                |
+| `apps/backend/src/middleware/serve-upload-static.middleware.ts` | 匹配 `/remotes`；`.json` MIME；`no-store`（见 [remotes-no-store-cache.md](./remotes-no-store-cache.md)） |
 | `apps/backend/src/services/upload/upload-public.controller.ts`  | `GET remotes/:filename`                              |
 | `apps/backend/uploads/remotes/plugins-registry.json`            | 清单数据（本机 entry 端口）                          |
 | `apps/frontend/src/utils/upload-file-url.ts`                    | 导出 `getUploadStaticOrigin`                         |
@@ -316,12 +316,14 @@ export function serveUploadStaticMiddleware(uploadsRoot: string) {
 			res.setHeader("Content-Type", mime);
 		}
 		res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-		// registry 宜短缓存，便于单独更新清单而不等 7 天
+		// remotes（registry）禁止缓存，避免桌面/代理继续吃旧版
 		res.setHeader(
 			// Cache-Control 头名
 			"Cache-Control",
-			// remotes：60 秒；其余仍 7 天
-			folder === "remotes" ? "public, max-age=60" : "public, max-age=604800",
+			// remotes：no-store（2026-07 起）；其余仍 7 天
+			folder === "remotes"
+				? "no-store, max-age=0, must-revalidate"
+				: "public, max-age=604800",
 		);
 		res.sendFile(absolutePath, (err) => {
 			if (err) {
@@ -332,7 +334,7 @@ export function serveUploadStaticMiddleware(uploadsRoot: string) {
 }
 ```
 
-**变更摘要**：路径含 `/remotes`；JSON MIME；remotes 短缓存。
+**变更摘要**：路径含 `/remotes`；JSON MIME；remotes 现为 `no-store`（完整对比见 [remotes-no-store-cache.md](./remotes-no-store-cache.md)）。
 
 ---
 
@@ -387,7 +389,7 @@ serveRemote(@Param('filename') filename: string, @Res() res: Response) {
 	// CORP 与静态中间件对齐
 	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 	// 短缓存 60s
-	res.setHeader('Cache-Control', 'public, max-age=60');
+	res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
 	// 流式写出文件体
 	createReadStream(absolutePath).pipe(res);
 }
@@ -616,7 +618,8 @@ proxy: {
 location ^~ /remotes/ {
   alias /usr/local/dnhyxc-ai/server/uploads/remotes/;
   add_header Cross-Origin-Resource-Policy cross-origin;
-  expires 60s;  # 或依赖后端 Cache-Control；alias 场景可加 add_header Cache-Control
+  # 勿 expires 缓存；与后端一致禁止缓存 registry
+  add_header Cache-Control "no-store, max-age=0, must-revalidate";
 }
 ```
 
@@ -634,7 +637,7 @@ location ^~ /remotes/ {
 | Web Prod（已配 alias） | 同源 `/remotes/...` 由 Nginx 直出文件                                             |
 | Tauri（含生产）        | `{VITE_*_API_DOMAIN}/upload/remotes/...`（9112 裸 `/remotes` 会落到 SPA，勿直连） |
 | 旧绝对 URL 直连后端    | Web 会 CORS；勿再写死绝对地址（除非 override 且后端开 CORS）                      |
-| images/files 缓存      | 仍 7 天，不受 remotes 短缓存影响                                                  |
+| images/files 缓存      | 仍 7 天，不受 remotes `no-store` 影响                                              |
 
 ---
 
@@ -687,7 +690,7 @@ curl -sI "$ENTRY" -H "Origin: tauri://localhost" | grep -i access-control-allow-
 
 ## 8. 测试与回归建议
 
-1. `curl -i http://localhost:9226/remotes/plugins-registry.json` → 200，`Content-Type` 含 json，`max-age=60`。
+1. `curl -i http://localhost:9226/remotes/plugins-registry.json` → 200，`Content-Type` 含 json，`Cache-Control` 含 `no-store`。
 2. 浏览器打开 Host Dev → Network 确认 registry 为 **9002** 同源，非 9226。
 3. 改 registry 内容后约 1 分钟内或强制刷新可见（注意 localStorage 缓存键；`force: true` 仍可能先读网络）。
 4. `curl` 备用：`/api/upload/remotes/plugins-registry.json`；请求 `foo.txt` → 400。

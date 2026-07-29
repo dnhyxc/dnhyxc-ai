@@ -1834,6 +1834,63 @@ export const enUS = {
 		'Invalid JSON: must parse and include a plugins array',
 	'plugins.registry.saveOk': 'Saved to remotes',
 	'plugins.registry.saveFail': 'Save failed',
+	'plugins.registry.noChanges': 'No changes, no need to save',
+	'plugins.registry.missingHostApiRange': 'Plugin {id} is missing hostApiRange',
+	'plugins.registry.hostApiIncompatible':
+		'Plugin {id}: hostApiRange "{range}" is incompatible with Host API {hostApi}. Bump version only for cache bust; keep hostApiRange as ^{hostApi}',
+	'plugins.registry.pluginNotFound': 'Plugin {id} not found in registry',
+	'plugins.registry.help.triggerAria': 'Field reference',
+	'plugins.registry.help.panelTitle': 'plugins-registry field reference',
+	'plugins.registry.help.footnote':
+		'Bump version only for cache bust. hostApiRange must cover the current Host API (see VITE_HOST_API_VERSION).',
+	'plugins.registry.help.sectionRoot': 'Root',
+	'plugins.registry.help.sectionBasic': 'Plugin basics',
+	'plugins.registry.help.sectionMf': 'Load & permissions',
+	'plugins.registry.help.sectionHost': 'Mount & security',
+	'plugins.registry.help.updatedAt':
+		'Last updated time; written automatically by the host on save.',
+	'plugins.registry.help.plugins':
+		'Array of plugin descriptors; each item is one listable plugin.',
+	'plugins.registry.help.id':
+		'Unique plugin id used for routes, sidebar, and local state.',
+	'plugins.registry.help.fieldTitle':
+		'Localized name map (zh-CN / en-US) for the plugins page and breadcrumbs.',
+	'plugins.registry.help.description':
+		'Localized blurb, or a legacy plain string; shown on plugin cards.',
+	'plugins.registry.help.routePath':
+		'Plugin route path, e.g. /english-learning/notes.',
+	'plugins.registry.help.entry':
+		'MF entry URL (prefer mf-manifest.json). Production requires https; localhost http is allowed in dev.',
+	'plugins.registry.help.version':
+		'Plugin package version. Bump this for releases / cache bust; do not confuse with hostApiRange.',
+	'plugins.registry.help.hostApiRange':
+		'Required Host API range (e.g. ^1.0.0). Must cover the current Host; change only when the Host contract upgrades.',
+	'plugins.registry.help.enabled':
+		'Whether the plugin is listed; false stops loading and hides host UI entries.',
+	'plugins.registry.help.trust':
+		'Trust level: first-party / partner / untrusted (iframe only, no loadRemote).',
+	'plugins.registry.help.remoteName':
+		'MF registerRemotes.name; defaults to id. Use the federation name when multiple plugins share one Remote.',
+	'plugins.registry.help.expose':
+		'MF expose path; default ./App (e.g. ./LearningNotes, ./EbookIdeas).',
+	'plugins.registry.help.injectRoute':
+		'Whether PluginManager injects a top-level route. false means the host tree already mounts PluginHostPage.',
+	'plugins.registry.help.preload':
+		'Load timing: route/idle (lazy, default) or eager (background preload after init; rarely needed).',
+	'plugins.registry.help.permissions':
+		'Permission list, e.g. ui:toast, nav:subtree, http:plugin-api, modules:ebook.',
+	'plugins.registry.help.menu':
+		'Sidebar entry: order and optional lucide icon name.',
+	'plugins.registry.help.host':
+		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon, order.',
+	'plugins.registry.help.iframeUrl':
+		'Required when trust is untrusted: standalone HTTPS page opened in an iframe.',
+	'plugins.registry.help.integrity':
+		'Optional sha384 integrity hash for the entry resource.',
+	'plugins.registry.help.signature':
+		'Optional signature flag; loading is rejected when set to invalid.',
+	'plugins.verify.hostApiIncompatible':
+		'Plugin {id}: Host API is {hostApi}, incompatible with hostApiRange "{range}". Bump version only for cache bust; change hostApiRange only when the Host contract upgrades',
 	'plugins.shelf.on': 'Listed',
 	'plugins.shelf.off': 'Delisted',
 	'plugins.shelf.toggle': 'List / delist',
@@ -1850,7 +1907,6 @@ export const enUS = {
 	'plugins.host.unavailable': 'Plugin "{id}" is unavailable',
 	'plugins.host.reload': 'Reload',
 	'plugins.host.loadFailed': 'Failed to load plugin "{id}"',
-	'plugins.registry.noChanges': 'No changes, no need to save',
 	'route.setting.about': 'About',
 	'route.setting.theme': 'Theme',
 	'route.setting.llm': 'LLM settings',

@@ -1,7 +1,7 @@
 # Module Federation 动态插件 Host
 
 > **文档角色（主文档）**：Host 侧动态插件运行时（registry → 校验 → MF loadRemote → 路由/侧栏注入 → 宿主页）。  
-> **延伸阅读**：[../ops/remotes-registry-static.md](../ops/remotes-registry-static.md)（registry 静态分发与 CORS）；[../english/learning-notes-remote.md](../english/learning-notes-remote.md)（英语学习笔记 Remote）；**第三方任意域名接入配置**：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)；**主/子样式隔离**：[../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md)；规划态可参考 `apps/frontend/specs/` 下 MF 方案稿。
+> **延伸阅读**：[../ops/remotes-registry-static.md](../ops/remotes-registry-static.md)（registry 静态分发与 CORS）；[../ops/remotes-no-store-cache.md](../ops/remotes-no-store-cache.md)（remotes `no-store`）；[plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)（entry `?v=` / afterResolve）；[mf-shared-react-router.md](./mf-shared-react-router.md)（勿 shared react-router）；[plugin-registry-hostapi.md](./plugin-registry-hostapi.md)；[remote-plugin-hmr.md](./remote-plugin-hmr.md)；[../english/learning-notes-remote.md](../english/learning-notes-remote.md)；**第三方任意域名接入配置**：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)；**主/子样式隔离**：[../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md)。
 
 ---
 
@@ -88,9 +88,11 @@ flowchart TD
 ### 3.3 Vite / MF 踩坑点（本轮已处理）
 
 1. **`optimizeDeps` 不要 exclude `react-router`**：否则 CJS `cookie` 的 `parse` named export 在 Safari/Tauri 报错。
-2. **要 exclude `react*`**：避免预打包写入 `virtual:mf:...` 后重启解析失败。
-3. **`clearMfViteDepCachePlugin`**：serve 时清 `node_modules/.vite`，对齐 `mf_owner` 递增。
-4. **`hostInitInjectLocation: 'entry'`**：避免默认 html 注入把任意 ts 打成无 export bootstrap。
+2. **federation `shared` 不要包含 `react-router`**：生产 `loadShare` 易与 `react-router/dom` 拆成双实例，导致 `useLocation` 找不到 Router（线上 `/plugins` 白屏）。详见 [mf-shared-react-router.md](./mf-shared-react-router.md)。
+3. **要 exclude `react*`**：避免预打包写入 `virtual:mf:...` 后重启解析失败。
+4. **`clearMfViteDepCachePlugin`**：serve 时清 `node_modules/.vite`，对齐 `mf_owner` 递增。
+5. **`hostInitInjectLocation: 'entry'`**：避免默认 html 注入把任意 ts 打成无 export bootstrap。
+6. **桌面插件缓存**：仅给 manifest 加 `?v=` 不够，须 `afterResolve` 给改写后的 `remoteEntry.js` 补 bust；见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。
 
 ---
 
@@ -820,10 +822,10 @@ federation({
 	name: 'host',
 	filename: 'remoteEntry.js',
 	remotes: {},
+	// 勿 shared react-router，见 mf-shared-react-router.md
 	shared: {
 		react: { singleton: true, requiredVersion: '^19.1.0' },
 		'react-dom': { singleton: true, requiredVersion: '^19.1.0' },
-		'react-router': { singleton: true },
 	},
 	// 默认 html：clientInjected 前会把任意 src/*.ts 包成无 export 的 entry bootstrap
 	hostInitInjectLocation: 'entry',
@@ -841,6 +843,7 @@ federation({
 | 变量                                                               | 作用                                                            |
 | ------------------------------------------------------------------ | --------------------------------------------------------------- |
 | `VITE_DEV_PLUGIN_REGISTRY_URL` / `VITE_PROD_PLUGIN_REGISTRY_URL`   | 覆盖 registry URL                                               |
+| `VITE_HOST_API_VERSION`                                            | Host 插件契约 semver（默认 `1.0.0`）；插件 `hostApiRange` 须覆盖 |
 | `VITE_DEV_PLUGIN_ENTRY_ORIGINS` / `VITE_PROD_PLUGIN_ENTRY_ORIGINS` | **已废弃**；准入改由 registry + `entryUrlAllowed`（生产 https） |
 | `VITE_PLUGIN_SKIP_INTEGRITY`                                       | 默认跳过 integrity（`!== 'false'` 即跳过）                      |
 

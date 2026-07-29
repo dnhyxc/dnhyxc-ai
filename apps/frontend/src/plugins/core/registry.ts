@@ -1,8 +1,10 @@
+import { translateSync } from '@/i18n';
 import { putUploadRemoteJson } from '@/service';
 import { getPlatformFetch } from '@/utils/fetch';
 import { resolveUploadedFileUrl } from '@/utils/upload-file-url';
 import { notifyPluginEnabled } from './enabledOverrides';
-import type { PluginRegistry } from './types';
+import { satisfiesRange } from './PluginVerifier';
+import { HOST_API_VERSION, type PluginRegistry } from './types';
 
 const CACHE_KEY = `dnhyxc.plugin.registry.${import.meta.env.PROD ? 'prod' : 'dev'}.v1`;
 export const PLUGIN_REGISTRY_CACHE_KEY = CACHE_KEY;
@@ -53,6 +55,11 @@ function writeCache(data: PluginRegistry) {
 	notifyPluginEnabled();
 }
 
+function withCacheBust(url: string): string {
+	const sep = url.includes('?') ? '&' : '?';
+	return `${url}${sep}t=${Date.now()}`;
+}
+
 async function fetchRegistryText(
 	url: string,
 	force?: boolean,
@@ -60,7 +67,8 @@ async function fetchRegistryText(
 	const doFetch = /^https?:\/\//i.test(url)
 		? await getPlatformFetch()
 		: globalThis.fetch.bind(globalThis);
-	const res = await doFetch(url, {
+	const fetchUrl = force ? withCacheBust(url) : url;
+	const res = await doFetch(fetchUrl, {
 		cache: 'no-store',
 		...(force ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
 	});
@@ -108,7 +116,7 @@ export async function fetchPluginRegistry(opts?: {
 /** 拉取远端原文（用于配置编辑页） */
 export async function fetchPluginRegistryRawText(): Promise<string> {
 	const url = registryUrl();
-	const text = await fetchRegistryText(url);
+	const text = await fetchRegistryText(url, true);
 	try {
 		return `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
 	} catch {
@@ -125,10 +133,32 @@ export function clearPluginRegistryCache() {
 	notifyPluginEnabled();
 }
 
+/** 保存前校验：hostApiRange 必须覆盖当前 Host API，避免误把 version 语义写进 hostApiRange */
+export function assertRegistryHostApiCompatible(data: PluginRegistry): void {
+	for (const p of data.plugins) {
+		const range = p.hostApiRange?.trim();
+		if (!range) {
+			throw new Error(
+				translateSync('plugins.registry.missingHostApiRange', { id: p.id }),
+			);
+		}
+		if (!satisfiesRange(HOST_API_VERSION, range)) {
+			throw new Error(
+				translateSync('plugins.registry.hostApiIncompatible', {
+					id: p.id,
+					range,
+					hostApi: HOST_API_VERSION,
+				}),
+			);
+		}
+	}
+}
+
 /** 将整份 registry 写回服务端 remotes，并刷新本地缓存 */
 export async function savePluginRegistry(
 	data: PluginRegistry,
 ): Promise<PluginRegistry> {
+	assertRegistryHostApiCompatible(data);
 	const next: PluginRegistry = {
 		...data,
 		updatedAt: formatRegistryUpdatedAt(),
@@ -147,7 +177,9 @@ export async function persistPluginEnabled(
 ): Promise<PluginRegistry> {
 	const data = await fetchPluginRegistry({ force: true });
 	const hit = data.plugins.find((p) => p.id === id);
-	if (!hit) throw new Error(`registry 中无插件 ${id}`);
+	if (!hit) {
+		throw new Error(translateSync('plugins.registry.pluginNotFound', { id }));
+	}
 	if (hit.enabled === enabled) {
 		writeCache(data);
 		return data;

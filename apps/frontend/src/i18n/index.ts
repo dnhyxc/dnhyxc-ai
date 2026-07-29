@@ -44,10 +44,18 @@ export function getActiveLocale(): Locale {
 	return DEFAULT_LOCALE;
 }
 
-/** 同步翻译（无 React 上下文） */
-export function translateSync(key: string): string {
+/** 同步翻译（无 React 上下文）；支持 `{name}` 插值 */
+export function translateSync(
+	key: string,
+	params?: Record<string, unknown>,
+): string {
 	const locale = getActiveLocale();
 	const dict = DICTS[locale] ?? DICTS[DEFAULT_LOCALE];
 	const fallback = DICTS[DEFAULT_LOCALE];
-	return dict[key] ?? fallback[key] ?? key;
+	const template = dict[key] ?? fallback[key] ?? key;
+	if (!params) return template;
+	return template.replace(/\{(\w+)\}/g, (full, k) => {
+		const v = params[k];
+		return v == null ? full : String(v);
+	});
 }

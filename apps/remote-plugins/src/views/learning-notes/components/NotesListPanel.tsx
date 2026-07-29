@@ -151,9 +151,9 @@ export const NotesListPanel = observer(function NotesListPanel({
 				) : (
 					<div className="flex flex-col gap-3">
 						{store.list.length === 0 ? (
-							<p className="text-textcolor/45 px-1 py-6 text-center text-xs">
+							<div className="text-textcolor/45 px-1 py-6 text-center text-sm">
 								{t('learningNotes.empty')}
-							</p>
+							</div>
 						) : null}
 						{store.list.map((n) => {
 							const active = activeId === n.id;

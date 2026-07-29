@@ -6,7 +6,7 @@ import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
 import { createHostBridge } from './createHostBridge';
-import { loadRemoteApp, registerRemote } from './mf';
+import { loadRemoteApp, pluginBust, registerRemote } from './mf';
 import { verifyPlugin } from './PluginVerifier';
 import { fetchPluginRegistry, persistPluginEnabled } from './registry';
 import type { LoadedPlugin, PluginDescriptor } from './types';
@@ -59,7 +59,9 @@ class PluginManagerImpl {
 		const eager = enabled.filter((p) => p.preload === 'eager');
 		if (eager.length === 0) return;
 		queueMicrotask(() => {
-			void Promise.all(eager.map((p) => this.loadPlugin(p)));
+			void Promise.all(
+				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
+			);
 		});
 	}
 
@@ -80,9 +82,18 @@ class PluginManagerImpl {
 	}
 
 	async ensurePlugin(id: string, opts?: { force?: boolean }) {
+		const registry = await fetchPluginRegistry({ force: true });
+		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+		if (!meta) {
+			throw new Error(`registry 中无启用插件 ${id}`);
+		}
+		// 生成 bust token：version@updatedAt（1.0.0@2026/07/29 01:49:49）
+		const bust = pluginBust(meta, registry.updatedAt);
 		const cur = this.plugins.get(id);
-		if (cur?.status === 'activated') return cur;
-		if (cur?.status === 'failed' && !opts?.force) {
+		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
+			return cur;
+		}
+		if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
 			throw new Error(cur.error || `加载 ${id} 失败`);
 		}
 
@@ -90,17 +101,15 @@ class PluginManagerImpl {
 		if (pending && !opts?.force) {
 			await pending;
 			const after = this.plugins.get(id);
-			if (after?.status === 'activated') return after;
-			throw new Error(after?.error || `加载 ${id} 失败`);
+			if (after?.status === 'activated' && after.bust === bust) return after;
+			if (after?.status !== 'activated') {
+				throw new Error(after?.error || `加载 ${id} 失败`);
+			}
+			/* bust 已变，继续往下重载 */
 		}
 
-		const registry = await fetchPluginRegistry({ force: true });
-		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
-		if (!meta) {
-			throw new Error(`registry 中无启用插件 ${id}`);
-		}
 		this.mountShell(meta);
-		await this.loadPlugin(meta, opts);
+		await this.loadPlugin(meta, opts, registry.updatedAt);
 		const next = this.plugins.get(id);
 		if (next?.status !== 'activated') {
 			throw new Error(next?.error || `加载 ${id} 失败`);
@@ -108,13 +117,14 @@ class PluginManagerImpl {
 		return next;
 	}
 
-	async loadPlugin(meta: PluginDescriptor, opts?: { force?: boolean }) {
+	async loadPlugin(
+		meta: PluginDescriptor,
+		opts?: { force?: boolean },
+		registryUpdatedAt?: string,
+	) {
+		const bust = pluginBust(meta, registryUpdatedAt);
 		const prev = this.plugins.get(meta.id);
-		if (
-			prev?.status === 'activated' &&
-			prev.meta.version === meta.version &&
-			!opts?.force
-		) {
+		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
 			return;
 		}
 		if (prev?.status === 'activated') {
@@ -128,7 +138,7 @@ class PluginManagerImpl {
 			await existing.catch(() => {});
 		}
 
-		const run = this.runLoad(meta);
+		const run = this.runLoad(meta, bust);
 		this.inflight.set(meta.id, run);
 		try {
 			await run;
@@ -139,13 +149,14 @@ class PluginManagerImpl {
 		}
 	}
 
-	private async runLoad(meta: PluginDescriptor) {
+	private async runLoad(meta: PluginDescriptor, bust: string) {
 		const nav = (to: string) => this.navigateImpl(to);
 		const loading: LoadedPlugin = {
 			meta,
 			bridge: createHostBridge(meta, nav),
 			mod: { default: () => null },
 			status: 'loading',
+			bust,
 		};
 		this.plugins.set(meta.id, loading);
 
@@ -159,11 +170,12 @@ class PluginManagerImpl {
 					bridge: createHostBridge(meta, nav),
 					mod: { default: () => null },
 					status: 'activated',
+					bust,
 				});
 				return;
 			}
 
-			registerRemote(meta);
+			registerRemote(meta, bust);
 			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
 			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
 			try {
@@ -179,6 +191,7 @@ class PluginManagerImpl {
 				bridge,
 				mod,
 				status: 'activated',
+				bust,
 			});
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);

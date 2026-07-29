@@ -51,10 +51,12 @@ export function serveUploadStaticMiddleware(uploadsRoot: string) {
 			res.setHeader('Content-Type', mime);
 		}
 		res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-		// registry 宜短缓存，便于单独更新
+		// remotes（registry）禁止缓存，避免桌面/代理继续吃旧版
 		res.setHeader(
 			'Cache-Control',
-			folder === 'remotes' ? 'public, max-age=60' : 'public, max-age=604800',
+			folder === 'remotes'
+				? 'no-store, max-age=0, must-revalidate'
+				: 'public, max-age=604800',
 		);
 		res.sendFile(absolutePath, (err) => {
 			if (err) {
