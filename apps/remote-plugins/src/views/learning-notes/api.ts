@@ -12,7 +12,7 @@ export type HostHttp = {
 const BASE = '/english-learning/notes';
 
 /** 列表默认每页条数 */
-export const NOTES_PAGE_SIZE = 10;
+export const NOTES_PAGE_SIZE = 20;
 
 export type NoteRecord = {
 	id: string;

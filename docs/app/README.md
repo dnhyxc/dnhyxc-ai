@@ -20,7 +20,7 @@
 | [login-password-secret-input-tab.md](./login-password-secret-input-tab.md) | **登录页密码显隐 + 全局 Tab 仅输入框**：`SecretInput` 接入登录/注册/找回密码、`useInputsOnlyTab` Hook |
 | [wechat-mini-program-login-bind.md](./wechat-mini-program-login-bind.md) | **微信小程序登录与账号关联**：code2session、bind_token/link_code 双 token、JWT 解绑吊销、Web 端绑定面板 |
 | [mf-plugin-host.md](./mf-plugin-host.md) | **Module Federation 动态插件 Host**：registry、校验、loadRemote、路由/侧栏注入、失败不闪烁 |
-| [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md) | **插件 entry 缓存破坏（完整方案）**：根因、四层协同、`mf.ts`/`PluginManager`/`registry`/后端 `no-store` 全量代码、发版验收 |
+| [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md) | **插件 entry 缓存破坏（version@manifestHash）**：Remote manifest 指纹 bust、afterResolve 补 remoteEntry、发布者勿改 Host registry |
 | [mf-shared-react-router.md](./mf-shared-react-router.md) | **勿 shared react-router**：避免生产双 Router / `useLocation` 白屏 |
 | [plugin-registry-hostapi.md](./plugin-registry-hostapi.md) | **Registry hostApi 校验与字段说明**：`VITE_HOST_API_VERSION`、保存校验、`RegistryFieldsHelp`、⌘S |
 | [remote-plugin-hmr.md](./remote-plugin-hmr.md) | **Remote 开发态双次刷新**：勿同文件空 `activate`；tiptap `optimizeDeps.include` |

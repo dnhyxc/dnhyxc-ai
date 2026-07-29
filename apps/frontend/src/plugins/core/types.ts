@@ -143,7 +143,7 @@ export interface LoadedPlugin {
 	mod: PluginModule;
 	status: PluginStatus;
 	error?: string;
-	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
+	/** version@manifestHash；与 MF entry bust 一致，用于判断是否需重载 */
 	bust?: string;
 }
 

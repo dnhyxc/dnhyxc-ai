@@ -119,7 +119,7 @@ export const NotesListPanel = observer(function NotesListPanel({
 	return (
 		<aside className="border-r mb-3 border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden contain-[layout_paint]">
 			<div className="flex h-10 shrink-0 items-center justify-between border-b border-theme/10 pl-3 pr-1.5 font-medium tracking-wide">
-				<div className="text-textcolor/85">
+				<div className="text-textcolor/85 truncate">
 					{t('learningNotes.listTitle')}
 					<span className="ml-3 text-xs text-textcolor/60">
 						{t('common.loadedCount', {
@@ -128,15 +128,17 @@ export const NotesListPanel = observer(function NotesListPanel({
 						})}
 					</span>
 				</div>
-				<Btn title={scrollTitle} onClick={onScrollFabClick}>
-					{displayMode === 'bottom' ? (
-						<ChevronDown size={18} />
-					) : displayMode === 'top' ? (
-						<ChevronUp size={18} />
-					) : (
-						<LocateFixed size={15} />
-					)}
-				</Btn>
+				{store.list.length <= 10 ? null : (
+					<Btn title={scrollTitle} onClick={onScrollFabClick}>
+						{displayMode === 'bottom' ? (
+							<ChevronDown size={18} />
+						) : displayMode === 'top' ? (
+							<ChevronUp size={18} />
+						) : (
+							<LocateFixed size={15} />
+						)}
+					</Btn>
+				)}
 			</div>
 			{/* ScrollArea 与想法列表/编辑器滚动条一致；逻辑仍 rAF 节流，不重渲右侧 */}
 			<ScrollArea
@@ -149,9 +151,9 @@ export const NotesListPanel = observer(function NotesListPanel({
 						<Loading className="flex-1" />
 					</div>
 				) : (
-					<div className="flex flex-col gap-3">
+					<div className="flex flex-col gap-3 flex-1">
 						{store.list.length === 0 ? (
-							<div className="text-textcolor/45 px-1 py-6 text-center text-sm">
+							<div className="flex-1 text-textcolor/45 px-1 flex items-start pt-7 justify-center text-center text-sm">
 								{t('learningNotes.empty')}
 							</div>
 						) : null}

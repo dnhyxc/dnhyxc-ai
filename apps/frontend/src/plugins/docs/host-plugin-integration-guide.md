@@ -1094,7 +1094,7 @@ flowchart TD
     E -->|hostApi 不兼容| F[提示错误，不写入]
     E -->|通过| G[savePluginRegistry 写 updatedAt + PUT]
     G --> H[clearPluginRegistryCache + pluginManager.init]
-    H --> I[完成；entry bust 用 version@updatedAt]
+    H --> I[完成；entry bust 用 version@manifestHash（与 registry updatedAt 解耦）]
 ```
 
 ---
@@ -1305,18 +1305,18 @@ export const routeInjector = new RouteInjectorImpl();
 发版后桌面仍显示旧插件，通常不是「没上传」，而是：
 
 1. MF 把真正 `import()` 的地址改写成**无 query** 的 `remoteEntry.js`，WKWebView 强缓存；
-2. 旧 Host「已 activated 就 return」，不比对 registry。
+2. 旧 Host「已 activated 就 return」，不比对 bust。
 
 **现行方案（Host）**：
 
-- bust = `version@registry.updatedAt`
+- bust = `version@manifestHash`（`resolvePluginBust` 拉 Remote 自有 `mf-manifest` 指纹；**不依赖**改 registry）
 - `registerRemote` 给 manifest 加 `?v=`；Runtime `afterResolve` 再给 `remoteEntry.js` 加 `?v=`
 - `ensurePlugin` / `loadPlugin` 用 `LoadedPlugin.bust` 决定是否重载
-- force 拉 registry 加 `?t=`；服务端 `/remotes` 为 `no-store`
+- force 拉 registry 加 `?t=`；服务端 `/remotes` 为 `no-store`（清单防缓存，与 entry bust 解耦）
 
 **完整思路 + 全量代码**：见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案) 与仓库 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
 
-**运维要点**：更新 `version` 或保存 registry（刷新 `updatedAt`）；**桌面必须发含该逻辑的壳**。
+**运维要点**：部署新 Remote 静态资源即可；**不要**为刷缓存让发布者改 Host registry；**桌面必须发含该逻辑的壳**。
 
 ### 12.1 PluginManager 状态机
 
@@ -1339,14 +1339,14 @@ console.log(plugin?.status); // 'registered' | 'loading' | 'activated' | 'failed
 // 获取所有已加载插件
 const allPlugins = pluginManager.list();
 
-// 确保插件可用（按需加载；内部 force 拉 registry，按 version@updatedAt bust 判断是否重载）
+// 确保插件可用（按需加载；内部 force 拉 registry，按 version@manifestHash bust 判断是否重载）
 await pluginManager.ensurePlugin("myPlugin");
 
 // 强制重新加载
 await pluginManager.ensurePlugin("myPlugin", { force: true });
 ```
 
-> **注意**：仅 `status === 'activated'` **不再**跳过加载；须 `LoadedPlugin.bust` 与当前 registry 的 `pluginBust(meta, updatedAt)` 一致才会复用。发新版时更新 registry 的 `version` 或保存以刷新 `updatedAt`，并确保桌面 Host 壳含 bust 逻辑。
+> **注意**：仅 `status === 'activated'` **不再**跳过加载；须 `LoadedPlugin.bust` 与当前 `await resolvePluginBust(meta)`（`version@manifestHash`）一致才会复用。发新版时部署 Remote 静态资源即可，并确保桌面 Host 壳含 bust 逻辑。
 
 ### 12.3 上架/下架
 
@@ -1496,11 +1496,11 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 
 ### Q5：插件版本更新后如何生效？
 
-1. 部署新 Remote 静态资源
-2. 更新 Registry 的 **`version`** 和/或保存一次以刷新 **`updatedAt`**（`savePluginRegistry` 会校验 `hostApiRange`）
-3. Host 用 `version@updatedAt` 作为 MF entry `?v=`；`afterResolve` 给改写后的 `remoteEntry.js` 再补 bust
+1. 部署新 Remote 静态资源（`mf-manifest.json` 正文须变化）
+2. Host 用 `resolvePluginBust` → `version@manifestHash` 作为 MF entry `?v=`；`afterResolve` 给改写后的 `remoteEntry.js` 再补 bust
+3. **不必**为刷缓存改 Host `plugins-registry.json`（上架 / 权限 / `entry` URL 等仍由管理员维护）
 4. **桌面生产**：须发布含上述逻辑的 Host 壳；只发插件不发壳仍可能吃旧 entry
-5. 后端 `/remotes` 为 `no-store`
+5. 后端 `/remotes` 为 `no-store`（清单本身）
 
 细节与完整代码：[mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)。
 

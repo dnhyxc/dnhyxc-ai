@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry 用 `version@updatedAt` bust + `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）+ `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
 
 ---
 
@@ -52,7 +52,7 @@
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
 - **样式隔离**：Host 运行时 `@scope([data-mf-plugin])` + head 劫持 + MutationObserver（详解 §2.10.2）；`untrusted` 走 iframe
-- **entry 缓存破坏**：`pluginBust = version@registryUpdatedAt`；`registerRemotes` 与 `afterResolve` 均给 entry / `remoteEntry.js` 补 `?v=`（WKWebView 固定名 ESM 强缓存）
+- **entry 缓存破坏**：`pluginBust = version@manifestHash`（指纹来自 Remote 自有 `mf-manifest`；发布者勿改 Host registry）；`registerRemotes` 与 `afterResolve` 均给 entry / `remoteEntry.js` 补 `?v=`（WKWebView 固定名 ESM 强缓存）
 - **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
 
 ---
@@ -289,6 +289,7 @@ function exposeBaseOf(d: PluginDescriptor) {
  * - 绝对 URL 用 URLSearchParams；相对路径手工拼 query
  */
 export function withBust(url: string, bust: string): string {
+	// 去空白；空则不改 URL（完整逐行见 §2.13.5）
 	const token = bust.trim();
 	if (!token) return url;
 	try {
@@ -307,25 +308,67 @@ export function withBust(url: string, bust: string): string {
 	}
 }
 
-/** bust token：`version` 或 `version@registryUpdatedAt` */
+/** bust token：`version` 或 `version@manifestHash`（完整逐行注释见 §2.13.5） */
 export function pluginBust(
+	// 至少需要 registry 声明的 version
 	meta: Pick<PluginDescriptor, 'version'>,
-	registryUpdatedAt?: string,
+	// Remote mf-manifest 内容指纹；勿传 registry.updatedAt
+	buildId?: string,
 ): string {
-	return [meta.version.trim(), registryUpdatedAt?.trim()]
-		.filter(Boolean)
-		.join('@');
+	// version 与 buildId 去空白后过滤空值，用 @ 连接
+	return [meta.version.trim(), buildId?.trim()].filter(Boolean).join('@');
+}
+
+/** FNV-1a 32-bit；仅作 cache bust（完整注释见 §2.13.5） */
+function hashText(text: string): string {
+	// FNV offset basis
+	let h = 2166136261;
+	// 逐字符异或再乘 FNV prime
+	for (let i = 0; i < text.length; i++) {
+		h ^= text.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	// 无符号 32 位十六进制
+	return (h >>> 0).toString(16);
+}
+
+/** 拉取 Remote 自有 mf-manifest，内容指纹做 buildId（完整注释见 §2.13.5） */
+export async function fetchEntryBuildId(entry: string): Promise<string> {
+	// 一次性 t= 防中间层缓存旧正文
+	const url = withBust(entry, `t${Date.now()}`);
+	// 禁止浏览器复用磁盘缓存
+	const res = await fetch(url, { cache: 'no-store' });
+	if (!res.ok) {
+		throw new Error(`entry buildId ${res.status}: ${entry}`);
+	}
+	return hashText(await res.text());
+}
+
+/** trusted → version@hash；untrusted → 仅 version（完整注释见 §2.13.5） */
+export async function resolvePluginBust(
+	meta: Pick<PluginDescriptor, 'version' | 'entry' | 'trust'>,
+): Promise<string> {
+	if (meta.trust === 'untrusted') {
+		return pluginBust(meta);
+	}
+	const buildId = await fetchEntryBuildId(meta.entry);
+	return pluginBust(meta, buildId);
 }
 
 /**
  * MF snapshot 会把 entry 改写成无 query 的 `.../remoteEntry.js`，
  * WKWebView 对固定名 ESM 强缓存。本钩子在 afterResolve 再补 `?v=`。
+ * （afterResolve 逐行注释见 §2.13.5）
  */
 const bustRemoteEntryPlugin: ModuleFederationRuntimePlugin = {
+	// 插件名（完整 afterResolve 逐行见 §2.13.5）
 	name: 'bust-remote-entry',
 	async afterResolve(args) {
+		// federation remote name
 		const name = args.remoteInfo?.name;
+		// registerRemote 写入的 token
 		const bust = name ? bustByRemote.get(name) : undefined;
+		// MF 改写后的 remoteEntry.js 再补 ?v=
 		if (bust && args.remoteInfo?.entry) {
 			args.remoteInfo.entry = withBust(args.remoteInfo.entry, bust);
 		}
@@ -336,20 +379,26 @@ const bustRemoteEntryPlugin: ModuleFederationRuntimePlugin = {
 /**
  * 注册远程模块
  * @param d - 插件描述符
- * @param bust - 可选；默认用 version。通常传入 pluginBust(meta, registry.updatedAt)
+ * @param bust - 可选；默认用 version。通常传入 await resolvePluginBust(meta)
  * - entry 先 withBust；同时写入 bustByRemote 供 afterResolve 使用
  * - force: true 允许覆盖已注册的 remote
  */
 export function registerRemote(d: PluginDescriptor, bust?: string) {
+	// 确保 React shared
 	ensureShared();
+	// 确保 afterResolve 已注册
 	ensureBustPlugin();
+	// 显式 bust 或回退 version
 	const token = (bust ?? d.version).trim();
+	// federation name
 	const name = remoteNameOf(d);
+	// 供 afterResolve 按 name 取回
 	if (token) bustByRemote.set(name, token);
 	getMf().registerRemotes(
 		[
 			{
 				name,
+				// manifest 先带 ?v=（MF 可能剥掉，故还需 afterResolve）
 				entry: withBust(d.entry, token),
 				type: 'module',
 			},
@@ -572,7 +621,7 @@ export interface LoadedPlugin {
 	mod: PluginModule;         // 插件模块
 	status: PluginStatus;      // 当前状态
 	error?: string;            // 错误信息（失败时）
-	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
+	/** version@manifestHash；与 MF entry bust 一致，用于判断是否需重载 */
 	bust?: string;
 }
 
@@ -612,7 +661,7 @@ import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
 import { createHostBridge } from './createHostBridge';
-import { loadRemoteApp, pluginBust, registerRemote } from './mf';
+import { loadRemoteApp, registerRemote, resolvePluginBust } from './mf';
 import { verifyPlugin } from './PluginVerifier';
 import { fetchPluginRegistry, persistPluginEnabled } from './registry';
 import type { LoadedPlugin, PluginDescriptor } from './types';
@@ -704,7 +753,7 @@ class PluginManagerImpl {
 		// 在微任务中后台预拉，不阻塞主应用启动
 		queueMicrotask(() => {
 			void Promise.all(
-				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
+				eager.map((p) => this.loadPlugin(p)),
 			);
 		});
 	}
@@ -737,27 +786,36 @@ class PluginManagerImpl {
 	 * @param id - 插件 ID
 	 * @param opts - 选项（force: 强制重新加载）
 	 * @returns 已激活的插件
-	 * - 先 force 拉 registry，算 bust = version@updatedAt
+	 * - 先 force 拉 registry 取 meta，再 resolvePluginBust → version@manifestHash
 	 * - 已激活且 bust 未变且未 force：直接返回
 	 * - bust 已变：继续重载（即使 status 仍是 activated）
 	 */
 	async ensurePlugin(id: string, opts?: { force?: boolean }) {
+		// 强制拉最新 registry（清单防缓存；与 entry bust 解耦）
 		const registry = await fetchPluginRegistry({ force: true });
+		// 找已启用的目标插件
 		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+		// 未启用或不存在则失败
 		if (!meta) {
 			throw new Error(`registry 中无启用插件 ${id}`);
 		}
-		const bust = pluginBust(meta, registry.updatedAt);
+		// version@manifestHash（逐行细节见 §2.13.6）
+		const bust = await resolvePluginBust(meta);
+		// 读内存态
 		const cur = this.plugins.get(id);
 
+		// 已激活且 bust 未变且未 force → 复用
 		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
 			return cur;
 		}
+		// 同 bust 失败且未 force → 抛旧错
 		if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
 			throw new Error(cur.error || `加载 ${id} 失败`);
 		}
 
+		// 并发加载 Promise
 		const pending = this.inflight.get(id);
+		// 非 force 时等待并发结果
 		if (pending && !opts?.force) {
 			await pending;
 			const after = this.plugins.get(id);
@@ -768,8 +826,10 @@ class PluginManagerImpl {
 			/* bust 已变，继续往下重载 */
 		}
 
+		// 确保路由/侧栏壳
 		this.mountShell(meta);
-		await this.loadPlugin(meta, opts, registry.updatedAt);
+		// 传入 bust，避免 loadPlugin 重复 fetch manifest
+		await this.loadPlugin(meta, opts, bust);
 		const next = this.plugins.get(id);
 		if (next?.status !== 'activated') {
 			throw new Error(next?.error || `加载 ${id} 失败`);
@@ -781,20 +841,26 @@ class PluginManagerImpl {
 	 * 加载插件
 	 * @param meta - 插件描述符
 	 * @param opts - 选项（force: 强制重新加载）
-	 * @param registryUpdatedAt - registry.updatedAt，参与 bust
+	 * @param bustToken - 可选；已算好的 bust，避免 ensurePlugin 重复 fetch
 	 */
 	async loadPlugin(
+		// 插件描述符
 		meta: PluginDescriptor,
+		// force 时忽略 bust 相等短路
 		opts?: { force?: boolean },
-		registryUpdatedAt?: string,
+		// 已算好的 bust；缺省则内部 resolvePluginBust
+		bustToken?: string,
 	) {
-		const bust = pluginBust(meta, registryUpdatedAt);
+		// 复用传入 token，或自行拉 manifest 指纹
+		const bust = bustToken ?? (await resolvePluginBust(meta));
 		const prev = this.plugins.get(meta.id);
 
+		// bust 未变 → 短路
 		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
 			return;
 		}
 
+		// bust 变了 → 先卸旧
 		if (prev?.status === 'activated') {
 			await this.unloadPlugin(meta.id);
 			this.mountShell(meta);
@@ -806,6 +872,7 @@ class PluginManagerImpl {
 			await existing.catch(() => {});
 		}
 
+		// 真正加载，写入 LoadedPlugin.bust
 		const run = this.runLoad(meta, bust);
 		this.inflight.set(meta.id, run);
 
@@ -821,10 +888,12 @@ class PluginManagerImpl {
 	/**
 	 * 执行实际加载逻辑
 	 * @param meta - 插件描述符
-	 * @param bust - version@updatedAt，写入 LoadedPlugin 并传给 registerRemote
+	 * @param bust - version@manifestHash，写入 LoadedPlugin 并传给 registerRemote
 	 */
 	private async runLoad(meta: PluginDescriptor, bust: string) {
+		// navigate 绑定（完整逐行见 §2.13.6）
 		const nav = (to: string) => this.navigateImpl(to);
+		// loading 占位并带上本次 bust
 		const loading: LoadedPlugin = {
 			meta,
 			bridge: createHostBridge(meta, nav),
@@ -837,6 +906,7 @@ class PluginManagerImpl {
 		try {
 			await verifyPlugin(meta);
 
+			// iframe 插件不进 MF
 			if (meta.trust === 'untrusted') {
 				this.plugins.set(meta.id, {
 					meta,
@@ -848,10 +918,12 @@ class PluginManagerImpl {
 				return;
 			}
 
+			// entry ?v=bust + bustByRemote
 			registerRemote(meta, bust);
 			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
 			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
 			try {
+				// afterResolve 会给 remoteEntry 再补 ?v=
 				mod = await loadRemoteApp(meta);
 			} finally {
 				endCapture();
@@ -2322,8 +2394,9 @@ const App = () => {
 
 ### 2.13 插件/子应用加载缓存破坏（完整方案）
 
-> **专题角色**：发版后桌面 / WebView 仍加载旧插件、或 registry 已更新但 `remoteEntry.js` 仍是旧包——根因与端到端修复。  
-> 仓库归档副本：[`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)（与本节同步维护）。
+> **专题角色**：发版后桌面 / WebView 仍加载旧插件、或只发静态资源却仍吃旧 `remoteEntry.js`——根因与端到端修复。  
+> **当前 bust**：`version@manifestHash`（Remote 自有 manifest 指纹）；**禁止**靠改 Host `plugins-registry.json` 刷缓存。  
+> 仓库归档副本：[`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)（与本节同步维护；若冲突以源码与该归档文为准）。
 
 #### 2.13.1 问题现象
 
@@ -2332,7 +2405,8 @@ const App = () => {
 | 桌面端发了新版插件 | 打开仍是旧 UI / 旧逻辑 |
 | 只改了 `mf-manifest.json` 的 query | 无效：真正 `import()` 的仍是无 query 的 `remoteEntry.js` |
 | 只 bump 了插件 `version`，Host 壳是旧逻辑 | 旧 Host「已 activated 就 return」，内存里不重载 |
-| registry 文件被代理 / WebView 缓存 | Host 读到旧 `updatedAt` / 旧 `entry` |
+| 旧方案：依赖改 registry `updatedAt` | 发布者被迫写 Host 清单 → **不安全** / 运维重 |
+| registry 文件被代理 / WebView 缓存 | Host 读到旧权限 / 旧 `entry`（与 entry bust 解耦后仍须 `no-store`） |
 
 #### 2.13.2 根因（两层缓存 + 一层短路）
 
@@ -2343,41 +2417,42 @@ sequenceDiagram
   participant Net as WebView/代理缓存
   participant CDN as Remote 静态资源
 
-  Host->>MF: registerRemotes(entry=mf-manifest.json?v=1.2.0)
-  MF->>CDN: GET mf-manifest.json?v=1.2.0
+  Host->>CDN: GET mf-manifest.json（算 buildId）
+  Host->>MF: registerRemotes(entry=mf-manifest.json?v=version@hash)
+  MF->>CDN: GET mf-manifest.json?v=...
   Note over MF: snapshot 解析后改写 entry<br/>变成 .../remoteEntry.js（去掉 ?v=）
   MF->>Net: import(.../remoteEntry.js)
   Net-->>MF: 命中固定 URL 的强缓存 → 旧模块
-  Note over Host: 旧 ensurePlugin：status===activated 直接 return<br/>即便 registry 已变也不重载
+  Note over Host: 旧 ensurePlugin：status===activated 直接 return<br/>即便资源已变也不重载
 ```
 
 1. **HTTP / WebView 层**：固定路径的 ESM（`remoteEntry.js`）在 WKWebView 等环境会被强缓存；仅给 manifest 加 `?v=` 不够。
 2. **MF 运行时层**：解析 manifest 后常把 `remoteInfo.entry` **改写成无 query 的 `remoteEntry.js`**。
-3. **Host 业务层**：旧逻辑「已 `activated` 就短路」，不比对 `version` / `updatedAt`，进程内永不重载。
+3. **Host 业务层**：旧逻辑「已 `activated` 就短路」，不比对 bust，进程内永不重载。
 
-#### 2.13.3 解决思路（四层协同）
+#### 2.13.3 解决思路（协同）
 
 | 层 | 手段 | 作用 |
 |----|------|------|
-| A. bust token | `pluginBust = version@registryUpdatedAt` | 资源版本或清单保存任一变化，token 就变 |
-| B. register 时 | `registerRemote(meta, bust)` → `entry = withBust(entry, bust)` + 写入 `bustByRemote` | manifest URL 带 `?v=` |
-| C. resolve 后 | Runtime 插件 `afterResolve` 再对改写后的 `remoteEntry.js` `withBust` | **真正 import 的 URL 也带 `?v=`** |
-| D. 是否重载 | `LoadedPlugin.bust`；`ensurePlugin` / `loadPlugin` 仅 `bust` 相同才跳过 | 内存态与 registry 对齐 |
-| E. registry 拉取 | force 时 URL `?t=Date.now()` + `cache: 'no-store'` | 少读到旧清单 |
-| F. 服务端 | `/remotes` 响应 `Cache-Control: no-store` | 代理 / 浏览器少缓存清单 |
+| A. bust token | `resolvePluginBust` → `version@manifestHash` | 只发 Remote 静态资源即可变 token；**不改 Host registry** |
+| B. register 时 | `registerRemote(meta, bust)` → `entry = withBust` + `bustByRemote` | manifest URL 带 `?v=` |
+| C. resolve 后 | `afterResolve` 再对 `remoteEntry.js` `withBust` | **真正 import 的 URL 也带 `?v=`** |
+| D. 是否重载 | `LoadedPlugin.bust`；仅 bust 相同才跳过 | 内存态与 Remote 构建对齐 |
+| E. registry 拉取 | force 时 `?t=` + `no-store` | 少读到旧**清单**（权限 / entry URL）；与 entry bust **解耦** |
+| F. 服务端 | `/remotes` → `Cache-Control: no-store` | 代理少缓存清单 |
 
 **发版 checklist**：
 
-1. 部署新 Remote 静态资源（新 `remoteEntry.js` 等）。
-2. 更新 registry：`version` 和/或保存一次（自动写 `updatedAt`）；`hostApiRange` 须覆盖 Host API。
-3. **桌面生产必须发含本方案的 Host 壳**（逻辑打在壳里；只发插件不发壳无效）。
+1. 部署新 Remote 静态资源（`mf-manifest.json` 正文须变化）。
+2. **不要**为刷缓存改 `plugins-registry.json`；仅管理员改上架 / 权限 / `entry` URL 等。
+3. **桌面生产必须发含本方案的 Host 壳**（`resolvePluginBust` + `afterResolve`）。
 
 #### 2.13.4 端到端数据流
 
 ```mermaid
 flowchart TD
-  A[ensurePlugin / init eager] --> B[fetchPluginRegistry force=true<br/>URL 加 ?t=]
-  B --> C[pluginBust version@updatedAt]
+  A[ensurePlugin / init eager] --> B[fetchPluginRegistry force=true<br/>取 meta]
+  B --> C[resolvePluginBust<br/>fetch manifest → FNV hash]
   C --> D{内存 LoadedPlugin.bust<br/>=== 当前 bust?}
   D -->|是且未 force| E[复用已加载模块]
   D -->|否| F[unload 旧插件可选]
@@ -2390,462 +2465,495 @@ flowchart TD
   L --> M[activate → status=activated<br/>写入 LoadedPlugin.bust]
 ```
 
-#### 2.13.5 完整源码：`mf.ts`（缓存相关 + 全文件）
+#### 2.13.5 完整源码：`mf.ts`（缓存相关，逐行注释）
 
-**路径**：`apps/frontend/src/plugins/core/mf.ts`
+**改动后** · `apps/frontend/src/plugins/core/mf.ts`（约 L15–L195，缓存相关符号完整定义）
 
 ```typescript
-import {
-	createInstance,
-	getInstance,
-	type ModuleFederation,
-	type ModuleFederationRuntimePlugin,
-} from '@module-federation/enhanced/runtime';
-import React from 'react';
-import ReactDOM from 'react-dom';
-import type { PluginDescriptor, PluginModule } from './types';
-
-let mf: ModuleFederation | null = null;
-let sharedReady = false;
-// afterResolve 插件是否已 registerPlugins
-let bustPluginReady = false;
-
-/** remoteName → bust；供 afterResolve 在 MF 改写 entry 后补 ?v= */
+// remoteName → bust token 的内存表；afterResolve 按 remote 名取回同一 token
 const bustByRemote = new Map<string, string>();
 
-/**
- * MF 一律走 WebView 原生 fetch/import（不走 plugin-http）。
- * 第三方插件域名不必写进 capabilities；对方对 Host Origin + tauri://localhost 开 CORS 即可。
- */
-function getMf(): ModuleFederation {
-	if (mf) return mf;
-	try {
-		const existing = getInstance();
-		if (existing) {
-			mf = existing;
-			return mf;
-		}
-	} catch {
-		/* no default instance yet */
-	}
-	mf = createInstance({ name: 'host', remotes: [] });
-	return mf;
-}
+// 是否已向 MF Runtime 注册过 bustRemoteEntryPlugin（只注册一次）
+let bustPluginReady = false;
 
-/** 给任意 URL 写入/覆盖查询参数 v=（manifest 与 remoteEntry 共用） */
+/**
+ * 给任意 URL 写入/覆盖查询参数 v=（manifest 与 remoteEntry 共用同一 token）
+ * @param url - 原始绝对或相对 URL，可已含 query / hash
+ * @param bust - cache bust token；空串则原样返回
+ */
 export function withBust(url: string, bust: string): string {
+	// 去掉首尾空白，避免写出 ?v=%20
 	const token = bust.trim();
+	// 无有效 token 时不改 URL，避免无意义的 ?v=
 	if (!token) return url;
 	try {
+		// 标准绝对 URL：用 URL API 解析
 		const u = new URL(url);
+		// 写入或覆盖同名查询参数 v
 		u.searchParams.set('v', token);
+		// 返回带 bust 的完整 href（含 origin / path / query / hash）
 		return u.href;
 	} catch {
-		// 相对路径或非法绝对 URL：手工拼 query，保留 hash
+		// 相对路径或非法 URL：手工拼 query，并保留 hash
+		// 定位 hash 起始下标（含 #）；无 hash 则为 -1
 		const hashIdx = url.indexOf('#');
+		// 截出 hash 段（含 #）或空串
 		const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+		// 去掉 hash 后的主体
 		const noHash = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+		// 是否已有 ?
 		const qIdx = noHash.indexOf('?');
+		// 无 query 的路径基址
 		const base = qIdx >= 0 ? noHash.slice(0, qIdx) : noHash;
+		// 解析已有 query（可能为空）
 		const params = new URLSearchParams(qIdx >= 0 ? noHash.slice(qIdx + 1) : '');
+		// 写入/覆盖 v
 		params.set('v', token);
+		// 拼回 base?params#hash
 		return `${base}?${params.toString()}${hash}`;
 	}
 }
 
 /**
- * bust token：插件 version + 可选 registry.updatedAt
- * 例：1.2.0@2026/07/29 08:00:00
+ * 组装 bust 字符串：version 与可选 buildId 用 @ 连接
+ * @param meta - 至少含 registry 声明的 version（展示/兼容用）
+ * @param buildId - Remote mf-manifest 内容指纹；勿传 registry.updatedAt（避免发布者改 Host 清单）
  */
 export function pluginBust(
+	// 只取 version 字段，避免无关依赖
 	meta: Pick<PluginDescriptor, 'version'>,
-	registryUpdatedAt?: string,
+	// Remote 构建指纹（manifest hash）
+	buildId?: string,
+	// 返回如 1.0.0@a1b2c3d4
 ): string {
-	return [meta.version.trim(), registryUpdatedAt?.trim()]
-		.filter(Boolean)
-		.join('@');
+	// 去空白后过滤空段，再用 @ 拼接
+	return [meta.version.trim(), buildId?.trim()].filter(Boolean).join('@');
 }
 
 /**
- * MF snapshot 常把 entry 改写成无 query 的 .../remoteEntry.js。
- * WKWebView 对固定名 ESM 强缓存 → 必须在改写之后再补 ?v=。
+ * FNV-1a 32-bit 内容指纹；仅作 cache bust，非安全哈希
+ * @param text - mf-manifest.json 响应正文
+ */
+function hashText(text: string): string {
+	// FNV offset basis
+	let h = 2166136261;
+	// 逐字节（此处按 UTF-16 code unit）异或再乘 FNV prime
+	for (let i = 0; i < text.length; i++) {
+		// 异或当前字符码
+		h ^= text.charCodeAt(i);
+		// 乘以 16777619（FNV prime），Math.imul 保 32-bit
+		h = Math.imul(h, 16777619);
+	}
+	// 无符号右移得到无符号 32 位，再转十六进制字符串
+	return (h >>> 0).toString(16);
+}
+
+/**
+ * 拉取 Remote 自有的 mf-manifest，用内容指纹做 buildId
+ * 发布者只更新自己域名静态资源即可；无需也不应改 Host registry
+ * @param entry - registry 中的 entry，通常为 …/mf-manifest.json
+ */
+export async function fetchEntryBuildId(entry: string): Promise<string> {
+	// 一次性 t= 防 HTTP 中间层缓存旧 manifest（与最终 ?v=bust 不同用途）
+	const url = withBust(entry, `t${Date.now()}`);
+	// 原生 fetch；cache: no-store 要求浏览器勿复用磁盘缓存
+	const res = await fetch(url, { cache: 'no-store' });
+	// 非 2xx：明确失败，避免静默用空正文算出假指纹
+	if (!res.ok) {
+		// 带上 status 与 entry，便于 CORS / 404 排障
+		throw new Error(`entry buildId ${res.status}: ${entry}`);
+	}
+	// 读全文并 FNV 哈希；manifest 变（hashed chunk 引用变）则 hash 变
+	return hashText(await res.text());
+}
+
+/**
+ * 解析当前插件应使用的 bust token
+ * trusted MF：version@manifestHash；untrusted：仅 version（iframe 不走 MF entry）
+ */
+export async function resolvePluginBust(
+	// 需要 version / entry / trust 三分量
+	meta: Pick<PluginDescriptor, 'version' | 'entry' | 'trust'>,
+	// 异步：trusted 路径会网络请求
+): Promise<string> {
+	// iframe 插件无 mf-manifest，不拉 Remote 指纹
+	if (meta.trust === 'untrusted') {
+		// 仅 version；上架变更仍靠管理员改 registry
+		return pluginBust(meta);
+	}
+	// 对 Remote 源站拉 manifest 并哈希
+	const buildId = await fetchEntryBuildId(meta.entry);
+	// 拼成 version@hash，供 registerRemote / LoadedPlugin.bust 共用
+	return pluginBust(meta, buildId);
+}
+
+/**
+ * MF Runtime 插件：snapshot 常把 entry 改写成无 query 的 …/remoteEntry.js
+ * WKWebView 对固定名 ESM 强缓存 → 必须在改写之后再补 ?v=
  */
 const bustRemoteEntryPlugin: ModuleFederationRuntimePlugin = {
+	// 插件名，便于调试与去重注册
 	name: 'bust-remote-entry',
+	// MF 解析 remote 信息之后调用
 	async afterResolve(args) {
+		// 当前 remote 的 federation name（与 registerRemotes.name 一致）
 		const name = args.remoteInfo?.name;
+		// 查 registerRemote 时写入的 bust token
 		const bust = name ? bustByRemote.get(name) : undefined;
+		// 有 token 且 entry 已被改写成 remoteEntry.js 时再补 query
 		if (bust && args.remoteInfo?.entry) {
+			// 覆盖 remoteInfo.entry，真正 import() 的 URL 带 ?v=
 			args.remoteInfo.entry = withBust(args.remoteInfo.entry, bust);
 		}
+		// 必须返回 args 供后续流水线使用
 		return args;
 	},
 };
 
+/** 确保 bustRemoteEntryPlugin 只向 MF 注册一次 */
 function ensureBustPlugin() {
+	// 已注册则直接返回
 	if (bustPluginReady) return;
+	// 向当前 MF 实例注册 afterResolve 钩子
 	getMf().registerPlugins([bustRemoteEntryPlugin]);
+	// 标记已就绪，避免重复 registerPlugins
 	bustPluginReady = true;
 }
 
-function ensureShared() {
-	if (sharedReady) return;
-	const instance = getMf();
-	instance.registerShared({
-		react: {
-			version: React.version,
-			scope: 'default',
-			get: async () => () => React,
-			shareConfig: {
-				singleton: true,
-				requiredVersion: `^${React.version}`,
-			},
-		},
-		'react-dom': {
-			version: ReactDOM.version || React.version,
-			scope: 'default',
-			get: async () => () => ReactDOM,
-			shareConfig: {
-				singleton: true,
-				requiredVersion: `^${ReactDOM.version || React.version}`,
-			},
-		},
-	});
-	sharedReady = true;
-}
-
-function remoteNameOf(d: PluginDescriptor) {
-	return d.remoteName?.trim() || d.id;
-}
-
-/** `./IdeasList` → `IdeasList` */
-function exposeBaseOf(d: PluginDescriptor) {
-	const raw = (d.expose?.trim() || './App').replace(/^\.\//, '');
-	return raw || 'App';
-}
-
 /**
- * 注册远程：entry 带 ?v=；写入 bustByRemote；force 覆盖同名 remote
- * @param bust 通常为 pluginBust(meta, registry.updatedAt)
+ * 注册远程模块：entry 带 ?v=；写入 bustByRemote；force 覆盖同名 remote
+ * @param d - 插件描述符（含 entry / remoteName / version）
+ * @param bust - 通常为 await resolvePluginBust(meta)；缺省回退 d.version
  */
 export function registerRemote(d: PluginDescriptor, bust?: string) {
+	// 确保 React / react-dom shared 已注册
 	ensureShared();
+	// 确保 afterResolve 钩子已挂上
 	ensureBustPlugin();
+	// 最终 token：显式 bust 或仅 version
 	const token = (bust ?? d.version).trim();
+	// federation remote 名：remoteName 优先，否则 id
 	const name = remoteNameOf(d);
+	// 非空 token 写入 Map，供 afterResolve 按 name 读取
 	if (token) bustByRemote.set(name, token);
+	// 强制重新 register，避免旧 entry 残留
 	getMf().registerRemotes(
 		[
 			{
+				// federation remote name
 				name,
+				// manifest URL 先带 ?v=token（MF 仍可能剥掉，故还需 afterResolve）
 				entry: withBust(d.entry, token),
+				// ESM remote
 				type: 'module',
 			},
 		],
+		// force: true 覆盖同名 remote
 		{ force: true },
 	);
 }
 
+/**
+ * 加载 Remote expose 模块（default 导出为 React 组件）
+ * 调用前须已 registerRemote（含正确 bust）
+ */
 export async function loadRemoteApp(
+	// 插件描述符
 	d: PluginDescriptor,
+	// 返回含 default / 可选 activate 的模块
 ): Promise<PluginModule> {
+	// 防御：确保 shared 已就绪
 	ensureShared();
+	// 防御：确保 afterResolve 已注册（即便绕过 registerRemote 误调）
 	ensureBustPlugin();
+	// 解析 federation name
 	const name = remoteNameOf(d);
+	// 解析 expose 基名（./App → App）
 	const expose = exposeBaseOf(d);
+	// 按 name/expose 动态 loadRemote
 	const mod = await getMf().loadRemote<PluginModule>(`${name}/${expose}`);
+	// 契约：必须有 default 组件
 	if (!mod?.default) {
+		// 缺 default 时抛错，上层记 failed
 		throw new Error(
 			`plugin ${d.id}: expose ./${expose} missing default export`,
 		);
 	}
+	// 返回已加载模块
 	return mod;
 }
 ```
 
-#### 2.13.6 完整源码：`LoadedPlugin.bust`（`types.ts` 摘录）
+**变更摘要**：bust 第二段从 `registry.updatedAt` 改为 Remote `mf-manifest` 的 FNV 指纹；新增 `fetchEntryBuildId` / `resolvePluginBust`；`withBust` + `afterResolve` 仍负责给真正 `import` 的 `remoteEntry.js` 补 `?v=`。
 
-**路径**：`apps/frontend/src/plugins/core/types.ts`
+#### 2.13.6 完整源码：`PluginManager`（bust 重载路径，逐行注释）
 
-```typescript
-export interface LoadedPlugin {
-	meta: PluginDescriptor;
-	bridge: HostBridgeProps;
-	mod: PluginModule;
-	status: PluginStatus;
-	error?: string;
-	/** version@registryUpdatedAt；与 MF entry bust 一致，用于判断是否需重载 */
-	bust?: string;
-}
-```
-
-#### 2.13.7 完整源码：`PluginManager`（重载判定）
-
-**路径**：`apps/frontend/src/plugins/core/PluginManager.ts`（与缓存相关的方法；文件其余见源码）
+**改动后** · `apps/frontend/src/plugins/core/PluginManager.ts`（`init` eager / `ensurePlugin` / `loadPlugin` / `runLoad`）
 
 ```typescript
-import { loadRemoteApp, pluginBust, registerRemote } from './mf';
-import { fetchPluginRegistry, persistPluginEnabled } from './registry';
-import type { LoadedPlugin, PluginDescriptor } from './types';
-// ... createPluginRoute / beginPluginStyleCapture / injectors 等同现源码
+// 从 mf 引入：加载 Remote、注册 entry、解析 version@manifestHash
+import { loadRemoteApp, registerRemote, resolvePluginBust } from './mf';
 
-class PluginManagerImpl {
-	private plugins = new Map<string, LoadedPlugin>();
-	private inflight = new Map<string, Promise<void>>();
-	// ...
-
-	async init() {
-		const registry = await fetchPluginRegistry({ force: true });
-		const enabled = registry.plugins.filter((p) => p.enabled);
-		for (const meta of enabled) {
-			this.mountShell(meta);
-		}
-		const eager = enabled.filter((p) => p.preload === 'eager');
-		if (eager.length === 0) return;
-		queueMicrotask(() => {
-			void Promise.all(
-				// eager 预拉也带 updatedAt，保证 bust 一致
-				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
-			);
-		});
-	}
-
-	async ensurePlugin(id: string, opts?: { force?: boolean }) {
-		// 每次 ensure 强制拉最新 registry（配合 ?t=）
-		const registry = await fetchPluginRegistry({ force: true });
-		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
-		if (!meta) {
-			throw new Error(`registry 中无启用插件 ${id}`);
-		}
-		const bust = pluginBust(meta, registry.updatedAt);
-		const cur = this.plugins.get(id);
-
-		// 仅 status+bust 都匹配才短路（旧逻辑只看 activated）
-		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
-			return cur;
-		}
-		if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
-			throw new Error(cur.error || `加载 ${id} 失败`);
-		}
-
-		const pending = this.inflight.get(id);
-		if (pending && !opts?.force) {
-			await pending;
-			const after = this.plugins.get(id);
-			if (after?.status === 'activated' && after.bust === bust) return after;
-			if (after?.status !== 'activated') {
-				throw new Error(after?.error || `加载 ${id} 失败`);
-			}
-			/* bust 已变：不 return，继续重载 */
-		}
-
+/**
+ * 启动：只挂壳；eager 插件在微任务里 loadPlugin（内部自己 resolvePluginBust）
+ */
+async init() {
+	// 强制拉最新 registry（清单 ?t= / no-store；与 entry bust 解耦）
+	const registry = await fetchPluginRegistry({ force: true });
+	// 仅处理 enabled 插件
+	const enabled = registry.plugins.filter((p) => p.enabled);
+	// 先挂路由/侧栏壳，不下载 MF
+	for (const meta of enabled) {
+		// 注入路由与侧栏项
 		this.mountShell(meta);
-		await this.loadPlugin(meta, opts, registry.updatedAt);
-		const next = this.plugins.get(id);
-		if (next?.status !== 'activated') {
-			throw new Error(next?.error || `加载 ${id} 失败`);
-		}
-		return next;
 	}
-
-	async loadPlugin(
-		meta: PluginDescriptor,
-		opts?: { force?: boolean },
-		registryUpdatedAt?: string,
-	) {
-		const bust = pluginBust(meta, registryUpdatedAt);
-		const prev = this.plugins.get(meta.id);
-		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
-			return;
-		}
-		// bust 变了：先卸再挂，避免旧 mod 残留
-		if (prev?.status === 'activated') {
-			await this.unloadPlugin(meta.id);
-			this.mountShell(meta);
-		}
-
-		const existing = this.inflight.get(meta.id);
-		if (existing) {
-			if (!opts?.force) return existing;
-			await existing.catch(() => {});
-		}
-
-		const run = this.runLoad(meta, bust);
-		this.inflight.set(meta.id, run);
-		try {
-			await run;
-		} finally {
-			if (this.inflight.get(meta.id) === run) {
-				this.inflight.delete(meta.id);
-			}
-		}
-	}
-
-	private async runLoad(meta: PluginDescriptor, bust: string) {
-		const nav = (to: string) => this.navigateImpl(to);
-		const loading: LoadedPlugin = {
-			meta,
-			bridge: createHostBridge(meta, nav),
-			mod: { default: () => null },
-			status: 'loading',
-			bust,
-		};
-		this.plugins.set(meta.id, loading);
-
-		try {
-			await verifyPlugin(meta);
-
-			if (meta.trust === 'untrusted') {
-				this.plugins.set(meta.id, {
-					meta,
-					bridge: createHostBridge(meta, nav),
-					mod: { default: () => null },
-					status: 'activated',
-					bust,
-				});
-				return;
-			}
-
-			// 关键：把 bust 传进 registerRemote
-			registerRemote(meta, bust);
-			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
-			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
-			try {
-				mod = await loadRemoteApp(meta);
-			} finally {
-				endCapture();
-			}
-			const bridge = createHostBridge(meta, nav);
-			await mod.activate?.(bridge.api);
-
-			this.plugins.set(meta.id, {
-				meta,
-				bridge,
-				mod,
-				status: 'activated',
-				bust,
-			});
-		} catch (e) {
-			const message = e instanceof Error ? e.message : String(e);
-			console.error(`[PluginManager] load ${meta.id} failed`, e);
-			this.plugins.set(meta.id, {
-				...loading,
-				status: 'failed',
-				error: message,
-			});
-		}
-	}
-
-	// unloadPlugin / setEnabled 见源码全文
-}
-
-export const pluginManager = new PluginManagerImpl();
-```
-
-#### 2.13.8 完整源码：registry 拉取防缓存（摘录）
-
-**路径**：`apps/frontend/src/plugins/core/registry.ts`
-
-```typescript
-/** force 拉取时给 URL 加时间戳，避开中间缓存 */
-function withCacheBust(url: string): string {
-	const sep = url.includes('?') ? '&' : '?';
-	return `${url}${sep}t=${Date.now()}`;
-}
-
-async function fetchRegistryText(
-	url: string,
-	force?: boolean,
-): Promise<string> {
-	const doFetch = /^https?:\/\//i.test(url)
-		? await getPlatformFetch()
-		: globalThis.fetch.bind(globalThis);
-	const fetchUrl = force ? withCacheBust(url) : url;
-	const res = await doFetch(fetchUrl, {
-		cache: 'no-store',
-		...(force ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
+	// 显式 opt-in 的 eager 预拉列表
+	const eager = enabled.filter((p) => p.preload === 'eager');
+	// 无 eager 则结束
+	if (eager.length === 0) return;
+	// 不阻塞 init：微任务后台拉
+	queueMicrotask(() => {
+		// 每个 eager 插件走完整 loadPlugin（会 fetch manifest 算 bust）
+		void Promise.all(eager.map((p) => this.loadPlugin(p)));
 	});
-	if (!res.ok) throw new Error(`registry ${res.status}`);
-	return res.text();
 }
 
-/** 编辑页始终 force */
-export async function fetchPluginRegistryRawText(): Promise<string> {
-	const url = registryUrl();
-	const text = await fetchRegistryText(url, true);
+/**
+ * 确保指定插件可用：按 bust 决定复用或重载
+ * @param id - registry 插件 id
+ * @param opts.force - true 时忽略 bust 相等短路
+ */
+async ensurePlugin(id: string, opts?: { force?: boolean }) {
+	// 每次 ensure 强制读最新清单（权限 / entry URL / enabled）
+	const registry = await fetchPluginRegistry({ force: true });
+	// 在启用列表中找目标
+	const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+	// 未启用或不存在
+	if (!meta) {
+		throw new Error(`registry 中无启用插件 ${id}`);
+	}
+	// bust = version@manifestHash（来自 Remote 自有 entry，不依赖改 registry）
+	const bust = await resolvePluginBust(meta);
+	// 读内存态
+	const cur = this.plugins.get(id);
+	// 已激活且 bust 未变且未 force → 复用，避免重复 import
+	if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
+		return cur;
+	}
+	// 失败且 bust 未变且未 force → 仍抛旧错，避免无意义重试
+	if (cur?.status === 'failed' && !opts?.force && cur.bust === bust) {
+		throw new Error(cur.error || `加载 ${id} 失败`);
+	}
+
+	// 同 id 并发加载中的 Promise
+	const pending = this.inflight.get(id);
+	// 非 force 时等待已有加载完成
+	if (pending && !opts?.force) {
+		// 等并发 load 结束
+		await pending;
+		// 再读一次内存
+		const after = this.plugins.get(id);
+		// 并发结果已是目标 bust 的 activated → 直接返回
+		if (after?.status === 'activated' && after.bust === bust) return after;
+		// 并发结果失败 → 抛错
+		if (after?.status !== 'activated') {
+			throw new Error(after?.error || `加载 ${id} 失败`);
+		}
+		/* bust 已变（并发期间 Remote 又发了版），继续往下重载 */
+	}
+
+	// 确保壳（路由/侧栏）在位
+	this.mountShell(meta);
+	// 传入已算好的 bust，避免 loadPlugin 内再 fetch 一次 manifest
+	await this.loadPlugin(meta, opts, bust);
+	// 加载后取最终态
+	const next = this.plugins.get(id);
+	// 未激活则抛错给调用方
+	if (next?.status !== 'activated') {
+		throw new Error(next?.error || `加载 ${id} 失败`);
+	}
+	// 返回已激活的 LoadedPlugin
+	return next;
+}
+
+/**
+ * 执行加载；bust 变则先 unload 再 load
+ * @param meta - 插件描述符
+ * @param opts.force - 强制重载
+ * @param bustToken - 可选；已算好的 bust，避免重复 fetchEntryBuildId
+ */
+async loadPlugin(
+	meta: PluginDescriptor,
+	opts?: { force?: boolean },
+	bustToken?: string,
+) {
+	// 有传入则复用；否则自行 resolve（eager / 内部调用路径）
+	const bust = bustToken ?? (await resolvePluginBust(meta));
+	// 当前内存中的同 id 插件
+	const prev = this.plugins.get(meta.id);
+	// 已激活且 bust 相同且未 force → 短路
+	if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
+		return;
+	}
+	// 已激活但 bust 变了（或 force）→ 先卸旧模块
+	if (prev?.status === 'activated') {
+		// deactivate + 清 eventBus + 卸路由壳
+		await this.unloadPlugin(meta.id);
+		// 卸完再挂壳（unload 会 remove 路由）
+		this.mountShell(meta);
+	}
+
+	// 并发 inflight
+	const existing = this.inflight.get(meta.id);
+	if (existing) {
+		// 非 force：直接复用同一个 Promise
+		if (!opts?.force) return existing;
+		// force：等旧的结束（忽略其失败）再开新 load
+		await existing.catch(() => {});
+	}
+
+	// 启动真正的 runLoad，带上本次 bust
+	const run = this.runLoad(meta, bust);
+	// 记入 inflight，供并发 ensure 等待
+	this.inflight.set(meta.id, run);
 	try {
-		return `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
-	} catch {
-		return text;
+		// 等待加载完成
+		await run;
+	} finally {
+		// 仅当 Map 里仍是本次 run 时删除，避免误删更新的 inflight
+		if (this.inflight.get(meta.id) === run) {
+			this.inflight.delete(meta.id);
+		}
 	}
 }
 
 /**
- * 保存 registry：自动写 updatedAt → bust 会变 → 下次 ensure 必重载
- * （另有 assertRegistryHostApiCompatible，见 hostApi 专题）
+ * 校验 → registerRemote(bust) → loadRemote → activate；失败写 failed
+ * @param bust - 写入 LoadedPlugin 并传给 registerRemote 的 token
  */
-export async function savePluginRegistry(
-	data: PluginRegistry,
-): Promise<PluginRegistry> {
-	assertRegistryHostApiCompatible(data);
-	const next: PluginRegistry = {
-		...data,
-		updatedAt: formatRegistryUpdatedAt(),
-		plugins: data.plugins,
+private async runLoad(meta: PluginDescriptor, bust: string) {
+	// navigate 闭包绑定当前 PluginManager 的 navigateImpl
+	const nav = (to: string) => this.navigateImpl(to);
+	// loading 占位；提前带上 bust，便于并发比对
+	const loading: LoadedPlugin = {
+		// 描述符快照
+		meta,
+		// 按 permissions 组装的 HostBridge
+		bridge: createHostBridge(meta, nav),
+		// 占位组件，避免渲染期空 default
+		mod: { default: () => null },
+		// 加载中
+		status: 'loading',
+		// 本次目标 bust
+		bust,
 	};
-	const payload = `${JSON.stringify(next, null, 2)}\n`;
-	await putUploadRemoteJson(PLUGIN_REGISTRY_FILENAME, payload);
-	writeCache(next);
-	return next;
+	// 写入 Map，对外可见 loading
+	this.plugins.set(meta.id, loading);
+
+	try {
+		// hostApiRange / integrity 等校验
+		await verifyPlugin(meta);
+
+		// untrusted：仅激活壳，由 PluginHostPage 渲染 iframe，不进 MF
+		if (meta.trust === 'untrusted') {
+			this.plugins.set(meta.id, {
+				meta,
+				bridge: createHostBridge(meta, nav),
+				mod: { default: () => null },
+				status: 'activated',
+				// iframe 路径 bust 多为纯 version
+				bust,
+			});
+			return;
+		}
+
+		// 注册 Remote：manifest ?v=bust，并写入 bustByRemote
+		registerRemote(meta, bust);
+		// 样式捕获窗口：包住 loadRemote 引入的 style/link
+		const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+		// loadRemote 返回的模块类型
+		let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
+		try {
+			// 真正 import Remote（afterResolve 会给 remoteEntry 补 ?v=）
+			mod = await loadRemoteApp(meta);
+		} finally {
+			// 无论成败结束捕获窗口
+			endCapture();
+		}
+		// 加载成功后再建一份 bridge（navigate 等最新）
+		const bridge = createHostBridge(meta, nav);
+		// 可选生命周期：有副作用插件的 activate
+		await mod.activate?.(bridge.api);
+
+		// 标记 activated，bust 与本次 token 一致
+		this.plugins.set(meta.id, {
+			meta,
+			bridge,
+			mod,
+			status: 'activated',
+			bust,
+		});
+	} catch (e) {
+		// 统一错误文案
+		const message = e instanceof Error ? e.message : String(e);
+		// 控制台保留堆栈
+		console.error(`[PluginManager] load ${meta.id} failed`, e);
+		// 写 failed，保留 loading 上的 bust，便于「同 bust 失败不重试」
+		this.plugins.set(meta.id, {
+			...loading,
+			status: 'failed',
+			error: message,
+		});
+	}
 }
 ```
 
-#### 2.13.9 完整源码：后端 remotes `no-store`
+**变更摘要**：`ensurePlugin` / `loadPlugin` 用 `await resolvePluginBust(meta)` 替代 `pluginBust(meta, registry.updatedAt)`；`runLoad` 把同一 bust 写入 `LoadedPlugin` 并传给 `registerRemote`。
 
-**路径**：`apps/backend/src/middleware/serve-upload-static.middleware.ts`（缓存头）
+#### 2.13.6.1 `LoadedPlugin.bust` 字段
 
-```typescript
-res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-// remotes（registry）禁止缓存，避免桌面/代理继续吃旧版
-res.setHeader(
-	'Cache-Control',
-	folder === 'remotes'
-		? 'no-store, max-age=0, must-revalidate'
-		: 'public, max-age=604800',
-);
-```
-
-**路径**：`apps/backend/src/services/upload/upload-public.controller.ts`
+**改动后** · `apps/frontend/src/plugins/core/types.ts`（约 L140–L148）
 
 ```typescript
-// 公开流式读：/remotes/ 同样 no-store
-res.setHeader(
-	'Cache-Control',
-	decoded.startsWith('/remotes/')
-		? 'no-store, max-age=0, must-revalidate'
-		: 'public, max-age=604800',
-);
-
-// GET /api/upload/remotes/:filename
-res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+// 内存中已加载（或加载中/失败）的插件运行时态
+export interface LoadedPlugin {
+	// registry 描述符快照
+	meta: PluginDescriptor;
+	// 按 permissions 密封的 HostBridge
+	bridge: HostBridgeProps;
+	// Remote 模块（default 组件 + 可选 activate/deactivate）
+	mod: PluginModule;
+	// registered | loading | activated | failed | unloaded
+	status: PluginStatus;
+	// failed 时的错误文案
+	error?: string;
+	// version@manifestHash；与 MF entry ?v= 一致，用于判断是否需重载
+	bust?: string;
+}
 ```
 
-生产 Nginx 若 `location ^~ /remotes/` 另设了 `expires`，须改为不缓存或与后端一致，否则仍可能吃旧清单。
+#### 2.13.7 registry `updatedAt` 说明
 
-#### 2.13.10 验收与排障
+`savePluginRegistry` 仍会写 `updatedAt`（编辑审计 / 强制刷新本地清单缓存）。**它不再参与 MF entry bust**。发布者不得通过改 registry 刷插件缓存。
+
+#### 2.13.8 后端 remotes `no-store`
+
+仍适用于 Host 清单 `/remotes/plugins-registry.json`（见 `serve-upload-static.middleware.ts`）。与 Remote CDN 上的 `mf-manifest` 是两条线。生产 Nginx 若对 `/remotes/` 另设了 `expires`，须改为不缓存或与后端一致。
+
+#### 2.13.9 验收与排障
 
 | 步骤 | 期望 |
 |------|------|
-| DevTools 看 `mf-manifest.json` 与 `remoteEntry.js` | URL 均含 `?v=version@updatedAt`（或等价 token） |
-| 只改 registry `updatedAt` 再进插件 | Host 卸载旧模并重新 `loadRemote` |
+| DevTools 看 `mf-manifest.json` 与 `remoteEntry.js` | URL 均含 `?v=version@<hash>` |
+| 只部署新 Remote、不改 registry 再进插件 | Host 重载；UI 为新版 |
 | `curl -i .../remotes/plugins-registry.json` | `Cache-Control` 含 `no-store` |
-| 桌面仍旧 | 确认已安装**含本方案的 Host 壳**，且 Remote 静态资源已部署 |
+| 桌面仍旧 | 确认已安装**含本方案的 Host 壳**，且 Remote 静态资源已部署、CORS 允许 Host fetch manifest |
 
 | 误区 | 正确做法 |
 |------|----------|
 | 只给 manifest 加 query | 必须 `afterResolve` 补 `remoteEntry.js` |
 | 只发插件不发桌面壳 | 生产 Host 逻辑在壳内，必须发壳 |
-| 只改资源不 bump version/不保存 registry | bust 不变 → 仍短路 |
+| 发布者改 Host registry 刷缓存 | **禁止**；部署 Remote 即可 |
 | 把 `version` 写成 `hostApiRange` | 保存失败或加载报 HOST_API 不兼容 |
 
 ---
@@ -3238,13 +3346,15 @@ federation({
 **文件路径**：`apps/frontend/src/plugins/core/PluginManager.ts`（`runLoad` 方法中 untrusted 处理）
 
 ```typescript
-private async runLoad(meta: PluginDescriptor) {
+private async runLoad(meta: PluginDescriptor, bust: string) {
+	// bust = await resolvePluginBust(meta) 由 loadPlugin 传入（见 §2.13.6）
 	const nav = (to: string) => this.navigateImpl(to);
 	const loading: LoadedPlugin = {
 		meta,
 		bridge: createHostBridge(meta, nav),
 		mod: { default: () => null },
 		status: 'loading',
+		bust,
 	};
 	this.plugins.set(meta.id, loading);
 
@@ -3258,12 +3368,13 @@ private async runLoad(meta: PluginDescriptor) {
 				bridge: createHostBridge(meta, nav),
 				mod: { default: () => null },
 				status: 'activated',
+				bust,
 			});
 			return;
 		}
 
-		// 正常 MF 加载流程（省略）
-		registerRemote(meta);
+		// 正常 MF：registerRemote(meta, bust) 后 loadRemote（省略）
+		registerRemote(meta, bust);
 		// ...
 	} catch (e) {
 		// 错误处理（省略）
@@ -4095,7 +4206,7 @@ flowchart TD
 3. 检查 CORS 配置
 4. 检查 `hostApiRange` 是否覆盖 Host `VITE_HOST_API_VERSION`（勿把插件 `version` 误写成 range）
 5. 检查信任等级配置
-6. 桌面仍旧版：确认 Host 壳已更新（含 bust / afterResolve）；registry `version` 或 `updatedAt` 已变；`/remotes` 为 `no-store`
+6. 桌面仍旧版：确认 Host 壳已更新（含 resolvePluginBust / afterResolve）；Remote 静态资源已部署且 manifest 有变；`/remotes` 为 `no-store`
 
 ### 5.5 HMR 不生效 / 连刷两次
 
@@ -4112,7 +4223,7 @@ flowchart TD
 
 **原因**：MF 解析后把 entry 改写成无 query 的 `remoteEntry.js`，WKWebView 强缓存。
 
-**解决方案**：Host 使用 `pluginBust` + `afterResolve`（见 §2.2）；发版更新 registry `version`/`updatedAt` 并**发布含该逻辑的桌面壳**。
+**解决方案**：Host 使用 `resolvePluginBust`（`version@manifestHash`）+ `afterResolve`（见 §2.13）；**只部署 Remote 静态资源即可**（勿为刷缓存改 Host registry），并**发布含该逻辑的桌面壳**。
 
 ### 5.7 样式隔离相关
 
@@ -4153,7 +4264,7 @@ flowchart TD
 
 - **运行时动态注册**：无需预配置，通过 registry 动态加载插件
 - **懒加载策略**：优化启动性能，按需加载
-- **entry 缓存破坏**：`version@updatedAt` + `afterResolve` 补 `remoteEntry.js?v=`
+- **entry 缓存破坏**：`version@manifestHash` + `afterResolve` 补 `remoteEntry.js?v=`（发布者勿改 Host registry）
 - **Host shared 收敛**：仅 shared react / react-dom；勿 shared react-router
 - **主子样式隔离**：Host `@scope` + head 劫持 + MutationObserver（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
 - **安全验证**：hostApiRange 运行时校验 + 保存 registry 前置校验

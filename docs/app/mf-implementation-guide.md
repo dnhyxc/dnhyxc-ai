@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、Host `@scope` 样式隔离。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、Host `@scope` 样式隔离。**entry 缓存破坏**现行方案为 `version@manifestHash`（Remote 自有 manifest 指纹，发布者勿改 Host registry），见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)；更完整的开发手册副本在 `apps/frontend/src/plugins/docs/mf-implementation-guide.md` §2.13。若与源码不一致，以源码为准。
 
 ---
 

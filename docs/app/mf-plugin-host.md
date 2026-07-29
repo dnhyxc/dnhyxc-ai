@@ -92,7 +92,7 @@ flowchart TD
 3. **要 exclude `react*`**：避免预打包写入 `virtual:mf:...` 后重启解析失败。
 4. **`clearMfViteDepCachePlugin`**：serve 时清 `node_modules/.vite`，对齐 `mf_owner` 递增。
 5. **`hostInitInjectLocation: 'entry'`**：避免默认 html 注入把任意 ts 打成无 export bootstrap。
-6. **桌面插件缓存**：仅给 manifest 加 `?v=` 不够，须 `afterResolve` 给改写后的 `remoteEntry.js` 补 bust；见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。
+6. **桌面插件缓存**：bust 为 `version@manifestHash`（拉 Remote 自有 manifest 指纹）；须 `afterResolve` 给改写后的 `remoteEntry.js` 补 `?v=`；发布者只更静态资源、勿改 Host registry。见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。
 
 ---
 

@@ -6,7 +6,7 @@ import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
 import { createHostBridge } from './createHostBridge';
-import { loadRemoteApp, pluginBust, registerRemote } from './mf';
+import { loadRemoteApp, registerRemote, resolvePluginBust } from './mf';
 import { verifyPlugin } from './PluginVerifier';
 import { fetchPluginRegistry, persistPluginEnabled } from './registry';
 import type { LoadedPlugin, PluginDescriptor } from './types';
@@ -59,9 +59,7 @@ class PluginManagerImpl {
 		const eager = enabled.filter((p) => p.preload === 'eager');
 		if (eager.length === 0) return;
 		queueMicrotask(() => {
-			void Promise.all(
-				eager.map((p) => this.loadPlugin(p, undefined, registry.updatedAt)),
-			);
+			void Promise.all(eager.map((p) => this.loadPlugin(p)));
 		});
 	}
 
@@ -87,8 +85,8 @@ class PluginManagerImpl {
 		if (!meta) {
 			throw new Error(`registry 中无启用插件 ${id}`);
 		}
-		// 生成 bust token：version@updatedAt（1.0.0@2026/07/29 01:49:49）
-		const bust = pluginBust(meta, registry.updatedAt);
+		// bust = version@manifestHash（来自 Remote 自有 entry，不依赖改 registry）
+		const bust = await resolvePluginBust(meta);
 		const cur = this.plugins.get(id);
 		if (cur?.status === 'activated' && cur.bust === bust && !opts?.force) {
 			return cur;
@@ -109,7 +107,7 @@ class PluginManagerImpl {
 		}
 
 		this.mountShell(meta);
-		await this.loadPlugin(meta, opts, registry.updatedAt);
+		await this.loadPlugin(meta, opts, bust);
 		const next = this.plugins.get(id);
 		if (next?.status !== 'activated') {
 			throw new Error(next?.error || `加载 ${id} 失败`);
@@ -120,9 +118,9 @@ class PluginManagerImpl {
 	async loadPlugin(
 		meta: PluginDescriptor,
 		opts?: { force?: boolean },
-		registryUpdatedAt?: string,
+		bustToken?: string,
 	) {
-		const bust = pluginBust(meta, registryUpdatedAt);
+		const bust = bustToken ?? (await resolvePluginBust(meta));
 		const prev = this.plugins.get(meta.id);
 		if (prev?.status === 'activated' && prev.bust === bust && !opts?.force) {
 			return;

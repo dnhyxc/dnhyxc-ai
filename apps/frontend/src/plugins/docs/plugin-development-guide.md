@@ -927,7 +927,7 @@ server {
 
 联系 Host 管理员添加 / 更新 Registry 配置（**只改 registry，不必改 Host 语言包**）。
 
-**发版与缓存（重要）**：部署新构建产物后，必须 bump 插件 **`version`**，或走 Host 注册表保存以刷新 **`updatedAt`**。Host 用 `version@updatedAt` 给 `mf-manifest.json` 与改写后的 `remoteEntry.js` 加 `?v=`，并按同一 token 决定是否重载。桌面用户还需安装含该逻辑的 Host 壳。完整方案见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)。
+**发版与缓存（重要）**：部署新构建产物后，Host 会拉取 Remote 自有的 `mf-manifest.json`，用内容指纹生成 bust（`version@manifestHash`），并给 `remoteEntry.js` 补 `?v=`。**不必**为刷新缓存去改 Host `plugins-registry.json`（也不应让发布者改）。桌面用户需安装含该逻辑的 Host 壳。完整方案见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案) 与 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
 
 ```json
 {

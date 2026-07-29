@@ -282,7 +282,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 						>
 							<NotesListPanel locale={locale} />
 						</ResizablePanel>
-						<ResizableHandle withHandle className="w-0" />
+						<ResizableHandle withHandle className="w-0 -translate-x-px" />
 					</>
 				) : null}
 				<ResizablePanel

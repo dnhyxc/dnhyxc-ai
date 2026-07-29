@@ -57,11 +57,44 @@ export function withBust(url: string, bust: string): string {
 
 export function pluginBust(
 	meta: Pick<PluginDescriptor, 'version'>,
-	registryUpdatedAt?: string,
+	/** Remote 构建指纹（manifest hash）；勿用 registry.updatedAt，避免发布者改 Host 清单 */
+	buildId?: string,
 ): string {
-	return [meta.version.trim(), registryUpdatedAt?.trim()]
-		.filter(Boolean)
-		.join('@');
+	return [meta.version.trim(), buildId?.trim()].filter(Boolean).join('@');
+}
+
+/** FNV-1a 32-bit；仅作 cache bust，非安全哈希 */
+function hashText(text: string): string {
+	let h = 2166136261;
+	for (let i = 0; i < text.length; i++) {
+		h ^= text.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	return (h >>> 0).toString(16);
+}
+
+/**
+ * 拉取 Remote 自有的 mf-manifest，用内容指纹做 bust。
+ * 发布者只更新自己域名上的静态资源即可；无需也不应改 Host registry。
+ */
+export async function fetchEntryBuildId(entry: string): Promise<string> {
+	const url = withBust(entry, `t${Date.now()}`);
+	const res = await fetch(url, { cache: 'no-store' });
+	if (!res.ok) {
+		throw new Error(`entry buildId ${res.status}: ${entry}`);
+	}
+	return hashText(await res.text());
+}
+
+/** trusted MF：version@manifestHash；untrusted：仅 version（iframe 不走 MF entry） */
+export async function resolvePluginBust(
+	meta: Pick<PluginDescriptor, 'version' | 'entry' | 'trust'>,
+): Promise<string> {
+	if (meta.trust === 'untrusted') {
+		return pluginBust(meta);
+	}
+	const buildId = await fetchEntryBuildId(meta.entry);
+	return pluginBust(meta, buildId);
 }
 
 /**

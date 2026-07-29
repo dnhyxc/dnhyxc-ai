@@ -80,7 +80,7 @@ res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
 ## 5. 兼容性与影响
 
 - Nginx 若对 `/remotes/` 另设 `expires`，生产应改为不缓存或与后端一致，否则仍可能吃旧清单。
-- Host 侧 force 拉 registry 仍会加 `?t=`（双保险），见 [plugin-entry-cache-bust.md](../app/plugin-entry-cache-bust.md)。
+- Host 侧 force 拉 registry 仍会加 `?t=`（清单防缓存）。**MF entry bust** 已与 `registry.updatedAt` 解耦，改为 Remote `mf-manifest` 内容指纹，见 [plugin-entry-cache-bust.md](../app/plugin-entry-cache-bust.md)。
 
 ## 6. 相关源码路径
 

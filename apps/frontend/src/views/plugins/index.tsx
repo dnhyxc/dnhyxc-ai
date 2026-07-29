@@ -106,7 +106,7 @@ export default function PluginsPage() {
 										<Card
 											key={p.id}
 											className={cn(
-												'gap-2 py-4 flex flex-col justify-around bg-theme/5 shadow-none',
+												'gap-2 py-4 flex flex-col justify-around border bg-theme/5 shadow-none',
 												!onShelf && 'opacity-80',
 											)}
 										>

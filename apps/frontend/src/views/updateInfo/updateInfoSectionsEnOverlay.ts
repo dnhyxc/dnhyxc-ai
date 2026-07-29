@@ -158,7 +158,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's3-10': {
 		title: 'More reliable desktop plugin updates',
 		description:
-			'After publishing a new module version, the desktop app loads the latest entry by registry version and update time instead of easily sticking to an old module; the module list itself is also no longer long-cached. If you still see an old version, update to the latest desktop app and try again.',
+			'After publishing a new module version, the desktop app picks up the latest code from changes in the module’s own entry manifest—no need to edit the platform module list just to bust cache; the module list itself is also no longer long-cached. If you still see an old version, update to the latest desktop app and try again.',
 	},
 	's3-11': {
 		title: 'Plugin Center blank-screen fix',
