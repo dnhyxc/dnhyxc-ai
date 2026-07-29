@@ -1,6 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import {
+	clipboardHasTextContent,
 	clipboardImageFiles,
 	dataTransferImageFiles,
 	fileToDataUrl,
@@ -37,6 +38,13 @@ export const ImageUpload = Extension.create<ImageUploadOptions>({
 					handlePaste(_view, event) {
 						const files = clipboardImageFiles(event);
 						if (!files.length) return false;
+						// 剪贴板同时含图片与文本/HTML：让 ProseMirror 先完成默认文本粘贴，
+						// 再异步插入图片（insertImages 读图是异步的，会在默认粘贴落盘后执行）
+						if (clipboardHasTextContent(event)) {
+							void insertImages(editor, files, (f) => resolveSrcRef.current(f));
+							return false;
+						}
+						// 仅有图片（如截图）：阻止默认行为，只插入图片
 						event.preventDefault();
 						void insertImages(editor, files, (f) => resolveSrcRef.current(f));
 						return true;

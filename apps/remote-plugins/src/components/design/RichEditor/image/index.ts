@@ -1,5 +1,6 @@
 export { ImageUpload, type ImageUploadOptions } from './ImageUpload';
 export {
+	clipboardHasTextContent,
 	clipboardImageFiles,
 	dataTransferImageFiles,
 	fileToDataUrl,

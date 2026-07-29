@@ -26,6 +26,7 @@ use command::common::{
     read_english_learning_import_json_file, select_directory, select_file,
     select_english_learning_import_json_file,
 };
+use command::clipboard::read_clipboard_html;
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
@@ -91,6 +92,7 @@ pub fn run() {
             clear_all_shortcuts,   // 清空所有快捷键
             clear_updater_cache,   // 清除 updater 插件缓存
             get_cache_size,        // 获取缓存大小
+            read_clipboard_html,   // 读取剪贴板 HTML（图文混合粘贴）
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息

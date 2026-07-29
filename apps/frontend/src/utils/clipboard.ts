@@ -30,6 +30,97 @@ async function readClipText(): Promise<string> {
 	return '';
 }
 
+/**
+ * Tauri 桌面端：读取系统剪贴板 HTML flavor（macOS public.html）。
+ * 图文混合复制时 HTML 里含 <img src>，弥补 readText 只拿纯文本、readImage 拿不到远程 URL 图片的缺陷。
+ * 走自定义 Rust 命令 read_clipboard_html（arboard），非 Tauri 环境返回 null。
+ */
+async function readClipHtml(): Promise<string | null> {
+	if (!isTauriRuntime()) return null;
+	try {
+		const { invoke } = await import('@tauri-apps/api/core');
+		const html = await invoke<string | null>('read_clipboard_html');
+		return html?.trim() ? html : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * 从剪贴板 HTML 提取所有 <img src>（http(s) URL 或 data URI）。
+ * 用于桌面端图文混合粘贴：把 HTML 里的图片作为 image 节点插入编辑器。
+ */
+function extractImgSrcs(html: string): string[] {
+	const srcs: string[] = [];
+	const re = /<img[^>]+src=["']([^"']+)["']/gi;
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(html)) !== null) {
+		const src = m[1];
+		if (src && /^https?:\/\/|^data:image\//i.test(src)) srcs.push(src);
+	}
+	return srcs;
+}
+
+/**
+ * 从剪贴板 HTML 提取纯文本（去标签），作为图文混合粘贴时的文本部分。
+ */
+function htmlToPlain(html: string): string {
+	const tmp = document.createElement('div');
+	tmp.innerHTML = html;
+	// 块级元素后补换行，保留基本排版
+	tmp.querySelectorAll('br').forEach((br) => {
+		br.replaceWith('\n');
+	});
+	return (tmp.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Tauri 桌面端：读取系统剪贴板图片位图，经 canvas 转 PNG data URL。
+ * 走 Tauri IPC（plugin-clipboard-manager），不触发 navigator.clipboard 的 Web 权限弹窗。
+ * 剪贴板无图片位图时 readImage 抛错，返回 null 静默忽略。
+ * 覆盖截图、从图片应用复制等"独立位图"场景；网页复制的 <img src> 远程图片拿不到。
+ */
+async function readClipImageAsDataUrl(): Promise<string | null> {
+	if (!isTauriRuntime()) return null;
+	try {
+		const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
+		const img = await readImage();
+		const rgba = await img.rgba();
+		const size = await img.size();
+		const width = size?.width ?? 0;
+		const height = size?.height ?? 0;
+		// 放宽校验：只要宽高非零且 rgba 存在就尝试转换（位图长度由 Tauri 保证）
+		if (!width || !height || !rgba || rgba.length === 0) return null;
+		const canvas = document.createElement('canvas');
+		canvas.width = width;
+		canvas.height = height;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return null;
+		ctx.putImageData(
+			new ImageData(new Uint8ClampedArray(rgba), width, height),
+			0,
+			0,
+		);
+		return canvas.toDataURL('image/png');
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * 从 DOM 元素向上查找 ProseMirror EditorView（内部 API pmViewDesc.view）。
+ * 用于 Tauri 桌面端手动插入图文到 TipTap 编辑器。
+ */
+function getProseMirrorView(el: HTMLElement): any | null {
+	let node: Element | null = el;
+	while (node) {
+		const desc = (node as any).pmViewDesc;
+		if (desc?.view) return desc.view;
+		node = node.parentElement;
+	}
+	return null;
+}
+
 export const copyToClipboard = async (text: string): Promise<void> => {
 	await writeClipText(text);
 };
@@ -251,14 +342,71 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 			}
 
 			if (key === 'v') {
+				// Tauri WebView 原生 paste 不触发到 ProseMirror：
+				// 优先读剪贴板 HTML（含 <img src>，覆盖网页复制图文混合），
+				// 回退 readText + readImage（覆盖纯文本 / 截图独立位图）。
+				// 经 ProseMirror view 事务插入，保证文本与图片都能落到编辑器。
 				event.preventDefault();
 				const root = tipTapBody;
 				void (async () => {
-					const text = await readClipText();
-					if (!text || !root.isConnected) return;
+					if (!root.isConnected) return;
+					// 1) 优先尝试 HTML：提取图片 src 与纯文本
+					const html = await readClipHtml();
+					let text = '';
+					let imgSrcs: string[] = [];
+					if (html) {
+						imgSrcs = extractImgSrcs(html);
+						text = htmlToPlain(html);
+					}
+					// 2) 无 HTML 时回退：readText 拿纯文本，readImage 拿截图位图
+					let imageDataUrl: string | null = null;
+					if (!html) {
+						const [t, img] = await Promise.all([
+							readClipText(),
+							readClipImageAsDataUrl(),
+						]);
+						text = t;
+						imageDataUrl = img;
+					}
+					if (!text && !imageDataUrl && imgSrcs.length === 0) return;
 					root.focus();
-					// ProseMirror 仍响应 insertText，避免自造选区破坏事务
-					document.execCommand('insertText', false, text);
+					const view = getProseMirrorView(root);
+					if (view) {
+						if (text) view.dispatch(view.state.tr.insertText(text));
+						// HTML 里的远程/数据图片：逐个插入 image 节点
+						for (const src of imgSrcs) {
+							const imageType = view.state.schema.nodes.image;
+							if (imageType) {
+								const node = imageType.create({ src });
+								view.dispatch(view.state.tr.replaceSelectionWith(node));
+							}
+						}
+						// 截图位图（data URL）
+						if (imageDataUrl) {
+							const imageType = view.state.schema.nodes.image;
+							if (imageType) {
+								const node = imageType.create({ src: imageDataUrl });
+								view.dispatch(view.state.tr.replaceSelectionWith(node));
+							}
+						}
+						view.focus();
+					} else {
+						if (text) document.execCommand('insertText', false, text);
+						for (const src of imgSrcs) {
+							document.execCommand(
+								'insertHTML',
+								false,
+								`<img src="${src}" alt="" />`,
+							);
+						}
+						if (imageDataUrl) {
+							document.execCommand(
+								'insertHTML',
+								false,
+								`<img src="${imageDataUrl}" alt="" />`,
+							);
+						}
+					}
 				})();
 			}
 			return;

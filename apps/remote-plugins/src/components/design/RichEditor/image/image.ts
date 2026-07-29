@@ -103,6 +103,17 @@ export function clipboardImageFiles(event: ClipboardEvent): File[] {
 	return out;
 }
 
+/** 剪贴板是否同时携带文本/HTML 内容（用于判断图片+文本混合粘贴） */
+export function clipboardHasTextContent(event: ClipboardEvent): boolean {
+	const data = event.clipboardData;
+	if (!data) return false;
+	const html = data.getData('text/html');
+	if (html && html.trim()) return true;
+	const text = data.getData('text/plain');
+	if (text && text.trim()) return true;
+	return false;
+}
+
 export function dataTransferImageFiles(dt: DataTransfer | null): File[] {
 	if (!dt?.files?.length) return [];
 	return [...dt.files].filter(isImageFile);
