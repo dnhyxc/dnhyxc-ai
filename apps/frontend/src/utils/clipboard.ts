@@ -46,32 +46,112 @@ async function readClipHtml(): Promise<string | null> {
 	}
 }
 
-/**
- * 从剪贴板 HTML 提取所有 <img src>（http(s) URL 或 data URI）。
- * 用于桌面端图文混合粘贴：把 HTML 里的图片作为 image 节点插入编辑器。
- */
-function extractImgSrcs(html: string): string[] {
-	const srcs: string[] = [];
-	const re = /<img[^>]+src=["']([^"']+)["']/gi;
-	let m: RegExpExecArray | null;
-	while ((m = re.exec(html)) !== null) {
-		const src = m[1];
-		if (src && /^https?:\/\/|^data:image\//i.test(src)) srcs.push(src);
-	}
-	return srcs;
-}
+type ClipSegment =
+	| { type: 'text'; value: string }
+	| { type: 'image'; src: string };
 
 /**
- * 从剪贴板 HTML 提取纯文本（去标签），作为图文混合粘贴时的文本部分。
+ * 按原始 DOM 顺序解析剪贴板 HTML，产出文本与图片片段序列。
+ * 保证粘贴后图文相对顺序与复制时一致（图片在前则插入时图片也在前）。
  */
-function htmlToPlain(html: string): string {
+function parseHtmlSegments(html: string): ClipSegment[] {
 	const tmp = document.createElement('div');
 	tmp.innerHTML = html;
-	// 块级元素后补换行，保留基本排版
+	// br 转换行，保留基本排版
 	tmp.querySelectorAll('br').forEach((br) => {
 		br.replaceWith('\n');
 	});
-	return (tmp.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
+	const segments: ClipSegment[] = [];
+	const isImgSrc = (src: string) => /^https?:\/\/|^data:image\//i.test(src);
+
+	// 深度优先遍历：按文档顺序收集文本与图片节点
+	const walk = (node: Node) => {
+		if (node.nodeType === Node.ELEMENT_NODE) {
+			const el = node as Element;
+			const tag = el.tagName.toLowerCase();
+			if (tag === 'img') {
+				const src = el.getAttribute('src') ?? '';
+				if (src && isImgSrc(src)) {
+					segments.push({ type: 'image', src });
+				}
+				return; // img 内部不再遍历
+			}
+			// 块级元素前后补换行，保留排版
+			const blockTags = new Set([
+				'p',
+				'div',
+				'li',
+				'h1',
+				'h2',
+				'h3',
+				'h4',
+				'h5',
+				'h6',
+				'tr',
+				'blockquote',
+			]);
+			if (blockTags.has(tag)) {
+				segments.push({ type: 'text', value: '\n' });
+			}
+		}
+		if (node.nodeType === Node.TEXT_NODE) {
+			const value = node.textContent ?? '';
+			if (value) segments.push({ type: 'text', value });
+			return; // 文本节点无子节点
+		}
+		node.childNodes.forEach(walk);
+		if (node.nodeType === Node.ELEMENT_NODE) {
+			const tag = (node as Element).tagName.toLowerCase();
+			const blockTags = new Set([
+				'p',
+				'div',
+				'li',
+				'h1',
+				'h2',
+				'h3',
+				'h4',
+				'h5',
+				'h6',
+				'tr',
+				'blockquote',
+			]);
+			if (blockTags.has(tag)) {
+				segments.push({ type: 'text', value: '\n' });
+			}
+		}
+	};
+	walk(tmp);
+	// 合并相邻文本片段，压缩多余空行
+	const merged: ClipSegment[] = [];
+	let buf = '';
+	for (const seg of segments) {
+		if (seg.type === 'text') {
+			buf += seg.value;
+		} else {
+			if (buf) {
+				merged.push({ type: 'text', value: buf });
+				buf = '';
+			}
+			merged.push(seg);
+		}
+	}
+	if (buf) merged.push({ type: 'text', value: buf });
+	// 压缩 3+ 换行为 2 个，trim 首尾
+	return merged
+		.map((seg) =>
+			seg.type === 'text'
+				? { ...seg, value: seg.value.replace(/\n{3,}/g, '\n\n') }
+				: seg,
+		)
+		.filter((seg, i, arr) => {
+			if (seg.type === 'text') {
+				if (seg.value.trim() === '') {
+					// 保留片段间的单个换行，仅丢弃纯空的首尾
+					return i !== 0 && i !== arr.length - 1;
+				}
+			}
+			return true;
+		});
 }
 
 /**
@@ -345,66 +425,56 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 				// Tauri WebView 原生 paste 不触发到 ProseMirror：
 				// 优先读剪贴板 HTML（含 <img src>，覆盖网页复制图文混合），
 				// 回退 readText + readImage（覆盖纯文本 / 截图独立位图）。
-				// 经 ProseMirror view 事务插入，保证文本与图片都能落到编辑器。
+				// 按 HTML 原始 DOM 顺序插入片段，保证图文相对顺序与复制时一致。
 				event.preventDefault();
 				const root = tipTapBody;
 				void (async () => {
 					if (!root.isConnected) return;
-					// 1) 优先尝试 HTML：提取图片 src 与纯文本
+					// 1) 优先尝试 HTML：按顺序解析为文本/图片片段
 					const html = await readClipHtml();
-					let text = '';
-					let imgSrcs: string[] = [];
-					if (html) {
-						imgSrcs = extractImgSrcs(html);
-						text = htmlToPlain(html);
-					}
-					// 2) 无 HTML 时回退：readText 拿纯文本，readImage 拿截图位图
+					let segments: ClipSegment[] = [];
 					let imageDataUrl: string | null = null;
-					if (!html) {
+					if (html) {
+						segments = parseHtmlSegments(html);
+					} else {
+						// 2) 无 HTML 时回退：readText 拿纯文本，readImage 拿截图位图
 						const [t, img] = await Promise.all([
 							readClipText(),
 							readClipImageAsDataUrl(),
 						]);
-						text = t;
+						if (t) segments.push({ type: 'text', value: t });
 						imageDataUrl = img;
 					}
-					if (!text && !imageDataUrl && imgSrcs.length === 0) return;
+					if (imageDataUrl) {
+						segments.push({ type: 'image', src: imageDataUrl });
+					}
+					if (segments.length === 0) return;
 					root.focus();
 					const view = getProseMirrorView(root);
 					if (view) {
-						if (text) view.dispatch(view.state.tr.insertText(text));
-						// HTML 里的远程/数据图片：逐个插入 image 节点
-						for (const src of imgSrcs) {
-							const imageType = view.state.schema.nodes.image;
-							if (imageType) {
-								const node = imageType.create({ src });
-								view.dispatch(view.state.tr.replaceSelectionWith(node));
-							}
-						}
-						// 截图位图（data URL）
-						if (imageDataUrl) {
-							const imageType = view.state.schema.nodes.image;
-							if (imageType) {
-								const node = imageType.create({ src: imageDataUrl });
+						const imageType = view.state.schema.nodes.image;
+						for (const seg of segments) {
+							if (seg.type === 'text') {
+								if (seg.value)
+									view.dispatch(view.state.tr.insertText(seg.value));
+							} else if (imageType) {
+								const node = imageType.create({ src: seg.src });
 								view.dispatch(view.state.tr.replaceSelectionWith(node));
 							}
 						}
 						view.focus();
 					} else {
-						if (text) document.execCommand('insertText', false, text);
-						for (const src of imgSrcs) {
-							document.execCommand(
-								'insertHTML',
-								false,
-								`<img src="${src}" alt="" />`,
-							);
-						}
-						if (imageDataUrl) {
-							document.execCommand(
-								'insertHTML',
-								false,
-								`<img src="${imageDataUrl}" alt="" />`,
-							);
+						for (const seg of segments) {
+							if (seg.type === 'text') {
+								if (seg.value)
+									document.execCommand('insertText', false, seg.value);
+							} else {
+								document.execCommand(
+									'insertHTML',
+									false,
+									`<img src="${seg.src}" alt="" />`,
+								);
+							}
 						}
 					}
 				})();
