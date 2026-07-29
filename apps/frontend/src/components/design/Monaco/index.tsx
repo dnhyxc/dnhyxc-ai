@@ -818,8 +818,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setInternalMarkdownAssistantOpen(false);
 	}, [bottomBarAssistantNode, assistantPanelControlled]);
 
-	// viewMode / 助手开关变化时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
-	useEffect(() => {
+	// viewMode / 助手开关 / 是否 Markdown 变化时同步 splitLayout
+	// 标题后缀切走再切回 markdown 会 remount PanelGroup（default 50/50），须重跑否则右侧空白栏残留
+	useLayoutEffect(() => {
+		if (!isMarkdown) return;
 		if (viewMode === 'edit' || viewMode === 'preview') {
 			panelGroupRef.current?.setLayout(
 				markdownRightPaneVisible
@@ -831,7 +833,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		if (viewMode === 'split' || viewMode === 'splitDiff') {
 			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 		}
-	}, [viewMode, markdownRightPaneVisible]);
+	}, [viewMode, markdownRightPaneVisible, isMarkdown]);
 
 	useEffect(() => {
 		if (prevDocumentIdentityRef.current !== documentIdentity) {
@@ -1733,7 +1735,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				});
 			});
 
-			if (viewModeRef.current !== 'preview') {
+			// 标题改后缀会切 language → Editor remount；勿抢走仍在输入的标题焦点
+			if (viewModeRef.current === 'preview') return;
+			const active = document.activeElement;
+			const keepExternalFocus =
+				active instanceof HTMLElement &&
+				(active.tagName === 'INPUT' ||
+					active.tagName === 'TEXTAREA' ||
+					active.isContentEditable) &&
+				!editor.getDomNode()?.contains(active);
+			if (!keepExternalFocus) {
 				editor.focus();
 			}
 		},

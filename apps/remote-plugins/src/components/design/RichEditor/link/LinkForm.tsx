@@ -45,7 +45,7 @@ export function LinkForm({
 
 	return (
 		<div
-			className="flex items-center gap-1 p-3 pb-2"
+			className="flex items-center gap-2 p-3 pb-2"
 			role="dialog"
 			aria-label={t.link}
 			onMouseDown={(e) => {

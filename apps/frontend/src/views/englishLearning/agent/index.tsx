@@ -200,7 +200,7 @@ export const AgentPanel = observer(function AgentPanel({
 	return (
 		<div
 			className={cn(
-				'relative flex h-full w-full flex-col overflow-hidden border-l border-theme/10 bg-theme-background',
+				'relative flex h-full w-full flex-col overflow-hidden bg-theme-background',
 			)}
 		>
 			<AssistantShell

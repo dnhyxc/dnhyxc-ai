@@ -368,39 +368,31 @@
 	height: 0;
 	pointer-events: none;
 }
-/* 
-.rich-editor-note-title {
-	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
-	margin: 0 0 0.75rem;
-	padding-bottom: 0.3rem;
-} */
-/* 
-.rich-editor-note-title-label {
+
+/*
+ * 标题角标几何兜底（随 RichEditor 打包，不依赖 Tailwind utility 注入时序）。
+ * 曾用 -inset-0.5：四边绝对值会在宽高未生效时拉满整卡，与 placeholder 叠字；刷新后 utility 齐了又正常。
+ */
+.rich-editor-note-title-shell {
+	position: relative;
+	padding-top: 2.25rem;
+	box-sizing: border-box;
+}
+
+.rich-editor-note-title-badge {
+	position: absolute;
+	top: -0.125rem;
+	left: -0.125rem;
+	right: auto;
+	bottom: auto;
+	height: 1.5rem;
+	width: auto;
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	font-size: 1.35em;
-	user-select: none;
-	line-height: 1.3;
-} */
-
-/* .rich-editor-note-title-content {
-	flex: 1;
-	min-width: 0;
-	outline: none;
-	border: none;
-	background: transparent;
-	color: inherit;
-	min-height: 1.6em;
-	font: inherit;
-	font-size: 1.35em;
-	font-weight: 700;
-	line-height: 1.35;
-	padding: 0;
-} */
+	gap: 0.5rem;
+	box-sizing: border-box;
+	z-index: 1;
+}
 
 .rich-editor-footer {
 	display: flex;

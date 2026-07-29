@@ -41,7 +41,8 @@ function ResizableHandle({
 			{...props}
 		>
 			{withHandle && (
-				<div className="bg-theme/5 z-10 flex h-4 ml-px w-3 items-center justify-center rounded-xs border border-theme/10">
+				// ponytail: left-1/2 + -ml-1.5（半宽 w-3/2）对齐分隔线中心；勿用 -translate-x（易被其它 transform 盖掉）
+				<div className="bg-theme/5 absolute top-1/2 left-1/2 z-10 flex h-4 w-3 -ml-1.5 -translate-y-1/2 items-center justify-center rounded-xs border border-theme/10">
 					<GripVerticalIcon className="size-2.5" />
 				</div>
 			)}

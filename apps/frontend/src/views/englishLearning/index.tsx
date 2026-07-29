@@ -117,9 +117,11 @@ const EnglishLearning = observer(function EnglishLearning() {
 									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
 								)}
 							>
+								{/* p-4.5 在 Root：右侧留白给滚动条贴边，不挡卡片；轨道上下与卡片齐平 */}
 								<ScrollArea
 									className="h-full p-4.5"
 									viewportClassName="rounded-md"
+									scrollbarClassName="!top-4.5 !bottom-4.5 h-auto"
 								>
 									<div className="flex min-h-0 flex-1 flex-col">
 										<EnglishLearningSidebar
@@ -129,7 +131,14 @@ const EnglishLearning = observer(function EnglishLearning() {
 								</ScrollArea>
 							</aside>
 						</ResizablePanel>
-						<ResizableHandle withHandle className="w-0" />
+						{/* w-0：拖到最左仍可抓；竖线上下与侧栏 p-6 对齐 */}
+						<ResizableHandle
+							withHandle
+							className={cn(
+								'w-0 bg-transparent',
+								'before:bg-theme/10 before:absolute before:top-6 before:bottom-6 before:left-1/2 before:w-px before:-translate-x-1/2',
+							)}
+						/>
 						<ResizablePanel
 							id="english-chat"
 							defaultSize="65%"
