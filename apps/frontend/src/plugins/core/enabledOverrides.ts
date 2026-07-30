@@ -1,12 +1,9 @@
-import type { PluginRegistry } from './types';
+import { getPluginEnabledPref } from './pluginEnabledPrefs';
 
 type Listener = () => void;
 
 /** 订阅插件启用状态变化的监听器集合 */
 const listeners = new Set<Listener>();
-
-/** 与 registry.ts CACHE_KEY 保持一致（避免循环依赖） */
-const REGISTRY_CACHE_KEY = `dnhyxc.plugin.registry.${import.meta.env.PROD ? 'prod' : 'dev'}.v1`;
 
 export function notifyPluginEnabled() {
 	for (const fn of listeners) fn();
@@ -21,17 +18,9 @@ export function subscribePluginEnabled(fn: Listener) {
 }
 
 /**
- * 是否上架：读 registry 本地缓存中的 `enabled`（与服务端 remotes 同步后写入）。
- * 无缓存时视为未上架（保守，避免误展示入口）。
+ * 是否上架：读当前账号服务端偏好的内存缓存（按 userId 隔离，Web/桌面同步）。
+ * 未设置 / 未加载时默认关闭。
  */
 export function isPluginEnabled(id: string): boolean {
-	try {
-		const cached = localStorage.getItem(REGISTRY_CACHE_KEY);
-		if (!cached) return false;
-		const data = JSON.parse(cached) as PluginRegistry;
-		const p = data.plugins?.find((x) => x.id === id);
-		return p?.enabled ?? false;
-	} catch {
-		return false;
-	}
+	return getPluginEnabledPref(id);
 }

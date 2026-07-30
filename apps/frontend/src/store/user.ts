@@ -1,4 +1,8 @@
 import { makeAutoObservable } from 'mobx';
+import {
+	ensurePluginEnabledPrefsLoaded,
+	prefetchPluginEnabledPrefs,
+} from '@/plugins/core/pluginEnabledPrefs';
 import { getStorage, removeStorage, setStorage } from '@/utils';
 import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
@@ -54,6 +58,18 @@ function readUserInfoFromStorage(): UserInfoShape | null {
 	}
 }
 
+function syncPluginShellsAfterUserChange(userId: number): void {
+	void (async () => {
+		try {
+			if (userId > 0) await ensurePluginEnabledPrefsLoaded(userId);
+			const { pluginManager } = await import('@/plugins/core/PluginManager');
+			await pluginManager.syncEnabledShells();
+		} catch (e) {
+			console.error('[plugins] sync after user change failed', e);
+		}
+	})();
+}
+
 class UserStore {
 	userInfo: UserInfoShape = createDefaultUserInfo();
 
@@ -65,6 +81,7 @@ class UserStore {
 			const id = normalizeUserId(stored);
 			if (id > 0) {
 				prefetchMinimaxTtsUserPrefs(id);
+				prefetchPluginEnabledPrefs(id);
 			}
 		}
 	}
@@ -80,6 +97,10 @@ class UserStore {
 		if (nextId > 0 && isMembershipActiveFromUserInfo(userInfo)) {
 			prefetchMinimaxTtsUserPrefs(nextId);
 		}
+		if (prevId !== nextId) {
+			if (nextId > 0) prefetchPluginEnabledPrefs(nextId);
+			syncPluginShellsAfterUserChange(nextId);
+		}
 		if (typeof window !== 'undefined') {
 			window.dispatchEvent(new Event('userInfoChanged'));
 		}
@@ -92,6 +113,7 @@ class UserStore {
 		removeStorage(USER_INFO_STORAGE_KEY);
 		if (hadUser) {
 			resetUserState();
+			syncPluginShellsAfterUserChange(0);
 		}
 	}
 }

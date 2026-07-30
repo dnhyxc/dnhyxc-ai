@@ -2,8 +2,9 @@ import { translateSync } from '@/i18n';
 import { putUploadRemoteJson } from '@/service';
 import { getPlatformFetch } from '@/utils/fetch';
 import { resolveUploadedFileUrl } from '@/utils/upload-file-url';
-import { notifyPluginEnabled } from './enabledOverrides';
+import { isPluginEnabled, notifyPluginEnabled } from './enabledOverrides';
 import { satisfiesRange } from './PluginVerifier';
+import { setPluginEnabledPref } from './pluginEnabledPrefs';
 import { HOST_API_VERSION, type PluginRegistry } from './types';
 
 const CACHE_KEY = `dnhyxc.plugin.registry.${import.meta.env.PROD ? 'prod' : 'dev'}.v1`;
@@ -170,7 +171,18 @@ export async function savePluginRegistry(
 	return next;
 }
 
-/** 上架/下架：改 plugins[].enabled 并持久化到 plugins-registry.json */
+/** 用当前账号偏好覆盖 registry 里的 enabled（仅展示/运行时，不写回服务端） */
+export function overlayUserEnabled(data: PluginRegistry): PluginRegistry {
+	return {
+		...data,
+		plugins: data.plugins.map((p) => ({
+			...p,
+			enabled: isPluginEnabled(p.id),
+		})),
+	};
+}
+
+/** 上架/下架：写入服务端账号偏好（Web/桌面同步），不改 registry catalog */
 export async function persistPluginEnabled(
 	id: string,
 	enabled: boolean,
@@ -180,12 +192,7 @@ export async function persistPluginEnabled(
 	if (!hit) {
 		throw new Error(translateSync('plugins.registry.pluginNotFound', { id }));
 	}
-	if (hit.enabled === enabled) {
-		writeCache(data);
-		return data;
-	}
-	return savePluginRegistry({
-		...data,
-		plugins: data.plugins.map((p) => (p.id === id ? { ...p, enabled } : p)),
-	});
+	await setPluginEnabledPref(id, enabled);
+	notifyPluginEnabled();
+	return overlayUserEnabled(data);
 }

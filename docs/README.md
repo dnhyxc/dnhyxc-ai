@@ -62,6 +62,8 @@
 | 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [app/plugin-development-guide.md](./app/plugin-development-guide.md)                                                                                      |
 | 主项目接入插件方式（自动路由 / 手动挂载 / iframe 隔离）             | [app/host-plugin-integration-guide.md](./app/host-plugin-integration-guide.md)                                                                            |
 | 插件上架/下架（setEnabled / 持久化 / Switch / Registry 编辑页）     | [app/plugin-shelf-toggle.md](./app/plugin-shelf-toggle.md)                                                                                                |
+| 插件开关偏好换号不同步 / Web 与桌面不一致 / 默认全关 / 偏好写回 catalog 污染全局 | [app/plugin-enabled-prefs-persistence.md](./app/plugin-enabled-prefs-persistence.md)                                                                       |
+| 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [app/switch-dynamic-id-fix.md](./app/switch-dynamic-id-fix.md)                                                                                            |
 | 插件中心卡片白边 / 远程插件污染 border-border                       | [app/plugin-card-border-theme.md](./app/plugin-card-border-theme.md)                                                                                      |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/ebook-plugin-ideas-list.md](./ebook/ebook-plugin-ideas-list.md)                                                                                    |

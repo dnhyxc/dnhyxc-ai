@@ -131,6 +131,8 @@ export const SETTINGS_LLM_DEFAULTS = '/settings/llm/defaults';
 export const SETTINGS_LLM_VECTOR = '/settings/llm/vector';
 /** 云端朗读（MiniMax）用户偏好 */
 export const SETTINGS_CLOUD_TTS = '/settings/cloud-tts';
+/** 插件上架偏好（按账号，Web/桌面同步） */
+export const SETTINGS_PLUGIN_ENABLED = '/settings/plugin-enabled';
 
 export const ASSISTANT_SESSION = '/assistant/session';
 /** 按知识条目标识拉取该文章下全部会话（历史记录） */

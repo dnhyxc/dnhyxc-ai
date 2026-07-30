@@ -8,17 +8,20 @@ function Switch({
 	className,
 	size = 'default',
 	children,
+	id,
 	...props
 }: React.ComponentProps<typeof SwitchPrimitive.Root> & {
 	size?: 'sm' | 'default';
 	children?: React.ReactNode;
 }) {
+	const autoId = React.useId();
+	const switchId = id ?? autoId;
 	return (
 		<div className="flex items-center">
 			<SwitchPrimitive.Root
 				data-slot="switch"
 				data-size={size}
-				id="airplane-mode"
+				id={switchId}
 				className={cn(
 					'peer cursor-pointer data-[state=checked]:bg-theme/50 data-[state=unchecked]:bg-theme/20 focus-visible:border-theme/10 focus-visible:ring-theme/50 dark:data-[state=unchecked]:bg-theme/80 group/switch inline-flex shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-[1.15rem] data-[size=default]:w-8 data-[size=sm]:h-3.5 data-[size=sm]:w-6',
 					className,
@@ -33,7 +36,7 @@ function Switch({
 				/>
 			</SwitchPrimitive.Root>
 			{children ? (
-				<Label htmlFor="airplane-mode" className="ml-2">
+				<Label htmlFor={switchId} className="ml-2">
 					{children}
 				</Label>
 			) : null}

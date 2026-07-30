@@ -1820,7 +1820,7 @@ export const enUS = {
 	'route.plugins.title': 'Plugins',
 	'plugins.page.title': 'Plugins',
 	'plugins.page.desc':
-		'Browse installed plugins. Turn off to delist: the host stops loading them and related UI entries hide.',
+		'Plugins Installed (All Disabled by Default). Disabling prevents base loading and hides entry points.',
 	'plugins.page.empty': 'No plugins (check that the registry is reachable)',
 	'plugins.page.editRegistry': 'Edit config',
 	'route.plugins.registry.title': 'Plugin registry',
@@ -1866,7 +1866,7 @@ export const enUS = {
 	'plugins.registry.help.hostApiRange':
 		'Required Host API range (e.g. ^1.0.0). Must cover the current Host; change only when the Host contract upgrades.',
 	'plugins.registry.help.enabled':
-		'Whether the plugin is listed; false stops loading and hides host UI entries.',
+		'Catalog default (now false). Actual shelf state is per-account on the server (Web/desktop sync) and is not written back here.',
 	'plugins.registry.help.trust':
 		'Trust level: first-party / partner / untrusted (iframe only, no loadRemote).',
 	'plugins.registry.help.remoteName':

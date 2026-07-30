@@ -6,8 +6,10 @@ import { eventBus } from '../host-api/EventBus';
 import { routeInjector } from '../inject/RouteInjector';
 import { sidebarInjector } from '../inject/SidebarInjector';
 import { createHostBridge } from './createHostBridge';
+import { isPluginEnabled, notifyPluginEnabled } from './enabledOverrides';
 import { loadRemoteApp, registerRemote, resolvePluginBust } from './mf';
 import { verifyPlugin } from './PluginVerifier';
+import { ensurePluginEnabledPrefsLoaded } from './pluginEnabledPrefs';
 import { fetchPluginRegistry, persistPluginEnabled } from './registry';
 import type { LoadedPlugin, PluginDescriptor } from './types';
 
@@ -51,8 +53,9 @@ class PluginManagerImpl {
 	 * `preload: 'eager'` 为显式 opt-in，仍不阻塞 init（微任务后台拉）。
 	 */
 	async init() {
+		await ensurePluginEnabledPrefsLoaded();
 		const registry = await fetchPluginRegistry({ force: true });
-		const enabled = registry.plugins.filter((p) => p.enabled);
+		const enabled = registry.plugins.filter((p) => isPluginEnabled(p.id));
 		for (const meta of enabled) {
 			this.mountShell(meta);
 		}
@@ -61,6 +64,17 @@ class PluginManagerImpl {
 		queueMicrotask(() => {
 			void Promise.all(eager.map((p) => this.loadPlugin(p)));
 		});
+	}
+
+	/** 切换账号后按服务端偏好重挂/卸载壳（路由、侧栏） */
+	async syncEnabledShells() {
+		await ensurePluginEnabledPrefsLoaded();
+		const registry = await fetchPluginRegistry();
+		for (const meta of registry.plugins) {
+			if (isPluginEnabled(meta.id)) this.mountShell(meta);
+			else await this.unloadPlugin(meta.id);
+		}
+		notifyPluginEnabled();
 	}
 
 	private mountShell(meta: PluginDescriptor) {
@@ -81,7 +95,9 @@ class PluginManagerImpl {
 
 	async ensurePlugin(id: string, opts?: { force?: boolean }) {
 		const registry = await fetchPluginRegistry({ force: true });
-		const meta = registry.plugins.find((p) => p.id === id && p.enabled);
+		const meta = registry.plugins.find(
+			(p) => p.id === id && isPluginEnabled(p.id),
+		);
 		if (!meta) {
 			throw new Error(`registry 中无启用插件 ${id}`);
 		}
@@ -224,8 +240,8 @@ class PluginManagerImpl {
 	}
 
 	/**
-	 * 上架 / 下架：写入服务端 plugins-registry.json，并即时挂壳或卸载。
-	 * Web / 桌面共用同一 remotes 文件；下架后业务入口配合 `usePluginEnabled` 隐藏。
+	 * 上架 / 下架：写入服务端账号偏好（Web/桌面同步），并即时挂壳或卸载。
+	 * 下架后业务入口配合 `usePluginEnabled` 隐藏。
 	 */
 	async setEnabled(id: string, enabled: boolean) {
 		const registry = await persistPluginEnabled(id, enabled);

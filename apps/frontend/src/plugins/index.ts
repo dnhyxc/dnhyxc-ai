@@ -28,6 +28,7 @@ export {
 	fetchPluginRegistry,
 	fetchPluginRegistryRawText,
 	formatRegistryUpdatedAt,
+	overlayUserEnabled,
 	PLUGIN_REGISTRY_CACHE_KEY,
 	PLUGIN_REGISTRY_FILENAME,
 	PLUGIN_REGISTRY_STATIC_PATH,

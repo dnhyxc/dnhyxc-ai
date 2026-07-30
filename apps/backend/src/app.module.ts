@@ -27,6 +27,7 @@ import { MailModule } from './services/mail/mail.module';
 import { MenusModule } from './services/menus/menus.module';
 import { OcrModule } from './services/ocr/ocr.module';
 import { PayModule } from './services/pay/pay.module';
+import { PluginPrefsModule } from './services/plugin-prefs/plugin-prefs.module';
 import { PromptModule } from './services/prompt/prompt.module';
 import { QdrantModule } from './services/qdrant/qdrant.module';
 import { RolesModule } from './services/roles/roles.module';
@@ -104,6 +105,7 @@ const connections = new Map();
 		KnowledgeQaModule,
 		ShareModule,
 		PayModule,
+		PluginPrefsModule,
 		AssistantModule,
 		AgentModule,
 	],

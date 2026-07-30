@@ -15,10 +15,15 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	fetchPluginRegistry,
+	isPluginEnabled,
+	overlayUserEnabled,
 	type PluginDescriptor,
 	pickPluginLocaleText,
 	pluginManager,
+	subscribePluginEnabled,
 } from '@/plugins';
+import { ensurePluginEnabledPrefsLoaded } from '@/plugins/core/pluginEnabledPrefs';
+import { getRequestErrorMessage } from '@/utils/fetch';
 
 /** 标题只认 registry.title[locale]，缺省回退 id */
 function pluginTitle(p: PluginDescriptor, locale: string) {
@@ -45,11 +50,12 @@ export default function PluginsPage() {
 
 	const refresh = useCallback(async () => {
 		try {
+			await ensurePluginEnabledPrefsLoaded();
 			const reg = await fetchPluginRegistry({ force: true });
-			setPlugins(reg.plugins);
+			setPlugins(overlayUserEnabled(reg).plugins);
 			setError(null);
 		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e));
+			setError(getRequestErrorMessage(e));
 		}
 	}, []);
 
@@ -57,13 +63,22 @@ export default function PluginsPage() {
 		void refresh();
 	}, [refresh]);
 
+	// 偏好变更时只重贴 enabled，避免再拉 registry → notify 死循环
+	useEffect(() => {
+		return subscribePluginEnabled(() => {
+			setPlugins((prev) =>
+				prev.map((p) => ({ ...p, enabled: isPluginEnabled(p.id) })),
+			);
+		});
+	}, []);
+
 	const onToggle = async (id: string, enabled: boolean) => {
 		setBusyId(id);
 		try {
 			await pluginManager.setEnabled(id, enabled);
 			await refresh();
 		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e));
+			setError(getRequestErrorMessage(e));
 		} finally {
 			setBusyId(null);
 		}

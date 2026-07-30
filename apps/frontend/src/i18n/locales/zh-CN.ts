@@ -1672,7 +1672,7 @@ export const zhCN = {
 	'route.plugins.title': '插件中心',
 	'plugins.page.title': '插件中心',
 	'plugins.page.desc':
-		'查看已接入的插件。关闭开关即下架：基座不再加载，相关业务入口也会隐藏。',
+		'查看已接入的插件，默认全部关闭，关闭后基座不再加载，相关业务入口也会隐藏。',
 	'plugins.page.empty': '暂无插件（请确认 registry 可访问）',
 	'plugins.page.editRegistry': '编辑配置',
 	'route.plugins.registry.title': '插件配置',
@@ -1715,7 +1715,7 @@ export const zhCN = {
 	'plugins.registry.help.hostApiRange':
 		'要求的 Host API 版本范围（如 ^1.0.0）。须覆盖当前 Host；仅 Host 契约升级时再改。',
 	'plugins.registry.help.enabled':
-		'是否上架；false 时 Host 不加载且隐藏业务入口。',
+		'目录建议默认值（现已默认 false）。实际上架/下架按账号保存在服务端（Web/桌面同步），不再写回此字段。',
 	'plugins.registry.help.trust':
 		'信任等级：first-party / partner / untrusted（后者走 iframe，不 loadRemote）。',
 	'plugins.registry.help.remoteName':
