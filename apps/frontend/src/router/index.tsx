@@ -22,6 +22,12 @@ const App = () => {
 	const [routeEpoch, setRouteEpoch] = useState(0);
 
 	useEffect(() => {
+		if (import.meta.env.PROD && isTauriRuntime()) {
+			// 线上桌面端禁 WebView 系统右键（后退/刷新/检查元素）；仅 preventDefault，不拦截项目自定义菜单
+			document.addEventListener('contextmenu', (e) => {
+				e.preventDefault();
+			});
+		}
 		const unsub = routeInjector.subscribe(() => {
 			setRouteEpoch((n) => n + 1);
 		});

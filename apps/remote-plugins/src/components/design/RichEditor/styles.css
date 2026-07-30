@@ -239,13 +239,27 @@
 	cursor: pointer;
 }
 
-.rich-editor-body .tiptap img,
+.rich-editor-body .tiptap img:not(.ProseMirror-separator),
 .rich-editor-body .tiptap .rich-editor-image {
 	max-width: 100%;
 	height: auto;
 	border-radius: 0.5rem;
 	display: block;
+	/* 与 img 内联 style 一致；stylesheet 失效时仍靠内联 */
 	margin: 0.75em 0;
+}
+
+/* 悬停时仍锁圆角（防 WebKit 重绘后 stylesheet 丢失） */
+.rich-editor-body .tiptap img:not(.ProseMirror-separator):hover,
+.rich-editor-body .tiptap .rich-editor-image:hover {
+	border-radius: 0.5rem;
+}
+
+.rich-editor-body .tiptap [data-resize-container][data-node="image"] {
+	margin: 0.75em 0;
+}
+.rich-editor-body .tiptap [data-resize-container][data-node="image"] img {
+	margin: 0;
 }
 
 /* 块级图片前后的间隙光标（点进图前/图后） */

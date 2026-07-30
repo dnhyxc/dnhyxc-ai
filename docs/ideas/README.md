@@ -29,6 +29,7 @@
 | [learning-notes-export-and-editor-polish.md](./learning-notes-export-and-editor-polish.md) | **DOCX 插图导出可靠化 + 长文编辑打磨**（核心已落地）：sharp@0.33.5 懒加载、foreign/webp→JPEG、长文自然高度/末窗落点、GapCursor/空段删除；含 C1–C13 改动点对照 |
 | [learning-notes-docx-export-handbook.md](./learning-notes-docx-export-handbook.md) | **学习笔记富文本导出 Word（DOCX）端到端实现手册**（已上线）：从零复刻教学手册；M1–M14 全链路（DB→builder→Service→Controller→拦截器短路→Host downloadBlob→HostBridge→iframe RPC→插件 API→MobX action→按钮 UI→TipTap 富文本→长文性能优化），含完整源码 + 逐行注释 + 验收清单 + 常见坑排查 |
 | [ebook-plugin-dynamic-integration.md](./ebook-plugin-dynamic-integration.md) | **主项目 Ebook 插件动态接入**（核心已上线）：从零复刻端到端实现手册；Host Surface 发现机制、模块级单例 handlers 冻结代理、MF runtime + 共享 React 单例、PluginManager 生命周期、createHostBridge 按权限装配、Iframe RPC + 同步 getter 预取改写、`@scope` 样式隔离、i18n 双轨同步；M1–M8 分阶段 + 23 章节 + 完整源码逐行注释 + 验收清单 + 排查手册 |
+| [tauri-clipboard-rich-paste.md](./tauri-clipboard-rich-paste.md) | **Tauri 桌面端剪贴板（文本/图文混合/图片/文件列表）**（已上线）：全局 keydown 接管 C/V/X/A、Rust arboard 读 HTML/位图/文件列表、四种 flavor 并行读 + 四级降级插入、TipTap parseSlice、React 受控输入同步、Web 端 ImageUpload handlePaste；含架构/流程/时序三图 + 完整源码逐行注释 + 验收清单 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

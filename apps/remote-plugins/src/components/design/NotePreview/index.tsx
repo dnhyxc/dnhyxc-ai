@@ -58,8 +58,9 @@ export function NotePreview({
 	return (
 		<div
 			className={cn(
-				// contain：预览大 DOM 不参与左侧列表滚动时的布局/绘制连锁
-				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md contain-[layout_paint_style]',
+				// contain layout/paint：大预览 DOM 不拖累左侧列表；勿加 style——
+				// WebKit/Tauri 下 contain:style 会导致子树样式进页不生效，鼠标移入才闪一下补上（如图 margin）
+				'note-preview flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-r-md contain-[layout_paint]',
 				className,
 			)}
 		>

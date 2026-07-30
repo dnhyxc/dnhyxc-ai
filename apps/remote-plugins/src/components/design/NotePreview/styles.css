@@ -5,7 +5,6 @@
 .note-preview-editor .rich-editor-body,
 .note-preview-static.rich-editor-body {
 	padding: 0.75rem;
-	padding-top: 0.28rem;
 	text-align: justify;
 }
 
@@ -20,9 +19,29 @@
 	display: none !important;
 }
 
-.note-preview-editor .ProseMirror > *:first-child,
-.note-preview-static .ProseMirror > *:first-child,
-.note-preview-static.rich-editor-body > .tiptap > *:first-child {
+/* 首块标题等去顶距。不要写 img/:first-child——WebKit+@scope 下会把后续图的间距也清掉；
+   图的顶距由 RichEditor 里「前驱 + img」规则负责。 */
+.note-preview-editor .ProseMirror
+	> :first-child:is(h1, h2, h3, h4, h5, h6, blockquote, pre, hr, ul, ol, table),
+.note-preview-static
+	.ProseMirror
+	> :first-child:is(h1, h2, h3, h4, h5, h6, blockquote, pre, hr, ul, ol, table),
+.note-preview-static.rich-editor-body
+	> .tiptap
+	> :first-child:is(
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		blockquote,
+		pre,
+		hr,
+		ul,
+		ol,
+		table
+	) {
 	margin-top: 0;
 }
 

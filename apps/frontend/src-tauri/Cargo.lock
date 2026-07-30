@@ -971,8 +971,10 @@ name = "dnhyxc-ai"
 version = "0.1.0"
 dependencies = [
  "arboard",
+ "base64 0.22.1",
  "cocoa",
  "futures",
+ "png 0.17.16",
  "reqwest 0.13.1",
  "rfd",
  "serde",

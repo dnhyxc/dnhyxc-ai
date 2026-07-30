@@ -13,11 +13,13 @@
 | [learning-notes-docx-builder.md](./learning-notes-docx-builder.md) | **DOCX Builder 端到端实现手册**：后端 `learning-note-docx.builder.ts` 全 28 个符号（HTML→DOCX 转换、sharp 懒加载转 JPEG、foreign/webp 兼容、本机 uploads 读盘、ImageBudget 图片预算、表格/列表/代码块转换、`buildLearningNoteDocxBuffer` 主入口） |
 | [learning-notes-large-note-editor.md](./learning-notes-large-note-editor.md) | **长文笔记编辑器（LargeNoteEditor）**：切块窗口化挂载、`LargeNoteDoc` 模型、`flushWindow` 写回、`originForScroll` 滞回换窗、入场贴底、`NotesListPanel` 列表隔离 |
 | [learning-notes-windowed-preview.md](./learning-notes-windowed-preview.md) | **长文窗口化预览（WindowedPreviewBody）**：`previewHtml.ts` 全正则化 HTML 处理（剥标题/补空段/图片懒加载/切块）、预览窗口化挂载、`NotePreview` 改造 `children` 插槽 |
+| [learning-notes-image-inline-style.md](./learning-notes-image-inline-style.md) | **学习笔记图片内联样式**：`previewHtml.ts` 注入 `<img>` margin/圆角内联样式、首图去顶距、`NotePreview` 去 `contain:style`、`RichEditor/extensions` Image 配置加内联 style、`RichEditor/styles.css` 排除伪图与缩放容器间距；摆脱 MF @scope stylesheet 依赖（含改动前/后对比与逐行注释） |
 | [learning-notes-editor-polish.md](./learning-notes-editor-polish.md) | **富文本编辑器打磨**：`TitleNode.appendTransaction` GapCursor 二次修正、`EmptyParagraphDelete` 扩展、`NoteTitleField` 抽取、`fileToDataUrl` 非 DOCX 安全 MIME 转 JPEG、GapCursor CSS、`mountEditor` 延迟挂载 |
 | [learning-notes-rich-editor-deep-dive.md](./learning-notes-rich-editor-deep-dive.md) | **富文本编辑器源码级详解**：13 个模块逐行注释、架构/调用链/设计决策全景 |
 | [rich-editor-core-fixes.md](./rich-editor-core-fixes.md) | **富文本编辑器核心优化**：appendTransaction GapCursor 精细化、onCreate 两帧 rAF 选区、shouldShowBubble 提取、工具栏 fits 溢出重算、LinkForm 迁 UI 组件、ScrollArea 接管滚动 |
 | [richeditor-performance-tuning.md](./richeditor-performance-tuning.md) | **RichEditor 性能优化**：JSON 懒序列化、回调 ref 化、CharacterCount 按需挂载、toolbarExtra useMemo |
 | [tauri-clipboard-tiptap.md](./tauri-clipboard-tiptap.md) | **Tauri 剪贴板支持 TipTap**：桌面端 WebView 系统级 Cmd/Ctrl+C/V/X 快捷键接管 TipTap 富文本正文 |
+| [tauri-clipboard-image-files.md](./tauri-clipboard-image-files.md) | **Tauri 剪贴板图片与文件列表读取**：Rust `arboard` 位图→PNG→base64、文件列表逐个读图→data URL、`clipboard.ts` 四 flavor 并行读取与降级插入、`getTipTapEditor`/`insertHtmlViaEditor`/`insertClipSegments` 全链路（含改动前/后对比与逐行注释）；与 [../ideas/tauri-clipboard-rich-paste.md](../ideas/tauri-clipboard-rich-paste.md) 互为专题/总文档 |
 | [learning-notes-crud.md](./learning-notes-crud.md) | **学习笔记 CRUD 与 API 集成**：列表左/编辑器右布局重构、`createNotesApi` 工厂、`Confirm` 删除确认、HostBridge 扩展 `put/delete` 全链路 |
 | [learning-notes-mobx-store.md](./learning-notes-mobx-store.md) | **学习笔记 MobX 状态管理与分页**：useState 重构为 MobX store、列表分页加载、滚动到底部加载更多 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |

@@ -106,7 +106,8 @@ export default function PluginsPage() {
 										<Card
 											key={p.id}
 											className={cn(
-												'gap-2 py-4 flex flex-col justify-around border bg-theme/5 shadow-none',
+												// 显式 border-theme/5，避免裸 border 吃到被远程插件污染的 border-border 白边
+												'gap-2 py-4 flex flex-col justify-around border border-theme/5 bg-theme/5 shadow-none',
 												!onShelf && 'opacity-80',
 											)}
 										>

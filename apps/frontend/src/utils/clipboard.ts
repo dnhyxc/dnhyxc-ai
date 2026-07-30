@@ -21,11 +21,20 @@ async function writeClipText(text: string): Promise<void> {
 
 async function readClipText(): Promise<string> {
 	if (isTauriRuntime()) {
-		const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
-		return readText();
+		try {
+			const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+			return await readText();
+		} catch {
+			// 剪贴板无文本 flavor（如纯图片/截图）：返回空串，不阻断 Promise.all
+			return '';
+		}
 	}
 	if (navigator.clipboard?.readText) {
-		return navigator.clipboard.readText();
+		try {
+			return await navigator.clipboard.readText();
+		} catch {
+			return '';
+		}
 	}
 	return '';
 }
@@ -50,78 +59,122 @@ type ClipSegment =
 	| { type: 'text'; value: string }
 	| { type: 'image'; src: string };
 
+const LITERAL_IMG_RE = /<img\b[^>]*>/gi;
+
+/** 1x1 占位图（知乎等懒加载） */
+function isPlaceholderSrc(src: string): boolean {
+	const s = src.trim();
+	if (s.startsWith('data:image/svg+xml;base64,') && s.length < 250) return true;
+	if (s.startsWith('data:image/gif;base64,') && s.length < 100) return true;
+	if (s.startsWith('data:image/png;base64,') && s.length < 200) return true;
+	return false;
+}
+
+function isImgSrc(src: string): boolean {
+	const s = src.trim();
+	if (!s || /^javascript:/i.test(s)) return false;
+	return true;
+}
+
+/** 懒加载属性优先，拿真实图 URL */
+function pickImgSrc(el: Element): string | null {
+	const candidates = [
+		el.getAttribute('data-rawsrc'),
+		el.getAttribute('data-src'),
+		el.getAttribute('data-original'),
+		el.getAttribute('src'),
+	].filter(Boolean) as string[];
+	for (const src of candidates) {
+		if (isImgSrc(src) && !isPlaceholderSrc(src)) return src;
+	}
+	const srcset = el.getAttribute('srcset');
+	if (srcset) {
+		const first = srcset.split(',')[0]?.trim().split(' ')[0];
+		if (first && isImgSrc(first)) return first;
+	}
+	for (const src of candidates) {
+		if (src.trim()) return src.trim();
+	}
+	return null;
+}
+
 /**
- * 按原始 DOM 顺序解析剪贴板 HTML，产出文本与图片片段序列。
- * 保证粘贴后图文相对顺序与复制时一致（图片在前则插入时图片也在前）。
+ * 清洗剪贴板 HTML，交给 TipTap insertContent（对齐 web 原生粘贴：保留 <a>、段落，不人造空行）。
+ * - 去掉 noscript/script 等重复源码
+ * - img 的 src 改写为 data-original 等真实地址
+ * - 剥掉文本里转义的裸 <img> 标签
+ */
+function preprocessClipboardHtml(html: string): string {
+	const tmp = document.createElement('div');
+	tmp.innerHTML = html;
+	tmp.querySelectorAll('noscript, script, style, template').forEach((el) => {
+		el.remove();
+	});
+	tmp.querySelectorAll('img').forEach((img) => {
+		const src = pickImgSrc(img);
+		if (src) img.setAttribute('src', src);
+		else img.remove();
+	});
+	const walk = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
+	const texts: Text[] = [];
+	while (walk.nextNode()) texts.push(walk.currentNode as Text);
+	for (const t of texts) {
+		const v = t.textContent ?? '';
+		if (!LITERAL_IMG_RE.test(v)) continue;
+		LITERAL_IMG_RE.lastIndex = 0;
+		t.textContent = v.replace(LITERAL_IMG_RE, '');
+	}
+	return tmp.innerHTML;
+}
+
+/**
+ * 按原始 DOM 顺序解析剪贴板 HTML → 文本/图片片段（无 TipTap 时的回退路径）。
  */
 function parseHtmlSegments(html: string): ClipSegment[] {
 	const tmp = document.createElement('div');
-	tmp.innerHTML = html;
-	// br 转换行，保留基本排版
+	tmp.innerHTML = preprocessClipboardHtml(html);
 	tmp.querySelectorAll('br').forEach((br) => {
 		br.replaceWith('\n');
 	});
 	const segments: ClipSegment[] = [];
-	const isImgSrc = (src: string) => /^https?:\/\/|^data:image\//i.test(src);
+	const blockTags = new Set([
+		'p',
+		'div',
+		'li',
+		'h1',
+		'h2',
+		'h3',
+		'h4',
+		'h5',
+		'h6',
+		'tr',
+		'blockquote',
+	]);
 
-	// 深度优先遍历：按文档顺序收集文本与图片节点
 	const walk = (node: Node) => {
 		if (node.nodeType === Node.ELEMENT_NODE) {
 			const el = node as Element;
 			const tag = el.tagName.toLowerCase();
 			if (tag === 'img') {
-				const src = el.getAttribute('src') ?? '';
-				if (src && isImgSrc(src)) {
-					segments.push({ type: 'image', src });
-				}
-				return; // img 内部不再遍历
+				const src = pickImgSrc(el);
+				if (src) segments.push({ type: 'image', src });
+				return;
 			}
-			// 块级元素前后补换行，保留排版
-			const blockTags = new Set([
-				'p',
-				'div',
-				'li',
-				'h1',
-				'h2',
-				'h3',
-				'h4',
-				'h5',
-				'h6',
-				'tr',
-				'blockquote',
-			]);
-			if (blockTags.has(tag)) {
-				segments.push({ type: 'text', value: '\n' });
-			}
+			if (blockTags.has(tag)) segments.push({ type: 'text', value: '\n' });
 		}
 		if (node.nodeType === Node.TEXT_NODE) {
 			const value = node.textContent ?? '';
 			if (value) segments.push({ type: 'text', value });
-			return; // 文本节点无子节点
+			return;
 		}
 		node.childNodes.forEach(walk);
 		if (node.nodeType === Node.ELEMENT_NODE) {
 			const tag = (node as Element).tagName.toLowerCase();
-			const blockTags = new Set([
-				'p',
-				'div',
-				'li',
-				'h1',
-				'h2',
-				'h3',
-				'h4',
-				'h5',
-				'h6',
-				'tr',
-				'blockquote',
-			]);
-			if (blockTags.has(tag)) {
-				segments.push({ type: 'text', value: '\n' });
-			}
+			if (blockTags.has(tag)) segments.push({ type: 'text', value: '\n' });
 		}
 	};
 	walk(tmp);
-	// 合并相邻文本片段，压缩多余空行
+
 	const merged: ClipSegment[] = [];
 	let buf = '';
 	for (const seg of segments) {
@@ -136,7 +189,6 @@ function parseHtmlSegments(html: string): ClipSegment[] {
 		}
 	}
 	if (buf) merged.push({ type: 'text', value: buf });
-	// 压缩 3+ 换行为 2 个，trim 首尾
 	return merged
 		.map((seg) =>
 			seg.type === 'text'
@@ -144,54 +196,63 @@ function parseHtmlSegments(html: string): ClipSegment[] {
 				: seg,
 		)
 		.filter((seg, i, arr) => {
-			if (seg.type === 'text') {
-				if (seg.value.trim() === '') {
-					// 保留片段间的单个换行，仅丢弃纯空的首尾
-					return i !== 0 && i !== arr.length - 1;
-				}
+			if (seg.type === 'text' && seg.value.trim() === '') {
+				return i !== 0 && i !== arr.length - 1;
 			}
 			return true;
 		});
 }
 
 /**
- * Tauri 桌面端：读取系统剪贴板图片位图，经 canvas 转 PNG data URL。
- * 走 Tauri IPC（plugin-clipboard-manager），不触发 navigator.clipboard 的 Web 权限弹窗。
- * 剪贴板无图片位图时 readImage 抛错，返回 null 静默忽略。
- * 覆盖截图、从图片应用复制等"独立位图"场景；网页复制的 <img src> 远程图片拿不到。
+ * Tauri 桌面端：读取系统剪贴板图片位图，Rust 侧用 arboard 读取并编码为 PNG base64 data URL。
+ * 走自定义 Rust 命令 read_clipboard_image_base64，避免 Tauri plugin readImage 的 canvas 转换问题。
+ * 剪贴板无图片位图时返回 null。覆盖截图、从图片应用复制等"独立位图"场景。
  */
 async function readClipImageAsDataUrl(): Promise<string | null> {
 	if (!isTauriRuntime()) return null;
 	try {
-		const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
-		const img = await readImage();
-		const rgba = await img.rgba();
-		const size = await img.size();
-		const width = size?.width ?? 0;
-		const height = size?.height ?? 0;
-		// 放宽校验：只要宽高非零且 rgba 存在就尝试转换（位图长度由 Tauri 保证）
-		if (!width || !height || !rgba || rgba.length === 0) return null;
-		const canvas = document.createElement('canvas');
-		canvas.width = width;
-		canvas.height = height;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return null;
-		ctx.putImageData(
-			new ImageData(new Uint8ClampedArray(rgba), width, height),
-			0,
-			0,
-		);
-		return canvas.toDataURL('image/png');
+		const { invoke } = await import('@tauri-apps/api/core');
+		const dataUrl = await invoke<string | null>('read_clipboard_image_base64');
+		return dataUrl?.startsWith('data:image/') ? dataUrl : null;
 	} catch {
 		return null;
 	}
 }
 
 /**
- * 从 DOM 元素向上查找 ProseMirror EditorView（内部 API pmViewDesc.view）。
- * 用于 Tauri 桌面端手动插入图文到 TipTap 编辑器。
+ * Tauri 桌面端：读取剪贴板文件列表中的所有图片文件，逐个返回 data URL。
+ * 走自定义 Rust 命令 read_clipboard_image_files_base64（arboard file_list + fs::read）。
+ * 覆盖从 Finder 选中多个图片文件复制、从富文本应用复制多图等场景（arboard get_image 只能读单张）。
+ * 非图片文件、读取失败的单项在 Rust 侧已跳过。
  */
+async function readClipImageFiles(): Promise<string[]> {
+	if (!isTauriRuntime()) return [];
+	try {
+		const { invoke } = await import('@tauri-apps/api/core');
+		const list = await invoke<string[]>('read_clipboard_image_files_base64');
+		return (list ?? []).filter((s) => s.startsWith('data:image/'));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * 从 DOM 向上取 TipTap Editor / ProseMirror EditorView。
+ * TipTap：view.dom.editor；原生 PM：pmViewDesc.view。
+ */
+function getTipTapEditor(el: HTMLElement): any | null {
+	let node: Element | null = el;
+	while (node) {
+		const editor = (node as any).editor;
+		if (editor?.commands && !editor.isDestroyed) return editor;
+		node = node.parentElement;
+	}
+	return null;
+}
+
 function getProseMirrorView(el: HTMLElement): any | null {
+	const editor = getTipTapEditor(el);
+	if (editor?.view) return editor.view;
 	let node: Element | null = el;
 	while (node) {
 		const desc = (node as any).pmViewDesc;
@@ -199,6 +260,71 @@ function getProseMirrorView(el: HTMLElement): any | null {
 		node = node.parentElement;
 	}
 	return null;
+}
+
+/**
+ * 有 HTML 时优先用 schema 缓存的 DOMParser.parseSlice（贴近 web 原生粘贴），
+ * 否则 TipTap insertContent；保留 <a> / 段落。成功返回处理后的 HTML，失败 null。
+ */
+function insertHtmlViaEditor(editor: any, html: string): string | null {
+	const processed = preprocessClipboardHtml(html);
+	if (!processed.trim()) return null;
+	const view = editor.view;
+	const parser = view?.state?.schema?.cached?.domParser;
+	if (parser?.parseSlice) {
+		try {
+			const holder = document.createElement('div');
+			holder.innerHTML = processed;
+			const slice = parser.parseSlice(holder, {
+				preserveWhitespace: true,
+				context: view.state.selection.$from,
+			});
+			if (slice?.content?.size) {
+				view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
+				view.focus();
+				return processed;
+			}
+		} catch {
+			// fall through
+		}
+	}
+	try {
+		const ok = !!editor.chain().focus().insertContent(processed).run();
+		return ok ? processed : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * 块级图片插入后若仍停在 NodeSelection，下一段会盖掉上一张；near 把光标挪到节点后。
+ */
+function moveSelectionAfter(tr: any): any {
+	const sel = tr.selection;
+	const Sel = sel?.constructor;
+	if (typeof Sel?.near !== 'function') return tr;
+	const next = Sel.near(tr.doc.resolve(sel.to), 1);
+	return next ? tr.setSelection(next) : tr;
+}
+
+/** 无 HTML / insertContent 失败时的回退：纯文本 + 图片片段 */
+function insertClipSegments(view: any, segments: ClipSegment[]): void {
+	const imageType = view.state.schema.nodes.image;
+	for (const seg of segments) {
+		if (seg.type === 'text') {
+			if (!seg.value) continue;
+			if (view.state.selection.node) {
+				view.dispatch(moveSelectionAfter(view.state.tr));
+			}
+			view.dispatch(view.state.tr.insertText(seg.value));
+		} else if (imageType) {
+			const node = imageType.create({ src: seg.src });
+			view.dispatch(
+				moveSelectionAfter(view.state.tr.replaceSelectionWith(node)),
+			);
+		}
+	}
+	view.focus();
 }
 
 export const copyToClipboard = async (text: string): Promise<void> => {
@@ -422,47 +548,79 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 			}
 
 			if (key === 'v') {
-				// Tauri WebView 原生 paste 不触发到 ProseMirror：
-				// 优先读剪贴板 HTML（含 <img src>，覆盖网页复制图文混合），
-				// 回退 readText + readImage（覆盖纯文本 / 截图独立位图）。
-				// 按 HTML 原始 DOM 顺序插入片段，保证图文相对顺序与复制时一致。
+				// Tauri WebView 原生 paste 往往到不了 ProseMirror：
+				// 有 HTML → 预处理后 insertContent（对齐 web：保留链接/段落）
+				// 无 HTML → 纯文本 + 文件列表/位图图片
 				event.preventDefault();
 				const root = tipTapBody;
 				void (async () => {
 					if (!root.isConnected) return;
-					// 1) 优先尝试 HTML：按顺序解析为文本/图片片段
-					const html = await readClipHtml();
-					let segments: ClipSegment[] = [];
-					let imageDataUrl: string | null = null;
-					if (html) {
-						segments = parseHtmlSegments(html);
-					} else {
-						// 2) 无 HTML 时回退：readText 拿纯文本，readImage 拿截图位图
-						const [t, img] = await Promise.all([
-							readClipText(),
-							readClipImageAsDataUrl(),
-						]);
-						if (t) segments.push({ type: 'text', value: t });
-						imageDataUrl = img;
+					const [html, imageDataUrl, imageFiles, text] = await Promise.all([
+						readClipHtml(),
+						readClipImageAsDataUrl(),
+						readClipImageFiles(),
+						readClipText(),
+					]);
+
+					root.focus();
+					const editor = getTipTapEditor(root);
+					const view = editor?.view ?? getProseMirrorView(root);
+
+					// 优先：整段 HTML 一次插入（链接、换行与 web 一致）
+					if (html && editor) {
+						const inserted = insertHtmlViaEditor(editor, html);
+						if (inserted != null) {
+							const htmlImageCount = (inserted.match(/<img\b/gi) ?? []).length;
+							const extraImages: string[] = [
+								...imageFiles,
+								...(imageDataUrl ? [imageDataUrl] : []),
+							];
+							const needExtra =
+								htmlImageCount === 0 ||
+								(htmlImageCount < extraImages.length && extraImages.length > 1);
+							if (needExtra && extraImages.length > 0 && view) {
+								insertClipSegments(
+									view,
+									extraImages.map((src) => ({
+										type: 'image' as const,
+										src,
+									})),
+								);
+							}
+							return;
+						}
 					}
-					if (imageDataUrl) {
-						segments.push({ type: 'image', src: imageDataUrl });
+
+					// 回退：文本/图片片段
+					let segments: ClipSegment[] = [];
+					if (html) segments = parseHtmlSegments(html);
+
+					const htmlImageCount = segments.filter(
+						(s) => s.type === 'image',
+					).length;
+					const extraImages: string[] = [
+						...imageFiles,
+						...(imageDataUrl ? [imageDataUrl] : []),
+					];
+					const needExtraImages =
+						htmlImageCount === 0 ||
+						(htmlImageCount < extraImages.length && extraImages.length > 1);
+
+					if (needExtraImages && extraImages.length > 0) {
+						if (segments.length === 0 && text) {
+							segments.push({ type: 'text', value: text });
+						}
+						for (const src of extraImages) {
+							segments.push({ type: 'image', src });
+						}
+					}
+					if (segments.length === 0 && text) {
+						segments.push({ type: 'text', value: text });
 					}
 					if (segments.length === 0) return;
-					root.focus();
-					const view = getProseMirrorView(root);
+
 					if (view) {
-						const imageType = view.state.schema.nodes.image;
-						for (const seg of segments) {
-							if (seg.type === 'text') {
-								if (seg.value)
-									view.dispatch(view.state.tr.insertText(seg.value));
-							} else if (imageType) {
-								const node = imageType.create({ src: seg.src });
-								view.dispatch(view.state.tr.replaceSelectionWith(node));
-							}
-						}
-						view.focus();
+						insertClipSegments(view, segments);
 					} else {
 						for (const seg of segments) {
 							if (seg.type === 'text') {
@@ -472,7 +630,7 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 								document.execCommand(
 									'insertHTML',
 									false,
-									`<img src="${seg.src}" alt="" />`,
+									`<img src="${seg.src.replace(/"/g, '&quot;')}" alt="" />`,
 								);
 							}
 						}

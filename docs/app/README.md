@@ -33,6 +33,8 @@
 | [ebook-host-surface-plugins.md](./ebook-host-surface-plugins.md) | **Ebook 阅读页插件动态接入（Host Surface 发现机制）**：`PluginDescriptor.host` 声明、`listHostSurfacePlugins`/`useHostSurfacePlugins` 同步枚举、`EbookReadHostPlugins` 三 part 槽位、阅读页去硬编码、后端 highlights 分页端点、remote 仓 ebook 视图重组与新增 expose（含改动前/后对比与逐行注释） |
 | [plugin-docs-update.md](./plugin-docs-update.md) | **插件开发文档路径同步**：`ebook-ideas` → `ebook/ideas` 目录重组后，同步 host-plugin-integration-guide / mf-implementation-guide 两份文档中的文件路径引用 |
 | [plugin-shelf-toggle.md](./plugin-shelf-toggle.md) | **插件上架/下架实现**：PluginManager.setEnabled、persistPluginEnabled 持久化、enabledOverrides 订阅、usePluginEnabled Hook、插件中心 Switch、Registry 编辑页、后端 PUT /upload/remotes（含改动前/后对比与逐行注释） |
+| [plugin-card-border-theme.md](./plugin-card-border-theme.md) | **插件中心卡片 border 显式主题色**：`Card` className 追加 `border-theme/5`，避免裸 `border` 吃到被远程插件污染的 `border-border` 白边（含改动前/后对比与逐行注释） |
+| [tauri-webview-context-menu-disable.md](./tauri-webview-context-menu-disable.md) | **Tauri 桌面端生产环境禁用 WebView 系统右键菜单**：`App` 首个 `useEffect` 内 `import.meta.env.PROD && isTauriRuntime()` 时注册 `contextmenu` 监听并 `preventDefault`（含改动前/后对比与逐行注释） |
 | [style-isolation-tech-overview.md](./style-isolation-tech-overview.md) | **主项目样式隔离技术说明**：5 分钟快速了解 @scope 原理、两层捕获机制、trusted/untrusted 两种模式、主子项目各自关注点、常见问题 FAQ |
 | [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |
 | [remote-demo-audio-player.md](./remote-demo-audio-player.md) | **remote-demo 插件多音频连续播放**：集成 AudioPlayer 组件、支持三段音频自动连续播放、进度跟踪和手动跳转 |

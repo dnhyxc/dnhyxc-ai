@@ -111,7 +111,11 @@ export function createExtensions(
 		Image.configure({
 			inline: false,
 			allowBase64: true,
-			HTMLAttributes: { class: 'rich-editor-image' },
+			HTMLAttributes: {
+				class: 'rich-editor-image',
+				// 内联间距/圆角：刷新后 MF @scope 样式常失效，不依赖 stylesheet
+				style: 'margin: 0.75em 0; border-radius: 0.5rem',
+			},
 			...(options.imageResize
 				? {
 						resize: {

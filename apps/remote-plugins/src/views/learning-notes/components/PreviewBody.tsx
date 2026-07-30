@@ -47,7 +47,10 @@ export function WindowedPreviewBody({ html, className }: Props) {
 
 	const windowHtml = useMemo(() => {
 		const { html: slice } = windowBodyHtml(boot.doc, origin);
-		return decoratePreviewHtml(preserveEmptyParagraphs(slice));
+		// 仅文档窗口起点才允许「以图开头 → 首图去顶距」
+		return decoratePreviewHtml(preserveEmptyParagraphs(slice), {
+			flushLeadingImg: origin === 0,
+		});
 	}, [boot.doc, origin]);
 
 	const applyOrigin = useCallback((nextOrigin: number) => {
