@@ -116,6 +116,7 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 				title: paged.getTitle(),
 				text: paged.getText(),
 				html: paged.getHTML(),
+				dirty,
 			});
 			if (ok) markClean();
 			return;
@@ -126,9 +127,10 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 			title: getDocTitleText(editor.state.doc).trim(),
 			text: editor.getText({ blockSeparator: '\n\n' }).trim(),
 			html: editor.getHTML(),
+			dirty,
 		});
 		if (ok) markClean();
-	}, [markClean, store]);
+	}, [markClean, store, dirty, t]);
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {

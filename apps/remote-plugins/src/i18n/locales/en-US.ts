@@ -61,6 +61,8 @@ const enUS: Record<string, string> = {
 		'HTTP not authorized — cannot sync notes',
 	'learningNotes.toast.httpDeniedSave': 'HTTP not authorized — cannot save',
 	'learningNotes.toast.saved': 'Note saved',
+	'learningNotes.toast.noSave':
+		'The content has not been modified and does not require updating',
 	'learningNotes.toast.updated': 'Note updated',
 	'learningNotes.toast.deleted': 'Deleted',
 	'learningNotes.toast.exportEmpty': 'Open a note before exporting',

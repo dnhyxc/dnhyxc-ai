@@ -210,7 +210,12 @@ class LearningNotesStore {
 		title: string;
 		html: string;
 		text: string;
+		dirty: boolean;
 	}): Promise<boolean> {
+		if (!input.dirty) {
+			this.toast(this.t('learningNotes.toast.noSave'), 'info');
+			return false;
+		}
 		if (!input.title.trim()) {
 			this.toast(this.t('learningNotes.toast.needTitle'), 'info');
 			return false;
