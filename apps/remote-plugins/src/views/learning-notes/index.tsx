@@ -109,28 +109,47 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 		void store.refreshList();
 	}, [api.http, api.ui?.downloadBlob, store, toast, t]);
 
+	const focusTitle = useCallback(() => {
+		const editor = editorRef.current;
+		if (!editor || editor.isDestroyed) return;
+		const root = editor.view.dom.closest('.rich-editor');
+		if (!root) return;
+		const vp = root.querySelector(
+			'[data-slot="scroll-area-viewport"]',
+		) as HTMLElement | null;
+		if (vp) vp.scrollTop = 0;
+		const input = root.querySelector(
+			'.rich-editor-note-title input',
+		) as HTMLInputElement | null;
+		input?.focus();
+	}, []);
+
 	const onSave = useCallback(async () => {
 		const paged = pagedSaveRef.current;
 		if (paged) {
+			const title = paged.getTitle();
 			const ok = await store.saveNote({
-				title: paged.getTitle(),
+				title,
 				text: paged.getText(),
 				html: paged.getHTML(),
 				dirty,
 			});
 			if (ok) markClean();
+			else if (dirty && !title.trim()) focusTitle();
 			return;
 		}
 		const editor = editorRef.current;
 		if (!editor || editor.isDestroyed) return;
+		const title = getDocTitleText(editor.state.doc).trim();
 		const ok = await store.saveNote({
-			title: getDocTitleText(editor.state.doc).trim(),
+			title,
 			text: editor.getText({ blockSeparator: '\n\n' }).trim(),
 			html: editor.getHTML(),
 			dirty,
 		});
 		if (ok) markClean();
-	}, [markClean, store, dirty, t]);
+		else if (dirty && !title) focusTitle();
+	}, [focusTitle, markClean, store, dirty, t]);
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {

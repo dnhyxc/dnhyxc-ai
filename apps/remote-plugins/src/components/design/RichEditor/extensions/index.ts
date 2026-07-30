@@ -39,6 +39,44 @@ const TabIndent = Extension.create({
 	},
 });
 
+function scrollEditorViewport(
+	editor: { view: { dom: Element } },
+	to: 'top' | 'bottom',
+) {
+	const vp = editor.view.dom.closest(
+		'[data-slot="scroll-area-viewport"]',
+	) as HTMLElement | null;
+	if (!vp) return;
+	vp.scrollTop = to === 'top' ? 0 : vp.scrollHeight;
+}
+
+/** Cmd/Ctrl+↑↓：滚到顶/底并落光标（避开 title atom 把 ↑ 纠到文末） */
+const DocEdgeNav = Extension.create({
+	name: 'docEdgeNav',
+	addKeyboardShortcuts() {
+		return {
+			'Mod-ArrowUp': ({ editor }) => {
+				if (editor.isActive('codeBlock')) return false;
+				const title = editor.state.doc.firstChild;
+				const start = title?.type.name === 'title' ? title.nodeSize + 1 : 1;
+				if (start <= editor.state.doc.content.size) {
+					editor.chain().setTextSelection(start).focus().run();
+				} else {
+					editor.commands.focus('start');
+				}
+				scrollEditorViewport(editor, 'top');
+				return true;
+			},
+			'Mod-ArrowDown': ({ editor }) => {
+				if (editor.isActive('codeBlock')) return false;
+				editor.commands.focus('end');
+				scrollEditorViewport(editor, 'bottom');
+				return true;
+			},
+		};
+	},
+});
+
 /** 首位固定 title，其后至少一段正文（避免仅有 atom 时 GapCursor 无法输入） */
 const CustomDocument = Document.extend({
 	content: 'title block+',
@@ -62,6 +100,7 @@ export function createExtensions(
 	const baseExtensions: Extensions = [
 		...(withTitle ? [CustomDocument, TitleNode] : []),
 		TabIndent,
+		DocEdgeNav,
 		EmptyParagraphDelete,
 		StarterKit.configure({
 			document: withTitle ? false : undefined,

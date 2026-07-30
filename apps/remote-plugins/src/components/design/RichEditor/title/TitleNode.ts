@@ -129,7 +129,7 @@ export const TitleNode = Node.create({
 							$from.pos > titleSize;
 
 						// 仅「空正文」或非法非文本选区才纠正。
-						// 正文里的 GapCursor（如图片前）合法——旧逻辑一律 atEnd，导致无法在图前输入。
+						// 正文 GapCursor（如图片前）合法；非法选区钉回正文开头（勿 atEnd，否则 Cmd+↑ 会被纠到文末）。
 						const bodyEmpty =
 							nextDoc.childCount < 2 ||
 							(nextDoc.childCount === 2 &&
@@ -148,10 +148,9 @@ export const TitleNode = Node.create({
 						}
 
 						if (needsFix && titleSize + 1 <= nextDoc.content.size) {
-							const nextSel = bodyEmpty
-								? TextSelection.create(nextDoc, titleSize + 1)
-								: Selection.atEnd(nextDoc);
-							tr = tr.setSelection(nextSel);
+							tr = tr.setSelection(
+								TextSelection.near(nextDoc.resolve(titleSize + 1), 1),
+							);
 							changed = true;
 						}
 					}

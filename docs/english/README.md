@@ -18,9 +18,11 @@
 | [learning-notes-rich-editor-deep-dive.md](./learning-notes-rich-editor-deep-dive.md) | **富文本编辑器源码级详解**：13 个模块逐行注释、架构/调用链/设计决策全景 |
 | [rich-editor-core-fixes.md](./rich-editor-core-fixes.md) | **富文本编辑器核心优化**：appendTransaction GapCursor 精细化、onCreate 两帧 rAF 选区、shouldShowBubble 提取、工具栏 fits 溢出重算、LinkForm 迁 UI 组件、ScrollArea 接管滚动 |
 | [richeditor-performance-tuning.md](./richeditor-performance-tuning.md) | **RichEditor 性能优化**：JSON 懒序列化、回调 ref 化、CharacterCount 按需挂载、toolbarExtra useMemo |
+| [rich-editor-doc-edge-nav.md](./rich-editor-doc-edge-nav.md) | **Cmd/Ctrl+↑↓ 文档首尾导航**：新增 `DocEdgeNav` 扩展与 `scrollEditorViewport` 辅助函数、`TitleNode.appendTransaction` 选区纠正从 `Selection.atEnd` 改为 `TextSelection.near`（含改动前/后对比与逐行注释） |
 | [tauri-clipboard-tiptap.md](./tauri-clipboard-tiptap.md) | **Tauri 剪贴板支持 TipTap**：桌面端 WebView 系统级 Cmd/Ctrl+C/V/X 快捷键接管 TipTap 富文本正文 |
 | [tauri-clipboard-image-files.md](./tauri-clipboard-image-files.md) | **Tauri 剪贴板图片与文件列表读取**：Rust `arboard` 位图→PNG→base64、文件列表逐个读图→data URL、`clipboard.ts` 四 flavor 并行读取与降级插入、`getTipTapEditor`/`insertHtmlViaEditor`/`insertClipSegments` 全链路（含改动前/后对比与逐行注释）；与 [../ideas/tauri-clipboard-rich-paste.md](../ideas/tauri-clipboard-rich-paste.md) 互为专题/总文档 |
 | [learning-notes-crud.md](./learning-notes-crud.md) | **学习笔记 CRUD 与 API 集成**：列表左/编辑器右布局重构、`createNotesApi` 工厂、`Confirm` 删除确认、HostBridge 扩展 `put/delete` 全链路 |
+| [learning-notes-save-focus-title.md](./learning-notes-save-focus-title.md) | **保存时标题为空自动聚焦标题**：`focusTitle` 回调滚动到顶并聚焦标题输入框、`onSave` 两路径提取 title 变量、保存失败+dirty+空标题时 `focusTitle()`（含改动前/后对比与逐行注释） |
 | [learning-notes-mobx-store.md](./learning-notes-mobx-store.md) | **学习笔记 MobX 状态管理与分页**：useState 重构为 MobX store、列表分页加载、滚动到底部加载更多 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |
 | [english-learning-impl-overview.md](./english-learning-impl-overview.md) | 产品能力总览 |
