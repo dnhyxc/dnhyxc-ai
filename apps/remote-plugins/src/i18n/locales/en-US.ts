@@ -42,6 +42,7 @@ const enUS: Record<string, string> = {
 		'Capture words, grammar, or speaking notes for today…',
 	'learningNotes.new': 'New note',
 	'learningNotes.edit': 'Edit',
+	'learningNotes.preview': 'Details',
 	'learningNotes.delete': 'Delete',
 	'learningNotes.exportDocx': 'Export Word',
 	'learningNotes.exportingDocx': 'Exporting…',

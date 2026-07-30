@@ -41,6 +41,7 @@ const zhCN: Record<string, string> = {
 	'learningNotes.placeholder': '记下今天的单词、语法或口语收获…',
 	'learningNotes.new': '新建笔记',
 	'learningNotes.edit': '编辑',
+	'learningNotes.preview': '详情',
 	'learningNotes.delete': '删除',
 	'learningNotes.exportDocx': '导出 Word',
 	'learningNotes.exportingDocx': '导出中…',

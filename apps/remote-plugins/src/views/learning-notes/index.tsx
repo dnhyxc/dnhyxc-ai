@@ -8,6 +8,7 @@ import {
 	richEditorLocaleOf,
 } from '@design/RichEditor';
 import {
+	Eye,
 	FileDown,
 	FilePenLine,
 	NotebookText,
@@ -205,6 +206,17 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 						/>
 					) : null}
 				</Btn>
+				{store.editingId ? (
+					<Btn
+						title={t('learningNotes.preview')}
+						onClick={() => {
+							const id = store.editingId;
+							if (id) void store.openPreview(id);
+						}}
+					>
+						<Eye size={15} />
+					</Btn>
+				) : null}
 				{listToggleBtn()}
 			</>
 		),
