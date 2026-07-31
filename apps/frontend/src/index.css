@@ -406,7 +406,6 @@ body {
 	background-image: var(--theme-bg-atmosphere);
 	background-repeat: no-repeat;
 	background-size: cover;
-	background-attachment: fixed;
 	font-family: var(--font-family);
 }
 

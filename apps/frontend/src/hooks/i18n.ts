@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { DEFAULT_LOCALE, DICTS, type Locale, SUPPORTED_LOCALES } from '@/i18n';
-import { getValue, onEmit, setValue } from '@/utils';
+import { onEmit } from '@/utils/event';
+import { getValue, setValue } from '@/utils/store';
 
 /** 供首屏同步读取，降低刷新时语言晚于首帧 */
 export const LOCALE_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_locale_bootstrap';

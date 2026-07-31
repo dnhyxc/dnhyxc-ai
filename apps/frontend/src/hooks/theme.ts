@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getValue, onEmit, setValue } from '@/utils';
+import { onEmit } from '@/utils/event';
+import { getValue, setValue } from '@/utils/store';
 
 export const THEMES = [
 	{
@@ -111,6 +112,27 @@ function readThemeBootstrapSync(): ThemeName | null {
 	} catch {
 		return null;
 	}
+}
+
+/** Tauri 窗口标题栏 light/dark，与 changeTheme 写入的 `theme` 一致（black→dark，其余→light） */
+export function readWindowChromeThemeSync(): 'light' | 'dark' {
+	const name = readThemeBootstrapSync();
+	if (name === 'black') return 'dark';
+	if (name) return 'light';
+	try {
+		const j = localStorage.getItem('dnhyxc_settings_json');
+		if (j) {
+			const o = JSON.parse(j) as { theme?: string; themeType?: string };
+			if (o.theme === 'dark' || o.theme === 'light') return o.theme;
+			if (o.themeType === 'black') return 'dark';
+			if (o.themeType) return 'light';
+		}
+	} catch {
+		// ignore
+	}
+	const legacy = localStorage.getItem('theme');
+	if (legacy === 'dark' || legacy === 'light') return legacy;
+	return 'light';
 }
 
 /** 从查询串解析主题名（用于分享页等在浏览器中还原壳内主题） */
@@ -264,8 +286,13 @@ export const useTheme = () => {
 			setTheme(themeName);
 			setThemeClass(themeName);
 			persistThemeBootstrap(themeName);
-			await setValue('theme', themeName === 'black' ? 'dark' : 'light');
+			const chrome = themeName === 'black' ? 'dark' : 'light';
+			await setValue('theme', chrome);
 			await setValue('themeType', themeName);
+			// 同步所有 Tauri 窗标题栏（含 about）
+			void import('@/utils/tauri').then(({ setThemeToAllWindows }) => {
+				void setThemeToAllWindows(chrome);
+			});
 		}
 		if (emit) {
 			onEmit('theme', themeName);

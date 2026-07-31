@@ -139,27 +139,30 @@ pub async fn determine_save_path_for_blob(
 }
 
 /// 从 store 中获取指定 key 的值
-pub async fn get_store_value(app_handle: &tauri::AppHandle, key: &str) -> Result<String, String> {
-    // 使用与前端的 @tauri-apps/plugin-store 相同的存储路径
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+pub async fn get_store_value<R: tauri::Runtime>(
+	app_handle: &tauri::AppHandle<R>,
+	key: &str,
+) -> Result<String, String> {
+	// 使用与前端的 @tauri-apps/plugin-store 相同的存储路径
+	let app_data_dir = app_handle
+		.path()
+		.app_data_dir()
+		.map_err(|e| format!("获取应用数据目录失败: {}", e))?;
 
-    let store_path = app_data_dir.join("settings.json");
-    let store = StoreBuilder::new(app_handle, store_path)
-        .build()
-        .map_err(|e| format!("创建存储失败: {}", e))?;
+	let store_path = app_data_dir.join("settings.json");
+	let store = StoreBuilder::new(app_handle, store_path)
+		.build()
+		.map_err(|e| format!("创建存储失败: {}", e))?;
 
-    match store.get(key) {
-        Some(value) => {
-            let value_str = value.to_string();
-            // 去除可能存在的引号
-            let cleaned_value = value_str.trim_matches('"');
-            Ok(cleaned_value.to_string())
-        }
-        None => Err(format!("未找到 key: {}", key)),
-    }
+	match store.get(key) {
+		Some(value) => {
+			let value_str = value.to_string();
+			// 去除可能存在的引号
+			let cleaned_value = value_str.trim_matches('"');
+			Ok(cleaned_value.to_string())
+		}
+		None => Err(format!("未找到 key: {}", key)),
+	}
 }
 
 /// 未配置 savePath 时的兜底：系统下载目录下 `dnhyxc-download`，否则 `~/Documents/dnhyxc-download`

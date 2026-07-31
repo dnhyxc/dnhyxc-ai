@@ -19,8 +19,8 @@ import { useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { sidebarInjector } from '@/plugins';
 import { hasValidAuthToken } from '@/router/authPaths';
-import useStore from '@/store';
-import { removeStorage, resolveCosUrlForWebDisplay } from '@/utils';
+import { performLogout } from '@/router/authSession';
+import { resolveCosUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
 import { ICON_MAP, MENUS, type SidebarMenuConfig } from './enum';
 
@@ -32,7 +32,6 @@ const isMenuActive = (path: string, pathname: string) =>
 const Sidebar = observer(() => {
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
-	const { userStore } = useStore();
 	const { storageInfo } = useStorageInfo();
 	const { t } = useI18n();
 	const [pluginMenus, setPluginMenus] = useState(() => [
@@ -70,9 +69,7 @@ const Sidebar = observer(() => {
 	}));
 
 	const onLogout = () => {
-		removeStorage('token');
-		userStore.clearUserInfo();
-		navigate('/login');
+		performLogout((to) => navigate(to));
 	};
 
 	const avatarUrl = useMemo(() => {

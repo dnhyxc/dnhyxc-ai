@@ -24,7 +24,7 @@ use command::common::{
     clear_all_shortcuts, clear_updater_cache, disable_auto_start, enable_auto_start,
     get_cache_size, greet_name, is_auto_start_enabled, register_shortcut, reload_all_shortcuts,
     read_english_learning_import_json_file, select_directory, select_file,
-    select_english_learning_import_json_file,
+    select_english_learning_import_json_file, sync_window_menu_shortcuts,
 };
 use command::clipboard::{
     read_clipboard_html, read_clipboard_image_base64, read_clipboard_image_files_base64,
@@ -61,7 +61,9 @@ pub fn run() {
             let _ = setup_global_shortcut(&app.handle(), &main_window);
 
             // 设置窗口事件处理器
-            setup_window_events(main_window, app.handle().clone());
+            setup_window_events(main_window.clone(), app.handle().clone());
+            #[cfg(target_os = "macos")]
+            system::zoom::install(&main_window);
             Ok(())
         })
         .init_plugin()
@@ -91,6 +93,7 @@ pub fn run() {
             is_auto_start_enabled, // 检测开机启动
             register_shortcut,     // 注册单个快捷键
             reload_all_shortcuts,  // 重新加载所有快捷键
+            sync_window_menu_shortcuts, // 同步窗口菜单加速键
             clear_all_shortcuts,   // 清空所有快捷键
             clear_updater_cache,   // 清除 updater 插件缓存
             get_cache_size,        // 获取缓存大小

@@ -6,15 +6,14 @@ import {
 	RouterProvider,
 } from 'react-router';
 import { useInputsOnlyTab } from '@/hooks';
+import { readWindowChromeThemeSync } from '@/hooks/theme';
 import { pluginManager, routeInjector } from '@/plugins';
 import {
 	attachTauriPlainFieldClipboardShortcuts,
-	getValue,
 	onCreateWindow,
-	removeStorage,
 } from '@/utils';
-import { http } from '@/utils/fetch';
 import { isTauriRuntime } from '@/utils/runtime';
+import { performLogout } from './authSession';
 import { buildRoutes } from './buildRoutes';
 
 const App = () => {
@@ -55,13 +54,12 @@ const App = () => {
 				return;
 			}
 			const { listen } = await import('@tauri-apps/api/event');
-			const aboutUnlisten = await listen('about', async (event) => {
+			const aboutUnlisten = await listen('about', (event) => {
 				const eventOptions = event.payload as {
 					version: string;
 				};
-				const theme = (await getValue('theme')) as 'light' | 'dark' | undefined;
-				onCreateWindow({
-					url: `/about?version=${eventOptions.version}`,
+				void onCreateWindow({
+					url: `/about?version=${encodeURIComponent(eventOptions.version)}`,
 					label: 'about',
 					title: 'dnhyxc-ai',
 					width: 400,
@@ -69,12 +67,13 @@ const App = () => {
 					titleBarStyle: 'visible',
 					hiddenTitle: false,
 					resizable: false,
-					theme,
+					// 与主窗配色一致：非 black → light 标题栏（勿传 undefined 以免跟系统深色）
+					theme: readWindowChromeThemeSync(),
 				});
 			});
 			const logoutUnlisten = await listen('logout', () => {
-				removeStorage('token');
-				http.setAuthToken('');
+				// Tauri File 菜单「退出登录」：需与侧边栏登出一致（清态 + 跳转）
+				performLogout((to) => router.navigate(to));
 			});
 			if (!cancelled) {
 				unlistenFns.push(aboutUnlisten, logoutUnlisten);
@@ -93,7 +92,7 @@ const App = () => {
 				u();
 			}
 		};
-	}, []);
+	}, [router]);
 
 	return (
 		<div className="h-full w-full bg-theme-background">

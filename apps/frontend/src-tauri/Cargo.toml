@@ -34,8 +34,28 @@ tauri-plugin-http = { version = "2.5.6", features = [
   "unsafe-headers",
   "rustls-tls",
 ] }
-
-cocoa = "0.26.1"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = [
+  "NSGeometry",
+  "NSArray",
+  "NSString",
+  "objc2-core-foundation",
+] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSWindow",
+  "NSView",
+  "NSScreen",
+  "NSResponder",
+  "NSGraphics",
+  "NSColor",
+  "NSApplication",
+  "NSMenu",
+  "NSMenuItem",
+  "NSImage",
+  "NSFontDescriptor",
+  "objc2-core-foundation",
+] }
+dispatch2 = "0.3"
 rfd = "0.17.2"
 reqwest = { version = "0.13.1", features = ["json", "stream"] }
 tokio = { version = "1.49.0", features = ["full", "rt"] }

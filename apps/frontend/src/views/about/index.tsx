@@ -1,18 +1,47 @@
 import { Button } from '@ui/button';
-import { useEffect } from 'react';
-import { type ThemeName, useGetVersion, useI18n, useTheme } from '@/hooks';
+import { useEffect, useState } from 'react';
+import { useI18n } from '@/hooks/i18n';
+import { type ThemeName, useTheme } from '@/hooks/theme';
 import type { Locale } from '@/i18n';
-import { onListen, openExternalUrl } from '@/utils';
+import { onListen } from '@/utils/event';
+import { openExternalUrl } from '@/utils/open-external';
+import { isTauriRuntime } from '@/utils/runtime';
 import {
 	getLegalPageAbsoluteUrl,
 	LEGAL_PAGE_PATHS,
 } from '@/views/legal/legalPageUrls';
 
-const About = () => {
-	const { version } = useGetVersion();
-	const { t, setLocale, locale } = useI18n();
+function readVersionFromSearch(): string {
+	try {
+		return new URLSearchParams(window.location.search).get('version') ?? '';
+	} catch {
+		return '';
+	}
+}
 
+const About = () => {
+	const [version, setVersion] = useState(readVersionFromSearch);
+	const { t, setLocale, locale } = useI18n();
 	const { changeTheme } = useTheme();
+
+	useEffect(() => {
+		if (version) return;
+		let cancelled = false;
+		(async () => {
+			if (!isTauriRuntime()) {
+				if (!cancelled) {
+					setVersion(import.meta.env.VITE_APP_VERSION ?? '浏览器预览');
+				}
+				return;
+			}
+			const { getVersion } = await import('@tauri-apps/api/app');
+			const v = await getVersion();
+			if (!cancelled) setVersion(v);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [version]);
 
 	useEffect(() => {
 		const unlistenThemePromise = onListen('theme', (value: string) => {
@@ -31,7 +60,9 @@ const About = () => {
 
 	return (
 		<div className="flex flex-col justify-center items-center w-full h-full">
-			<div className="mb-10">{t('about.appVersion', { version })}</div>
+			<div className="mb-10">
+				{t('about.appVersion', { version: version || '…' })}
+			</div>
 			<div className="flex flex-col justify-center items-center">
 				<div className="mb-2.5">{t('about.copyright')}</div>
 				<div className="mb-2">{t('about.copyrightYears')}</div>

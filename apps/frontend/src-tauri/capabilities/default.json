@@ -11,6 +11,8 @@
 		"core:webview:allow-create-webview-window",
 		"core:window:allow-set-focus",
 		"core:window:allow-set-theme",
+		"core:window:allow-set-size",
+		"core:window:allow-set-position",
 		"http:default",
 		"http:allow-fetch",
 		"store:allow-load",

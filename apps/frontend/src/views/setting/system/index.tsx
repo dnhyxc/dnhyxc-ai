@@ -144,7 +144,7 @@ const System = () => {
 			return;
 		}
 
-		/** 知识库等：只写 store，由页面内 keydown 响应，不占用全局快捷键 */
+		/** 知识库等：只写 store；窗口菜单项还需同步菜单加速键 */
 		if (pageOnly) {
 			void (async () => {
 				await setValue(`shortcut_${info.key}`, shortcuts);
@@ -158,6 +158,9 @@ const System = () => {
 				window.dispatchEvent(
 					new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
 				);
+				if (info.syncWindowMenu && isTauriRuntime()) {
+					void desktopInvoke('sync_window_menu_shortcuts');
+				}
 			})();
 			return;
 		}
@@ -381,9 +384,17 @@ const System = () => {
 
 								// 手动归类：应用显示/刷新相关放在一起
 								const appVisibilityActions = new Set([
-									'hide',
 									'hideOrShowApp',
 									'reload',
+									'window_close',
+									'window_scale',
+									'window_minimize',
+									'window_fill',
+									'window_center',
+									'window_fullscreen',
+									'file_about',
+									'file_logout',
+									'file_quit',
 								]);
 								if (appVisibilityActions.has(i.action)) {
 									const groupTitle = t(

@@ -131,32 +131,41 @@ pub fn register_shortcut(
     Ok(())
 }
 
+/// 注册窗口菜单快捷键同步命令
+#[tauri::command]
+pub fn sync_window_menu_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
+	crate::system::menu::sync_window_menu_accelerators(&app);
+	Ok(())
+}
+
 /// 重新加载所有快捷键配置（从 store 读取）
 #[tauri::command]
 pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
-    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
+	SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
 
-    let _ = app.global_shortcut().unregister_all();
+	let _ = app.global_shortcut().unregister_all();
 
-    let shortcut_actions = load_shortcuts_from_store(&app);
+	let shortcut_actions = load_shortcuts_from_store(&app);
 
-    for shortcut_action in &shortcut_actions {
-        let _ = app
-            .global_shortcut()
-            .register(shortcut_action.shortcut.clone());
-    }
+	for shortcut_action in &shortcut_actions {
+		let _ = app
+			.global_shortcut()
+			.register(shortcut_action.shortcut.clone());
+	}
 
-    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-    Ok(())
+	crate::system::menu::sync_window_menu_accelerators(&app);
+
+	SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+	Ok(())
 }
 
 /// 获取应用缓存目录
 fn get_cache_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let app_name = app_handle.package_info().name.clone();
-    app_handle
-        .path()
-        .resolve(&app_name, BaseDirectory::Cache)
-        .map_err(|e| format!("无法获取缓存目录: {}", e))
+	let app_name = app_handle.package_info().name.clone();
+	app_handle
+		.path()
+		.resolve(&app_name, BaseDirectory::Cache)
+		.map_err(|e| format!("无法获取缓存目录: {}", e))
 }
 
 /// 清除缓存

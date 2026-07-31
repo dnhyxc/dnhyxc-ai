@@ -49,10 +49,22 @@ export const onCreateWindow = async (options: WindowOptions) => {
 
 	const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
 
-	const getLabel = await WebviewWindow.getByLabel(label);
-
-	if (getLabel) {
-		getLabel.setFocus();
+	const existing = await WebviewWindow.getByLabel(label);
+	if (existing) {
+		try {
+			if (theme) await existing.setTheme(theme);
+		} catch {
+			// 主题失败不影响置顶
+		}
+		try {
+			await existing.unminimize();
+		} catch {
+			// ignore
+		}
+		await existing.show();
+		await existing.setFocus();
+		createdCallback?.();
+		return;
 	}
 
 	const webview = new WebviewWindow(label, {

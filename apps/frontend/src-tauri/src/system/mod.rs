@@ -1,5 +1,7 @@
 pub mod dock;
 pub mod event;
+#[cfg(target_os = "macos")]
+pub mod zoom;
 pub mod menu;
 pub mod shortcut;
 pub mod tray;

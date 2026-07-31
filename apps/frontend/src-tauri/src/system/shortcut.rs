@@ -8,7 +8,6 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ShortcutActionType {
-    Hide,
     Reload,
     NewWorkflow,
     OpenSubWindow,
@@ -24,7 +23,6 @@ pub struct ShortcutAction {
 impl ShortcutActionType {
     fn from_key(key: i32) -> Option<Self> {
         match key {
-            1 => Some(ShortcutActionType::Hide),
             2 => Some(ShortcutActionType::HideOrShowApp),
             3 => Some(ShortcutActionType::Reload),
             4 => Some(ShortcutActionType::NewWorkflow),
@@ -176,12 +174,6 @@ pub fn handle_shortcut<R: Runtime>(
     if let Ok(mapping) = SHORTCUT_KEY_MAPPING.lock() {
         if let Some(&action_type) = mapping.get(&(modifiers, code)) {
             match action_type {
-                ShortcutActionType::Hide => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.close();
-                        let _ = app.emit("shortcut-triggered", "hide");
-                    }
-                }
                 ShortcutActionType::Reload => {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.eval("window.location.reload()");

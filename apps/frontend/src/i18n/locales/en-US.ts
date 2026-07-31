@@ -375,7 +375,7 @@ export const enUS = {
 
 	'setting.system.shortcuts.title': 'Keyboard shortcuts',
 	'setting.system.shortcuts.desc':
-		'「App visibility/refresh」shortcuts are global, other shortcuts only work in their respective windows.',
+		'App visibility/reload (including window actions) sync to the menu bar; knowledge and other shortcuts only work in their windows.',
 	'setting.system.shortcuts.group.other': 'Other',
 	'setting.system.shortcuts.group.knowledge': 'Knowledge',
 	'setting.system.shortcuts.group.appVisibility': 'App visibility / refresh',
@@ -394,6 +394,15 @@ export const enUS = {
 	'setting.system.shortcuts.item.reload': 'Reload app',
 	'setting.system.shortcuts.item.newWorkflow': 'Create workflow',
 	'setting.system.shortcuts.item.openSubwindow': 'Open subwindow',
+	'setting.system.shortcuts.item.window.minimize': 'Minimize window',
+	'setting.system.shortcuts.item.window.close': 'Close window',
+	'setting.system.shortcuts.item.window.scale': 'Zoom window',
+	'setting.system.shortcuts.item.window.fill': 'Fill window',
+	'setting.system.shortcuts.item.window.center': 'Center window',
+	'setting.system.shortcuts.item.window.fullscreen': 'Full screen',
+	'setting.system.shortcuts.item.file.about': 'About',
+	'setting.system.shortcuts.item.file.logout': 'Log out',
+	'setting.system.shortcuts.item.file.quit': 'Quit',
 	'setting.system.shortcuts.item.knowledge.save': 'Knowledge: Save',
 	'setting.system.shortcuts.item.knowledge.import': 'Knowledge: Import file',
 	'setting.system.shortcuts.item.knowledge.clearDraft':
