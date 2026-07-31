@@ -24,7 +24,7 @@ import {
 	getCloudTtsSettings,
 	type TtsPlaybackSource,
 	updateCloudTtsSettings,
-} from '@/service/cloudTtsSettings';
+} from '@/service';
 import {
 	getLoggedInUserId,
 	userScopedStorageKey,

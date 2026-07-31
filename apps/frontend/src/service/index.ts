@@ -15,7 +15,7 @@ import {
 import type { SearchOrganicItem } from '@/types/chat';
 import { downloadBlob } from '@/utils';
 import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
-import { getPlatformFetch, http } from '@/utils/fetch';
+import { getPlatformFetch, http, type RequestConfig } from '@/utils/fetch';
 import { retryAsync, runTasksWithConcurrency } from '@/utils/retryAsync';
 import { isTauriRuntime } from '@/utils/runtime';
 import type {
@@ -107,6 +107,11 @@ import {
 	RESET_PASSWORD,
 	SEND_EMAIL,
 	SEND_RESET_PWD_EMAIL,
+	SETTINGS_CLOUD_TTS,
+	SETTINGS_LLM,
+	SETTINGS_LLM_DEFAULTS,
+	SETTINGS_LLM_VECTOR,
+	SETTINGS_PLUGIN_ENABLED,
 	SPEECH_TRANSCRIPTION,
 	STOP_SSE,
 	UPDATE_EMAIL,
@@ -2326,4 +2331,167 @@ export const fetchEbookBytes = async (bookId: string): Promise<ArrayBuffer> => {
 		throw new Error(translateSync('ebook.err.loadFailed'));
 	}
 	return await res.arrayBuffer();
+};
+
+/** 会员朗读选路：本机 / MiniMax 云端 / 讯飞在线 / Edge TTS，四选一互斥 */
+export type TtsPlaybackSource = 'local' | 'cloud' | 'xfyun' | 'edge';
+
+export type CloudTtsSettingsView = {
+	enabled: boolean;
+	playbackSource: TtsPlaybackSource;
+	model: string;
+	voiceId: string;
+	xfyunVoiceId: string;
+	edgeVoiceId: string;
+	minimaxSpeed: number;
+	minimaxVol: number;
+	minimaxPitch: number;
+	xfyunSpeed: number;
+	xfyunVolume: number;
+	xfyunPitch: number;
+	edgeSpeed: number;
+	edgeVol: number;
+	edgePitch: number;
+	emotion: string;
+	format: string;
+	languageBoost: string;
+	sampleRate: number;
+	bitrate: number;
+	channel: 1 | 2;
+	xfyunAppId: string;
+	xfyunApiKey: string;
+	xfyunApiSecret: string;
+	minimaxApiKey: string;
+};
+
+/** GET /settings/cloud-tts */
+export const getCloudTtsSettings = async (config?: RequestConfig) => {
+	return await http.get<CloudTtsSettingsView>(SETTINGS_CLOUD_TTS, config);
+};
+
+/** PUT /settings/cloud-tts */
+export const updateCloudTtsSettings = async (
+	body: CloudTtsSettingsView,
+	config?: RequestConfig,
+) => {
+	return await http.put<CloudTtsSettingsView>(SETTINGS_CLOUD_TTS, body, config);
+};
+
+/** DELETE /settings/cloud-tts */
+export const clearCloudTtsSettings = async (config?: RequestConfig) => {
+	return await http.delete<CloudTtsSettingsView>(SETTINGS_CLOUD_TTS, config);
+};
+
+export type LlmSettingsView = {
+	enabled: boolean;
+	baseUrl: string;
+	modelName: string;
+	apiKeyConfigured: boolean;
+	/** 已保存的完整密钥（设置页回显） */
+	apiKey: string;
+	apiKeyMask: string | null;
+	active: boolean;
+	vectorEnabled: boolean;
+	vectorBaseUrl: string;
+	vectorRerankUrl: string;
+	vectorEmbeddingModel: string;
+	vectorRerankModel: string;
+	vectorCollectionName: string;
+	vectorSearchProfiles: Array<{
+		collectionName: string;
+		embeddingModel: string;
+		rerankModel: string;
+	}>;
+	vectorApiKeyConfigured: boolean;
+	vectorApiKey: string;
+	vectorApiKeyMask: string | null;
+	vectorActive: boolean;
+	vectorBgeOnly: boolean;
+	/** 超级管理员已开启全站仅 BGE 向量库 */
+	vectorBgeOnlyGlobal: boolean;
+};
+
+export type UpsertLlmSettingsBody = {
+	enabled: boolean;
+	baseUrl?: string;
+	modelName?: string;
+	apiKey?: string;
+};
+
+export type UpsertLlmVectorSettingsBody = {
+	enabled: boolean;
+	baseUrl?: string;
+	rerankUrl?: string;
+	embeddingModel?: string;
+	rerankModel?: string;
+	collectionName?: string;
+	apiKey?: string;
+	bgeOnly?: boolean;
+};
+
+export type LlmSettingsDefaultsView = {
+	baseUrl: string;
+	vector: {
+		baseUrl: string;
+		rerankUrl: string;
+		embeddingModel: string;
+		rerankModel: string;
+		collectionName: string;
+	};
+};
+
+/** GET /settings/llm */
+export const getLlmSettings = async () => {
+	return await http.get<LlmSettingsView>(SETTINGS_LLM);
+};
+
+/** GET /settings/llm/defaults */
+export const getLlmSettingsDefaults = async () => {
+	return await http.get<LlmSettingsDefaultsView>(SETTINGS_LLM_DEFAULTS);
+};
+
+/** PUT /settings/llm */
+export const updateLlmSettings = async (body: UpsertLlmSettingsBody) => {
+	return await http.put<LlmSettingsView>(SETTINGS_LLM, body);
+};
+
+/** DELETE /settings/llm */
+export const clearLlmSettings = async () => {
+	return await http.delete<LlmSettingsView>(SETTINGS_LLM);
+};
+
+/** PUT /settings/llm/vector */
+export const updateLlmVectorSettings = async (
+	body: UpsertLlmVectorSettingsBody,
+) => {
+	return await http.put<LlmSettingsView>(SETTINGS_LLM_VECTOR, body);
+};
+
+/** DELETE /settings/llm/vector */
+export const clearLlmVectorSettings = async () => {
+	return await http.delete<LlmSettingsView>(SETTINGS_LLM_VECTOR);
+};
+
+export type PluginEnabledPrefsView = {
+	enabledIds: string[];
+};
+
+/** GET /settings/plugin-enabled */
+export const getPluginEnabledPrefs = async (config?: RequestConfig) => {
+	return await http.get<PluginEnabledPrefsView>(
+		SETTINGS_PLUGIN_ENABLED,
+		config,
+	);
+};
+
+/** PUT /settings/plugin-enabled */
+export const updatePluginEnabledPrefs = async (
+	body: PluginEnabledPrefsView,
+	config?: RequestConfig,
+) => {
+	return await http.put<PluginEnabledPrefsView>(
+		SETTINGS_PLUGIN_ENABLED,
+		body,
+		config,
+	);
 };

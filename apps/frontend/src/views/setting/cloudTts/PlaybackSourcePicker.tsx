@@ -2,7 +2,7 @@ import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
+import type { TtsPlaybackSource } from '@/service';
 
 const MEMBER_SOURCES: TtsPlaybackSource[] = ['local', 'edge', 'cloud', 'xfyun'];
 const FREE_SOURCES: TtsPlaybackSource[] = ['local', 'edge'];

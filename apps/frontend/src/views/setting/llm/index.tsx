@@ -15,7 +15,7 @@ import {
 	type LlmSettingsView,
 	updateLlmSettings,
 	updateLlmVectorSettings,
-} from '@/service/llmSettings';
+} from '@/service';
 
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';

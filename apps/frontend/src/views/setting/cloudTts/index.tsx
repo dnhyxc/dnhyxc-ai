@@ -46,7 +46,7 @@ import {
 } from '@/constants/xfyunTts';
 import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
+import type { TtsPlaybackSource } from '@/service';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
 import {

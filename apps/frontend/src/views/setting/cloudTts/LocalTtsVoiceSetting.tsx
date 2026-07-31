@@ -18,7 +18,7 @@ import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
+import type { TtsPlaybackSource } from '@/service';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
 import type { LocalVoiceOption } from '@/utils/speech';

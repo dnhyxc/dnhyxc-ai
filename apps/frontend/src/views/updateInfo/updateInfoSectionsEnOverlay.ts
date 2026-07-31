@@ -170,6 +170,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The registry page adds a field help entry; saving checks each module’s Host API compatibility range so mistaken edits do not break loading. Supports ⌘/Ctrl+S; an orange dot on the save control indicates unsaved changes.',
 	},
+	's3-13': {
+		title: 'Plugin enablement persisted to account & synced across devices',
+		description:
+			'When you toggle a feature module on or off in the Plugin Center, the preference is saved to your account on the server, not only to the local browser. Sign in from another device, switch between the web and desktop app, or sign out and back in on the same machine—your enabled/disabled choices stay the same. Without a preference (e.g. new accounts) everything is off by default, so the sidebar or home screen is not crowded with unfamiliar entries. Switching accounts automatically re-mounts or removes sidebar entries to match the new user’s preference, no manual refresh required. Any enablement history saved only to local storage in older versions is migrated once to your account on first sign-in, so you do not have to re-configure. If the Plugin Center or registry fails to load, the page now shows a more specific reason—network, expired credentials, malformed registry, or other internal error—so you can try reconnecting or re-signing in before contacting support.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:
@@ -510,6 +515,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'sendDisabled maintainability',
 		description:
 			'sendDisabled derived via useMemo and explicit branches with ?? false for optional booleans—same behavior, clearer code.',
+	},
+	's10-4': {
+		title: 'Fix: clicking a label on one card toggled another card’s switch',
+		description:
+			'Fixed an issue in pages that show many cards with switches and adjacent labels (e.g. Plugin Center): clicking the label text next to a switch could accidentally toggle the very first card’s switch instead of the one next to the label—turning on the wrong plugin or turning off one you expected to stay on. Now each card’s label text is correctly paired with its own switch, and every switch on the same screen gets a stable, unique identity, even when there are dozens of switches in a list.',
 	},
 	's11-1': {
 		title: 'No second full-audio transcription after stop',

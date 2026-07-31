@@ -1,7 +1,4 @@
-import {
-	getPluginEnabledPrefs,
-	updatePluginEnabledPrefs,
-} from '@/service/pluginEnabledPrefs';
+import { getPluginEnabledPrefs, updatePluginEnabledPrefs } from '@/service';
 import {
 	getLoggedInUserId,
 	userScopedStorageKey,
