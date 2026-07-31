@@ -4,10 +4,12 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { User } from '../user/user.entity';
 import { QueryLearningNoteDto } from './dto/query-learning-note.dto';
 import { SaveLearningNoteDto } from './dto/save-learning-note.dto';
 import { UpdateLearningNoteDto } from './dto/update-learning-note.dto';
+import { UpdateNoteVisibilityDto } from './dto/update-note-visibility.dto';
 import { EnglishLearningNote } from './english-learning-note.entity';
 import {
 	buildLearningNoteDocxBuffer,
@@ -16,14 +18,16 @@ import {
 
 export type LearningNoteListItem = Pick<
 	EnglishLearningNote,
-	'id' | 'title' | 'userId' | 'createdAt' | 'updatedAt'
->;
+	'id' | 'title' | 'userId' | 'isPublic' | 'createdAt' | 'updatedAt'
+> & { isOwned: boolean; author: string };
 
 @Injectable()
 export class LearningNotesService {
 	constructor(
 		@InjectRepository(EnglishLearningNote)
 		private readonly noteRepo: Repository<EnglishLearningNote>,
+		@InjectRepository(User)
+		private readonly userRepo: Repository<User>,
 	) {}
 
 	async save(
@@ -34,6 +38,7 @@ export class LearningNotesService {
 			userId,
 			title: dto.title?.trim() ? dto.title.trim() : null,
 			content: dto.content ?? '',
+			isPublic: false,
 		});
 		const saved = await this.noteRepo.save(row);
 		return { id: saved.id };
@@ -52,15 +57,49 @@ export class LearningNotesService {
 		return this.noteRepo.save(row);
 	}
 
+	/** 所有者设置是否全站公开 */
+	async setVisibility(
+		userId: number,
+		id: string,
+		dto: UpdateNoteVisibilityDto,
+	): Promise<LearningNoteListItem> {
+		const row = await this.requireOwned(userId, id);
+		row.isPublic = dto.isPublic;
+		const saved = await this.noteRepo.save(row);
+		const authors = await this.authorMap([saved.userId]);
+		return this.toListItem(saved, userId, authors.get(saved.userId));
+	}
+
 	async remove(userId: number, id: string): Promise<void> {
 		const row = await this.requireOwned(userId, id);
 		await this.noteRepo.delete({ id: row.id, userId });
 	}
 
-	async findOne(userId: number, id: string): Promise<EnglishLearningNote> {
-		return this.requireOwned(userId, id);
+	/** 本人笔记，或已公开笔记（任意登录用户可读） */
+	async findOne(
+		userId: number,
+		id: string,
+	): Promise<EnglishLearningNote & { isOwned: boolean; author: string }> {
+		const owned = await this.noteRepo.findOne({ where: { id, userId } });
+		if (owned) {
+			const authors = await this.authorMap([owned.userId]);
+			return Object.assign(owned, {
+				isOwned: true,
+				author: authors.get(owned.userId) ?? String(owned.userId),
+			});
+		}
+		const pub = await this.noteRepo.findOne({
+			where: { id, isPublic: true },
+		});
+		if (!pub) throw new NotFoundException('笔记不存在');
+		const authors = await this.authorMap([pub.userId]);
+		return Object.assign(pub, {
+			isOwned: false,
+			author: authors.get(pub.userId) ?? String(pub.userId),
+		});
 	}
 
+	/** 分页：本人笔记 + 他人公开笔记（对齐词库可见范围） */
 	async findPage(
 		userId: number,
 		query: QueryLearningNoteDto,
@@ -71,24 +110,33 @@ export class LearningNotesService {
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
 
-		const where: Record<string, unknown> = { userId };
-		if (title) where.title = Like(`%${title}%`);
+		const qb = this.noteRepo
+			.createQueryBuilder('n')
+			.select([
+				'n.id',
+				'n.title',
+				'n.userId',
+				'n.isPublic',
+				'n.createdAt',
+				'n.updatedAt',
+			])
+			.where('(n.userId = :userId OR n.isPublic = true)', { userId })
+			.orderBy('n.updatedAt', 'DESC')
+			.take(take)
+			.skip(skip);
 
-		const [list, total] = await this.noteRepo.findAndCount({
-			select: {
-				id: true,
-				title: true,
-				userId: true,
-				createdAt: true,
-				updatedAt: true,
-			},
-			where,
-			order: { updatedAt: 'DESC' },
-			take,
-			skip,
-		});
+		if (title) {
+			qb.andWhere('n.title LIKE :title', { title: `%${title}%` });
+		}
 
-		return { list, total };
+		const [rows, total] = await qb.getManyAndCount();
+		const authors = await this.authorMap(rows.map((r) => r.userId));
+		return {
+			list: rows.map((row) =>
+				this.toListItem(row, userId, authors.get(row.userId)),
+			),
+			total,
+		};
 	}
 
 	/**
@@ -111,6 +159,41 @@ export class LearningNotesService {
 			const msg = e instanceof Error ? e.message : String(e);
 			throw new BadRequestException(msg || '导出失败');
 		}
+	}
+
+	private async authorMap(userIds: number[]): Promise<Map<number, string>> {
+		const unique = [...new Set(userIds.filter((id) => id > 0))];
+		const map = new Map<number, string>();
+		if (unique.length === 0) return map;
+		const users = await this.userRepo.find({
+			where: { id: In(unique) },
+			select: { id: true, username: true },
+		});
+		for (const u of users) map.set(u.id, u.username);
+		for (const id of unique) {
+			if (!map.has(id)) map.set(id, String(id));
+		}
+		return map;
+	}
+
+	private toListItem(
+		row: Pick<
+			EnglishLearningNote,
+			'id' | 'title' | 'userId' | 'isPublic' | 'createdAt' | 'updatedAt'
+		>,
+		viewerUserId: number,
+		author?: string,
+	): LearningNoteListItem {
+		return {
+			id: row.id,
+			title: row.title,
+			userId: row.userId,
+			isPublic: row.isPublic,
+			isOwned: row.userId === viewerUserId,
+			author: author?.trim() || String(row.userId),
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
+		};
 	}
 
 	private async requireOwned(

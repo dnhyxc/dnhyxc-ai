@@ -21,7 +21,7 @@ function Btn({
 	return (
 		<button
 			type="button"
-			className="rich-editor-btn"
+			className="rich-editor-btn lucide-stroke-draw-hover [&_svg]:overflow-visible"
 			title={title}
 			aria-label={title}
 			onMouseDown={(e) => e.preventDefault()}

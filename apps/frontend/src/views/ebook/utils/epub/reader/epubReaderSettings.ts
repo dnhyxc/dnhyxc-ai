@@ -235,7 +235,7 @@ export const epubReaderSurfaceOverlayClass =
 	'bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_80%,transparent)]';
 
 /** 阅读页 chrome 分隔线色（基于正文字色，避免 border-theme 在自定义阅读背景上不可见） */
-export const epubReaderChromeBorderColorClass = 'border-textcolor/18';
+export const epubReaderChromeBorderColorClass = 'border-theme/10';
 
 /** 阅读页 chrome 次要按钮（取消、删除等） */
 export const epubReaderChromeOutlineButtonClass =

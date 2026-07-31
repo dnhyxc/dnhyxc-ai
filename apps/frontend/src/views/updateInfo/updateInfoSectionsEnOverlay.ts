@@ -991,6 +991,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When note content differs from the last save, an orange dot appears on the toolbar Save icon; it clears after a successful save.',
 	},
+	's24-60': {
+		title: 'Learning notes public/private & list redesign',
+		description:
+			'Learning notes now support a public/private visibility flag—private by default. Click the “Public” button (with a confirmation dialog) from the hover card or the preview header to publish a note; any logged-in user can then read it in their own notes list. The list is now a responsive grid of cards showing the title, the author, a public badge (teal for your own notes, sky for others’), and the last update time. Only the note owner sees the hover actions (publish/unpublish, edit, delete); others’ public notes are view-only. A new “Refresh” button at the top of the panel re-fetches the latest list after edits.',
+	},
+	's24-61': {
+		title: 'Rich-text toolbar button hover animation',
+		description:
+			'Toolbar buttons (including the selection bubble) in the learning-notes rich-text editor now draw a thin stroke along each Lucide icon on hover, layered with the existing background color for a more tactile feel. It also respects the system “reduce motion” setting and falls back to the previous behavior when motion is disabled.',
+	},
 	's24-56': {
 		title: 'Plugin error page polish',
 		description:

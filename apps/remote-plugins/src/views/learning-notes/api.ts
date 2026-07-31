@@ -19,6 +19,11 @@ export type NoteRecord = {
 	title: string | null;
 	content: string;
 	userId?: number;
+	/** 作者用户名 */
+	author?: string;
+	isPublic?: boolean;
+	/** 当前登录用户是否为作者；缺省按本人（写接口回包） */
+	isOwned?: boolean;
 	createdAt?: string;
 	updatedAt?: string;
 };
@@ -30,6 +35,9 @@ export type Note = {
 	title: string;
 	html: string;
 	at: number;
+	author: string;
+	isPublic: boolean;
+	isOwned: boolean;
 };
 
 export type NoteListPage = {
@@ -56,6 +64,10 @@ function toNote(row: NoteListItem | NoteRecord): Note {
 		title: (row.title ?? '').trim() || translateSync('common.untitledNote'),
 		html,
 		at: Number.isFinite(at) ? at : Date.now(),
+		author: (row.author ?? '').trim() || String(row.userId ?? ''),
+		isPublic: Boolean(row.isPublic),
+		// 列表/详情带 isOwned；update 等本人写回包可不带，默认本人
+		isOwned: row.isOwned !== false,
 	};
 }
 
@@ -120,6 +132,12 @@ export function createNotesApi(http: HostHttp) {
 
 		async remove(id: string): Promise<void> {
 			await http.delete(`${BASE}/delete/${id}`);
+		},
+
+		/** 所有者设置是否公开 */
+		async setVisibility(id: string, isPublic: boolean): Promise<Note> {
+			const res = await http.put(`${BASE}/visibility/${id}`, { isPublic });
+			return toNote(unwrapData<NoteListItem>(res));
 		},
 	};
 }

@@ -102,6 +102,28 @@ body {
 	--theme-card: var(--card);
 }
 
+/* 与主站知识库 header 一致：Lucide hover 描边画线 */
+@keyframes lucide-stroke-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lucide-stroke-draw-hover:hover svg path,
+	.lucide-stroke-draw-hover:hover svg line,
+	.lucide-stroke-draw-hover:hover svg circle,
+	.lucide-stroke-draw-hover:hover svg polyline,
+	.lucide-stroke-draw-hover:hover svg rect,
+	.lucide-stroke-draw-hover:hover svg ellipse {
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-dasharray: 80;
+		stroke-dashoffset: 80;
+		animation: lucide-stroke-draw 0.5s linear forwards;
+	}
+}
+
 @theme inline {
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);

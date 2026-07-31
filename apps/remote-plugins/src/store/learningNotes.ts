@@ -21,13 +21,10 @@ type HostDownloadBlob = (options: {
 const DOCX_MIME =
 	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-function errMsg(e: unknown, t: TFn): string {
-	if (e instanceof Error && e.message) return e.message;
-	if (e && typeof e === 'object' && 'message' in e) {
-		const m = (e as { message?: unknown }).message;
-		if (typeof m === 'string' && m.trim()) return m;
-	}
-	return t('common.requestFailed');
+/** Host `http.*` 失败时 fetch 层已 Toast；仅本地 Error（如导出校验）再提示 */
+function toastUnlessHostHttp(toast: ToastFn, e: unknown, t: TFn) {
+	if (e instanceof Error)
+		toast(e.message || t('common.requestFailed'), 'error');
 }
 
 /**
@@ -48,6 +45,8 @@ class LearningNotesStore {
 	pageSize = NOTES_PAGE_SIZE;
 	loading = false;
 	loadingMore = false;
+	/** 列表已有数据时的刷新，不卸列表 */
+	refreshing = false;
 
 	listOpen = false;
 	preview: Note | null = null;
@@ -58,6 +57,9 @@ class LearningNotesStore {
 	saving = false;
 	confirmOpen = false;
 	pendingDeleteId: string | null = null;
+	/** 公开/取消公开确认 */
+	visibilityConfirmOpen = false;
+	pendingVisibility: { id: string; isPublic: boolean } | null = null;
 	exportingDocx = false;
 
 	constructor() {
@@ -84,16 +86,36 @@ class LearningNotesStore {
 		return !!(this.preview?.id ?? this.editingId);
 	}
 
+	clearList() {
+		this.list = [];
+		this.total = 0;
+		this.pageNo = 1;
+		this.loading = false;
+		this.loadingMore = false;
+		this.refreshing = false;
+	}
+
 	setListOpen(open: boolean) {
 		this.listOpen = open;
+		if (open) {
+			void this.refreshList();
+		} else {
+			this.clearList();
+		}
 	}
 
 	toggleListOpen() {
-		this.listOpen = !this.listOpen;
+		this.setListOpen(!this.listOpen);
 	}
 
 	setConfirmOpen(open: boolean) {
 		this.confirmOpen = open;
+		if (!open) this.pendingDeleteId = null;
+	}
+
+	setVisibilityConfirmOpen(open: boolean) {
+		this.visibilityConfirmOpen = open;
+		if (!open) this.pendingVisibility = null;
 	}
 
 	setLoadingDetail(loading: boolean) {
@@ -105,15 +127,20 @@ class LearningNotesStore {
 			this.toast(this.t('learningNotes.toast.httpDeniedSync'), 'error');
 			return;
 		}
+		if (this.loading || this.refreshing) return;
 		if (append) {
-			if (this.loading || this.loadingMore || !this.hasMore) return;
+			if (this.loadingMore || !this.hasMore) return;
 			this.loadingMore = true;
+		} else if (this.list.length > 0) {
+			this.refreshing = true;
 		} else {
 			this.loading = true;
 		}
 		try {
 			const data = await this.api.list(page, this.pageSize);
 			runInAction(() => {
+				// 关闭列表后丢弃迟到回包，避免清空后又被写回
+				if (!this.listOpen) return;
 				this.total = data.total;
 				this.pageNo = page;
 				if (append) {
@@ -126,22 +153,25 @@ class LearningNotesStore {
 					this.list = data.list;
 				}
 			});
-		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+		} catch {
+			// Host http 已 Toast
 		} finally {
 			runInAction(() => {
 				this.loading = false;
 				this.loadingMore = false;
+				this.refreshing = false;
 			});
 		}
 	}
 
 	async refreshList(): Promise<void> {
+		if (!this.listOpen) return;
 		await this.fetchPage(1, false);
 	}
 
 	async loadMore(): Promise<void> {
-		if (!this.hasMore || this.loading || this.loadingMore) return;
+		if (!this.hasMore || this.loading || this.refreshing || this.loadingMore)
+			return;
 		await this.fetchPage(this.pageNo + 1, true);
 	}
 
@@ -163,6 +193,15 @@ class LearningNotesStore {
 				title: listHit?.title ?? this.preview?.title ?? '',
 				html: this.preview?.id === id ? this.preview.html : '',
 				at: listHit?.at ?? this.preview?.at ?? Date.now(),
+				author:
+					listHit?.author ??
+					(this.preview?.id === id ? this.preview.author : ''),
+				isPublic:
+					listHit?.isPublic ??
+					(this.preview?.id === id ? this.preview.isPublic : false),
+				isOwned:
+					listHit?.isOwned ??
+					(this.preview?.id === id ? this.preview.isOwned : true),
 			};
 		});
 		try {
@@ -171,8 +210,8 @@ class LearningNotesStore {
 				// 慢网下用户可能已点开另一篇
 				if (this.preview?.id === id) this.preview = note;
 			});
-		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+		} catch {
+			// Host http 已 Toast（如「笔记不存在」）
 			runInAction(() => {
 				if (this.preview?.id === id && !this.preview.html) {
 					this.preview = null;
@@ -200,8 +239,8 @@ class LearningNotesStore {
 			runInAction(() => {
 				this.openEdit(note);
 			});
-		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+		} catch {
+			// Host http 已 Toast
 		}
 	}
 
@@ -249,8 +288,8 @@ class LearningNotesStore {
 			}
 			await this.refreshList();
 			return true;
-		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+		} catch {
+			// Host http 已 Toast
 			return false;
 		} finally {
 			runInAction(() => {
@@ -262,6 +301,52 @@ class LearningNotesStore {
 	requestDelete(id: string) {
 		this.pendingDeleteId = id;
 		this.confirmOpen = true;
+	}
+
+	requestVisibility(id: string, isPublic: boolean) {
+		this.pendingVisibility = { id, isPublic };
+		this.visibilityConfirmOpen = true;
+	}
+
+	async confirmVisibility(): Promise<void> {
+		const pending = this.pendingVisibility;
+		if (!this.api || !pending) return;
+		try {
+			const updated = await this.api.setVisibility(
+				pending.id,
+				pending.isPublic,
+			);
+			runInAction(() => {
+				this.list = this.list.map((n) =>
+					n.id === updated.id
+						? { ...n, isPublic: updated.isPublic, isOwned: true }
+						: n,
+				);
+				if (this.preview?.id === updated.id) {
+					this.preview = {
+						...this.preview,
+						isPublic: updated.isPublic,
+						isOwned: true,
+					};
+				}
+				this.pendingVisibility = null;
+				this.visibilityConfirmOpen = false;
+			});
+			this.toast(
+				this.t(
+					pending.isPublic
+						? 'learningNotes.toast.madePublic'
+						: 'learningNotes.toast.madePrivate',
+				),
+				'success',
+			);
+		} catch {
+			// Host http 已 Toast
+			runInAction(() => {
+				this.pendingVisibility = null;
+				this.visibilityConfirmOpen = false;
+			});
+		}
 	}
 
 	/** 导出当前预览笔记为 DOCX（服务端生成 + Host downloadBlob 落盘） */
@@ -308,7 +393,8 @@ class LearningNotesStore {
 				this.toast(this.t('learningNotes.toast.exportOk'), 'success');
 			}
 		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+			// 接口错误 Host 已 Toast；仅本地校验（如导出文件无效）再提示
+			toastUnlessHostHttp(this.toast, e, this.t);
 		} finally {
 			runInAction(() => {
 				this.exportingDocx = false;
@@ -332,8 +418,8 @@ class LearningNotesStore {
 			});
 			this.toast(this.t('learningNotes.toast.deleted'), 'success');
 			await this.refreshList();
-		} catch (e) {
-			this.toast(errMsg(e, this.t), 'error');
+		} catch {
+			// Host http 已 Toast
 			runInAction(() => {
 				this.pendingDeleteId = null;
 			});

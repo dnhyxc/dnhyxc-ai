@@ -90,7 +90,7 @@ export function EbookReadSplitLayout({
 			<ResizablePanel
 				id="reader"
 				defaultSize={58}
-				minSize={30}
+				minSize={0}
 				className="min-h-0 min-w-0"
 			>
 				{children}

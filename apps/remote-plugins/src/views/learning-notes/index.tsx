@@ -107,7 +107,6 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 
 	useEffect(() => {
 		store.bind(api.http, toast, t, api.ui?.downloadBlob);
-		void store.refreshList();
 	}, [api.http, api.ui?.downloadBlob, store, toast, t]);
 
 	const focusTitle = useCallback(() => {
@@ -223,45 +222,51 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 		[dirty, listToggleBtn, onSave, store, store.editingId, store.saving, t],
 	);
 
+	const previewOwned = store.preview?.isOwned !== false;
 	const previewHeaderExtra = useMemo(
 		() => (
 			<>
 				<Btn title={t('learningNotes.new')} onClick={() => store.openNew()}>
 					<FilePenLine size={15} />
 				</Btn>
-				<Btn
-					title={t('learningNotes.edit')}
-					disabled={store.loadingDetail}
-					onClick={() => {
-						if (store.preview) store.openEdit(store.preview);
-					}}
-				>
-					<SquarePen size={15} />
-				</Btn>
-				<Btn
-					title={t('learningNotes.delete')}
-					onClick={() => {
-						if (store.preview) store.requestDelete(store.preview.id);
-					}}
-				>
-					<Trash2 size={15} />
-				</Btn>
-				<Btn
-					title={
-						store.exportingDocx
-							? t('learningNotes.exportingDocx')
-							: t('learningNotes.exportDocx')
-					}
-					disabled={store.exportingDocx || store.loadingDetail}
-					onClick={() => void store.exportPreviewDocx()}
-				>
-					<FileDown size={15} />
-				</Btn>
+				{previewOwned ? (
+					<>
+						<Btn
+							title={t('learningNotes.edit')}
+							disabled={store.loadingDetail}
+							onClick={() => {
+								if (store.preview) store.openEdit(store.preview);
+							}}
+						>
+							<SquarePen size={15} />
+						</Btn>
+						<Btn
+							title={t('learningNotes.delete')}
+							onClick={() => {
+								if (store.preview) store.requestDelete(store.preview.id);
+							}}
+						>
+							<Trash2 size={15} />
+						</Btn>
+						<Btn
+							title={
+								store.exportingDocx
+									? t('learningNotes.exportingDocx')
+									: t('learningNotes.exportDocx')
+							}
+							disabled={store.exportingDocx || store.loadingDetail}
+							onClick={() => void store.exportPreviewDocx()}
+						>
+							<FileDown size={15} />
+						</Btn>
+					</>
+				) : null}
 				{listToggleBtn()}
 			</>
 		),
 		[
 			listToggleBtn,
+			previewOwned,
 			store,
 			store.exportingDocx,
 			store.loadingDetail,
@@ -300,6 +305,21 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 				description={t('learningNotes.deleteConfirmDesc')}
 				onConfirm={() => void store.confirmDelete()}
 			/>
+			<Confirm
+				open={store.visibilityConfirmOpen}
+				onOpenChange={(open) => store.setVisibilityConfirmOpen(open)}
+				title={
+					store.pendingVisibility?.isPublic
+						? t('learningNotes.publicConfirmTitle')
+						: t('learningNotes.privateConfirmTitle')
+				}
+				description={
+					store.pendingVisibility?.isPublic
+						? t('learningNotes.publicConfirmDesc')
+						: t('learningNotes.privateConfirmDesc')
+				}
+				onConfirm={() => void store.confirmVisibility()}
+			/>
 			<ResizablePanelGroup
 				id="learning-notes-split"
 				orientation="horizontal"
@@ -321,8 +341,8 @@ function LearningNotesApp({ api }: HostBridgeProps) {
 				<ResizablePanel
 					id="learning-notes-editor"
 					defaultSize={store.listOpen ? 65 : 100}
-					minSize={50}
-					className="min-h-0 min-w-0"
+					minSize={0}
+					className="min-h-0 min-w-0 overflow-hidden"
 				>
 					<div className="border-theme/10 relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 						{!store.preview ? (

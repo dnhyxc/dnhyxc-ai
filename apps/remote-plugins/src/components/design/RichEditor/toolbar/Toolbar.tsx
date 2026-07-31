@@ -101,7 +101,11 @@ export function Btn({
 			aria-label={title}
 			aria-pressed={active}
 			disabled={disabled}
-			className={cn('rich-editor-btn ml-0.5', active && 'is-active', className)}
+			className={cn(
+				'rich-editor-btn lucide-stroke-draw-hover ml-0.5 [&_svg]:overflow-visible',
+				active && 'is-active',
+				className,
+			)}
 			onMouseDown={(e) => e.preventDefault()}
 			onClick={(e) => onClick(e as unknown as MouseEvent)}
 		>
@@ -386,7 +390,7 @@ export function Toolbar({
 								title={activeHeading?.title ?? '标题级别'}
 								aria-label={activeHeading?.title ?? '标题级别'}
 								className={cn(
-									'rich-editor-btn ml-0.5',
+									'rich-editor-btn lucide-stroke-draw-hover ml-0.5 [&_svg]:overflow-visible',
 									activeHeading && 'is-active',
 								)}
 								onMouseDown={(e) => e.preventDefault()}
@@ -984,7 +988,7 @@ export function Toolbar({
 									type="button"
 									title="更多"
 									aria-label="更多"
-									className="rich-editor-btn ml-0.5"
+									className="rich-editor-btn lucide-stroke-draw-hover ml-0.5 [&_svg]:overflow-visible"
 									onMouseDown={(e) => e.preventDefault()}
 								>
 									<MoreHorizontal size={ICON} />

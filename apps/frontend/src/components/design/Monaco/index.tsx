@@ -1951,7 +1951,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							<ResizablePanel
 								id="editor"
 								defaultSize={50}
-								minSize={20}
+								minSize={0}
 								className="min-h-0 min-w-0"
 							>
 								{viewMode === 'split' || viewMode === 'splitDiff' ? (

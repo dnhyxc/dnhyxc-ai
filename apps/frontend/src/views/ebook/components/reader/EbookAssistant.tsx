@@ -200,7 +200,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 					setInput={setInput}
 					className="w-full px-0 pb-4"
 					textareaClassName={cn('min-h-12', epubReaderChromeTextareaClass)}
-					inputWrapClassName="border border-textcolor/18"
+					inputWrapClassName="border border-theme/10"
 					sendMessage={sendMessage}
 					placeholder={t('ebook.read.assistant.placeholder')}
 					disableTextInput={false}
@@ -247,7 +247,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 					) : null}
 					<div className="text-textcolor/70 flex justify-center items-start text-sm">
 						<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
-							<div className="flex w-full justify-between rounded-md border border-textcolor/18 p-2">
+							<div className="flex w-full justify-between rounded-md border border-theme/10 p-2">
 								<Sparkles
 									size={18}
 									className="mr-2 mt-0.5 shrink-0 text-teal-500"

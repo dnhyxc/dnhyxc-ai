@@ -137,7 +137,7 @@ const HANDLER_PROP: Partial<
 const CONTAINER_CLASS: Record<BarVariant, string> = {
 	panel: 'flex h-full w-full min-w-0 items-stretch',
 	inline:
-		'flex w-full min-w-0 items-stretch overflow-hidden rounded-md border border-textcolor/18 bg-textcolor/5',
+		'flex w-full min-w-0 items-stretch overflow-hidden rounded-md border border-theme/10 bg-textcolor/5',
 	floating: 'flex items-center px-0.5',
 };
 
@@ -151,7 +151,7 @@ const ITEM_BUTTON_CLASS: Record<BarVariant, string> = {
 	panel:
 		'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors',
 	inline:
-		'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-r border-textcolor/18 py-2 px-0.5 text-xs transition-colors last:border-r-0',
+		'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-r border-theme/10 py-2 px-0.5 text-xs transition-colors last:border-r-0',
 	floating:
 		'flex shrink-0 flex-col items-center gap-0.5 rounded-md py-2 transition-colors',
 };

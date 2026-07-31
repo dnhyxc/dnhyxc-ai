@@ -21,6 +21,7 @@ import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { QueryLearningNoteDto } from './dto/query-learning-note.dto';
 import { SaveLearningNoteDto } from './dto/save-learning-note.dto';
 import { UpdateLearningNoteDto } from './dto/update-learning-note.dto';
+import { UpdateNoteVisibilityDto } from './dto/update-note-visibility.dto';
 import { LearningNotesService } from './learning-notes.service';
 
 type AuthedRequest = Request & { user?: { userId?: number } };
@@ -42,6 +43,7 @@ export class LearningNotesController {
 		return this.notesService.save(this.userId(req), dto);
 	}
 
+	/** 本人笔记 + 他人公开笔记 */
 	@Get('list')
 	async list(@Req() req: AuthedRequest, @Query() query: QueryLearningNoteDto) {
 		return this.notesService.findPage(this.userId(req), query);
@@ -82,6 +84,16 @@ export class LearningNotesController {
 		@Body() dto: UpdateLearningNoteDto,
 	) {
 		return this.notesService.update(this.userId(req), { ...dto, id });
+	}
+
+	/** 所有者设置笔记是否公开 */
+	@Put('visibility/:id')
+	async setVisibility(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateNoteVisibilityDto,
+	) {
+		return this.notesService.setVisibility(this.userId(req), id, dto);
 	}
 
 	@Delete('delete/:id')
