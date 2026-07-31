@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -24,8 +24,14 @@ import { removeStorage, resolveCosUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
 import { ICON_MAP, MENUS, type SidebarMenuConfig } from './enum';
 
+const isMenuActive = (path: string, pathname: string) =>
+	path === '/'
+		? pathname === '/'
+		: pathname === path || pathname.startsWith(`${path}/`);
+
 const Sidebar = observer(() => {
 	const navigate = useNavigate();
+	const { pathname } = useLocation();
 	const { userStore } = useStore();
 	const { storageInfo } = useStorageInfo();
 	const { t } = useI18n();
@@ -94,26 +100,33 @@ const Sidebar = observer(() => {
 							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>
-					{processedMenus.map((item) => (
-						<div
-							key={item.path}
-							role="button"
-							tabIndex={0}
-							className="lucide-stroke-draw-hover group text-theme mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
-							onClick={item.onClick}
-						>
-							<span
+					{processedMenus.map((item) => {
+						const active = isMenuActive(item.path, pathname);
+						return (
+							<div
+								key={item.path}
+								role="button"
+								tabIndex={0}
+								aria-current={active ? 'page' : undefined}
 								className={cn(
-									'flex size-full items-center justify-center [&>svg]:size-5.5 [&>svg]:shrink-0 [&>svg]:overflow-visible',
-									item.nameKey === 'nav.home' && '[&>svg]:size-6',
-									item.nameKey === 'nav.chat' && '[&>svg]:size-6',
-									item.nameKey === 'nav.plugins' && '[&>svg]:size-6',
+									'lucide-stroke-draw-hover group mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
+									active ? 'bg-theme/12 text-teal-400' : 'text-theme',
 								)}
+								onClick={item.onClick}
 							>
-								{item.icon}
-							</span>
-						</div>
-					))}
+								<span
+									className={cn(
+										'flex size-full items-center justify-center [&>svg]:size-5.5 [&>svg]:shrink-0 [&>svg]:overflow-visible',
+										item.nameKey === 'nav.home' && '[&>svg]:size-6',
+										item.nameKey === 'nav.chat' && '[&>svg]:size-6',
+										item.nameKey === 'nav.plugins' && '[&>svg]:size-6',
+									)}
+								>
+									{item.icon}
+								</span>
+							</div>
+						);
+					})}
 				</div>
 				{storageInfo?.access_token ? (
 					<DropdownMenu>
