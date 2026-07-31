@@ -66,8 +66,10 @@
 | 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [app/switch-dynamic-id-fix.md](./app/switch-dynamic-id-fix.md)                                                                                            |
 | 插件中心卡片白边 / 远程插件污染 border-border                       | [app/plugin-card-border-theme.md](./app/plugin-card-border-theme.md)                                                                                      |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |
-| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [ideas/tauri-window-zoom-unveil.md](./ideas/tauri-window-zoom-unveil.md)（swizzle zoom: + 目标尺寸预布局 + 揭开动画） |
-| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [ideas/tauri-system-menu-shortcuts.md](./ideas/tauri-system-menu-shortcuts.md)（store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测） |
+| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [app/tauri-window-zoom-unveil.md](./app/tauri-window-zoom-unveil.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/tauri-window-zoom-unveil.md](./ideas/tauri-window-zoom-unveil.md)（规划思路） |
+| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [app/tauri-system-menu-shortcuts.md](./app/tauri-system-menu-shortcuts.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/tauri-system-menu-shortcuts.md](./ideas/tauri-system-menu-shortcuts.md)（规划思路） |
+| 关于子窗加载慢 / 关于窗口主题与主窗不一致                          | [app/about-window-lightweight.md](./app/about-window-lightweight.md)（main.tsx 按 pathname 分流 + about.tsx 极简入口 + readWindowChromeThemeSync 同步读主题） |
+| 菜单/侧边栏登出不一致 / 多窗口主题不同步 / 401 后状态残留          | [app/logout-unify-theme-sync.md](./app/logout-unify-theme-sync.md)（performLogout 集中清态 + 动态 import 规避循环依赖 + setThemeToAllWindows 广播） |
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/ebook-plugin-ideas-list.md](./ebook/ebook-plugin-ideas-list.md)                                                                                    |
 | 后端 Remote 静态资源服务（serveRemote / uploads/remotes）           | [ops/remote-static-resources.md](./ops/remote-static-resources.md)                                                                                        |
 | remotes registry 仍被缓存 / 桌面吃旧清单                            | [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md)                                                                                           |

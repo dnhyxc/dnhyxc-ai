@@ -7,6 +7,7 @@ import {
 	FileText,
 	Globe,
 	MessageSquare,
+	Puzzle,
 	Rocket,
 	Shield,
 	Sparkles,
@@ -17,6 +18,7 @@ import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
 import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
+import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
 import { getProjectGuideAbsoluteUrl } from '@/views/projectGuide/paths';
 
 const Home = () => {
@@ -25,6 +27,12 @@ const Home = () => {
 
 	const SHOWCASE = useMemo(
 		() => [
+			{
+				icon: Puzzle,
+				title: t('home.showcase.plugin.title'),
+				desc: t('home.showcase.plugin.desc'),
+				color: 'from-violet-400 to-purple-500',
+			},
 			{
 				icon: Rocket,
 				title: t('home.showcase.fast.title'),
@@ -81,6 +89,15 @@ const Home = () => {
 				color: 'from-orange-500 to-amber-500',
 				/** 点击后进入智能对话 */
 				navigateChat: true,
+			},
+			{
+				step: '4',
+				title: t('home.steps.pluginDev.title'),
+				desc: t('home.steps.pluginDev.desc'),
+				icon: Puzzle,
+				color: 'from-violet-500 to-purple-600',
+				/** 在默认浏览器打开插件开发手册 */
+				openPluginDevGuide: true,
 			},
 		],
 		[t, locale],
@@ -342,7 +359,7 @@ const Home = () => {
 							>
 								{t('home.sections.showcase')}
 							</motion.h3>
-							<div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
+							<div className="grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
 								{SHOWCASE.map((feature, idx) => (
 									<motion.div
 										key={feature.title}
@@ -402,6 +419,10 @@ const Home = () => {
 												navigate('/login?mode=register');
 											} else if (item.navigateChat) {
 												navigate('/chat');
+											} else if (item.openPluginDevGuide) {
+												void openExternalUrl(
+													getPluginDevGuideAbsoluteUrl(locale),
+												);
 											}
 										}}
 									>

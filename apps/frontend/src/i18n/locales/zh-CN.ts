@@ -716,6 +716,8 @@ export const zhCN = {
 	'home.features.document.subtitle': '智能分析',
 	'home.features.document.desc':
 		'Image、PDF、Word、Excel 等格式的解析、总结与内容提取',
+	'home.showcase.plugin.title': '插件系统',
+	'home.showcase.plugin.desc': '可扩展架构',
 	'home.showcase.fast.title': '快速响应',
 	'home.showcase.fast.desc': '毫秒级响应速度',
 	'home.showcase.privacy.title': '隐私保护',
@@ -730,6 +732,8 @@ export const zhCN = {
 	'home.steps.register.desc': '创建您的个人账户',
 	'home.steps.start.title': '开始使用',
 	'home.steps.start.desc': '享受智能助手服务',
+	'home.steps.pluginDev.title': '插件开发',
+	'home.steps.pluginDev.desc': '为平台开发专属插件',
 	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
 	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai 网页版',
 	'home.quicklinks.blog.title': '我的博客',
@@ -1772,6 +1776,7 @@ export const zhCN = {
 	'route.legal.userAgreement': '用户服务协议',
 	'route.updateInfo.title': '更新信息',
 	'route.projectGuide.title': '产品指南',
+	'route.pluginDevGuide.title': '插件开发手册',
 	'route.downloadDesktop.title': '下载桌面客户端',
 	'route.guard.needLoginTitle': '请先登录后再访问',
 	'route.guard.needLoginMessage': '「{page}」需要登录后才能访问。',
@@ -1832,6 +1837,7 @@ export const zhCN = {
 	'updateInfoPage.header.subtitle':
 		'能力说明随版本更新；与仓库内《更新信息》文档请保持同步。',
 	'updateInfoPage.item.dateLabel': '更新：{date}',
+	'pluginDevGuide.item.dateLabel': '更新：{date}',
 
 	'coding.toolbar.selectTemplate': '选择模版',
 	'coding.toolbar.preview.show': '👁️‍🗨️ 显示预览',

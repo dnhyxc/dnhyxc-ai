@@ -110,6 +110,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'New one-tap login via WeChat Mini Program—sign up and log in with your WeChat account, no need to type a username and password. You can also link an existing Web account: generate a 6-digit link code in the Web account settings, then enter it in the mini program. Bookshelf, reading progress, highlights, and thoughts all sync across both sides. You can unlink anytime from the Web side, and all WeChat-login sessions are immediately revoked.',
 	},
+	's2-13': {
+		title: 'Unified logout & multi-window theme sync',
+		description:
+			'Logout from the sidebar menu, File menu, or 401 session-expiry all run the same cleanup routine—local cache, session state, and UI consistently return to the signed-out state, with no residual state after logging out from the menu. When you switch the theme color scheme, all open desktop child windows (e.g. the About window) update in sync, so child windows no longer mismatch the main window theme.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:
@@ -173,7 +178,17 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's3-13': {
 		title: 'Plugin enablement persisted to account & synced across devices',
 		description:
-			'When you toggle a feature module on or off in the Plugin Center, the preference is saved to your account on the server, not only to the local browser. Sign in from another device, switch between the web and desktop app, or sign out and back in on the same machine—your enabled/disabled choices stay the same. Without a preference (e.g. new accounts) everything is off by default, so the sidebar or home screen is not crowded with unfamiliar entries. Switching accounts automatically re-mounts or removes sidebar entries to match the new user’s preference, no manual refresh required. Any enablement history saved only to local storage in older versions is migrated once to your account on first sign-in, so you do not have to re-configure. If the Plugin Center or registry fails to load, the page now shows a more specific reason—network, expired credentials, malformed registry, or other internal error—so you can try reconnecting or re-signing in before contacting support.',
+			"When you toggle a feature module on or off in the Plugin Center, the preference is saved to your account on the server, not only to the local browser. Sign in from another device, switch between the web and desktop app, or sign out and back in on the same machine—your enabled/disabled choices stay the same. Without a preference (e.g. new accounts) everything is off by default, so the sidebar or home screen is not crowded with unfamiliar entries. Switching accounts automatically re-mounts or removes sidebar entries to match the new user's preference, no manual refresh required.Any enablement history saved only to local storage in older versions is migrated once to your account on first sign-in, so you do not have to re- configure.If the Plugin Center or registry fails to load, the page now shows a more specific reason—network, expired credentials, malformed registry, or other internal error—so you can try reconnecting or re - signing in before contacting support.",
+	},
+	's3-14': {
+		title: 'macOS window zoom: no white flash',
+		description:
+			'Fixes the white flash on macOS desktop when double-clicking the title bar or clicking the green zoom button—the page content could not keep up with the window resize. The page is now pre-laid-out to the target size before the window unveils it, so the transition is smooth with no "shell grew but content stayed small" white gap.',
+	},
+	's3-15': {
+		title: 'System menu & keyboard-shortcut framework',
+		description:
+			"The macOS desktop menu bar now has full File, Edit, and other system menus with zh/en labels and unified SF Symbols icons. After changing a shortcut in Settings, the menu-bar accelerator updates immediately—no restart needed. Global shortcuts auto-release when the window loses focus (except Show/Hide App), so they no longer hijack other apps' shortcuts. In-page and global shortcuts are managed together; conflicts are caught at recording time.",
 	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
@@ -665,6 +680,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Legal pages: header language toggle',
 		description:
 			'/service-policy and /user-agreement headers include the same language toggle as /project-guide: navigate with ?lang= to switch zh/en immediately, wired to standalone-page locale-from-URL behavior—no need to change global settings first.',
+	},
+	's20-5': {
+		title: 'About window lightweighting',
+		description:
+			'The About window now loads an on-demand code bundle—opens faster with less overhead. The window theme is read synchronously at creation, so in dark mode it no longer briefly flashes light before switching. If the About window is already open, clicking "About" again focuses the existing window instead of opening a new one.',
 	},
 	's21-1': {
 		title: '/update-info standalone route',

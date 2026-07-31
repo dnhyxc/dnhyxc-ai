@@ -162,7 +162,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s7-1': {
 		title: '7.1 Global shortcuts (desktop)',
 		description:
-			'Configure shortcuts for common actions. Conflicts are blocked with a clear message so one shortcut does not trigger multiple actions.',
+			"Configure shortcuts for common actions. Conflicts are blocked with a clear message so one shortcut does not trigger multiple actions. The macOS menu bar provides full File, Edit, and other system menus with zh/en labels and unified SF Symbols icons; changing a shortcut in Settings updates the menu-bar accelerator immediately without restart. Global shortcuts auto-release when the window loses focus (except Show/Hide App), so they do not hijack other apps' shortcuts.",
 	},
 	'pg-s7-2': {
 		title: '7.2 In-page shortcuts (Knowledge)',

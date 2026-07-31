@@ -784,6 +784,8 @@ export const enUS = {
 	'home.features.document.subtitle': 'Smart analysis',
 	'home.features.document.desc':
 		'Parse, summarize, and extract content from Image, PDF, Word, Excel, and more.',
+	'home.showcase.plugin.title': 'Plugin System',
+	'home.showcase.plugin.desc': 'Extensible architecture',
 	'home.showcase.fast.title': 'Fast',
 	'home.showcase.fast.desc': 'Millisecond-level response',
 	'home.showcase.privacy.title': 'Privacy',
@@ -798,6 +800,8 @@ export const enUS = {
 	'home.steps.register.desc': 'Create your personal account',
 	'home.steps.start.title': 'Start',
 	'home.steps.start.desc': 'Enjoy the smart assistant experience',
+	'home.steps.pluginDev.title': 'Plugin development',
+	'home.steps.pluginDev.desc': 'Build custom plugins for the platform',
 	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
 	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai web',
 	'home.quicklinks.blog.title': 'My blog',
@@ -1925,6 +1929,7 @@ export const enUS = {
 	'route.legal.userAgreement': 'User service agreement',
 	'route.updateInfo.title': 'Release notes',
 	'route.projectGuide.title': 'Product guide',
+	'route.pluginDevGuide.title': 'Plugin development guide',
 	'route.downloadDesktop.title': 'Download desktop app',
 	'route.guard.needLoginTitle': 'Please sign in before accessing',
 	'route.guard.needLoginMessage': '「{page}」requires sign-in.',
@@ -1987,6 +1992,7 @@ export const enUS = {
 	'updateInfoPage.header.subtitle':
 		'Capabilities change with releases — keep in sync with the repo notes.',
 	'updateInfoPage.item.dateLabel': 'Updated: {date}',
+	'pluginDevGuide.item.dateLabel': 'Updated: {date}',
 
 	// 编程文案
 	'coding.toolbar.selectTemplate': 'Select template',

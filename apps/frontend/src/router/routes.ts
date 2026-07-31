@@ -38,6 +38,7 @@ import LegalServicePolicy from '@/views/legal/servicePolicy';
 import LegalUserAgreement from '@/views/legal/userAgreement';
 import Login from '@/views/login';
 import Pay from '@/views/pay';
+import PluginDevGuidePage from '@/views/pluginDevGuide';
 import PluginsPage from '@/views/plugins';
 import PluginsLayout from '@/views/plugins/Layout';
 import PluginRegistryEditorPage from '@/views/plugins/registry';
@@ -384,6 +385,13 @@ const routes: RouteConfig[] = [
 		Component: ProjectGuidePage,
 		meta: {
 			titleKey: 'route.projectGuide.title',
+		},
+	},
+	{
+		path: '/plugin-dev-guide',
+		Component: PluginDevGuidePage,
+		meta: {
+			titleKey: 'route.pluginDevGuide.title',
 		},
 	},
 	{
