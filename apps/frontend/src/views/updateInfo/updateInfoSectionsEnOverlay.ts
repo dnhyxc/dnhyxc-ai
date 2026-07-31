@@ -996,6 +996,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The error page shown when a plugin is unavailable now has a centered layout and uses unified button styling for a more consistent look.',
 	},
+	's24-59': {
+		title: 'English TTS auto-stop on page switch & stale media-control fix',
+		description:
+			'When reading aloud a classic quote or word in English Learning, switching to another sub-page or leaving English Learning now stops playback immediately—no more audio bleeding across pages. Tapping another entry to trigger a stop no longer leaves a silent progress bar lingering in system media controls (Touch Bar / Control Center / Bluetooth headset popup). Classic-quote and word cloud TTS also switched to single-utterance synthesis for a faster first packet.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

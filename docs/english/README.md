@@ -103,6 +103,7 @@
 | [xfyun-cloud-tts.md](./xfyun-cloud-tts.md) | **讯飞在线云端朗读**：WS 合成、设置页音量/音高、Node 18 `ws` |
 | [cloud-tts-user-credentials.md](./cloud-tts-user-credentials.md) | **用户凭证与失败降级**：MiniMax/讯飞 Key 入库、Toast、xfyunVoiceId 独立 |
 | [english-tts-playback.md](./english-tts-playback.md) | 播放世代、异步丢弃 |
+| [english-tts-stop-cleanup.md](./english-tts-stop-cleanup.md) | **增量**：`stopAllPlayback` 彻底释放音频元素与 MediaSession（修复 Touch Bar/控制中心残留进度条）、路由壳子页切换自动停播、经典句朗读统一 `cloudSingleUtterance` |
 | [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) | **增量**：本机 `cancel()` 后 50ms settle，修复首句无声（听当前/听书本机路径） |
 | [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)

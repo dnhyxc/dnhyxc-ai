@@ -128,7 +128,7 @@ export function ClassicQuotesLibrarySection({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(text);
+				await playPreferred(text, { cloudSingleUtterance: true });
 			} catch {
 				Toast({
 					type: 'warning',

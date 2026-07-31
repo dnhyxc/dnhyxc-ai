@@ -210,7 +210,7 @@ export function ClassicQuoteMistakesPanel({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(english);
+				await playPreferred(english, { cloudSingleUtterance: true });
 			} catch {
 				Toast({
 					type: 'warning',

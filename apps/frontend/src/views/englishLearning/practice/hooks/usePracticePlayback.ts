@@ -57,7 +57,7 @@ export function usePracticePlayback(args: {
 			for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
 				// 若 runId 早于当前，立即中断
 				if (dictationPlayRunRef.current !== runId) return;
-				await playPreferred(answerText);
+				await playPreferred(answerText, { cloudSingleUtterance: true });
 				if (dictationPlayRunRef.current !== runId) return;
 				// 非最后一次播放则等待间隔
 				if (i < DICTATION_PLAY_COUNT - 1) {
@@ -102,7 +102,7 @@ export function usePracticePlayback(args: {
 				if (useDictationSequence) {
 					await playDictationSequence(runId);
 				} else {
-					await playPreferred(answerText);
+					await playPreferred(answerText, { cloudSingleUtterance: true });
 				}
 			} catch {
 				// 支持突然变不可用、或系统错误

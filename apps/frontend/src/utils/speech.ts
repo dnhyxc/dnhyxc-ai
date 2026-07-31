@@ -1255,6 +1255,15 @@ export function stopAllPlayback(): void {
 	lastCloudTtsErrorToastAt = 0;
 	sessionCloudSourceOverride = null;
 	stopPlaybackMediaOnly();
+	// 仅 pause/清 src 时 Chromium/macOS 仍可能按旧 <audio> 外推 Touch Bar / 控制中心进度条
+	releaseCloudAudioEl();
+	silenceCloudAudioUnlock();
+	clearPlaybackMediaSession({ clearHandlers: !englishPlaybackMediaHandlers });
+	requestAnimationFrame(() => {
+		clearPlaybackMediaSession({
+			clearHandlers: !englishPlaybackMediaHandlers,
+		});
+	});
 }
 
 /**

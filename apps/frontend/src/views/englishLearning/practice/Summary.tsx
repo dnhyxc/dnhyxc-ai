@@ -175,7 +175,7 @@ export function Summary({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, { cloudSingleUtterance: true });
 			} catch {
 				Toast({
 					type: 'warning',
