@@ -4,9 +4,10 @@ import { Button } from '@ui/index';
 import {
 	BookMarked,
 	Highlighter,
-	Lightbulb,
+	// Lightbulb,
 	type LucideIcon,
 	Puzzle,
+	Sparkle,
 	Sparkles,
 } from 'lucide-react';
 import { type CSSProperties, useEffect } from 'react';
@@ -19,7 +20,7 @@ import {
 } from '@/plugins';
 
 const ICON_BY_NAME: Record<string, LucideIcon> = {
-	Lightbulb,
+	Sparkle,
 	Puzzle,
 	Sparkles,
 	BookMarked,

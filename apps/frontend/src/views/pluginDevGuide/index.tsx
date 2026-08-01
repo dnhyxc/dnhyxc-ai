@@ -24,7 +24,7 @@ const FencedCodeBlock = memo(function FencedCodeBlock({
 }) {
 	// 用空行 + ``` 包裹，其他内容完全没有 —— 只渲染这一个代码块
 	const fenced = useMemo(() => {
-		return '```' + code.lang + '\n' + code.code + '\n```';
+		return `\`\`\`${code.lang}\n${code.code}\n\`\`\``;
 	}, [code.lang, code.code]);
 
 	return (
@@ -53,7 +53,7 @@ const PluginDevGuidePage = memo(function PluginDevGuidePage() {
 	const onToggleLanguage = useCallback(() => {
 		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
 		setForceCopyKey((k) => k + 1);
-		navigate('/plugin-dev-guide/?lang=' + next);
+		navigate(`/plugin-dev-guide/?lang=${next}`);
 	}, [locale, navigate]);
 
 	return (
@@ -93,7 +93,7 @@ const PluginDevGuidePage = memo(function PluginDevGuidePage() {
 
 					{sections.map((section) => (
 						<section
-							key={section.id + '-' + locale}
+							key={`${section.id}-${locale}`}
 							className="pb-14 last:pb-4"
 						>
 							<h2 className="mb-6 text-base font-semibold text-textcolor sm:text-lg">
@@ -101,11 +101,10 @@ const PluginDevGuidePage = memo(function PluginDevGuidePage() {
 							</h2>
 							<div className="flex flex-col gap-8">
 								{section.items.map((item) => {
-									const codeBlockId =
-										'codeblock-' + section.id + '-' + item.id + '-' + locale;
+									const codeBlockId = `codeblock-${section.id}-${item.id}-${locale}`;
 									return (
 										<article
-											key={section.id + '-' + item.id + '-' + locale}
+											key={`${section.id}-${item.id}-${locale}`}
 											className="scroll-mt-4"
 										>
 											<h3 className="text-[15px] font-medium leading-snug text-textcolor">

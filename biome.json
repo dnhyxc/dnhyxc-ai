@@ -24,7 +24,8 @@
 				"useArrowFunction": "off",
 				"noForEach": "off",
 				"noUselessConstructor": "off",
-				"noImportantStyles": "off"
+				"noImportantStyles": "off",
+				"noUselessStringRaw": "off"
 			},
 			"style": {
 				"useTemplate": "info",
