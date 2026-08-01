@@ -1,0 +1,80 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--color-background: #f8fafc;
+	--color-foreground: #0f172a;
+	--color-card: #ffffff;
+	--color-card-foreground: #0f172a;
+	--color-popover: #ffffff;
+	--color-popover-foreground: #0f172a;
+	--color-primary: #6366f1;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #f1f5f9;
+	--color-secondary-foreground: #0f172a;
+	--color-muted: #f1f5f9;
+	--color-muted-foreground: #64748b;
+	--color-accent: #f1f5f9;
+	--color-accent-foreground: #0f172a;
+	--color-destructive: #ef4444;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #e2e8f0;
+	--color-input: #e2e8f0;
+	--color-ring: #6366f1;
+	--color-sidebar: #1e293b;
+	--color-sidebar-foreground: #f1f5f9;
+	--color-sidebar-accent: #334155;
+	--color-sidebar-accent-foreground: #ffffff;
+	--color-sidebar-border: #334155;
+	--radius: 0.5rem;
+}
+
+@layer base {
+	* {
+		border-color: var(--color-border);
+	}
+	body {
+		background-color: var(--color-background);
+		color: var(--color-foreground);
+		font-feature-settings:
+			"rlig" 1,
+			"calt" 1;
+		margin: 0;
+		padding: 0;
+	}
+	html,
+	body,
+	#root {
+		height: 100%;
+		width: 100%;
+	}
+	ol,
+	ul,
+	menu {
+		list-style: revert;
+	}
+}
+
+.dark {
+	--color-background: #0f172a;
+	--color-foreground: #f8fafc;
+	--color-card: #1e293b;
+	--color-card-foreground: #f8fafc;
+	--color-popover: #1e293b;
+	--color-popover-foreground: #f8fafc;
+	--color-secondary: #334155;
+	--color-secondary-foreground: #f8fafc;
+	--color-muted: #334155;
+	--color-muted-foreground: #94a3b8;
+	--color-accent: #334155;
+	--color-accent-foreground: #f8fafc;
+	--color-border: #334155;
+	--color-input: #334155;
+	--color-sidebar: #020617;
+	--color-sidebar-foreground: #e2e8f0;
+	--color-sidebar-accent: #1e293b;
+	--color-sidebar-accent-foreground: #ffffff;
+	--color-sidebar-border: #1e293b;
+}

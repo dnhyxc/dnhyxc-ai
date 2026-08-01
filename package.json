@@ -19,6 +19,8 @@
 		"dev:remote-demo": "pnpm -C apps/remote-demo dev",
 		"dev:remote-counter": "pnpm -C apps/remote-counter dev",
 		"dev:remote-plugins": "pnpm -C apps/remote-plugins dev",
+		"dev:admin": "pnpm -C apps/admin dev",
+		"build:admin": "pnpm -C apps/admin build",
 		"dev:mf": "pnpm -C apps/remote-demo dev & pnpm -C apps/remote-counter dev & pnpm -C apps/remote-plugins dev & pnpm -C apps/frontend dev",
 		"check": "biome check --write",
 		"check:staged": "biome check --staged --no-errors-on-unmatched",
