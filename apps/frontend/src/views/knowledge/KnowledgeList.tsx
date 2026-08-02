@@ -3,7 +3,7 @@ import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Switch, Toast } from '@ui/index';
-import { Code2, Trash2 } from 'lucide-react';
+import { Code2, Globe, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/hooks';
@@ -54,6 +54,7 @@ interface KnowledgeListRowProps {
 	selected: boolean;
 	onActivate: (item: KnowledgeListItem) => void;
 	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void;
+	onVisibilityClick?: (e: React.MouseEvent, item: KnowledgeListItem) => void;
 	/** 本地文件夹模式：在 Cursor / Trae 中打开（按钮在删除左侧） */
 	showOpenInExternalEditor?: boolean;
 	onOpenInExternalEditorClick?: (
@@ -69,6 +70,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		selected,
 		onActivate,
 		onTrashClick,
+		onVisibilityClick,
 		showOpenInExternalEditor = false,
 		onOpenInExternalEditorClick,
 	} = props;
@@ -84,6 +86,24 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		showOpenInExternalEditor &&
 		!!item.localAbsolutePath &&
 		!!onOpenInExternalEditorClick;
+	const owned = item.localAbsolutePath ? true : item.isOwned !== false;
+	const showVisibility =
+		owned && !item.localAbsolutePath && !!onVisibilityClick;
+	const showTrash = owned;
+	const actionCount =
+		(showOpenEditor ? 1 : 0) + (showVisibility ? 1 : 0) + (showTrash ? 1 : 0);
+	const hoverPr =
+		actionCount >= 3
+			? 'group-hover:pr-22'
+			: actionCount === 2
+				? 'group-hover:pr-14'
+				: actionCount === 1
+					? 'group-hover:pr-8'
+					: '';
+	const author = item.author?.trim() || '';
+	const updatedLabel = t('knowledge.list.updatedAt', {
+		time: formatDate(item.updatedAt?.toString() ?? ''),
+	});
 
 	return (
 		<div
@@ -96,58 +116,113 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		>
 			{/* 与学习笔记列表一致：非 hover 时 title 占满；操作区 absolute 不占位 */}
 			<div
-				className={cn(
-					'min-w-0 w-full truncate font-medium pr-0',
-					showOpenEditor ? 'group-hover:pr-14' : 'group-hover:pr-8',
-				)}
+				className={cn('min-w-0 w-full flex items-center gap-1.5 pr-0', hoverPr)}
 			>
-				{item.title?.trim() || t('knowledge.common.untitled')}
-			</div>
-			<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
-				{showOpenEditor ? (
-					<Tooltip
-						side="left"
-						sideOffset={6}
-						delayDuration={200}
-						shadow
-						content={t('knowledge.list.openInEditor')}
+				{item.isPublic ? (
+					<span
+						className={cn(
+							'shrink-0 rounded px-1.5 py-1 text-xs font-medium leading-none',
+							owned
+								? 'bg-teal-500/15 text-teal-500'
+								: 'bg-sky-500/15 text-sky-500',
+						)}
 					>
+						{t('knowledge.list.publicBadge')}
+					</span>
+				) : null}
+				<span className="min-w-0 truncate font-medium">
+					{item.title?.trim() || t('knowledge.common.untitled')}
+				</span>
+			</div>
+			{actionCount > 0 ? (
+				<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
+					{showOpenEditor ? (
+						<Tooltip
+							side="left"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={t('knowledge.list.openInEditor')}
+						>
+							<button
+								type="button"
+								aria-label={t('knowledge.list.openInEditor')}
+								className={cn(
+									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+									'hover:text-teal-500 hover:bg-teal-500/10',
+								)}
+								onClick={(e) => {
+									e.stopPropagation();
+									onOpenInExternalEditorClick?.(e, item);
+								}}
+							>
+								<Code2 size={16} />
+							</button>
+						</Tooltip>
+					) : null}
+					{showVisibility ? (
 						<button
 							type="button"
-							aria-label={t('knowledge.list.openInEditor')}
+							title={
+								item.isPublic
+									? t('knowledge.list.makePrivate')
+									: t('knowledge.list.makePublic')
+							}
+							aria-label={
+								item.isPublic
+									? t('knowledge.list.makePrivate')
+									: t('knowledge.list.makePublic')
+							}
+							className={cn(
+								'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
+								item.isPublic
+									? 'text-teal-500 hover:bg-teal-500/10'
+									: 'text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10',
+							)}
+							onClick={(e) => onVisibilityClick?.(e, item)}
+						>
+							<Globe size={15} />
+						</button>
+					) : null}
+					{showTrash ? (
+						<button
+							type="button"
+							aria-label={
+								item.localAbsolutePath
+									? t('knowledge.list.deleteLocalMdAria')
+									: t('knowledge.list.deleteFromLibraryAria')
+							}
 							className={cn(
 								'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
-								'hover:text-teal-500 hover:bg-teal-500/10',
+								'hover:text-destructive hover:bg-destructive/10',
 							)}
-							onClick={(e) => {
-								e.stopPropagation();
-								onOpenInExternalEditorClick?.(e, item);
-							}}
+							onClick={(e) => onTrashClick(e, item)}
 						>
-							<Code2 size={16} />
+							<Trash2 size={16} />
 						</button>
-					</Tooltip>
-				) : null}
-				<button
-					type="button"
-					aria-label={
-						item.localAbsolutePath
-							? t('knowledge.list.deleteLocalMdAria')
-							: t('knowledge.list.deleteFromLibraryAria')
-					}
-					className={cn(
-						'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
-						'hover:text-destructive hover:bg-destructive/10',
-					)}
-					onClick={(e) => onTrashClick(e, item)}
-				>
-					<Trash2 size={16} />
-				</button>
-			</div>
-			<div className="text-xs text-textcolor/50 space-y-0.5">
-				{t('knowledge.list.updatedAt', {
-					time: formatDate(item.updatedAt?.toString() ?? ''),
-				})}
+					) : null}
+				</div>
+			) : null}
+			<div className="flex min-w-0 w-full items-center gap-1 text-xs text-textcolor/50">
+				{author ? (
+					<>
+						<Tooltip
+							side="bottom"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={author}
+						>
+							<span className="min-w-0 truncate">{author}</span>
+						</Tooltip>
+						<span className="shrink-0" aria-hidden>
+							·
+						</span>
+						<span className="shrink-0 whitespace-nowrap">{updatedLabel}</span>
+					</>
+				) : (
+					<span className="truncate">{updatedLabel}</span>
+				)}
 			</div>
 		</div>
 	);
@@ -175,6 +250,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const [deleteRecordOnlyOpen, setDeleteRecordOnlyOpen] = useState(false);
 		const [selectKnowledge, setSelectKnowledge] =
 			useState<KnowledgeListItem | null>(null);
+		const [visibilityConfirmOpen, setVisibilityConfirmOpen] = useState(false);
+		const [pendingVisibility, setPendingVisibility] = useState<{
+			id: string;
+			isPublic: boolean;
+		} | null>(null);
 
 		/** false：云端列表；true：递归扫描本地文件夹中的 .md */
 		const [useLocalFolder, setUseLocalFolder] = useState(!allowCloudList);
@@ -494,6 +574,36 @@ const KnowledgeList: React.FC<IProps> = observer(
 			[openDeleteFlow],
 		);
 
+		const onVisibilityClick = useCallback(
+			(e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				e.stopPropagation();
+				setPendingVisibility({
+					id: knowledge.id,
+					isPublic: !knowledge.isPublic,
+				});
+				setVisibilityConfirmOpen(true);
+			},
+			[],
+		);
+
+		const onConfirmVisibility = useCallback(async () => {
+			if (!pendingVisibility) return;
+			const ok = await knowledgeStore.setItemVisibility(
+				pendingVisibility.id,
+				pendingVisibility.isPublic,
+			);
+			if (ok) {
+				Toast({
+					type: 'success',
+					title: pendingVisibility.isPublic
+						? t('knowledge.list.madePublic')
+						: t('knowledge.list.madePrivate'),
+				});
+			}
+			setVisibilityConfirmOpen(false);
+			setPendingVisibility(null);
+		}, [knowledgeStore, pendingVisibility, t]);
+
 		/** 本地列表：在 Cursor / Trae 中打开（由 Rust detect_markdown_editor，优先 Cursor） */
 		const onOpenInExternalEditorClick = useCallback(
 			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
@@ -523,11 +633,17 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const deleteLocalFileName =
 			deleteLocalPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteLocalPath;
 
-		const { loading, loadingMore, list } = knowledgeStore;
+		const { loading, loadingMore, list, hasMore } = knowledgeStore;
 		const displayList = useLocalFolder ? localList : list;
 		const displayLoading = useLocalFolder ? localLoading : loading;
 		const showInitialPlaceholder = displayLoading && displayList.length === 0;
 		const showLoadMoreHint = !useLocalFolder && loadingMore;
+		const showNoMoreHint =
+			!useLocalFolder &&
+			!loading &&
+			!loadingMore &&
+			list.length > 0 &&
+			!hasMore;
 		const showEmptyHint =
 			!displayLoading &&
 			displayList.length === 0 &&
@@ -538,6 +654,28 @@ const KnowledgeList: React.FC<IProps> = observer(
 
 		return (
 			<>
+				<Confirm
+					open={visibilityConfirmOpen}
+					onOpenChange={(v) => {
+						setVisibilityConfirmOpen(v);
+						if (!v) setPendingVisibility(null);
+					}}
+					title={
+						pendingVisibility?.isPublic
+							? t('knowledge.list.publicConfirmTitle')
+							: t('knowledge.list.privateConfirmTitle')
+					}
+					description={
+						pendingVisibility?.isPublic
+							? t('knowledge.list.publicConfirmDesc')
+							: t('knowledge.list.privateConfirmDesc')
+					}
+					cancelText={t('common.cancel')}
+					confirmText={t('common.confirm')}
+					closeOnConfirm={false}
+					onConfirm={onConfirmVisibility}
+				/>
+
 				<Confirm
 					open={deleteRecordOnlyOpen}
 					onOpenChange={(v) => {
@@ -715,6 +853,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 										}
 										onActivate={handleRowClick}
 										onTrashClick={onTrashClick}
+										onVisibilityClick={
+											useLocalFolder ? undefined : onVisibilityClick
+										}
 										showOpenInExternalEditor={
 											useLocalFolder && isTauriRuntime()
 										}
@@ -728,6 +869,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 											aria-hidden
 										/>
 										{t('common.loadingMore')}
+									</div>
+								) : null}
+								{showNoMoreHint ? (
+									<div className="col-span-full text-textcolor/35 py-2 text-center text-xs">
+										{t('common.noMore')}
 									</div>
 								) : null}
 								{showEmptyHint ? (

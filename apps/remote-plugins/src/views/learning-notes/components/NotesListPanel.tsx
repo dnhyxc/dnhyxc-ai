@@ -209,15 +209,28 @@ export const NotesListPanel = observer(function NotesListPanel({
 													{n.title}
 												</span>
 											</div>
-											<div className="text-textcolor/45 mt-1.5 flex min-w-0 items-center gap-2 text-xs">
+											<div className="text-textcolor/45 mt-1.5 flex min-w-0 w-full items-center gap-1 text-xs">
 												{n.author ? (
-													<span className="min-w-0 truncate" title={n.author}>
-														{n.author}
+													<>
+														<span className="min-w-0 truncate" title={n.author}>
+															{n.author}
+														</span>
+														<span className="shrink-0" aria-hidden>
+															·
+														</span>
+														<span className="shrink-0 whitespace-nowrap">
+															{t('learningNotes.updatedAt', {
+																time: new Date(n.at).toLocaleString(locale),
+															})}
+														</span>
+													</>
+												) : (
+													<span className="truncate">
+														{t('learningNotes.updatedAt', {
+															time: new Date(n.at).toLocaleString(locale),
+														})}
 													</span>
-												) : null}
-												<span className="shrink-0">
-													{new Date(n.at).toLocaleString(locale)}
-												</span>
+												)}
 											</div>
 										</button>
 										{owned ? (

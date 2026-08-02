@@ -45,6 +45,7 @@ const zhCN: Record<string, string> = {
 	'learningNotes.makePublic': '公开',
 	'learningNotes.makePrivate': '取消公开',
 	'learningNotes.publicBadge': '公开',
+	'learningNotes.updatedAt': '更新 {time}',
 	'learningNotes.publicConfirmTitle': '确定公开这条笔记？',
 	'learningNotes.publicConfirmDesc': '公开后，所有登录用户都可以查看该笔记',
 	'learningNotes.privateConfirmTitle': '确定取消公开？',

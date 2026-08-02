@@ -6,6 +6,7 @@ import {
 	getKnowledgeDetail,
 	getKnowledgeList,
 	getKnowledgeTrashList,
+	setKnowledgeVisibility,
 	updateKnowledge,
 } from '@/service';
 import type {
@@ -355,8 +356,7 @@ class KnowledgeStore {
 	};
 
 	async fetchPage(page: number, append: boolean): Promise<void> {
-		const authorId = getLoggedInUserId();
-		if (!authorId) {
+		if (!getLoggedInUserId()) {
 			return Toast({
 				type: 'error',
 				title: '请先登录',
@@ -368,11 +368,11 @@ class KnowledgeStore {
 			this.loading = true;
 		}
 		try {
+			// 列表可见范围由后端按 JWT：本人 OR 公开
 			const res = await getKnowledgeList({
 				pageNo: page,
 				pageSize: this.pageSize,
 				title: this.titleKeyword.trim() || undefined,
-				authorId,
 			});
 			if (!res.success || !res.data) {
 				return;
@@ -393,6 +393,31 @@ class KnowledgeStore {
 				this.loadingMore = false;
 			});
 		}
+	}
+
+	/** 所有者设置公开/私有，并同步本地列表项 */
+	async setItemVisibility(id: string, isPublic: boolean): Promise<boolean> {
+		if (!getLoggedInUserId()) {
+			Toast({ type: 'error', title: '请先登录' });
+			return false;
+		}
+		const res = await setKnowledgeVisibility(id, isPublic);
+		if (!res.success || !res.data) {
+			return false;
+		}
+		const updated = res.data;
+		runInAction(() => {
+			this.list = this.list.map((item) =>
+				item.id === updated.id
+					? {
+							...item,
+							isPublic: updated.isPublic,
+							isOwned: updated.isOwned ?? true,
+						}
+					: item,
+			);
+		});
+		return true;
 	}
 
 	async fetchTrashPage(page: number, append: boolean): Promise<void> {

@@ -4,6 +4,7 @@
 	"description": "Dnhyxc AI 全栈 monorepo：流式智能对话、Markdown 知识库与 RAG 文档助手、英语学习（单词包/经典句/Agent）、对话分享；React + Tauri 桌面/Web 客户端，NestJS 后端，支持硅基等 OpenAI 兼容大模型与设置页自定义模型配置。",
 	"type": "module",
 	"scripts": {
+		"start": "pnpm -C apps/backend start:dev & pnpm -C apps/frontend tauri dev",
 		"dev": "pnpm -C apps/frontend tauri dev",
 		"build": "pnpm run build:patch",
 		"build:patch": "eval $(pnpm -C apps/frontend exec release-kit print-tauri-signing-env) && pnpm -C apps/frontend exec release-kit bump-version patch && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",

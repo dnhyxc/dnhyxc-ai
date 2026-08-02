@@ -11,6 +11,7 @@ import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { UpdateKnowledgeVisibilityDto } from './dto/update-knowledge-visibility.dto';
 import { Knowledge } from './knowledge.entity';
 import { KnowledgeTrash } from './knowledge-trash.entity';
 
@@ -24,8 +25,14 @@ function assistantArticleIdForTrashRow(trashRowId: string): string {
 /** 列表项：不含大字段 content，减轻列表接口体积 */
 export type KnowledgeListItem = Pick<
 	Knowledge,
-	'id' | 'title' | 'author' | 'authorId' | 'createdAt' | 'updatedAt'
->;
+	| 'id'
+	| 'title'
+	| 'author'
+	| 'authorId'
+	| 'isPublic'
+	| 'createdAt'
+	| 'updatedAt'
+> & { isOwned: boolean };
 
 /** 回收站列表项：不含 content */
 export type KnowledgeTrashListItem = Pick<
@@ -50,6 +57,7 @@ export class KnowledgeService {
 			content: dto.content,
 			author: dto.author ?? null,
 			authorId: dto.authorId ?? null,
+			isPublic: false,
 		} satisfies Partial<Knowledge>);
 		const saved = await this.knowledgeRepository.save(row);
 		// 异步触发向量入库：不阻塞保存主流程
@@ -67,7 +75,7 @@ export class KnowledgeService {
 	/**
 	 * 按 id 更新；未传任何可更新字段时抛 BadRequestException
 	 */
-	async update(dto: UpdateKnowledgeDto): Promise<Knowledge> {
+	async update(userId: number, dto: UpdateKnowledgeDto): Promise<Knowledge> {
 		const { title, content, author, authorId } = dto;
 		if (
 			title === undefined &&
@@ -77,7 +85,7 @@ export class KnowledgeService {
 		) {
 			throw new BadRequestException('请至少提供一项要更新的字段');
 		}
-		const row = await this.requireById(dto.id);
+		const row = await this.requireOwned(userId, dto.id);
 		if (title !== undefined) row.title = title.trim() || null;
 		if (content !== undefined) row.content = content;
 		if (author !== undefined) row.author = author;
@@ -95,16 +103,30 @@ export class KnowledgeService {
 		return saved;
 	}
 
+	/** 所有者设置是否全站公开 */
+	async setVisibility(
+		userId: number,
+		id: string,
+		dto: UpdateKnowledgeVisibilityDto,
+	): Promise<KnowledgeListItem> {
+		const row = await this.requireOwned(userId, id);
+		row.isPublic = dto.isPublic;
+		const saved = await this.knowledgeRepository.save(row);
+		return this.toListItem(saved, userId);
+	}
+
 	/**
 	 * 删除知识库条目：写入回收站快照后，再从主表物理删除。
 	 */
-	async remove(id: string): Promise<void> {
+	async remove(userId: number, id: string): Promise<void> {
 		await this.knowledgeRepository.manager.transaction(async (manager) => {
 			const knowledgeRepo = manager.getRepository(Knowledge);
 			const trashRepo = manager.getRepository(KnowledgeTrash);
 			const assistantSessionRepo = manager.getRepository(AssistantSession);
 
-			const row = await knowledgeRepo.findOne({ where: { id } });
+			const row = await knowledgeRepo.findOne({
+				where: { id, authorId: userId },
+			});
 			if (!row) {
 				throw new NotFoundException('知识库条目不存在');
 			}
@@ -127,9 +149,10 @@ export class KnowledgeService {
 	}
 
 	/**
-	 * 分页列表；默认按更新时间倒序
+	 * 分页列表：本人条目 + 他人公开条目；默认按更新时间倒序
 	 */
 	async findPage(
+		userId: number,
 		query: QueryKnowledgeDto,
 	): Promise<{ list: KnowledgeListItem[]; total: number }> {
 		const pageNo = query.pageNo ?? 1;
@@ -137,33 +160,52 @@ export class KnowledgeService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
-		const authorId = query.authorId;
 
-		const where: Record<string, unknown> = {};
-		if (title) where.title = Like(`%${title}%`);
-		if (authorId != null) where.authorId = authorId;
+		const qb = this.knowledgeRepository
+			.createQueryBuilder('k')
+			.select([
+				'k.id',
+				'k.title',
+				'k.author',
+				'k.authorId',
+				'k.isPublic',
+				'k.createdAt',
+				'k.updatedAt',
+			])
+			.where('(k.authorId = :userId OR k.isPublic = true)', { userId })
+			.orderBy('k.updatedAt', 'DESC')
+			.take(take)
+			.skip(skip);
 
-		const [list, total] = await this.knowledgeRepository.findAndCount({
-			select: {
-				id: true,
-				title: true,
-				author: true,
-				authorId: true,
-				createdAt: true,
-				updatedAt: true,
-			},
-			where,
-			order: { updatedAt: 'DESC' },
-			take,
-			skip,
-		});
+		if (title) {
+			qb.andWhere('k.title LIKE :title', { title: `%${title}%` });
+		}
 
-		return { list, total };
+		const [rows, total] = await qb.getManyAndCount();
+		return {
+			list: rows.map((row) => this.toListItem(row, userId)),
+			total,
+		};
 	}
 
-	/** 单条详情（含正文） */
-	async findOneById(id: string): Promise<Knowledge> {
-		return this.requireById(id);
+	/** 本人任意，或已公开条目（任意登录用户可读） */
+	async findOneById(
+		userId: number,
+		id: string,
+	): Promise<Knowledge & { isOwned: boolean }> {
+		const owned = await this.knowledgeRepository.findOne({
+			where: { id, authorId: userId },
+		});
+		if (owned) {
+			return Object.assign(owned, { isOwned: true });
+		}
+		const pub = await this.knowledgeRepository.findOne({
+			where: { id, isPublic: true },
+		});
+		if (!pub) {
+			throw new NotFoundException('知识库条目不存在');
+		}
+		return Object.assign(pub, { isOwned: false });
 	}
 
 	// ---------------- 回收站 ----------------
@@ -266,8 +308,35 @@ export class KnowledgeService {
 		);
 	}
 
-	private async requireById(id: string): Promise<Knowledge> {
-		const row = await this.knowledgeRepository.findOne({ where: { id } });
+	private toListItem(
+		row: Pick<
+			Knowledge,
+			| 'id'
+			| 'title'
+			| 'author'
+			| 'authorId'
+			| 'isPublic'
+			| 'createdAt'
+			| 'updatedAt'
+		>,
+		viewerUserId: number,
+	): KnowledgeListItem {
+		return {
+			id: row.id,
+			title: row.title,
+			author: row.author,
+			authorId: row.authorId,
+			isPublic: row.isPublic,
+			isOwned: row.authorId === viewerUserId,
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
+		};
+	}
+
+	private async requireOwned(userId: number, id: string): Promise<Knowledge> {
+		const row = await this.knowledgeRepository.findOne({
+			where: { id, authorId: userId },
+		});
 		if (!row) {
 			throw new NotFoundException('知识库条目不存在');
 		}

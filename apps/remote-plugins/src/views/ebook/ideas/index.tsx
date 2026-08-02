@@ -253,7 +253,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 							) : null}
 							{!hasMore && items.length > 0 ? (
 								<p className="text-textcolor/35 pb-3 text-center text-xs">
-									{t('common.allLoaded')}
+									{t('common.noMore')}
 								</p>
 							) : null}
 						</div>

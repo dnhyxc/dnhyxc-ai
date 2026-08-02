@@ -129,7 +129,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 			setSelection({});
 		}, [open, knowledgeStore]);
 
-		const { trashList, trashLoading, trashLoadingMore } = knowledgeStore;
+		const { trashList, trashLoading, trashLoadingMore, trashHasMore } =
+			knowledgeStore;
 		const selectedIds = useMemo(
 			() => Object.keys(selection).filter((id) => selection[id]),
 			[selection],
@@ -280,6 +281,11 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 		}, [doDeleteSingle, knowledgeStore, pendingDeleteIds, trashList, t]);
 
 		const showInitialPlaceholder = trashLoading && trashList.length === 0;
+		const showNoMoreHint =
+			!trashLoading &&
+			!trashLoadingMore &&
+			trashList.length > 0 &&
+			!trashHasMore;
 		const showEmptyHint =
 			!trashLoading && trashList.length === 0 && !trashLoadingMore;
 
@@ -417,6 +423,11 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 											aria-hidden
 										/>
 										{t('common.loadingMore')}
+									</div>
+								) : null}
+								{showNoMoreHint ? (
+									<div className="col-span-full text-textcolor/35 py-2 text-center text-xs">
+										{t('common.noMore')}
 									</div>
 								) : null}
 								{showEmptyHint ? (

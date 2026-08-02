@@ -101,6 +101,7 @@ import {
 	KNOWLEDGE_TRASH_DETAIL,
 	KNOWLEDGE_TRASH_LIST,
 	KNOWLEDGE_UPDATE,
+	KNOWLEDGE_VISIBILITY,
 	LOGIN,
 	LOGIN_BY_EMAIL,
 	REGISTER,
@@ -1850,6 +1851,15 @@ export const deleteKnowledge = async (id: string) => {
 	return await http.delete<{ id: string }>(KNOWLEDGE_DELETE, {
 		params: [id],
 	});
+};
+
+/** PUT /knowledge/visibility/:id：所有者设置公开/私有 */
+export const setKnowledgeVisibility = async (id: string, isPublic: boolean) => {
+	return await http.put<KnowledgeListItem>(
+		KNOWLEDGE_VISIBILITY,
+		{ isPublic },
+		{ params: [id] },
+	);
 };
 
 // ---------- 知识库回收站（knowledge.controller）----------

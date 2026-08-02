@@ -75,6 +75,10 @@ export type KnowledgeRecord = {
 	content: string;
 	author: string | null;
 	authorId: number | null;
+	/** 公开后任意登录用户可读 / 出现在列表 */
+	isPublic?: boolean;
+	/** 当前登录用户是否为作者（列表/详情由后端计算） */
+	isOwned?: boolean;
 	createdAt?: string;
 	updatedAt?: string;
 	/**

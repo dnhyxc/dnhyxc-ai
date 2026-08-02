@@ -9,9 +9,12 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
+	UnauthorizedException,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { DeleteKnowledgeTrashBatchDto } from './dto/delete-knowledge-trash-batch.dto';
@@ -19,7 +22,10 @@ import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { UpdateKnowledgeVisibilityDto } from './dto/update-knowledge-visibility.dto';
 import { KnowledgeService } from './knowledge.service';
+
+type AuthedRequest = Request & { user?: { userId?: number } };
 
 @Controller('knowledge')
 @UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
@@ -27,29 +33,49 @@ import { KnowledgeService } from './knowledge.service';
 export class KnowledgeController {
 	constructor(private readonly knowledgeService: KnowledgeService) {}
 
+	private userId(req: AuthedRequest): number {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未登录');
+		return userId;
+	}
+
 	@Post('save')
 	async save(@Body() dto: SaveKnowledgeDto) {
 		return this.knowledgeService.saveMarkdown(dto);
 	}
 
+	/** 本人条目 + 他人公开条目 */
 	@Get('list')
-	async list(@Query() query: QueryKnowledgeDto) {
-		return this.knowledgeService.findPage(query);
+	async list(@Req() req: AuthedRequest, @Query() query: QueryKnowledgeDto) {
+		return this.knowledgeService.findPage(this.userId(req), query);
 	}
 
 	@Get('detail/:id')
-	async one(@Param('id', ParseUUIDPipe) id: string) {
-		return this.knowledgeService.findOneById(id);
+	async one(@Req() req: AuthedRequest, @Param('id', ParseUUIDPipe) id: string) {
+		return this.knowledgeService.findOneById(this.userId(req), id);
 	}
 
 	@Put('update/:id')
-	async update(@Body() dto: UpdateKnowledgeDto) {
-		return this.knowledgeService.update(dto);
+	async update(@Req() req: AuthedRequest, @Body() dto: UpdateKnowledgeDto) {
+		return this.knowledgeService.update(this.userId(req), dto);
+	}
+
+	/** 所有者设置知识文档是否公开 */
+	@Put('visibility/:id')
+	async setVisibility(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateKnowledgeVisibilityDto,
+	) {
+		return this.knowledgeService.setVisibility(this.userId(req), id, dto);
 	}
 
 	@Delete('delete/:id')
-	async remove(@Param('id', ParseUUIDPipe) id: string) {
-		await this.knowledgeService.remove(id);
+	async remove(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.knowledgeService.remove(this.userId(req), id);
 		return { id };
 	}
 

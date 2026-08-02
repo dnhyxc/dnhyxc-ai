@@ -46,6 +46,7 @@ const enUS: Record<string, string> = {
 	'learningNotes.makePublic': 'Make public',
 	'learningNotes.makePrivate': 'Make private',
 	'learningNotes.publicBadge': 'Public',
+	'learningNotes.updatedAt': 'Updated {time}',
 	'learningNotes.publicConfirmTitle': 'Make this note public?',
 	'learningNotes.publicConfirmDesc':
 		'Once public, any signed-in user can view this note',

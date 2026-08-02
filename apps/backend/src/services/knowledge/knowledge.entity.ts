@@ -2,11 +2,13 @@ import {
 	Column,
 	CreateDateColumn,
 	Entity,
+	Index,
 	PrimaryGeneratedColumn,
 	UpdateDateColumn,
 } from 'typeorm';
 
 @Entity({ name: 'knowledge' })
+@Index('IDX_knowledge_public', ['isPublic'])
 export class Knowledge {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
@@ -23,6 +25,10 @@ export class Knowledge {
 
 	@Column('int', { nullable: true })
 	authorId: number | null;
+
+	/** 为 true 时任意登录用户可读详情 / 出现在公开列表 */
+	@Column({ name: 'is_public', type: 'boolean', default: false })
+	isPublic!: boolean;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;

@@ -1162,21 +1162,24 @@ const Knowledge = observer(() => {
 
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
+			// 他人公开文档：按新草稿打开（保存走新建），避免误改对方条目
+			const editable = record.isOwned !== false;
+			const editingId = editable ? record.id : null;
 			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
 			const nextAssistantKey = knowledgeAssistantDocumentKey(
 				knowledgeAssistantArticleBinding({
 					knowledgeTrashPreviewId: null,
-					knowledgeEditingKnowledgeId: record.id,
+					knowledgeEditingKnowledgeId: editingId,
 				}),
 				trashOpenNonce,
 			);
 			stopEphemeralAssistantStreamingIfNeeded(nextAssistantKey);
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
-			knowledgeStore.setKnowledgeEditingKnowledgeId(record.id);
+			knowledgeStore.setKnowledgeEditingKnowledgeId(editingId);
 			knowledgeStore.setKnowledgeTrashPreviewId(null);
 			knowledgeStore.setKnowledgeLocalDirPath(record.localDirPath ?? null);
 			const t = (record.title ?? '').trim();
-			knowledgeStore.setKnowledgeLocalDiskTitle(t || null);
+			knowledgeStore.setKnowledgeLocalDiskTitle(editable ? t || null : null);
 			const content = record.content ?? '';
 			knowledgeStore.setKnowledgePersistedSnapshot({ title: t, content });
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
