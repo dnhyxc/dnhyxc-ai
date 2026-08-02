@@ -1,15 +1,21 @@
 import { BullModule } from '@nestjs/bullmq';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
-import { Global, Logger, Module } from '@nestjs/common';
+import {
+	Global,
+	Logger,
+	MiddlewareConsumer,
+	Module,
+	NestModule,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
 import { appConfig } from './factorys/app-config.factory';
 import { createBullRedisConnectionOptions } from './factorys/bull-redis-connection.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
+import { OperationLogMiddleware } from './middleware/operation-log.middleware';
 import { AgentModule } from './services/agent/agent.module';
 import { AssistantModule } from './services/assistant/assistant.module';
 // 业务模块
@@ -117,6 +123,7 @@ const connections = new Map();
 			provide: 'TYPEORM_CONNECTIONS',
 			useValue: connections,
 		},
+		OperationLogMiddleware,
 		// 这样配置全局守卫，就可以在 AdminGuard 或者 JwtGuard 中使用到 userService 了
 		// {
 		// 	provide: APP_GUARD,
@@ -125,4 +132,8 @@ const connections = new Map();
 	],
 	exports: [Logger],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(OperationLogMiddleware).forRoutes('*');
+	}
+}

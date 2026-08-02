@@ -1,11 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { utilities, WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
 import { Console } from 'winston/lib/winston/transports';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import { LogEnum } from '../../enum/config.enum';
 import { LogsController } from './logs.controller';
+import { Logs } from './logs.entity';
 import { LogsService } from './logs.service';
 
 const createDailyRotateTransport = (
@@ -29,8 +31,10 @@ const createDailyRotateTransport = (
 	});
 };
 
+@Global()
 @Module({
 	imports: [
+		TypeOrmModule.forFeature([Logs]),
 		WinstonModule.forRootAsync({
 			inject: [ConfigService],
 			useFactory: (configService: ConfigService) => {
@@ -58,5 +62,6 @@ const createDailyRotateTransport = (
 	],
 	controllers: [LogsController],
 	providers: [LogsService],
+	exports: [LogsService],
 })
 export class LogsModule {}

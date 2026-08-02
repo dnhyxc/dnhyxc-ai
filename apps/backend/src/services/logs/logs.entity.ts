@@ -1,5 +1,6 @@
 import {
 	Column,
+	CreateDateColumn,
 	Entity,
 	JoinColumn,
 	ManyToOne,
@@ -18,18 +19,23 @@ export class Logs {
 	@Column()
 	method: string;
 
-	@Column()
+	@Column({ type: 'text' })
 	data: string;
+
+	@Column({ type: 'text', nullable: true })
+	responseData: string | null;
 
 	@Column()
 	result: number;
 
-	// 表示多个用户对应一个用户
+	@CreateDateColumn({ type: 'timestamp' })
+	createTime: Date;
+
 	@ManyToOne(
 		() => User,
 		(user) => user.logs,
+		{ nullable: true },
 	)
-	// 表明在 user 表中建立关联关系，即默认会在 logs 表中生成一个 userId 外键字段
 	@JoinColumn()
-	user: User;
+	user: User | null;
 }
