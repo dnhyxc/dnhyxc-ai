@@ -2,108 +2,247 @@
 
 ## 项目介绍
 
-dnhyxc-ai 是一个集成了人工智能功能的现代化桌面应用程序，采用前后端分离架构，使用 Tauri 作为前端框架，NestJS 作为后端框架。该项目旨在提供一个功能丰富的 AI 助手平台，支持多种 AI 功能，包括文本生成、代码辅助、文件处理等。
+dnhyxc-ai 是一个基于 pnpm Monorepo 的全栈 AI 助手平台，前端采用 React 19 + Tauri 2 双端架构（桌面 / Web），后端基于 NestJS + MySQL + Redis，集成 Module Federation 动态插件系统。项目旨在提供一个功能丰富的 AI 工作台，覆盖流式智能对话、知识库 RAG 问答、EPUB 电子书阅读器（高亮批注 + TTS 听书）、英语学习（SRS 记忆 + Agent）、会员支付、权限管理及后台管理等完整功能，支持硅基流动等 OpenAI 兼容大模型自由配置。
 
 ## 核心功能
 
-- **AI 对话系统**：基于 LangChain 的智能对话功能
-- **用户管理**：完整的用户认证和权限管理系统
-- **文件处理**：支持多种文件格式的上传、解析和处理
-- **提示管理**：AI 提示词管理和优化
-- **菜单系统**：可定制的功能菜单
-- **日志系统**：详细的操作日志记录
-- **邮件服务**：内置邮件通知功能
-- **缓存系统**：高性能的数据缓存机制
-- **任务队列**：基于 BullMQ 的异步任务处理
+### AI 对话系统
+
+- 基于 LangChain 的流式智能对话，支持多会话管理、上下文分支、消息编辑与重新生成
+- AI Agent 模式，支持工具调用（Function Calling）、网络搜索、附件解析
+- 对话内容分享，生成独立分享链接供他人查看
+- 支持 Markdown 渲染、代码高亮、Mermaid 图表、数学公式（KaTeX）
+- 代码模式内置 Monaco Editor，支持代码格式化与运行
+
+### 知识库与 RAG
+
+- Markdown 知识库管理，支持文档分类、公开/私有设置、回收站
+- 基于 Qdrant 向量数据库的 RAG 检索增强问答
+- 文档分块（chunk）策略，支持相似度检索与上下文增强
+- 知识库对话分享
+
+### EPUB 电子书阅读器
+
+- 基于 epub.js 的 EPUB 阅读器，支持书架管理、分类、排序
+- 阅读进度同步、章节目录导航、分页翻阅
+- 文本高亮、批注、读书想法（笔记）
+- TTS 听书功能，支持 Edge TTS / MiniMax / 讯飞等多引擎
+- 句级高亮跟随、语速调节、后台预加载
+- 电子书分享与协作权限管理
+
+### 英语学习
+
+- 单词包管理（导入 / 收藏 / 错题本 / 笔记）
+- 基于 SRS（间隔重复）的记忆复习算法
+- 每日打卡与学习记录追踪
+- 经典句库、语法参考、形态参考
+- 英语 Agent 智能对话练习
+- 云 TTS 发音朗读
+
+### 动态插件系统
+
+- 基于 Module Federation 的微前端架构，支持远程插件动态加载
+- 插件注册表（Registry）管理，支持启用/禁用、信任级别、权限控制
+- HostBridge API：插件可访问宿主的 HTTP 请求、Toast、路由导航、事件总线等能力
+- 支持业务页嵌入（EPUB 阅读页抽屉 / 工具栏）与独立路由页面两种形态
+- iframe 模式用于不可信插件的安全隔离
+
+### 用户与权限
+
+- JWT 认证 + Passport 策略，支持邮箱注册/登录、微信快捷登录
+- 基于 CASL 的细粒度权限控制（角色 / 资源 / 操作）
+- 会员体系，支持 Stripe / 云支付会员订阅
+- 用户资料管理、头像上传（腾讯云 COS）
+
+### 后台管理系统
+
+- 独立的 Admin 管理后台（React 19 + TypeScript）
+- 仪表盘数据统计（Recharts 可视化）
+- 用户管理、角色管理、菜单管理
+- 电子书管理、知识库管理
+- 操作日志、会员管理
+
+### 其他功能
+
+- 深色 / 浅色主题切换
+- 中英双语国际化（i18n）
+- Tauri 桌面端特性：系统托盘、全局快捷键、自动启动、应用自动更新
+- OCR 文字识别
+- 语音转文字
+- 文件上传与管理（本地存储 + 腾讯云 COS）
 
 ## 技术架构
 
 ### 整体架构
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   前端 (Tauri)  │───▶│   后端 (NestJS)  │───▶│   数据库 (MySQL) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-      │                        │                        │
-      │                        │                        │
-      └────────────────────────┼────────────────────────┘
-                              │
-                      ┌────────┴────────┐
-                      │   缓存/队列系统  │
-                      │ (Redis/BullMQ)  │
-                      └─────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    客户端（双端）                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐  │
+│  │ Tauri 桌面端 │  │  Web 浏览器  │  │ MF Remote 插件   │  │
+│  │ (React 19)  │  │ (React 19)  │  │ (remote-plugins) │  │
+│  └──────┬──────┘  └──────┬──────┘  └────────┬─────────┘  │
+│         │                │                  │             │
+│         └────────────────┼──────────────────┘             │
+│                          │ HTTPS /api                     │
+└──────────────────────────┼───────────────────────────────┘
+                           │
+┌──────────────────────────┼───────────────────────────────┐
+│                    后端服务 (NestJS)                       │
+│  ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┐      │
+│  │ Auth │ Chat │Ebook │Know- │Agent │ Pay  │ ...  │      │
+│  │      │      │      │ledge │      │      │      │      │
+│  └──┬───┴──┬───┴──┬───┴──┬───┴──┬───┴──┬───┴──────┘      │
+│     │      │      │      │      │      │                  │
+│  ┌──┴──────┴──────┴──────┴──────┴──────┴──┐               │
+│  │          TypeORM / MySQL 8.0           │               │
+│  └────────────────────────────────────────┘               │
+│  ┌─────────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │  Redis (Cache)  │  │ BullMQ (队列) │  │ Qdrant (向量) │  │
+│  └─────────────────┘  └──────────────┘  └──────────────┘  │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Monorepo 结构
+
+```
+dnhyxc-ai/
+├── apps/
+│   ├── frontend/          # 主应用（Tauri + React 19，桌面/Web 双端）
+│   │   ├── src/           # 前端源码
+│   │   │   ├── components/  # UI 组件（shadcn/ui + 业务组件）
+│   │   │   ├── views/       # 页面视图
+│   │   │   ├── router/      # 路由配置
+│   │   │   ├── store/       # MobX 状态管理
+│   │   │   ├── service/     # API 服务层
+│   │   │   ├── hooks/       # 自定义 Hooks
+│   │   │   ├── plugins/     # MF 插件系统核心
+│   │   │   ├── i18n/        # 国际化（zh-CN / en-US）
+│   │   │   └── utils/       # 工具函数
+│   │   └── src-tauri/     # Tauri 原生层（Rust）
+│   │       └── src/
+│   │           ├── command/  # Tauri 命令（下载、剪贴板等）
+│   │           ├── system/   # 系统集成（菜单、托盘、快捷键）
+│   │           └── plugin/   # 插件初始化
+│   ├── backend/           # 后端服务（NestJS）
+│   │   └── src/
+│   │       ├── services/    # 业务模块（20+ 模块）
+│   │       ├── guards/      # 权限守卫（JWT / CASL / Admin）
+│   │       ├── filters/     # 异常过滤器
+│   │       ├── interceptors/# 响应拦截器
+│   │       ├── middleware/  # 中间件（操作日志等）
+│   │       ├── migrations/  # TypeORM 数据库迁移
+│   │       └── utils/       # 工具函数
+│   ├── remote-demo/       # MF 插件最小样例（音频播放器）
+│   └── remote-plugins/    # 官方业务插件包（EPUB想法/划线 + 学习笔记）
+├── packages/
+│   ├── markdown-kit/      # Markdown 渲染组件库（公开 npm 包）
+│   ├── release-kit/       # Tauri 发布辅助 CLI（版本/上传/Wiki）
+│   ├── release-run/       # 发布脚本运行时
+│   ├── ci/                # CI/部署工具（SSH 部署 + pm2 重启）
+│   └── mcps/              # 组件目录 MCP Server（AI 编码辅助）
+├── docs/                  # 项目文档（按功能域分类）
+├── docker-compose.yml     # Docker 编排（MySQL + Adminer + Qdrant）
+└── package.json           # Monorepo 根配置
 ```
 
 ### 前端技术栈
 
-- **框架**：Tauri + React 19
-- **构建工具**：Vite
-- **UI 框架**：Tailwind CSS + Radix UI
-- **状态管理**：MobX
-- **表单处理**：React Hook Form + Zod
-- **代码编辑器**：Monaco Editor
-- **Markdown 编辑器**：md-editor-rt
-- **响应式布局**：react-resizable-panels
+| 分类 | 技术 |
+|------|------|
+| 框架 | Tauri 2 + React 19 |
+| 构建 | Vite 7 |
+| UI | Tailwind CSS v4 + Radix UI (shadcn/ui) |
+| 状态管理 | MobX 6 |
+| 路由 | React Router 7 |
+| 表单 | React Hook Form + Zod |
+| 代码编辑器 | Monaco Editor |
+| 电子书 | epub.js + pdfjs-dist |
+| 微前端 | Module Federation (@module-federation/vite) |
+| 图标 | Lucide React |
+| 动画 | Framer Motion |
+| HTTP | Axios |
+| 国际化 | 自定义 i18n（zh-CN / en-US） |
 
 ### 后端技术栈
 
-- **框架**：NestJS
-- **数据库**：TypeORM + MySQL
-- **AI 集成**：LangChain + OpenAI
-- **认证**：JWT + Passport
-- **权限管理**：CASL
-- **文件处理**：Multer（本地上传）+ 腾讯云 COS（头像等）
-- **邮件服务**：Nodemailer
-- **缓存**：Cache Manager + Redis
-- **任务队列**：BullMQ
-- **日志**：Winston
-- **API 文档**：Swagger
+| 分类 | 技术 |
+|------|------|
+| 框架 | NestJS 11 |
+| 数据库 | TypeORM + MySQL 8.0 |
+| AI 集成 | LangChain + OpenAI 兼容 API |
+| 向量数据库 | Qdrant |
+| 认证 | JWT + Passport |
+| 权限 | CASL |
+| 缓存 | Cache Manager + Redis |
+| 任务队列 | BullMQ |
+| 邮件 | Nodemailer |
+| 文件存储 | Multer（本地）+ 腾讯云 COS |
+| 支付 | Stripe |
+| 日志 | Winston |
+| API 文档 | Swagger |
+| 安全 | Helmet + Express Rate Limit |
 
-## 项目结构
+### Tauri 原生层（Rust）
 
-```
-dnhyxc-ai/
-├── apps/                 # 应用程序目录
-│   ├── backend/          # 后端服务
-│   │   ├── src/          # 源代码
-│   │   │   ├── services/ # 业务服务模块
-│   │   │   │   ├── user/     # 用户管理
-│   │   │   │   ├── prompt/   # 提示管理
-│   │   │   │   ├── menus/    # 菜单管理
-│   │   │   │   ├── logs/     # 日志管理
-│   │   │   │   ├── upload/   # 文件上传
-│   │   │   │   └── ...      # 其他服务
-│   │   │   ├── guards/     # 权限守卫
-│   │   │   ├── entities/   # 数据实体
-│   │   │   └── ...        # 其他模块
-│   │   └── test/          # 测试文件
-│   └── frontend/         # 前端应用
-│       ├── src/          # 源代码
-│       │   ├── components/ # React 组件
-│       │   ├── pages/     # 页面组件
-│       │   ├── services/  # API 服务
-│       │   └── ...       # 其他目录
-├── packages/             # 共享包
-│   └── release-run/      # 发布辅助脚本（签名环境、Wiki 等）
-├── docker-compose.yml    # Docker 配置
-└── package.json         # 项目配置
-```
+| 功能 | 实现 |
+|------|------|
+| 系统托盘 | `src/system/tray.rs` |
+| 应用菜单 | `src/system/menu.rs` |
+| 全局快捷键 | `src/system/shortcut.rs` |
+| Dock 管理 | `src/system/dock.rs` |
+| 窗口缩放 | `src/system/zoom.rs` |
+| 系统事件 | `src/system/event.rs` |
+| 文件下载 | `src/command/download.rs` |
+| 电子书处理 | `src/command/ebook.rs` |
+| 剪贴板 | `src/command/clipboard.rs` |
+| 应用自动更新 | Tauri Updater Plugin |
+
+## 后端模块一览
+
+| 模块 | 说明 |
+|------|------|
+| AuthModule | 用户认证（邮箱注册/登录、微信登录、验证码） |
+| UserModule | 用户管理（资料、头像、密码） |
+| RolesModule | 角色管理 |
+| MenusModule | 菜单管理 |
+| ChatModule | AI 对话（流式响应、会话管理、消息分支） |
+| AssistantModule | AI 助手（文档对话） |
+| AgentModule | AI Agent（工具调用、网络搜索） |
+| KnowledgeModule | 知识库管理（Markdown 文档 CRUD、回收站） |
+| KnowledgeQaModule | 知识库 RAG 问答 |
+| QdrantModule | Qdrant 向量数据库服务 |
+| EbookModule | EPUB 电子书（书架、章节解析、阅读进度、高亮、想法） |
+| EbookAssistantModule | 电子书 AI 助手 |
+| EnglishLearningModule | 英语学习（单词包、SRS 复习、每日打卡） |
+| LearningNotesModule | 学习笔记 |
+| WebSearchModule | 网络搜索（Serper / Tavily） |
+| ShareModule | 内容分享 |
+| PayModule | 会员支付（Stripe / 云支付） |
+| UploadModule | 文件上传（本地 + 腾讯云 COS） |
+| OcrModule | OCR 文字识别 |
+| SpeechTranscriptionModule | 语音转文字 |
+| MailModule | 邮件服务 |
+| LlmConfigModule | 大模型配置管理（加密存储） |
+| LogsModule | 操作日志 |
+| PromptModule | 提示词管理 |
+| PluginPrefsModule | 插件偏好设置 |
 
 ## 开发环境
 
 ### 前提条件
 
-- Node.js (v18+)
-- pnpm
-- Docker & Docker Compose
-- MySQL
+- Node.js v18+
+- pnpm v10+
+- Rust（Tauri 桌面端构建）
+- Docker & Docker Compose（MySQL / Qdrant）
 
-### 安装步骤
+### 快速开始
 
 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/dnhyxc/dnhyxc-ai.git
 cd dnhyxc-ai
 ```
 
@@ -113,38 +252,76 @@ cd dnhyxc-ai
 pnpm install
 ```
 
-3. 启动开发环境
+3. 启动基础设施（MySQL + Qdrant）
 
 ```bash
-# 启动后端服务
-pnpm -C apps/backend start:dev
+docker-compose up -d
+```
 
-# 启动前端应用
+4. 启动后端服务
+
+```bash
+pnpm server:dev
+```
+
+5. 启动前端应用
+
+```bash
+# Web 开发模式
+pnpm dev:frontend
+
+# Tauri 桌面端开发模式
 pnpm dev
 ```
 
-4. 访问应用
+6. 访问应用
 
-- 前端：http://localhost:9002
-- 后端 API：http://localhost:9112
-- 数据库管理：http://localhost:3091
+| 服务 | 地址 |
+|------|------|
+| 前端（Web） | http://localhost:9002 |
+| 后端 API | http://localhost:9112/api |
+| Swagger 文档 | http://localhost:9112/api-docs |
+| Adminer（数据库管理） | http://localhost:3091 |
+| Qdrant 控制台 | http://localhost:6333/dashboard |
+
+### Module Federation 联调
+
+同时启动 Host + Remote 插件：
+
+```bash
+# 启动所有 MF 远端 + Host
+pnpm dev:mf
+
+# 或单独启动各远端
+pnpm dev:remote-demo     # 端口 9007
+pnpm dev:remote-plugins  # 端口 9008
+```
+
+## 常用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 启动 Tauri 桌面端开发 |
+| `pnpm dev:frontend` | 启动 Web 前端开发 |
+| `pnpm server:dev` | 启动后端开发服务 |
+| `pnpm dev:mf` | 同时启动 Host + 所有 MF 远端 |
+| `pnpm build` | 构建并发布 Tauri 桌面端 |
+| `pnpm server:build` | 构建后端 |
+| `pnpm server:start` | 启动后端生产服务 |
+| `pnpm check` | Biome 代码检查与格式化 |
+| `pnpm commit` | 交互式规范提交（Commitizen） |
+| `pnpm changeset` | 生成 Changeset |
 
 ## 部署
 
 ### Docker 部署
 
 ```bash
-# 构建并启动所有服务
+# 启动 MySQL + Adminer + Qdrant
 docker-compose up -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f
 ```
 
-### 生产环境
+### 后端部署
 
 ```bash
 # 构建后端
@@ -153,68 +330,73 @@ pnpm -C apps/backend build
 # 启动生产服务
 pnpm -C apps/backend start:prod
 
-# 构建前端
-pnpm -C apps/frontend tauri build
+# SSH 远程部署
+pnpm -C apps/backend deploy:ssh
 ```
 
-## API 文档
+### 前端 / 桌面端部署
 
-后端 API 文档可通过 Swagger 访问：
+```bash
+# 构建 Tauri 桌面端安装包（自动签名 + 上传 Release）
+pnpm build:patch    # patch 版本
+pnpm build:minor    # minor 版本
+pnpm build:major    # major 版本
 
-- 开发环境：http://localhost:3000/api
-- 生产环境：http://your-domain.com/api
+# 仅构建 Web 前端
+pnpm -C apps/frontend build
+```
+
+### 数据库迁移
+
+```bash
+# 生成迁移文件
+pnpm -C apps/backend m:g MigrationName
+
+# 执行迁移
+pnpm -C apps/backend m:run
+
+# 回滚迁移
+pnpm -C apps/backend m:revert
+```
+
+## 项目文档
+
+项目按功能域维护文档，位于 `docs/` 目录下：
+
+- `docs/app/` — 前端应用文档（插件系统、i18n、路由鉴权、Tauri 集成等）
+- `docs/ebook/` — EPUB 阅读器文档（阅读器、听书、高亮、想法等）
+- `docs/chat/` — AI 对话文档（流式响应、分享、上传、网络搜索等）
+- `docs/english/` — 英语学习文档（SRS、TTS、每日打卡等）
+- `docs/cos/` — 腾讯云 COS 对象存储文档
+- `docs/Influence-point/` — 改动影响点分析
 
 ## 贡献指南
 
 1. Fork 项目
 2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+3. 提交更改（使用规范提交：`pnpm commit`）
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 创建 Pull Request
 
+### 提交规范
+
+项目使用 Commitizen + commitlint 规范提交信息，支持以下类型：
+
+- `feat` — 新功能
+- `fix` — Bug 修复
+- `docs` — 文档变更
+- `style` — 代码格式（不影响功能）
+- `refactor` — 重构
+- `perf` — 性能优化
+- `test` — 测试
+- `chore` — 构建/工具变更
+
 ## 许可证
 
-本项目采用 ISC 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+ISC License
 
 ## 联系方式
 
-- 邮箱：dnhyxc@gmail.com
+- 邮箱：dnhyxc@163.com
 - 项目主页：https://github.com/dnhyxc/dnhyxc-ai
-- 相关文档：https://github.com/dnhyxc/dnhyxc-ai/wiki
-
-## 版本历史
-
-- v0.0.1 - 初始版本，包含基础 AI 功能和用户管理系统
-
-## 未来规划
-
-- [ ] 多语言支持
-- [ ] 高级 AI 模型集成
-- [ ] 实时协作功能
-- [ ] 移动端支持
-- [ ] 更多的 AI 插件和扩展
-- [ ] 性能优化和缓存策略改进
-
-## 实现 AI Agent 代码审查功能
-
-### 技术栈使用
-
-1. 前端技术栈：React + Vite + Tailwindcss + shadcn 组件库 + lucide 图标库。
-2. 后端技术栈：Nestjs + Langchain + TypeOrm MySql + Redis + BullMQ 消息队列 + GLM 4.7 模型 + RAG + 你自行选择一个开源免费的、最热门的，最方便使用的向量数据库。
-
-### 主要实现的功能
-
-1. 多范围审查：支持项目/目录/文件/代码片段/Git 项目审查，适配不同开发阶段与场景。
-2. 深度分析（AI+规则）：LLM 结合规则引擎（PMD/Checkstyle/SpotBugs/Semgrep），既有上下文推理又有规范落地。
-3. RAG 增强：基于代码库与知识库的检索增强生成（Hybrid：BM25 + 向量检索 + Rerank），提供相似问题与修复示例。
-4. Function Calling：以结构化工具调用驱动本地分析器与解析器（JavaParser/Semgrep），强制输出严格 JSON 结果（Finding/Report）。
-5. 专业报告：生成 HTML/Markdown/PDF 报告，包含问题分布、严重级别统计、位置与 Diff、可执行建议。
-6. 历史与检索：审查记录留存、分页与查询（名称/范围/时间）、二次检索与复盘。
-7. 规范与规则：内置阿里/Google/Airbnb/PEP8 规范模板，支持自定义规范（名称+要点）、权重调优。
-8. Git 集成：支持 Git 地址配置（账户与令牌），拉取并增量分析模块级问题。
-9. CI/CD 集成：REST API 与 Webhook，在 PR/MR、构建、发布前自动触发审查与阻断策略。
-10. 安全与合规：敏感信息脱敏、凭据仅会话态、审计日志与链路追踪。
-
-注意：要给出完整的实现代码
-
-// Always respond in 中文
+- 在线体验：https://dnhyxc.cn:9002
