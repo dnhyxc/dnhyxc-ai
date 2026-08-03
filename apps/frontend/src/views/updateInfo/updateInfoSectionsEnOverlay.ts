@@ -516,6 +516,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'API Keys are no longer auto-filled from local build-time env; they echo only after you saved them in Settings and the API returns them. Switching chat or vector presets or linked vector model / rerank / collection fields no longer clears keys already entered; BGE and Qwen3 preset tiers keep the three vector fields paired.',
 	},
+	's9-10': {
+		title: 'Configurable accent color',
+		description:
+			'Settings → Theme adds an “Accent color” section with 10 presets (default teal, lime, peach pink, indigo, ochre, xiang yellow, apricot, dai teal, pine flower, evergreen). Pick one and hover, selected, link, and button accents across the app update instantly; the choice is saved per signed-in account and syncs across devices. Refreshing or restarting no longer flashes back to the default color. Accent color is orthogonal to the color theme (white / dark / red / beige) and they can be combined freely. Decorative areas that are teal by design—home gradient buttons, English-learning sidebar gradients, and vocabulary-stream progress bars—keep the original teal and do not follow the accent color.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:

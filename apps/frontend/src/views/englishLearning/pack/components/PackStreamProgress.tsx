@@ -31,10 +31,11 @@ function PackStreamProgressInner({ kind }: PackStreamProgressProps) {
 		return null;
 	}
 
-	const accentBar = kind === 'vocab' ? 'bg-teal-500/85' : 'bg-violet-500/85';
+	/* 单词资料：固定原版 teal hex，不跟随全局主题色 */
+	const accentBar = kind === 'vocab' ? 'bg-[#14b8a6]/85' : 'bg-violet-500/85';
 	const accentText =
 		kind === 'vocab'
-			? 'text-teal-600/90 dark:text-teal-400/90'
+			? 'text-[#0d9488]/90 dark:text-[#2dd4bf]/90'
 			: 'text-indigo-600/90 dark:text-indigo-400/90';
 	const progressKey =
 		kind === 'vocab'

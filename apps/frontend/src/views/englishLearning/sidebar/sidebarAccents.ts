@@ -6,13 +6,16 @@
  * - 今日记词：emerald·teal（与词包区色相相邻）
  * - 今日复习：玫瑰金（粉金渐变，侧栏唯一）
  * - 下区暖色：橙→黄(收藏)、玫→橙(错题)
+ *
+ * 今日记词 / 单词资料 的 teal 端用固定 hex（Tailwind 默认 teal-400/500/600），
+ * 不跟随全局主题色（--brand-accent 会覆盖 text-teal-*）。须写死完整 class，勿模板拼接。
  */
 export const ENGLISH_SIDEBAR_ICON_GRADIENT = {
 	toolbar: 'bg-linear-to-r from-lime-600 to-green-700',
-	daily: 'bg-linear-to-r from-emerald-500 to-teal-600',
+	daily: 'bg-linear-to-r from-emerald-500 to-[#0d9488]',
 	vocabSource: 'bg-linear-to-r from-cyan-500 to-blue-600',
 	classicSource: 'bg-linear-to-r from-indigo-500 to-blue-600',
-	vocabPack: 'bg-linear-to-r from-teal-500 to-cyan-600',
+	vocabPack: 'bg-linear-to-r from-[#14b8a6] to-cyan-600',
 	classicPack: 'bg-linear-to-r from-violet-600 to-indigo-600',
 	review: 'bg-linear-to-r from-[#9a5c66] to-[#b8874f]',
 	favorites: 'bg-linear-to-r from-orange-500 to-yellow-500',
@@ -24,13 +27,13 @@ export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 	toolbar:
 		'bg-linear-to-r from-lime-600 to-green-700 hover:bg-linear-to-r hover:from-lime-400 hover:to-green-500',
 	daily:
-		'bg-linear-to-r from-emerald-500 to-teal-600 hover:bg-linear-to-r hover:from-emerald-400 hover:to-teal-500',
+		'bg-linear-to-r from-emerald-500 to-[#0d9488] hover:bg-linear-to-r hover:from-emerald-400 hover:to-[#14b8a6]',
 	vocabSource:
 		'bg-linear-to-r from-cyan-500 to-blue-600 hover:bg-linear-to-r hover:from-cyan-400 hover:to-blue-600',
 	classicSource:
 		'bg-linear-to-r from-indigo-500 to-blue-600 hover:bg-linear-to-r hover:from-indigo-400 hover:to-blue-600',
 	vocabPack:
-		'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
+		'bg-linear-to-r from-[#14b8a6] to-cyan-600 hover:bg-linear-to-r hover:from-[#2dd4bf] hover:to-cyan-600',
 	classicPack:
 		'bg-linear-to-r from-violet-600 to-indigo-600 hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
 	review:
@@ -46,7 +49,7 @@ export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 /** 侧栏文字链渐变（与对应入口 icon / 按钮色相一致） */
 export const ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT = {
 	daily:
-		'bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 bg-clip-text text-transparent',
+		'bg-linear-to-r from-emerald-500 to-[#0d9488] hover:from-emerald-400 hover:to-[#14b8a6] bg-clip-text text-transparent',
 	vocab:
 		'bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 bg-clip-text text-transparent',
 	classic:

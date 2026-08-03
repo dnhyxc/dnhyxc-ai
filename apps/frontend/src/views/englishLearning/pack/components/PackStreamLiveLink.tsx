@@ -54,15 +54,16 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 	const progressKey = isVocab
 		? 'englishLearning.vocab.progress'
 		: 'englishLearning.classic.progress';
-	const accentBar = isVocab ? 'bg-teal-500/85' : 'bg-violet-500/85';
+	/* 单词资料：固定原版 teal hex，不跟随全局主题色 */
+	const accentBar = isVocab ? 'bg-[#14b8a6]/85' : 'bg-violet-500/85';
 	const accentToolLine = isVocab
-		? 'text-teal-600/90 dark:text-teal-400/90'
+		? 'text-[#0d9488]/90 dark:text-[#2dd4bf]/90'
 		: 'text-indigo-600/90 dark:text-indigo-400/90';
 	const accentBorder = isVocab
-		? 'border-teal-500/6 bg-linear-to-r from-teal-500/18 to-cyan-600/18'
+		? 'border-[#14b8a6]/6 bg-linear-to-r from-[#14b8a6]/18 to-cyan-600/18'
 		: 'border-violet-500/6 bg-linear-to-r from-violet-500/18 to-indigo-600/18';
 	const bgColor = isVocab
-		? 'bg-linear-to-r from-teal-500/35 to-cyan-600/30'
+		? 'bg-linear-to-r from-[#14b8a6]/35 to-cyan-600/30'
 		: 'bg-linear-to-r from-violet-500/30 to-indigo-600/30';
 
 	return (

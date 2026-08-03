@@ -68,7 +68,8 @@ const Home = () => {
 				title: t('home.steps.install.title'),
 				desc: t('home.steps.install.desc'),
 				icon: Rocket,
-				color: 'from-teal-500 to-cyan-600',
+				/* 固定原版 teal hex，不跟随全局主题色 */
+				color: 'from-[#14b8a6] to-cyan-600',
 				/** 在默认浏览器打开桌面端下载落地页 */
 				downloadDesktop: true,
 			},
@@ -111,10 +112,11 @@ const Home = () => {
 				title: t('home.features.chat.title'),
 				subtitle: t('home.features.chat.subtitle'),
 				desc: t('home.features.chat.desc'),
-				color: 'from-emerald-400 to-teal-500',
+				/* 固定原版 teal hex，不跟随全局主题色 */
+				color: 'from-emerald-400 to-[#14b8a6]',
 				glow: 'shadow-emerald-500/25',
 				hoverBg:
-					'group-hover:bg-linear-to-br group-hover:from-emerald-500/15 group-hover:to-teal-600/5',
+					'group-hover:bg-linear-to-br group-hover:from-emerald-500/15 group-hover:to-[#0d9488]/5',
 				onClick: () => navigate('/chat'),
 			},
 			{
@@ -261,7 +263,7 @@ const Home = () => {
 										<Button
 											variant="dynamic"
 											onClick={onClickQuickStart}
-											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-md bg-linear-to-r from-teal-500 to-cyan-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-500/30 active:scale-[0.98]"
+											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-md bg-linear-to-br from-teal-300 to-teal-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-300/30 active:scale-[0.98]"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
@@ -336,7 +338,7 @@ const Home = () => {
 											{feature.desc}
 										</p>
 
-										<div className="relative mt-4 flex items-center gap-2 border-t border-dashed border-theme/5 pt-4 text-sm font-semibold text-teal-400/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-300">
+										<div className="relative mt-4 flex items-center gap-2 border-t border-dashed border-theme/5 pt-4 text-sm font-semibold text-teal-500/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-400">
 											<span>{t('home.features.enter')}</span>
 											<ArrowRight className="h-4 w-4" />
 										</div>
@@ -434,7 +436,7 @@ const Home = () => {
 											</span>
 										</div>
 										<div className="min-w-0 flex-1">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-300">
+											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-400">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>
@@ -443,7 +445,7 @@ const Home = () => {
 											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme-white/5 group-hover:bg-theme-white/10"
 											whileHover={{ x: 4 }}
 										>
-											<ArrowRight className="h-5 w-5 text-textcolor/40 group-hover:text-teal-400" />
+											<ArrowRight className="h-5 w-5 text-textcolor/40 group-hover:text-teal-500" />
 										</motion.div>
 									</motion.div>
 								))}
@@ -484,7 +486,7 @@ const Home = () => {
 											</span>
 										</div>
 										<div className="min-w-0 flex-1">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-300">
+											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-400">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>

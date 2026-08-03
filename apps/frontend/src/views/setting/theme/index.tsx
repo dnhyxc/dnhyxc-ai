@@ -1,7 +1,14 @@
 import { Button } from '@ui/button';
 import { CircleCheckBig } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { THEMES, useI18n, useTheme } from '@/hooks';
+import {
+	ACCENT_COLORS,
+	accentBadgeFg,
+	THEMES,
+	useI18n,
+	useTheme,
+} from '@/hooks';
+import { cn } from '@/lib/utils';
 
 /** 展示用：中文说明 + 变量名 + 常用 Tailwind 类 */
 function StyleRow({
@@ -34,7 +41,7 @@ function StyleRow({
 }
 
 const Theme = () => {
-	const { theme, changeTheme } = useTheme();
+	const { theme, changeTheme, accent, changeAccent } = useTheme();
 	const { t } = useI18n();
 
 	const colorThemes = THEMES.filter((themeItem) => themeItem.type === 'color');
@@ -78,6 +85,54 @@ const Theme = () => {
 								</Button>
 							</div>
 						))}
+					</div>
+				</div>
+
+				<div className="my-3.5 w-full border-b border-theme/20 pb-4.5">
+					<div className="text-md font-bold">
+						{t('setting.theme.accentTitle')}
+					</div>
+					<div className="mt-3.5 px-8.5">
+						<div className="divide-y divide-theme-border/60 overflow-hidden rounded-xl border border-theme-border bg-theme-card">
+							{ACCENT_COLORS.map((item) => {
+								const selected = accent === item.id;
+								return (
+									<button
+										key={item.id}
+										type="button"
+										onClick={() => void changeAccent(item.id)}
+										className={cn(
+											'flex w-full cursor-pointer items-center gap-3 px-3.5 py-2.5 text-left transition-colors',
+											selected ? 'bg-teal-500/10' : 'hover:bg-theme/10',
+										)}
+									>
+										<span
+											className="size-5 shrink-0 rounded-full border border-theme-border/50 shadow-sm"
+											style={{ backgroundColor: item.hex }}
+											aria-hidden
+										/>
+										<span className="w-16 shrink-0 text-sm font-medium text-textcolor">
+											{t(item.labelKey) ?? item.label}
+										</span>
+										<span
+											className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium text-textcolor/90"
+											style={{
+												backgroundColor: item.hex,
+												color: accentBadgeFg(item.hex),
+											}}
+										>
+											{item.hex}
+										</span>
+										<span className="min-w-0 flex-1 truncate text-xs text-textcolor/55">
+											{t(item.descKey)}
+										</span>
+										{selected ? (
+											<CircleCheckBig className="size-4 shrink-0 text-teal-500" />
+										) : null}
+									</button>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 
@@ -141,10 +196,10 @@ const Theme = () => {
 
 							<StyleRow
 								title={t('setting.theme.preview.accent.title')}
-								varName="--theme-color"
-								classHint="· text-theme"
+								varName="--brand-accent"
+								classHint="· text-teal-500"
 							>
-								<p className="font-medium text-theme">
+								<p className="font-medium text-teal-500">
 									{t('setting.theme.preview.accent.desc')}
 								</p>
 							</StyleRow>

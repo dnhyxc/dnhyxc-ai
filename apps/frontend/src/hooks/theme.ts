@@ -77,14 +77,157 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]['name'];
 
+/**
+ * 交互强调色（与彩色主题正交；默认 teal-500）
+ * 下列 9 色顺序与 hex 一一对应，名称/描述按色相匹配。
+ */
+export const ACCENT_COLORS = [
+	{
+		id: 'teal',
+		hex: '#14B8A6',
+		label: '默认',
+		labelKey: 'setting.theme.accent.teal',
+		descKey: 'setting.theme.accent.teal.desc',
+	},
+	{
+		id: 'yuebai',
+		hex: '#B9D731',
+		label: '青柠',
+		labelKey: 'setting.theme.accent.yuebai',
+		descKey: 'setting.theme.accent.yuebai.desc',
+	},
+	{
+		id: 'zhizi',
+		hex: '#EB507E',
+		label: '桃红',
+		labelKey: 'setting.theme.accent.zhizi',
+		descKey: 'setting.theme.accent.zhizi.desc',
+	},
+	{
+		id: 'xueqing',
+		hex: '#1361AB',
+		label: '靛青',
+		labelKey: 'setting.theme.accent.xueqing',
+		descKey: 'setting.theme.accent.xueqing.desc',
+	},
+	{
+		id: 'canglang',
+		hex: '#B95036',
+		label: '赭石',
+		labelKey: 'setting.theme.accent.canglang',
+		descKey: 'setting.theme.accent.canglang.desc',
+	},
+	{
+		id: 'wuxin',
+		hex: '#F2CE2B',
+		label: '缃黄',
+		labelKey: 'setting.theme.accent.wuxin',
+		descKey: 'setting.theme.accent.wuxin.desc',
+	},
+	{
+		id: 'yushi',
+		hex: '#F09C5A',
+		label: '杏橙',
+		labelKey: 'setting.theme.accent.yushi',
+		descKey: 'setting.theme.accent.yushi.desc',
+	},
+	{
+		id: 'tuoyan',
+		hex: '#21373D',
+		label: '黛青',
+		labelKey: 'setting.theme.accent.tuoyan',
+		descKey: 'setting.theme.accent.tuoyan.desc',
+	},
+	{
+		id: 'xicao',
+		hex: '#EBEFBA',
+		label: '松花',
+		labelKey: 'setting.theme.accent.xicao',
+		descKey: 'setting.theme.accent.xicao.desc',
+	},
+	{
+		id: 'qiansui',
+		hex: '#1F3028',
+		label: '苍翠',
+		labelKey: 'setting.theme.accent.qiansui',
+		descKey: 'setting.theme.accent.qiansui.desc',
+	},
+] as const;
+
+/** hex 徽章字色：深底白字、浅底深字 */
+export function accentBadgeFg(hex: string): '#fff' | '#1a1a1a' {
+	const h = hex.replace('#', '');
+	if (h.length < 6) return '#1a1a1a';
+	const r = Number.parseInt(h.slice(0, 2), 16);
+	const g = Number.parseInt(h.slice(2, 4), 16);
+	const b = Number.parseInt(h.slice(4, 6), 16);
+	return (r * 299 + g * 587 + b * 114) / 1000 < 160 ? '#fff' : '#1a1a1a';
+}
+
+export type AccentId = (typeof ACCENT_COLORS)[number]['id'];
+
+const DEFAULT_ACCENT_ID: AccentId = 'teal';
+
 /** 供 index.html 首屏脚本读取，与 Tauri store 同步，减轻刷新时主题晚于首帧 */
 export const THEME_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_theme_bootstrap';
+/** 主题色 bootstrap，与 theme 并列，防首帧 teal 闪一下 */
+export const ACCENT_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_accent_bootstrap';
 
 function persistThemeBootstrap(themeName: ThemeName) {
 	try {
 		localStorage.setItem(THEME_BOOTSTRAP_STORAGE_KEY, themeName);
 	} catch {
 		// 私密模式等场景忽略
+	}
+}
+
+function persistAccentBootstrap(accentId: AccentId) {
+	try {
+		localStorage.setItem(ACCENT_BOOTSTRAP_STORAGE_KEY, accentId);
+	} catch {
+		// 私密模式等场景忽略
+	}
+}
+
+function resolveAccentId(raw: string | null | undefined): AccentId | null {
+	if (!raw) return null;
+	return ACCENT_COLORS.some((c) => c.id === raw) ? (raw as AccentId) : null;
+}
+
+/** 将主题色写入 html：--brand-accent 及 light/dark 派生 */
+export function applyAccentToDocument(accentId: AccentId) {
+	const item =
+		ACCENT_COLORS.find((c) => c.id === accentId) ??
+		ACCENT_COLORS.find((c) => c.id === DEFAULT_ACCENT_ID)!;
+	const root = document.documentElement;
+	root.style.setProperty('--brand-accent', item.hex);
+	root.style.setProperty(
+		'--brand-accent-soft',
+		`color-mix(in oklch, ${item.hex} 95%, white)`,
+	);
+	root.style.setProperty(
+		'--brand-accent-light',
+		`color-mix(in oklch, ${item.hex} 95%, black)`,
+	);
+	root.style.setProperty(
+		'--brand-accent-dark',
+		`color-mix(in oklch, ${item.hex} 80%, black)`,
+	);
+}
+
+function readAccentBootstrapSync(): AccentId | null {
+	if (typeof window === 'undefined') return null;
+	try {
+		const b = resolveAccentId(
+			localStorage.getItem(ACCENT_BOOTSTRAP_STORAGE_KEY),
+		);
+		if (b) return b;
+		const j = localStorage.getItem('dnhyxc_settings_json');
+		if (!j) return null;
+		const o = JSON.parse(j) as { accentColor?: string };
+		return resolveAccentId(o.accentColor);
+	} catch {
+		return null;
 	}
 }
 
@@ -175,6 +318,9 @@ export const useTheme = () => {
 	const [theme, setTheme] = useState<ThemeName>(
 		() => readThemeBootstrapSync() ?? 'white',
 	);
+	const [accent, setAccent] = useState<AccentId>(
+		() => readAccentBootstrapSync() ?? DEFAULT_ACCENT_ID,
+	);
 
 	useEffect(() => {
 		// 启动时先把当前主题应用到 body。
@@ -182,31 +328,39 @@ export const useTheme = () => {
 		// 导致“设置页默认选中 white，但主题未生效，必须手动点一次”。
 		setThemeClass(theme);
 		persistThemeBootstrap(theme);
+		applyAccentToDocument(accent);
+		persistAccentBootstrap(accent);
 
 		const initTheme = async () => {
 			// URL 优先：从 Tauri 复制出的分享链接带 ?theme=，浏览器无 store 也能对齐
-			if (typeof window !== 'undefined') {
-				const fromUrl = parseThemeFromSearch(window.location.search);
-				if (fromUrl) {
-					setTheme(fromUrl);
-					setThemeClass(fromUrl);
-					persistThemeBootstrap(fromUrl);
-					return;
+			const fromUrl =
+				typeof window !== 'undefined'
+					? parseThemeFromSearch(window.location.search)
+					: null;
+			if (fromUrl) {
+				setTheme(fromUrl);
+				setThemeClass(fromUrl);
+				persistThemeBootstrap(fromUrl);
+			} else {
+				const themeType = (await getValue('themeType')) as ThemeName;
+				const themeItem = THEMES.find((t) => t.name === themeType);
+				if (themeItem?.type === 'color' && themeType) {
+					setTheme(themeType);
+					setThemeClass(themeType);
+					persistThemeBootstrap(themeType);
 				}
 			}
 
-			const themeType = (await getValue('themeType')) as ThemeName;
-
-			const themeItem = THEMES.find((t) => t.name === themeType);
-			const isColorTheme = themeItem?.type === 'color';
-
-			if (isColorTheme && themeType) {
-				setTheme(themeType);
-				setThemeClass(themeType);
-				persistThemeBootstrap(themeType);
+			const storedAccent = resolveAccentId(
+				(await getValue('accentColor')) as string | undefined,
+			);
+			if (storedAccent) {
+				setAccent(storedAccent);
+				applyAccentToDocument(storedAccent);
+				persistAccentBootstrap(storedAccent);
 			}
 		};
-		initTheme();
+		void initTheme();
 	}, []);
 
 	const setThemeClass = (themeName: string) => {
@@ -299,5 +453,21 @@ export const useTheme = () => {
 		}
 	};
 
-	return { theme, changeTheme, themes: THEMES };
+	const changeAccent = async (accentId: AccentId) => {
+		const item = ACCENT_COLORS.find((c) => c.id === accentId);
+		if (!item) return;
+		setAccent(accentId);
+		applyAccentToDocument(accentId);
+		persistAccentBootstrap(accentId);
+		await setValue('accentColor', accentId);
+	};
+
+	return {
+		theme,
+		changeTheme,
+		themes: THEMES,
+		accent,
+		changeAccent,
+		accents: ACCENT_COLORS,
+	};
 };

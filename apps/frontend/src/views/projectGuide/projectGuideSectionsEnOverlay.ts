@@ -204,6 +204,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'After sign-in, open /pay (or tap Buy membership on /profile). Pick Monthly ¥9.9 (30 days), Quarterly ¥25.9 (90 days), or Annual ¥99.9 (365 days)—fixed prices, not editable. Open embedded checkout to pay with Stripe; on success you are redirected to profile with a gold Member badge and gold “Valid until …” line. Renewals stack after the current expiry; when membership lapses, profile shows non-member state and you can purchase again.',
 	},
+	'pg-s8-7': {
+		title: '8.7 Accent color',
+		description:
+			'Open Settings → Theme (/setting/theme). The “Accent color” section lists 10 presets: Default (teal), Lime, Peach pink, Indigo, Ochre, Xiang yellow, Apricot, Dai teal, Pine flower, Evergreen. Each row shows a color dot, name, hex badge, and a short description, with a check mark on the current choice.\nPick any color to apply instantly—hover, selected, link, and button accents across the app update with it (feature-card entry arrows, settings check marks, link highlights, etc.). No extra save needed; the choice is stored per signed-in account and syncs across devices.\nThe accent color is orthogonal to the “color theme” above (white / dark / red / beige): color theme sets backgrounds and text hue, accent color sets interactive accents, and they can be combined freely.\nRefreshing the page or restarting the desktop app will not flash back to the default color (the first paint already applies your choice).\nSome decorative areas (home Quick-start gradient buttons, English-learning sidebar gradients for daily memorization / word packs, vocabulary-stream progress bars, word-pack count buttons) intentionally keep the original teal and do not follow the accent color—this is by design, not a bug.',
+	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',
 		description:

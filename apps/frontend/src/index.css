@@ -410,6 +410,11 @@ body {
 }
 
 :root {
+	/* 主题色（交互强调）：默认 teal-500；由 useTheme.changeAccent / 首屏脚本覆盖 */
+	--brand-accent: #14b8a6;
+	--brand-accent-soft: color-mix(in oklch, var(--brand-accent) 55%, white);
+	--brand-accent-light: color-mix(in oklch, var(--brand-accent) 75%, white);
+	--brand-accent-dark: color-mix(in oklch, var(--brand-accent) 85%, black);
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.13 0.028 261.692);
 	--card: oklch(1 0 0);
@@ -1225,6 +1230,11 @@ body.theme-beige {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	/* 覆盖 Tailwind 默认 teal，使全站 text-teal-* / hover:text-teal-* 跟随主题色 */
+	--color-teal-300: var(--brand-accent-soft);
+	--color-teal-400: var(--brand-accent-light);
+	--color-teal-500: var(--brand-accent);
+	--color-teal-600: var(--brand-accent-dark);
 	--color-theme: var(--theme-color);
 	--color-theme-background: var(--theme-background);
 	--color-theme-card: var(--theme-card);
@@ -1330,8 +1340,8 @@ body.theme-beige {
 	border-radius: 9999px;
 	background: linear-gradient(
 		to top,
-		rgb(13 148 136 / 0.5),
-		rgb(94 234 212 / 0.9)
+		color-mix(in oklch, var(--brand-accent-dark) 50%, transparent),
+		color-mix(in oklch, var(--brand-accent-light) 90%, transparent)
 	);
 	animation: practice-dictation-bar 0.72s ease-in-out infinite;
 	will-change: height, opacity;

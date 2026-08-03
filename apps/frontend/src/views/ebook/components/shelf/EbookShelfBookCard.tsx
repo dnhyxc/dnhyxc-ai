@@ -125,8 +125,8 @@ function EbookShelfBorderProgress({
 				'pointer-events-none absolute inset-0 size-full transition-colors',
 				byFmt(
 					fmt,
-					'text-teal-900/18 dark:text-emerald-50/28 group-hover:text-teal-900/25 dark:group-hover:text-emerald-50/38',
-					'text-sky-900/18 dark:text-sky-50/28 group-hover:text-sky-900/25 dark:group-hover:text-sky-50/38',
+					'text-teal-900/18 group-hover:text-teal-900/25',
+					'text-sky-900/18 group-hover:text-sky-900/25',
 				),
 			)}
 			viewBox={`0 0 ${viewW} ${viewH}`}
@@ -146,7 +146,7 @@ function EbookShelfBorderProgress({
 				<path
 					className={cn(
 						'transition-[stroke-dasharray] duration-300',
-						byFmt(fmt, 'text-emerald-500', 'text-sky-500'),
+						byFmt(fmt, 'text-teal-500', 'text-sky-500'),
 					)}
 					d={strokePath}
 					fill="none"
@@ -346,14 +346,8 @@ export function EbookShelfBookCard({
 					!book.coverUrl &&
 						byFmt(
 							book.fmt,
-							cn(
-								'bg-linear-to-br from-emerald-400/28 via-teal-500/14 to-emerald-400/16',
-								'dark:from-emerald-500/32 dark:via-teal-700/18 dark:to-emerald-600/14',
-							),
-							cn(
-								'bg-linear-to-br from-sky-400/24 via-cyan-500/12 to-sky-400/14',
-								'dark:from-sky-500/28 dark:via-cyan-700/16 dark:to-sky-500/12',
-							),
+							cn('bg-linear-to-br from-emerald-400/28 to-teal-500/30'),
+							cn('bg-linear-to-br from-sky-400/28 to-teal-500/30'),
 						),
 					'shadow-sm shadow-teal-950/5 transition-shadow duration-200',
 					'hover:shadow-md hover:shadow-teal-950/10',

@@ -21,7 +21,7 @@
 | [`mermaid/`](./mermaid/)     | Mermaid 围栏与预览                      | [mermaid/markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md)                                                           |
 | [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit`               | [tools/index.md](./tools/index.md)                                                                                                       |
 | [`react/`](./react/)         | React Hooks 专题                        | 按文件名检索                                                                                                                             |
-| [`setting/`](./setting/)     | 系统快捷键                              | [setting/system-shortcuts-implementation-record.md](./setting/system-shortcuts-implementation-record.md)                                 |
+| [`setting/`](./setting/)     | 设置页（系统快捷键、主题色等）          | [setting/README.md](./setting/README.md)                                                                                                 |
 | [`meta/`](./meta/)           | 发布与更新同步                          | [meta/project-features-update.md](./meta/project-features-update.md)                                                                     |
 | [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
@@ -196,6 +196,7 @@
 | 知识库纯预览右侧空「预览内容为空」/ 双预览占位                    | [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md)                                                                           |
 | 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md) · [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) |
 | 预览切编辑丢位置 / 助手开时编辑切预览总在文首                     | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md)                                                       |
+| 主题色（强调色）怎么换 / 全站 hover/选中色不跟随 / 首帧闪回 teal  | [setting/accent-color-settings.md](./setting/accent-color-settings.md)（10 色预设 + CSS 变量覆盖 + 首屏防闪 + 原版 teal 豁免）                            |
 
 ---
 

@@ -455,10 +455,11 @@ function VocabularyPackSectionInner() {
 									)
 								}
 								className={cn(
-									'flex-1 rounded-md border bg-teal-500/15 hover:bg-teal-500/20 px-0 py-1 text-xs font-medium transition-colors',
+									/* 固定 teal-500 hex：不跟随全局主题色 */
+									'flex-1 rounded-md border bg-[#14b8a6]/15 hover:bg-[#14b8a6]/20 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
-										? 'border-teal-500/35 text-teal-500 bg-teal-500/20'
-										: 'border-teal-500/10 text-textcolor hover:border-teal-500/20 hover:text-teal-500 hover:bg-teal-500/20',
+										? 'border-[#14b8a6]/35 text-[#14b8a6] bg-[#14b8a6]/20'
+										: 'border-[#14b8a6]/10 text-textcolor hover:border-[#14b8a6]/20 hover:text-[#14b8a6] hover:bg-[#14b8a6]/20',
 								)}
 							>
 								{n}
