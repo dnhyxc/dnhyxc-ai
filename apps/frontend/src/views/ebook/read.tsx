@@ -2815,8 +2815,8 @@ function EbookReadPage() {
 									className={cn(
 										'shrink-0 rounded px-1.5 h-5.5 pb-px mt-px flex items-center justify-center text-xs font-medium leading-none',
 										openSource === 'local'
-											? 'bg-emerald-500/15 text-emerald-600'
-											: 'bg-sky-500/15 text-sky-600',
+											? 'bg-teal-500/15 text-teal-500'
+											: 'bg-orange-500/15 text-orange-500',
 									)}
 								>
 									{openSource === 'local'

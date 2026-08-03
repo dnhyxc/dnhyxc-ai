@@ -9,18 +9,17 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
-				default: 'text-default bg-theme hover:bg-theme/80',
+				default: 'text-default bg-teal-500 hover:bg-teal-600',
 				destructive:
 					'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
 				outline:
-					'border border-theme/20 text-theme shadow-xs hover:bg-theme/10 dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
-				secondary: 'bg-theme/20 text-textcolor hover:bg-theme/30',
-				ghost:
-					'hover:bg-theme/10 hover::text-textcolor dark:hover:bg-accent/50',
+					'border border-teal-500/20 text-theme shadow-xs hover:bg-teal-500/10 dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+				secondary: 'bg-teal-500/20 text-textcolor hover:bg-teal-500/30',
+				ghost: 'hover:bg-teal-500/10 hover::text-textcolor',
 				link: 'text-textcolor underline-offset-4 hover:text-teal-500',
 				dynamic:
-					'relative overflow-hidden hover:bg-theme/10 dark:hover:bg-accent/50 before:pointer-events-none before:absolute before:inset-0 before:z-0 before:content-[""] before:-translate-x-full before:bg-linear-to-r before:from-transparent before:via-white/30 before:to-transparent dark:before:via-white/12 before:transition-transform before:duration-500 before:ease-out hover:before:translate-x-full [&>*]:relative [&>*]:z-[1]',
-				loading: 'bg-theme/30 hover:bg-theme/30',
+					'relative overflow-hidden hover:bg-teal-500/10 before:pointer-events-none before:absolute before:inset-0 before:z-0 before:content-[""] before:-translate-x-full before:bg-linear-to-r before:from-transparent before:via-white/30 before:to-transparent dark:before:via-white/12 before:transition-transform before:duration-500 before:ease-out hover:before:translate-x-full [&>*]:relative [&>*]:z-[1]',
+				loading: 'bg-teal-500/30 hover:bg-teal-500/30',
 			},
 			size: {
 				default: 'h-9 px-4 py-2 has-[>svg]:px-3 pb-2.5',
