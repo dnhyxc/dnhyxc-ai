@@ -43,6 +43,43 @@ function entryOriginOf(entry: string): string {
 	}
 }
 
+/** Host 源码根（…/apps/frontend），由本模块 URL 推导，避免白名单 remote 目录名 */
+let hostViteRootCache: string | null = null;
+function hostViteRoot(): string {
+	if (hostViteRootCache != null) return hostViteRootCache;
+	try {
+		const path = decodeURIComponent(
+			new URL(import.meta.url).pathname.replace(/\\/g, '/'),
+		);
+		const marker = '/apps/frontend';
+		const idx = path.lastIndexOf(marker);
+		if (idx >= 0) {
+			hostViteRootCache = path.slice(0, idx + marker.length);
+			return hostViteRootCache;
+		}
+	} catch {
+		/* ignore */
+	}
+	hostViteRootCache = '/apps/frontend';
+	return hostViteRootCache;
+}
+
+/**
+ * 是否为 Host 自身 Vite 注入的 style（dev）。
+ * 只排除 Host；其余 app（micro / remote-demo / 未来新目录）在 capture 窗口内一律可认领。
+ */
+function isHostViteDevStyle(viteId: string): boolean {
+	const id = viteId.replace(/\\/g, '/');
+	const root = hostViteRoot();
+	if (root && id.includes(root)) return true;
+	if (/\/apps\/frontend(?:\/|$)/i.test(id)) return true;
+	// Host Vite 相对 id（无 monorepo apps/ 段）；Remote 一般是 @fs 绝对路径含 apps/<name>
+	if (!/\/apps\//i.test(id) && (/^\/src\//.test(id) || /^\/@id\//.test(id))) {
+		return true;
+	}
+	return false;
+}
+
 function looksLikeRemoteStyle(
 	el: HTMLStyleElement | HTMLLinkElement,
 	ctx: CaptureCtx,
@@ -59,12 +96,8 @@ function looksLikeRemoteStyle(
 		}
 	}
 	const viteId = el.getAttribute('data-vite-dev-id') || '';
-	if (viteId) {
-		return /(?:^|[\\/])micro(?:[\\/]|$)|remote-plugins|remote-demo|remote-host/i.test(
-			viteId,
-		);
-	}
-	// 生产 MF 注入的 style 常无 vite id：仅在主动 capture 窗口内认领
+	// Dev：有 vite id 时排除 Host，其余交给当前 capture；生产无 id 同样仅认领 active
+	if (viteId && isHostViteDevStyle(viteId)) return false;
 	return active?.pluginId === ctx.pluginId;
 }
 

@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）+ `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）+ `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
 
 ---
 
@@ -1967,8 +1967,10 @@ sequenceDiagram
 
 1. `data-mf-style-owner === pluginId`（已认领）
 2. `<link rel="stylesheet">`：`href` 的 **origin === entryOrigin**
-3. `<style data-vite-dev-id>`：匹配 `/remote-plugins|remote-demo|remote-host/i`（dev）
-4. 生产无 vite id：**仅在当前 capture 窗口**（`active.pluginId === ctx.pluginId`）认领
+3. `<style data-vite-dev-id>`（**仅 dev / HMR**）：**排除 Host**（`import.meta.url` 推出的 `…/apps/frontend` 根、或 Host 相对 id `/src/*` `/@id/*`）；其余在当前 capture 窗口认领。**不**再维护 `micro|remote-demo|…` 目录白名单——新增/重命名 `apps/<remote>` 无需改此文件
+4. 无 vite id（**生产 MF 常见**）：**仅在当前 capture 窗口**（`active.pluginId === ctx.pluginId`）认领
+
+线上构建一般无 `data-vite-dev-id`，走第 4 步；第 3 步只影响本地 Vite 同页注入。
 
 处理策略：
 
@@ -2080,8 +2082,48 @@ function entryOriginOf(entry: string): string {
 }
 
 /**
+ * Host 源码根（…/apps/frontend），由本模块 URL 推导。
+ * 用「排除 Host」替代「白名单 remote 目录名」，与 MF 动态加载一致。
+ */
+let hostViteRootCache: string | null = null;
+function hostViteRoot(): string {
+	if (hostViteRootCache != null) return hostViteRootCache;
+	try {
+		const path = decodeURIComponent(
+			new URL(import.meta.url).pathname.replace(/\\/g, '/'),
+		);
+		const marker = '/apps/frontend';
+		const idx = path.lastIndexOf(marker);
+		if (idx >= 0) {
+			hostViteRootCache = path.slice(0, idx + marker.length);
+			return hostViteRootCache;
+		}
+	} catch {
+		/* ignore */
+	}
+	hostViteRootCache = '/apps/frontend';
+	return hostViteRootCache;
+}
+
+/**
+ * 是否为 Host 自身 Vite 注入的 style（dev）。
+ * 只排除 Host；micro / remote-demo / 未来 apps/<name> 在 capture 窗口内均可认领。
+ */
+function isHostViteDevStyle(viteId: string): boolean {
+	const id = viteId.replace(/\\/g, '/');
+	const root = hostViteRoot();
+	if (root && id.includes(root)) return true;
+	if (/\/apps\/frontend(?:\/|$)/i.test(id)) return true;
+	// Host Vite 相对 id（无 monorepo apps/ 段）；Remote 一般是 @fs 绝对路径含 apps/<name>
+	if (!/\/apps\//i.test(id) && (/^\/src\//.test(id) || /^\/@id\//.test(id))) {
+		return true;
+	}
+	return false;
+}
+
+/**
  * 判断节点是否属于当前插件的 Remote 样式。
- * 顺序：已标记 → link origin → vite-dev-id → 捕获窗口认领。
+ * 顺序：已标记 → link origin →（dev）排除 Host vite-dev-id → 捕获窗口认领。
  */
 function looksLikeRemoteStyle(
 	el: HTMLStyleElement | HTMLLinkElement,
@@ -2099,10 +2141,8 @@ function looksLikeRemoteStyle(
 		}
 	}
 	const viteId = el.getAttribute('data-vite-dev-id') || '';
-	if (viteId) {
-		return /remote-plugins|remote-demo|remote-host/i.test(viteId);
-	}
-	// 生产 MF 注入的 style 常无 vite id：仅在主动 capture 窗口内认领
+	// Dev：有 vite id 时排除 Host；生产无 id 同样仅认领 active
+	if (viteId && isHostViteDevStyle(viteId)) return false;
 	return active?.pluginId === ctx.pluginId;
 }
 

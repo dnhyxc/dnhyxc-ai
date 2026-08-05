@@ -1,5 +1,7 @@
 # 主子项目样式隔离实现
 
+> **延伸阅读**：本文记录样式隔离的**完整初始实现**。其中 §3.3 / §4.1 的 `looksLikeRemoteStyle` viteId 分支后续已重构——dev 模式由「白名单 remote 目录名」改为「排除 Host 自身」，详见 [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)。下方 §3.3 / §4.1 保留初始版本代码以供历史对照，最新源码以仓库为准。
+
 ## 1. 背景与目标
 
 ### 1.1 问题
@@ -79,6 +81,8 @@
 3. Vite 开发模式：检查 `data-vite-dev-id` 是否含 remote 路径
 4. 生产环境：捕获窗口期内注入的归属于当前插件
 
+> **已更新**：第 3 步的「白名单 remote 目录名」正则后续已改为「排除 Host 自身 Vite 样式」（`hostViteRoot` + `isHostViteDevStyle`），新增 / 重命名 `apps/<remote>` 不必再改正则。详见 [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)。
+
 ### 3.4 嵌套安全
 
 使用引用计数（`patchDepth`）管理 DOM 方法劫持，支持插件嵌套加载，计数归零才恢复原生方法。
@@ -90,6 +94,8 @@
 ### 4.1 `styleIsolation.ts` — 样式隔离核心（纯新增）
 
 `styleIsolation.ts` 为纯新增文件，无改动前版本。以下为完整源码逐行注释。
+
+> **已更新**：下方 `looksLikeRemoteStyle` 的 viteId 分支（白名单正则 `micro|remote-plugins|remote-demo|remote-host`）后续已重构为「排除 Host」方案（新增 `hostViteRoot` / `isHostViteDevStyle`）。以下代码保留初始版本供历史对照，最新源码见仓库 `apps/frontend/src/plugins/host/styleIsolation.ts`，重构细节见 [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)。
 
 **新增** · `apps/frontend/src/plugins/host/styleIsolation.ts`（全文，约 L1–L214）
 

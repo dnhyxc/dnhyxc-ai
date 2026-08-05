@@ -43,6 +43,7 @@
 | [logout-unify-theme-sync.md](./logout-unify-theme-sync.md) | **登出统一 + 多窗主题同步**：新增 `performLogout(navigate?)` 集中清态（侧边栏 / File 菜单 / 401 三入口复用）、动态 import 规避 `utils↔authSession↔store` 静态循环、`changeTheme` 写完 store 后 `setThemeToAllWindows` 广播、新增 `readWindowChromeThemeSync` 三级回退同步读、`onCreateWindow` 已存在窗 `setTheme`（含改动前/后对比与逐行注释） |
 | [style-isolation-tech-overview.md](./style-isolation-tech-overview.md) | **主项目样式隔离技术说明**：5 分钟快速了解 @scope 原理、两层捕获机制、trusted/untrusted 两种模式、主子项目各自关注点、常见问题 FAQ |
 | [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |
+| [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md) | **开发态样式认领：白名单 → 排除 Host**：`looksLikeRemoteStyle` viteId 分支由匹配 `micro\|remote-plugins\|…` 目录名改为 `hostViteRoot` + `isHostViteDevStyle` 排除 Host，新增/重命名 `apps/<remote>` 不必改正则（含改动前/后对比与逐行注释） |
 | [remote-demo-audio-player.md](./remote-demo-audio-player.md) | **remote-demo 插件多音频连续播放**：集成 AudioPlayer 组件、支持三段音频自动连续播放、进度跟踪和手动跳转 |
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |

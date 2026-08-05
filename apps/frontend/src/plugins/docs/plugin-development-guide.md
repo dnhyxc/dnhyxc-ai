@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`。参考实现：`apps/remote-plugins`（端口 **9008**）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host，不白名单 remote 目录名）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -413,7 +413,9 @@ export async function deactivate() {
 | `first-party` / `partner` | Host `styleIsolation.ts` 运行时 `@scope([data-mf-plugin])` | 正常 `@import "tailwindcss"`（含 Preflight） |
 | `untrusted` | iframe | 独立文档样式，互不影响 |
 
-详见 `apps/remote-plugins/plugin-info.md` 与 `docs/ideas/mf-css-isolation.md`。
+Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应用目录改名一般**不必**改 Host；生产无 `data-vite-dev-id`，只在 load/挂载 capture 窗口认领。详见 `mf-implementation-guide.md` §2.10.2。
+
+详见 `apps/micro/plugin-info.md` 与 `docs/ideas/mf-css-isolation.md`。
 
 ### 5.2 样式文件示例
 

@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`）。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`）。若不一致，以源码为准。
 
 ---
 
@@ -1533,6 +1533,8 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 `first-party` / `partner`：Host `styleIsolation.ts` 在 loadRemote / 挂载期间把 Remote 注入的 CSS 包进  
 `@scope ([data-mf-plugin="id"])`。Remote **可用**正常 `@import "tailwindcss"`。  
 `untrusted` 走 iframe，天然隔离。
+
+开发态认领 Remote `<style>` 时**排除 Host**（由本模块 URL 推导 `…/apps/frontend`），不维护子项目目录白名单；新增/重命名 `apps/<remote>` 一般不必改 Host。生产构建通常无 `data-vite-dev-id`，仍只在 capture 窗口认领，行为与原先一致。详见 [mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md)。
 
 ### C. 参考文档
 
