@@ -81,6 +81,7 @@ export default defineConfig(({ mode }) => {
 			// 禁止把 shared 打进 .vite/deps（否则 deps 里会 import virtual:mf 且常解析失败）
 			exclude: MF_SHARED_EXCLUDE,
 			include: [
+				'@tauri-apps/api/core',
 				'@dnhyxc-ai/markdown-kit/react',
 				'prettier/standalone',
 				'prettier/plugins/babel',

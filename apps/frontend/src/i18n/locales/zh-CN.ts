@@ -723,6 +723,22 @@ export const zhCN = {
 	'home.hero.quickStart': '快速开始',
 	'home.hero.learnMore': '了解更多',
 	'home.hero.downloadDesktop': '下载桌面版',
+	'home.hero.knowledge.title': '知识库',
+	'home.hero.knowledge.subtitle': 'Markdown 笔记',
+	'home.hero.knowledge.desc':
+		'所见即所得的 Markdown 编辑器，支持文件导入、双向预览、草稿自动保存与回收站恢复，让每一条灵感都能被妥善沉淀、随时检索与高效复用，构建你的私人知识体系。',
+	'home.hero.ebook.title': '书架',
+	'home.hero.ebook.subtitle': '电子书阅读',
+	'home.hero.ebook.desc':
+		'导入 EPUB 电子书，通过目录导航、全文搜索、阅读进度跟踪与书签管理，打造沉浸式阅读体验，让每一本好书都触手可及、随时翻阅，在数字书架上延续阅读的温度。',
+	'home.hero.english.title': '英语学习',
+	'home.hero.english.subtitle': '单词与句型',
+	'home.hero.english.desc':
+		'每日单词推送、经典句练习、错题本与收藏夹，多维度提升词汇量与语感，结合艾宾浩斯记忆曲线科学复习，让英语学习更高效、更有节奏，从输入到输出形成完整闭环。',
+	'home.hero.plugins.title': '插件中心',
+	'home.hero.plugins.subtitle': '可扩展架构',
+	'home.hero.plugins.desc':
+		'安装社区插件扩展能力，或参考开发手册打造专属插件，灵活接入你的工作流，让工具随需求生长、由你定义，在开放生态中构建独一无二的专属工作台。',
 	'home.features.enter': '进入模块',
 	'home.sections.showcase': '特色功能',
 	'home.sections.steps': '快速开始',

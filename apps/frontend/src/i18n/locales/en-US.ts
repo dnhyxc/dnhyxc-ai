@@ -790,6 +790,22 @@ export const enUS = {
 	'home.hero.quickStart': 'Get started',
 	'home.hero.learnMore': 'Learn more',
 	'home.hero.downloadDesktop': 'Download desktop app',
+	'home.hero.knowledge.title': 'Knowledge',
+	'home.hero.knowledge.subtitle': 'Markdown Notes',
+	'home.hero.knowledge.desc':
+		'A WYSIWYG Markdown editor with file import, dual-pane preview, draft auto-save and trash recovery — capture every spark of inspiration, organize knowledge, and build your personal wiki with structured notes.',
+	'home.hero.ebook.title': 'Bookshelf',
+	'home.hero.ebook.subtitle': 'E-book Reader',
+	'home.hero.ebook.desc':
+		'Import EPUB books with table-of-content navigation, full-text search, reading progress and bookmarks for an immersive reading experience. Every book is within reach, always ready on your digital bookshelf.',
+	'home.hero.english.title': 'English Learning',
+	'home.hero.english.subtitle': 'Vocabulary & Quotes',
+	'home.hero.english.desc':
+		'Daily words, classic quote practice, mistake book and favorites — build vocabulary and language intuition from multiple angles. Scientific spaced repetition keeps your learning efficient, rhythmic, and rewarding.',
+	'home.hero.plugins.title': 'Plugins',
+	'home.hero.plugins.subtitle': 'Extensible',
+	'home.hero.plugins.desc':
+		'Install community plugins to extend capabilities, or follow the dev guide to build your own and flexibly integrate into your workflow. Let your tools grow with your needs in an open, customizable ecosystem.',
 	'home.features.enter': 'Enter',
 	'home.sections.showcase': 'Highlights',
 	'home.sections.steps': 'Quick start',
