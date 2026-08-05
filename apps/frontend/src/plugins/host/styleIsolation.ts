@@ -60,7 +60,9 @@ function looksLikeRemoteStyle(
 	}
 	const viteId = el.getAttribute('data-vite-dev-id') || '';
 	if (viteId) {
-		return /remote-plugins|remote-demo|remote-host/i.test(viteId);
+		return /(?:^|[\\/])micro(?:[\\/]|$)|remote-plugins|remote-demo|remote-host/i.test(
+			viteId,
+		);
 	}
 	// 生产 MF 注入的 style 常无 vite id：仅在主动 capture 窗口内认领
 	return active?.pluginId === ctx.pluginId;

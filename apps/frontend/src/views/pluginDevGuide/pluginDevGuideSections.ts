@@ -579,7 +579,7 @@ http {
     }
   }
 
-  # ── remote-plugins 插件集合部署（端口 9008，可托管多个插件） ──
+  # ── micro 插件集合部署（端口 9008，可托管多个插件） ──
   server {
     listen 9008 ssl;
     server_name  dnhyxc.cn;
@@ -603,7 +603,7 @@ http {
         return 204;
       }
 
-      root  /usr/local/nginx/remote-plugins/dist;
+      root  /usr/local/nginx/micro/dist;
       index   index.html  index.htm;
       try_files   $uri  $uri/ /index.html;
     }

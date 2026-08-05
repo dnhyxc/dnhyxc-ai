@@ -1,4 +1,4 @@
-/** remote-plugins copy (English) */
+/** micro (formerly remote-plugins) copy (English) */
 const enUS: Record<string, string> = {
 	'common.confirm': 'Confirm',
 	'common.cancel': 'Cancel',
@@ -13,7 +13,7 @@ const enUS: Record<string, string> = {
 	'common.toggleLanguage': 'Toggle language',
 	'common.connectingHost': 'Connecting to host…',
 
-	'layout.brand': 'remote-plugins',
+	'layout.brand': 'micro',
 	'layout.home': 'Home',
 	'layout.learningNotes': 'Learning notes',
 	'layout.ideasList': 'EPUB ideas',

@@ -1,4 +1,4 @@
-/** remote-plugins 文案（中文） */
+/** micro（原 remote-plugins）文案（中文） */
 const zhCN: Record<string, string> = {
 	'common.confirm': '确认',
 	'common.cancel': '取消',
@@ -13,7 +13,7 @@ const zhCN: Record<string, string> = {
 	'common.toggleLanguage': '切换语言',
 	'common.connectingHost': '连接 Host…',
 
-	'layout.brand': 'remote-plugins',
+	'layout.brand': 'micro',
 	'layout.home': '首页',
 	'layout.learningNotes': '学习笔记',
 	'layout.ideasList': 'EPUB 想法列表',

@@ -13,12 +13,12 @@
 	},
 	"restartScript": "pm2 restart server",
 	"remotePlugins": {
-		"name": "remote-plugins",
+		"name": "micro",
 		"localFilePath": {
-			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/remote-plugins",
-			"windows": "E:\\code\\dnhyxc-ai\\apps\\remote-plugins"
+			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/micro",
+			"windows": "E:\\code\\dnhyxc-ai\\apps\\micro"
 		},
-		"remoteFilePath": "/usr/local/nginx/remote-plugins",
+		"remoteFilePath": "/usr/local/nginx/micro",
 		"isServer": false
 	}
 }
