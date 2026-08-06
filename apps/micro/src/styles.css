@@ -70,6 +70,10 @@ body {
 	--theme-secondary: var(--secondary);
 	--theme-muted: var(--muted);
 	--theme-card: var(--card);
+	--brand-accent: #14b8a6;
+	--brand-accent-soft: color-mix(in oklch, var(--brand-accent) 55%, white);
+	--brand-accent-light: color-mix(in oklch, var(--brand-accent) 75%, white);
+	--brand-accent-dark: color-mix(in oklch, var(--brand-accent) 85%, black);
 }
 
 .dark {
@@ -100,6 +104,10 @@ body {
 	--theme-secondary: var(--secondary);
 	--theme-muted: var(--muted);
 	--theme-card: var(--card);
+	--brand-accent: #14b8a6;
+	--brand-accent-soft: color-mix(in oklch, var(--brand-accent) 55%, white);
+	--brand-accent-light: color-mix(in oklch, var(--brand-accent) 75%, white);
+	--brand-accent-dark: color-mix(in oklch, var(--brand-accent) 85%, black);
 }
 
 /* 与主站知识库 header 一致：Lucide hover 描边画线 */
@@ -156,4 +164,8 @@ body {
 	--color-theme-secondary: var(--theme-secondary);
 	--color-theme-muted: var(--theme-muted);
 	--color-theme-card: var(--theme-card);
+	--color-teal-300: var(--brand-accent-soft);
+	--color-teal-400: var(--brand-accent-light);
+	--color-teal-500: var(--brand-accent);
+	--color-teal-600: var(--brand-accent-dark);
 }

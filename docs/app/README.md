@@ -45,6 +45,8 @@
 | [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |
 | [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md) | **开发态样式认领：白名单 → 排除 Host**：`looksLikeRemoteStyle` viteId 分支由匹配 `micro\|remote-plugins\|…` 目录名改为 `hostViteRoot` + `isHostViteDevStyle` 排除 Host，新增/重命名 `apps/<remote>` 不必改正则（含改动前/后对比与逐行注释） |
 | [remote-demo-audio-player.md](./remote-demo-audio-player.md) | **remote-demo 插件多音频连续播放**：集成 AudioPlayer 组件、支持三段音频自动连续播放、进度跟踪和手动跳转 |
+| [video-player-plugin.md](./video-player-plugin.md) | **视频播放器插件**：基于 xgplayer 的视频播放插件实现，支持多文件上传、自定义控制条、PiP、影院态全屏、选集、倍速等（含改动前/后对比与逐行注释） |
+| [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md) | **插件影院态全屏与路由防闪 404**：`appFullscreen` 单例、Layout 影院态订阅、`PluginPageShell` 统一外壳、`pluginsReady` + `PluginRoutesPending` 防 404、侧栏菜单拆分、Tauri 全屏 capability（含改动前/后对比与逐行注释） |
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |

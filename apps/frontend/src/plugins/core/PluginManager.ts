@@ -15,7 +15,7 @@ import type { LoadedPlugin, PluginDescriptor } from './types';
 
 function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 	const Page: ComponentType = () =>
-		createElement(PluginHostPage, { pluginId: meta.id });
+		createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 	return {
 		path: meta.routePath,
 		Component: Page,

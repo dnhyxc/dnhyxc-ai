@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）+ `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）+ `afterResolve` 补 `remoteEntry.js?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**。若与源码不一致，以源码为准。
 
 ---
 
@@ -20,11 +20,13 @@
    - 2.8 插件验证器 (`PluginVerifier.ts`)
    - 2.9 Registry 管理 (`registry.ts`)
    - 2.10 插件宿主页面 (`PluginHostPage.tsx`)
+   - 2.10.0 独立路由外壳 (`PluginPageShell.tsx`)
    - 2.10.1 错误边界
    - **2.10.2 主子样式隔离（原理与完整实现）**
-   - 2.11 路由构建与初始化 (`buildRoutes.ts` / `router/index.tsx`)
+   - **2.11 路由构建与初始化**（含刷新子应用防闪 404）
    - 2.12 语言（locale）同步
    - **2.13 插件/子应用加载缓存破坏（完整方案）**
+   - **2.14 应用级全屏（影院态）**
 3. [子项目/插件接入](#3-子项目插件接入)
    - 3.1 Vite 配置
    - 3.2 组件实现规范
@@ -36,6 +38,7 @@
 4. [完整数据流](#4-完整数据流)
 5. [常见问题与解决方案](#5-常见问题与解决方案)
    - 5.7 样式隔离相关
+   - **5.9 刷新子应用先闪 404**
 
 ---
 
@@ -48,12 +51,14 @@
 - **共享 React 单例**：Host 和 Remote 共享同一个 React 实例，避免双 React 问题
 - **安全验证**：包含信任等级、origin 白名单、hostApi 版本检查、可选 integrity 校验
 - **幂等注入**：路由和侧栏注入支持幂等，避免重复注入导致闪烁
+- **刷新防闪 404**：`pluginsReady` + catch-all 占位（§2.11）；静态路由仍可首屏匹配
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
 - **样式隔离**：Host 运行时 `@scope([data-mf-plugin])` + head 劫持 + MutationObserver（详解 §2.10.2）；`untrusted` 走 iframe
 - **entry 缓存破坏**：`pluginBust = version@manifestHash`（指纹来自 Remote 自有 `mf-manifest`；发布者勿改 Host registry）；`registerRemotes` 与 `afterResolve` 均给 entry / `remoteEntry.js` 补 `?v=`（WKWebView 固定名 ESM 强缓存）
 - **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
+- **应用级全屏**：`api.ui.setAppFullscreen`（`ui:toast`）驱动 Layout 影院态 + Tauri/Web 系统全屏；独立路由页 `pageShell` → `PluginPageShell`（§2.14 / 专题文档）
 
 ---
 
@@ -578,12 +583,30 @@ export interface HostBridgeProps {
 			put: <T = unknown>(url: string, body?: unknown) => Promise<T>;
 			delete: <T = unknown>(url: string) => Promise<T>;
 		};
-		/** UI（需 ui:toast） */
+		/** UI（需 ui:toast）：Toast / 应用级全屏 / 统一落盘 */
 		ui?: {
 			showToast: (options: {
 				message: string;
 				type?: 'success' | 'error' | 'info';
 			}) => void;
+			/**
+			 * 应用级全屏：隐藏 Host 壳（侧栏/顶栏）并（Tauri）拉窗口全屏 /（Web）document 全屏。
+			 * 实现见 host-api/appFullscreen.ts；Layout / PluginPageShell 订阅状态。
+			 */
+			setAppFullscreen?: (full: boolean) => Promise<void>;
+			/**
+			 * 统一落盘（Web `<a download>` / Tauri `download_blob`）。
+			 * Tauri 成功/失败时 Host 已 Toast，`hostToasted: true` 时插件勿再弹成功提示。
+			 */
+			downloadBlob?: (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => Promise<{
+				ok: boolean;
+				hostToasted: boolean;
+				message?: string;
+			}>;
 		};
 		/** 模块 API（需 modules:chat / modules:ebook） */
 		modules?: Readonly<Record<string, (...args: unknown[]) => unknown>>;
@@ -671,11 +694,11 @@ import type { LoadedPlugin, PluginDescriptor } from './types';
  * @param meta - 插件描述符
  * @returns 路由配置对象
  * - 使用 PluginHostPage 作为组件
- * - 传递 pluginId 给宿主页面
+ * - pageShell: true → 独立路由套 PluginPageShell（业务内嵌勿传）
  */
 function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 	const Page: ComponentType = () =>
-		createElement(PluginHostPage, { pluginId: meta.id });
+		createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 	return {
 		path: meta.routePath,
 		Component: Page,
@@ -1215,6 +1238,7 @@ export const sidebarInjector = new SidebarInjectorImpl();
 ```typescript
 import { Toast } from '@ui/sonner';
 import { http } from '@/utils/fetch';
+import { setAppFullscreen } from '../host-api/appFullscreen';
 import { deepFreeze } from '../host-api/deepFreeze';
 import { createEbookModulesApi } from '../host-api/ebookHostApi';
 import { eventBus } from '../host-api/EventBus';
@@ -1274,7 +1298,7 @@ export function createHostBridge(
 		},
 	};
 
-	// 如果有 ui:toast 权限，添加 UI API
+	// 如果有 ui:toast 权限，添加 UI API（Toast + 应用级全屏 + 统一落盘）
 	if (allow.has('ui:toast')) {
 		api.ui = Object.freeze({
 			showToast: (options: {
@@ -1285,6 +1309,16 @@ export function createHostBridge(
 					type: options.type ?? 'info',
 					title: options.message,
 				});
+			},
+			/** 应用级全屏：藏壳 + Tauri 窗口 / Web document 全屏（见 §2.14） */
+			setAppFullscreen,
+			/** 与主站收藏导出同源：Web / Tauri2 统一落盘 */
+			downloadBlob: async (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => {
+				// ... 见源码 createHostBridge.ts：downloadBlob + hostToasted
 			},
 		});
 	}
@@ -1812,14 +1846,23 @@ export function clearPluginRegistryCache() {
 2. **MF**：`withLiveLocale` 覆盖 `api.locale` + `eventBus.emit(pluginId, 'locale')`；包装 `data-mf-plugin`；挂载期 `attachPluginStyleIsolation`
 3. **untrusted**：`<iframe sandbox=...>` + `attachIframeBridge`（用 `loaded.bridge`，**不用** liveBridge）
 4. Loading / 失败文案走 Host i18n keys：`plugins.host.*`
+5. **`pageShell?: boolean`**：为 `true` 时用 `PluginPageShell` 包裹激活态内容（**仅** `PluginManager.createPluginRoute` 传 true；业务内嵌勿开）
 
 ```typescript
-// 摘录：locale 热更新 + 双路径渲染
+// 摘录：pageShell + locale 热更新 + 双路径渲染
+type Props = {
+	pluginId: string;
+	className?: string;
+	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
+	/** 独立路由页：套 Host 统一容器。业务树内嵌勿开。 */
+	pageShell?: boolean;
+};
+
 function withLiveLocale(bridge: HostBridgeProps, locale: HostLocale): HostBridgeProps {
 	return { ...bridge, api: { ...bridge.api, locale } };
 }
 
-export function PluginHostPage({ pluginId }: Props) {
+export function PluginHostPage({ pluginId, className, part, pageShell }: Props) {
 	const { locale, t } = useI18n();
 	// ... ensurePlugin(pluginId, { force: retryKey > 0 }) ...
 
@@ -1838,34 +1881,49 @@ export function PluginHostPage({ pluginId }: Props) {
 		[loaded?.bridge, locale],
 	);
 
+	const wrap = (node: ReactNode) =>
+		pageShell ? <PluginPageShell>{node}</PluginPageShell> : node;
+
 	if (loaded?.status === 'activated') {
 		if (loaded.meta.trust === 'untrusted') {
-			return (
+			return wrap(
 				<PluginErrorBoundary pluginId={pluginId}>
 					<UntrustedIframe
 						pluginId={pluginId}
 						src={loaded.meta.iframeUrl!}
 						bridge={loaded.bridge}
 					/>
-				</PluginErrorBoundary>
+				</PluginErrorBoundary>,
 			);
 		}
 		const Comp = loaded.mod.default;
-		return (
+		return wrap(
 			<PluginErrorBoundary pluginId={pluginId}>
 				<div
-					className={`plugin-${pluginId} h-full w-full`}
+					className={cn(`plugin-${pluginId} h-full w-full min-h-0`, className)}
 					data-mf-plugin={pluginId}
 					data-plugin-root
 				>
 					<Comp {...liveBridge!} />
 				</div>
-			</PluginErrorBoundary>
+			</PluginErrorBoundary>,
 		);
 	}
-	// Loading / failed + 手动重试按钮（i18n）
+	// Loading / failed + 手动重试按钮（i18n）；loading 态当前未强制 wrap pageShell
 }
 ```
+
+`PluginManager.createPluginRoute`：
+
+```typescript
+createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
+```
+
+#### 2.10.0 独立路由外壳 (`PluginPageShell.tsx`)
+
+**文件路径**：`apps/frontend/src/plugins/host/PluginPageShell.tsx`
+
+订阅 `subscribeAppFullscreen`：正常态 `p-5.5 pt-0` + 圆角内容区；影院态 `p-0` / `rounded-none`。完整说明见 §2.14。
 
 #### 2.10.1 错误边界
 
@@ -2330,27 +2388,76 @@ export function attachPluginStyleIsolation(
 
 ### 2.11 路由构建与初始化
 
-**文件路径**：`apps/frontend/src/router/buildRoutes.ts`
+**文件路径**：`apps/frontend/src/router/buildRoutes.ts`、`apps/frontend/src/router/index.tsx`
+
+#### 2.11.1 问题：刷新子应用路径先闪 404
+
+| 项 | 说明 |
+|----|------|
+| **现象** | 硬刷新 `/video-player` 等 `injectRoute` 插件路径时，先出现 Host「404 Not Found」，再渲染子应用页 |
+| **根因** | 插件路由由 `pluginManager.init()` **异步**注入；首屏 `createBrowserRouter(buildRoutes())` 只有静态表。静态表顶层有 `path: '*'` → `NotFound`。URL 尚未挂到 Layout children 时命中 catch-all，于是闪 404；init 完成后 `routeInjector` notify / epoch +1 重建 router，才命中插件页 |
+| **为何不阻塞整站** | 若等 init 完再挂 `RouterProvider`，首页/聊天等静态路由也会被 registry/偏好网络拖慢。只改 catch-all：插件未就绪时用占位组件，静态路由照常首屏可用 |
+
+```mermaid
+sequenceDiagram
+	participant User
+	participant App as router/index.tsx
+	participant RR as createBrowserRouter
+	participant PM as pluginManager.init
+	participant RI as routeInjector
+
+	User->>App: 硬刷新 /video-player
+	App->>RR: buildRoutes(pluginsReady=false)
+	Note over RR: 无动态路由；* → PluginRoutesPending（非 404）
+	App->>PM: 异步 init
+	PM->>RI: mountShell → inject
+	RI-->>App: subscribe → routeEpoch++
+	App->>RR: buildRoutes(false) + 动态路由
+	Note over RR: 命中 Layout children 插件页
+	PM-->>App: finally → pluginsReady=true
+	App->>RR: buildRoutes(true)
+	Note over RR: * 恢复为真正 NotFound
+```
+
+#### 2.11.2 方案要点
+
+1. App 增加 `pluginsReady`（初始 `false`）；`pluginManager.init()` 在 **`finally`** 里置 `true` 并 bump `routeEpoch`（失败也要 ready，否则真 404 永远不出现）。
+2. `buildRoutes(pluginsReady)`：未就绪时把静态表里 `path === '*'` 的 `Component` 换成 `PluginRoutesPending`（主题色空白占位）；就绪后仍用 `NotFound`。
+3. 动态路由仍挂到 **Layout（routes[0]）的 children 末尾**；catch-all 仍是顶层兄弟路由。Header / `routeMeta` 调 `buildRoutes()` 默认 `pluginsReady=true`，只读 meta，不受占位影响。
+
+#### 2.11.3 `buildRoutes.ts`（与源码对齐）
 
 ```typescript
-import { routeInjector } from "@/plugins";
-import routes, { type RouteConfig } from "./routes";
+import { createElement } from 'react';
+import { routeInjector } from '@/plugins';
+import routes, { type RouteConfig } from './routes';
+
+/** 插件壳未就绪时占住 `*`，避免刷新子项目路径先闪 404 */
+function PluginRoutesPending() {
+	// 顶层 * 无 Layout；用主题背景空白即可，不必上 Loading 动画
+	return createElement('div', {
+		className: 'h-full w-full bg-theme-background',
+	});
+}
 
 /**
- * 构建完整路由表
- * - 静态壳路由 + PluginManager 注入的动态插件路由
- * - 无动态项时直接返回静态表（避免无谓复制）
- * @returns 路由配置数组
+ * 静态壳路由 + PluginManager 注入的动态插件路由
+ * @param pluginsReady - false：catch-all 用占位；true：真正 NotFound
  */
-export function buildRoutes(): RouteConfig[] {
-	// 获取当前已注入的动态路由
+export function buildRoutes(pluginsReady = true): RouteConfig[] {
 	const dynamic = routeInjector.getRoutes();
-	
-	// 无动态项时直接返回静态表
-	if (dynamic.length === 0) return routes;
+	// 未就绪：只替换 *，其它静态 path 不变，首页/聊天仍可立刻匹配
+	const base = pluginsReady
+		? routes
+		: routes.map((route) =>
+				route.path === '*'
+					? { ...route, Component: PluginRoutesPending }
+					: route,
+			);
 
-	// 将动态路由挂到 Layout 壳的 children 末尾
-	return routes.map((route, index) => {
+	if (dynamic.length === 0) return base;
+
+	return base.map((route, index) => {
 		// Layout 壳：首条带 children 的路由
 		if (index === 0 && route.children) {
 			return {
@@ -2363,57 +2470,42 @@ export function buildRoutes(): RouteConfig[] {
 }
 ```
 
-**文件路径**：`apps/frontend/src/router/index.tsx`
+#### 2.11.4 `router/index.tsx`（关键片段）
 
 ```typescript
-import { useState, useEffect, useMemo } from 'react';
-import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom';
-import { pluginManager, routeInjector } from '@/plugins';
-import { buildRoutes } from './buildRoutes';
-// ... 其他导入
-
 const App = () => {
 	useInputsOnlyTab();
-	
-	// 路由世代：注入变化或 init 完成时 +1，触发重建 router
+	// 路由世代：inject / init 结束时 +1，触发重建 router
 	const [routeEpoch, setRouteEpoch] = useState(0);
+	// false 时 catch-all 不渲染 404，等插件壳挂上后再决断
+	const [pluginsReady, setPluginsReady] = useState(false);
 
 	useEffect(() => {
-		// 订阅路由注入变化：变化时递增 epoch，触发 router 重建
 		const unsub = routeInjector.subscribe(() => {
 			setRouteEpoch((n) => n + 1);
 		});
-		
-		// 启动插件系统
 		void pluginManager
 			.init()
-			.then(() => setRouteEpoch((n) => n + 1))  // init 完成后重建 router
-			.catch((e) => console.error('[plugins] init failed', e));
-		
-		// 清理：取消订阅
+			.catch((e) => console.error('[plugins] init failed', e))
+			.finally(() => {
+				// 成功或失败都 ready，避免假路径永远停在占位
+				setPluginsReady(true);
+				setRouteEpoch((n) => n + 1);
+			});
 		return unsub;
 	}, []);
 
-	// 根据 epoch 创建 router（useMemo 避免不必要的重建）
 	const router = useMemo(() => {
-		const r = createBrowserRouter(buildRoutes() as RouteObject[]);
-		
-		// 把 SPA navigate 注入 Manager，供 Bridge 使用
+		const r = createBrowserRouter(
+			buildRoutes(pluginsReady) as RouteObject[],
+		);
 		pluginManager.setNavigate((to) => {
 			void r.navigate(to);
 		});
-		
 		return r;
-	}, [routeEpoch]);
+	}, [routeEpoch, pluginsReady]);
 
-	// ... 其他 useEffect
-
-	return (
-		<div className="h-full w-full bg-theme-background">
-			<Toaster />
-			<RouterProvider router={router} />
-		</div>
-	);
+	// ...
 };
 ```
 
@@ -2995,6 +3087,137 @@ export interface LoadedPlugin {
 | 只发插件不发桌面壳 | 生产 Host 逻辑在壳内，必须发壳 |
 | 发布者改 Host registry 刷缓存 | **禁止**；部署 Remote 即可 |
 | 把 `version` 写成 `hostApiRange` | 保存失败或加载报 HOST_API 不兼容 |
+
+---
+
+### 2.14 应用级全屏（影院态）
+
+接入手册视角与回归清单见 `host-plugin-integration-guide.md` §15；插件调用见 `plugin-development-guide.md` §16。
+
+#### 2.14.1 模块 `host-api/appFullscreen.ts`（全文）
+
+**文件路径**：`apps/frontend/src/plugins/host-api/appFullscreen.ts`
+
+| API | 作用 |
+|-----|------|
+| `getAppFullscreen()` | 同步读影院态 |
+| `subscribeAppFullscreen(fn)` | Layout / `PluginPageShell` 订阅 |
+| `setAppFullscreen(next)` | 写状态 + Tauri `setFullscreen` / Web `requestFullscreen` |
+| `APP_FULLSCREEN_EVENT` | `window` CustomEvent，`detail.full` |
+
+状态为**模块单例**（非 React Context），保证 Bridge、Layout、Shell 同源。
+
+```typescript
+/**
+ * Host 应用级影院/全屏状态。
+ * 插件只调 bridge `api.ui.setAppFullscreen`；壳层显隐由 Layout 订阅。
+ */
+import { isTauriRuntime } from '@/utils/runtime';
+
+export const APP_FULLSCREEN_EVENT = 'host:app-fullscreen';
+
+type Listener = (full: boolean) => void;
+
+let full = false;
+const listeners = new Set<Listener>();
+
+export function getAppFullscreen(): boolean {
+	return full;
+}
+
+export function subscribeAppFullscreen(fn: Listener): () => void {
+	listeners.add(fn);
+	return () => {
+		listeners.delete(fn);
+	};
+}
+
+function notify(next: boolean) {
+	full = next;
+	for (const fn of listeners) fn(next);
+	window.dispatchEvent(
+		new CustomEvent(APP_FULLSCREEN_EVENT, { detail: { full: next } }),
+	);
+}
+
+/** Host / bridge 入口：改布局态 + 系统窗口全屏 */
+export async function setAppFullscreen(next: boolean): Promise<void> {
+	if (full !== next) notify(next);
+
+	if (isTauriRuntime()) {
+		try {
+			const { getCurrentWindow } = await import('@tauri-apps/api/window');
+			await getCurrentWindow().setFullscreen(next);
+		} catch (err) {
+			console.warn('[host] setFullscreen failed', err);
+		}
+		return;
+	}
+
+	try {
+		if (next) {
+			if (!document.fullscreenElement) {
+				await document.documentElement.requestFullscreen();
+			}
+		} else if (document.fullscreenElement) {
+			await document.exitFullscreen();
+		}
+	} catch {
+		/* 布局态已切换即可 */
+	}
+}
+```
+
+要点：先 `notify` 布局态再调系统 API；Tauri 提前 `return` 不走 document 全屏；`full === next` 时跳过 notify 但仍执行系统对齐。
+
+#### 2.14.2 Bridge 注入
+
+`createHostBridge` 在 `ui:toast` 下：
+
+```typescript
+api.ui = Object.freeze({
+	showToast: (options) => { /* ... */ },
+	setAppFullscreen,
+	downloadBlob: async (options) => { /* ... */ },
+});
+```
+
+#### 2.14.3 `PluginPageShell` + `pageShell`
+
+```tsx
+export function PluginPageShell({ children, className }: { children: ReactNode; className?: string }) {
+	const [theater, setTheater] = useState(getAppFullscreen);
+	useEffect(() => subscribeAppFullscreen(setTheater), []);
+	return (
+		<div className={cn('mx-auto flex h-full min-h-0 flex-col', theater ? 'p-0' : 'p-5.5 pt-0', className)}>
+			<div className={cn('h-full min-h-0 overflow-hidden bg-theme-background', theater ? 'rounded-none p-0' : 'rounded-md')}>
+				{children}
+			</div>
+		</div>
+	);
+}
+```
+
+`PluginHostPage`：`wrap = (node) => pageShell ? <PluginPageShell>{node}</PluginPageShell> : node`；仅 `createPluginRoute` 传 `pageShell: true`。
+
+#### 2.14.4 Layout 行为（`apps/frontend/src/layout/index.tsx`）
+
+- `theater === true`：不渲染 Sidebar / Header / Web 备案 footer；去掉 `py-7 pr-7` 与圆角；内容区 `h-full overflow-hidden`
+- Web：`fullscreenchange` 且无 `document.fullscreenElement` 时 `setAppFullscreen(false)`
+- Tauri：`capabilities/default.json` 含 `core:window:allow-set-fullscreen` / `allow-is-fullscreen`
+
+#### 2.14.5 侧栏 `MENUS` / `PLUGINS`
+
+`Sidebar/enum.tsx` 拆分；`Sidebar/index.tsx`：`[...MENUS, ...dynamic, ...PLUGINS]`。
+
+#### 2.14.6 插件调用
+
+```typescript
+await api.ui?.setAppFullscreen?.(true);  // 需 permissions 含 ui:toast
+await api.ui?.setAppFullscreen?.(false); // 退出 / 卸载时务必回写
+```
+
+参考：`apps/micro/src/views/video-player/VideoPlayer.tsx` 的 `onFull`。iframe untrusted 若 RPC 未登记则不可远程调用。
 
 ---
 
@@ -4296,6 +4519,29 @@ flowchart TD
 
 **解决方案**：激活态挂载期必须持续捕获（现源码已接）。
 
+### 5.8 应用级全屏后侧栏仍在 / Esc 后壳卡住
+
+**原因**：只对插件 DOM 调了 `requestFullscreen`，未走 Host `api.ui.setAppFullscreen`；或退出时未回写 `false`。
+
+**解决方案**：
+
+1. Registry 声明 `ui:toast`
+2. 进入/退出调用 `await api.ui.setAppFullscreen(true|false)`
+3. Web Esc：Layout 有 `fullscreenchange` 兜底；插件仍应主动退出
+4. Tauri：确认 capability 含 `allow-set-fullscreen`
+5. 详见 §2.14；接入手册见 `host-plugin-integration-guide.md` §15
+
+### 5.9 刷新子应用路径先出现 404 再出插件页
+
+**原因**：首屏 router 在 `pluginManager.init()` 完成前只有静态路由；插件 `routePath` 未注入时 URL 命中顶层 `*` → `NotFound`。
+
+**解决方案**（详见 §2.11）：
+
+1. `pluginsReady` 初始为 `false`；init 的 `finally` 置 `true` 并重建 router
+2. `buildRoutes(false)` 将 `*` 换成 `PluginRoutesPending`，勿渲染 404
+3. 注入完成后再匹配插件页；真假路径在 ready 后才显示 NotFound
+4. **不要**整站等待 init 再挂 `RouterProvider`（会拖慢所有静态页）
+
 ---
 
 ## 6. 总结
@@ -4304,7 +4550,9 @@ flowchart TD
 
 - **运行时动态注册**：无需预配置，通过 registry 动态加载插件
 - **懒加载策略**：优化启动性能，按需加载
+- **刷新防闪 404**：`pluginsReady` + catch-all 占位（§2.11），静态路由仍可首屏匹配
 - **entry 缓存破坏**：`version@manifestHash` + `afterResolve` 补 `remoteEntry.js?v=`（发布者勿改 Host registry）
+- **应用级全屏**：`setAppFullscreen` + Layout 影院态 + 独立路由 `PluginPageShell`
 - **Host shared 收敛**：仅 shared react / react-dom；勿 shared react-router
 - **主子样式隔离**：Host `@scope` + head 劫持 + MutationObserver（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
 - **安全验证**：hostApiRange 运行时校验 + 保存 registry 前置校验

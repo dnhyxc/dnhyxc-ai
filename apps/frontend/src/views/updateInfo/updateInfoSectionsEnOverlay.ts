@@ -190,6 +190,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			"The macOS desktop menu bar now has full File, Edit, and other system menus with zh/en labels and unified SF Symbols icons. After changing a shortcut in Settings, the menu-bar accelerator updates immediately—no restart needed. Global shortcuts auto-release when the window loses focus (except Show/Hide App), so they no longer hijack other apps' shortcuts. In-page and global shortcuts are managed together; conflicts are caught at recording time.",
 	},
+	's3-16': {
+		title: 'Video player plugin',
+		description:
+			'A new standalone video player module is now available. Enable it in the Plugin Center and a TV-icon entry appears in the sidebar—just drop or pick local video files to play. Supports multi-file playlist selection, a custom control bar (progress, volume, playback rate, Picture-in-Picture, fullscreen, mirror), 0.5X–3.0X speed control with keyboard arrow keys, and play modes (auto / loop / stop). The player is auto-cleaned on unmount to avoid leaving the host in theater mode.',
+	},
+	's3-17': {
+		title: 'Plugin theater fullscreen & 404 flash prevention',
+		description:
+			'When a plugin such as the video player enters fullscreen, the host sidebar, header, and ICP footer all hide to create a true theater mode. On Tauri the app window is taken to system-level fullscreen; in the browser it falls back to document-level fullscreen; pressing Esc exits theater mode automatically. The previously visible 404 flash when refreshing a plugin route (e.g. /video-player, /plugins) is also fixed: the page now shows a theme-colored placeholder until the plugin is ready, then swaps directly to the plugin page without a NotFound flash.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:

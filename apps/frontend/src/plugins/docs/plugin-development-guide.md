@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host，不白名单 remote 目录名）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host，不白名单 remote 目录名）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding。Host 侧见 `host-plugin-integration-guide.md` §15；实现见 `mf-implementation-guide.md` §2.14。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -24,6 +24,7 @@
 13. [发布流程](#13-发布流程)
 14. [验收清单](#14-验收清单)
 15. [常见问题](#15-常见问题)
+16. [应用级全屏 API](#16-应用级全屏-api)
 
 ---
 
@@ -354,6 +355,13 @@ type HostBridgeProps = {
 				message: string;
 				type?: 'success' | 'error' | 'info';
 			}) => void;
+			/** 应用级全屏：藏 Host 壳 + Tauri/Web 系统全屏（需 ui:toast） */
+			setAppFullscreen?: (full: boolean) => Promise<void>;
+			downloadBlob?: (options: {
+				fileName: string;
+				data: ArrayBuffer | Uint8Array;
+				mimeType?: string;
+			}) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
 		};
 		modules?: Readonly<Record<string, (...args: unknown[]) => unknown>>;
 	};
@@ -460,6 +468,8 @@ Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应�
 | `api.event.on/off/emit` | 无 | 事件总线（MF 下可收 `locale`） |
 | `api.http.get/post/put/delete` | `http:plugin-api` | HTTP 请求 |
 | `api.ui.showToast` | `ui:toast` | 显示 Toast |
+| `api.ui.setAppFullscreen` | `ui:toast` | 应用级影院全屏（藏侧栏/顶栏；Tauri 窗口 / Web document） |
+| `api.ui.downloadBlob` | `ui:toast` | 统一落盘；Tauri 已 Toast 时看 `hostToasted` |
 | `api.modules.ebook` | `modules:ebook` | 电子书模块 API |
 | `api.modules.openThread` | `modules:chat` | 打开聊天线程 |
 
@@ -585,7 +595,7 @@ export function useHostLocale(api?: {
 
 | 权限 | 说明 | 用途 |
 |------|------|------|
-| `ui:toast` | 允许使用 Toast | 显示通知消息 |
+| `ui:toast` | 允许使用 `api.ui` | `showToast`、`setAppFullscreen`、`downloadBlob` |
 | `nav:subtree` | 允许子路由导航 | 在插件路由范围内跳转 |
 | `http:plugin-api` | 允许 HTTP 请求 | 调用后端 API |
 | `modules:chat` | 允许聊天模块 | 打开聊天线程 |
@@ -714,6 +724,10 @@ export function mockApi(extra?: Record<string, unknown>) {
 		},
 		ui: {
 			showToast: (o: { message: string }) => console.info('[toast]', o.message),
+			// 独立预览：无 Layout 影院态，可 no-op；嵌入主站用真实现
+			setAppFullscreen: async (full: boolean) => {
+				console.info('[setAppFullscreen]', full);
+			},
 		},
 		...extra,
 	};
@@ -984,6 +998,8 @@ server {
 | Host 集成 | 可通过 Registry 加载并正常显示 |
 | Registry 文案 | 配了 `title`/`description` locale map；**无** `titleKey` / `descriptionKey` / `menu.nameKey` |
 | 路由导航 | 配置正确，可正常访问 |
+| 应用级全屏（若需要） | 声明 `ui:toast`；进出调用 `api.ui.setAppFullscreen`；卸载时退出影院态 |
+| 独立路由边距 | Host 已套 `PluginPageShell`；插件勿再叠同等外层 `p-5.5` |
 
 ### 14.2 安全验收
 
@@ -1052,6 +1068,74 @@ server {
 3. 重新构建并部署
 4. Host 会自动检测版本变化并重新加载
 
+### Q6：全屏后 Host 侧栏还在？
+
+元素/`requestFullscreen(某节点)` **不会**藏 Host 壳。需要：
+
+```typescript
+await api.ui?.setAppFullscreen?.(true);
+// 退出
+await api.ui?.setAppFullscreen?.(false);
+```
+
+并确保 Registry 含 `ui:toast`。详见本节 §16；Host 行为见 `host-plugin-integration-guide.md` §15。
+
+---
+
+## 16. 应用级全屏 API
+
+> Host 实现与 Layout 行为见 `host-plugin-integration-guide.md` §15、`mf-implementation-guide.md` §2.14。
+
+### 16.1 契约
+
+| 项 | 值 |
+|----|-----|
+| 方法 | `api.ui.setAppFullscreen(full: boolean): Promise<void>` |
+| 权限 | 与 Toast 相同：`ui:toast`（否则无 `api.ui`） |
+| 效果 | 隐藏 Host Sidebar/Header；去 `PluginPageShell` 边距；Tauri 窗口全屏 / Web `document` 全屏 |
+
+### 16.2 推荐用法（对齐 `apps/micro` 视频播放器）
+
+```typescript
+// 进入：优先 Host 影院态；独立预览再降级元素全屏
+async function enterFullscreen(hostUi?: {
+	setAppFullscreen?: (v: boolean) => Promise<void>;
+}, shell?: HTMLElement | null) {
+	if (hostUi?.setAppFullscreen) {
+		await hostUi.setAppFullscreen(true);
+		return;
+	}
+	await shell?.requestFullscreen?.();
+}
+
+// 退出：务必回写 false，避免离开页后 Host 仍无侧栏
+async function exitFullscreen(hostUi?: {
+	setAppFullscreen?: (v: boolean) => Promise<void>;
+}) {
+	try {
+		await hostUi?.setAppFullscreen?.(false);
+	} catch {
+		/* ignore */
+	}
+	if (document.fullscreenElement) {
+		await document.exitFullscreen().catch(() => {});
+	}
+}
+
+// 组件卸载 / 路由离开
+useEffect(() => {
+	return () => {
+		void hostUi?.setAppFullscreen?.(false);
+	};
+}, [hostUi]);
+```
+
+### 16.3 注意
+
+- **全局唯一态**：多插件不要同时抢影院开关而不协调。
+- **drawer / Tab 内嵌**：一般不要调 `setAppFullscreen`，否则会藏掉整个主站壳。
+- **iframe untrusted**：当前 RPC 未必开放此方法；第一方 MF 走 props。
+
 ---
 
 ## 附录
@@ -1069,4 +1153,4 @@ server {
 
 ### C. 示例项目
 
-参考 `apps/remote-plugins`（多 expose，端口 9008）和 `apps/remote-demo`（最小插件，端口 9007）。
+参考 `apps/micro` / `apps/remote-plugins`（多 expose，端口 9008）和 `apps/remote-demo`（最小插件，端口 9007）。

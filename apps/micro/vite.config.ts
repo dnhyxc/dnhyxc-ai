@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
 					'./EbookHighlights': './src/views/ebook/highlights/index.tsx',
 					'./EbookTestBookInfo': './src/views/ebook/toolbar-test/index.ts',
 					'./LearningNotes': './src/views/learning-notes/index.tsx',
+					'./VideoPlayer': './src/views/video-player/index.tsx',
 				},
 				shared: {
 					react: { singleton: true, requiredVersion: '^19.1.0' },

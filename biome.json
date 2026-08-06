@@ -45,7 +45,8 @@
 			"suspicious": {
 				"noArrayIndexKey": "off",
 				"noExplicitAny": "off",
-				"noAssignInExpressions": "off"
+				"noAssignInExpressions": "off",
+				"useIterableCallbackReturn": "off"
 			}
 		}
 	},

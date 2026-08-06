@@ -7,6 +7,7 @@ import EbookTestBookInfoApp from '@/views/ebook/toolbar-test/book-info';
 import { EmbedIdeasList, EmbedLearningNotes } from '@/views/embed';
 import Home from '@/views/home';
 import LearningNotesApp from '@/views/learning-notes';
+import VideoPlayerApp from '@/views/video-player';
 
 const mockEbookModules = {
 	ebook: {
@@ -66,6 +67,18 @@ export const routes: RouteObject[] = [
 							'/ebook/plugins/toolbar-test',
 						)}
 					/>
+				),
+			},
+			{
+				path: 'video-player',
+				element: (
+					<div className="h-full min-h-0">
+						<VideoPlayerApp
+							independent
+							api={mockApi()}
+							plugin={mockPlugin('videoPlayer', '/video-player')}
+						/>
+					</div>
 				),
 			},
 			{

@@ -22,7 +22,7 @@ import { hasValidAuthToken } from '@/router/authPaths';
 import { performLogout } from '@/router/authSession';
 import { resolveCosUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
-import { ICON_MAP, MENUS, type SidebarMenuConfig } from './enum';
+import { ICON_MAP, MENUS, PLUGINS, type SidebarMenuConfig } from './enum';
 
 const isMenuActive = (path: string, pathname: string) =>
 	path === '/'
@@ -56,7 +56,7 @@ const Sidebar = observer(() => {
 			path: m.path,
 			requiresAuth: m.requiresAuth,
 		}));
-		return [...MENUS, ...dynamic].filter(
+		return [...MENUS, ...dynamic, ...PLUGINS].filter(
 			(menu) => !menu.requiresAuth || loggedIn,
 		);
 		// storageInfo 变化（登录/登出）时与 token 展示状态对齐并重算菜单

@@ -15,6 +15,7 @@ export default function Layout() {
 			to: '/ebook/plugins/toolbar-test',
 			label: t('layout.ebookTestBookInfo'),
 		},
+		{ to: '/video-player', label: t('layout.videoPlayer') },
 	];
 
 	return (

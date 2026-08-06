@@ -106,6 +106,10 @@ export interface HostBridgeProps {
 				type?: 'success' | 'error' | 'info';
 			}) => void;
 			/**
+			 * 应用级全屏：隐藏 Host 壳（侧栏/顶栏）并（Tauri）拉窗口全屏 /（Web）document 全屏。
+			 */
+			setAppFullscreen?: (full: boolean) => Promise<void>;
+			/**
 			 * 统一落盘（Web `<a download>` / Tauri `download_blob`）。
 			 * Tauri 成功/失败时 Host 已 Toast，`hostToasted: true` 时插件勿再弹成功提示。
 			 */

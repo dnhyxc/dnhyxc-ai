@@ -8,6 +8,7 @@ import {
 	Package,
 	Puzzle,
 	TreePalm,
+	TvMinimalPlay,
 	Vegan,
 	WalletCards,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export const ICON_MAP = {
 	Vegan: <Vegan />,
 	Puzzle: <Puzzle />,
 	Flower: <Flower />,
+	TvMinimalPlay: <TvMinimalPlay />,
 };
 
 export const MENUS: SidebarMenuConfig[] = [
@@ -61,11 +63,6 @@ export const MENUS: SidebarMenuConfig[] = [
 		icon: 'Vegan',
 		path: '/english-learning',
 	},
-	{
-		nameKey: 'nav.plugins',
-		icon: 'Flower',
-		path: '/plugins',
-	},
 	// {
 	// 	name: 'document',
 	// 	icon: 'Package',
@@ -86,4 +83,12 @@ export const MENUS: SidebarMenuConfig[] = [
 	// 	icon: 'CreditCard',
 	// 	path: '/pay',
 	// },
+];
+
+export const PLUGINS: SidebarMenuConfig[] = [
+	{
+		nameKey: 'nav.plugins',
+		icon: 'Flower',
+		path: '/plugins',
+	},
 ];

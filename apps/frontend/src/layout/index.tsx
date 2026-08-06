@@ -10,10 +10,16 @@ import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { TooltipProvider } from '@ui/index';
 import { Toast } from '@ui/sonner';
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import { useI18n, useTheme } from '@/hooks';
+import { cn } from '@/lib/utils';
+import {
+	getAppFullscreen,
+	setAppFullscreen,
+	subscribeAppFullscreen,
+} from '@/plugins/host-api/appFullscreen';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
 import { formatRoutePageLabel } from '@/router/routeMeta';
 import { isTauriRuntime } from '@/utils/runtime';
@@ -24,6 +30,7 @@ const Layout = () => {
 	const { t, locale } = useI18n();
 	/** 避免 React Strict Mode 或依赖抖动导致同一次拦截连续弹出多条 Toast */
 	const authRedirectToastShownRef = useRef(false);
+	const [theater, setTheater] = useState(getAppFullscreen);
 
 	useTheme();
 
@@ -49,27 +56,69 @@ const Layout = () => {
 			replace: true,
 			state: { from: `${location.pathname}${location.search}` },
 		});
-	}, [needAuth, authed, location.pathname, location.search, navigate, t]);
+	}, [
+		needAuth,
+		authed,
+		location.pathname,
+		location.search,
+		navigate,
+		t,
+		locale,
+	]);
+
+	useEffect(() => subscribeAppFullscreen(setTheater), []);
+
+	// Web：系统 Esc 退出 document 全屏时同步关掉影院态
+	useEffect(() => {
+		const onFs = () => {
+			if (document.fullscreenElement) return;
+			if (!getAppFullscreen()) return;
+			if (isTauriRuntime()) return;
+			void setAppFullscreen(false);
+		};
+		document.addEventListener('fullscreenchange', onFs);
+		return () => document.removeEventListener('fullscreenchange', onFs);
+	}, []);
 
 	return (
 		<ChatCoreProvider>
-			<main className="relative w-full h-full flex rounded-md overflow-hidden bg-theme-background">
-				<Sidebar />
+			<main
+				className={cn(
+					'relative flex h-full w-full overflow-hidden bg-theme-background',
+					theater ? 'rounded-none' : 'rounded-md',
+				)}
+			>
+				{theater ? null : <Sidebar />}
 				<TooltipProvider>
 					<div
 						data-tauri-drag-region
-						className="box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col rounded-md py-7 pr-7"
+						className={cn(
+							'box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col',
+							theater ? 'rounded-none p-0' : 'rounded-md py-7 pr-7',
+						)}
 					>
-						<div className="relative h-full w-full min-w-0 max-w-full rounded-md bg-theme-secondary overflow-hidden">
-							<Header />
-							<div className="box-border h-[calc(100%-3.25rem)] min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto">
+						<div
+							className={cn(
+								'relative h-full w-full min-w-0 max-w-full overflow-hidden bg-theme-secondary',
+								theater ? 'rounded-none' : 'rounded-md',
+							)}
+						>
+							{theater ? null : <Header />}
+							<div
+								className={cn(
+									'box-border min-h-0 min-w-0 w-full max-w-full',
+									theater
+										? 'h-full overflow-hidden'
+										: 'h-[calc(100%-3.25rem)] overflow-x-hidden overflow-y-auto',
+								)}
+							>
 								{needAuth && !authed ? null : <Outlet />}
 							</div>
 						</div>
 					</div>
 				</TooltipProvider>
-				{!isTauriRuntime() ? (
-					<footer className="absolute bottom-1 left-0 w-full text-right pr-6.5 text-xs text-textcolor/55">
+				{!isTauriRuntime() && !theater ? (
+					<footer className="absolute bottom-1 left-0 w-full pr-6.5 text-right text-xs text-textcolor/55">
 						<a
 							href="https://beian.miit.gov.cn/"
 							target="_blank"

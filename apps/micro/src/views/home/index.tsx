@@ -25,6 +25,11 @@ export default function Home() {
 			title: t('home.ebookTestBookInfo.title'),
 			desc: t('home.ebookTestBookInfo.desc'),
 		},
+		{
+			to: '/video-player',
+			title: t('home.videoPlayer.title'),
+			desc: t('home.videoPlayer.desc'),
+		},
 	] as const;
 
 	return (

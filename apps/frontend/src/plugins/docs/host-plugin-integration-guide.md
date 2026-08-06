@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`）。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**）。详解见本文 §11.3 / §15。若不一致，以源码为准。
 
 ---
 
@@ -20,10 +20,12 @@
 9. [Registry 配置管理](#9-registry-配置管理)
 10. [侧栏菜单动态注入](#10-侧栏菜单动态注入)
 11. [路由系统与插件协同](#11-路由系统与插件协同)
+    - 11.3 刷新子应用防闪 404
 12. [插件状态管理](#12-插件状态管理)
 13. [HostBridge API 提供](#13-hostbridge-api-提供)
 14. [语言（locale）同步](#14-语言locale同步)
-15. [常见问题](#15-常见问题)
+15. [应用级全屏与插件页外壳](#15-应用级全屏与插件页外壳)
+16. [常见问题](#16-常见问题)
 
 ---
 
@@ -64,15 +66,18 @@ Host 应用
 │   │   ├── RouteInjector.ts     # 路由注入器
 │   │   └── SidebarInjector.ts   # 侧栏注入器
 │   ├── host/
-│   │   ├── PluginHostPage.tsx   # 插件宿主页面（MF / iframe / locale 热更新）
+│   │   ├── PluginHostPage.tsx   # 插件宿主（MF / iframe / locale；可选 pageShell）
+│   │   ├── PluginPageShell.tsx  # 独立路由页统一边距；订阅影院态
 │   │   ├── PluginErrorBoundary.tsx # 错误边界
 │   │   └── styleIsolation.ts    # Remote CSS @scope 隔离
 │   ├── host-api/
 │   │   ├── EventBus.ts          # 事件总线
 │   │   ├── ebookHostApi.ts      # 电子书模块 API
+│   │   ├── appFullscreen.ts     # 应用级影院/全屏状态与 setAppFullscreen
 │   │   └── deepFreeze.ts        # 深度冻结
-│   └── hooks/
-│       └── usePluginEnabled.ts  # 插件启用状态 Hook
+│   ├── hooks/
+│   │   └── usePluginEnabled.ts  # 插件启用状态 Hook
+│   └── docs/                    # 本目录手册与专题
 ```
 
 ### 2.2 数据流
@@ -86,6 +91,9 @@ flowchart TD
     D --> F[sidebarInjector.add]
     E --> G[buildRoutes 重建 router]
     F --> H[Sidebar 重新渲染]
+    A --> P[pluginsReady=false：* 用占位]
+    B --> Q[finally：pluginsReady=true]
+    Q --> G
     I[用户访问插件路由] --> J[PluginHostPage]
     J --> K[ensurePlugin]
     K --> L[verifyPlugin]
@@ -93,6 +101,8 @@ flowchart TD
     M --> N[loadRemoteApp]
     N --> O[渲染插件组件]
 ```
+
+> **刷新防闪 404**：首屏在 `pluginsReady === false` 时，顶层 `*` 渲染占位而非 NotFound；init 注入动态路由并 `finally` 置 ready 后再决断真 404。详见 §11.3。
 
 ---
 
@@ -164,7 +174,8 @@ private mountShell(meta: PluginDescriptor) {
 ```typescript
 function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 	const Page: ComponentType = () =>
-		createElement(PluginHostPage, { pluginId: meta.id });
+		// pageShell: true → 套 PluginPageShell（统一边距）；业务内嵌挂载勿传
+		createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 	return {
 		path: meta.routePath,
 		Component: Page,
@@ -181,12 +192,32 @@ function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 **buildRoutes.ts**：
 
 ```typescript
-export function buildRoutes(): RouteConfig[] {
+import { createElement } from 'react';
+import { routeInjector } from '@/plugins';
+import routes, { type RouteConfig } from './routes';
+
+/** 插件壳未就绪时占住 `*`，避免刷新子项目路径先闪 404 */
+function PluginRoutesPending() {
+	return createElement('div', {
+		className: 'h-full w-full bg-theme-background',
+	});
+}
+
+/** @param pluginsReady - false：catch-all 用占位；true：真正 NotFound */
+export function buildRoutes(pluginsReady = true): RouteConfig[] {
 	const dynamic = routeInjector.getRoutes();
-	if (dynamic.length === 0) return routes;
+	const base = pluginsReady
+		? routes
+		: routes.map((route) =>
+				route.path === '*'
+					? { ...route, Component: PluginRoutesPending }
+					: route,
+			);
+
+	if (dynamic.length === 0) return base;
 
 	// 将动态路由挂到 Layout 壳的 children 末尾
-	return routes.map((route, index) => {
+	return base.map((route, index) => {
 		if (index === 0 && route.children) {
 			return {
 				...route,
@@ -197,6 +228,8 @@ export function buildRoutes(): RouteConfig[] {
 	});
 }
 ```
+
+> 刷新插件页闪 404 的完整思路见 §11.3；实现细节见 [mf-implementation-guide.md §2.11](./mf-implementation-guide.md#211-路由构建与初始化)。
 
 ### 3.5 不需要手动代码
 
@@ -1121,7 +1154,7 @@ const Sidebar = observer(() => {
 		return sidebarInjector.subscribe(sync);
 	}, []);
 
-	// 合并静态菜单 + 动态插件菜单
+	// 合并：业务主菜单 + Registry 动态插件 + 固定「插件中心」等（PLUGINS）
 	const visibleMenus = useMemo(() => {
 		const loggedIn = hasValidAuthToken();
 		const dynamic = pluginMenus.map((m) => ({
@@ -1130,7 +1163,7 @@ const Sidebar = observer(() => {
 			path: m.path,
 			requiresAuth: m.requiresAuth,
 		}));
-		return [...MENUS, ...dynamic].filter(
+		return [...MENUS, ...dynamic, ...PLUGINS].filter(
 			(menu) => !menu.requiresAuth || loggedIn,
 		);
 	}, [storageInfo, pluginMenus]);
@@ -1214,6 +1247,8 @@ import { buildRoutes } from "./buildRoutes";
 
 const App = () => {
 	const [routeEpoch, setRouteEpoch] = useState(0);
+	/** false 时 catch-all 不渲染 404，等插件壳挂上后再决断 */
+	const [pluginsReady, setPluginsReady] = useState(false);
 
 	useEffect(() => {
 		// 订阅路由注入变化
@@ -1221,18 +1256,23 @@ const App = () => {
 			setRouteEpoch((n) => n + 1);
 		});
 
-		// 启动插件系统
+		// 启动插件系统；finally 才 ready（失败也要，否则真 404 不出现）
 		void pluginManager
 			.init()
-			.then(() => setRouteEpoch((n) => n + 1))
-			.catch((e) => console.error("[plugins] init failed", e));
+			.catch((e) => console.error("[plugins] init failed", e))
+			.finally(() => {
+				setPluginsReady(true);
+				setRouteEpoch((n) => n + 1);
+			});
 
 		return unsub;
 	}, []);
 
-	// 根据 epoch 重建 router
+	// 根据 epoch + pluginsReady 重建 router
 	const router = useMemo(() => {
-		const r = createBrowserRouter(buildRoutes() as RouteObject[]);
+		const r = createBrowserRouter(
+			buildRoutes(pluginsReady) as RouteObject[],
+		);
 
 		// 把 SPA navigate 注入 Manager
 		pluginManager.setNavigate((to) => {
@@ -1240,7 +1280,7 @@ const App = () => {
 		});
 
 		return r;
-	}, [routeEpoch]);
+	}, [routeEpoch, pluginsReady]);
 
 	return (
 		<div className="h-full w-full bg-theme-background">
@@ -1295,6 +1335,26 @@ class RouteInjectorImpl {
 
 export const routeInjector = new RouteInjectorImpl();
 ```
+
+### 11.3 刷新子应用防闪 404
+
+**现象**：硬刷新 `/video-player` 等自动注入路由时，先闪 Host「404 Not Found」，再出子应用页。
+
+**根因**：`pluginManager.init()` 异步拉 registry / 挂壳；首屏静态路由表含顶层 `path: '*'` → `NotFound`。插件 `routePath` 尚未注入 Layout children 时，URL 命中 catch-all。
+
+**做法**（源码：`router/index.tsx` + `buildRoutes.ts`）：
+
+| 步骤 | 行为 |
+|------|------|
+| 1 | `pluginsReady` 初始 `false` |
+| 2 | `buildRoutes(false)` 把 `*` 换成 `PluginRoutesPending`（主题色空白，不渲染 404） |
+| 3 | init 过程中 `routeInjector.inject` → subscribe bump epoch → 动态路由进 Layout children |
+| 4 | init **`finally`** 置 `pluginsReady=true` 并再 bump epoch；`*` 恢复为真正 `NotFound` |
+| 5 | 假路径在 ready 后才显示 404；静态路由（`/`、`/chat`…）始终可首屏匹配 |
+
+**不要**：等 init 完再挂 `RouterProvider`（会拖慢全部静态页）。
+
+**详解 + 时序图**：见 [mf-implementation-guide.md §2.11](./mf-implementation-guide.md#211-路由构建与初始化)。
 
 ---
 
@@ -1395,12 +1455,15 @@ export function createHostBridge(
 |------|-----------|------|
 | （无） | `api.theme` / `api.locale` / `api.event` | 主题快照、语言、插件域事件总线 |
 | `ui:toast` | `api.ui.showToast` | Toast |
+| `ui:toast` | `api.ui.setAppFullscreen` | 应用级影院全屏（藏侧栏/顶栏 + Tauri 窗口 / Web document 全屏） |
+| `ui:toast` | `api.ui.downloadBlob` | Web / Tauri 统一落盘 |
 | `nav:subtree` | `api.navigate` | 仅允许 `to.startsWith(routePath)` |
 | `http:plugin-api` | `api.http.get/post/put/delete` | 经 Host `@/utils/fetch` |
 | `modules:chat` | `api.modules.openThread` | 打开 `/chat/c/:id` |
 | `modules:ebook` | `api.modules.ebook.*` | 阅读页绑定的 ebook Host API |
 
 > **注意**：Host **不再**注入 `api.t`。插件用自有 i18n 字典，只跟随 `api.locale`（见下一节）。
+> **注意**：`setAppFullscreen` / `downloadBlob` 与 `showToast` 共用 `ui:toast` 门闩；无该权限则整个 `api.ui` 不存在。影院态详解见本文 §15。
 
 ---
 
@@ -1420,7 +1483,203 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 
 ---
 
-## 15. 常见问题
+## 15. 应用级全屏与插件页外壳
+
+独立路由注入的插件（例如视频播放器）需要「真正占满应用可视区域」的全屏体验。本节说明 Host 侧如何提供影院态、统一页壳，以及插件如何调用。实现细节另见 `mf-implementation-guide.md` §2.14；插件侧用法见 `plugin-development-guide.md` §16。
+
+### 15.1 背景与要解决的问题
+
+| 旧问题 | 新方案 |
+|--------|--------|
+| 插件只能对自身 DOM / `requestFullscreen(某节点)`，**侧栏、顶栏、外边距仍在** | Host 提供 **应用级影院态**：隐藏 Sidebar / Header / 备案 footer，并去掉 Layout / `PluginPageShell` 内边距与圆角 |
+| Tauri 桌面端仅 CSS/元素全屏，**窗口本身未进系统全屏** | `setAppFullscreen(true)` 在 Tauri 调 `getCurrentWindow().setFullscreen(true)` |
+| Web 端用户按 Esc 退出浏览器全屏后，**壳层可能仍藏着** | Layout 监听 `fullscreenchange`，在 Web 且无 `document.fullscreenElement` 时回写 `setAppFullscreen(false)` |
+| 自动注入路由的插件页与业务内嵌挂载共用同一套外层 padding | `PluginHostPage` 增加 `pageShell`；**仅** `PluginManager.createPluginRoute` 传 `pageShell: true` |
+
+设计原则：
+
+- **插件不直接改 Layout**：只调 `api.ui.setAppFullscreen(boolean)`。
+- **状态单源**：模块级 `full` + `subscribeAppFullscreen`；Layout 与 `PluginPageShell` 各自订阅。
+- **业务内嵌挂载不加壳**：英语笔记 / 电子书 drawer 等仍 `<PluginHostPage pluginId=... />`，避免双层边距。
+
+### 15.2 改动范围一览
+
+| 路径 | 变更类型 | 作用 |
+|------|----------|------|
+| `apps/frontend/src/plugins/host-api/appFullscreen.ts` | **新增** | 影院态状态、订阅、`setAppFullscreen` |
+| `apps/frontend/src/plugins/host/PluginPageShell.tsx` | **新增** | 独立路由页统一外边距/圆角；影院态收起 |
+| `apps/frontend/src/plugins/host/PluginHostPage.tsx` | 修改 | `pageShell?`；激活态用 `wrap()` 套壳；根节点加 `min-h-0` |
+| `apps/frontend/src/plugins/core/PluginManager.ts` | 修改 | `createPluginRoute` → `pageShell: true` |
+| `apps/frontend/src/plugins/core/createHostBridge.ts` | 修改 | `ui:toast` 权限下注入 `setAppFullscreen` |
+| `apps/frontend/src/plugins/core/types.ts` | 修改 | `HostBridgeProps.api.ui.setAppFullscreen?` |
+| `apps/frontend/src/layout/index.tsx` | 修改 | 订阅影院态；藏侧栏/顶栏/footer；Web Esc 同步 |
+| `apps/frontend/src/components/design/Sidebar/enum.tsx` | 修改 | `/plugins` 迁入 `PLUGINS`；图标 `TvMinimalPlay` |
+| `apps/frontend/src/components/design/Sidebar/index.tsx` | （已用） | 菜单顺序：`MENUS + dynamic + PLUGINS` |
+| `apps/frontend/src-tauri/capabilities/default.json` | 修改 | `allow-set-fullscreen` / `allow-is-fullscreen` |
+| `apps/micro/.../VideoPlayer.tsx` | 消费方 | 全屏优先 `hostUi.setAppFullscreen` |
+
+### 15.3 整体架构与数据流
+
+```
+插件（如 VideoPlayer）
+  └─ api.ui.setAppFullscreen(true|false)
+        │
+        ▼
+host-api/appFullscreen.ts
+  ├─ notify(next)  → 模块变量 full + listeners + CustomEvent('host:app-fullscreen')
+  ├─ Tauri: getCurrentWindow().setFullscreen(next)
+  └─ Web: documentElement.requestFullscreen / exitFullscreen
+        │
+        ├──────────────────────────────┐
+        ▼                              ▼
+Layout (theater)                PluginPageShell (theater)
+  藏 Sidebar/Header/footer         p-0 / rounded-none
+  内容区 h-full overflow-hidden
+```
+
+```mermaid
+sequenceDiagram
+  participant P as 插件 UI
+  participant B as HostBridge api.ui
+  participant A as appFullscreen
+  participant L as Layout
+  participant S as PluginPageShell
+  participant OS as Tauri窗口 / document
+
+  P->>B: setAppFullscreen(true)
+  B->>A: setAppFullscreen(true)
+  A->>A: notify(true)
+  A-->>L: subscribe 回调 setTheater(true)
+  A-->>S: subscribe 回调 setTheater(true)
+  alt Tauri
+    A->>OS: setFullscreen(true)
+  else Web
+    A->>OS: requestFullscreen()
+  end
+  Note over L: 卸 Sidebar/Header；去 padding
+  Note over S: 去 p-5.5 / 圆角
+```
+
+独立路由注入时的组件树（影院关）：
+
+```
+Layout
+├── Sidebar
+└── Header + Outlet
+      └── PluginHostPage pageShell={true}
+            └── PluginPageShell（p-5.5 + 圆角内容区）
+                  └── PluginErrorBoundary
+                        └── div[data-mf-plugin] → 插件 default 组件
+```
+
+影院开：`Sidebar`/`Header` 为 `null`；`PluginPageShell` 与 Layout 内边距为 0。
+
+### 15.4 主项目要接什么
+
+| 能力 | Host 落点 | 插件怎么用 |
+|------|-----------|------------|
+| 影院态状态机 | `host-api/appFullscreen.ts` | `await api.ui?.setAppFullscreen?.(true\|false)` |
+| 藏侧栏/顶栏 | `layout/index.tsx` 订阅 `subscribeAppFullscreen` | 无需改 Layout |
+| 独立路由统一边距 | `PluginPageShell`；`createPluginRoute` 传 `pageShell: true` | 勿在插件内再叠一层同等 `p-5.5` |
+| 业务内嵌 | `<PluginHostPage pluginId="..." />` **不传** `pageShell` | 避免双层外壳 |
+| Tauri 窗口全屏 | `capabilities/default.json` 已加 `allow-set-fullscreen` | 同 API |
+
+`setAppFullscreen` / `downloadBlob` 与 `showToast` 共用 **`ui:toast`** 门闩；无该权限则整个 `api.ui` 不存在。
+
+### 15.5 `appFullscreen.ts` 导出 API
+
+**文件路径**：`apps/frontend/src/plugins/host-api/appFullscreen.ts`
+
+| 符号 | 签名 | 说明 |
+|------|------|------|
+| `APP_FULLSCREEN_EVENT` | `'host:app-fullscreen'` | `window` CustomEvent，`detail: { full }` |
+| `getAppFullscreen` | `() => boolean` | 同步读当前影院态 |
+| `subscribeAppFullscreen` | `(fn) => unsubscribe` | React `useEffect` 订阅 |
+| `setAppFullscreen` | `(next: boolean) => Promise<void>` | **唯一写入口** |
+
+要点：先改布局态再调系统 API；Tauri 不走 `document` 全屏；`full === next` 时跳过 `notify` 但仍对齐系统 API。完整带注释源码见 `mf-implementation-guide.md` §2.14.1。
+
+### 15.6 `PluginPageShell` + `pageShell`
+
+`PluginPageShell` 订阅影院态：正常 `p-5.5 pt-0` + 圆角；影院 `p-0` / `rounded-none`。
+
+| 调用方 | `pageShell` | 原因 |
+|--------|-------------|------|
+| `PluginManager.createPluginRoute` | `true` | 独立顶栏路由页 |
+| 英语学习笔记 Tab / 电子书 drawer / 手动业务挂载 | 默认 `false` | 避免双层外壳 |
+
+```tsx
+{/* 业务内嵌：已有容器，禁止 pageShell */}
+<PluginHostPage pluginId="learningNotes" />
+```
+
+MF 根增加 `min-h-0`，避免 flex 子项撑破 `h-full`。
+
+### 15.7 Layout 影院态
+
+**文件路径**：`apps/frontend/src/layout/index.tsx`
+
+```tsx
+const [theater, setTheater] = useState(getAppFullscreen);
+useEffect(() => subscribeAppFullscreen(setTheater), []);
+
+// theater === true：不渲染 Sidebar/Header；去掉 py-7 pr-7 / rounded-md；
+// 内容区 h-full overflow-hidden；Web 备案 footer 隐藏
+
+// Web Esc 兜底
+useEffect(() => {
+	const onFs = () => {
+		if (document.fullscreenElement) return;
+		if (!getAppFullscreen()) return;
+		if (isTauriRuntime()) return;
+		void setAppFullscreen(false);
+	};
+	document.addEventListener('fullscreenchange', onFs);
+	return () => document.removeEventListener('fullscreenchange', onFs);
+}, []);
+```
+
+插件退出全屏时应 **主动** `setAppFullscreen(false)`；本监听防止 Esc 后壳层卡住。
+
+### 15.8 侧栏 `MENUS` 与 `PLUGINS`
+
+`Sidebar/enum.tsx`：业务 `MENUS`（不含 `/plugins`）；固定 `PLUGINS`（插件中心）排在动态项之后。
+
+合并顺序：`[...MENUS, ...sidebarInjector 动态项, ...PLUGINS]`。
+
+`ICON_MAP` 含 `TvMinimalPlay`，供 Registry `menu.icon` 使用。
+
+### 15.9 Tauri capability
+
+`apps/frontend/src-tauri/capabilities/default.json` 需：
+
+```json
+"core:window:allow-set-fullscreen",
+"core:window:allow-is-fullscreen"
+```
+
+未加权限时布局影院态仍可切换，但窗口可能进不了系统全屏。
+
+### 15.10 行为边界与回归
+
+| 项 | 说明 |
+|----|------|
+| 权限 | 需 `ui:toast` 才有 `api.ui` |
+| 业务内嵌 | 调 `setAppFullscreen` 仍会藏全局侧栏——drawer 内慎用 |
+| 多插件 | 影院态全局唯一 |
+| 破坏性 | 自动路由页多一层 `PluginPageShell`；插件勿再叠同等外间距 |
+
+回归清单：
+
+- [ ] `injectRoute` 页有统一边距；业务内嵌无双层壳
+- [ ] `setAppFullscreen(true/false)` 壳层显隐正确
+- [ ] Web Esc 后侧栏恢复
+- [ ] Tauri 窗口全屏；侧栏顺序：业务 → 动态插件 → 插件中心
+- [ ] 切路由后不残留无侧栏状态
+
+---
+
+## 16. 常见问题
 
 ### Q1：如何在新页面中接入插件？
 
@@ -1429,7 +1688,7 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 1. 在 Registry 中配置插件（`injectRoute: false`）
 2. 在业务页面中导入 `PluginHostPage` 和 `usePluginEnabled`
 3. 使用 `usePluginEnabled` 检查插件状态
-4. 使用 `PluginHostPage` 渲染插件
+4. 使用 `PluginHostPage` 渲染插件（**不要**传 `pageShell`，除非你确认需要 Host 统一外边距）
 
 ```tsx
 import { PluginHostPage, usePluginEnabled } from "@/plugins";
@@ -1515,6 +1774,19 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 ### Q6：新增/改名插件要改 Host 语言包吗？
 
 **不必。** 在 Registry 里写 `title` / `description` 的 `zh-CN` / `en-US` 即可。插件中心与 `injectRoute` 注入页的面包屑都会用 `pickPluginLocaleText` 按当前 locale 解析。业务自有路由（如 `injectRoute: false` 的英语学习笔记）若 Header 标题来自 Host `routes.ts` 的 `titleKey`，那是业务路由配置，与插件 registry 无关。
+
+### Q7：插件全屏后侧栏还在 / Esc 后壳层卡住？
+
+1. Registry 是否声明 `ui:toast`（否则无 `api.ui.setAppFullscreen`）
+2. 是否调用的是 **Host** `setAppFullscreen`，而非仅对某 DOM `requestFullscreen`
+3. Web Esc：Layout 会监听 `fullscreenchange` 回写；插件退出时仍应主动 `setAppFullscreen(false)`
+4. 详解与回归清单：见本文 §15
+
+### Q8：刷新子应用页面先闪 404？
+
+**原因**：插件路由异步注入，首屏 URL 先命中顶层 `*` → NotFound。
+
+**现行修复**：`pluginsReady` + `buildRoutes` 在未就绪时用占位替换 catch-all。见本文 §11.3；实现细节见 [mf-implementation-guide.md §2.11](./mf-implementation-guide.md#211-路由构建与初始化)。
 
 ---
 

@@ -99,6 +99,23 @@ const zhCN: Record<string, string> = {
 	'ebookTest.bookInfo.ping': 'Toast',
 	'ebookTest.bookInfo.toastOk': '当前书籍：{id}',
 	'ebookTest.bookInfo.toastUnbound': '未绑定书籍（独立预览常见）',
+	'layout.videoPlayer': '视频播放器',
+
+	'home.videoPlayer.title': '视频播放器',
+	'home.videoPlayer.desc': 'expose ./VideoPlayer · registry videoPlayer',
+
+	'videoPlayer.selectVideo': '选择视频',
+	'videoPlayer.continueSelect': '继续选择',
+	'videoPlayer.dragOrClick': '拖拽或点击文件上传',
+	'videoPlayer.episodes': '选集',
+	'videoPlayer.muted': '静音',
+	'videoPlayer.playMode': '播放方式',
+	'videoPlayer.reset': '重置',
+	'videoPlayer.screenMirror': '镜像画面',
+	'videoPlayer.speed': '播放倍速',
+	'videoPlayer.pip': '画中画',
+	'videoPlayer.fullscreen': '全屏',
+	'videoPlayer.exitFullscreen': '退出全屏',
 };
 
 export default zhCN;

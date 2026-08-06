@@ -1,6 +1,6 @@
 import Tooltip from '@design/Tooltip';
 import { CircleQuestionMark } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import Loading from '@/components/design/Loading';
 import { Button, Spinner } from '@/components/ui';
 import { useI18n } from '@/hooks';
@@ -10,12 +10,18 @@ import { pluginManager } from '../core/PluginManager';
 import type { HostBridgeProps, HostLocale } from '../core/types';
 import { eventBus } from '../host-api/EventBus';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
+import { PluginPageShell } from './PluginPageShell';
 import { attachPluginStyleIsolation } from './styleIsolation';
 
 type Props = {
 	pluginId: string;
 	className?: string;
 	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
+	/**
+	 * 独立路由页：套 Host 统一容器。
+	 * 业务树内嵌挂载（英语笔记 / 电子书 drawer 等）勿开，避免双层外壳。
+	 */
+	pageShell?: boolean;
 };
 
 /** 用 Host 当前语言覆盖 bridge 快照；插件自维护 t，只同步 locale */
@@ -68,7 +74,12 @@ function UntrustedIframe({
 	);
 }
 
-export function PluginHostPage({ pluginId, className, part }: Props) {
+export function PluginHostPage({
+	pluginId,
+	className,
+	part,
+	pageShell,
+}: Props) {
 	const { locale, t } = useI18n();
 	const [retryKey, setRetryKey] = useState(0);
 	const [busy, setBusy] = useState(
@@ -137,40 +148,43 @@ export function PluginHostPage({ pluginId, className, part }: Props) {
 		[loaded?.bridge, locale],
 	);
 
+	const wrap = (node: ReactNode) =>
+		pageShell ? <PluginPageShell>{node}</PluginPageShell> : node;
+
 	if (loaded?.status === 'activated') {
 		if (loaded.meta.trust === 'untrusted') {
 			const src = loaded.meta.iframeUrl?.trim();
 			if (!src) {
-				return (
+				return wrap(
 					<div className="text-muted-foreground p-6 text-sm">
 						{t('plugins.host.missingIframeUrl', { id: pluginId })}
-					</div>
+					</div>,
 				);
 			}
 			// iframe 语言靠 attachIframeBridge 的 init + onListen('locale') 推送，勿用 liveBridge 以免重挂
-			return (
+			return wrap(
 				<PluginErrorBoundary pluginId={pluginId}>
 					<UntrustedIframe
 						pluginId={pluginId}
 						src={src}
 						bridge={loaded.bridge}
 					/>
-				</PluginErrorBoundary>
+				</PluginErrorBoundary>,
 			);
 		}
 
 		if (!liveBridge) return null;
 		const Comp = loaded.mod.default;
-		return (
+		return wrap(
 			<PluginErrorBoundary pluginId={pluginId}>
 				<div
-					className={cn(`plugin-${pluginId} h-full w-full`, className)}
+					className={cn(`plugin-${pluginId} h-full w-full min-h-0`, className)}
 					data-mf-plugin={pluginId}
 					data-plugin-root
 				>
 					<Comp {...liveBridge} />
 				</div>
-			</PluginErrorBoundary>
+			</PluginErrorBoundary>,
 		);
 	}
 

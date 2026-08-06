@@ -2,6 +2,7 @@ import { Toast } from '@ui/sonner';
 import { getActiveLocale, type Locale } from '@/i18n';
 import { downloadBlob, isTauriRuntime } from '@/utils';
 import { http } from '@/utils/fetch';
+import { setAppFullscreen } from '../host-api/appFullscreen';
 import { deepFreeze } from '../host-api/deepFreeze';
 import { eventBus } from '../host-api/EventBus';
 import { createEbookModulesApi } from '../host-api/ebookHostApi';
@@ -62,6 +63,8 @@ export function createHostBridge(
 					title: options.message,
 				});
 			},
+			/** 应用级全屏：藏壳 + Tauri 窗口 / Web document 全屏 */
+			setAppFullscreen,
 			/** 与主站收藏导出同源：Web / Tauri2 统一落盘 */
 			downloadBlob: async (options: {
 				fileName: string;

@@ -105,6 +105,23 @@ const enUS: Record<string, string> = {
 	'ebookTest.bookInfo.toastOk': 'Current book: {id}',
 	'ebookTest.bookInfo.toastUnbound':
 		'No book bound (common in standalone preview)',
+	'layout.videoPlayer': 'Video player',
+
+	'home.videoPlayer.title': 'Video player',
+	'home.videoPlayer.desc': 'expose ./VideoPlayer · registry videoPlayer',
+
+	'videoPlayer.selectVideo': 'Select video',
+	'videoPlayer.continueSelect': 'Continue selecting',
+	'videoPlayer.dragOrClick': 'Drag or click to upload',
+	'videoPlayer.episodes': 'Episodes',
+	'videoPlayer.muted': 'Muted',
+	'videoPlayer.playMode': 'Play mode',
+	'videoPlayer.reset': 'Reset',
+	'videoPlayer.screenMirror': 'Mirror',
+	'videoPlayer.speed': 'Playback speed',
+	'videoPlayer.pip': 'Picture in picture',
+	'videoPlayer.fullscreen': 'Fullscreen',
+	'videoPlayer.exitFullscreen': 'Exit fullscreen',
 };
 
 export default enUS;

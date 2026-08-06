@@ -19,6 +19,8 @@ import { buildRoutes } from './buildRoutes';
 const App = () => {
 	useInputsOnlyTab();
 	const [routeEpoch, setRouteEpoch] = useState(0);
+	/** false 时 catch-all 不渲染 404，等插件壳挂上后再决断 */
+	const [pluginsReady, setPluginsReady] = useState(false);
 
 	useEffect(() => {
 		if (import.meta.env.PROD && isTauriRuntime()) {
@@ -32,18 +34,21 @@ const App = () => {
 		});
 		void pluginManager
 			.init()
-			.then(() => setRouteEpoch((n) => n + 1))
-			.catch((e) => console.error('[plugins] init failed', e));
+			.catch((e) => console.error('[plugins] init failed', e))
+			.finally(() => {
+				setPluginsReady(true);
+				setRouteEpoch((n) => n + 1);
+			});
 		return unsub;
 	}, []);
 
 	const router = useMemo(() => {
-		const r = createBrowserRouter(buildRoutes() as RouteObject[]);
+		const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
 		pluginManager.setNavigate((to) => {
 			void r.navigate(to);
 		});
 		return r;
-	}, [routeEpoch]);
+	}, [routeEpoch, pluginsReady]);
 
 	useEffect(() => {
 		let cancelled = false;
