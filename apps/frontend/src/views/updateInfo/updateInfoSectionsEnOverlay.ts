@@ -200,6 +200,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When a plugin such as the video player enters fullscreen, the host sidebar, header, and ICP footer all hide to create a true theater mode. On Tauri the app window is taken to system-level fullscreen; in the browser it falls back to document-level fullscreen; pressing Esc exits theater mode automatically. The previously visible 404 flash when refreshing a plugin route (e.g. /video-player, /plugins) is also fixed: the page now shows a theme-colored placeholder until the plugin is ready, then swaps directly to the plugin page without a NotFound flash.',
 	},
+	's3-18': {
+		title: 'Video player experience enhancements',
+		description:
+			'Building on the component refactor, the video player gets several interaction upgrades: progress-bar thumbnail preview—hovering anywhere on the progress bar pops up a thumbnail of that frame so you can quickly locate clips, with automatic edge clearance to avoid overflow; cross-platform Picture-in-Picture—PiP now works on Safari (macOS / iOS) and other browsers, with a clear overlay shown in the main player area when PiP is active, and play/pause actions inside the PiP window sync correctly back to the main player; player language follows the host—switching the UI language now also switches the player’s internal hints (buffering, etc.) to the matching language; more thorough reset—clicking Reset now fully clears the preview, progress bar, hover state, and player instance, leaving no PiP overlay behind; long-video ruler optimization—ruler tick nodes for videos over 10 minutes are capped to avoid stuttering when hovering the progress bar.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:

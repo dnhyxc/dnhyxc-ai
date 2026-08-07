@@ -5,14 +5,14 @@
 export const LIMIT = 100;
 
 export const PLAY_OPTIONS = [
-	{ label: '自动切换', value: 'auto' as const },
-	{ label: '循环播放', value: 'loop' as const },
-	{ label: '播完暂停', value: 'stop' as const },
+	{ labelKey: 'videoPlayer.playModeAuto', value: 'auto' as const },
+	{ labelKey: 'videoPlayer.playModeLoop', value: 'loop' as const },
+	{ labelKey: 'videoPlayer.playModeStop', value: 'stop' as const },
 ];
 
 export const SCREEN_TYPE = [
-	{ label: '自动', value: 'auto' as const },
-	{ label: '镜像', value: 'mirror' as const },
+	{ labelKey: 'videoPlayer.screenAuto', value: 'auto' as const },
+	{ labelKey: 'videoPlayer.screenMirrorOn', value: 'mirror' as const },
 ];
 
 export type PlayType = (typeof PLAY_OPTIONS)[number]['value'];

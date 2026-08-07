@@ -1,32 +1,50 @@
 # 视频播放器组件化重构
 
+> **延伸阅读**：[video-player-feature-enhancement.md](./video-player-feature-enhancement.md)（功能增强：缩略图预览 + 多平台画中画 + 语言本地化）
+
 ## 1. 背景与目标
 
 上一轮已实现视频播放器插件（`video-player-plugin.md`），但播放器 UI、上传交互、弹窗 / 分段选择器 / 音量 等通用控件全部堆在单文件 `VideoPlayer.tsx` 里（~1400 行），与 MF 插件入口耦合：
 
-- 复用成本高：独立预览页、其它业务想要接入播放器时，只能整套拷出 `VideoPlayer.tsx` + `tools.ts` + `styles.css`。
-- 职责不清：播放器 UI、上传交互、弹窗 / tooltip、分段控件等横向能力混在一起，回归定位成本高。
-- 主题变量散落在 `styles.css` 与 `PlaybackRatePanel` 的硬编码色值上，暗色模式下某些控件仍显示白色。
+- **复用成本高**：独立预览页、其它业务想要接入播放器时，只能整套拷出 `VideoPlayer.tsx` + `tools.ts` + `styles.css`。
+- **职责不清**：播放器 UI、上传交互、弹窗 / tooltip、分段控件等横向能力混在一起，回归定位成本高。
+- **主题变量散落**：`PlaybackRatePanel` 的硬编码色值在暗色模式下显示异常。
 
 本轮将播放器**组件化**，把纯播放、上传、弹出层、分段、音量等拆分到 `components/design/` 下，插件入口只负责**列表状态 + 组合**，让播放器可以被其它场景直接复用。
 
 ## 2. 改动范围
 
+### 2.1 核心组件重构
+
 - `apps/micro/src/views/video-player/VideoPlayer.tsx` — **删除**（原 1423 行单体组件）
 - `apps/micro/src/views/video-player/tools.ts` — **删除**（移入 `components/design/VideoPlayer/tools.ts`）
 - `apps/micro/src/views/video-player/styles.css` — **删除**（播放器样式改为组件内 Less + 局部 Tailwind）
 - `apps/micro/src/views/video-player/index.tsx` — **重写** 插件入口：变成「列表状态 + 组合层」
-- `apps/micro/src/components/design/VideoPlayer/` — **新增** 4 个文件：`index.tsx` / `player.tsx` / `tools.ts` / `types.ts`
+
+### 2.2 新增通用组件
+
+- `apps/micro/src/components/design/VideoPlayer/` — **新增** 4 个文件：
+  - `index.tsx` — 统一导出
+  - `player.tsx` — 纯播放组件（接收受控/非受控 props）
+  - `tools.ts` — 工具函数（全屏、时间格式化、URL 管理等）
+  - `types.ts` — 类型定义（`VideoPlayerProps`、`VideoPlayerHostUi` 等）
 - `apps/micro/src/components/design/VideoUpload/index.tsx` — **新增**（基于 `DragDropFileUpload` 的视频上传壳）
 - `apps/micro/src/components/design/Popover/index.tsx` — **新增**（原 `VideoPlayer.tsx` 内 `Popover` 独立）
 - `apps/micro/src/components/design/Tooltip/index.tsx` — **新增**（原 `VideoPlayer.tsx` 内 `Tip` 独立 + 命名改为 `Tooltip`）
 - `apps/micro/src/components/design/Segmented/index.tsx` — **新增**（原 `VideoPlayer.tsx` 内 `Segmented` 独立）
 - `apps/micro/src/components/design/Volume/index.tsx` — **新增**（原 `VideoPlayer.tsx` 内 `VolumeIcon` 独立）
-- `apps/micro/src/components/design/PlaybackRatePanel/index.tsx` — **改** 主题颜色：`text-white` / `rgba(255,255,255,...)` 全部换为 `text-textcolor` 与 `bg-textcolor/50`
-- `apps/micro/src/components/design/index.ts` — **改** 导出补齐 `VideoPlayer` / `VideoUpload` / `Tip` / `DragDropFileUpload` / `HoverPopover` / `Segmented` / `Volume`
+
+### 2.3 UI 基础层与导出更新
+
 - `apps/micro/src/components/ui/popover.tsx` / `tooltip.tsx` — **新增**（Radix 基础层，供 `TooltipProvider` 用）
 - `apps/micro/src/components/ui/index.ts` — **改** 追加 `Popover*` / `tooltip` 导出
-- `apps/micro/src/layout/index.tsx` — **改** 外层包 `TooltipProvider`，让全局 tooltip 生效
+- `apps/micro/src/components/design/PlaybackRatePanel/index.tsx` — **改** 主题颜色替换
+- `apps/micro/src/components/design/index.ts` — **改** 导出补齐
+
+### 2.4 其他变更
+
+- `apps/micro/src/layout/index.tsx` — **改** 外层包 `TooltipProvider`
+- `apps/micro/i18n/locales/en-US.ts` / `zh-CN.ts` — **改** 新增翻译条目
 - `apps/micro/package.json` — **改** 新增 `less` 依赖
 
 ## 3. 实现思路
@@ -35,23 +53,37 @@
 
 重构后的播放器按职责拆成三层：
 
-1. **工具层** `VideoPlayer/tools.ts`：常量（`PLAY_OPTIONS` / `SCREEN_TYPE` / `LIMIT`）、全屏降级工具 `enterFullscreen` / `exitFullscreen` / `setDocumentAppFullscreen`、URL `appendVideoFiles` / `revokeVideoUrls`、`formatTime`。
-2. **通用控件层** `VideoPlayer/player.tsx` + 周边：`VideoPlayer`（纯播放组件，不管列表 / 上传）、`VideoUpload`（基于 `DragDropFileUpload` 的壳）、`Popover` / `Tooltip` / `Segmented` / `Volume` / `PlaybackRatePanel`。
-3. **插件组合层** `views/video-player/index.tsx`：只维护 `videos` 列表与当前下标，装配「上传壳 + 播放器」。
+1. **工具层** `VideoPlayer/tools.ts`：
+   - 常量（`PLAY_OPTIONS` / `SCREEN_TYPE` / `LIMIT`）
+   - 全屏降级工具 `enterFullscreen` / `exitFullscreen` / `setDocumentAppFullscreen`
+   - URL `appendVideoFiles` / `revokeVideoUrls`
+   - `formatTime`
+
+2. **通用控件层**：
+   - `VideoPlayer/player.tsx` — 纯播放组件，不管列表 / 上传
+   - `VideoUpload` — 基于 `DragDropFileUpload` 的壳
+   - `Popover` / `Tooltip` / `Segmented` / `Volume` / `PlaybackRatePanel`
+
+3. **插件组合层** `views/video-player/index.tsx`：
+   - 维护 `videos` 列表与当前下标
+   - 装配「上传壳 + 播放器」
 
 ### 3.2 播放器受控 / 非受控 API
 
 `VideoPlayer` 对外暴露的 props 统一成受控 / 非受控两套：
 
-```
-videos: VideoItem[]              // 播放列表（外部传入，播放器不负责上传）
-index?: number                   // 受控当前集下标
-defaultIndex?: number            // 非受控初始下标
-onIndexChange?: (i: number) => void
-embedded?: boolean               // 嵌入模式：只渲染画面壳
-hostUi?: VideoPlayerHostUi       // Host 注入（showToast / setAppFullscreen）
-onAdd?: () => void               // 继续选择（外层管上传 UI）
-onClear?: () => void             // 清空（外层应同步 revoke Blob URL）
+```typescript
+type VideoPlayerProps = {
+    videos: VideoItem[];           // 播放列表（外部传入，播放器不负责上传）
+    index?: number;                 // 受控当前集下标
+    defaultIndex?: number;          // 非受控初始下标
+    onIndexChange?: (i: number) => void;
+    embedded?: boolean;             // 嵌入模式：只渲染画面壳
+    hostUi?: VideoPlayerHostUi;     // Host 注入（showToast / setAppFullscreen）
+    onAdd?: () => void;             // 继续选择（外层管上传 UI）
+    onClear?: () => void;           // 清空（外层应同步 revoke Blob URL）
+    className?: string;
+};
 ```
 
 这样独立预览页只要传 `videos` + `hostUi` 就能跑，宿主插件只需要额外处理上传状态。
@@ -556,6 +588,28 @@ export * from './tooltip';
 
 **变更摘要**：补齐 `Popover*` 与 `tooltip` 两个 Radix 基础层的导出，播放器周边的 `HoverPopover` / `Tooltip` 组件不再需要自己造轮子。
 
+---
+
+### 4.7 i18n 翻译条目补充
+
+**对比范围**：`zh-CN.ts` / `en-US.ts` 各新增 1 条翻译。
+
+**改动后** · `apps/micro/src/i18n/locales/zh-CN.ts`（当前）
+
+```typescript
+// 新增「继续选择」翻译条目，用于 VideoPlayer onAdd 按钮
+'videoPlayer.continueSelect': '继续选择',
+```
+
+**改动后** · `apps/micro/src/i18n/locales/en-US.ts`（当前）
+
+```typescript
+// 对应的英文翻译
+'videoPlayer.continueSelect': 'Continue selecting',
+```
+
+**变更摘要**：为播放器「继续选择」按钮补充中英文翻译，使插件在切换语言时按钮文案正确显示。
+
 ## 5. 兼容性与影响
 
 ### 5.1 破坏性改动
@@ -595,6 +649,7 @@ export * from './tooltip';
 | 旧单体播放器（已删除，仅供历史对照） | `apps/micro/src/views/video-player/VideoPlayer.tsx`（基线） |
 | 独立预览 Layout（新增 TooltipProvider） | `apps/micro/src/layout/index.tsx` |
 | less 依赖声明 | `apps/micro/package.json` |
+| 中英文翻译补充 | `apps/micro/src/i18n/locales/zh-CN.ts` / `en-US.ts` |
 
 ---
 
