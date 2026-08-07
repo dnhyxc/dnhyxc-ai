@@ -553,6 +553,9 @@ importers:
       framer-motion:
         specifier: ^12.29.0
         version: 12.29.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      less:
+        specifier: ^4.7.0
+        version: 4.7.0
       lowlight:
         specifier: ^3.3.0
         version: 3.3.0
@@ -589,6 +592,9 @@ importers:
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
+      xgplayer:
+        specifier: ^3.0.21
+        version: 3.0.26(core-js@3.49.0)
     devDependencies:
       '@module-federation/vite':
         specifier: ^1.18.2
@@ -5875,6 +5881,9 @@ packages:
   dagre-d3-es@7.0.14:
     resolution: {integrity: sha512-P4rFMVq9ESWqmOgK+dlXvOtLwYg0i7u0HBGJER0LZDJT2VHIPAMZ/riPxqJceWMStH5+E61QxFra9kIS3AqdMg==}
 
+  danmu.js@1.2.1:
+    resolution: {integrity: sha512-evDEImUBo94c846fC92K//Dzll8jXnZ3zKmYlQHwMzmvw6IW2IyjWL3Ew2SqEAzuqauFnDkwJEgZauu3uW/p1Q==}
+
   dargs@8.1.0:
     resolution: {integrity: sha512-wAV9QHOsNbwnWdNW2FYvE1P56wtgSbM+3SZcdGiWQILwVjACCXDCI3Ai8QlCjMDB8YK5zySiXZYBiwGmNY3lnw==}
     engines: {node: '>=12'}
@@ -5959,6 +5968,9 @@ packages:
   delayed-stream@1.0.0:
     resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
     engines: {node: '>=0.4.0'}
+
+  delegate@3.2.0:
+    resolution: {integrity: sha512-IofjkYBZaZivn0V8nnsMJGBr4jVLxHDheKSW88PyxS5QC4Vo9ZbZVvhzlSxY87fVq3STR6r+4cGepyHkcWOQSw==}
 
   denque@2.1.0:
     resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
@@ -10162,6 +10174,16 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  xgplayer-subtitles@3.0.26:
+    resolution: {integrity: sha512-HiHlw3E8emEQCv0xFYHdmNUFgyzyWGBnSNmyI/fkuuvRBb+4IbsCfxg6PF3r1TNCfzOuNzA/OaMbtXBSH8n/Bw==}
+    peerDependencies:
+      core-js: '>=3.12.1'
+
+  xgplayer@3.0.26:
+    resolution: {integrity: sha512-F/urLGIrxCa1DI+wtkPyT0TcRS6Wejbo+OZKOTlSVvg0+SGyN3TfSXddNcu6LL876ZTWzlEwhS4C5nKSUV5FZw==}
+    peerDependencies:
+      core-js: '>=3.12.1'
 
   xlsx@0.18.5:
     resolution: {integrity: sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==}
@@ -15500,6 +15522,10 @@ snapshots:
       d3: 7.9.0
       lodash-es: 4.18.1
 
+  danmu.js@1.2.1:
+    dependencies:
+      event-emitter: 0.3.5
+
   dargs@8.1.0: {}
 
   dashdash@1.14.1:
@@ -15556,6 +15582,8 @@ snapshots:
       robust-predicates: 3.0.3
 
   delayed-stream@1.0.0: {}
+
+  delegate@3.2.0: {}
 
   denque@2.1.0: {}
 
@@ -20554,6 +20582,19 @@ snapshots:
   ws@8.19.0: {}
 
   ws@8.21.0: {}
+
+  xgplayer-subtitles@3.0.26(core-js@3.49.0):
+    dependencies:
+      core-js: 3.49.0
+      eventemitter3: 4.0.7
+
+  xgplayer@3.0.26(core-js@3.49.0):
+    dependencies:
+      core-js: 3.49.0
+      danmu.js: 1.2.1
+      delegate: 3.2.0
+      eventemitter3: 4.0.7
+      xgplayer-subtitles: 3.0.26(core-js@3.49.0)
 
   xlsx@0.18.5:
     dependencies:

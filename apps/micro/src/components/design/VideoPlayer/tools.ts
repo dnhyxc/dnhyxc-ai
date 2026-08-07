@@ -1,9 +1,8 @@
 /**
- * 视频播放器常量与工具函数
- * 对齐 src/views/tools/VideoPlayer/tools.ts（去除裁剪相关 captureFrame）
+ * 视频播放器常量与工具
  */
 
-export const LIMIT = 100; // 最大上传视频数量
+export const LIMIT = 100;
 
 export const PLAY_OPTIONS = [
 	{ label: '自动切换', value: 'auto' as const },
@@ -19,19 +18,46 @@ export const SCREEN_TYPE = [
 export type PlayType = (typeof PLAY_OPTIONS)[number]['value'];
 export type ScreenType = (typeof SCREEN_TYPE)[number]['value'];
 
-export interface VideoUrlList {
+/** 播放列表项（由外部传入，播放器不负责上传） */
+export interface VideoItem {
 	url: string;
 	name: string;
-	size: number;
-	type: string;
-	file?: File;
+	size?: number;
+	type?: string;
 }
 
-/**
- * 将秒数格式化为 HH:MM:SS 或 MM:SS
- * @param time 秒
- * @param withHours 是否强制显示小时位
- */
+/** @deprecated 用 VideoItem */
+export type VideoUrlList = VideoItem;
+
+/** 将 File 转为 VideoItem 并合并进已有列表（去重、限量） */
+export function appendVideoFiles(
+	files: readonly File[],
+	existing: readonly VideoItem[] = [],
+	limit = LIMIT,
+): VideoItem[] {
+	const next = [...existing];
+	for (const file of files) {
+		if (next.length >= limit) break;
+		if (next.some((i) => i.name === file.name && i.size === file.size)) {
+			continue;
+		}
+		next.push({
+			url: URL.createObjectURL(file),
+			name: file.name,
+			size: file.size,
+			type: file.type,
+		});
+	}
+	return next.length === existing.length ? [...existing] : next;
+}
+
+/** 释放 blob: URL，避免泄漏 */
+export function revokeVideoUrls(items: readonly VideoItem[]): void {
+	for (const item of items) {
+		if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+	}
+}
+
 export function formatTime(time: number, withHours = false): string {
 	if (time === undefined || time === null || Number.isNaN(time)) {
 		return '00:00';
@@ -44,21 +70,6 @@ export function formatTime(time: number, withHours = false): string {
 		return `${pad(h)}:${pad(m)}:${pad(s)}`;
 	}
 	return `${pad(m)}:${pad(s)}`;
-}
-
-export function formatDate(
-	timestamp: number,
-	format = 'YYYY.MM.DD.HH.mm.ss',
-): string {
-	const d = new Date(timestamp);
-	const pad = (n: number) => String(n).padStart(2, '0');
-	return format
-		.replace('YYYY', String(d.getFullYear()))
-		.replace('MM', pad(d.getMonth() + 1))
-		.replace('DD', pad(d.getDate()))
-		.replace('HH', pad(d.getHours()))
-		.replace('mm', pad(d.getMinutes()))
-		.replace('ss', pad(d.getSeconds()));
 }
 
 type FsEl = HTMLElement & {

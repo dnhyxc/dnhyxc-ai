@@ -16,6 +16,7 @@ const LABELS = Array.from(
 const PRESETS = [1, 1.5, 2, 2.5, 3] as const;
 
 const TICK_MAJOR_H = 20;
+const TICK_MIDDLE_H = 15;
 const TICK_MINOR_H = 10;
 
 type Tick = { index: number; major: boolean };
@@ -126,15 +127,15 @@ export function PlaybackRatePanel({
 
 	return (
 		<div
-			className={cn('px-3 pt-2 pb-3 text-left', className)}
+			className={cn('px-3 pt-2 pb-3 text-left text-textcolor', className)}
 			onPointerDown={(e) => e.stopPropagation()}
 		>
-			<div className="text-left text-sm font-normal text-theme/5 mb-2.5">
+			<div className="text-left text-sm font-normal text-textcolor mb-2.5">
 				{label}
 			</div>
 
 			<div className="rounded-md bg-theme/5 pt-2 pb-3.5 px-2">
-				<p className="text-center text-3xl font-semibold tabular-nums text-white">
+				<p className="text-center text-3xl font-semibold tabular-nums">
 					{formatRate(snapRate(rate))}
 				</p>
 
@@ -174,9 +175,9 @@ export function PlaybackRatePanel({
 											bottom: 0,
 											transform: 'translateX(-50%)',
 											width: 1,
-											height: tick.major ? TICK_MAJOR_H : TICK_MINOR_H,
-											backgroundColor: 'rgba(255,255,255,0.35)',
+											height: tick.major ? TICK_MIDDLE_H : TICK_MINOR_H,
 										}}
+										className="bg-textcolor/50"
 									/>
 								))}
 							</div>
@@ -208,7 +209,7 @@ export function PlaybackRatePanel({
 							{LABELS.map((value) => (
 								<span
 									key={value}
-									className="w-0 overflow-visible text-center text-[10px] whitespace-nowrap text-white/45 tabular-nums"
+									className="w-0 overflow-visible text-center text-xs whitespace-nowrap text-textcolor tabular-nums"
 								>
 									<span className="inline-block -translate-x-1/2">
 										{formatRate(value)}
@@ -227,10 +228,10 @@ export function PlaybackRatePanel({
 								key={preset}
 								type="button"
 								className={cn(
-									'size-9 shrink-0 cursor-pointer rounded-full border text-xs tabular-nums transition-colors',
+									'size-10 shrink-0 cursor-pointer rounded-full border text-sm tabular-nums transition-colors',
 									selected
-										? 'border-teal-500 font-medium text-white'
-										: 'border-white/15 text-white/70 hover:border-white/30 hover:text-white',
+										? 'border-teal-500 font-medium text-teal-500'
+										: 'border-theme/35 text-textcolor/70 hover:border-teal-500 hover:text-teal-500',
 								)}
 								aria-label={formatRate(preset)}
 								aria-pressed={selected}

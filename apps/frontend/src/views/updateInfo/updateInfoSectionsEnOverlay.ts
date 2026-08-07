@@ -193,7 +193,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's3-16': {
 		title: 'Video player plugin',
 		description:
-			'A new standalone video player module is now available. Enable it in the Plugin Center and a TV-icon entry appears in the sidebar—just drop or pick local video files to play. Supports multi-file playlist selection, a custom control bar (progress, volume, playback rate, Picture-in-Picture, fullscreen, mirror), 0.5X–3.0X speed control with keyboard arrow keys, and play modes (auto / loop / stop). The player is auto-cleaned on unmount to avoid leaving the host in theater mode.',
+			'A new standalone video player module is now available. Enable it in the Plugin Center and a TV-icon entry appears in the sidebar—just drop or pick local video files to play. Supports multi-file playlist selection, a custom control bar (progress, volume, playback rate, Picture-in-Picture, fullscreen, mirror), 0.5X–3.0X speed control with keyboard arrow keys, and play modes (auto / loop / stop). The player is auto-cleaned on unmount to avoid leaving the host in theater mode. The player has also been refactored into reusable components—player body, upload, tooltips, segmented controls, and volume can now be reused by other features. The playback-rate panel and tick labels now use theme tokens, so they stay readable in both light and dark themes. Tooltips on controls now work consistently in both the standalone preview and the host-mounted plugin page.',
 	},
 	's3-17': {
 		title: 'Plugin theater fullscreen & 404 flash prevention',

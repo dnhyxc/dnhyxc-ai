@@ -1,12 +1,16 @@
 /**
- * 视频播放器组件
- * 对齐 src/views/tools/VideoPlayer/index.vue（一比一复刻 UI 与交互，去除裁剪/转码/GIF/水印等功能）
+ * 通用视频播放器（仅播放）：列表与上传由外部传入 / 组合。
  *
- * 保留功能：多文件上传、xgplayer 初始化、自定义控制条、进度条（hover tip/点击跳转/拖拽滑块/刻度尺）、
- * 播放暂停/上下集、时间显示、设置（播放方式/镜像）、选集、音量、倍速、画中画、全屏、mini timeline、
- * 音量 tip、视频名、中心播放按钮、键盘快捷键。
+ * 功能：xgplayer、自定义控制条、进度条、上下集、设置、选集、音量、倍速、PiP、全屏、快捷键。
  */
 
+import {
+	HoverPopover,
+	PlaybackRatePanel,
+	Segmented,
+	Tip,
+	Volume,
+} from '@design/index';
 import { ScrollArea } from '@ui/scroll-area';
 import {
 	FolderPlus,
@@ -20,24 +24,9 @@ import {
 	Settings,
 	SkipBack,
 	SkipForward,
-	Upload,
-	Volume1,
-	Volume2,
-	VolumeX,
 } from 'lucide-react';
-import {
-	type ReactNode,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Player from 'xgplayer';
-import DragDropFileUpload, {
-	type DragDropAcceptResult,
-	type DragDropFileUploadHandle,
-} from '@/components/design/DragDropFileUpload';
-import { PlaybackRatePanel } from '@/components/design/PlaybackRatePanel';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -45,194 +34,51 @@ import {
 	exitFullscreen,
 	formatTime,
 	getFullscreenElement,
-	LIMIT,
 	PLAY_OPTIONS,
 	type PlayType,
 	SCREEN_TYPE,
 	type ScreenType,
 	setDocumentAppFullscreen,
-	type VideoUrlList,
+	type VideoItem,
 } from './tools';
-import './styles.css';
+import type { VideoPlayerProps } from './types';
 import 'xgplayer/dist/index.min.css';
 
-/** 底栏操作图标统一尺寸 */
-const CTRL_ICON = 18;
+// /** 底栏操作图标统一尺寸 */
+// const CTRL_ICON = 18;
 
-function VolumeIcon({
-	volume,
-	size = CTRL_ICON,
-}: {
-	volume: number;
-	size?: number;
-}) {
-	if (volume <= 0) return <VolumeX size={size} />;
-	if (volume < 0.6) return <Volume1 size={size} />;
-	return <Volume2 size={size} />;
-}
-
-/* --------------------------------- 弹出层 --------------------------------- */
-
-function Tip({ label, children }: { label: string; children: ReactNode }) {
-	return (
-		<span className="vp-tip" data-tip={label}>
-			{children}
-		</span>
-	);
-}
-
-function Popover({
-	trigger,
-	children,
-	align = 'center',
-	width,
-	mode = 'click',
-	contentClassName,
-	contentPadding = 10,
-	onOpenChange,
-	onContentPointer,
-}: {
-	trigger: (open: boolean) => ReactNode;
-	children: ReactNode | ((api: { close: () => void }) => ReactNode);
-	align?: 'center' | 'start' | 'end';
-	width?: number | string;
-	/** click：点击切换；hover：悬停展示 */
-	mode?: 'click' | 'hover';
-	contentClassName?: string;
-	contentPadding?: number | string;
-	onOpenChange?: (open: boolean) => void;
-	/** 指针在 POP 内容上时回调（用于保持底栏可见） */
-	onContentPointer?: () => void;
-}) {
-	const [open, setOpen] = useState(false);
-	const ref = useRef<HTMLDivElement>(null);
-	const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	const clearLeaveTimer = useCallback(() => {
-		if (leaveTimerRef.current) {
-			clearTimeout(leaveTimerRef.current);
-			leaveTimerRef.current = null;
-		}
-	}, []);
-
-	const setOpenSafe = useCallback(
-		(next: boolean | ((prev: boolean) => boolean)) => {
-			setOpen((prev) => {
-				const value = typeof next === 'function' ? next(prev) : next;
-				if (value !== prev) onOpenChange?.(value);
-				return value;
-			});
-		},
-		[onOpenChange],
-	);
-
-	const close = useCallback(() => setOpenSafe(false), [setOpenSafe]);
-
-	useEffect(() => {
-		if (!open || mode !== 'click') return;
-		const onDown = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node)) {
-				setOpenSafe(false);
-			}
-		};
-		document.addEventListener('mousedown', onDown);
-		return () => document.removeEventListener('mousedown', onDown);
-	}, [open, mode, setOpenSafe]);
-
-	useEffect(() => () => clearLeaveTimer(), [clearLeaveTimer]);
-
-	const onHoverEnter = () => {
-		if (mode !== 'hover') return;
-		clearLeaveTimer();
-		setOpenSafe(true);
-	};
-
-	const onHoverLeave = () => {
-		if (mode !== 'hover') return;
-		clearLeaveTimer();
-		leaveTimerRef.current = setTimeout(() => setOpenSafe(false), 120);
-	};
-
-	return (
-		<div
-			ref={ref}
-			className="vp-popover relative inline-flex"
-			onMouseEnter={onHoverEnter}
-			onMouseLeave={onHoverLeave}
-		>
-			<div
-				className="vp-popover-trigger inline-flex"
-				onClick={mode === 'click' ? () => setOpenSafe((v) => !v) : undefined}
-			>
-				{trigger(open)}
-			</div>
-			{open ? (
-				<div
-					className={cn(
-						'vp-popover-content absolute bottom-full z-50',
-						align === 'center' && 'left-1/2 -translate-x-1/2',
-						align === 'start' && 'left-0',
-						align === 'end' && 'right-0',
-						contentClassName,
-					)}
-					style={{
-						marginBottom: 8,
-						width: typeof width === 'number' ? `${width}px` : width,
-						padding: contentPadding,
-					}}
-					onClick={(e) => e.stopPropagation()}
-					onMouseEnter={onContentPointer}
-					onMouseMove={onContentPointer}
-				>
-					{typeof children === 'function' ? children({ close }) : children}
-				</div>
-			) : null}
-		</div>
-	);
-}
-
-function Segmented<T extends string>({
-	value,
-	options,
-	onChange,
-}: {
-	value: T;
-	options: { label: string; value: T }[];
-	onChange: (v: T) => void;
-}) {
-	return (
-		<div className="vp-segmented">
-			{options.map((o) => (
-				<button
-					key={o.value}
-					type="button"
-					className={cn(
-						'vp-segmented-item',
-						value === o.value && 'vp-segmented-active',
-					)}
-					onClick={() => onChange(o.value)}
-				>
-					{o.label}
-				</button>
-			))}
-		</div>
-	);
-}
+// function VolumeIcon({
+// 	volume,
+// 	size = CTRL_ICON,
+// }: {
+// 	volume: number;
+// 	size?: number;
+// }) {
+// 	if (volume <= 0) return <VolumeX size={size} />;
+// 	if (volume < 0.6) return <Volume1 size={size} />;
+// 	return <Volume2 size={size} />;
+// }
 
 /* ------------------------------- 主播放器组件 ------------------------------ */
 
+// 底栏操作图标统一尺寸
+const CTRL_ICON = 18;
+// 倍速列表
 const PLAYBACK_RATES = [3, 2.5, 2, 1.5, 1, 0.75, 0.5];
+// 控制条隐藏时间
 const CHROME_HIDE_MS = 3000;
 
-type HostUi = {
-	showToast?: (options: {
-		message: string;
-		type?: 'success' | 'error' | 'info';
-	}) => void;
-	setAppFullscreen?: (full: boolean) => Promise<void>;
-};
-
-export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
+export default function VideoPlayer({
+	videos,
+	index: indexProp,
+	defaultIndex = 0,
+	onIndexChange,
+	className,
+	embedded = false,
+	hostUi,
+	onAdd,
+	onClear,
+}: VideoPlayerProps) {
 	const { t } = useI18n();
 	/** Host 注入优先；独立运行无注入时用 document 全屏（与 mockHost 同源） */
 	const setAppFullscreen = hostUi?.setAppFullscreen ?? setDocumentAppFullscreen;
@@ -240,6 +86,18 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	const usingDocumentFs =
 		!hostUi?.setAppFullscreen ||
 		hostUi.setAppFullscreen === setDocumentAppFullscreen;
+
+	const controlled = indexProp !== undefined;
+	const [innerIndex, setInnerIndex] = useState(defaultIndex);
+	const playIndex = controlled ? indexProp : innerIndex;
+
+	const setPlayIndex = useCallback(
+		(next: number) => {
+			if (!controlled) setInnerIndex(next);
+			onIndexChange?.(next);
+		},
+		[controlled, onIndexChange],
+	);
 
 	const playerRef = useRef<Player | null>(null);
 	const animationRef = useRef<number | null>(null);
@@ -251,6 +109,8 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	const ignoreMouseRef = useRef(false);
 	/** 底栏任一 POP 打开时 >0，期间不自动隐藏操作条 */
 	const popoverOpenRef = useRef(0);
+	/** 指针在底栏上时不自动隐藏操作条与光标 */
+	const controlsHoverRef = useRef(false);
 
 	const controlsRef = useRef<HTMLDivElement>(null);
 	const durationRef = useRef<HTMLDivElement>(null);
@@ -259,11 +119,7 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	const timeTipRef = useRef<HTMLDivElement>(null);
 	const timePointRef = useRef<HTMLDivElement>(null);
 	const volumeTipRef = useRef<HTMLDivElement>(null);
-	const uploadRef = useRef<DragDropFileUploadHandle>(null);
 
-	const [urlList, setUrlList] = useState<VideoUrlList[]>([]);
-	const [playIndex, setPlayIndex] = useState(0);
-	const [currentUrl, setCurrentUrl] = useState('');
 	const [volume, setVolume] = useState(0.6);
 	const [playType, setPlayType] = useState<PlayType>('auto');
 	const [screenType, setScreenType] = useState<ScreenType>('auto');
@@ -284,20 +140,26 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	/** 播放列表/方式：xgplayer ended 闭包易过期，一律读 ref */
 	const playTypeRef = useRef(playType);
 	const playIndexRef = useRef(playIndex);
-	const urlListRef = useRef(urlList);
-	const currentUrlRef = useRef(currentUrl);
+	const videosRef = useRef(videos);
 	playTypeRef.current = playType;
 	playIndexRef.current = playIndex;
-	urlListRef.current = urlList;
+	videosRef.current = videos;
+
+	const safeIndex =
+		videos.length === 0
+			? 0
+			: Math.min(Math.max(0, playIndex), videos.length - 1);
+	const currentUrl = videos[safeIndex]?.url ?? '';
+	const currentUrlRef = useRef(currentUrl);
 	currentUrlRef.current = currentUrl;
+
 	/** 仅给 xgplayer 用，勿再挂 React 子节点（会与播放器抢 DOM） */
 	const playerContainerRef = useRef<HTMLDivElement>(null);
 	/** 画面 + 自定义控制条外壳，全屏目标 */
 	const videoShellRef = useRef<HTMLDivElement>(null);
 
 	const timeInfo = `${formatTime(playTimeInfo.currentTime)} / ${formatTime(playTimeInfo.duration)}`;
-	const currentVideoName =
-		urlList.find((i) => i.url === currentUrl)?.name ?? '';
+	const currentVideoName = videos[safeIndex]?.name ?? '';
 	const chromeOn = uiChromeVisible;
 
 	isFullscreenRef.current = isFullscreen;
@@ -426,7 +288,7 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	// 返回是否已切到下一集
 	const autoPlayNext = useCallback((): boolean => {
 		const type = playTypeRef.current;
-		const list = urlListRef.current;
+		const list = videosRef.current;
 		if (type === 'stop' || list.length === 0) return false;
 
 		const found = list.findIndex((i) => i.url === currentUrlRef.current);
@@ -434,25 +296,18 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 
 		if (type === 'auto') {
 			if (index >= list.length - 1) return false;
-			const nextIndex = index + 1;
-			const nextUrl = list[nextIndex].url;
 			switchingRef.current = true;
-			setPlayIndex(nextIndex);
-			setCurrentUrl(nextUrl);
-			switchUrl(nextUrl, true);
+			setPlayIndex(index + 1);
 			return true;
 		}
 		if (type === 'loop') {
 			const nextIndex = index < list.length - 1 ? index + 1 : 0;
-			const nextUrl = list[nextIndex].url;
 			switchingRef.current = true;
 			setPlayIndex(nextIndex);
-			setCurrentUrl(nextUrl);
-			switchUrl(nextUrl, true);
 			return true;
 		}
 		return false;
-	}, [switchUrl]);
+	}, [setPlayIndex]);
 
 	const autoPlayNextRef = useRef(autoPlayNext);
 	autoPlayNextRef.current = autoPlayNext;
@@ -486,8 +341,8 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 				controls: false,
 				cssFullscreen: false,
 				playbackRate: PLAYBACK_RATES,
-				// 自定义切集，不要原生「重播」层
-				ignores: ['replay'],
+				// 自定义切集 / 中心播控，不要原生「重播」与「开始/暂停」层
+				ignores: ['replay', 'start'],
 			} as ConstructorParameters<typeof Player>[0]);
 			playerRef.current = player;
 
@@ -550,27 +405,6 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 		],
 	);
 
-	const onFiles = useCallback((result: DragDropAcceptResult) => {
-		if (result.accepted.length === 0) return;
-		setUrlList((prev) => {
-			const next = [...prev];
-			for (const file of result.accepted) {
-				if (next.length >= LIMIT) break;
-				if (next.some((i) => i.name === file.name && i.size === file.size)) {
-					continue;
-				}
-				next.push({
-					url: window.URL.createObjectURL(file),
-					name: file.name,
-					size: file.size,
-					type: file.type,
-					file,
-				});
-			}
-			return next.length === prev.length ? prev : next;
-		});
-	}, []);
-
 	// 播放控制（play() 异步，状态交给 play/pause 事件；勿用即时 paused 反推）
 	const onPlay = useCallback((e?: React.MouseEvent) => {
 		e?.stopPropagation();
@@ -590,32 +424,26 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	}, []);
 
 	const onPrev = useCallback(() => {
-		if (playIndex === 0 && playType !== 'loop') return;
-		if (urlList.length === 0) return;
-		const curIndex = urlList.findIndex((i) => i.url === currentUrl);
+		if (safeIndex === 0 && playType !== 'loop') return;
+		if (videos.length === 0) return;
+		const curIndex = videos.findIndex((i) => i.url === currentUrl);
 		let index: number;
 		if (curIndex > 0) index = curIndex - 1;
-		else if (playType === 'loop') index = urlList.length - 1;
+		else if (playType === 'loop') index = videos.length - 1;
 		else index = 0;
 		setPlayIndex(index);
-		const url = urlList[index].url;
-		setCurrentUrl(url);
-		switchUrl(url, true);
-	}, [playIndex, playType, urlList, currentUrl, switchUrl]);
+	}, [safeIndex, playType, videos, currentUrl, setPlayIndex]);
 
 	const onNext = useCallback(() => {
-		if (playIndex === urlList.length - 1 && playType !== 'loop') return;
-		if (urlList.length === 0) return;
-		const curIndex = urlList.findIndex((i) => i.url === currentUrl);
+		if (safeIndex === videos.length - 1 && playType !== 'loop') return;
+		if (videos.length === 0) return;
+		const curIndex = videos.findIndex((i) => i.url === currentUrl);
 		let index: number;
-		if (curIndex < urlList.length - 1) index = curIndex + 1;
+		if (curIndex < videos.length - 1) index = curIndex + 1;
 		else if (playType === 'loop') index = 0;
-		else index = urlList.length - 1;
+		else index = videos.length - 1;
 		setPlayIndex(index);
-		const url = urlList[index].url;
-		setCurrentUrl(url);
-		switchUrl(url, true);
-	}, [playIndex, playType, urlList, currentUrl, switchUrl]);
+	}, [safeIndex, playType, videos, currentUrl, setPlayIndex]);
 
 	const onFull = useCallback(
 		async (e?: React.MouseEvent) => {
@@ -639,6 +467,7 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 			setUiChromeVisible(true);
 			if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
 			hideTimerRef.current = setTimeout(() => {
+				if (popoverOpenRef.current > 0 || controlsHoverRef.current) return;
 				setUiChromeVisible(false);
 				ignoreMouseRef.current = true;
 				window.setTimeout(() => {
@@ -736,26 +565,22 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	);
 
 	const onCheckUrl = useCallback(
-		(item: VideoUrlList, index: number) => {
-			setCurrentUrl(item.url);
+		(_item: VideoItem, index: number) => {
 			setPlayIndex(index);
-			switchUrl(item.url, true);
 		},
-		[switchUrl],
+		[setPlayIndex],
 	);
 
 	const onReset = useCallback(() => {
 		setPlayStatus(false);
 		restoreTimeInfo(0);
 		if (animationRef.current) cancelAnimationFrame(animationRef.current);
-		setUrlList([]);
-		setPlayIndex(0);
-		setCurrentUrl('');
 		playerRef.current?.destroy();
 		playerRef.current = null;
-	}, [restoreTimeInfo]);
+		onClear?.();
+	}, [restoreTimeInfo, onClear]);
 
-	/** 显示控制条+光标；静止后隐藏（已显示时 bump 不额外 setState；POP 打开时不隐藏） */
+	/** 显示控制条+光标；静止后隐藏（已显示时 bump 不额外 setState；POP/悬停底栏时不隐藏） */
 	const bumpChrome = useCallback(() => {
 		if (ignoreMouseRef.current) return;
 		setUiChromeVisible((v) => (v ? v : true));
@@ -763,9 +588,9 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 			clearTimeout(hideTimerRef.current);
 			hideTimerRef.current = null;
 		}
-		if (popoverOpenRef.current > 0) return;
+		if (popoverOpenRef.current > 0 || controlsHoverRef.current) return;
 		hideTimerRef.current = setTimeout(() => {
-			if (popoverOpenRef.current > 0) return;
+			if (popoverOpenRef.current > 0 || controlsHoverRef.current) return;
 			setUiChromeVisible(false);
 			ignoreMouseRef.current = true;
 			window.setTimeout(() => {
@@ -792,6 +617,22 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 		[bumpChrome],
 	);
 
+	const onControlsBarEnter = useCallback(() => {
+		controlsHoverRef.current = true;
+		ignoreMouseRef.current = false;
+		setUiChromeVisible(true);
+		if (hideTimerRef.current) {
+			clearTimeout(hideTimerRef.current);
+			hideTimerRef.current = null;
+		}
+	}, []);
+
+	const onControlsBarLeave = useCallback(() => {
+		controlsHoverRef.current = false;
+		if (popoverOpenRef.current > 0) return;
+		bumpChrome();
+	}, [bumpChrome]);
+
 	const onPlayerMouseMove = useCallback(() => {
 		bumpChrome();
 	}, [bumpChrome]);
@@ -801,7 +642,7 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	}, [bumpChrome]);
 
 	const onPlayerMouseLeave = useCallback(() => {
-		if (popoverOpenRef.current > 0) return;
+		if (popoverOpenRef.current > 0 || controlsHoverRef.current) return;
 		if (hideTimerRef.current) {
 			clearTimeout(hideTimerRef.current);
 			hideTimerRef.current = null;
@@ -992,16 +833,25 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 	}, [timeInfo]);
 
 	useEffect(() => {
-		if (urlList.length === 0) return;
-		if (!currentUrl) {
-			setCurrentUrl(urlList[0].url);
-			setPlayIndex(0);
-			return;
-		}
+		if (videos.length === 0) return;
+		if (!currentUrl) return;
 		if (playerContainerRef.current && !playerRef.current) {
 			initPlayer(currentUrl, false, 0);
 		}
-	}, [urlList, currentUrl, initPlayer]);
+	}, [videos.length, currentUrl, initPlayer]);
+
+	/** 外部换源时切播 */
+	const prevUrlRef = useRef(currentUrl);
+	useEffect(() => {
+		if (!currentUrl || !playerRef.current) {
+			prevUrlRef.current = currentUrl;
+			return;
+		}
+		if (prevUrlRef.current !== currentUrl) {
+			prevUrlRef.current = currentUrl;
+			switchUrl(currentUrl, true);
+		}
+	}, [currentUrl, switchUrl]);
 
 	useEffect(() => {
 		document.addEventListener('visibilitychange', onVisibilityChange);
@@ -1029,394 +879,431 @@ export default function VideoPlayer({ hostUi }: { hostUi?: HostUi } = {}) {
 		};
 	}, [removePipListeners, setAppFullscreen]);
 
+	/** theater / chrome 由 isFullscreen、chromeOn 直接挂在 shell 上 */
+
 	const rulerCount = playerRef.current?.duration
 		? Math.floor(playerRef.current.duration / 5)
 		: 0;
 
-	return (
+	if (videos.length === 0) {
+		return null;
+	}
+
+	const theater = isFullscreen;
+	const chromeHidden = !chromeOn;
+
+	const shell = (
 		<div
+			ref={videoShellRef}
 			className={cn(
-				'vp-wrap h-full w-full',
-				isFullscreen && 'vp-theater',
-				urlList.length > 0 && !chromeOn && 'vp-chrome-hidden',
+				'relative flex h-full w-full justify-center overflow-hidden rounded-md text-center contain-[layout_paint]',
+				'[:fullscreen]:fixed [:fullscreen]:inset-0 [:fullscreen]:z-9999 [:fullscreen]:h-screen [:fullscreen]:w-screen [:fullscreen]:rounded-none [:fullscreen]:bg-black',
+				'[&:-webkit-full-screen]:fixed [&:-webkit-full-screen]:inset-0 [&:-webkit-full-screen]:z-9999 [&:-webkit-full-screen]:h-screen [&:-webkit-full-screen]:w-screen [&:-webkit-full-screen]:rounded-none [&:-webkit-full-screen]:bg-black',
+				'[&.vp-css-fullscreen]:fixed [&.vp-css-fullscreen]:inset-0 [&.vp-css-fullscreen]:z-9999 [&.vp-css-fullscreen]:h-screen [&.vp-css-fullscreen]:w-screen [&.vp-css-fullscreen]:rounded-none [&.vp-css-fullscreen]:bg-black',
+				/* 藏 xgplayer 原生 UI（挂在 shell，避免 #vp-player 被改 class 后失效） */
+				'[&_.xgplayer-controls]:hidden! [&_.xgplayer-replay]:hidden! [&_.xgplayer-start]:hidden! [&_xg-start]:hidden!',
+				'[&_.xg-spot-info]:hidden! [&_.xgplayer-progress-point]:hidden!',
+				theater && 'rounded-none',
+				chromeHidden && 'cursor-none',
+				embedded && className,
 			)}
+			onMouseMove={onPlayerMouseMove}
+			onMouseEnter={onPlayerMouseEnter}
+			onMouseLeave={onPlayerMouseLeave}
+			onClick={onShellClick}
 		>
-			<div className="vp-content">
-				{/* 上传区始终挂载，便于底栏「继续选择」调用 open() */}
+			{/* xgplayer 独占此节点 */}
+			<div
+				ref={playerContainerRef}
+				id="vp-player"
+				className={cn(
+					'box-border flex h-full! w-full items-center justify-center overflow-hidden rounded-b-md',
+					'[&_.xgplayer]:h-full! [&_.xgplayer]:w-full!',
+					'[&_.xgplayer-video]:h-full! [&_.xgplayer-video]:w-full!',
+					'[&_video]:box-border [&_video]:h-full [&_video]:w-full [&_video]:rounded-md [&_video]:object-contain [&_video]:bg-theme-background',
+					theater && 'rounded-none',
+				)}
+			/>
+
+			{currentVideoName ? (
 				<div
-					className={cn(urlList.length > 0 ? 'sr-only' : 'vp-video-content')}
-					aria-hidden={urlList.length > 0}
+					className={cn(
+						'pointer-events-none absolute top-0 left-0 z-2 box-border w-full overflow-hidden p-[9px_10px_0] text-left text-base text-ellipsis whitespace-nowrap text-textcolor',
+						chromeHidden && 'pointer-events-none opacity-0!',
+					)}
 				>
-					<DragDropFileUpload
-						ref={uploadRef}
-						className={urlList.length > 0 ? undefined : 'h-full w-full'}
-						zoneClassName={
-							urlList.length > 0
-								? undefined
-								: 'vp-upload-drag flex h-full w-full flex-1 flex-col items-center justify-center gap-2.5 border-0'
-						}
-						accept="video/*"
-						multiple
-						maxCount={LIMIT}
-						ariaLabel={t('videoPlayer.selectVideo')}
-						onFiles={onFiles}
+					{currentVideoName}
+				</div>
+			) : null}
+
+			{!playStatus ? (
+				<div
+					className="absolute right-25 bottom-30 z-2 cursor-pointer text-teal-500 transition-opacity duration-300 ease-in-out"
+					onClick={(e) => {
+						e.stopPropagation();
+						onPlay();
+					}}
+				>
+					<Play size={80} fill="currentColor" />
+				</div>
+			) : null}
+
+			<div
+				ref={controlsRef}
+				className={cn(
+					'absolute bottom-0 left-0 z-3 box-border flex w-full flex-col overflow-visible rounded-b-[5px] bg-transparent pt-2.5 pr-2.5 pb-0 pl-2.5 opacity-0 transition-opacity duration-200 ease-in-out has-[[data-vp=progress]:hover]:*:data-[vp=bar-bg]:top-[-20px]',
+					chromeOn && 'opacity-100',
+					chromeHidden && 'pointer-events-none opacity-0!',
+					theater && 'rounded-none',
+				)}
+				onClick={(e) => e.stopPropagation()}
+				onMouseEnter={onControlsBarEnter}
+				onMouseLeave={onControlsBarLeave}
+			>
+				<div
+					data-vp="bar-bg"
+					className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 rounded-[inherit] bg-[rgba(20,20,20,0.82)] transition-[top] duration-300 ease-in-out"
+					aria-hidden
+				/>
+				<div
+					data-vp="progress"
+					className="group/progress relative z-1 box-border h-2 min-h-2 w-full shrink-0 rounded-[5px]"
+				>
+					{/* 交互热区恒为展开高度；可视轨道仍 8px→28px，避免边缘 hover 跳动 */}
+					<div
+						ref={durationRef}
+						className="absolute right-0 bottom-0 left-0 z-1 h-7 cursor-pointer"
+						onMouseEnter={onMouseEnter}
+						onMouseMove={onMouseEnter}
+						onClick={onDurationClick}
 					>
-						{urlList.length > 0 ? null : (
-							<>
-								<Upload size={48} />
-								<div className="text-sm">{t('videoPlayer.dragOrClick')}</div>
-							</>
-						)}
-					</DragDropFileUpload>
+						<div
+							className="pointer-events-none absolute inset-x-0 bottom-0 h-2 rounded-sm bg-white/20 shadow-[inset_0_0_1px_rgba(0,0,0,0.3)] transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
+							aria-hidden
+						/>
+						{existDuration && hoverTime ? (
+							<div
+								ref={timeTipRef}
+								className='pointer-events-none absolute bottom-[35.5px] z-999 mb-0.5 rounded-[3px] bg-teal-500 px-1.5 py-0.5 text-xs whitespace-nowrap text-white opacity-0 transition-opacity duration-300 ease-in-out select-none group-hover/progress:opacity-100 after:absolute after:top-full after:left-1/2 after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-7 after:border-t-7 after:border-x-transparent after:border-t-teal-500 after:content-[""]'
+							>
+								{hoverTime}
+							</div>
+						) : null}
+						<div
+							ref={currentTimeRef}
+							className="pointer-events-none absolute bottom-0 left-0 h-2 w-0 rounded-[3px] bg-teal-500 transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
+						>
+							{existDuration ? (
+								<div
+									ref={timePointRef}
+									className="absolute top-1/2 right-[-5px] z-999 box-border h-[calc(100%+6px)] w-2.5 -translate-y-1/2 cursor-grab rounded-[2px] border border-[color-mix(in_oklab,var(--theme-color)_10%,transparent)] bg-teal-500 opacity-0 shadow-[0_0_2px_rgba(0,0,0,0.3)] transition-opacity duration-200 ease-in-out pointer-events-auto active:cursor-grabbing group-hover/progress:opacity-100"
+									onMouseDown={onTimePointDragStart}
+								/>
+							) : null}
+						</div>
+						{rulerCount > 0 && existDuration ? (
+							<div className="pointer-events-none absolute bottom-0 left-0 flex h-2.5 w-full items-end justify-between border-b border-teal-500 opacity-0 transition-opacity duration-300 ease-in-out group-hover/progress:opacity-100">
+								{Array.from({ length: rulerCount }).map((_, i) => (
+									<div
+										key={i}
+										className={cn(
+											'h-[5px] w-px rounded-[5px] bg-teal-500',
+											(i + 1) % 5 === 0 && 'h-2',
+										)}
+									/>
+								))}
+							</div>
+						) : null}
+					</div>
 				</div>
 
-				{urlList.length > 0 ? (
-					<div
-						ref={videoShellRef}
-						className="vp-video-content"
-						onMouseMove={onPlayerMouseMove}
-						onMouseEnter={onPlayerMouseEnter}
-						onMouseLeave={onPlayerMouseLeave}
-						onClick={onShellClick}
-					>
-						{/* xgplayer 独占此节点 */}
-						<div ref={playerContainerRef} id="vp-player" />
-
-						{currentVideoName ? (
-							<div className="vp-video-name">{currentVideoName}</div>
-						) : null}
-
-						{!playStatus ? (
-							<div
-								className="vp-video-player-icon"
-								onClick={(e) => {
-									e.stopPropagation();
-									onPlay();
-								}}
-							>
-								<Play size={60} fill="currentColor" />
-							</div>
-						) : null}
-
+				<div className="relative z-1 my-[15px] flex items-end justify-between">
+					<div className="flex items-center text-white">
 						<div
-							ref={controlsRef}
 							className={cn(
-								'vp-controls-bar',
-								chromeOn && 'vp-show-controls-bar',
-								chromeOn && 'vp-show-controls',
+								'flex cursor-pointer items-center text-white hover:text-teal-500',
+								safeIndex === 0 &&
+									playType !== 'loop' &&
+									'pointer-events-none cursor-not-allowed text-white/50',
 							)}
-							onClick={(e) => e.stopPropagation()}
+							onClick={onPrev}
 						>
-							<div className="vp-progress">
-								<div
-									ref={durationRef}
-									className="vp-duration"
-									onMouseEnter={onMouseEnter}
-									onMouseMove={onMouseEnter}
-									onClick={onDurationClick}
-								>
-									{existDuration && hoverTime ? (
-										<div ref={timeTipRef} className="vp-time-tip">
-											{hoverTime}
-										</div>
-									) : null}
-									<div ref={currentTimeRef} className="vp-current-time">
-										{existDuration ? (
-											<div
-												ref={timePointRef}
-												className="vp-time-point"
-												onMouseDown={onTimePointDragStart}
-											/>
-										) : null}
-									</div>
-									{rulerCount > 0 && existDuration ? (
-										<div className="vp-ruler">
-											{Array.from({ length: rulerCount }).map((_, i) => (
-												<div
-													key={i}
-													className={cn(
-														'vp-ruler-line',
-														(i + 1) % 5 === 0 && 'vp-long-line',
-													)}
-												/>
-											))}
-										</div>
-									) : null}
-								</div>
-							</div>
-
-							<div className="vp-player-actions">
-								<div className="vp-player-actions-left">
-									<div
-										className={cn(
-											'vp-prev',
-											playIndex === 0 && playType !== 'loop' && 'vp-disabled',
-										)}
-										onClick={onPrev}
-									>
-										<SkipBack size={CTRL_ICON} />
-									</div>
-									<div className="vp-action-icon">
-										{!playStatus ? (
-											<Play size={CTRL_ICON} onClick={onPlay} />
-										) : (
-											<Pause size={CTRL_ICON} onClick={onPause} />
-										)}
-									</div>
-									<div
-										className={cn(
-											'vp-next',
-											playIndex === urlList.length - 1 &&
-												playType !== 'loop' &&
-												'vp-disabled',
-										)}
-										onClick={onNext}
-									>
-										<SkipForward size={CTRL_ICON} />
-									</div>
-									<div className="vp-player-time">
-										{existDuration ? timeInfo : timeInfo.split('/')[0]}
-									</div>
-								</div>
-
-								<div className="vp-player-actions-right">
-									<Tip label={t('videoPlayer.continueSelect')}>
-										<div
-											className="vp-action-icon"
-											onClick={() => uploadRef.current?.open()}
-										>
-											<FolderPlus size={CTRL_ICON} />
-										</div>
-									</Tip>
-									<Tip label={t('videoPlayer.reset')}>
-										<div className="vp-action-icon" onClick={onReset}>
-											<ListRestart size={CTRL_ICON} />
-										</div>
-									</Tip>
-
-									<Popover
-										align="center"
-										width={280}
-										mode="hover"
-										onOpenChange={onControlsPopoverOpenChange}
-										onContentPointer={bumpChrome}
-										trigger={() => (
-											<div className="vp-action-icon">
-												<Settings size={CTRL_ICON} />
-											</div>
-										)}
-									>
-										<div className="vp-url-list">
-											<div className="vp-setting-item">
-												<div className="vp-setting-row">
-													<div className="vp-setting-label">
-														{t('videoPlayer.playMode')}
-													</div>
-													<Segmented
-														value={playType}
-														options={PLAY_OPTIONS}
-														onChange={(v) => setPlayType(v)}
-													/>
-												</div>
-												<div className="vp-setting-row">
-													<div className="vp-setting-label">
-														{t('videoPlayer.screenMirror')}
-													</div>
-													<Segmented
-														value={screenType}
-														options={SCREEN_TYPE}
-														onChange={(v) => setScreenType(v)}
-													/>
-												</div>
-											</div>
-										</div>
-									</Popover>
-
-									{urlList.length > 1 ? (
-										<Popover
-											align="end"
-											width={360}
-											mode="hover"
-											contentPadding={0}
-											contentClassName="vp-episodes-popover"
-											onOpenChange={onControlsPopoverOpenChange}
-											onContentPointer={bumpChrome}
-											trigger={() => (
-												<div
-													className="vp-action-icon"
-													title={t('videoPlayer.episodes')}
-												>
-													<ListVideo size={CTRL_ICON} />
-												</div>
-											)}
-										>
-											{({ close }) => (
-												<div className="vp-episodes-body">
-													<div className="vp-episodes-title">
-														{t('videoPlayer.episodes')}
-													</div>
-													<ScrollArea
-														type="always"
-														className="vp-episodes-scroll"
-														style={{ height: 300 }}
-														viewportClassName="vp-episodes-viewport [&>div]:block! [&>div]:h-auto! [&>div]:min-h-0! [&>div]:min-w-0! [&>div]:max-w-full! [&>div]:w-full!"
-														scrollbarClassName="vp-episodes-scrollbar"
-														onWheel={(e) => e.stopPropagation()}
-													>
-														<div className="vp-url-list">
-															{urlList.map((item, index) => (
-																<div
-																	key={item.url}
-																	className={cn(
-																		'vp-url-item',
-																		playIndex === index && 'vp-active-url-item',
-																	)}
-																	onClick={() => {
-																		onCheckUrl(item, index);
-																		close();
-																	}}
-																>
-																	{item.name}
-																</div>
-															))}
-														</div>
-													</ScrollArea>
-												</div>
-											)}
-										</Popover>
-									) : null}
-
-									<Popover
-										align="center"
-										width={40}
-										mode="hover"
-										onOpenChange={onControlsPopoverOpenChange}
-										onContentPointer={bumpChrome}
-										trigger={() => (
-											<div
-												className="vp-action-icon"
-												onClick={(e) => {
-													e.stopPropagation();
-													onVolumeChange();
-												}}
-											>
-												<VolumeIcon volume={volume} />
-											</div>
-										)}
-									>
-										<div className="vp-volume-info">
-											<div
-												className="vp-volume-text"
-												onClick={onVolumeChange}
-												title={t('videoPlayer.muted')}
-											>
-												{(volume * 100).toFixed(0)}
-											</div>
-											<div
-												ref={volumeSliderRef}
-												className="vp-volume-slider"
-												role="slider"
-												tabIndex={0}
-												aria-orientation="vertical"
-												aria-valuemin={0}
-												aria-valuemax={100}
-												aria-valuenow={Math.round(volume * 100)}
-												aria-valuetext={`${(volume * 100).toFixed(0)}%`}
-												onPointerDown={onVolumePointerDown}
-												onPointerMove={onVolumePointerMove}
-												onKeyDown={(e) => {
-													if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-														e.preventDefault();
-														setVolume((v) => Math.min(1, v + 0.05));
-													} else if (
-														e.key === 'ArrowDown' ||
-														e.key === 'ArrowLeft'
-													) {
-														e.preventDefault();
-														setVolume((v) => Math.max(0, v - 0.05));
-													}
-												}}
-											>
-												<div className="vp-volume-track">
-													<div
-														className="vp-volume-fill"
-														style={{ height: `${volume * 100}%` }}
-													/>
-													<div
-														className="vp-volume-thumb"
-														style={{ bottom: `${volume * 100}%` }}
-													/>
-												</div>
-											</div>
-										</div>
-									</Popover>
-
-									<Popover
-										align="end"
-										width={360}
-										mode="hover"
-										contentPadding={0}
-										contentClassName="vp-rate-popover"
-										onOpenChange={onControlsPopoverOpenChange}
-										onContentPointer={bumpChrome}
-										trigger={() => (
-											<div className="vp-action-icon vp-action-rate">
-												{playbackRate.toFixed(1)}x
-											</div>
-										)}
-									>
-										<PlaybackRatePanel
-											rate={playbackRate}
-											onRateChange={onChangePlaybackRate}
-											label={t('videoPlayer.speed')}
-										/>
-									</Popover>
-
-									<Tip label={t('videoPlayer.pip')}>
-										<div
-											className="vp-action-icon"
-											onClick={onPictureToPicture}
-										>
-											<PictureInPicture2 size={CTRL_ICON} />
-										</div>
-									</Tip>
-									<Tip
-										label={
-											isFullscreen
-												? t('videoPlayer.exitFullscreen')
-												: t('videoPlayer.fullscreen')
-										}
-									>
-										<div className="vp-action-icon -mt-0.5" onClick={onFull}>
-											{isFullscreen ? (
-												<Minimize size={CTRL_ICON} />
-											) : (
-												<Maximize size={CTRL_ICON} />
-											)}
-										</div>
-									</Tip>
-								</div>
-							</div>
+							<SkipBack size={CTRL_ICON} />
 						</div>
-
-						<div
-							ref={miniTimelineRef}
-							className={cn(
-								'vp-mini-timeline',
-								!chromeOn && 'vp-show-controls-bar',
+						<div className="mx-3 flex cursor-pointer items-center text-white hover:text-teal-500">
+							{!playStatus ? (
+								<Play size={CTRL_ICON} onClick={onPlay} />
+							) : (
+								<Pause size={CTRL_ICON} onClick={onPause} />
 							)}
-						/>
-
-						<div ref={volumeTipRef} className="vp-volume-tip">
-							<VolumeIcon volume={volume} />
-							<span>
-								{volume > 0
-									? `${(volume * 100).toFixed(0)}%`
-									: t('videoPlayer.muted')}
-							</span>
+						</div>
+						<div
+							className={cn(
+								'mr-5 flex cursor-pointer items-center text-white hover:text-teal-500',
+								safeIndex === videos.length - 1 &&
+									playType !== 'loop' &&
+									'pointer-events-none cursor-not-allowed text-white/50',
+							)}
+							onClick={onNext}
+						>
+							<SkipForward size={CTRL_ICON} />
+						</div>
+						<div className="m-0 flex items-center text-sm leading-none">
+							{existDuration ? timeInfo : timeInfo.split('/')[0]}
 						</div>
 					</div>
-				) : null}
+
+					<div className="flex items-center gap-[15px]">
+						{onAdd ? (
+							<Tip label={t('videoPlayer.continueSelect')}>
+								<div
+									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									onClick={onAdd}
+								>
+									<FolderPlus size={CTRL_ICON} />
+								</div>
+							</Tip>
+						) : null}
+						{onClear ? (
+							<Tip label={t('videoPlayer.reset')}>
+								<div
+									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									onClick={onReset}
+								>
+									<ListRestart size={CTRL_ICON} />
+								</div>
+							</Tip>
+						) : null}
+
+						{videos.length > 1 ? (
+							<HoverPopover
+								align="center"
+								width={320}
+								contentPadding={0}
+								contentClassName="overflow-hidden p-0!"
+								onOpenChange={onControlsPopoverOpenChange}
+								onContentPointer={bumpChrome}
+								trigger={
+									<div className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500">
+										<ListVideo size={CTRL_ICON} />
+									</div>
+								}
+							>
+								{({ close }) => (
+									<div className="flex max-w-full min-w-0 flex-col overflow-hidden">
+										<div className="h-10 shrink-0 border-b border-theme/15 px-4 py-2.5 text-sm leading-[1.2] font-semibold">
+											{t('videoPlayer.episodes')}
+										</div>
+										<ScrollArea
+											type="always"
+											className="h-75 max-h-75 w-full max-w-full min-w-0"
+											style={{ height: 300 }}
+											viewportClassName="[&>div]:block! [&>div]:h-auto! [&>div]:min-h-0! [&>div]:min-w-0! [&>div]:max-w-full! [&>div]:w-full!"
+											onWheel={(e) => e.stopPropagation()}
+										>
+											<div className="box-border max-w-full min-w-0 overflow-x-hidden p-2">
+												{videos.map((item, index) => (
+													<div
+														key={item.url}
+														className={cn(
+															'cursor-pointer truncate rounded-md p-2 text-sm text-textcolor/80 hover:bg-theme/15',
+															safeIndex === index && 'text-teal-500',
+														)}
+														onClick={() => {
+															onCheckUrl(item, index);
+															close();
+														}}
+													>
+														{item.name}
+													</div>
+												))}
+											</div>
+										</ScrollArea>
+									</div>
+								)}
+							</HoverPopover>
+						) : null}
+
+						<HoverPopover
+							align="center"
+							width={320}
+							contentPadding={0}
+							contentClassName="overflow-visible backdrop-blur-[2px]"
+							onOpenChange={onControlsPopoverOpenChange}
+							onContentPointer={bumpChrome}
+							trigger={
+								<div className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-white hover:text-teal-500">
+									{playbackRate.toFixed(1)}x
+								</div>
+							}
+						>
+							<PlaybackRatePanel
+								rate={playbackRate}
+								onRateChange={onChangePlaybackRate}
+								label={t('videoPlayer.speed')}
+							/>
+						</HoverPopover>
+
+						<HoverPopover
+							align="center"
+							width={40}
+							contentPadding={10}
+							onOpenChange={onControlsPopoverOpenChange}
+							onContentPointer={bumpChrome}
+							trigger={
+								<div
+									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									onClick={(e) => {
+										e.stopPropagation();
+										onVolumeChange();
+									}}
+								>
+									<Volume volume={volume} />
+								</div>
+							}
+						>
+							<div className="flex w-full flex-col items-center gap-2">
+								<div
+									className="text-center text-sm text-textcolor"
+									onClick={onVolumeChange}
+									title={t('videoPlayer.muted')}
+								>
+									{(volume * 100).toFixed(0)}
+								</div>
+								<div
+									ref={volumeSliderRef}
+									className="relative h-24 w-5 shrink-0 cursor-pointer touch-none outline-none"
+									role="slider"
+									tabIndex={0}
+									aria-orientation="vertical"
+									aria-valuemin={0}
+									aria-valuemax={100}
+									aria-valuenow={Math.round(volume * 100)}
+									aria-valuetext={`${(volume * 100).toFixed(0)}%`}
+									onPointerDown={onVolumePointerDown}
+									onPointerMove={onVolumePointerMove}
+									onKeyDown={(e) => {
+										if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+											e.preventDefault();
+											setVolume((v) => Math.min(1, v + 0.05));
+										} else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+											e.preventDefault();
+											setVolume((v) => Math.max(0, v - 0.05));
+										}
+									}}
+								>
+									<div className="pointer-events-none absolute top-0 bottom-0 left-1/2 w-1 -translate-x-1/2 rounded-sm bg-teal-300/30">
+										<div
+											className="absolute right-0 bottom-0 left-0 rounded-sm bg-teal-500"
+											style={{ height: `${volume * 100}%` }}
+										/>
+										<div
+											className="pointer-events-none absolute left-1/2 h-3 w-3 -translate-x-1/2 translate-y-1/2 rounded-full bg-teal-500 shadow-sm"
+											style={{ bottom: `${volume * 100}%` }}
+										/>
+									</div>
+								</div>
+							</div>
+						</HoverPopover>
+
+						<HoverPopover
+							align="center"
+							width={280}
+							onOpenChange={onControlsPopoverOpenChange}
+							onContentPointer={bumpChrome}
+							trigger={
+								<div className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500">
+									<Settings size={CTRL_ICON} />
+								</div>
+							}
+						>
+							<div className="rounded-md">
+								<div className="mb-4 flex w-full flex-col items-start">
+									<div className="mb-1.5 text-sm text-textcolor/80">
+										{t('videoPlayer.playMode')}
+									</div>
+									<Segmented
+										value={playType}
+										options={PLAY_OPTIONS}
+										onChange={(v) => setPlayType(v)}
+									/>
+								</div>
+								<div className="mb-1.5 flex w-full flex-col items-start">
+									<div className="mb-1.5 text-sm text-textcolor/80">
+										{t('videoPlayer.screenMirror')}
+									</div>
+									<Segmented
+										value={screenType}
+										options={SCREEN_TYPE}
+										onChange={(v) => setScreenType(v)}
+									/>
+								</div>
+							</div>
+						</HoverPopover>
+
+						<Tip label={t('videoPlayer.pip')}>
+							<div
+								className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+								onClick={onPictureToPicture}
+							>
+								<PictureInPicture2 size={CTRL_ICON} />
+							</div>
+						</Tip>
+						<Tip
+							label={
+								isFullscreen
+									? t('videoPlayer.exitFullscreen')
+									: t('videoPlayer.fullscreen')
+							}
+						>
+							<div
+								className="-mt-0.5 flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+								onClick={onFull}
+							>
+								{isFullscreen ? (
+									<Minimize size={CTRL_ICON} />
+								) : (
+									<Maximize size={CTRL_ICON} />
+								)}
+							</div>
+						</Tip>
+					</div>
+				</div>
+			</div>
+
+			<div
+				ref={miniTimelineRef}
+				className={cn(
+					'absolute bottom-0 left-0 z-2 h-0.5 rounded-[5px] bg-teal-500 transition-opacity duration-300 ease-in-out',
+					chromeHidden ? 'opacity-100' : 'opacity-0!',
+				)}
+			/>
+
+			<div
+				ref={volumeTipRef}
+				className="absolute bottom-35 left-26 z-2 flex items-center gap-2 rounded-md bg-teal-500 px-2.5 py-1.5 text-xl font-bold text-white opacity-0 transition-opacity duration-300"
+			>
+				<Volume volume={volume} />
+				<span>
+					{volume > 0
+						? `${(volume * 100).toFixed(0)}%`
+						: t('videoPlayer.muted')}
+				</span>
+			</div>
+		</div>
+	);
+
+	return embedded ? (
+		shell
+	) : (
+		<div
+			className={cn(
+				'relative box-border h-full w-full select-none rounded-md [-webkit-user-select:none]',
+				className,
+			)}
+		>
+			<div className="relative box-border h-full rounded-md p-0 text-center">
+				{shell}
 			</div>
 		</div>
 	);

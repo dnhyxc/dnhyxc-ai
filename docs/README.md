@@ -66,6 +66,7 @@
 | 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [app/switch-dynamic-id-fix.md](./app/switch-dynamic-id-fix.md)                                                                                            |
 | 插件中心卡片白边 / 远程插件污染 border-border                       | [app/plugin-card-border-theme.md](./app/plugin-card-border-theme.md)                                                                                      |
 | 视频播放器插件 / 影院态全屏（藏侧栏 + Tauri 窗口/Web document 全屏） | [app/video-player-plugin.md](./app/video-player-plugin.md)、[app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)                                                                                   |
+| 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [app/video-player-component-refactor.md](./app/video-player-component-refactor.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
 | 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |

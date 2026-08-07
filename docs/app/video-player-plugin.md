@@ -1,5 +1,9 @@
 # 视频播放器插件实现
 
+> **文档角色**：记录视频播放器 MF 插件的**插件化接入**（宿主 → 插件桥接、影院态全屏、路由挂载、独立预览）。播放器**组件化拆分 / 通用化**的设计与代码改动见 [video-player-component-refactor.md](./video-player-component-refactor.md)。
+>
+> **延伸阅读**：[video-player-component-refactor.md](./video-player-component-refactor.md) · [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md)
+
 ## 1. 背景与目标
 
 主站需要一个功能完整的视频播放器插件，支持多文件上传、自定义控制条（进度条、音量、倍速、画中画、全屏、选集、设置面板等），作为 Module Federation 动态子项目通过插件系统挂载到主站。
