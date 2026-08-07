@@ -4,13 +4,7 @@
  * 功能：xgplayer、自定义控制条、进度条、上下集、设置、选集、音量、倍速、PiP、全屏、快捷键。
  */
 
-import {
-	HoverPopover,
-	PlaybackRatePanel,
-	Segmented,
-	Tip,
-	Volume,
-} from '@design/index';
+import { HoverPopover, RatePanel, Segmented, Tip, Volume } from '@design/index';
 import { ScrollArea } from '@ui/scroll-area';
 import {
 	FolderPlus,
@@ -1420,7 +1414,7 @@ export default function VideoPlayer({
 								</div>
 							}
 						>
-							<PlaybackRatePanel
+							<RatePanel
 								rate={playbackRate}
 								onRateChange={onChangePlaybackRate}
 								label={t('videoPlayer.speed')}

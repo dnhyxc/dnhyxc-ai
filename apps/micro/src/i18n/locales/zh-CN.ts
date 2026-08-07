@@ -121,7 +121,7 @@ const zhCN: Record<string, string> = {
 	'videoPlayer.featurePrevNext': '上下集切换',
 	'videoPlayer.featureShortcut': '键盘快捷键',
 	'videoPlayer.featureMirror': '镜像画面',
-	'videoPlayer.featureReset': '一键重置',
+	'videoPlayer.featureFramePreview': '逐帧预览',
 	'videoPlayer.tipTitle': '快速提示',
 	'videoPlayer.tipDesc':
 		'支持批量上传，最多 100 个视频文件。拖拽文件到此区域或点击选择。',

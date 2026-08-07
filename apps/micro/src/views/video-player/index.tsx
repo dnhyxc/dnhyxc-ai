@@ -12,13 +12,11 @@ import {
 	type VideoItem,
 	VideoPlayer,
 } from '@/components/design/VideoPlayer';
-import VideoUpload, {
-	type VideoUploadHandle,
-} from '@/components/design/VideoUpload';
 import { TooltipProvider } from '@/components/ui';
 import { useHostLocale } from '@/hooks';
 import type { Locale } from '@/i18n';
 import { cn } from '@/lib/utils';
+import VideoUpload, { type VideoUploadHandle } from './components/VideoUpload';
 /** MF 嵌入 Host 时必须由 expose 入口带上 Tailwind，否则仅 Host 扫到的 utility 生效 */
 import '@/styles.css';
 

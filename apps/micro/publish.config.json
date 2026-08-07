@@ -12,7 +12,7 @@
 		"restartPath": "/usr/local/dnhyxc-ai/server"
 	},
 	"restartScript": "pm2 restart server",
-	"remotePlugins": {
+	"micro": {
 		"name": "micro",
 		"localFilePath": {
 			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/micro",

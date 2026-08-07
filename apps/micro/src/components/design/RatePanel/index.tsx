@@ -54,7 +54,7 @@ function indexFromClientX(el: HTMLElement, clientX: number): number {
 	return Math.round(Math.min(1, Math.max(0, ratio)) * STEP_COUNT);
 }
 
-export type PlaybackRatePanelProps = {
+export type RatePanelProps = {
 	rate: number;
 	onRateChange: (rate: number) => void;
 	label: string;
@@ -66,13 +66,13 @@ export type PlaybackRatePanelProps = {
  * 播放倍速面板：0.5X–3.0X 刻度（0.1 步进）+ 快捷预设。
  * 刻度用 flex 均分绘制，避免 absolute + 父级 text-align 导致错乱。
  */
-export function PlaybackRatePanel({
+export function RatePanel({
 	rate,
 	onRateChange,
 	label,
 	className,
 	footer,
-}: PlaybackRatePanelProps) {
+}: RatePanelProps) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const draggingRef = useRef(false);
 	const index = toIndex(rate);
@@ -249,4 +249,4 @@ export function PlaybackRatePanel({
 	);
 }
 
-export default PlaybackRatePanel;
+export default RatePanel;

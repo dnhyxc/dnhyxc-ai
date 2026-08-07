@@ -13,12 +13,12 @@ import {
 	FlipHorizontal,
 	GripVertical,
 	Keyboard,
-	ListRestart,
 	Maximize2,
 	Monitor,
 	PictureInPicture,
 	Play,
 	RotateCcw,
+	Scissors,
 	SkipForward,
 	Sparkles,
 	Upload,
@@ -33,7 +33,6 @@ import DragDropFileUpload, {
 	type DragDropFileUploadProps,
 } from '@/components/design/DragDropFileUpload';
 import { LIMIT } from '@/components/design/VideoPlayer';
-import { ScrollArea } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
@@ -61,7 +60,7 @@ const FEATURES = [
 	{ num: '09', icon: SkipForward, key: 'videoPlayer.featurePrevNext' },
 	{ num: '10', icon: Keyboard, key: 'videoPlayer.featureShortcut' },
 	{ num: '11', icon: FlipHorizontal, key: 'videoPlayer.featureMirror' },
-	{ num: '12', icon: ListRestart, key: 'videoPlayer.featureReset' },
+	{ num: '12', icon: Scissors, key: 'videoPlayer.featureFramePreview' },
 ] as const;
 
 const FORMATS = ['MP4', 'WebM', 'MOV', 'MKV', 'FLV'];
@@ -89,19 +88,16 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 					className,
 				)}
 			>
-				{/* 背景颗粒层 */}
-				<div className="bg-film-grain pointer-events-none absolute inset-0 opacity-30" />
-
 				{/* 顶部标题栏 */}
 				<header className="relative z-10 flex items-center justify-between pb-3">
 					<div className="flex items-center gap-2.5">
 						<Film size={20} className="text-teal-500" />
 						<span className="text-sm font-semibold tracking-[0.2em] text-textcolor">
-							VIDEO&nbsp;PLAYER
+							{t('videoPlayer.selectVideo')}
 						</span>
 					</div>
 					<div className="flex items-center gap-3 font-mono text-[11px]">
-						<div className="rounded-md bg-theme/5 px-2 py-1 text-textcolor/80 tabular-nums">
+						<div className="text-textcolor/80 tabular-nums">
 							{t('videoPlayer.countRemaining', { count: remain })}
 						</div>
 					</div>
@@ -114,7 +110,7 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 						ref={ref}
 						className="flex min-h-0 flex-1"
 						zoneClassName={cn(
-							'vp-upload-upload-zone relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-md border border-theme/5 bg-theme/2 transition-colors duration-200',
+							'relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-md border border-theme/5 bg-theme/2',
 							'hover:border-teal-500 data-drag-active:!border-teal-500',
 							zoneClassName,
 						)}
@@ -126,13 +122,7 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 						disabled={remain <= 0 || Boolean(rest.disabled)}
 					>
 						{children ?? (
-							<div
-								className={cn(
-									'group relative flex min-h-0 flex-1 flex-col items-center gap-5 p-6',
-									'cursor-pointer transition-[transform,opacity,background-color] duration-200 ease-out',
-									'data-drag-active:bg-teal-500/5',
-								)}
-							>
+							<div className="data-drag-active:bg-teal-500/5 cursor-pointer group relative flex min-h-0 flex-1 flex-col items-center gap-5 p-6">
 								{/* 中心区：图标 + 标题 + 格式标签 */}
 								<div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-5">
 									<div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500 border border-teal-500/10">
@@ -176,44 +166,37 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 					{/* 右侧：功能面板 — 卡片模式 */}
 					<aside
 						className={cn(
-							'relative flex w-60 flex-col overflow-hidden rounded-md border border-theme/5 bg-theme/2 transition-colors duration-200',
+							'relative flex w-60 flex-col overflow-hidden rounded-md border border-dashed border-theme/5 bg-theme/2',
 						)}
 					>
 						<div className="relative z-10 flex min-h-0 flex-1 flex-col">
 							{/* 标题 */}
-							<div className="mx-3 mt-3 mb-2 flex shrink-0 items-center gap-2 border-b border-theme/5 pb-3">
+							<div className="mx-3 mt-2.5 pb-2.5 flex shrink-0 items-center gap-2 border-b border-theme/5">
 								<Zap size={16} className="-mt-0.5 text-teal-500" />
 								<span className="text-sm font-medium tracking-[0.15em] text-textcolor/60">
 									{t('videoPlayer.featuresTitle').toUpperCase()}
 								</span>
 							</div>
 
-							{/* 功能列表：ScrollArea，滚动条贴卡片右缘 */}
-							<ScrollArea
-								className="h-full"
-								viewportClassName="px-1"
-								scrollbarClassName="border-l-0 p-0 w-1.5"
-							>
-								<div className="flex flex-col gap-1.5">
-									{FEATURES.map((f) => (
-										<div
-											key={f.key}
-											className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5"
-										>
-											<span className="font-mono text-sm text-textcolor/35 tabular-nums">
-												{f.num}
-											</span>
-											<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-theme/5 text-teal-500 transition-colors">
-												<f.icon size={15} />
-											</span>
-											<span className="text-sm text-textcolor/70 transition-colors duration-200 group-hover:text-textcolor">
-												{t(f.key)}
-											</span>
-										</div>
-									))}
-								</div>
-							</ScrollArea>
-							<div className="mt-2 h-1.5" />
+							{/* 功能列表：flex-1 铺满容器，每项等分 */}
+							<div className="mx-1 flex flex-1 flex-col justify-between px-2 py-2">
+								{FEATURES.map((f) => (
+									<div
+										key={f.key}
+										className="flex flex-1 min-h-0 items-center gap-3 rounded-lg transition-colors"
+									>
+										<span className="font-mono text-sm text-textcolor/35 tabular-nums">
+											{f.num}
+										</span>
+										<span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-md bg-theme/5 text-teal-500 transition-colors">
+											<f.icon size={14.5} />
+										</span>
+										<span className="text-sm text-textcolor/70 transition-colors">
+											{t(f.key)}
+										</span>
+									</div>
+								))}
+							</div>
 						</div>
 					</aside>
 				</main>

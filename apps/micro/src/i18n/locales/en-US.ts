@@ -127,7 +127,7 @@ const enUS: Record<string, string> = {
 	'videoPlayer.featurePrevNext': 'Prev/Next Episode',
 	'videoPlayer.featureShortcut': 'Keyboard Shortcuts',
 	'videoPlayer.featureMirror': 'Mirror Screen',
-	'videoPlayer.featureReset': 'One-Click Reset',
+	'videoPlayer.featureFramePreview': 'Frame Preview',
 	'videoPlayer.tipTitle': 'Quick Tip',
 	'videoPlayer.tipDesc':
 		'Batch upload up to 100 video files. Drag files into this area or click to select.',

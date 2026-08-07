@@ -2,9 +2,9 @@ export { default as DragDropFileUpload } from './DragDropFileUpload';
 export * from './Loading';
 export type { NotePreviewProps } from './NotePreview';
 export { NotePreview, stripNoteTitleHtml } from './NotePreview';
-export type { PlaybackRatePanelProps } from './PlaybackRatePanel';
-export { PlaybackRatePanel } from './PlaybackRatePanel';
 export { default as HoverPopover } from './Popover';
+export type { RatePanelProps } from './RatePanel';
+export { RatePanel } from './RatePanel';
 export type {
 	CodeLanguage,
 	CreateExtensionsOptions,
@@ -39,6 +39,4 @@ export {
 	revokeVideoUrls,
 	VideoPlayer,
 } from './VideoPlayer';
-export type { VideoUploadHandle, VideoUploadProps } from './VideoUpload';
-export { VideoUpload } from './VideoUpload';
 export { default as Volume } from './Volume';

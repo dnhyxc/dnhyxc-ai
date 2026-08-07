@@ -7,7 +7,7 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
-		"publish": "dnhyxc-ci publish remotePlugins",
+		"publish": "dnhyxc-ci publish micro",
 		"deploy": "pnpm run build && pnpm run publish",
 		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart server'"
 	},
