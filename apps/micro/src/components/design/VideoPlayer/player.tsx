@@ -962,7 +962,7 @@ export default function VideoPlayer({
 			>
 				<div
 					data-vp="bar-bg"
-					className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 rounded-[inherit] bg-[rgba(20,20,20,0.82)] transition-[top] duration-300 ease-in-out"
+					className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 rounded-[inherit] bg-theme/10 backdrop-blur-xs transition-[top] duration-300 ease-in-out"
 					aria-hidden
 				/>
 				<div
@@ -978,7 +978,7 @@ export default function VideoPlayer({
 						onClick={onDurationClick}
 					>
 						<div
-							className="pointer-events-none absolute inset-x-0 bottom-0 h-2 rounded-sm bg-white/20 shadow-[inset_0_0_1px_rgba(0,0,0,0.3)] transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
+							className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 rounded-sm bg-teal-500/15 border border-teal-500/5 transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
 							aria-hidden
 						/>
 						{existDuration && hoverTime ? (
@@ -991,12 +991,12 @@ export default function VideoPlayer({
 						) : null}
 						<div
 							ref={currentTimeRef}
-							className="pointer-events-none absolute bottom-0 left-0 h-2 w-0 rounded-[3px] bg-teal-500 transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
+							className="pointer-events-none absolute bottom-0 left-0 h-1.5 w-0 rounded-[3px] bg-teal-500 transition-[height,border-radius] duration-300 ease-in-out group-hover/progress:h-7 group-hover/progress:rounded-none"
 						>
 							{existDuration ? (
 								<div
 									ref={timePointRef}
-									className="absolute top-1/2 right-[-5px] z-999 box-border h-[calc(100%+6px)] w-2.5 -translate-y-1/2 cursor-grab rounded-[2px] border border-[color-mix(in_oklab,var(--theme-color)_10%,transparent)] bg-teal-500 opacity-0 shadow-[0_0_2px_rgba(0,0,0,0.3)] transition-opacity duration-200 ease-in-out pointer-events-auto active:cursor-grabbing group-hover/progress:opacity-100"
+									className="absolute top-1/2 right-[-5px] z-999 box-border h-[calc(100%+6px)] w-2.5 -translate-y-1/2 cursor-grab rounded-[2px] border border-theme/10 bg-teal-500 opacity-0 shadow-[0_0_2px_rgba(0,0,0,0.3)] transition-opacity duration-200 ease-in-out pointer-events-auto active:cursor-grabbing group-hover/progress:opacity-100"
 									onMouseDown={onTimePointDragStart}
 								/>
 							) : null}
@@ -1018,19 +1018,19 @@ export default function VideoPlayer({
 				</div>
 
 				<div className="relative z-1 my-[15px] flex items-end justify-between">
-					<div className="flex items-center text-white">
+					<div className="flex items-center text-textcolor">
 						<div
 							className={cn(
-								'flex cursor-pointer items-center text-white hover:text-teal-500',
+								'flex cursor-pointer items-center text-textcolor hover:text-teal-500',
 								safeIndex === 0 &&
 									playType !== 'loop' &&
-									'pointer-events-none cursor-not-allowed text-white/50',
+									'pointer-events-none cursor-not-allowed text-textcolor/50',
 							)}
 							onClick={onPrev}
 						>
 							<SkipBack size={CTRL_ICON} />
 						</div>
-						<div className="mx-3 flex cursor-pointer items-center text-white hover:text-teal-500">
+						<div className="mx-3 flex cursor-pointer items-center text-textcolor hover:text-teal-500">
 							{!playStatus ? (
 								<Play size={CTRL_ICON} onClick={onPlay} />
 							) : (
@@ -1039,10 +1039,10 @@ export default function VideoPlayer({
 						</div>
 						<div
 							className={cn(
-								'mr-5 flex cursor-pointer items-center text-white hover:text-teal-500',
+								'mr-5 flex cursor-pointer items-center text-textcolor hover:text-teal-500',
 								safeIndex === videos.length - 1 &&
 									playType !== 'loop' &&
-									'pointer-events-none cursor-not-allowed text-white/50',
+									'pointer-events-none cursor-not-allowed text-textcolor/50',
 							)}
 							onClick={onNext}
 						>
@@ -1057,7 +1057,7 @@ export default function VideoPlayer({
 						{onAdd ? (
 							<Tip label={t('videoPlayer.continueSelect')}>
 								<div
-									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
 									onClick={onAdd}
 								>
 									<FolderPlus size={CTRL_ICON} />
@@ -1067,7 +1067,7 @@ export default function VideoPlayer({
 						{onClear ? (
 							<Tip label={t('videoPlayer.reset')}>
 								<div
-									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
 									onClick={onReset}
 								>
 									<ListRestart size={CTRL_ICON} />
@@ -1084,7 +1084,7 @@ export default function VideoPlayer({
 								onOpenChange={onControlsPopoverOpenChange}
 								onContentPointer={bumpChrome}
 								trigger={
-									<div className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500">
+									<div className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500">
 										<ListVideo size={CTRL_ICON} />
 									</div>
 								}
@@ -1132,7 +1132,7 @@ export default function VideoPlayer({
 							onOpenChange={onControlsPopoverOpenChange}
 							onContentPointer={bumpChrome}
 							trigger={
-								<div className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-white hover:text-teal-500">
+								<div className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-textcolor hover:text-teal-500">
 									{playbackRate.toFixed(1)}x
 								</div>
 							}
@@ -1152,7 +1152,7 @@ export default function VideoPlayer({
 							onContentPointer={bumpChrome}
 							trigger={
 								<div
-									className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
 									onClick={(e) => {
 										e.stopPropagation();
 										onVolumeChange();
@@ -1212,7 +1212,7 @@ export default function VideoPlayer({
 							onOpenChange={onControlsPopoverOpenChange}
 							onContentPointer={bumpChrome}
 							trigger={
-								<div className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500">
+								<div className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500">
 									<Settings size={CTRL_ICON} />
 								</div>
 							}
@@ -1243,7 +1243,7 @@ export default function VideoPlayer({
 
 						<Tip label={t('videoPlayer.pip')}>
 							<div
-								className="flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+								className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
 								onClick={onPictureToPicture}
 							>
 								<PictureInPicture2 size={CTRL_ICON} />
@@ -1257,7 +1257,7 @@ export default function VideoPlayer({
 							}
 						>
 							<div
-								className="-mt-0.5 flex cursor-pointer items-center justify-center text-white hover:text-teal-500"
+								className="-mt-0.5 flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
 								onClick={onFull}
 							>
 								{isFullscreen ? (
