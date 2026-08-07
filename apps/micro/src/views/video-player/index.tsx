@@ -65,13 +65,13 @@ export default function VideoPlayerApp({ api }: HostBridgeProps) {
 	return (
 		<TooltipProvider delayDuration={200}>
 			<div className="relative box-border h-full min-h-0 w-full select-none rounded-[5px] [-webkit-user-select:none]">
-				<div className="relative box-border h-full rounded-[5px] p-0 text-center">
+				<div className="relative box-border h-full rounded-md p-0 text-center">
 					{/* 上传区始终挂载：空态展示，有片后藏起仍可供「继续选择」open() */}
 					<div
 						className={cn(
 							hasVideos
 								? 'sr-only'
-								: 'relative flex h-full w-full justify-center overflow-hidden rounded-[5px] text-center [contain:layout_paint]',
+								: 'relative flex h-full w-full justify-center overflow-hidden rounded-md text-center contain-[layout_paint]',
 						)}
 						aria-hidden={hasVideos}
 					>
