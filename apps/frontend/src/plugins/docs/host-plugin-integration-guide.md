@@ -1369,12 +1369,13 @@ export const routeInjector = new RouteInjectorImpl();
 
 **现行方案（Host）**：
 
-- bust = `version@manifestHash`（`resolvePluginBust` 拉 Remote 自有 `mf-manifest` 指纹；**不依赖**改 registry）
-- `registerRemote` 给 manifest 加 `?v=`；Runtime `afterResolve` 再给 `remoteEntry.js` 加 `?v=`
+- bust = `version@manifestHash`（`resolvePluginBust` / `fetchManifestMeta` 拉 Remote 自有 `mf-manifest` 指纹；**不依赖**改 registry）
+- **一次 GET manifest**：同时算指纹并解析 `remoteEntry` 绝对地址；`registerRemote` **直连** `remoteEntry.js?v=`，MF **不再二次**拉 `mf-manifest.json`
+- Runtime `afterResolve` 若剥掉 query，再给 `remoteEntry.js` 补 `?v=`
 - `ensurePlugin` / `loadPlugin` 用 `LoadedPlugin.bust` 决定是否重载
 - force 拉 registry 加 `?t=`；服务端 `/remotes` 为 `no-store`（清单防缓存，与 entry bust 解耦）
 
-**完整思路 + 全量代码**：见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案) 与仓库 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
+**完整思路 + 全量代码**：见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)（含 §2.13.3.1 双次请求优化说明）与仓库 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
 
 **运维要点**：部署新 Remote 静态资源即可；**不要**为刷缓存让发布者改 Host registry；**桌面必须发含该逻辑的壳**。
 
@@ -1730,10 +1731,10 @@ if (allow.has("modules:my")) {
 ### Q3：插件加载失败如何排查？
 
 1. 检查 Console 错误信息
-2. 检查 Network 面板 `mf-manifest.json` 是否加载成功
+2. 检查 Network：`mf-manifest.json` 应成功且进入该插件时通常 **仅 1 条**；另有 `remoteEntry.js?v=…`
 3. 检查 `pluginManager.get('pluginId')?.status`
 4. 检查 Registry 配置是否正确
-5. 检查 Remote 是否启动且 CORS 配置正确
+5. 检查 Remote 是否启动且 CORS 配置正确（Host 需 `fetch` manifest 算指纹）
 
 ### Q4：如何调试插件？
 
@@ -1756,12 +1757,12 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 ### Q5：插件版本更新后如何生效？
 
 1. 部署新 Remote 静态资源（`mf-manifest.json` 正文须变化）
-2. Host 用 `resolvePluginBust` → `version@manifestHash` 作为 MF entry `?v=`；`afterResolve` 给改写后的 `remoteEntry.js` 再补 bust
+2. Host `resolvePluginBust` **GET 一次** manifest → `version@manifestHash`，并解析 `remoteEntry`；`registerRemote` **直连** `remoteEntry.js?v=`；`afterResolve` 再兜底补 bust
 3. **不必**为刷缓存改 Host `plugins-registry.json`（上架 / 权限 / `entry` URL 等仍由管理员维护）
 4. **桌面生产**：须发布含上述逻辑的 Host 壳；只发插件不发壳仍可能吃旧 entry
 5. 后端 `/remotes` 为 `no-store`（清单本身）
 
-细节与完整代码：[mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)。
+细节与完整代码：[mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)（含 §2.13.3.1 单次 manifest）。
 
 ### Q5.1：`hostApi 1.0.0 not in ^1.0.1`？
 

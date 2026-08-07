@@ -943,7 +943,7 @@ server {
 
 联系 Host 管理员添加 / 更新 Registry 配置（**只改 registry，不必改 Host 语言包**）。
 
-**发版与缓存（重要）**：部署新构建产物后，Host 会拉取 Remote 自有的 `mf-manifest.json`，用内容指纹生成 bust（`version@manifestHash`），并给 `remoteEntry.js` 补 `?v=`。**不必**为刷新缓存去改 Host `plugins-registry.json`（也不应让发布者改）。桌面用户需安装含该逻辑的 Host 壳。完整方案见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案) 与 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
+**发版与缓存（重要）**：部署新构建产物后，Host 会 **GET 一次** Remote 自有的 `mf-manifest.json`，用内容指纹生成 bust（`version@manifestHash`），并解析出 `remoteEntry.js` 后直连加载（带 `?v=`）；**不必**、也**不应**为刷新缓存去改 Host `plugins-registry.json`。桌面用户需安装含该逻辑的 Host 壳。Network 中进入插件应只见 **一条** `mf-manifest.json`。完整方案见 [mf-implementation-guide.md §2.13](./mf-implementation-guide.md#213-插件子应用加载缓存破坏完整方案)（§2.13.3.1）与 [`docs/app/plugin-entry-cache-bust.md`](../../../../docs/app/plugin-entry-cache-bust.md)。
 
 ```json
 {
@@ -1032,9 +1032,9 @@ server {
 
 **排查步骤**：
 1. 检查 Console 是否有错误信息
-2. 检查 Network 面板是否成功加载 `mf-manifest.json`
-3. 检查 `remoteEntry.js` 是否可访问
-4. 确认 Registry 配置正确
+2. 检查 Network：进入插件时 `mf-manifest.json` 通常 **仅 1 条**（Host 算 bust）；`remoteEntry.js?v=…` 须成功
+3. 若报 `Module ./X does not exist in container`：确认线上 Remote 已部署含该 expose 的构建（勿只发 Host）
+4. 确认 Registry 配置正确；Remote CORS 允许 Host `fetch` manifest
 
 ### Q2：为什么我的样式影响了 Host 页面？
 

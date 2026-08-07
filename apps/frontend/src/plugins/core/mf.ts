@@ -14,6 +14,50 @@ let bustPluginReady = false;
 
 /** remoteName → bust token；afterResolve 给改写后的 remoteEntry.js 补上 */
 const bustByRemote = new Map<string, string>();
+/**
+ * registry entry（通常 mf-manifest.json）→ 解析出的 remoteEntry.js 绝对地址。
+ * resolvePluginBust 拉 manifest 时写入，registerRemote 直接注册 remoteEntry，避免 MF 再拉一次 manifest。
+ */
+const remoteEntryByManifest = new Map<string, string>();
+
+function entryKey(entry: string): string {
+	try {
+		const u = new URL(entry);
+		u.search = '';
+		u.hash = '';
+		return u.href;
+	} catch {
+		return entry;
+	}
+}
+
+/** 从 manifest 正文 / entry URL 得到 remoteEntry.js 绝对地址 */
+function resolveRemoteEntryUrl(entry: string, manifestText: string): string {
+	try {
+		const json = JSON.parse(manifestText) as {
+			metaData?: { publicPath?: string; remoteEntry?: { name?: string } };
+		};
+		const file = json.metaData?.remoteEntry?.name?.trim() || 'remoteEntry.js';
+		const publicPath = json.metaData?.publicPath?.trim();
+		if (publicPath) return new URL(file, publicPath).href;
+	} catch {
+		/* 非 JSON 或结构异常：按 entry 路径回退 */
+	}
+	try {
+		const u = new URL(entry);
+		if (/remoteEntry\.js$/i.test(u.pathname)) {
+			u.search = '';
+			u.hash = '';
+			return u.href;
+		}
+		u.pathname = u.pathname.replace(/[^/]*$/, 'remoteEntry.js');
+		u.search = '';
+		u.hash = '';
+		return u.href;
+	} catch {
+		return entry;
+	}
+}
 
 /**
  * MF 一律走 WebView 原生 fetch/import（不走 plugin-http）。
@@ -74,16 +118,31 @@ function hashText(text: string): string {
 }
 
 /**
- * 拉取 Remote 自有的 mf-manifest，用内容指纹做 bust。
- * 发布者只更新自己域名上的静态资源即可；无需也不应改 Host registry。
+ * 拉取 Remote 自有的 mf-manifest（仅此一次网络请求）：
+ * - 内容指纹 → bust
+ * - 解析 remoteEntry 绝对地址 → 供 registerRemote 直连，MF 不再二次拉 manifest
  */
-export async function fetchEntryBuildId(entry: string): Promise<string> {
+async function fetchManifestMeta(
+	entry: string,
+): Promise<{ buildId: string; remoteEntryUrl: string }> {
 	const url = withBust(entry, `t${Date.now()}`);
 	const res = await fetch(url, { cache: 'no-store' });
 	if (!res.ok) {
 		throw new Error(`entry buildId ${res.status}: ${entry}`);
 	}
-	return hashText(await res.text());
+	const text = await res.text();
+	const remoteEntryUrl = resolveRemoteEntryUrl(entry, text);
+	remoteEntryByManifest.set(entryKey(entry), remoteEntryUrl);
+	return { buildId: hashText(text), remoteEntryUrl };
+}
+
+/**
+ * 拉取 Remote 自有的 mf-manifest，用内容指纹做 bust。
+ * 发布者只更新自己域名上的静态资源即可；无需也不应改 Host registry。
+ */
+export async function fetchEntryBuildId(entry: string): Promise<string> {
+	const { buildId } = await fetchManifestMeta(entry);
+	return buildId;
 }
 
 /** trusted MF：version@manifestHash；untrusted：仅 version（iframe 不走 MF entry） */
@@ -93,7 +152,7 @@ export async function resolvePluginBust(
 	if (meta.trust === 'untrusted') {
 		return pluginBust(meta);
 	}
-	const buildId = await fetchEntryBuildId(meta.entry);
+	const { buildId } = await fetchManifestMeta(meta.entry);
 	return pluginBust(meta, buildId);
 }
 
@@ -164,11 +223,15 @@ export function registerRemote(d: PluginDescriptor, bust?: string) {
 	const token = (bust ?? d.version).trim();
 	const name = remoteNameOf(d);
 	if (token) bustByRemote.set(name, token);
+	/* 优先用 resolvePluginBust 已解析的 remoteEntry，跳过 MF 对 mf-manifest 的第二次请求 */
+	const remoteEntry =
+		remoteEntryByManifest.get(entryKey(d.entry)) ??
+		resolveRemoteEntryUrl(d.entry, '');
 	getMf().registerRemotes(
 		[
 			{
 				name,
-				entry: withBust(d.entry, token),
+				entry: withBust(remoteEntry, token),
 				type: 'module',
 			},
 		],

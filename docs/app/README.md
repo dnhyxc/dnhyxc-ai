@@ -21,6 +21,7 @@
 | [wechat-mini-program-login-bind.md](./wechat-mini-program-login-bind.md) | **微信小程序登录与账号关联**：code2session、bind_token/link_code 双 token、JWT 解绑吊销、Web 端绑定面板 |
 | [mf-plugin-host.md](./mf-plugin-host.md) | **Module Federation 动态插件 Host**：registry、校验、loadRemote、路由/侧栏注入、失败不闪烁 |
 | [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md) | **插件 entry 缓存破坏（version@manifestHash）**：Remote manifest 指纹 bust、afterResolve 补 remoteEntry、发布者勿改 Host registry |
+| [mf-manifest-dedup.md](./mf-manifest-dedup.md) | **MF manifest 去重与 remoteEntry 直连优化**：一次拉取 manifest 同时产出 buildId + remoteEntry 地址、registerRemote 跳过 MF 二次 manifest 请求、federation `name` 改为 `micro`（含改动前/后对比与逐行注释） |
 | [mf-shared-react-router.md](./mf-shared-react-router.md) | **勿 shared react-router**：避免生产双 Router / `useLocation` 白屏 |
 | [plugin-registry-hostapi.md](./plugin-registry-hostapi.md) | **Registry hostApi 校验与字段说明**：`VITE_HOST_API_VERSION`、保存校验、`RegistryFieldsHelp`、⌘S |
 | [remote-plugin-hmr.md](./remote-plugin-hmr.md) | **Remote 开发态双次刷新**：勿同文件空 `activate`；tiptap `optimizeDeps.include` |

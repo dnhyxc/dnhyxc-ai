@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
 			}),
 			tailwindcss(),
 			federation({
-				name: 'remotePlugins',
+				name: 'micro',
 				filename: 'remoteEntry.js',
 				manifest: true,
 				exposes: {
