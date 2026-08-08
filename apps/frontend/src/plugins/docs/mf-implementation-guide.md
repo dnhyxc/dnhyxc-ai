@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名；`data-mf-style-realm` 按 Remote entry 域隔离多 expose；`createPortal` 收编 + Drawer `claimPluginPortalTarget`；sonner 等 Host 关键样式防误包；`@/plugins` 导出 `styleRealmKey` / claim / clear）**；**Layout / `PluginPageShell`：overflow 与 `border-radius` 分层，避免废掉路由页内 `backdrop-filter`（§2.10.0 / §2.14）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**；App 根 **`data-mf-host-portal`**。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领排除 Host；`data-mf-style-realm` 多 expose；`createPortal` + body 挂载收编 Vue Teleport；body `removeChild`/`replaceChild` 镜像修 antd `getScrollBarSize`；qiankun 式 transpile / CSSOM `insertRule` / `captureStack`；Drawer `claimPluginPortalTarget`；sonner 防误包；详解 `docs/app/style-isolation-qiankun-harden.md`；`@/plugins` 导出 realm/claim）**；**Layout / `PluginPageShell`：overflow 与 `border-radius` 分层，避免废掉路由页内 `backdrop-filter`（§2.10.0 / §2.14）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**；App 根 **`data-mf-host-portal`**。若与源码不一致，以源码为准。
 
 ---
 
@@ -22,7 +22,7 @@
    - 2.10 插件宿主页面 (`PluginHostPage.tsx`)
    - 2.10.0 独立路由外壳 (`PluginPageShell.tsx`；**勿圆角同层 overflow-hidden**)
    - 2.10.1 错误边界
-   - **2.10.2 主子样式隔离（原理与完整实现）**（realm / Portal / sonner / reclaim / Drawer 认领）
+   - **2.10.2 主子样式隔离（原理与完整实现）**（realm / Portal·Teleport / body remove 镜像·antd getScrollBarSize / transpile·CSSOM / sonner / reclaim / Drawer 认领）
    - **2.11 路由构建与初始化**（含刷新子应用防闪 404；`data-mf-host-portal`）
    - 2.12 语言（locale）同步
    - **2.13 插件/子应用加载缓存破坏（完整方案）**
@@ -37,7 +37,7 @@
    - 3.7 Registry 配置示例
 4. [完整数据流](#4-完整数据流)
 5. [常见问题与解决方案](#5-常见问题与解决方案)
-   - 5.7 样式隔离相关（含 Portal / sonner / **backdrop-filter**）
+   - 5.7 样式隔离相关（含 Portal / antd getScrollBarSize / sonner / **backdrop-filter**）
    - **5.9 刷新子应用先闪 404**
 
 ---
@@ -55,7 +55,7 @@
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
-- **样式隔离**：Host 运行时 `@scope([data-mf-style-realm])` + head 劫持 + MutationObserver + Portal `createPortal` 收编（详解 §2.10.2）；`untrusted` 走 iframe
+- **样式隔离**：Host 运行时 `@scope([data-mf-style-realm])` + transpile/CSSOM + head 劫持 + MutationObserver + Portal/`Teleport` 收编（含 body `removeChild`/`replaceChild` 镜像）+ antd Modal/Drawer 兼容（详解 §2.10.2 / `docs/app/style-isolation-qiankun-harden.md`）；`untrusted` 走 iframe
 - **entry 缓存破坏**：`pluginBust = version@manifestHash`（指纹来自 Remote 自有 `mf-manifest`；发布者勿改 Host registry）；`resolvePluginBust` **只拉一次** manifest（算指纹并解析 `remoteEntry`），`registerRemote` **直连** `remoteEntry.js?v=`，`afterResolve` 再兜底补 `?v=`（WKWebView 固定名 ESM 强缓存）
 - **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
 - **应用级全屏**：`api.ui.setAppFullscreen`（`ui:toast`）驱动 Layout 影院态 + Tauri/Web 系统全屏；独立路由页 `pageShell` → `PluginPageShell`（§2.14）
@@ -2096,9 +2096,10 @@ export function PluginPageShell({
 #### 2.10.2 主子样式隔离（原理与完整实现）
 
 > **源码**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
-> **姊妹稿**（技术速览 / 落地手册）：`docs/app/style-isolation-tech-overview.md`、`docs/app/style-isolation-implementation.md`、`docs/ideas/mf-css-isolation.md`  
+> **姊妹稿**（技术速览 / 落地手册）：`docs/app/style-isolation-tech-overview.md`、`docs/app/style-isolation-implementation.md`、`docs/app/style-isolation-realm-portal.md`、`docs/app/style-isolation-qiankun-harden.md`（**本轮 qiankun 级加固**）、`docs/ideas/mf-css-isolation.md`  
 > **目标**：隔离责任在 **Host**；Remote 可按普通 Vite + Tailwind 工程开发（含 Preflight），主↔子样式互不破坏。  
-> **现行要点（相对早期「按 pluginId `@scope`」）**：样式域改为 **`data-mf-style-realm`（按 Remote entry）**；挂载期 **`reclaimEntryStyles`** 收回同 entry 已注入 CSS；Portal 用劫持共享 **`react-dom.createPortal`** 收进 `[data-mf-portal-scope]`；Host Drawer 等外壳打开前 **`claimPluginPortalTarget`** 防首帧闪烁；sonner 等 Host 关键样式禁止误包。
+> **现行要点（相对早期「按 pluginId `@scope`」）**：样式域改为 **`data-mf-style-realm`（按 Remote entry）**；挂载期 **`reclaimEntryStyles`** 收回同 entry 已注入 CSS；Portal 用劫持共享 **`react-dom.createPortal`** + **body 原型挂载**（覆盖 Vue Teleport 等）收进 `[data-mf-portal-scope]`；body **`removeChild` / `replaceChild` 镜像**（`resolveRetargetedChildParent`）修 antd `getScrollBarSize` 等「`body.append` → `body.remove`」在 append 重定向后抛 `NotFoundError`；Host Drawer 等外壳打开前 **`claimPluginPortalTarget`** 防首帧闪烁；sonner 等 Host 关键样式禁止误包。  
+> **第三轮加固（对齐 qiankun next）**：`transpileStyleText`（`@font-face`/`@namespace`/`@import` hoist、`@keyframes` realm 前缀）；`CSSStyleSheet.insertRule` 拦截；`captureStack` 替代单例 `active`；head MO 仅 `childList`（HMR 改节点级）；sticky 认领改为 scope **`:hover`**；Toaster children 识别永不收编。详解见 [`style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)。
 
 ##### 172.16.0.5 问题与目标
 
@@ -2111,7 +2112,11 @@ Host 与 Remote **同页共享一个 `document`**：
 | 多插件同仓                         | 学习笔记 / 全书想法等共用 `remotePlugins` 时样式互相串 |
 | 多 expose 共一份 CSS               | 若按 `pluginId` 包 `@scope`，先打开的插件「占走」样式，切换后另一插件匹配不到 |
 | Radix / Drawer Portal → `body`     | 弹层逃出插件子树，utility / 组件样式丢失；或 `createPortal` 容器在 body↔scope 间切换导致闪烁 |
-| Host 全局 Toaster（sonner）        | 被误 `@scope` 后 `position:fixed` 失效，顶开布局       |
+| Vue Teleport / 原生 append → `body` | 非 React 栈同样逃出 realm，仅 patch `createPortal` 不够 |
+| antd Modal/Drawer `getScrollBarSize` | `body.appendChild(measure)` 被重定向到 portal-scope 后，仍 `body.removeChild` → WebKit `NotFoundError`，Portal 崩溃 |
+| CSS-in-JS `insertRule`             | 绕过改写 `style.textContent`，规则仍全局泄漏 |
+| 整包 `@scope`                      | `@font-face` 失效；跨 Remote `@keyframes` 撞名 |
+| Host 全局 Toaster（sonner）        | 被误 `@scope` 后 `position:fixed` 失效，顶开布局；或 sticky 误收进插件 portal-scope |
 
 **目标**：
 
@@ -2119,22 +2124,24 @@ Host 与 Remote **同页共享一个 `document`**：
 2. Host 运行时把 Remote 注入的 CSS **限制在** `[data-mf-style-realm="…"]` 容器内（同一 Remote 多插件共享同一 realm；`data-mf-plugin` 仍作插件根标识）。
 3. 仍能**继承** Host 主题 CSS 变量（视觉统一）。
 4. `untrusted` 继续走 **iframe**（独立 document，不走本方案）。
-5. Portal 弹层在 **不改 Remote 业务** 的前提下仍命中 `@scope`；打开/悬停不因容器搬迁闪烁。
-6. Host 关键全局样式（如 sonner）永不被收进 Remote `@scope`。
+5. Portal / Teleport 弹层在 **不改 Remote 业务** 的前提下仍命中 `@scope`；打开/悬停不因容器搬迁闪烁。
+6. Host 关键全局样式（如 sonner）永不被收进 Remote `@scope`，亦不被误收编进 portal-scope。
+7. 转译对齐 qiankun：全局 at-rule hoist、keyframes 前缀；CSSOM 与文本注入双路径覆盖。
 
 ##### 192.168.1.2 方案选型（为何用 `@scope`）
 
 | 方案                                             | Remote 改造     | 隔离     | 主题变量继承 | 本项目                  |
 | ------------------------------------------------ | --------------- | -------- | ------------ | ----------------------- |
 | **CSS `@scope` + head 劫持 + MutationObserver**  | 零              | 选择器级 | ✅           | ✅ 采用                 |
-| **+ `createPortal` 收编到 portal-scope**         | 零（Host 静默） | 同上     | ✅           | ✅ Portal 逃逸补强      |
+| **+ `createPortal` / body 挂载收编到 portal-scope** | 零（Host 静默） | 同上     | ✅           | ✅ 跨框架 Portal 补强 |
+| **+ qiankun 式 transpile / CSSOM `insertRule`** | 零              | 更强     | ✅           | ✅ 第三轮加固           |
 | Shadow DOM                                       | 中（挂载/事件） | 强       | ❌ 差        | ❌                      |
 | 强制 Remote 关 Preflight / 嵌套 utilities        | 高              | 弱～中   | ✅           | ❌ 已弃                 |
-| qiankun experimentalStyleIsolation（改写选择器） | 低              | 中       | ✅           | ❌（改用原生 `@scope`） |
+| qiankun experimentalStyleIsolation（改写选择器） | 低              | 中       | ✅           | ❌（改用原生 `@scope` + 同类 transpile） |
 | 业务传 `getPopupContainer` / portal container    | 中～高          | ✅       | ✅           | ❌（污染主/子业务代码） |
 | iframe                                           | 低              | 完全     | ❌           | ✅ 仅 `untrusted`       |
 
-一句话：**类 qiankun experimentalStyleIsolation 的意图，用浏览器原生 `@scope` 落地；Portal 用 Host 静默收编，业务零改。**
+一句话：**类 qiankun next `@scope` runtime isolation 的意图落地（原生 `@scope` + hoist/keyframes 转译 + CSSOM）；Portal/Teleport 用 Host 静默收编，业务零改。**
 
 ##### 192.168.1.2 `@scope` 原理
 
@@ -2159,9 +2166,9 @@ Host 与 Remote **同页共享一个 `document`**：
 要点：
 
 - 支持 Chrome 118+ / Firefox 125+ / Safari 17.4+（本项目目标环境已覆盖）。
-- 不改写选择器字符串，性能好；Tailwind / `@keyframes` / CSS 变量均可包进块内。
+- 不改写普通选择器字符串；`@font-face` / `@namespace` / `@import` **提升出** `@scope`；`@keyframes` 按 realm **加前缀**并改写 `animation*` 引用（防撞名）。
 - CSS 变量仍可从容器祖先（Host）**继承进来**，主题统一。
-- `unwrapScope`：HMR / 换 realm 时可剥掉最外层 `@scope` 再重包。
+- `unwrapScope`：按大括号深度剥最外层 `@scope`，保留 hoist 段，便于 HMR / 换 realm 重包。
 
 宿主必须提供 scope 根（`PluginHostPage`）：
 
@@ -2199,22 +2206,22 @@ sequenceDiagram
 
   PM->>SI: beginPluginStyleCapture(id, entry, remoteName)
   SI->>SI: realm = styleRealmKey；repairHostCriticalStyles；reclaimEntryStyles
-  SI->>Head: patch appendChild / insertBefore + MutationObserver
+  SI->>Head: patch appendChild / insertBefore + CSSOM insertRule + head childList MO
   PM->>MF: loadRemote（Vite/MF 往 head 注 style/link）
-  Head-->>SI: 同步/异步注入 → wrapWithScope(realm)
+  Head-->>SI: 同步/异步注入 → transpileStyleText / wrapWithScope(realm)
   MF-->>PM: module
   PM->>SI: endCapture()（refcount 归零则卸 patch）
-  Page->>SI: attachPluginStyleIsolation（CSS 捕获 + Portal bridge）
-  Note over Page,SI: 覆盖 HMR / 延迟 import；createPortal 收编到 portal-scope
+  Page->>SI: attachPluginStyleIsolation（CSS 捕获 + Portal/Teleport bridge）
+  Note over Page,SI: 覆盖 HMR / 延迟 import；createPortal + body 挂载收编到 portal-scope
   Page-->>Page: 卸载时 disconnect + releaseHeadPatch + 卸 portal scope
 ```
 
 | 阶段         | API                                                              | 时机                                                         | 捕获什么                          |
 | ------------ | ---------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------- |
 | **初始加载** | `beginPluginStyleCapture(id, entry, remoteName?)`                | `registerRemote` 之后、`loadRemoteApp` 前后（`try/finally`） | 入口及依赖首次注入的 CSS；并 reclaim 同 entry |
-| **挂载期**   | `attachPluginStyleIsolation`（内部 = CSS 捕获 + **Portal bridge**） | `status === 'activated'` 且非 untrusted                      | HMR、动态 `import()`、晚到的 link；Portal 收编 |
+| **挂载期**   | `attachPluginStyleIsolation`（内部 = CSS 捕获 + **Portal bridge**） | `status === 'activated'` 且非 untrusted                      | HMR、动态 `import()`、晚到的 link；Portal/Teleport 收编 |
 
-嵌套安全：`patchDepth` 引用计数；多次 begin 只 patch 一次 head，全部 end 后才恢复原生方法。`active` 栈用 `prev` 恢复外层上下文（现按 `active.realm` + `pluginId` 判断）。
+嵌套安全：`patchDepth` / `cssomPatchDepth` 引用计数；多次 begin 只 patch 一次 head/CSSOM，全部 end 后才恢复原生方法。捕获上下文用 **`captureStack` + `activeCtx()`**（替代单例 `active`），dispose 时按 ctx 引用 `splice`，避免并行加载互相覆盖。
 
 ##### 192.168.1.4 如何认出「这是 Remote 的样式」
 
@@ -2227,27 +2234,32 @@ sequenceDiagram
 5. 文本含 `[data-sonner-toaster]` → 标 Host 关键并拒绝（防 Toaster 失 `fixed`）
 6. `<style data-vite-dev-id>`（**仅 dev / HMR**）：**排除 Host**（`import.meta.url` 推出的 `…/apps/frontend` 根、或 Host 相对 id `/src/*` `/@id/*`）；其余在当前 capture 窗口认领。**不**再维护 `micro|remote-demo|…` 目录白名单——新增/重命名 `apps/<remote>` 无需改此文件
 7. 生产无 vite id、有遗留 owner=pluginId 且 CSS 仍包着该 plugin 的 `@scope` → 可升到当前 realm
-8. **无任何标记**：`reclaim` 模式 **绝不碰**（避免收走 Host sonner 等）；`live` 捕获窗口内才认领新注入（`active.realm === ctx.realm`）
+8. **无任何标记**：`reclaim` 模式 **绝不碰**（避免收走 Host sonner 等）；`live` 捕获窗口内才认领新注入（`activeCtx()?.realm === ctx.realm`）
 
 线上构建一般无 `data-vite-dev-id`，走 origin / owner / live 窗口；第 6 步只影响本地 Vite 同页注入。
 
 处理策略：
 
-- **style**：把 `textContent` 包进 `@scope (...) { ... }`（可先 `unwrapScope` 再包）；Vite 常先插空 style 再写内容 → 对该节点再挂一次 MutationObserver。
-- **link**：`fetch(href, { mode: 'cors' })` → 新建 scoped `<style>` 插在 link 后 → `link.disabled = true`。CORS 失败则**优雅降级**（原样生效，不阻断加载）。同源已旁路过的 link 会复用 `data-mf-from-link` 节点并按 realm 重包。
+- **style**：`transpileStyleText` → hoist 全局 at-rule + keyframes 前缀 + `@scope`；Vite 常先插空 style 再写内容 → **立刻打 `mfStyleOwner`**（供 CSSOM）并挂节点级 MO；已 scoped 节点另挂 HMR 观察器。
+- **link**：先 `disabled` 再 `fetch` → 新建 scoped `<style>` 插在 link 后。CORS 失败则**优雅降级**（原样生效，不阻断加载）。同源已旁路过的 link 会复用 `data-mf-from-link` 节点并按 realm 重包。
+- **CSSOM**：`ensureCssomPatch` 劫持 `insertRule`；`ownerNode` 带 `mfStyleOwner` 时对单条规则 `transpileStyleRule`。
 - **repairHostCriticalStyles**：捕获开始时扫描 head，剥掉误包到 sonner 上的 `@scope`。
+- **观察器性能**：head 只听 **`childList`**；空 style / HMR 改写由**节点级** MO 负责（不再对 head 开 `subtree + characterData`）。
 
-##### 10.0.0.2 Portal → `@scope`（`createPortal` 收编）
+##### 10.0.0.2 Portal → `@scope`（`createPortal` + body 挂载收编）
 
-Radix HoverPopover / Sheet / Drawer 等默认 `createPortal(…, document.body)`，子树不在 `[data-mf-style-realm]` 内 → Remote utility 失效。业界正解多是业务改 `getPopupContainer`；本项目约束为 **主/子业务零改**，故在 Host 静默处理：
+Radix HoverPopover / Sheet / Drawer 等默认 `createPortal(…, document.body)`，Vue `Teleport to="body"` / 原生 `appendChild` 同理：子树不在 `[data-mf-style-realm]` 内 → Remote utility 失效。业界正解多是业务改 `getPopupContainer`；本项目约束为 **主/子业务零改**，故在 Host 静默处理：
 
 | 机制 | 作用 |
 | ---- | ---- |
 | 劫持共享 `react-dom.createPortal` | 目标为 `body`/`documentElement` 时，改挂到 `body > [data-mf-portal-scope="<pluginId>"]`（带同 realm） |
-| `data-mf-host-portal` | App 根（含 Host `<Toaster />`）标记后，其内 portal **不**收编，避免 Host Toast 进插件 scope |
-| `pointerover` / `focusin` | 仅在进出插件根 / portal-scope **边界**时更新 `lastTouchedPluginId`（`relatedTarget` 早退，避免 mousemove 热路径） |
-| sticky resolve | scope 内已有子节点时，短暂丢归属也不要把容器打回 `body`（防 POP 闪烁） |
-| `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 等「先 Portal 再挂插件」场景：打开前同步认领，首帧就进 scope；关闭时 clear（不等 `attach`） |
+| 劫持 `Node.appendChild` / `insertBefore` / `Element.append` / `prepend` | 同上认领逻辑，覆盖 **Vue Teleport** 与原生 body 挂载（跳过 SCRIPT/STYLE/LINK/META… 与 Host 标记节点） |
+| 劫持 `Node.removeChild` / `replaceChild`（`resolveRetargetedChildParent`） | append 已重定向时，调用方仍对 `body` 做 remove/replace → 改从 **实际父节点** 操作，避免 `NotFoundError`（典型：antd/`rc-util` `getScrollBarSize`） |
+| `isHostProtectedPortalChildren` | children 可识别为 sonner Toaster / `data-mf-host-portal` 时**永不收编** |
+| `data-mf-host-portal` | App 根标记后，container 落在该子树内的 portal **不**收编 |
+| `pointerover` / `focusin` | 仅在进出插件根 / portal-scope **边界**时更新 `lastTouchedPluginId`（`relatedTarget` 早退） |
+| sticky resolve | scope **仍 `:hover`（含弹层）** 且有子节点时沿用认领；比「有子节点就占」更安全，降低误收 Host Toast |
+| `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 等「先 Portal 再挂插件」：打开前同步认领；关闭 clear 并可 `maybeReleaseBodyPortalPatch` |
 
 ```mermaid
 sequenceDiagram
@@ -2269,6 +2281,17 @@ sequenceDiagram
 
 1. 指针进入 POP 时旧逻辑不认 portal-scope → 归属变 `null` → 容器 scope→body → 重挂。  
 2. 电子书 Drawer：首帧无 claim 挂 body，插件激活/聚焦后再搬进 scope → 整树重挂。打开前 `claimPluginPortalTarget`（见 `EbookReadHostPlugins`）。
+
+**antd Modal/Drawer 崩溃（已修）**：
+
+`rc-util` 的 `getScrollBarSize` 在打开弹层时同步测量滚动条宽度：
+
+```text
+document.body.appendChild(measureEle)  →  测量 offsetWidth - clientWidth  →  document.body.removeChild(measureEle)
+```
+
+Host 把 `appendChild` 重定向进 `[data-mf-portal-scope]` 后，`measureEle.parentNode !== document.body`，再对 body 调 `removeChild` 会抛 `NotFoundError: The object can not be found here.`（WebKit），并被 `PluginErrorBoundary` 接住。  
+修复：在 `ensureBodyPortalPatch` 中同步劫持 `removeChild` / `replaceChild`，经 `resolveRetargetedChildParent` 落到实际父节点后再原生卸载。自检：`styleIsolation.smoke.ts` 覆盖 `resolveRetargetedChildParent`。
 
 ##### 192.168.1.3 Host 接入点（调用方）
 
@@ -2438,21 +2461,24 @@ export {
 ##### 10.0.2.5 核心实现（全文 + 逐行说明）
 
 **文件路径**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
-> 下列为**全文 + 逐行上方语义注释**（与现行源码正文一致，仅文档层追加 `//`；源码自带 JSDoc/`//` 原位保留）。早期「按 pluginId 生成 `@scope`」已改为 realm；含 head 劫持 / Vite 空 style / CORS 降级 / Portal 收编。
+> 下列为**全文 + 逐行上方语义注释**（与现行源码对齐；**未改动的源码行优先保留本文档历史讲解注释**，新增/变更行采用源码侧注释）。含 realm、`transpileStyleText` / CSSOM、`captureStack`、body Portal/Teleport 收编、sonner 保护。第三轮加固对比见 [`style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)。
 
 ```typescript
 // 模块级文档：说明 Host 侧 CSS 隔离策略、realm 键、Portal 收编目标
 /**
- * Host 侧 CSS 隔离（类 qiankun experimentalStyleIsolation）：
- * Remote 注入的 CSS 用 @scope 包到 [data-mf-style-realm="…"]。
+ * Host 侧 CSS 隔离（对齐 qiankun next `@scope` runtime isolation）：
+ * Remote 注入的 CSS 用 @scope 包到 [data-mf-style-realm="…"]；
+ * @font-face/@namespace 提升出 scope；@keyframes 按 realm 前缀防撞名；
+ * CSSOM insertRule 拦截补齐 CSS-in-JS；body 挂载劫持覆盖 React/Vue 等 Portal/Teleport。
+ * body removeChild/replaceChild 同步镜像：antd getScrollBarSize 等「body.append → body.remove」
+ * 在 append 被重定向后仍能按实际父节点卸载，避免 NotFoundError。
  *
- * 多 expose 共用同一 Remote（如 micro 的 LearningNotes + VideoPlayer）时，
- * CSS 只注入一份：必须按 Remote realm 隔离，不能按 pluginId，否则先打开的插件
- * 「占走」样式，切换后另一插件匹配不到 @scope。
- *
- * Portal：劫持共享 react-dom.createPortal，收进 body 下带同 realm 的 scope 容器。
+ * 多 expose 共用同一 Remote 时按 realm（非 pluginId）隔离。
+ * 不改主/子业务逻辑：仅改写注入的 CSS 与 body 级 Portal 挂载点。
  */
 
+// React：isValidElement 与 ReactNode，供 Portal 子树改挂时判定
+import { isValidElement, type ReactNode } from 'react';
 // 引入 ReactDOM，后续 monkey-patch createPortal 将 body Portal 收进插件 scope 容器
 import ReactDOM from 'react-dom';
 
@@ -2468,8 +2494,16 @@ type CaptureCtx = {
 // 结束 CaptureCtx 类型定义
 };
 
-// 当前激活的 capture 上下文；null 表示不在 loadRemote 注入窗口内
-let active: CaptureCtx | null = null;
+/** 嵌套 begin/attach 用栈，避免并行加载时 active 互相覆盖 */
+// 见上行 JSDoc：嵌套 begin/attach 用栈，并行加载时避免 active 互相覆盖
+const captureStack: CaptureCtx[] = [];
+// 取栈顶捕获上下文；栈空时返回 null，表示不在捕获窗口
+function activeCtx(): CaptureCtx | null {
+	// 返回栈顶 ctx，空栈则 null
+	return captureStack[captureStack.length - 1] ?? null;
+// 结束 activeCtx
+}
+
 // head.appendChild/insertBefore patch 嵌套深度，支持 begin/end 成对嵌套
 let patchDepth = 0;
 // 缓存 document.head.appendChild 原生实现，release 时还原
@@ -2482,6 +2516,25 @@ let origInsert: <T extends Node>(node: T, ref: Node | null) => T;
 let lastTouchedPluginId: string | null = null;
 // 是否已在 document 安装 pointerover/focusin 桥接监听
 let touchBridgeInstalled = false;
+
+// 匹配 @keyframes 名，供按 realm 加前缀防撞
+const KEYFRAMES_RE = /@keyframes\s+([\w-]+)/g;
+// 匹配整段 @font-face（含嵌套大括号），供 hoist 出 @scope
+const FONT_FACE_RE = /@font-face\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}/g;
+// 匹配 @namespace 声明，须 hoist 到文件顶
+const NAMESPACE_RE = /@namespace\s+[^;]+;/g;
+// @import 正则续行声明：整句提到文件最前
+const IMPORT_RE =
+	// 匹配 url(...) 或字符串形式的 @import 整句
+	/@import\s+(?:url\(\s*["']?[^"')]+["']?\s*\)|["'][^"']+["'])[^;]*;/g;
+// 匹配 animation-name 声明，便于把值里的 kf 名换成前缀名
+const ANIMATION_NAME_DECL_RE = /(animation-name\s*:\s*)([^;}]+)/gi;
+// 匹配 animation 简写声明（需排除 animation-* 长属性）
+const ANIMATION_SHORTHAND_DECL_RE = /(animation\s*:\s*)([^;}]+)/gi;
+// 从 animation 值里抠标识符 token，对照 nameMap 替换
+const IDENT_TOKEN_RE = /([\w-]+)/g;
+// 已加前缀的 keyframes 标记串，避免二次改写
+const KF_PREFIX_MARK = '__mf';
 
 // 将 CSS 标识符转义，避免 realm 含特殊字符时破坏 [attr="…"] 选择器
 function cssEscapeIdent(id: string): string {
@@ -2550,6 +2603,23 @@ function scopeSelector(realm: string): string {
 // 结束 scopeSelector 函数
 }
 
+// 为 realm 生成稳定短前缀，给 @keyframes 名防跨 Remote 撞名
+function kfPrefixForRealm(realm: string): string {
+	// FNV-1a 32 位初始偏移基础
+	let h = 2166136261;
+	// 逐字节混入 realm 字符
+	for (let i = 0; i < realm.length; i++) {
+		// 异或当前字符码
+		h ^= realm.charCodeAt(i);
+		// 乘 FNV 质数完成一轮混叠
+		h = Math.imul(h, 16777619);
+	// 结束 for 循环
+	}
+	// 无符号化后转 36 进制，拼上固定标记与下划线
+	return `${KF_PREFIX_MARK}${(h >>> 0).toString(36)}_`;
+// 结束 kfPrefixForRealm
+}
+
 // 判断 CSS 文本是否已用给定选择器包过 @scope，避免重复包裹
 function alreadyScoped(text: string, sel: string): boolean {
 	// 检测 @scope (sel) 或 @scope(sel) 两种写法
@@ -2557,32 +2627,254 @@ function alreadyScoped(text: string, sel: string): boolean {
 // 结束 alreadyScoped 函数
 }
 
-/** 去掉最外层 @scope (…) { … }，便于按新 realm 重包 / HMR 后重包 */
+/** 按大括号深度剥最外层 @scope (…) { … }，保留 hoist 段 */
 // 若文本被单层 @scope 包裹则剥壳，否则原样返回
 function unwrapScope(cssText: string): string {
-	// 去首尾空白便于正则匹配外层 @scope
-	const trimmed = cssText.trim();
-	// 匹配开头 @scope(selector){ 结构
-	const m = trimmed.match(/^@scope\s*\([^)]*\)\s*\{/);
-	// 结构不完整则视为未包或已损坏，不强行改写
-	if (!m || !trimmed.endsWith('}')) return cssText;
-	// 去掉 @scope 头与最外层 }，返回内部规则体
-	return trimmed.slice(m[0].length, -1).trim();
+	// 定位最外层 @scope (…) { 的起始
+	const m = cssText.match(/@scope\s*\([^)]*\)\s*\{/);
+	// 无匹配或无 index 则原样返回（未包 scope 或异常）
+	if (!m || m.index == null) return cssText;
+	// @scope 匹配起点下标
+	const start = m.index;
+	// 外层 { 的下标（match 末字符）
+	const openAt = start + m[0].length - 1;
+	// 大括号嵌套深度，用于找到配对的外层 }
+	let depth = 0;
+	// 从开括号起扫描到串尾找闭合
+	for (let i = openAt; i < cssText.length; i++) {
+		// 当前字符
+		const ch = cssText[i];
+		// 遇 { 加深一层
+		if (ch === '{') depth++;
+		// 遇 } 进入减深分支
+		else if (ch === '}') {
+			// 减一层深度
+			depth--;
+			// 回到 0 说明外层 @scope 块结束
+			if (depth === 0) {
+				// @scope 之前的 hoist/前缀文本
+				const before = cssText.slice(0, start).trimEnd();
+				// @scope 大括号内的样式正文
+				const inner = cssText.slice(openAt + 1, i).trim();
+				// 闭合 } 之后的剩余文本
+				const after = cssText.slice(i + 1).trim();
+				// 拼接非空三段，剥掉最外层 scope
+				return [before, inner, after].filter(Boolean).join('\n');
+			// 结束 depth===0 分支
+			}
+		// 结束 ch==='}' 分支
+		}
+	// 结束 for 扫描
+	}
+	// 未找到配对 } 则原样返回，避免截断损坏
+	return cssText;
 // 结束 unwrapScope 函数
 }
 
-// 用 @scope(sel){ body } 包裹 CSS；已 scoped 或空文本则跳过
-function wrapWithScope(cssText: string, sel: string): string {
+// 用正则抽出 at-rule，返回抽出列表与剩余 CSS
+function extractAtRules(
+	// 待扫描的 CSS 文本
+	cssText: string,
+	// 匹配目标 at-rule 的全局正则
+	regex: RegExp,
+// 返回类型：抽出片段与剩余串；函数体开始
+): { extracted: string[]; remaining: string } {
+	// 收集匹配到的 at-rule 原文
+	const extracted: string[] = [];
+	// replace 回调：记下 match 并从正文删除
+	const remaining = cssText.replace(regex, (match) => {
+		// 把整段 match 推进 extracted
+		extracted.push(match);
+		// 用空串删掉该 at-rule，留给后续 hoist
+		return '';
+	// 结束 replace 回调
+	});
+	// 返回抽出结果与剩余 CSS
+	return { extracted, remaining };
+// 结束 extractAtRules
+}
+
+// 按 nameMap 改写 animation 值里的 keyframes 标识符（保留时长等）
+function rewriteAnimationValueTokens(
+	// 逗号分隔的多段 animation 值
+	value: string,
+	// 原名 → 带 realm 前缀的新名
+	nameMap: Map<string, string>,
+// 返回改写后的 animation 值；函数体开始
+): string {
+	// 对每段 animation 列表项替换 ident
+	return value
+		// 按逗号拆成多条动画定义
+		.split(',')
+		// 对单条定义做 map，准备替换其中的 ident
+		.map((entry) =>
+			// 命中 nameMap 则换前缀名，否则保留原 token（如 ease、1s）
+			entry.replace(IDENT_TOKEN_RE, (token) => nameMap.get(token) ?? token),
+		// 结束 map 回调
+		)
+		// 再拼回逗号分隔列表
+		.join(',');
+// 结束 rewriteAnimationValueTokens
+}
+
+// 给 CSS 内 @keyframes 名加 realm 前缀，并同步改写 animation 引用
+function prefixKeyframes(cssText: string, realm: string): string {
+	// 本 realm 的稳定前缀
+	const prefix = kfPrefixForRealm(realm);
+	// 收集「原名 → 前缀名」，供 animation 声明第二遍替换
+	const nameMap = new Map<string, string>();
+	// 第一遍：改写 @keyframes 规则名并填充 nameMap
+	let result = cssText.replace(KEYFRAMES_RE, (match, name: string) => {
+		// 已带 __mf 标记则跳过，避免重复前缀
+		if (name.startsWith(KF_PREFIX_MARK)) return match;
+		// 拼出带 realm 前缀的新 keyframes 名
+		const next = `${prefix}${name}`;
+		// 记下映射，供 animation-name / animation 简写使用
+		nameMap.set(name, next);
+		// 返回改写后的 @keyframes 行
+		return `@keyframes ${next}`;
+	// 结束 KEYFRAMES_RE replace 回调
+	});
+	// 没有改过任何 kf 名则无需动 animation 声明
+	if (nameMap.size === 0) return result;
+
+	// 第二遍：改写 animation-name: … 中的名字列表
+	result = result.replace(
+		// 匹配 animation-name 声明
+		ANIMATION_NAME_DECL_RE,
+		// 保留「animation-name:」头，只改值里的 kf 名
+		(_m, head: string, value: string) =>
+			// 头 + 按 nameMap 改写后的值
+			`${head}${rewriteAnimationValueTokens(value, nameMap)}`,
+	// 结束 animation-name replace
+	);
+	// 第三遍：改写 animation 简写（排除 animation-* 长属性误伤）
+	result = result.replace(
+		// 匹配疑似 animation 简写的声明
+		ANIMATION_SHORTHAND_DECL_RE,
+		// 简写回调：先过滤 animation-xxx 长属性
+		(match, head: string, value: string) => {
+			// animation-duration 等长属性整段 match 以 animation- 开头则原样
+			if (/^animation-[a-z]/i.test(match)) return match;
+			// 真正的 animation 简写：改写值里的 kf 名
+			return `${head}${rewriteAnimationValueTokens(value, nameMap)}`;
+		// 结束 animation 简写回调
+		},
+	// 结束 animation 简写 replace
+	);
+	// 返回完成 kf 前缀与引用同步的 CSS
+	return result;
+// 结束 prefixKeyframes
+}
+
+/**
+ * 类 qiankun transpileStyleText：hoist 全局 at-rule + keyframes 前缀 + @scope。
+ * @import 提到文件顶部（必须在任何规则前）；导入内容本身仍可能全局生效——CORS/外链场景的已知上限。
+ */
+// 见上行 JSDoc：整段 style 文本转译（hoist + kf 前缀 + @scope）
+function transpileStyleText(
+	// 原始 CSS 文本
+	cssText: string,
+	// 目标 @scope 选择器
+	sel: string,
+	// realm：keyframes 前缀与 owner 语义
+	realm: string,
+// 返回可写入 style 标签的转译结果；函数体开始
+): string {
 	// 读取去空白后的 CSS 文本
 	const trimmed = cssText.trim();
 	// 空 CSS 直接返回，无需包裹
 	if (!trimmed) return cssText;
 	// 已是目标 @scope 则幂等返回
 	if (alreadyScoped(trimmed, sel)) return cssText;
-	// 先剥旧 @scope 再取 body，支持 HMR/切换 realm 重包
-	const body = unwrapScope(trimmed);
-	// 返回带换行的 @scope 包裹结果
-	return `@scope (${sel}) {\n${body}\n}\n`;
+
+	// 若曾误包 scope，先剥到裸 CSS 再重新 hoist/包
+	const bare = unwrapScope(trimmed);
+	// 抽出所有 @import，剩余交给后续 font-face 等
+	const { extracted: imports, remaining: afterImport } = extractAtRules(
+		// 从裸 CSS 抽 @import
+		bare,
+		// 使用 IMPORT_RE
+		IMPORT_RE,
+	// 结束 extractAtRules(@import) 调用
+	);
+	// 抽出 @font-face，剩余继续抽 namespace
+	const { extracted: fontFaces, remaining: afterFont } = extractAtRules(
+		// 在去 import 后的串上抽 font-face
+		afterImport,
+		// 使用 FONT_FACE_RE
+		FONT_FACE_RE,
+	// 结束 extractAtRules(@font-face)
+	);
+	// 抽出 @namespace
+	const { extracted: namespaces, remaining: afterNs } = extractAtRules(
+		// 在去 font-face 后的串上抽 namespace
+		afterFont,
+		// 使用 NAMESPACE_RE
+		NAMESPACE_RE,
+	// 结束 extractAtRules(@namespace)
+	);
+
+	// 对剩余规则做 kf 前缀，作为 @scope 正文
+	const scopedContent = prefixKeyframes(afterNs, realm).trim();
+	// hoist 顺序：@import → @namespace → @font-face（符合 CSS 顶置约束）
+	const hoisted = [...imports, ...namespaces, ...fontFaces].join('\n');
+	// 没有可 scope 的正文则只返回 hoist 段
+	if (!scopedContent) return hoisted.trim();
+
+	// 用 @scope (sel) 包住插件局部规则
+	const scoped = `@scope (${sel}) {\n${scopedContent}\n}\n`;
+	// 有 hoist 则拼在 scope 块前，否则只返回 scope 块
+	return hoisted ? `${hoisted}\n${scoped}` : scoped;
+// 结束 transpileStyleText
+}
+
+/** 单条 CSSOM 规则（无 @import） */
+// 见上行 JSDoc：单条 CSSOM insertRule 文本转译（无 @import 流程）
+function transpileStyleRule(
+	// insertRule 传入的单条 rule 文本
+	ruleText: string,
+	// 目标 scope 选择器
+	sel: string,
+	// realm 供 keyframes 前缀
+	realm: string,
+// 返回可 insertRule 的字符串；函数体开始
+): string {
+	// 去空白后判断规则类型
+	const trimmed = ruleText.trim();
+	// 空规则原样返回
+	if (!trimmed) return ruleText;
+	// 已是目标 @scope 开头则不重复包
+	if (
+		// 有空格的 @scope (sel) 写法
+		trimmed.startsWith(`@scope (${sel})`) ||
+		// 无空格的 @scope(sel) 写法
+		trimmed.startsWith(`@scope(${sel})`)
+	// 结束已 scope 判定条件，进入分支
+	) {
+		// 已隔离则直接返回 trimmed
+		return trimmed;
+	// 结束已 scope 分支
+	}
+	// @font-face / @namespace 必须全局，不进 @scope
+	if (/^@font-face\b/i.test(trimmed) || /^@namespace\b/i.test(trimmed)) {
+		// 原样返回这类全局 at-rule
+		return trimmed;
+	// 结束全局 at-rule 分支
+	}
+	// @import 不能经 insertRule 可靠处理，原样放行
+	if (/^@import\b/i.test(trimmed)) return trimmed;
+	// 其余规则先做 kf 前缀再包一层 @scope
+	const prefixed = prefixKeyframes(trimmed, realm);
+	// 单行 @scope 包装，供 CSSOM 插入
+	return `@scope (${sel}) { ${prefixed} }`;
+// 结束 transpileStyleRule
+}
+
+// wrapWithScope：委托 transpileStyleText，统一整段文本入口
+function wrapWithScope(cssText: string, sel: string, realm: string): string {
+	// 直接转译整段 CSS
+	return transpileStyleText(cssText, sel, realm);
 // 结束 wrapWithScope 函数
 }
 
@@ -2784,8 +3076,8 @@ function looksLikeRemoteStyle(
 			/* ignore */
 		// 结束 viteId try 块（catch 体为 /* ignore */）
 		}
-		// 无 host 匹配：仅 active capture 为本 realm 时认领新注入
-		return active?.realm === ctx.realm;
+		// 无 host 线索时：仅当仍在本 realm 捕获窗口内才认领
+		return activeCtx()?.realm === ctx.realm;
 	// 结束 viteId 分支
 	}
 
@@ -2794,8 +3086,8 @@ function looksLikeRemoteStyle(
 	if (owner) {
 		// 旧版 scoped 样式仍含 [data-mf-plugin="owner"] 时可 reclaim 到 realm
 		if (
-			// 条件：active capture 正是本 realm
-			active?.realm === ctx.realm &&
+			// active 仍是本 realm
+			activeCtx()?.realm === ctx.realm &&
 			// 且 CSS 含双引号版 data-mf-plugin 选择器
 			(text.includes(`[data-mf-plugin="${owner}"]`) ||
 				// 或 CSS 含单引号版 data-mf-plugin 选择器
@@ -2814,8 +3106,50 @@ function looksLikeRemoteStyle(
 	// 无标记的 style：reclaim 绝不碰（避免收走 Host sonner 等）；仅 live 捕获窗口认领新注入
 	// 见下行源码注释：reclaim 对无标记 style 保守拒绝；live 依赖 active capture
 	if (mode === 'reclaim') return false;
-	// live 模式：无标记新注入仅在 active 为本 realm 时认领
-	return active?.realm === ctx.realm;
+	// live 捕获窗口内：仅栈顶仍是本 realm 时认领新注入
+	return activeCtx()?.realm === ctx.realm;
+// 结束 looksLikeRemoteStyle
+}
+
+// 空 style 等待 textContent 出现的 MutationObserver，弱键防泄漏
+const pendingStyleObservers = new WeakMap<HTMLStyleElement, MutationObserver>();
+// 已 scoped 的 style 监听 HMR 改文，弱键防泄漏
+const hmrStyleObservers = new WeakMap<HTMLStyleElement, MutationObserver>();
+
+// 监听已隔离 style 的文本被 HMR 改写后重新 scope
+function watchScopedStyleHmr(
+	// 目标 style 元素
+	el: HTMLStyleElement,
+	// 期望的 owner realm
+	realm: string,
+	// 可选 origin，回写 data-mf-style-origin
+	entryOrigin: string | undefined,
+	// alreadyScoped / wrap 使用的选择器
+	sel: string,
+// 函数体开始（无显式返回类型）
+) {
+	// 已在监听则跳过，避免重复 MO
+	if (hmrStyleObservers.has(el)) return;
+	// 子树/字符变化时检查是否需重新隔离
+	const mo = new MutationObserver(() => {
+		// owner 已不是本 realm 则忽略（可能被其它插件接管）
+		if (el.dataset.mfStyleOwner !== realm) return;
+		// 读最新 CSS 文本
+		const text = el.textContent ?? '';
+		// 有内容且不再带本 sel 的 @scope → 清标记并重跑 scope
+		if (text.trim() && !alreadyScoped(text, sel)) {
+			// 去掉 mfScoped，允许 scopeStyleElement 重写
+			delete el.dataset.mfScoped;
+			// 再次 wrap/@scope
+			scopeStyleElement(el, realm, entryOrigin);
+		// 结束需重 scope 分支
+		}
+	// 结束 MutationObserver 回调
+	});
+	// 记下 MO，供 has 判断与生命周期
+	hmrStyleObservers.set(el, mo);
+	// 观察子节点、字符数据与子树，覆盖 Vite HMR 换文
+	mo.observe(el, { childList: true, characterData: true, subtree: true });
 // 结束 looksLikeRemoteStyle 函数
 }
 
@@ -2845,18 +3179,31 @@ function scopeStyleElement(
 	const text = el.textContent ?? '';
 	// 内容为空：Vite 可能先插空 style 再填 textContent
 	if (!text.trim()) {
+		// 立刻打 owner：CSS-in-JS 可能先 insertRule 再填 text
+		// 先写入 owner=realm，CSSOM patch 才能知道归属
+		el.dataset.mfStyleOwner = realm;
+		// 标 scoped，避免被当成未处理节点反复进逻辑
+		el.dataset.mfScoped = '1';
+		// 有 origin 则一并写入
+		if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
+		// 已有 pending MO 则不再挂第二个
+		if (pendingStyleObservers.has(el)) return;
 		// 挂 MutationObserver 等待非空后再递归 scope
 		const mo = new MutationObserver(() => {
 			// observer 回调：检测 textContent 是否已有实质内容
 			if ((el.textContent ?? '').trim()) {
 				// 有内容则 disconnect 避免重复触发
 				mo.disconnect();
+				// 从 pending 表移除
+				pendingStyleObservers.delete(el);
 				// 递归调用完成 @scope 包裹
 				scopeStyleElement(el, realm, entryOrigin);
 			// 结束 observer 内 if 块
 			}
 		// 结束 MutationObserver 回调
 		});
+		// 登记 pending MO
+		pendingStyleObservers.set(el, mo);
 		// 监听 style 子树与字符数据变化
 		mo.observe(el, {
 			// observe 选项：childList
@@ -2871,26 +3218,34 @@ function scopeStyleElement(
 		return;
 	// 结束空 text 分支
 	}
-	// 已是目标 @scope：只补 dataset，不改 textContent
-	if (alreadyScoped(text, sel)) {
-		// 标记 mfScoped=1
-		el.dataset.mfScoped = '1';
-		// 写入 mfStyleOwner=realm
-		el.dataset.mfStyleOwner = realm;
+	// 已正确 scoped 到本 realm 则只补 origin 与 HMR 监听
+	if (
+		// 已标 mfScoped
+		el.dataset.mfScoped === '1' &&
+		// owner 仍是本 realm
+		el.dataset.mfStyleOwner === realm &&
+		// 文本已含本 sel 的 @scope
+		alreadyScoped(text, sel)
+	// 结束「已隔离」条件
+	) {
 		// 有 entryOrigin 则写入 mfStyleOrigin
 		if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
+		// 确保 HMR 监听已挂
+		watchScopedStyleHmr(el, realm, entryOrigin, sel);
 		// 已 scoped 分支 return
 		return;
 	// 结束 alreadyScoped 分支
 	}
-	// 写入 @scope 包裹后的 CSS 到 textContent
-	el.textContent = wrapWithScope(text, sel);
+	// 正式把 CSS wrap 进 @scope 写回 textContent
+	el.textContent = wrapWithScope(text, sel, realm);
 	// 标记 mfScoped=1
 	el.dataset.mfScoped = '1';
 	// 写入 mfStyleOwner=realm
 	el.dataset.mfStyleOwner = realm;
 	// 有 entryOrigin 则写入 mfStyleOrigin
 	if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
+	// 挂上 HMR 重隔离监听
+	watchScopedStyleHmr(el, realm, entryOrigin, sel);
 // 结束 scopeStyleElement 函数
 }
 
@@ -2948,8 +3303,11 @@ async function scopeLinkElement(
 		const css = await res.text();
 		// 创建内联 style 承载 scoped 内容
 		const style = document.createElement('style');
-		// 写入 @scope 包裹后的 CSS
-		style.textContent = wrapWithScope(css, sel);
+		// 先禁用 link，避免 fetch 窗口内未隔离样式闪烁污染 Host
+		// 立刻禁用原 link，缩短未隔离窗口
+		el.disabled = true;
+		// 写入 wrap 后的 CSS
+		style.textContent = wrapWithScope(css, sel, realm);
 		// style 打 mfScoped=1
 		style.dataset.mfScoped = '1';
 		// style 写 mfStyleOwner=realm
@@ -2962,15 +3320,13 @@ async function scopeLinkElement(
 		el.insertAdjacentElement('afterend', style);
 		// link 打 mfScoped=1
 		el.dataset.mfScoped = '1';
-		// 禁用原 link
-		el.disabled = true;
 		// link 写 mfStyleOwner=realm
 		el.dataset.mfStyleOwner = realm;
 		// link 写 mfStyleOrigin=entryOrigin
 		el.dataset.mfStyleOrigin = entryOrigin;
 	// fetch 失败（CORS/离线）静默忽略
 	} catch {
-		/* CORS / 离线 */
+		/* CORS / 离线：保持原 link，不阻断功能（隔离降级） */
 	// 结束 scopeLinkElement 的 catch 块（体为 /* CORS / 离线 */）
 	}
 // 结束 scopeLinkElement 函数
@@ -3037,6 +3393,84 @@ function reclaimEntryStyles(ctx: CaptureCtx) {
 // 结束 reclaimEntryStyles 函数
 }
 
+/* -------------------- CSSOM insertRule（CSS-in-JS） -------------------- */
+
+// CSSOM insertRule patch 引用计数
+let cssomPatchDepth = 0;
+// 保存 CSSStyleSheet.prototype.insertRule 原函数
+let origInsertRule: typeof CSSStyleSheet.prototype.insertRule | null = null;
+
+// 从 stylesheet 的 ownerNode 读 mfStyleOwner 作为 realm
+function sheetOwnerRealm(sheet: CSSStyleSheet): string | null {
+	// CSSOM sheet 对应的 DOM 节点
+	const owner = sheet.ownerNode;
+	// 非 style 标签拥有的 sheet 不走此 patch 语义
+	if (!(owner instanceof HTMLStyleElement)) return null;
+	// Host 关键 style 上的规则不改写
+	if (owner.dataset.mfHostStyle === '1') return null;
+	// 返回 dataset 上的 owner realm，无则 null
+	return owner.dataset.mfStyleOwner || null;
+// 结束 sheetOwnerRealm
+}
+
+// 确保 CSSStyleSheet.insertRule 被包一层 @scope 转译
+function ensureCssomPatch() {
+	// 已 patch：只增加深度，避免重复替换 prototype
+	if (cssomPatchDepth > 0) {
+		// 嵌套引用 +1
+		cssomPatchDepth += 1;
+		// 已装过则返回
+		return;
+	// 结束已 patch 分支
+	}
+	// 保存原生 insertRule
+	origInsertRule = CSSStyleSheet.prototype.insertRule;
+	// 替换为会按 owner realm 转译的实现
+	CSSStyleSheet.prototype.insertRule = function mfInsertRule(
+		// 待插入的 CSS 规则文本
+		rule: string,
+		// 可选插入下标
+		index?: number,
+	// 返回新规则索引；包装函数体开始
+	): number {
+		// 看本 sheet 是否属于某插件 realm
+		const realm = sheetOwnerRealm(this);
+		// 有 owner 则转译后再插入
+		if (realm) {
+			// 生成本 realm 的 scope 选择器
+			const sel = scopeSelector(realm);
+			// 单条规则 transpile 后写回局部 rule
+			rule = transpileStyleRule(rule, sel, realm);
+		// 结束有 realm 分支
+		}
+		// 调用原生 insertRule，保持 CSSOM 索引语义
+		return origInsertRule!.call(this, rule, index);
+	// 结束 mfInsertRule
+	};
+	// 深度置 1，标记 patch 已装
+	cssomPatchDepth = 1;
+// 结束 ensureCssomPatch
+}
+
+// 减少 CSSOM patch 引用；到 0 时恢复原生 insertRule
+function releaseCssomPatch() {
+	// 未装过则无操作
+	if (cssomPatchDepth <= 0) return;
+	// 引用计数 -1
+	cssomPatchDepth -= 1;
+	// 仍有其它捕获窗口持有 patch 则不卸载
+	if (cssomPatchDepth > 0) return;
+	// 仅当当前仍是我们的包装函数时才还原，避免误伤他人 patch
+	if (origInsertRule && CSSStyleSheet.prototype.insertRule !== origInsertRule) {
+		// 恢复原型上的原生 insertRule
+		CSSStyleSheet.prototype.insertRule = origInsertRule;
+	// 结束仍是我们包装的分支
+	}
+	// 清空保存的原函数引用
+	origInsertRule = null;
+// 结束 releaseCssomPatch
+}
+
 // 首次调用 patch head.appendChild/insertBefore；嵌套 begin 只增 patchDepth
 function ensureHeadPatch() {
 	// 已在 patch 栈内：仅递增深度
@@ -3058,8 +3492,10 @@ function ensureHeadPatch() {
 	head.appendChild = function appendScoped<T extends Node>(node: T): T {
 		// 先走原生 appendChild 完成 DOM 插入
 		const ret = origAppend(node);
-		// active capture 窗口内认领并 @scope 新 style/link
-		if (active) processNode(node, active);
+		// 取当前捕获栈顶
+		const ctx = activeCtx();
+		// 在捕获窗口内则尝试隔离该节点
+		if (ctx) processNode(node, ctx);
 		// 返回原生 appendChild 的返回值
 		return ret;
 	// 结束 appendScoped 函数赋值
@@ -3075,8 +3511,10 @@ function ensureHeadPatch() {
 	): T {
 		// 先走原生 insertBefore
 		const ret = origInsert(node, ref);
-		// active 存在则 processNode
-		if (active) processNode(node, active);
+		// 当前捕获上下文
+		const ctx = activeCtx();
+		// 有 ctx 则隔离
+		if (ctx) processNode(node, ctx);
 		// 返回原生 insertBefore 返回值
 		return ret;
 	// 结束 insertScoped 函数赋值
@@ -3084,6 +3522,8 @@ function ensureHeadPatch() {
 
 	// 标记进入第一层 patch，patchDepth=1
 	patchDepth = 1;
+	// 同时装上 CSSOM insertRule patch
+	ensureCssomPatch();
 // 结束 ensureHeadPatch 函数
 }
 
@@ -3099,6 +3539,8 @@ function releaseHeadPatch() {
 	document.head.appendChild = origAppend as typeof document.head.appendChild;
 	// 还原 head.insertBefore 为 origInsert
 	document.head.insertBefore = origInsert as typeof document.head.insertBefore;
+	// 成对释放 CSSOM patch
+	releaseCssomPatch();
 // 结束 releaseHeadPatch 函数
 }
 
@@ -3127,10 +3569,8 @@ export function beginPluginStyleCapture(
 		entryOrigin: entryOriginOf(entry),
 	// 结束 CaptureCtx 字面量
 	};
-	// 保存嵌套 capture 的外层 active，teardown 时恢复
-	const prev = active;
-	// 覆盖模块级 active 为本次 ctx
-	active = ctx;
+	// 压栈，使 activeCtx 指向本次加载
+	captureStack.push(ctx);
 	// patch head 插入方法以拦截新 style/link
 	ensureHeadPatch();
 	// 修复 head 内误包 @scope 的 Host 关键样式
@@ -3138,58 +3578,29 @@ export function beginPluginStyleCapture(
 	// reclaim 已注入的同 entry Remote 样式到当前 realm
 	reclaimEntryStyles(ctx);
 
-	// 本 realm 的 @scope 选择器，供 HMR 检测是否丢失 @scope
-	const sel = scopeSelector(realm);
 	// MutationObserver 监听 head 子树：新节点与 style 文本变更
 	const obs = new MutationObserver((mutations) => {
-		// capture 已结束或 realm 已切换则忽略回调
-		if (!active || active.realm !== realm) return;
+		// 若栈顶已不是本 realm（嵌套其它 Remote）则忽略
+		if (activeCtx()?.realm !== realm) return;
 		// 遍历本次 batch 的 mutation 记录
 		for (const m of mutations) {
 			// 处理 addedNodes 中的新 style/link
 			for (const n of m.addedNodes) processNode(n, ctx);
-			// HMR 可能改写已有 style 的 textContent
-			if (m.target instanceof HTMLStyleElement) {
-				// target 非 Remote 样式则 continue
-				if (!looksLikeRemoteStyle(m.target, ctx)) continue;
-				// 读取 HMR 后 style 文本
-				const text = m.target.textContent ?? '';
-				// HMR 可能改写 textContent 丢掉 @scope
-				// 见下行源码注释：有内容但未 scoped 时清 mfScoped 强制重包
-				if (text.trim() && !alreadyScoped(text, sel)) {
-					// 删除 mfScoped 让 scopeStyleElement 重新 wrap
-					delete m.target.dataset.mfScoped;
-				// 结束 HMR 重包条件 if 块
-				}
-				// 对 target style 执行 scope（含 HMR 重包路径）
-				scopeStyleElement(m.target, realm, ctx.entryOrigin);
-			// 结束 HTMLStyleElement target 分支
-			}
 		// 结束 for (mutations) 循环
 		}
 	// 结束 MutationObserver 回调
 	});
-	// 开始 observe document.head
-	obs.observe(document.head, {
-		// 监听 childList：新 style/link 插入
-		childList: true,
-		// 监听 subtree：head 内深层变化
-		subtree: true,
-		// 监听 characterData：style textContent HMR
-		characterData: true,
-	// 结束 observe 配置对象
-	});
+	// 只观察 childList，不做 subtree（空 style/HMR 由节点级 MO 负责）
+	obs.observe(document.head, { childList: true });
 
 	// 返回 teardown 闭包
 	return () => {
 		// 断开 MutationObserver
 		obs.disconnect();
-		// 仅当 active 仍指向本次 capture 时才恢复 prev
-		if (active?.realm === realm && active.pluginId === pluginId) {
-			// 恢复嵌套 capture 的外层 active
-			active = prev;
-		// 结束 active 恢复 if 块
-		}
+		// 从栈尾侧查找本 ctx，支持嵌套乱序结束
+		const idx = captureStack.lastIndexOf(ctx);
+		// 找到则删除该帧，避免残留 active
+		if (idx >= 0) captureStack.splice(idx, 1);
 		// release head patch（递减 patchDepth，可能还原原生方法）
 		releaseHeadPatch();
 	// 结束 teardown 闭包
@@ -3197,13 +3608,33 @@ export function beginPluginStyleCapture(
 // 结束 beginPluginStyleCapture 函数
 }
 
-/* -------------------- Portal → @scope（createPortal 收编） -------------------- */
+// Portal/Teleport 段：把挂到 document.body 的节点重定向进带 @scope 的插件 scope 容器
+/* -------------------- Portal / Teleport → @scope -------------------- */
 
 // 当前已 attach Portal 桥接的 pluginId 集合
 const portalPlugins = new Set<string>();
 /** pluginId → realm，Portal 容器需带 style-realm 才能吃到 CSS */
 // pluginId → realm 映射，Portal 容器需带 data-mf-style-realm 才能匹配 @scope
 const portalRealmByPlugin = new Map<string, string>();
+
+// 原生 append 到 body 时跳过重定向的标签（资源/元数据/宿主专用标记）
+const PORTAL_SKIP_TAGS = new Set([
+	// 脚本须挂真实 body，重定向会破坏加载与执行顺序
+	'SCRIPT',
+	// 样式表由 head 捕获路径处理，不走 Portal 收编
+	'STYLE',
+	// 外链资源保持在 document 级，避免进 scope 失效
+	'LINK',
+	// 文档元信息必须留在 head/body 顶层
+	'META',
+	// 无脚本降级内容不应进插件 scope
+	'NOSCRIPT',
+	// 模板节点非可见 UI，勿当弹层收编
+	'TEMPLATE',
+	// <base> 影响整页 URL 解析，禁止挪动
+	'BASE',
+// 结束 PORTAL_SKIP_TAGS 集合字面量
+]);
 
 // 从 DOM 元素向上查找所属 pluginId
 function claimIdFromElement(el: Element | null): string | null {
@@ -3333,8 +3764,20 @@ function resolveClaimPluginId(): string | null {
 			`[data-mf-portal-scope="${cssEscapeIdent(id)}"]`,
 		// 结束 querySelector 实参
 		);
-		// 容器存在且已有 Portal 子节点 → sticky 返回该 id
-		if (host && host.childElementCount > 0) return id;
+		// 容器存在、非空且自身或子孙仍 hover 才 sticky
+		if (
+			// host 必须是 HTMLElement
+			host instanceof HTMLElement &&
+			// 有 Portal 子树才值得 sticky
+			host.childElementCount > 0 &&
+			// matches/querySelector :hover 覆盖弹层悬停
+			(host.matches(':hover') || host.querySelector(':hover'))
+		// 结束 hover 判断
+		) {
+			// 返回仍悬停的插件 id
+			return id;
+		// 结束 if (host ...)
+		}
 	// 结束 for (portalPlugins) 循环
 	}
 	// 所有策略均未命中则 null，createPortal 保持挂 body
@@ -3352,6 +3795,8 @@ export function claimPluginPortalTarget(pluginId: string, realm: string): void {
 	ensureTouchBridge();
 	// 确保 createPortal 已被 patch
 	ensureCreatePortalPatch();
+	// 安装 Node/Element body 挂载原型 patch
+	ensureBodyPortalPatch();
 	// 记录 pluginId → realm 供 Portal 容器写 data-mf-style-realm
 	portalRealmByPlugin.set(pluginId, realm);
 	// 设置同步认领 override，首帧 createPortal 即用
@@ -3369,6 +3814,8 @@ export function clearPluginPortalClaim(pluginId?: string | null): void {
 	if (pluginId && portalClaimOverride !== pluginId) return;
 	// 清空 portalClaimOverride
 	portalClaimOverride = null;
+	// 若无活跃插件且无 override，尝试还原 body 原型
+	maybeReleaseBodyPortalPatch();
 // 结束 clearPluginPortalClaim 函数
 }
 
@@ -3406,8 +3853,18 @@ function ensureBodyPortalScope(pluginId: string): HTMLElement {
 	el.style.cssText =
 		// cssText 赋值：position/size/z-index 详见字符串
 		'position:absolute;left:0;top:0;width:0;height:0;overflow:visible;z-index:2147503646;';
-	// 挂到 document.body
-	document.body.appendChild(el);
+	// 置 busy：append 自身触发的 body patch 不再递归重定向
+	bodyPatchBusy = true;
+	// try/finally 保证 busy 一定复位
+	try {
+		// 挂到 body；经 patch 时因 busy 走原生 append
+		document.body.appendChild(el);
+	// finally 块
+	} finally {
+		// 清除 busy，恢复对外部 Portal append 的拦截
+		bodyPatchBusy = false;
+	// 结束 try/finally
+	}
 	// 返回新建容器
 	return el;
 // 结束 ensureBodyPortalScope 函数
@@ -3432,6 +3889,27 @@ function isBodyPortalTarget(
 ): boolean {
 	// body 或 documentElement 即 true
 	return container === document.body || container === document.documentElement;
+// 结束 isBodyPortalTarget
+}
+
+// 判断原生 append 的节点是否应跳过重定向（资源/宿主/scope 自身）
+function shouldSkipPortalNode(node: Node): boolean {
+	// DocumentFragment 需继续处理（React 18 可能 portal 到 fragment）
+	if (node instanceof DocumentFragment) return false;
+	// 非 Element 节点（文本等）跳过
+	if (!(node instanceof Element)) return true;
+	// head 资源类标签不应收编进插件 scope
+	if (PORTAL_SKIP_TAGS.has(node.tagName)) return true;
+	// portal scope 容器自身不再重定向
+	if (node.hasAttribute('data-mf-portal-scope')) return true;
+	// stamp 占位节点跳过
+	if (node.hasAttribute('data-mf-portal-stamp')) return true;
+	// Host Sonner toaster 永不收编
+	if (node.hasAttribute('data-sonner-toaster')) return true;
+	// Host 专用 portal 标记节点跳过
+	if (node.hasAttribute('data-mf-host-portal')) return true;
+	// 其余 Element 可参与重定向
+	return false;
 // 结束 isBodyPortalTarget 函数
 }
 
@@ -3469,6 +3947,34 @@ let createPortalPatched = false;
 // 保存原始 createPortal，patch 内委托调用
 let origCreatePortal: typeof ReactDOM.createPortal | null = null;
 
+/** Host Toaster 等：children 可识别时永不收编，避免 lastTouched 误伤 */
+// 见上行 JSDoc：识别 Host Toaster 等受保护 children，避免被 lastTouched 误收编
+function isHostProtectedPortalChildren(children: ReactNode): boolean {
+	// 非单一 React 元素则无法从 props 识别，不保护
+	if (!isValidElement(children)) return false;
+	// 收窄 props 类型以读 data-* 与 className
+	const p = children.props as {
+		// className 字段
+		className?: string;
+		// Sonner toaster 标记
+		'data-sonner-toaster'?: unknown;
+		// Host portal 标记
+		'data-mf-host-portal'?: unknown;
+	// 结束 props 类型
+	};
+	// 显式 Host portal/toaster 标记则保护
+	if (p['data-sonner-toaster'] != null || p['data-mf-host-portal'] != null) {
+		// 命中 data 属性则走原生 createPortal 到 body
+		return true;
+	// 结束 data 属性保护 if 块
+	}
+	// 读 className
+	const cn = p.className;
+	// class 含 toaster 词也视为 Host 全局 toast 容器
+	return typeof cn === 'string' && /\btoaster\b/.test(cn);
+// 结束 isHostProtectedPortalChildren
+}
+
 // 一次性 patch ReactDOM.createPortal，body Portal 重定向到插件 scope
 function ensureCreatePortalPatch() {
 	// 已 patch 则直接返回
@@ -3479,6 +3985,12 @@ function ensureCreatePortalPatch() {
 	origCreatePortal = ReactDOM.createPortal.bind(ReactDOM);
 	// 替换为包装函数：必要时 retarget container 再委托 origCreatePortal
 	ReactDOM.createPortal = ((children, container, key) => {
+		// Host 受保护 children 永不改 container
+		if (isHostProtectedPortalChildren(children)) {
+			// 委托原生 createPortal
+			return origCreatePortal!(children, container as Element, key);
+		// 结束 protected 分支
+		}
 		// 有 portal 插件注册或同步 claim 时才尝试 retarget
 		const next =
 			// 条件：portalPlugins 非空或 portalClaimOverride 存在
@@ -3494,12 +4006,300 @@ function ensureCreatePortalPatch() {
 // 结束 ensureCreatePortalPatch 函数
 }
 
+/** Vue Teleport / 原生 append 到 body：与 createPortal 同一套认领，框架无关 */
+// 见上行 JSDoc：Vue Teleport / 原生 append 与 createPortal 共用认领逻辑
+let bodyPortalPatched = false;
+// body 原型 patch 是否已安装
+let bodyPatchBusy = false;
+// patch 内部 append scope 容器时置 true，防止递归重定向
+let origBodyAppend: typeof Node.prototype.appendChild | null = null;
+// 保存 Node.prototype.appendChild
+let origBodyInsert: typeof Node.prototype.insertBefore | null = null;
+// 保存 Node.prototype.insertBefore
+let origBodyAppendFn: typeof Element.prototype.append | null = null;
+// 保存 Element.prototype.append
+let origBodyPrepend: typeof Element.prototype.prepend | null = null;
+// 保存 Element.prototype.prepend
+let origBodyRemove: typeof Node.prototype.removeChild | null = null;
+// 保存 Node.prototype.removeChild（镜像 retarget 卸载）
+let origBodyReplace: typeof Node.prototype.replaceChild | null = null;
+
+/**
+ * append 被重定向到 portal scope 后，调用方仍可能对 body 做 remove/replace。
+ * 若 child 实际父节点已变，改从实际父节点操作，避免 NotFoundError。
+ */
+function resolveRetargetedChildParent(assumedParent: Node, child: Node): Node {
+	// 读 child 当前真实父节点
+	const actual = child.parentNode;
+	// 已挂到别的父节点（典型：portal scope）则改用实际父
+	return actual && actual !== assumedParent ? actual : assumedParent;
+	// 结束 resolveRetargetedChildParent
+}
+
+// 保存 Element.prototype.prepend（历史讲解注释位置；现行源码见上 origBodyPrepend）
+function retargetBodyMount(parent: Node, node: Node): Node {
+	// 原生 append 到 body 时：按认领把 parent 换成插件 scope 容器
+	if (bodyPatchBusy) return parent;
+	// patch 自身正在 append scope 节点时不改写 parent
+	if (parent !== document.body && parent !== document.documentElement) {
+		// 仅 body/documentElement 作为 parent 才参与重定向
+		return parent;
+		// parent 非 body 则原样返回
+	}
+	// 结束 parent 非 body 分支
+	if (portalPlugins.size === 0 && !portalClaimOverride) return parent;
+	// 无活跃 Portal 且无预认领则不改 parent
+	if (shouldSkipPortalNode(node)) return parent;
+	// 应跳过的节点类型保持挂到 body
+	return retargetPortalContainer(parent as Element);
+	// 否则按 retargetPortalContainer 解析 scope 容器作为 parent
+}
+
+// 结束 retargetBodyMount
+function ensureBodyPortalPatch() {
+	// patch Node/Element 原型：拦截所有框架的 body 级 DOM 挂载
+	if (bodyPortalPatched) return;
+	// 已 patch 则返回
+	bodyPortalPatched = true;
+	// 标记 body patch 已安装
+	origBodyAppend = Node.prototype.appendChild;
+	// 缓存 appendChild
+	origBodyInsert = Node.prototype.insertBefore;
+	// 缓存 insertBefore
+	origBodyAppendFn = Element.prototype.append;
+	// 缓存 Element.append
+	origBodyPrepend = Element.prototype.prepend;
+	// 缓存 Element.prepend
+	origBodyRemove = Node.prototype.removeChild;
+	// 缓存 removeChild
+	origBodyReplace = Node.prototype.replaceChild;
+	// 缓存 replaceChild
+
+	Node.prototype.appendChild = function mfAppendChild<T extends Node>(
+		// 包装 Node.prototype.appendChild
+		node: T,
+		// appendChild 的 node 参数
+	): T {
+		// appendChild 包装函数体开始
+		if (
+			// 早退条件：busy / 非 body / 无 Portal
+			bodyPatchBusy ||
+			// bodyPatchBusy
+			(this !== document.body && this !== document.documentElement) ||
+			// this 非 body/documentElement
+			(portalPlugins.size === 0 && !portalClaimOverride)
+			// 无 portalPlugins 且无 override
+		) {
+			// 结束早退条件
+			return origBodyAppend!.call(this, node) as T;
+			// 走原生 appendChild
+		}
+		// 结束早退 if 块
+		const parent = retargetBodyMount(this, node);
+		// retargetBodyMount 解析 parent
+		return origBodyAppend!.call(parent, node) as T;
+		// 向 scope 容器 appendChild
+	};
+
+	// 结束 appendChild 包装
+	Node.prototype.insertBefore = function mfInsertBefore<T extends Node>(
+		// 包装 Node.prototype.insertBefore
+		node: T,
+		// insertBefore 的 node 参数
+		ref: Node | null,
+		// ref 参数
+	): T {
+		// insertBefore 包装函数体开始
+		if (
+			// 早退条件同 appendChild
+			bodyPatchBusy ||
+			// bodyPatchBusy
+			(this !== document.body && this !== document.documentElement) ||
+			// 非 body parent
+			(portalPlugins.size === 0 && !portalClaimOverride)
+			// 无 Portal 活跃
+		) {
+			// 结束早退条件
+			return origBodyInsert!.call(this, node, ref) as T;
+			// 原生 insertBefore
+		}
+		// 结束早退 if 块
+		const parent = retargetBodyMount(this, node);
+		// retarget parent
+		if (parent !== this) return origBodyAppend!.call(parent, node) as T;
+		// parent 变则 appendChild 到 scope
+		return origBodyInsert!.call(this, node, ref) as T;
+		// parent 未变则原生 insertBefore
+	};
+
+	// 结束 insertBefore 包装
+	// 镜像 remove：body.removeChild 时若节点已被 append 重定向，从实际父节点卸下
+	Node.prototype.removeChild = function mfRemoveChild<T extends Node>(
+		// 待移除子节点
+		child: T,
+		// 返回被移除节点
+	): T {
+		// busy 或非 body/html：原生路径
+		if (
+			bodyPatchBusy ||
+			(this !== document.body && this !== document.documentElement)
+		) {
+			return origBodyRemove!.call(this, child) as T;
+		}
+		// 解析可能被 retarget 后的实际父节点
+		const parent = resolveRetargetedChildParent(this, child);
+		return origBodyRemove!.call(parent, child) as T;
+	};
+
+	// 镜像 replace：与 removeChild 同理，避免 body.replaceChild 找不到节点
+	Node.prototype.replaceChild = function mfReplaceChild<T extends Node>(
+		// 新节点
+		node: Node,
+		// 旧节点
+		child: T,
+		// 返回被替换的旧节点
+	): T {
+		if (
+			bodyPatchBusy ||
+			(this !== document.body && this !== document.documentElement)
+		) {
+			return origBodyReplace!.call(this, node, child) as T;
+		}
+		const parent = resolveRetargetedChildParent(this, child);
+		// 旧节点在 scope 内：在实际父上 replace；新节点若仍走 body append 路径由其它 patch 处理
+		return origBodyReplace!.call(parent, node, child) as T;
+	};
+
+	Element.prototype.append = function mfAppend(
+		// 包装 Element.prototype.append
+		...nodes: (Node | string)[]
+		// 可变 nodes 参数
+	): void {
+		// append 包装函数体开始
+		if (
+			// 早退条件
+			bodyPatchBusy ||
+			// bodyPatchBusy
+			(this !== document.body && this !== document.documentElement) ||
+			// 非 body
+			(portalPlugins.size === 0 && !portalClaimOverride)
+			// 无 Portal
+		) {
+			// 结束早退条件
+			origBodyAppendFn!.apply(this, nodes);
+			// 原生 append 全部入参
+			return;
+			// return 结束早退
+		}
+		// 结束早退 if 块
+		for (const n of nodes) {
+			// for 逐节点 retarget
+			if (typeof n === 'string') {
+				// 字符串节点直接 append
+				origBodyAppendFn!.call(this, n);
+				// 原生 append 字符串
+				continue;
+				// continue 下一节点
+			}
+			// 结束字符串 if 块
+			const parent = retargetBodyMount(this, n);
+			// Element 节点走 retargetBodyMount
+			if (parent !== this) origBodyAppend!.call(parent, n);
+			// parent 变则 appendChild 到 scope
+			else origBodyAppendFn!.call(this, n);
+			// 否则 Element.append 到 this
+		}
+		// 结束 for 循环
+	};
+
+	// 结束 append 包装赋值
+	Element.prototype.prepend = function mfPrepend(
+		// 包装 Element.prepend，逻辑与 append 对称
+		...nodes: (Node | string)[]
+		// 可变 nodes 参数
+	): void {
+		// prepend 包装函数体开始
+		if (
+			// 早退条件
+			bodyPatchBusy ||
+			// bodyPatchBusy
+			(this !== document.body && this !== document.documentElement) ||
+			// 非 body
+			(portalPlugins.size === 0 && !portalClaimOverride)
+			// 无 Portal
+		) {
+			// 结束早退条件
+			origBodyPrepend!.apply(this, nodes);
+			// 原生 prepend 全部入参
+			return;
+			// return 结束早退
+		}
+		// 结束早退 if 块
+		for (const n of nodes) {
+			// for 逐节点处理
+			if (typeof n === 'string') {
+				// 字符串节点直接 prepend
+				origBodyPrepend!.call(this, n);
+				// 原生 prepend 字符串节点
+				continue;
+				// continue
+			}
+			// 结束字符串 if 块
+			const parent = retargetBodyMount(this, n);
+			// Element 节点 retarget
+			if (parent !== this) origBodyAppend!.call(parent, n);
+			// parent 变则 appendChild（prepend 语义简化为 append）
+			else origBodyPrepend!.call(this, n);
+			// parent 未变则 prepend
+		}
+		// 结束 for 循环
+	};
+	// 结束 prepend 包装赋值
+}
+
+// 结束 ensureBodyPortalPatch
+function maybeReleaseBodyPortalPatch() {
+	// 无活跃 Portal 且无预认领时还原 body 原型，避免污染全局 DOM API
+	if (!bodyPortalPatched) return;
+	// 未 patch 则无需释放
+	if (portalPlugins.size > 0 || portalClaimOverride) return;
+	// 仍有插件或 override 时保持 patch
+	if (origBodyAppend) Node.prototype.appendChild = origBodyAppend;
+	// 还原 appendChild
+	if (origBodyInsert) Node.prototype.insertBefore = origBodyInsert;
+	// 还原 insertBefore
+	if (origBodyAppendFn) Element.prototype.append = origBodyAppendFn;
+	// 还原 Element.append
+	if (origBodyPrepend) Element.prototype.prepend = origBodyPrepend;
+	// 还原 Element.prepend
+	if (origBodyRemove) Node.prototype.removeChild = origBodyRemove;
+	// 还原 removeChild
+	if (origBodyReplace) Node.prototype.replaceChild = origBodyReplace;
+	// 还原 replaceChild
+	origBodyAppend = null;
+	// 清空保存的 appendChild 引用
+	origBodyInsert = null;
+	// 清空 insertBefore
+	origBodyAppendFn = null;
+	// 清空 append
+	origBodyPrepend = null;
+	// 清空 prepend
+	origBodyRemove = null;
+	// 清空 removeChild
+	origBodyReplace = null;
+	// 清空 replaceChild
+	bodyPortalPatched = false;
+	// 允许下次 attach 重新 patch
+}
+
 // 插件页挂载期间注册 Portal 桥接；返回 cleanup
 function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
 	// 确保 pointer/focus 桥接已安装
 	ensureTouchBridge();
 	// 确保 createPortal 已被 patch
 	ensureCreatePortalPatch();
+	// patch React createPortal
+	ensureBodyPortalPatch();
 	// 注册 pluginId 到 portalPlugins
 	portalPlugins.add(pluginId);
 	// 写入 pluginId → realm 映射
@@ -3518,13 +4318,15 @@ function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
 		removeBodyPortalScope(pluginId);
 		// 若 lastTouched 正是本 plugin 则清 null
 		if (lastTouchedPluginId === pluginId) lastTouchedPluginId = null;
+		// 若 lastTouched 指向本插件则清空
+		maybeReleaseBodyPortalPatch();
 	// 结束 cleanup 闭包
 	};
 // 结束 attachPortalScopeBridge 函数
 }
 
 /**
- * 插件页挂载期间继续隔离（HMR / 延迟 CSS）+ Portal 静默纳入 @scope。
+ * 插件页挂载期间继续隔离（HMR / 延迟 CSS）+ Portal/Teleport 静默纳入 @scope。
  */
 // 组合 CSS capture 与 Portal 桥接；插件页 mount 调用，unmount 执行返回 cleanup
 export function attachPluginStyleIsolation(
@@ -3553,8 +4355,24 @@ export function attachPluginStyleIsolation(
 // 结束 attachPluginStyleIsolation 函数
 }
 
+/** @internal smoke / 自检用 */
+// 见上行 JSDoc：导出内部 transpile/scope 工具供 smoke 自检
+export const __styleIsolationTest = {
+	// CSS 全文 @scope 包装入口
+	transpileStyleText,
+	// 单条 CSSOM rule 改写
+	transpileStyleRule,
+	// 从已 scope 文本还原
+	unwrapScope,
+	// 生成 [data-mf-style-realm=…] 选择器
+	scopeSelector,
+	// 生成 realm 专属 @keyframes 前缀
+	kfPrefixForRealm,
+	// body.removeChild 镜像：解析 retarget 后的实际父节点
+	resolveRetargetedChildParent,
+	// 结束 __styleIsolationTest 对象
+};
 ```
-
 ##### 10.20.0.5 边界与验收
 
 | 场景                  | 行为                                                              |
@@ -3563,8 +4381,12 @@ export function attachPluginStyleIsolation(
 | link CORS 失败        | 原 link 仍生效，可能泄漏全局；partner 应开 CORS 或把 CSS 打进 JS  |
 | 忘记 `data-mf-style-realm` / `data-mf-plugin` | scoped 规则匹配不到插件 UI → **子应用看起来没样式**               |
 | 同 Remote 多插件切换  | `reclaimEntryStyles` 后两插件应都能吃到同一份 CSS（同一 realm）   |
-| Portal POP / Drawer 闪烁 | 归属 sticky + Drawer 打开前 `claimPluginPortalTarget`             |
-| Host Toaster 顶开布局 | sonner 被误 `@scope`；靠 critical 检测 + `data-mf-host-portal`    |
+| Portal POP / Drawer 闪烁 | sticky 改为 scope `:hover` + Drawer 打开前 `claimPluginPortalTarget` |
+| Host Toaster 顶开布局 / 误进 scope | critical CSS 检测 + `data-mf-host-portal` + Toaster children 识别永不收编 |
+| Vue Teleport / 非 React 弹层无样式 | body 原型挂载劫持与 `createPortal` 同一套认领 |
+| antd Modal/Drawer 打开崩溃（`getScrollBarSize` / `NotFoundError`） | body `removeChild`/`replaceChild` 镜像到实际父节点（`resolveRetargetedChildParent`） |
+| CSS-in-JS 全局泄漏 | `insertRule` → `transpileStyleRule`（需 style 已打 `mfStyleOwner`） |
+| `@font-face` / 动画异常 | hoist 出 scope；keyframes 按 realm 前缀 |
 | MF 内毛玻璃失效、独立预览正常 | 圆角容器同层 `overflow-hidden` 裁切了 `backdrop-filter` 采样；见 §2.10.0 / §2.14.4 |
 | `untrusted`           | 不调用本模块；sandbox iframe                                      |
 | 打开笔记后再进设置    | Host 字体/标签不应被 Remote Preflight 改坏                        |
@@ -3576,17 +4398,20 @@ export function attachPluginStyleIsolation(
 3. 学习笔记 ↔ 视频播放器（同 Remote）：切换后双方样式仍正常。
 4. 视频底栏 POP：鼠标移入不闪；滤镜/音量轨道有色。
 5. 电子书「全书划线」Drawer：首次打开不闪。
-6. Host Toast：仍右上角 fixed，不顶开布局。
-7. `apps/micro` 独立预览（:9008）仍用标准 Tailwind。
-8. 视频播放器嵌入 Host：控制条 / POP 上 `backdrop-filter` 仍能模糊到画面（非纯灰底）。
+6. Host Toast：仍右上角 fixed，不顶开布局；插件弹层打开时 Toast 仍挂 Host。
+7. Remote 内 antd Modal / Drawer：打开不抛 `NotFoundError`（`getScrollBarSize`）。
+8. `apps/micro` 独立预览（:9008）仍用标准 Tailwind。
+9. 视频播放器嵌入 Host：控制条 / POP 上 `backdrop-filter` 仍能模糊到画面（非纯灰底）。
+10. 转译自检：`pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/host/styleIsolation.smoke.ts`。
 
 ##### 10.10.0.5 明确不做
 
 - 不要求 Remote 构建期去掉 Preflight / 嵌套 `@tailwind utilities`。
 - 不恢复「半套 Shadow + 只搬 head」。
 - 不把全体第一方改成 iframe。
-- 不要求业务改 `getPopupContainer` / 传 portal `container`（由 Host `createPortal` 收编）。
+- 不要求业务改 `getPopupContainer` / 传 portal `container`（由 Host `createPortal` + body 挂载收编）。
 - 不在 reclaim 时认领无标记的裸 `<style>`（避免误伤 Host）。
+- 不强制 Shadow DOM（会断主题变量继承）。
 
 ---
 
@@ -4893,7 +5718,7 @@ export async function deactivate() {
 3. 组件根仍可带 `data-plugin-root`（兼容旧选择器）；**宿主容器**上的 `data-mf-plugin` + `data-mf-style-realm` 由 Host 设置。
 4. 外链 `<link rel="stylesheet">`：须对 Host 源开 **CORS**，否则无法改写成 scoped style（见 §5.7）。优先把 CSS 打进 JS（Vite 默认注入 `<style>`）。
 5. `untrusted` 勿依赖 Host CSS；走 embed + iframe。
-6. 勿在插件侧再改 `createPortal` / 强行传 portal container（Host 已静默收编）；Host Drawer 类外壳由宿主调用 `claimPluginPortalTarget`。
+6. 勿在插件侧再改 `createPortal` / 强行传 portal container（Host 已静默收编，含 body remove 镜像）；antd Modal/Drawer 无需改 `getContainer`；Host Drawer 类外壳由宿主调用 `claimPluginPortalTarget`。
 7. 独立预览正常、嵌入后 `backdrop-filter` 失效：属 Host `PluginPageShell` / Layout overflow 分层问题（§2.10.0 / §2.14.4），不是插件要关掉毛玻璃。
 
 #### 3.3.4 嵌入后样式「看起来丢了」怎么查
@@ -5911,6 +6736,14 @@ flowchart TD
 
 **解决方案**：portal-scope 也计入归属；scope 有子节点时 sticky；Drawer 打开前 `claimPluginPortalTarget`（`EbookReadHostPlugins`）。
 
+#### antd Modal / Drawer 打开即崩溃（`getScrollBarSize` / `NotFoundError`）
+
+**现象**：插件内打开 antd `Modal`/`Drawer`，控制台 `NotFoundError: The object can not be found here.`（`getScrollBarSize.js`），`<Portal>` 被 `PluginErrorBoundary` 接住。
+
+**原因**：Host 把 `document.body.appendChild` 重定向到 `[data-mf-portal-scope]`；`rc-util` `getScrollBarSize` 测量完仍调用 `document.body.removeChild(measureEle)`，节点已不在 body 下。
+
+**解决方案**：`ensureBodyPortalPatch` 同步劫持 `Node.removeChild` / `replaceChild`，经 `resolveRetargetedChildParent` 从实际父节点卸载。见 §2.10.2 / `10.0.0.2`。插件侧**无需**改 `getContainer`。
+
 #### Host Toast 把整页往下顶
 
 **原因**：sonner 的 `__insertCSS` 无 vite-id，被 `reclaim` 误 `@scope`，`[data-sonner-toaster]{position:fixed}` 不再命中 Host Toaster。
@@ -5975,7 +6808,7 @@ flowchart TD
 - **应用级全屏**：`setAppFullscreen` + Layout 影院态 + 独立路由 `PluginPageShell`
 - **MF 内毛玻璃**：Layout / `PluginPageShell` overflow 与 rounded 分层（§2.10.0 / §2.14.4）
 - **Host shared 收敛**：仅 shared react / react-dom；勿 shared react-router
-- **主子样式隔离**：Host `@scope([data-mf-style-realm])` + head 劫持 + MutationObserver + `createPortal` 收编 + Drawer `claimPluginPortalTarget`（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
+- **主子样式隔离**：Host `@scope([data-mf-style-realm])` + transpile/CSSOM + head 劫持 + MutationObserver + `createPortal`/body Teleport 收编 + Drawer `claimPluginPortalTarget`（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
 - **安全验证**：hostApiRange 运行时校验 + 保存 registry 前置校验
 - **幂等注入**：避免重复注入导致的闪烁问题
 - **失败重试**：稳定的失败态管理，支持手动重试

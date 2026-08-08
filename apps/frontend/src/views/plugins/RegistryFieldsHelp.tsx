@@ -43,6 +43,7 @@ const SECTIONS: FieldSection[] = [
 		rows: [
 			{ field: 'remoteName', descKey: 'plugins.registry.help.remoteName' },
 			{ field: 'expose', descKey: 'plugins.registry.help.expose' },
+			{ field: 'framework', descKey: 'plugins.registry.help.framework' },
 			{ field: 'injectRoute', descKey: 'plugins.registry.help.injectRoute' },
 			{ field: 'preload', descKey: 'plugins.registry.help.preload' },
 			{ field: 'permissions', descKey: 'plugins.registry.help.permissions' },

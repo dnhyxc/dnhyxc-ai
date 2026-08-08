@@ -1783,6 +1783,8 @@ export const zhCN = {
 		'MF registerRemotes.name；默认等于 id。多插件共用同一 Remote 时填 federation name。',
 	'plugins.registry.help.expose':
 		'MF expose 路径，默认 ./App；如 ./LearningNotes、./EbookIdeas。',
+	'plugins.registry.help.framework':
+		'可选 react | vue。vue 时 Host 用 createVueHostBridge 包装 default（也可在 expose 导出 framework = "vue"）。',
 	'plugins.registry.help.injectRoute':
 		'是否由 PluginManager 注入顶层路由。false 表示宿主业务树已挂好 PluginHostPage。',
 	'plugins.registry.help.preload':

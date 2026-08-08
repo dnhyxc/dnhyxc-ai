@@ -32,7 +32,7 @@ export function PluginPageShell({
 		>
 			<div
 				className={cn(
-					'h-full min-h-0 bg-theme-background',
+					'h-full min-h-0 bg-theme-background overflow-auto',
 					theater ? 'rounded-none p-0' : 'rounded-md',
 				)}
 			>

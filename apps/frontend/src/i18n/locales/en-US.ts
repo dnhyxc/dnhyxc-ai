@@ -1935,6 +1935,8 @@ export const enUS = {
 		'MF registerRemotes.name; defaults to id. Use the federation name when multiple plugins share one Remote.',
 	'plugins.registry.help.expose':
 		'MF expose path; default ./App (e.g. ./LearningNotes, ./EbookIdeas).',
+	'plugins.registry.help.framework':
+		'Optional react | vue. For vue, Host wraps default via createVueHostBridge (or export framework = "vue" from the expose).',
 	'plugins.registry.help.injectRoute':
 		'Whether PluginManager injects a top-level route. false means the host tree already mounts PluginHostPage.',
 	'plugins.registry.help.preload':

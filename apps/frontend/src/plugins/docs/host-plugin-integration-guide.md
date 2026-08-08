@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；**`data-mf-style-realm` 多 expose 共 Remote；`createPortal` 收编 + Drawer `claimPluginPortalTarget`；sonner 防误包；`@/plugins` 导出 realm/claim API**；**Layout / `PluginPageShell` overflow 与 rounded 分层（backdrop-filter）**；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**；App 根 **`data-mf-host-portal`**）。详解见本文 §11.3 / §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2 / §2.14。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；**`data-mf-style-realm` 多 expose 共 Remote；`createPortal`/body Teleport 收编 + body remove/replace 镜像（antd getScrollBarSize）+ Drawer claim；qiankun transpile/CSSOM；sonner 防误包；`@/plugins` 导出 realm/claim API**；**Layout / `PluginPageShell` overflow 与 rounded 分层（backdrop-filter）**；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**；App 根 **`data-mf-host-portal`**）。详解见本文 §11.3 / §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2 / §2.14。若不一致，以源码为准。
 
 ---
 
@@ -144,6 +144,8 @@ flowchart TD
 ```
 
 > 插件中心标题、注入路由面包屑都读 `title` locale map；侧栏只显示 icon，不必也不应配置 `menu.nameKey` / Host i18n key。
+
+**Vue Remote**：在条目上增加 `"framework": "vue"`，Host 经 `normalizePluginModule` → `createVueHostBridge` 挂载；Remote **勿**自建 React 桥。插件侧每个 expose 仍须 `import '@/styles.css'`（见 [plugin-development-guide.md §4.3 / §5.2](./plugin-development-guide.md#43-vue-子应用)）。
 
 ### 3.3 自动注入的代码流程
 
@@ -1517,7 +1519,8 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 | `apps/frontend/src/components/design/Sidebar/enum.tsx` | 修改 | `/plugins` 迁入 `PLUGINS`；图标 `TvMinimalPlay` |
 | `apps/frontend/src/components/design/Sidebar/index.tsx` | （已用） | 菜单顺序：`MENUS + dynamic + PLUGINS` |
 | `apps/frontend/src-tauri/capabilities/default.json` | 修改 | `allow-set-fullscreen` / `allow-is-fullscreen` |
-| `apps/frontend/src/plugins/host/styleIsolation.ts` | 续改 | realm / Portal / reclaim / sonner / claim（详表见附录 B.0） |
+| `apps/frontend/src/plugins/host/styleIsolation.ts` | 续改 | realm / Portal·Teleport / body remove·replace 镜像（antd getScrollBarSize）/ transpile·CSSOM / reclaim / sonner / claim（详表见附录 B.0；专题 `docs/app/style-isolation-qiankun-harden.md`） |
+| `apps/frontend/src/plugins/core/createVueHostBridge.tsx` | 新增 | Host 侧 Vue 桥；`loadRemoteApp` → `normalizePluginModule` 自动包装 |
 | `apps/frontend/src/plugins/index.ts` | 修改 | 导出 `styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim` |
 | `apps/frontend/src/router/index.tsx` | 修改 | App 根 `data-mf-host-portal`（保护 Host Toaster） |
 | `apps/frontend/src/views/ebook/.../EbookReadHostPlugins.tsx` | 修改 | Drawer 打开前 claim / 关闭 clear |
@@ -1845,11 +1848,14 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 | 5 | `unwrapScope` / HMR 重包 | MutationObserver | HMR 改写 textContent 丢掉 `@scope` 时清 `mfScoped` 再包 |
 | 6 | `looksLikeRemoteStyle(..., 'live'\|'reclaim')` | 认领策略 | reclaim **绝不**碰无标记 style（防误伤 sonner） |
 | 7 | `isHostCriticalCss` / `repairHostCriticalStyles` | sonner | 文本含 `[data-sonner-toaster]` 永不 `@scope` |
-| 8 | 劫持 `react-dom.createPortal` | Portal 收编 | body 弹层进 `[data-mf-portal-scope]`（同 realm） |
-| 9 | `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 槽 | 首帧进 scope，避免 body→scope 闪烁 |
-| 10 | `data-mf-host-portal` | `router/index.tsx` App 根 | Host `<Toaster />` 不被收编 |
-| 11 | barrel 导出 | `plugins/index.ts` | `styleRealmKey` / claim / clear 供业务 Host 槽使用 |
-| 12 | 圆角层去掉 `overflow-hidden` | `PluginPageShell` + Layout | 保 MF 内 `backdrop-filter`（见 B.1） |
+| 8 | 劫持 `react-dom.createPortal` + body 原型挂载 | Portal/Teleport 收编 | body 弹层进 `[data-mf-portal-scope]`（同 realm；含 Vue Teleport） |
+| 9 | 劫持 body `removeChild` / `replaceChild`（`resolveRetargetedChildParent`） | `styleIsolation.ts` | 镜像 append 重定向：antd `getScrollBarSize` 等仍对 `body.removeChild` 时从实际父节点卸载，避免 `NotFoundError` |
+| 10 | `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 槽 | 首帧进 scope，避免 body→scope 闪烁 |
+| 11 | `data-mf-host-portal` + Toaster children 识别 | `router/index.tsx` / createPortal patch | Host `<Toaster />` 不被收编 |
+| 12 | `transpileStyleText` / CSSOM `insertRule` | `styleIsolation.ts` | font-face hoist、keyframes 前缀、CSS-in-JS 覆盖（见 `docs/app/style-isolation-qiankun-harden.md`） |
+| 13 | `captureStack` + head 仅 `childList` MO | 捕获窗口 | 并行加载安全；性能收窄 |
+| 14 | barrel 导出 | `plugins/index.ts` | `styleRealmKey` / claim / clear 供业务 Host 槽使用 |
+| 15 | 圆角层去掉 `overflow-hidden` | `PluginPageShell` + Layout | 保 MF 内 `backdrop-filter`（见 B.1） |
 
 #### B.1 overflow 与 `backdrop-filter`（Host 外壳）
 
@@ -1907,15 +1913,18 @@ claimPluginPortalTarget(
 | 能力 | 说明 |
 | ---- | ---- |
 | `reclaimEntryStyles` | 切换同 Remote 插件时，把 head 里已注入 CSS 按当前 realm 重包 |
-| Portal 收编 | 劫持共享 `react-dom.createPortal`，body 弹层进 `[data-mf-portal-scope]`（同 realm） |
+| Portal / Teleport 收编 | `createPortal` + body 挂载劫持 → `[data-mf-portal-scope]`（同 realm） |
+| body remove/replace 镜像 | append 重定向后，`body.removeChild` / `replaceChild` 落到实际父节点（修 antd Modal/Drawer `getScrollBarSize` 崩溃） |
 | `claimPluginPortalTarget` | Host Drawer 等打开前同步认领，避免首帧 body→scope 闪烁 |
-| Host 关键样式 | sonner 等禁止误 `@scope`；App 根 `data-mf-host-portal` 包住 `<Toaster />` |
+| Host 关键样式 | sonner 禁止误 `@scope`；`data-mf-host-portal` + Toaster children 识别 |
+| qiankun 级转译 | hoist 全局 at-rule、keyframes 前缀、CSSOM `insertRule` |
 | overflow 分层 | Layout / `PluginPageShell` 保 `backdrop-filter`（B.1） |
 
-开发态认领 Remote `<style>` 时**排除 Host**（由本模块 URL 推导 `…/apps/frontend`），不维护子项目目录白名单；新增/重命名 `apps/<remote>` 一般不必改 Host。生产构建通常无 `data-vite-dev-id`，仍只在 capture 窗口认领。详解见 [mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md)。
+开发态认领 Remote `<style>` 时**排除 Host**（由本模块 URL 推导 `…/apps/frontend`），不维护子项目目录白名单；新增/重命名 `apps/<remote>` 一般不必改 Host。生产构建通常无 `data-vite-dev-id`，仍只在 capture 窗口认领。详解见 [mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md)；第三轮加固对比见 [`docs/app/style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)。
 
 ### C. 参考文档
 
 - [mf-implementation-guide.md](./mf-implementation-guide.md)：实现过程文档
+- [`docs/app/style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)：transpile / CSSOM / Teleport 加固专题
 - [plugin-development-guide.md](./plugin-development-guide.md)：插件开发手册
 - 仓库归档副本：`docs/app/` 下同名文件（以本目录与源码为准）

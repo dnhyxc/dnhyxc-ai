@@ -781,6 +781,7 @@ export default function VideoPlayer({
 
 	const onControlsPopoverOpenChange = useCallback(
 		(open: boolean) => {
+			console.log('onControlsPopoverOpenChange', open);
 			popoverOpenRef.current += open ? 1 : -1;
 			if (popoverOpenRef.current < 0) popoverOpenRef.current = 0;
 			if (open) {
@@ -1437,7 +1438,12 @@ export default function VideoPlayer({
 								onOpenChange={onControlsPopoverOpenChange}
 								onContentPointer={bumpChrome}
 								trigger={
-									<div className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500">
+									<div
+										className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+										onClick={(e) => {
+											e.stopPropagation();
+										}}
+									>
 										<ListVideo size={CTRL_ICON} />
 									</div>
 								}
@@ -1485,7 +1491,12 @@ export default function VideoPlayer({
 							onOpenChange={onControlsPopoverOpenChange}
 							onContentPointer={bumpChrome}
 							trigger={
-								<div className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-textcolor hover:text-teal-500">
+								<div
+									className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-textcolor hover:text-teal-500"
+									onClick={(e) => {
+										e.stopPropagation();
+									}}
+								>
 									{playbackRate.toFixed(1)}x
 								</div>
 							}
@@ -1565,7 +1576,12 @@ export default function VideoPlayer({
 							onOpenChange={onControlsPopoverOpenChange}
 							onContentPointer={bumpChrome}
 							trigger={
-								<div className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500">
+								<div
+									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+									onClick={(e) => {
+										e.stopPropagation();
+									}}
+								>
 									<Settings size={CTRL_ICON} />
 								</div>
 							}

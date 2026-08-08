@@ -22,6 +22,8 @@ const MF_SHARED_EXCLUDE = [
 	'react/jsx-dev-runtime',
 	'react-dom',
 	'react-dom/client',
+	// Vue 子应用与 Host 桥共享同一运行时（createVueHostBridge）
+	'vue',
 ];
 
 // https://vite.dev/config/
@@ -60,6 +62,7 @@ export default defineConfig(({ mode }) => {
 				shared: {
 					react: { singleton: true, requiredVersion: '^19.1.0' },
 					'react-dom': { singleton: true, requiredVersion: '^19.1.0' },
+					vue: { singleton: true, requiredVersion: '^3.5.0' },
 				},
 				// 默认 html：clientInjected 前会把任意 src/*.ts 包成无 export 的 entry bootstrap
 				hostInitInjectLocation: 'entry',

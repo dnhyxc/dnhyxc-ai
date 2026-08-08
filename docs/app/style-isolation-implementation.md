@@ -3,6 +3,8 @@
 > **延伸阅读**：本文记录样式隔离的**完整初始实现**。其中 §3.3 / §4.1 的 `looksLikeRemoteStyle` viteId 分支后续已重构——dev 模式由「白名单 remote 目录名」改为「排除 Host 自身」，详见 [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)。下方 §3.3 / §4.1 保留初始版本代码以供历史对照，最新源码以仓库为准。
 >
 > Realm 键粒度、Portal 收编、HMR 重包与 sonner 保护详见 [style-isolation-realm-portal.md](./style-isolation-realm-portal.md)。
+>
+> **第三轮加固**（qiankun 式 transpile / CSSOM / 跨框架 body Portal / `captureStack`）详见 [style-isolation-qiankun-harden.md](./style-isolation-qiankun-harden.md)；勿把本文代码块当作现行全文。
 
 ## 1. 背景与目标
 

@@ -5,6 +5,8 @@ export {
 	MF_IFRAME_CHANNEL,
 } from './core/attachIframeBridge';
 export { createHostBridge } from './core/createHostBridge';
+export type { VuePluginRootProps } from './core/createVueHostBridge';
+export { createVueHostBridge } from './core/createVueHostBridge';
 export {
 	isPluginEnabled,
 	subscribePluginEnabled,
@@ -20,6 +22,11 @@ export {
 	registerRemote,
 	resolvePluginBust,
 } from './core/mf';
+export type { RawRemoteModule } from './core/normalizePluginModule';
+export {
+	isVueRemoteModule,
+	normalizePluginModule,
+} from './core/normalizePluginModule';
 export { pluginManager } from './core/PluginManager';
 export { satisfiesRange, verifyPlugin } from './core/PluginVerifier';
 export {

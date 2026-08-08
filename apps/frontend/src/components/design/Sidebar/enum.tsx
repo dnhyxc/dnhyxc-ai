@@ -2,6 +2,7 @@ import {
 	BookOpenText,
 	Bot,
 	// Codesandbox,
+	FlaskConical,
 	Flower,
 	LibraryBig,
 	NotebookTabs,
@@ -34,6 +35,7 @@ export const ICON_MAP = {
 	Puzzle: <Puzzle />,
 	Flower: <Flower />,
 	TvMinimalPlay: <TvMinimalPlay />,
+	FlaskConical: <FlaskConical />,
 };
 
 export const MENUS: SidebarMenuConfig[] = [

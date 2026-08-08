@@ -2,7 +2,7 @@
 
 > **文档角色**：记录样式隔离第二轮加固——把「按 `pluginId` 认领样式」升级为「按 Remote 来源 realm 认领」，新增 `createPortal` 劫持把 `body` portal 收编进插件 scope，HMR 重新包裹 `@scope`，以及 sonner Toaster 等 Host 全局样式的保护性放行。
 >
-> **延伸阅读**：[style-isolation-implementation.md](./style-isolation-implementation.md)（首轮 CSS @scope 实现）· [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)（dev 模式排除 Host）· [style-isolation-tech-overview.md](./style-isolation-tech-overview.md)（整体技术说明）
+> **延伸阅读**：[style-isolation-implementation.md](./style-isolation-implementation.md)（首轮）· [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md)（dev 排除 Host）· [style-isolation-qiankun-harden.md](./style-isolation-qiankun-harden.md)（**第三轮**：transpile / CSSOM / Teleport）· [style-isolation-tech-overview.md](./style-isolation-tech-overview.md)
 
 ## 1. 背景与目标
 

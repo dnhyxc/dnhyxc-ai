@@ -53,6 +53,8 @@
 | 桌面插件 RUNTIME-003 / Origin tauri://localhost                     | 对方 CORS 漏配；见上 + [apps/remote-plugins/README.md](../apps/remote-plugins/README.md)                                                   |
 | 插件样式污染主站 / 子应用 Button 无样式                             | [app/style-isolation-implementation.md](./app/style-isolation-implementation.md)（实现手册）、[ideas/mf-css-isolation.md](./ideas/mf-css-isolation.md)（思路）                                                                                                 |
 | 同一 Remote 多插件切换后样式丢失 / Drawer Portal 组件无样式 / sonner Toaster 顶开布局 | [app/style-isolation-realm-portal.md](./app/style-isolation-realm-portal.md)（Realm 键 + createPortal 收编 + sonner 保护 + HMR 重包） |
+| Vue Teleport / CSS-in-JS 样式泄漏 / `@font-face` 失效 / keyframes 撞名 | [app/style-isolation-qiankun-harden.md](./app/style-isolation-qiankun-harden.md)（transpile / CSSOM / body Portal / captureStack） |
+| Vue Remote 加载报错 / React 插件中混跑 Vue 组件 / framework 识别失败 | [app/plugin-vue-bridge.md](./app/plugin-vue-bridge.md)（createVueHostBridge / normalizePluginModule / registry framework） |
 | 动态插件加载失败闪烁 / virtual:mf 解析失败                          | [app/mf-plugin-host.md](./app/mf-plugin-host.md)                                                                                                         |
 | 桌面发新版插件仍是旧版 / remoteEntry 被缓存                         | [app/plugin-entry-cache-bust.md](./app/plugin-entry-cache-bust.md)（`version@manifestHash`）+ [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md) |
 | 线上 `/plugins` `useLocation` 无 Router context                     | [app/mf-shared-react-router.md](./app/mf-shared-react-router.md)                                                                                          |

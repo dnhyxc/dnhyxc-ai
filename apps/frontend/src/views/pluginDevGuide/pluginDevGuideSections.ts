@@ -1,7 +1,8 @@
 /**
- * 插件开发手册内容（章节/条目数据驱动）。
- * - 仅代码块交给 ParserMarkdownPreviewPane 做语法高亮
- * - 其他内容（标题/描述/表格/列表/引用）在视图层自行渲染（之前的结构）
+ * 插件 / 子应用开发手册（页面数据驱动）。
+ * 与 apps/frontend/src/plugins/docs/plugin-development-guide.md 及现行 Host 契约对齐。
+ * - 正文：标题 + description（视图层渲染）
+ * - 代码：交给 ParserMarkdownPreviewPane 高亮
  */
 
 export interface PluginGuideCode {
@@ -16,6 +17,7 @@ export interface PluginGuideCode {
 		| 'nginx'
 		| 'dotenv'
 		| 'css'
+		| 'vue'
 		| 'markdown';
 	/** 纯代码内容（不含 ``` 围栏） */
 	code: string;
@@ -35,1388 +37,1291 @@ export interface PluginGuideSection {
 	items: PluginGuideBullet[];
 }
 
-const TODAY = '2026-08-01';
+const TODAY = '2026-08-08';
 
-// ─────────────────────────────────────────────────────────────────────
-// 中/英文正文。注意所有代码的 code 字段使用普通字符串，不含 ``` 与语言标记。
-// 模板字符串内部的反引号使用 String.raw 与分段拼接，避免反斜杠被误处理。
-// ─────────────────────────────────────────────────────────────────────
+function item(
+	id: string,
+	title: string,
+	description: string,
+	code?: PluginGuideCode,
+): PluginGuideBullet {
+	return { id, title, dateLabel: TODAY, description, code };
+}
 
-/* ---------- 通用代码片段集合（中/英共用，因为代码本身不翻译） ---------- */
+/* ========================= 共用代码片段 ========================= */
 
-const CODE_2_2_BASH = String.raw`# 1. 基于 Vite + React + TypeScript 模板创建项目
-pnpm create vite hello-plugin --template react-ts
-cd hello-plugin
+const CODE_ENV = String.raw`# 与 Host registry entry 同源（React 示例常用 9008；Vue 示例常用 9009）
+VITE_REMOTE_PUBLIC_ORIGIN=http://127.0.0.1:9008
 
-# 2. 安装核心依赖（与宿主保持同一大版本）
-pnpm add react@18 react-dom@18 react-router-dom@6
-pnpm add -D typescript@5 vite@5 @vitejs/plugin-react@4
-pnpm add -D @originjs/vite-plugin-federation@1.3.6
-pnpm add -D @types/react@18 @types/react-dom@18
+# React 插件：指向 Host 开发服，供 React Refresh
+VITE_REACT_REFRESH_HOST=http://127.0.0.1:9002`;
 
-# 3. （可选）若插件需要使用宿主同款 UI / Tailwind：
-pnpm add tailwindcss@3 lucide-react
-pnpm add -D postcss autoprefixer`;
+const CODE_REACT_DEPS = String.raw`mkdir my-react-plugin && cd my-react-plugin
+pnpm init
 
-const CODE_2_3_DOTENV = String.raw`# 插件本地开发端口（不要与主项目冲突，主项目默认 5173）
-VITE_PORT=5174
+pnpm add react react-dom
+pnpm add -D vite @vitejs/plugin-react @module-federation/vite \
+  typescript @types/node @types/react @types/react-dom \
+  tailwindcss @tailwindcss/vite`;
 
-# 宿主远程入口地址（本地联调时填主项目）
-VITE_HOST_REMOTE_URL=http://localhost:5173/assets/remoteEntry.js
+const CODE_VUE_DEPS = String.raw`mkdir my-vue-plugin && cd my-vue-plugin
+pnpm init
 
-# 插件自身对外 remoteEntry 地址（注册到宿主 Registry 用）
-VITE_PLUGIN_REMOTE_URL=http://localhost:5174/assets/remoteEntry.js
+pnpm add vue vue-router
+pnpm add -D vite @vitejs/plugin-vue @module-federation/vite \
+  typescript @types/node vue-tsc \
+  tailwindcss @tailwindcss/vite
 
-# 插件在 Registry 中注册的唯一 ID
-VITE_PLUGIN_ID=hello-plugin
+# UI（可选，与样例 micro-vue 对齐）
+pnpm add reka-ui class-variance-authority clsx tailwind-merge @vueuse/core @lucide/vue`;
 
-# 插件依赖共享模式，保持默认即可
-VITE_SHARED_STRATEGY=singleton`;
-
-const CODE_3_1_VITE_TS = String.raw`import { defineConfig, loadEnv } from 'vite';
+const CODE_VITE_REACT = String.raw`import fs from 'node:fs';
+import path from 'node:path';
+import { federation } from '@module-federation/vite';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
-// 避免 dev server 热更新期间出现 React "Invalid hook call"（mf 缓存问题）
-// 每次启动前先清掉 node_modules/.vite 缓存
-const clearFederationCachePlugin = () => ({
-  name: 'clear-federation-cache',
-  apply: 'serve' as const,
-  configureServer() {
-    try {
-      const fs = require('node:fs');
-      const path = require('node:path');
-      const cacheDir = path.resolve(__dirname, 'node_modules/.vite');
-      if (fs.existsSync(cacheDir)) {
-        fs.rmSync(cacheDir, { recursive: true, force: true });
-        // eslint-disable-next-line no-console
-        console.log('[vite] cleared node_modules/.vite cache for Module Federation');
-      }
-    } catch (e) {
-      // ignore
-    }
-  },
-});
+/** MF mf_owner id 递增后 .vite/deps 会失效，serve 时清缓存 */
+function clearMfViteDepCache(): Plugin {
+  return {
+    name: 'clear-mf-vite-dep-cache',
+    enforce: 'pre',
+    config(config, { command }) {
+      if (command !== 'serve') return;
+      const root = config.root ? path.resolve(config.root) : process.cwd();
+      fs.rmSync(path.join(root, 'node_modules/.vite'), {
+        recursive: true,
+        force: true,
+      });
+    },
+  };
+}
+
+const host = '127.0.0.1';
+const port = 9008;
+const devOrigin = 'http://' + host + ':' + port;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const origin = env.VITE_REMOTE_PUBLIC_ORIGIN || devOrigin;
+  const reactRefreshHost =
+    env.VITE_REACT_REFRESH_HOST || 'http://127.0.0.1:9002';
 
   return {
+    // 必须与 Host registry entry 同源
+    base: origin + '/',
     plugins: [
-      clearFederationCachePlugin(),
-      react(),
+      clearMfViteDepCache(),
+      react({ reactRefreshHost }),
+      tailwindcss(),
       federation({
-        // 插件对外名称，Registry 中 name 必须与之匹配
-        name: env.VITE_PLUGIN_ID ?? 'hello-plugin',
-
-        // 宿主访问插件时拉取的远端入口文件，保持默认即可
+        name: 'myReactPlugin', // 与 registry.remoteName 一致
         filename: 'remoteEntry.js',
-
-        // 导出插件根模块；宿主通过 get('./App') 取此模块
+        manifest: true,
         exposes: {
-          './App': './src/App.tsx',
+          // 每个 expose 入口内必须 import '@/styles.css'
+          './App': './src/views/app/index.tsx',
         },
-
-        // 共享依赖：单例模式避免重复加载 React，与宿主共用一份
         shared: {
-          react: { singleton: true, requiredVersion: '^18.0.0' },
-          'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
-          'react-router-dom': { singleton: true, requiredVersion: '^6.0.0' },
-          'lucide-react': { singleton: true, requiredVersion: '^0.400.0' },
+          // 勿 shared react-router；仅 react / react-dom
+          react: { singleton: true, requiredVersion: '^19.1.0' },
+          'react-dom': { singleton: true, requiredVersion: '^19.1.0' },
         },
+        hostInitInjectLocation: 'entry',
+        dts: false,
+        dev: { remoteHmr: true },
       }),
     ],
-
-    server: {
-      port: Number(env.VITE_PORT ?? 5174),
-
-      // 宿主通过 Module Federation 拉远端模块时会跨端口，必须打开 CORS
-      cors: true,
-
-      // 允许外部 IP 访问（局域网内手机/同事联调时需要）
-      host: true,
-
-      // 防止预构建把共享依赖打包到插件 bundle，造成双 React 副本
-      fs: { allow: ['..'] },
-      optimizeDeps: {
-        exclude: ['@originjs/vite-plugin-federation'],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+        '@ui': path.resolve(__dirname, 'src/components/ui'),
       },
     },
-
-    build: {
-      modulePreload: false,
-      target: 'esnext',
-      minify: false,
-      cssCodeSplit: false,
+    optimizeDeps: {
+      include: [], // 重依赖（如 @tiptap/*）建议 include，避免 HMR 整页 reload
+      exclude: [
+        'react',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'react-dom',
+        'react-dom/client',
+      ],
     },
+    server: {
+      host,
+      port,
+      strictPort: true,
+      origin: devOrigin,
+      cors: true,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    },
+    preview: { host, port, strictPort: true, cors: true },
+    build: { target: 'esnext', modulePreload: false, minify: false },
   };
 });`;
 
-const CODE_4_1_TYPES = String.raw`// src/types.d.ts —— 从宿主 types.ts 中复制的最小子集
-// 维护方式：每升级宿主插件契约时，同步覆盖此文件
+const CODE_VITE_VUE = String.raw`import fs from 'node:fs';
+import path from 'node:path';
+import { federation } from '@module-federation/vite';
+import tailwindcss from '@tailwindcss/vite';
+import vue from '@vitejs/plugin-vue';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
-export type PluginTrust = 'first-party' | 'partner' | 'untrusted';
-export type PluginPermission =
-  | 'ui:toast'
-  | 'nav:subtree'
-  | 'http:plugin-api'
-  | 'modules:chat'
-  | 'modules:ebook';
-
-export interface HostBridgeProps {
-  /** 插件在 Registry 中声明的唯一 ID */
-  pluginId: string;
-  /** 插件自身信任等级 */
-  trust: PluginTrust;
-  /** 允许插件使用的权限（宿主已过滤） */
-  permissions: PluginPermission[];
-  /** 宿主当前语言（例如 zh-CN / en-US） */
-  locale: string;
-  /** 宿主当前主题（light / dark），跟随宿主变化 */
-  theme: string;
-  /**
-   * 关闭当前插件页面，回到上一级。
-   * 未声明 nav:subtree 权限仍可通过此方法正常退出本插件。
-   */
-  close: () => void;
-  /** Toast 通知（需 ui:toast 权限，否则为 undefined） */
-  toast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
-  /**
-   * 插件内部路由跳转（需 nav:subtree 权限）。
-   * @param path 相对插件自己路由前缀的路径，例如 "/settings"
-   */
-  navigate?: (path: string) => void;
-  /**
-   * 宿主代理的安全 HTTP 请求（需 http:plugin-api 权限）。
-   * 只允许访问 Registry 中 allowList 域名。
-   */
-  http?: (input: {
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-    url: string;
-    body?: unknown;
-    headers?: Record<string, string>;
-  }) => Promise<{ status: number; data: unknown; headers: Record<string, string> }>;
-  /** 宿主开放的模块能力（需对应 modules:xxx 权限） */
-  modules?: {
-    chat?: {
-      createConversation: (opts: { title?: string }) => Promise<{ id: string }>;
-    };
-    ebook?: {
-      listBooks: () => Promise<Array<{ id: string; title: string }>>;
-    };
-  };
-}`;
-
-const CODE_4_2_APP_TSX = String.raw`// src/App.tsx
-import { Puzzle, RefreshCw, Settings, X } from 'lucide-react';
-import { memo, useCallback, useEffect, useState } from 'react';
-import type { HostBridgeProps } from './types';
-
-/**
- * 插件根组件：宿主通过 Module Federation 拿到此导出后直接渲染。
- *
- * - 不允许自己再包另一个 ReactDOM.createRoot，会导致共享依赖失效。
- * - 如果需要独立开发时的预览，单独写一个 main.tsx（见 §4.3）。
- */
-const App = memo(function App(bridge: HostBridgeProps) {
-  const { pluginId, trust, permissions, locale, theme, close, toast, navigate, http } = bridge;
-
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  // 权限检测的正确姿势（避免运行期 undefined 调用报错）
-  const has = useCallback(
-    (p: HostBridgeProps['permissions'][number]) => permissions.includes(p),
-    [permissions],
-  );
-
-  const onSayHello = useCallback(() => {
-    if (toast) toast('你好，' + pluginId + '！', 'success');
-  }, [toast, pluginId]);
-
-  const onFetchDemo = useCallback(async () => {
-    if (!http) {
-      toast?.('未授权 http:plugin-api 权限', 'error');
-      return;
-    }
-    setLoading(true);
-    try {
-      // 此 URL 必须先告诉主项目维护者，加到 Registry 的 allowList
-      const res = await http({
-        method: 'GET',
-        url: 'https://api.example.com/plugin/hello-plugin/status',
+function clearMfViteDepCache(): Plugin {
+  return {
+    name: 'clear-mf-vite-dep-cache',
+    enforce: 'pre',
+    config(config, { command }) {
+      if (command !== 'serve') return;
+      const root = config.root ? path.resolve(config.root) : process.cwd();
+      fs.rmSync(path.join(root, 'node_modules/.vite'), {
+        recursive: true,
+        force: true,
       });
-      toast?.('HTTP ' + res.status, res.status < 400 ? 'success' : 'error');
-    } catch (e) {
-      toast?.(String(e), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [http, toast]);
-
-  // 生命周期钩子：激活
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[' + pluginId + '] activate', { locale, theme, trust });
-    return () => {
-      // 插件卸载清理（取消订阅、释放大内存、断开 ws 等）
-      // eslint-disable-next-line no-console
-      console.log('[' + pluginId + '] deactivate');
-    };
-  }, [pluginId, locale, theme, trust]);
-
-  return (
-    <div
-      className={[
-        'box-border min-h-full w-full p-5 text-[14px]',
-        theme === 'dark' ? 'text-slate-100' : 'text-slate-800',
-      ].join(' ')}
-      style={{ fontFamily: 'inherit' }}
-    >
-      {/* 顶部栏：左右对齐 —— 左=标题 右=关闭按钮 */}
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Puzzle className="size-5 text-violet-500" />
-          <h1 className="text-lg font-semibold">Hello 插件</h1>
-          <span className="rounded-md px-2 py-0.5 text-xs bg-violet-500/10 text-violet-500">
-            {trust}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={close}
-          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          <X className="size-4" /> 关闭
-        </button>
-      </header>
-
-      {/* 主体：两个示例卡片 */}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-black/5 dark:border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Settings className="size-4 text-slate-400" />
-            <h2 className="font-medium">计数器示例</h2>
-          </div>
-          <p className="mb-3 text-slate-500 dark:text-slate-400">
-            当前：<strong className="text-violet-500">{count}</strong>
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setCount((c) => c - 1)}
-              className="rounded-md bg-slate-100 px-3 py-1.5 dark:bg-slate-800"
-            >
-              - 1
-            </button>
-            <button
-              type="button"
-              onClick={onSayHello}
-              disabled={!has('ui:toast')}
-              className="rounded-md bg-violet-500 text-white px-3 py-1.5 disabled:opacity-40"
-            >
-              Toast 打招呼
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-black/5 dark:border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <RefreshCw className={'size-4 text-slate-400 ' + (loading ? 'animate-spin' : '')} />
-            <h2 className="font-medium">安全 HTTP 示例</h2>
-          </div>
-          <p className="mb-3 text-slate-500 dark:text-slate-400">
-            宿主代理请求，域名必须在 Registry.allowList 中
-          </p>
-          <button
-            type="button"
-            onClick={onFetchDemo}
-            disabled={loading || !has('http:plugin-api')}
-            className="rounded-md bg-emerald-500 text-white px-3 py-1.5 disabled:opacity-40"
-          >
-            {loading ? '请求中…' : 'GET /status'}
-          </button>
-        </div>
-      </section>
-
-      {/* 权限与环境信息（仅供开发者调试，生产可移除） */}
-      <footer className="mt-10 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 p-3 text-xs text-slate-500 dark:text-slate-400">
-        <div>permissions: {permissions.join(', ') || '(empty)'}</div>
-        <div>locale: {locale} · theme: {theme} · navigate: {navigate ? 'on' : 'off'}</div>
-      </footer>
-    </div>
-  );
-});
-
-export default App;`;
-
-const CODE_4_3_MAIN_TSX = String.raw`// src/main.tsx —— 独立本地开发时的入口（宿主不会用到此文件）
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import type { HostBridgeProps } from './types';
-
-/** 本地开发时用的 mock HostBridge，让你不启动宿主也能看到页面效果 */
-const mockBridge: HostBridgeProps = {
-  pluginId: 'hello-plugin',
-  trust: 'first-party',
-  permissions: ['ui:toast', 'nav:subtree', 'http:plugin-api'],
-  locale: 'zh-CN',
-  theme: 'dark',
-  close: () => alert('[mock] close()'),
-  toast: (msg, type = 'info') => {
-    // eslint-disable-next-line no-console
-    console.log('[toast:' + type + ']', msg);
-    alert(msg);
-  },
-  navigate: (p) => alert('[mock] navigate(' + p + ')'),
-  http: async (r) => {
-    // eslint-disable-next-line no-console
-    console.log('[mock] http', r);
-    await new Promise((r2) => setTimeout(r2, 500));
-    return { status: 200, data: { ok: true }, headers: {} };
-  },
-  modules: {
-    chat: { createConversation: async () => ({ id: 'mock-chat-1' }) },
-  },
-};
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App {...mockBridge} />
-  </React.StrictMode>,
-);`;
-
-const CODE_5_1_I18N_TS = String.raw`// src/i18n.ts
-type Dict = Record<string, string>;
-const ZH: Dict = {
-  'hello.title': 'Hello 插件',
-  'hello.desc': '这是一个示例插件',
-  'hello.success': '操作成功',
-  'error.noPermission': '缺少权限：{perm}',
-};
-const EN: Dict = {
-  'hello.title': 'Hello Plugin',
-  'hello.desc': 'This is a sample plugin.',
-  'hello.success': 'Operation succeeded',
-  'error.noPermission': 'Missing permission: {perm}',
-};
-
-let curLocale: 'zh-CN' | 'en-US' = 'zh-CN';
-export const setLocale = (l: string) => {
-  curLocale = l === 'en-US' ? 'en-US' : 'zh-CN';
-};
-export const t = (key: string, vars?: Record<string, string | number>) => {
-  const dict = curLocale === 'zh-CN' ? ZH : EN;
-  let s = dict[key] ?? key;
-  if (vars) Object.entries(vars).forEach(([k, v]) => (s = s.replace('{' + k + '}', String(v))));
-  return s;
-};`;
-
-const CODE_5_2_FOLLOW_LOCALE = String.raw`// 在 App 组件内 useEffect 之前：
-import { setLocale, t as i18nT } from './i18n';
-
-setLocale(locale);`;
-
-const CODE_6_1_PERMS_YAML = String.raw`# permissions 可选项：
-- ui:toast            # 允许调用宿主 Toast
-- nav:subtree         # 允许在插件自己路由前缀下跳转（navigate()）
-- http:plugin-api     # 允许通过宿主代理发起 HTTP 请求（必须配 allowList）
-- modules:chat        # 允许访问宿主聊天模块
-- modules:ebook       # 允许访问宿主电子书模块`;
-
-const CODE_6_2_GOOD_BAD = String.raw`//  ✅ 正确：检测 bridge 方法是否存在（宿主过滤权限后会设为 undefined）
-if (bridge.toast) bridge.toast('保存成功', 'success');
-if (bridge.navigate) bridge.navigate('/settings');
-
-//  ✅ 更健壮：结合 permissions 数组
-const canHttp = bridge.permissions.includes('http:plugin-api');
-// <button disabled={!canHttp}>请求</button>
-
-//  ❌ 错误：直接调用（缺少权限时运行时报 TypeError: bridge.http is not a function）
-bridge.http({ method: 'GET', url: 'https://evil.com/x' });`;
-
-const CODE_7_1_REGISTRY_JSON = String.raw`{
-  "plugins": [
-    {
-      "id": "hello-plugin",
-      "remoteName": "hello-plugin",
-      "expose": "./App",
-      "title": {
-        "zh-CN": "Hello 示例插件",
-        "en-US": "Hello Sample Plugin"
-      },
-      "description": {
-        "zh-CN": "展示如何开发并接入一个 Module Federation 插件",
-        "en-US": "Shows how to develop and integrate a Module Federation plugin"
-      },
-      "routePath": "/hello-plugin",
-      "entry": "http://127.0.0.1:5174/mf-manifest.json",
-      "version": "1.0.0",
-      "hostApiRange": "^1.0.0",
-      "menu": {
-        "order": 100,
-        "icon": "Puzzle"
-      },
-      "permissions": ["ui:toast", "nav:subtree", "http:plugin-api"],
-      "preload": "route",
-      "enabled": true,
-      "trust": "first-party"
-    }
-  ]
-}`;
-
-const CODE_7_3_UNTRUSTED_JSON = String.raw`{
-  "plugins": [
-    {
-      "id": "hello-iframe-plugin",
-      "title": {
-        "zh-CN": "Hello iframe 插件",
-        "en-US": "Hello iframe Plugin"
-      },
-      "description": {
-        "zh-CN": "一个不受信任的 iframe 插件示例",
-        "en-US": "An untrusted iframe plugin example"
-      },
-      "routePath": "/hello-iframe-plugin",
-      "entry": "https://cdn.example.com/hello-iframe/latest/mf-manifest.json",
-      "version": "1.0.0",
-      "hostApiRange": "^1.0.0",
-      "permissions": ["ui:toast"],
-      "preload": "route",
-      "enabled": false,
-      "trust": "untrusted"
-    }
-  ]
-}`;
-
-const CODE_8_1_BUILD_BASH = String.raw`# 生产构建
-pnpm build
-
-# 产物默认在 dist/，注意必须暴露以下静态资源：
-#   dist/mf-manifest.json      ← MF manifest（Registry 中 entry 指向此文件）
-#   dist/assets/*.js / *.css   ← 插件代码与样式
-ls -R dist/`;
-
-const CODE_8_2_NGINX = String.raw`#user  nobody;
-worker_processes  1;
-
-#error_log  logs/error.log;
-#error_log  logs/error.log  notice;
-#error_log  logs/error.log  info;
-
-#pid        logs/nginx.pid;
-
-events {
-  worker_connections  1024;
+    },
+  };
 }
 
-http {
-  include       mime.types;
-  default_type  application/octet-stream;
-  sendfile  on;
-  keepalive_timeout   65;
-  client_max_body_size  100m;
+const host = '127.0.0.1';
+const port = 9009;
+const devOrigin = 'http://' + host + ':' + port;
 
-  gzip  on;
-  gzip_min_length 1k;
-  gzip_buffers 4 16k;
-  gzip_http_version 1.0;
-  gzip_comp_level 5;
-  gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
-  gzip_vary on;
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const origin = env.VITE_REMOTE_PUBLIC_ORIGIN || devOrigin;
 
-  # 按实际宿主来源收紧 CORS（生产建议白名单，不要用 *）
-  map $http_origin $mf_cors_origin {
-    default "";
-    "https://dnhyxc.cn:9002"   $http_origin;
-    "http://tauri.localhost"    $http_origin;
-    "https://tauri.localhost"   $http_origin;
-    "tauri://localhost"         $http_origin;
-  }
+  return {
+    base: origin + '/',
+    plugins: [
+      clearMfViteDepCache(),
+      vue(),
+      tailwindcss(),
+      federation({
+        name: 'microVue', // registry.remoteName
+        filename: 'remoteEntry.js',
+        manifest: true,
+        exposes: {
+          './StyleIsolationLab': './src/views/style-isolation-lab/index.ts',
+        },
+        shared: {
+          // Vue 只 shared vue；勿在 Remote 自建 React 桥
+          vue: { singleton: true, requiredVersion: '^3.5.0' },
+        },
+        hostInitInjectLocation: 'entry',
+        dts: false,
+        dev: { remoteHmr: true },
+      }),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+        '@ui': path.resolve(__dirname, 'src/components/ui'),
+      },
+    },
+    server: {
+      host,
+      port,
+      strictPort: true,
+      origin: devOrigin,
+      cors: true,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    },
+    preview: { host, port, strictPort: true, cors: true },
+    build: { target: 'esnext', modulePreload: false, minify: false },
+  };
+});`;
 
-  # ── 独立插件项目部署（如 hello-plugin，端口 9007） ──
-  server {
-    listen 9007 ssl;
-    server_name  dnhyxc.cn;
+const CODE_HOST_BRIDGE_TYPES = String.raw`/** 与 Host apps/frontend/src/plugins/core/types.ts 对齐的最小子集（无 api.t） */
+export type HostLocale = 'zh-CN' | 'en-US';
 
-    ssl_certificate /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn_bundle.crt;
-    ssl_certificate_key /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn.key;
+export type HostBridgeProps = {
+  api: {
+    theme: 'light' | 'dark';
+    locale: HostLocale;
+    navigate?: (to: string) => void;
+    event: {
+      on: (event: string, handler: (data?: unknown) => void) => void;
+      off: (event: string, handler: (data?: unknown) => void) => void;
+      emit: (event: string, data?: unknown) => void;
+    };
+    http?: {
+      get: <T = unknown>(url: string) => Promise<T>;
+      post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+      put: <T = unknown>(url: string, body?: unknown) => Promise<T>;
+      delete: <T = unknown>(url: string) => Promise<T>;
+    };
+    ui?: {
+      showToast: (options: {
+        message: string;
+        type?: 'success' | 'error' | 'info' | 'warning';
+        title?: string;
+      }) => void;
+      /** 应用级影院全屏（藏侧栏/顶栏）；需 ui:toast */
+      setAppFullscreen?: (full: boolean) => Promise<void>;
+      downloadBlob?: (options: {
+        fileName: string;
+        data: ArrayBuffer | Uint8Array;
+        mimeType?: string;
+      }) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
+    };
+    modules?: Readonly<Record<string, (...args: unknown[]) => unknown>>;
+  };
+  plugin: { id: string; version: string; routePath: string };
+};`;
 
-    # 允许 Host 拉 MF 资源
-    add_header Access-Control-Allow-Origin $mf_cors_origin always;
-    add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "Content-Type, Range" always;
-    add_header Cross-Origin-Resource-Policy "cross-origin" always;
+const CODE_REACT_EXPOSE = String.raw`// src/views/app/index.tsx —— MF expose 入口（Host 只加载这里，不跑 main.tsx）
+import '@/styles.css';
+export { default } from './App';
+// 可选生命周期：拆到 lifecycle.ts，勿与频繁改动的组件同文件（Fast Refresh）
+// export { activate, deactivate } from './lifecycle';`;
 
-    location / {
-      if ($request_method = OPTIONS) {
-        add_header Access-Control-Allow-Origin $mf_cors_origin;
-        add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
-        add_header Access-Control-Allow-Headers "Content-Type, Range";
-        add_header Access-Control-Max-Age 86400;
-        add_header Content-Length 0;
-        return 204;
-      }
+const CODE_REACT_APP = String.raw`// src/views/app/App.tsx
+import { useHostLocale, useI18n } from '@/hooks';
+import type { HostBridgeProps } from '@/types/host';
 
-      root  /usr/local/nginx/remote/dist;
-      index   index.html  index.htm;
-      try_files   $uri  $uri/ /index.html;
-    }
+export default function App({ api, plugin }: HostBridgeProps) {
+  const { t } = useI18n();
+  useHostLocale(api); // 跟随 Host locale；独立预览无 locale 时无操作
 
-    location /api/ {
-      proxy_set_header  Host  $http_host;
-      proxy_set_header  X-Real-IP $remote_addr;
-      proxy_set_header  REMOTE-HOST $remote_addr;
-      proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header  X-Forwarded-Proto $scheme;
-      proxy_pass  https://172.17.0.1:9112;
-    }
+  return (
+    <div className="plugin-standalone h-full" data-plugin-root>
+      <h1>
+        {t('home.title')} · {plugin.id} v{plugin.version}
+      </h1>
+      <p>
+        theme={api.theme} · locale={api.locale}
+      </p>
+      <button
+        type="button"
+        onClick={() =>
+          api.ui?.showToast({ message: 'Hello from React plugin', type: 'success' })
+        }
+      >
+        {t('common.toast')}
+      </button>
+    </div>
+  );
+}`;
 
-    error_page  500 502 503 504 /50x.html;
-    location = /50x.html {
-      root  html;
-    }
-  }
+const CODE_REACT_MAIN = String.raw`// src/main.tsx —— 仅独立预览；Host 嵌入时不会执行
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
+import App from './views/app/App';
+import { mockApi, mockPlugin } from '@/utils/mockHost';
 
-  # ── micro 插件集合部署（端口 9008，可托管多个插件） ──
-  server {
-    listen 9008 ssl;
-    server_name  dnhyxc.cn;
+const api = mockApi({
+  ui: { showToast: (o) => console.info('[toast]', o.message) },
+});
+const plugin = mockPlugin('myReactPlugin', '/my-react-plugin', '1.0.0');
 
-    ssl_certificate /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn_bundle.crt;
-    ssl_certificate_key /usr/local/nginx/certs/dnhyxc.cn_nginx/dnhyxc.cn.key;
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App api={api} plugin={plugin} />
+  </StrictMode>,
+);`;
 
-    # 允许 Host 拉 MF 资源
-    add_header Access-Control-Allow-Origin $mf_cors_origin always;
-    add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "Content-Type, Range" always;
-    add_header Cross-Origin-Resource-Policy "cross-origin" always;
+const CODE_VUE_EXPOSE = String.raw`// src/views/style-isolation-lab/index.ts —— MF expose（Vue）
+// Host 不执行 main.ts：样式必须挂在本入口
+import '@/styles.css';
 
-    location / {
-      if ($request_method = OPTIONS) {
-        add_header Access-Control-Allow-Origin $mf_cors_origin;
-        add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
-        add_header Access-Control-Allow-Headers "Content-Type, Range";
-        add_header Access-Control-Max-Age 86400;
-        add_header Content-Length 0;
-        return 204;
-      }
+export { default } from './App.vue';
+// framework 由 registry "framework": "vue" 声明即可，不必再 export const framework`;
 
-      root  /usr/local/nginx/micro/dist;
-      index   index.html  index.htm;
-      try_files   $uri  $uri/ /index.html;
-    }
+const CODE_VUE_APP = String.raw`<!-- src/views/style-isolation-lab/App.vue -->
+<script setup lang="ts">
+import { computed, toRef } from 'vue';
+import type { HostBridgeProps } from '@/types/host';
 
-    location /api/ {
-      proxy_set_header  Host  $http_host;
-      proxy_set_header  X-Real-IP $remote_addr;
-      proxy_set_header  REMOTE-HOST $remote_addr;
-      proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header  X-Forwarded-Proto $scheme;
-      proxy_pass  https://172.17.0.1:9112;
-    }
+/**
+ * Host createVueHostBridge 注入：props.bridge（reactive）
+ * 注意：不是 React 那样的 { api, plugin } 顶层展开
+ */
+const props = defineProps<{ bridge: HostBridgeProps }>();
+const bridge = toRef(props, 'bridge');
+const theme = computed(() => bridge.value.api.theme);
+const pluginId = computed(() => bridge.value.plugin.id);
 
-    error_page  500 502 503 504 /50x.html;
-    location = /50x.html {
-      root  html;
-    }
+function hostToast() {
+  bridge.value.api.ui?.showToast?.({
+    message: 'Hello from Vue plugin',
+    type: 'info',
+    title: 'micro-vue',
+  });
+}
+</script>
+
+<template>
+  <div
+    class="box-border flex h-full min-h-0 w-full flex-col gap-4 p-5.5"
+    data-plugin-root
+    :class="theme === 'dark' ? 'dark' : ''"
+  >
+    <h1 class="text-xl font-semibold">Vue 子应用 · {{ pluginId }}</h1>
+    <button type="button" class="rounded-md border px-3 py-1.5" @click="hostToast">
+      Host Toast
+    </button>
+    <!-- Tooltip / Dialog / Sheet 等可正常 Teleport→body；Host 会收编进 data-mf-portal-scope -->
+  </div>
+</template>`;
+
+const CODE_VUE_MAIN = String.raw`// src/main.ts —— 仅独立预览
+import { createApp } from 'vue';
+import App from './App.vue';
+import { router } from './router';
+import './styles.css';
+
+createApp(App).use(router).mount('#app');`;
+
+const CODE_STYLES_CSS = String.raw`/* src/styles.css —— 可完整 @import tailwind（含 Preflight）；隔离由 Host @scope 负责 */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+#app,
+#root,
+[data-plugin-root] {
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0.02 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0.02 264);
+  /* …其余 token 对齐 Host / apps/micro/src/styles.css */
+}
+
+.dark {
+  --background: oklch(0.145 0.02 264);
+  --foreground: oklch(0.985 0.002 247.839);
+  /* … */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+}`;
+
+const CODE_REGISTRY_REACT = String.raw`{
+  "id": "myReactPlugin",
+  "remoteName": "myReactPlugin",
+  "expose": "./App",
+  "title": {
+    "zh-CN": "我的 React 插件",
+    "en-US": "My React plugin"
+  },
+  "description": {
+    "zh-CN": "React MF 子应用示例。",
+    "en-US": "React Module Federation remote sample."
+  },
+  "routePath": "/my-react-plugin",
+  "entry": "http://127.0.0.1:9008/mf-manifest.json",
+  "version": "1.0.0",
+  "hostApiRange": "^1.0.0",
+  "injectRoute": true,
+  "menu": { "order": 100, "icon": "Puzzle" },
+  "permissions": ["ui:toast", "nav:subtree"],
+  "preload": "route",
+  "enabled": true,
+  "trust": "first-party"
+}`;
+
+const CODE_REGISTRY_VUE = String.raw`{
+  "id": "vueStyleIsolationLab",
+  "remoteName": "microVue",
+  "expose": "./StyleIsolationLab",
+  "framework": "vue",
+  "title": {
+    "zh-CN": "Vue 样式实验室",
+    "en-US": "Vue style lab"
+  },
+  "description": {
+    "zh-CN": "Vue3 子应用：验收 Teleport 与 Host 样式隔离。",
+    "en-US": "Vue3 remote for Teleport + Host CSS isolation."
+  },
+  "routePath": "/vue-style-lab",
+  "entry": "http://127.0.0.1:9009/mf-manifest.json",
+  "version": "1.0.0",
+  "hostApiRange": "^1.0.0",
+  "injectRoute": true,
+  "menu": { "order": 102, "icon": "FlaskConical" },
+  "permissions": ["ui:toast", "nav:subtree"],
+  "preload": "route",
+  "enabled": true,
+  "trust": "first-party"
+}`;
+
+const CODE_API_USAGE = String.raw`export default function App({ api, plugin }: HostBridgeProps) {
+  const onFetch = async () => {
+    // ✅ 受限 API 使用前检查存在性（无权限时 Host 不注入该字段）
+    if (!api.http) return;
+    const data = await api.http.get('/api/plugin-data');
+    console.log(data);
+  };
+
+  const onNav = () => {
+    api.navigate?.(plugin.routePath + '/detail');
+  };
+
+  const onToast = () => {
+    api.ui?.showToast({ message: 'ok', type: 'success' });
+  };
+
+  const onFullscreen = async () => {
+    // 需 ui:toast；进出影院态成对调用，卸载时记得退出
+    await api.ui?.setAppFullscreen?.(true);
+  };
+
+  return null;
+}`;
+
+const CODE_LIFECYCLE = String.raw`// lifecycle.ts —— 与组件文件分离
+import type { HostBridgeProps } from '@/types/host';
+
+export async function activate(api: HostBridgeProps['api']) {
+  api.event.on('book-changed', (data) => {
+    console.log('book-changed', data);
+  });
+  await api.http?.get('/api/init-data');
+}
+
+export async function deactivate() {
+  // 清理订阅 / 定时器
+}
+
+// expose 入口：
+// import '@/styles.css';
+// export { default } from './App';
+// export { activate, deactivate } from './lifecycle';`;
+
+const CODE_USE_HOST_LOCALE = String.raw`// src/hooks/useHostLocale.ts
+import { useEffect } from 'react';
+import { applyHostLocale, isLocale, type Locale } from '@/i18n';
+
+export function useHostLocale(api?: {
+  locale?: Locale;
+  event?: {
+    on: (event: string, handler: (data?: unknown) => void) => void;
+    off: (event: string, handler: (data?: unknown) => void) => void;
+  };
+}) {
+  useEffect(() => {
+    if (isLocale(api?.locale)) applyHostLocale(api.locale);
+  }, [api?.locale]);
+
+  useEffect(() => {
+    const event = api?.event;
+    if (!event) return;
+    const onLocale = (data?: unknown) => {
+      if (isLocale(data)) applyHostLocale(data);
+    };
+    event.on('locale', onLocale);
+    return () => event.off('locale', onLocale);
+  }, [api?.event]);
+}`;
+
+const CODE_UNTRUSTED = String.raw`{
+  "id": "thirdPartyWidget",
+  "title": { "zh-CN": "第三方小部件", "en-US": "Third-party widget" },
+  "routePath": "/third-party-widget",
+  "entry": "https://example.com/unused-for-iframe.json",
+  "version": "1.0.0",
+  "hostApiRange": "^1.0.0",
+  "permissions": ["ui:toast"],
+  "enabled": true,
+  "trust": "untrusted",
+  "iframeUrl": "http://127.0.0.1:9008/embed/my-page"
+}`;
+
+const CODE_NGINX = String.raw`server {
+  listen 9008;
+  server_name _;
+  root /path/to/plugin/dist;
+  location / {
+    try_files $uri $uri/ /index.html;
+    add_header Access-Control-Allow-Origin "*";
+    add_header Access-Control-Allow-Methods "GET, OPTIONS";
+    add_header Cache-Control "no-store";
   }
 }`;
 
-const CODE_8_3_HOST_DEBUG = String.raw`// 1. 查看所有已注册插件信息（调试伪代码：根据宿主暴露的 dev API 调整）
-window.__PLUGIN_DEV__ = window.__PLUGIN_DEV__ || {};
-// const mgr = window.__PLUGIN_DEV__.manager;
-// console.table(mgr.registry.list);
+const CODE_TREE = String.raw`my-plugin/
+├── src/
+│   ├── main.tsx / main.ts     # 仅独立预览
+│   ├── styles.css             # Tailwind + token（expose 也要 import）
+│   ├── types/host.ts          # HostBridgeProps 最小类型
+│   ├── views/
+│   │   └── app/
+│   │       ├── index.tsx      # MF expose：import styles + export default
+│   │       └── App.tsx / App.vue
+│   ├── hooks/                 # useI18n / useHostLocale（React）
+│   ├── i18n/                  # 插件自有字典（无 api.t）
+│   ├── utils/mockHost.ts      # 独立预览 mock
+│   └── components/ui/         # 可选 shadcn / shadcn-vue
+├── vite.config.ts
+├── package.json
+└── .env`;
 
-// 2. 强制重新加载当前插件
-// mgr.reload('hello-plugin');
-
-// 3. 查看当前激活插件的 bridge（仅本地开发，请勿在生产暴露）
-// console.log(mgr.activePlugin?.bridge);`;
-
-const CODE_9_HELLO_WORLD = String.raw`// src/App.tsx —— Hello World 完整版
-import { Globe, Puzzle, X } from 'lucide-react';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { setLocale as i18nSetLocale, t as i18nT } from './i18n';
-import type { HostBridgeProps } from './types';
-
-const App = memo(function App(bridge: HostBridgeProps) {
-  const { locale, theme, close, toast, http, permissions } = bridge;
-  i18nSetLocale(locale);
-
-  const [ping, setPing] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const hasHttp = permissions.includes('http:plugin-api');
-
-  const onPing = useCallback(async () => {
-    if (!http || !toast) {
-      toast?.('缺少必要权限', 'error');
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await http({
-        method: 'GET',
-        url: 'https://api.example.com/plugin/hello-plugin/ping',
-      });
-      if (r.status >= 400) throw new Error('HTTP ' + r.status);
-      setPing(new Date().toLocaleTimeString());
-      toast(i18nT('hello.success'), 'success');
-    } catch (e) {
-      toast(i18nT('error.noPermission', { perm: 'http:plugin-api' }), 'error');
-    } finally {
-      setBusy(false);
-    }
-  }, [http, toast]);
-
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[hello-plugin] mounted with theme', theme);
-    return () => {
-      // eslint-disable-next-line no-console
-      console.log('[hello-plugin] unmounted');
-    };
-  }, [theme]);
-
-  return (
-    <div className={'min-h-full w-full p-6 ' + (theme === 'dark' ? 'text-slate-100' : 'text-slate-800')}>
-      <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Puzzle className="size-6 text-violet-500" />
-          <h1 className="text-xl font-bold">{i18nT('hello.title')}</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-            <Globe className="size-3.5" /> {locale}
-          </span>
-          <button type="button" onClick={close} className="rounded-md px-2.5 py-1 hover:bg-black/5 dark:hover:bg-white/10">
-            <X className="size-4 inline" /> 关闭
-          </button>
-        </div>
-      </header>
-
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">{i18nT('hello.desc')}</p>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border p-4">
-          <h2 className="mb-2 font-medium">Toast 示例</h2>
-          <button
-            type="button"
-            onClick={() => toast && toast(i18nT('hello.desc'), 'info')}
-            className="rounded-md bg-violet-500 px-3 py-1.5 text-white"
-          >
-            弹出一条 Toast
-          </button>
-        </div>
-
-        <div className="rounded-xl border p-4">
-          <h2 className="mb-2 font-medium">HTTP 示例</h2>
-          <p className="mb-2 text-xs text-slate-400">
-            {ping ? '上次成功 ' + ping : '未请求'}
-          </p>
-          <button
-            type="button"
-            onClick={onPing}
-            disabled={busy || !hasHttp}
-            className="rounded-md bg-emerald-500 px-3 py-1.5 text-white disabled:opacity-40"
-          >
-            {busy ? 'Ping…' : 'GET /ping'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-export default App;`;
-
-const CODE_10_3_TAILWIND_PREFIX = String.raw`// tailwind.config.js：给插件专属 class 加前缀避免样式污染
-module.exports = {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
-  prefix: 'hp-',
-  // ... theme 等配置按实际需求写
-};`;
-
-/* =======================================================================
- *  中文版
- * ======================================================================= */
+/* ========================= 中文 ========================= */
 
 const introZh =
-	'阅读对象：希望为本平台开发独立插件（子应用）的前端开发者。' +
-	'目标：从项目初始化到接入主项目，一步步完成一个可运行的插件。';
+	'阅读对象：为本平台开发 React / Vue Module Federation 子应用（插件）的前端开发者。\n\n' +
+	'目标：从零搭好工程、正确导出 expose、配置 Registry，并在 Host 内获得与独立预览一致的样式（含 Tooltip / Dialog / Teleport）。\n\n' +
+	'参考实现：\n' +
+	'• React：仓库内 apps/micro（端口 9008，federation name 可为 micro / remotePlugins）\n' +
+	'• Vue：仓外 micro-vue 样例（端口 9009，name: microVue，registry framework: vue）\n' +
+	'• 更细的源码级说明见 Host 仓库 apps/frontend/src/plugins/docs/plugin-development-guide.md\n\n' +
+	'更新日期：' +
+	TODAY;
 
 const sectionsZh: PluginGuideSection[] = [
 	{
 		id: 'arch',
-		title: '1. 架构概览',
+		title: '1. 架构与加载模型',
 		items: [
-			{
-				id: 'arch-components',
-				title: '1.1 系统组成',
-				dateLabel: TODAY,
-				description:
-					'主项目在插件体系上由三个核心模块组成：\n' +
-					'• PluginManager（plugins/core/PluginManager.ts）负责加载、卸载、激活插件，管理生命周期；\n' +
-					'• PluginRegistry（plugins/core/registry.ts）抓取并缓存插件元数据，支持用户覆盖启用状态；\n' +
-					'• PluginHostPage（views/pluginHost/index.tsx）真实挂载插件的页面，根据信任等级选择嵌入方式。',
-			},
-			{
-				id: 'arch-trust',
-				title: '1.2 信任等级与嵌入方式',
-				dateLabel: TODAY,
-				description:
-					'主项目按 trust 字段区分三类插件：\n' +
-					'• first-party：Module Federation 直接挂载，共享宿主 React/依赖。权限最高，可调用所有已开放 API。适用于团队内部、完全可信插件。\n' +
-					'• partner：Module Federation 挂载，宿主按需注入白名单能力。权限受限，仅允许声明的权限。适用于合作方插件。\n' +
-					'• untrusted：iframe 隔离沙盒，通过 postMessage 通信。权限最小，仅允许显式白名单接口。适用于第三方未知来源插件。',
-			},
-			{
-				id: 'arch-flow',
-				title: '1.3 加载流程',
-				dateLabel: TODAY,
-				description:
-					'1. 宿主启动后 PluginManager.init() 拉取远端注册表（Registry JSON）。\n' +
-					'2. PluginRegistry 合并用户本地启用配置，得到最终启用清单。\n' +
-					'3. 用户点击某插件，PluginHostPage 进入插件路由页。\n' +
-					'4. mountShell() 先渲染占位骨架屏（避免空白感知）。\n' +
-					'5. loadPlugin() 按信任等级加载：\n' +
-					'   • first-party / partner：通过 Module Federation container.get(EXPORT_NAME) 动态加载。\n' +
-					'   • untrusted：创建 <iframe src="..."> 并注入 postMessage HostBridge。\n' +
-					'6. 挂载完成后调用插件导出的 activate() 钩子，正式进入生命周期。',
-			},
+			item(
+				'arch-roles',
+				'1.1 角色分工',
+				'• Host（apps/frontend）：拉 Registry、registerRemotes、loadRemote、注入路由/侧栏、挂载 PluginHostPage、运行时 CSS @scope 隔离、Portal/Teleport 收编。\n' +
+					'• Remote（子应用）：Vite + @module-federation/vite 暴露模块；业务只关心 default 导出与权限内的 HostBridge API。\n' +
+					'• Registry（plugins-registry.json）：声明 id / entry / expose / remoteName / framework / permissions / trust 等；改标题文案只改 registry，不必改 Host 语言包。',
+			),
+			item(
+				'arch-trust',
+				'1.2 信任等级与嵌入方式',
+				'• first-party / partner：Module Federation 嵌入；Host 用 @scope([data-mf-style-realm]) 隔离 CSS；Portal（React createPortal）与 Vue Teleport（body 挂载）由 Host 收编到 [data-mf-portal-scope]。\n' +
+					'• untrusted：iframe + postMessage；样式天然隔离；须配置 iframeUrl（开发可用 localhost http，生产须 https）。\n' +
+					'权限由 Host 按 registry.permissions 注入：未声明的能力在 bridge 上为 undefined，调用前必须可选链/判空。',
+			),
+			item(
+				'arch-flow',
+				'1.3 加载流程（MF）',
+				'1. Host PluginManager.init() 拉取 Registry（可有本地启用覆盖）。\n' +
+					'2. injectRoute !== false 时注入顶层路由与侧栏 icon。\n' +
+					'3. 进入插件路由 → ensurePlugin → GET 一次 mf-manifest.json 算 bust（version@manifestHash）→ 加载 remoteEntry.js?v=…。\n' +
+					'4. loadRemote(expose) 得到原始模块 → normalizePluginModule：\n' +
+					'   • React：default 即组件；\n' +
+					'   • Vue：registry.framework === "vue"（或启发式）→ createVueHostBridge 包成 React 组件。\n' +
+					'5. PluginHostPage 渲染带 data-mf-plugin + data-mf-style-realm 的根，并 attachPluginStyleIsolation（CSS 捕获 + Portal 桥）。\n' +
+					'6. 可选调用 activate；卸载时 deactivate + 释放隔离。',
+			),
+			item(
+				'arch-tree',
+				'1.4 推荐目录结构',
+				'一仓可多 expose（如 apps/micro）。每个 expose 对应 views 下独立入口。',
+				{ lang: 'markdown', code: CODE_TREE },
+			),
 		],
 	},
 	{
 		id: 'init',
-		title: '2. 初始化插件项目',
+		title: '2. 环境与项目初始化',
 		items: [
-			{
-				id: 'init-env',
-				title: '2.1 环境要求',
-				dateLabel: TODAY,
-				description:
-					'工具与推荐版本（与宿主保持一致可避免大量兼容问题）：\n' +
-					'• Node.js ≥ 18.17（Node 20 LTS 最佳）\n' +
-					'• pnpm ≥ 8.10（与主项目包管理器一致）\n' +
-					'• Vite 5.x（匹配宿主 vite-plugin-federation 版本）\n' +
-					'• React 18.x（必须与宿主同一主版本）\n' +
-					'• TypeScript ≥ 5.3（尽量与宿主 TS 版本对齐）',
-			},
-			{
-				id: 'init-create',
-				title: '2.2 最简创建命令',
-				dateLabel: TODAY,
-				description:
-					'先用 Vite 官方模板起项目，再补齐 Module Federation 与宿主共享依赖：',
-				code: { lang: 'bash', code: CODE_2_2_BASH },
-			},
-			{
-				id: 'init-envfile',
-				title: '2.3 环境变量（.env）',
-				dateLabel: TODAY,
-				description:
-					'项目根目录新建 .env，内容如下（实际端口号按你团队实际分配调整）：',
-				code: { lang: 'dotenv', code: CODE_2_3_DOTENV },
-			},
+			item(
+				'init-tools',
+				'2.1 工具版本',
+				'• Node.js ≥ 20\n• pnpm ≥ 8\n• Host 开发服默认常见端口 9002；Remote 示例 9007（demo）/ 9008（React micro）/ 9009（Vue）——勿与 Host 冲突。\n• MF 插件用 @module-federation/vite（不是旧的 @originjs/vite-plugin-federation）。',
+			),
+			item(
+				'init-env',
+				'2.2 环境变量 .env',
+				'VITE_REMOTE_PUBLIC_ORIGIN 必须与 registry 的 entry 同源（含协议/主机/端口），并与 vite base 一致。',
+				{ lang: 'dotenv', code: CODE_ENV },
+			),
+			item(
+				'init-react-deps',
+				'2.3 初始化 React 子应用依赖',
+				'与 Host 共用 React 大版本（当前示例 ^19）。shared 仅 singleton react / react-dom。',
+				{ lang: 'bash', code: CODE_REACT_DEPS },
+			),
+			item(
+				'init-vue-deps',
+				'2.4 初始化 Vue 子应用依赖',
+				'Host 已内置 createVueHostBridge：Remote 不要安装 React、不要写 React 桥接层。shared 仅 vue singleton。',
+				{ lang: 'bash', code: CODE_VUE_DEPS },
+			),
 		],
 	},
 	{
-		id: 'vite',
-		title: '3. 配置 Vite 与 Module Federation',
+		id: 'vite-react',
+		title: '3. React：Vite + Module Federation',
 		items: [
-			{
-				id: 'vite-full-config',
-				title: '3.1 完整 vite.config.ts 模板',
-				dateLabel: TODAY,
-				description:
-					'下面这份配置包含：清缓存 workaround、MF 共享依赖（React singleton）、dev CORS 开、优化构建选项。' +
-					'注意：如果少了 cors: true，宿主加载时浏览器直接报 CORS；少了 singleton 会出现 Invalid hook call 等诡异错误。',
-				code: { lang: 'typescript', code: CODE_3_1_VITE_TS },
-			},
+			item(
+				'vite-react-full',
+				'3.1 完整 vite.config.ts（React）',
+				'必选核对：base；federation.name / filename / manifest / exposes；shared.react|react-dom.singleton；hostInitInjectLocation: "entry"；optimizeDeps.exclude React；server.cors + ACAO；build.modulePreload: false。\n勿 shared react-router。',
+				{ lang: 'typescript', code: CODE_VITE_REACT },
+			),
+			item(
+				'vite-react-checklist',
+				'3.2 React Vite 检查表',
+				'• base 与 registry entry 同源\n' +
+					'• name ↔ remoteName；expose 路径 ↔ registry.expose\n' +
+					'• 每个 exposes 指向的文件内 import styles.css\n' +
+					'• 开发：先起 Remote，再在 Host 打开插件路由\n' +
+					'• Invalid hook call → 双 React：查 singleton / 清 node_modules/.vite / 勿在插件内再 createRoot',
+			),
 		],
 	},
 	{
-		id: 'app',
-		title: '4. 实现插件主组件（App.tsx）',
+		id: 'vite-vue',
+		title: '4. Vue：Vite + Module Federation',
 		items: [
-			{
-				id: 'app-types',
-				title: '4.1 HostBridgeProps 类型（复制到 src/types.d.ts）',
-				dateLabel: TODAY,
-				description:
-					'每次宿主插件契约升级时，都需要同步覆盖插件项目里的这个最小子集。' +
-					'里面包含了插件能从宿主拿到的所有桥接能力定义。',
-				code: { lang: 'typescript', code: CODE_4_1_TYPES },
-			},
-			{
-				id: 'app-root',
-				title: '4.2 插件根组件 App.tsx 完整模板',
-				dateLabel: TODAY,
-				description:
-					'宿主通过 Module Federation 拿到此默认导出后直接渲染。禁止你自己再包一层 ReactDOM.createRoot（会导致共享依赖失效）。' +
-					'如果需要本地独立预览，使用下一节的 main.tsx。',
-				code: { lang: 'tsx', code: CODE_4_2_APP_TSX },
-			},
-			{
-				id: 'app-main',
-				title: '4.3 独立预览入口（main.tsx）',
-				dateLabel: TODAY,
-				description:
-					'本地开发时用的入口：注入一个 mock HostBridge，不启动宿主也能看到页面效果。宿主真正加载插件时不会用到此文件。',
-				code: { lang: 'tsx', code: CODE_4_3_MAIN_TSX },
-			},
+			item(
+				'vite-vue-full',
+				'4.1 完整 vite.config.ts（Vue）',
+				'与 React 差异：plugin-vue；shared 只配 vue；无 reactRefreshHost。expose 指向 index.ts（再 export App.vue）。',
+				{ lang: 'typescript', code: CODE_VITE_VUE },
+			),
+			item(
+				'vite-vue-rules',
+				'4.2 Vue Remote 硬性约定',
+				'1. Registry 必须写 "framework": "vue"（Host normalizePluginModule 优先读该字段）。\n' +
+					'2. expose 只导出 Vue 根（default）；不必 export const framework = "vue"（registry 已写时冗余）。\n' +
+					'3. 禁止在 Remote 内自建 React 桥（Host 的 createVueHostBridge 负责把 Vue 挂进 React 树）。\n' +
+					'4. 根组件接收 props.bridge（reactive HostBridgeProps），不是顶层展开的 api/plugin。\n' +
+					'5. Teleport→body 的弹层：不要手写 container；Host body 原型 patch 会收编进同 realm 的 portal-scope。\n' +
+					'6. 同样：每个 expose 入口 import "@/styles.css"。',
+			),
+		],
+	},
+	{
+		id: 'react-impl',
+		title: '5. React 插件实现',
+		items: [
+			item(
+				'react-types',
+				'5.1 HostBridgeProps（复制到子项目）',
+				'Host 不提供 api.t。插件自维护 i18n，只跟随 api.locale。权限不足时 http / ui / navigate 可能为 undefined。',
+				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
+			),
+			item(
+				'react-expose',
+				'5.2 expose 入口（必须 import styles）',
+				'Host 只 loadRemote(expose)，不会执行 main.tsx。漏掉 styles → 独立预览正常、嵌入后 Tooltip/菜单「裸奔」。',
+				{ lang: 'tsx', code: CODE_REACT_EXPOSE },
+			),
+			item(
+				'react-app',
+				'5.3 根组件 App.tsx',
+				'default 导出 React 组件；根节点建议 data-plugin-root + plugin-standalone。Host 还会再包一层 data-mf-plugin / data-mf-style-realm。独立路由页若 Host 已套 PluginPageShell，勿再叠同等外层 padding。',
+				{ lang: 'tsx', code: CODE_REACT_APP },
+			),
+			item(
+				'react-main',
+				'5.4 独立预览 main.tsx',
+				'mockApi 可不传 locale，便于本地切语言。嵌入 Host 时此文件完全不跑。',
+				{ lang: 'tsx', code: CODE_REACT_MAIN },
+			),
+			item(
+				'react-api',
+				'5.5 调用 Host API（权限安全）',
+				'常用：api.ui.showToast / setAppFullscreen / downloadBlob（需 ui:toast）；api.navigate（nav:subtree）；api.http.*（http:plugin-api）；api.modules.*（modules:*）。',
+				{ lang: 'tsx', code: CODE_API_USAGE },
+			),
+			item(
+				'react-lifecycle',
+				'5.6 生命周期 activate / deactivate',
+				'可选。勿与频繁改动的组件同文件导出空钩子（会打断 Fast Refresh / Host import）。有副作用时拆 lifecycle.ts。',
+				{ lang: 'typescript', code: CODE_LIFECYCLE },
+			),
+		],
+	},
+	{
+		id: 'vue-impl',
+		title: '6. Vue 插件实现',
+		items: [
+			item(
+				'vue-bridge-model',
+				'6.1 Host 如何挂载 Vue',
+				'loadRemote → normalizePluginModule（见 framework: vue）→ createVueHostBridge(VueRoot)：\n' +
+					'• React 侧渲染挂载点 div[data-plugin-root][data-mf-framework=vue]\n' +
+					'• createApp(VueRoot, { bridge: reactiveProps }).mount(el)\n' +
+					'• bridge.api / bridge.plugin 热更新时写入同一 reactive 对象\n' +
+					'因此 Vue 根必须 defineProps<{ bridge: HostBridgeProps }>()，用 toRef/computed 读字段。',
+			),
+			item(
+				'vue-types',
+				'6.2 类型（与 React 同一套 HostBridgeProps）',
+				'可把 5.1 的类型放到 src/types/host.ts 共用。Vue 只是消费方式变为 props.bridge。',
+				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
+			),
+			item(
+				'vue-expose',
+				'6.3 expose 入口 index.ts',
+				'务必 import styles；只 re-export App.vue。',
+				{ lang: 'typescript', code: CODE_VUE_EXPOSE },
+			),
+			item(
+				'vue-app',
+				'6.4 根组件 App.vue 示例',
+				'弹层组件（Tooltip/Popover/Dialog/Sheet/ContextMenu/Sonner）可按 shadcn-vue 正常写 Teleport。验收时在 DevTools 看弹层是否落在 [data-mf-portal-scope] 且带同一 data-mf-style-realm。',
+				{ lang: 'vue', code: CODE_VUE_APP },
+			),
+			item(
+				'vue-main',
+				'6.5 独立预览 main.ts + 路由',
+				'独立预览可用 vue-router 挂实验室页，并向 App 传入 mock bridge（形状与 Host 一致）。Host 嵌入时不会走 main。',
+				{ lang: 'typescript', code: CODE_VUE_MAIN },
+			),
+			item(
+				'vue-donts',
+				'6.6 Vue 常见错误',
+				'• 只在 main.ts import styles → Host 内无 utility（箭头在、气泡没了；Context Menu 字体错乱）\n' +
+					'• registry 漏 framework: vue → 可能被当成 React 渲染而白屏\n' +
+					'• Remote 自建 React 桥 + shared react → 与 Host 方案冲突、体积翻倍\n' +
+					'• 在业务里手写 data-mf-style-realm / portal container → 干扰 Host 认领\n' +
+					'• 根 props 写成 { api, plugin } 顶层 —— Host 传的是 { bridge }',
+			),
+		],
+	},
+	{
+		id: 'styles',
+		title: '7. 样式、隔离与悬浮层',
+		items: [
+			item(
+				'styles-model',
+				'7.1 Host 隔离模型（插件零侵入）',
+				'• first-party/partner：Remote 可正常 @import "tailwindcss"（含 Preflight）。Host 把注入 CSS 包进 @scope([data-mf-style-realm="…"])；同 Remote 多 expose 共享 realm。\n' +
+					'• 勿再给 Tailwind 强行加 hp- 前缀、勿为「防污染」关掉 Preflight（旧文档已过时）。\n' +
+					'• Portal/Drawer/POP：不要为 MF 特传 getPopupContainer；Host 劫持 createPortal + body 原型挂载（覆盖 Vue Teleport）。\n' +
+					'• 独立预览正常、仅嵌入后 backdrop-filter 失效 → 查 Host PluginPageShell/Layout 是否在圆角同层 overflow-hidden，不是插件 CSS 写错。',
+			),
+			item(
+				'styles-expose',
+				'7.2 【关键】每个 expose 必须 import styles.css',
+				'• main.ts / main.tsx 里的 import "./styles.css"：仅独立预览执行；嵌入 Host 时不跑。\n' +
+					'• expose 入口里的 import "@/styles.css"：随 Remote 模块注入，嵌入 Host 时必须有。\n' +
+					'• 一仓多 expose：每个入口都要写（可重复 import）。\n' +
+					'漏写典型症状：独立预览正常；Host 内 Tooltip 只剩文字/箭头、Context Menu 字体错乱。',
+			),
+			item(
+				'styles-file',
+				'7.3 styles.css 示例',
+				'token / @theme 建议对齐 apps/micro/src/styles.css。嵌入时部分变量可继承 Host :root。',
+				{ lang: 'css', code: CODE_STYLES_CSS },
+			),
+			item(
+				'styles-portal',
+				'7.4 悬浮层验收清单',
+				'打开 Tooltip / Dialog / Context Menu / Sheet / Sonner 后：\n' +
+					'1. utility 与背景色仍正常（未被剥光，也不污染 Host）\n' +
+					'2. DevTools：弹层在 [data-mf-portal-scope="pluginId"] 内，且 data-mf-style-realm 与插件根一致\n' +
+					'3. 插件内 Sonner 不顶开 Host 布局；Host Toast 仍 fixed\n' +
+					'4. 勿手写 data-mf-* 业务标记',
+			),
 		],
 	},
 	{
 		id: 'i18n',
-		title: '5. 多语言与主题跟随',
+		title: '8. 插件内 i18n 与 Host locale',
 		items: [
-			{
-				id: 'i18n-dict',
-				title: '5.1 在插件内部维护自己的 i18n 字典',
-				dateLabel: TODAY,
-				description:
-					'宿主并不会把自己的翻译表共享给插件。插件需要自己管理词条，参考下面实现一个最小可用的 t() + setLocale()。',
-				code: { lang: 'typescript', code: CODE_5_1_I18N_TS },
-			},
-			{
-				id: 'i18n-follow',
-				title: '5.2 跟随宿主语言切换',
-				dateLabel: TODAY,
-				description:
-					'宿主在用户切换语言时会以新的 bridge props 整体 re-render 整个插件（不需要事件订阅）。' +
-					'所以你只需在 App 组件顶部每次 render 都调用 setLocale(locale) 即可：',
-				code: { lang: 'tsx', code: CODE_5_2_FOLLOW_LOCALE },
-			},
+			item(
+				'i18n-rules',
+				'8.1 规则',
+				'• Host 不注入 api.t。\n' +
+					'• 插件自建字典（src/i18n + useI18n）。\n' +
+					'• MF：props api.locale + event.on("locale")；用 useHostLocale(api)。\n' +
+					'• 独立预览：URL ?lang= / 本地 storage；mock 可不传 locale。\n' +
+					'• iframe：init.locale + postMessage type:"locale"。\n' +
+					'• storage key 与 Host 隔离（勿占用 Host 的 locale key）。',
+			),
+			item(
+				'i18n-hook',
+				'8.2 useHostLocale（React）',
+				'Vue 侧可用 watch(() => bridge.api.locale, …) + 监听 bridge.api.event 的 locale 事件，语义相同。',
+				{ lang: 'typescript', code: CODE_USE_HOST_LOCALE },
+			),
 		],
 	},
 	{
 		id: 'perm',
-		title: '6. 权限声明与 API 使用',
+		title: '9. 权限与 Registry 字段',
 		items: [
-			{
-				id: 'perm-list',
-				title: '6.1 权限清单（提交给主项目维护者时一并提供）',
-				dateLabel: TODAY,
-				description:
-					'宿主目前支持的权限如下；你需要对照自己插件实际用到的能力，把对应的权限项告诉主项目维护者写入 Registry.permissions。',
-				code: { lang: 'yaml', code: CODE_6_1_PERMS_YAML },
-			},
-			{
-				id: 'perm-good-bad',
-				title: '6.2 正确 vs 错误使用示例',
-				dateLabel: TODAY,
-				description:
-					'宿主在把 bridge 交给插件前会先按 Registry.permissions 过滤，未授权的方法会变成 undefined。' +
-					'调用前做 feature-detect 是唯一稳健的写法。',
-				code: { lang: 'tsx', code: CODE_6_2_GOOD_BAD },
-			},
+			item(
+				'perm-list',
+				'9.1 权限列表',
+				'• ui:toast — showToast / setAppFullscreen / downloadBlob\n' +
+					'• nav:subtree — api.navigate\n' +
+					'• http:plugin-api — api.http.*\n' +
+					'• modules:chat — 聊天模块\n' +
+					'• modules:ebook — 电子书模块\n' +
+					'原则：最小权限；用前判空。',
+			),
+			item(
+				'registry-react',
+				'9.2 React 插件 Registry 示例',
+				'不要写 titleKey / descriptionKey / menu.nameKey。menu 仅 order + icon（侧栏不展示文字）。hostApiRange 须覆盖 Host 的 VITE_HOST_API_VERSION（默认 1.0.0），勿与插件 version 混淆。',
+				{ lang: 'json', code: CODE_REGISTRY_REACT },
+			),
+			item(
+				'registry-vue',
+				'9.3 Vue 插件 Registry（必须 framework）',
+				'framework: "vue" 为上架硬性要求。remoteName 对齐 vite federation.name；expose 对齐 exposes 键。',
+				{ lang: 'json', code: CODE_REGISTRY_VUE },
+			),
+			item(
+				'registry-fields',
+				'9.4 字段速查',
+				'• id — 唯一；侧栏/路由内部键\n' +
+					'• remoteName — MF 容器名；多插件共 Remote 时填同一 name\n' +
+					'• expose — 如 "./App" / "./StyleIsolationLab"\n' +
+					'• framework — "vue" | "react"（可省略，默认按 React；Vue 必填 vue）\n' +
+					'• entry — …/mf-manifest.json\n' +
+					'• routePath / injectRoute / menu / permissions / preload / trust / iframeUrl\n' +
+					'• host — 业务页自动挂载（如 ebook.read drawer/toolbar）\n' +
+					'发版：部署新产物即可；Host 用 manifest 指纹 bust，不必为刷缓存改 registry updatedAt。',
+			),
+			item('registry-untrusted', '9.5 untrusted（iframe）示例', '', {
+				lang: 'json',
+				code: CODE_UNTRUSTED,
+			}),
 		],
 	},
 	{
-		id: 'registry',
-		title: '7. 注册到主项目（给主项目维护者的配置）',
+		id: 'preview-deploy',
+		title: '10. 预览、部署与调试',
 		items: [
-			{
-				id: 'registry-snippet',
-				title: '7.1 给主项目维护者的 Registry 配置片段',
-				dateLabel: TODAY,
-				description:
-					'把下面的 JSON 片段发给主项目维护者，请其追加到插件 Registry 文件中。' +
-					'Registry 实际位置可能是 apps/frontend/src/plugins/registry.json，也可能是后端服务拉取的远端 JSON（取决于宿主部署方式）。',
-				code: { lang: 'json', code: CODE_7_1_REGISTRY_JSON },
-			},
-			{
-				id: 'registry-fields',
-				title: '7.2 Registry 字段说明表',
-				dateLabel: TODAY,
-				description:
-					'字段速查（给你自己和宿主维护者都留一份底）：\n' +
-					'• id：全局唯一插件 ID（建议与 remoteName 保持一致），必填。\n' +
-					'• remoteName：Module Federation container 名字，必须与 vite.config 中 federation({ name }) 完全相同。当 id 与 MF name 一致时可省略。\n' +
-					'• expose：MF exposes 中的导出 key，例如 ./App、./LearningNotes。当 entry 为 mf-manifest.json 时可省略（宿主从 manifest 中自动解析）。\n' +
-					'• title：按 locale 配置的显示名称（zh-CN / en-US），必填。\n' +
-					'• description：按 locale 配置的一句话描述，必填。\n' +
-					'• routePath：插件在宿主中的路由路径（如 /hello-plugin），必填。\n' +
-					'• entry：MF manifest 文件地址（如 http://127.0.0.1:5174/mf-manifest.json），必填。\n' +
-					'• version：语义化 x.y.z 版本号，必填。\n' +
-					'• hostApiRange：宿主 API 兼容版本范围（如 ^1.0.0），必填。\n' +
-					'• trust：决定嵌入方式（first-party / partner / untrusted），必填。\n' +
-					'• permissions：权限白名单，宿主据此过滤 bridge 方法，必填。\n' +
-					'• preload：预加载策略，可选值 route（路由进入时加载）或 none，默认 route。\n' +
-					'• enabled：是否默认启用，必填。\n' +
-					'• menu：侧栏入口配置，含 order（排序权重）和 icon（图标名），独立页面插件必填。\n' +
-					'• injectRoute：是否注入到宿主路由树，默认 false。当插件需要在宿主特定页面内嵌渲染时设为 false 并配 host 字段。\n' +
-					'• host：嵌入宿主特定页面的配置，含 surface（宿主页面标识）、slot（嵌入位置如 drawer/toolbar）、icon、order。仅 injectRoute=false 时使用。',
-			},
-			{
-				id: 'registry-untrusted',
-				title: '7.3 untrusted（iframe 沙盒）配置示例',
-				dateLabel: TODAY,
-				description:
-					'untrusted 插件在 iframe 内运行，不能通过 MF 共享宿主依赖，需要自行打包 React 等。' +
-					'桥接走 postMessage，仅暴露 permissions 中声明的最少量能力。示例如下：',
-				code: { lang: 'json', code: CODE_7_3_UNTRUSTED_JSON },
-			},
+			item(
+				'preview',
+				'10.1 本地联调顺序',
+				'1. pnpm dev 启动 Remote（确认 /mf-manifest.json 可访问）\n' +
+					'2. 启动 Host；Registry 指向该 entry 且 enabled\n' +
+					'3. 侧栏进入插件路由\n' +
+					'4. Network：进入插件应主要看到 1 条 mf-manifest.json + remoteEntry.js?v=\n' +
+					'5. 独立预览：React 开 main 路由；Vue 开实验室 path',
+			),
+			item(
+				'deploy',
+				'10.2 构建与静态托管',
+				'pnpm build → 托管 dist；CORS 放开；建议 Cache-Control: no-store（配合 Host bust）。',
+				{ lang: 'nginx', code: CODE_NGINX },
+			),
+			item(
+				'debug',
+				'10.3 调试要点',
+				'• 双 React / Invalid hook call：shared singleton + 清 .vite + 勿二次 createRoot\n' +
+					'• CORS：server.cors + ACAO\n' +
+					'• Module ./X does not exist：线上未部署含该 expose 的构建\n' +
+					'• 样式进 Host 却污染：查是否绕过 head 注入；Host sonner 应有 data-mf-host-style 保护\n' +
+					'• 嵌入无样式：expose 是否 import styles.css\n' +
+					'• Vue 白屏：registry framework: vue\n' +
+					'• 语言不跟随：useHostLocale / watch bridge.api.locale',
+			),
 		],
 	},
 	{
-		id: 'deploy',
-		title: '8. 部署与调试',
+		id: 'checklist',
+		title: '11. 验收清单',
 		items: [
-			{
-				id: 'deploy-build',
-				title: '8.1 构建产物',
-				dateLabel: TODAY,
-				description:
-					'执行 pnpm build。至少要对外暴露 dist/assets/remoteEntry.js（MF 入口）以及配套的 *.js/*.css 资源。',
-				code: { lang: 'bash', code: CODE_8_1_BUILD_BASH },
-			},
-			{
-				id: 'deploy-nginx',
-				title: '8.2 Nginx 示例配置',
-				dateLabel: TODAY,
-				description:
-					'上线推荐 Nginx 托管构建产物。核心要点：全开 CORS、SPA deep link 回退到 index.html、静态 hash 资源长缓存、remoteEntry 短缓存：',
-				code: { lang: 'nginx', code: CODE_8_2_NGINX },
-			},
-			{
-				id: 'deploy-host-debug',
-				title: '8.3 宿主控制台调试命令',
-				dateLabel: TODAY,
-				description:
-					'插件成功加载后，在宿主页面的浏览器控制台可以通过宿主暴露的 dev API（如果有）快速查看插件列表/重新加载/查看 bridge。示例如下（按宿主实际暴露方式调整）：',
-				code: { lang: 'typescript', code: CODE_8_3_HOST_DEBUG },
-			},
+			item(
+				'checklist-all',
+				'11.1 上线前核对',
+				'【工程】\n' +
+					'□ @module-federation/vite；manifest: true；hostInitInjectLocation: entry\n' +
+					'□ React：shared 仅 react/react-dom singleton；Vue：shared 仅 vue singleton\n' +
+					'□ 每个 expose 入口 import "@/styles.css"\n\n' +
+					'【组件】\n' +
+					'□ default 导出；React 收 {api,plugin}；Vue 收 props.bridge\n' +
+					'□ 根 data-plugin-root；无空 activate 与组件同文件\n' +
+					'□ 自有 i18n；无 api.t\n\n' +
+					'【Registry】\n' +
+					'□ title/description locale map；hostApiRange 正确\n' +
+					'□ Vue：framework: "vue"\n' +
+					'□ permissions 最小集；trust/iframeUrl 匹配\n\n' +
+					'【体验】\n' +
+					'□ 独立预览与 Host 嵌入样式一致（含悬浮层）\n' +
+					'□ Host Toast 不被插件样式顶开\n' +
+					'□ 若用影院全屏：成对 setAppFullscreen，卸载退出',
+			),
 		],
 	},
 	{
-		id: 'hello',
-		title: '9. 完整 Hello World 示例（i18n + Toast + HTTP）',
+		id: 'faq',
+		title: '12. 常见问题',
 		items: [
-			{
-				id: 'hello-full',
-				title: '9.1 Hello World 完整 App.tsx',
-				dateLabel: TODAY,
-				description:
-					'把 §5 i18n、§4 基础组件、§6 权限检测、错误处理一次性整合出来的“可直接照抄”模板。' +
-					'直接替换你项目里的 App.tsx 即可看到所有效果。',
-				code: { lang: 'tsx', code: CODE_9_HELLO_WORLD },
-			},
-		],
-	},
-	{
-		id: 'troubleshoot',
-		title: '10. 常见问题排查（Troubleshooting）',
-		items: [
-			{
-				id: 'ts-invalid-hook',
-				title:
-					'10.1 Invalid hook call（Hooks 只能在 function component 内部调用）',
-				dateLabel: TODAY,
-				description:
-					'典型原因：插件项目里跑了两份不同的 React 实例。排查步骤：\n' +
-					'1. vite.config.ts 的 shared 中 react/react-dom 必须加 singleton: true。\n' +
-					'2. 删除插件 node_modules/.vite 缓存后重新 pnpm dev。\n' +
-					'3. 在插件和宿主中分别 pnpm ls react，确认 major 版本完全一致。\n' +
-					'4. 确认插件被宿主渲染时，App 组件内部没有再写 ReactDOM.createRoot(...).render(<App {...bridge} />)（宿主已经帮你 render 了，再 createRoot 必出双实例问题）。',
-			},
-			{
-				id: 'ts-cors',
-				title: '10.2 CORS：Access to script at remoteEntry.js blocked',
-				dateLabel: TODAY,
-				description:
-					'1. 本地：插件 vite.config.ts 的 server.cors 必须是 true。\n' +
-					'2. 线上：CDN/Nginx 侧按 §8.2 配置 Access-Control-Allow-Origin。\n' +
-					'3. 使用第三方 CDN（jsDelivr / unpkg / Cloudflare Pages）时确认其默认 CORS 策略允许。',
-			},
-			{
-				id: 'ts-style-leak',
-				title: '10.3 样式污染（插件 Tailwind 影响宿主全局样式）',
-				dateLabel: TODAY,
-				description:
-					'两条铁律：\n' +
-					'① 给你的插件 Tailwind 加一个专属 prefix（例如 hp-），这样 plugin- 类不会跟宿主撞名。\n' +
-					'② 永远不要在插件里写 @tailwind base（它会注入 reset 影响宿主），只保留 components + utilities。\n' +
-					'参考配置：',
-				code: { lang: 'javascript', code: CODE_10_3_TAILWIND_PREFIX },
-			},
-			{
-				id: 'ts-bridge-undefined',
-				title: '10.4 bridge 字段 undefined（明明声明了权限却用不了）',
-				dateLabel: TODAY,
-				description:
-					'1. 对照 §7.2 确认 Registry.permissions 确实包含了你以为的权限。\n' +
-					'2. 打开宿主日志，看 PluginManager 加载该插件时是否有 permission filtered 之类警告。\n' +
-					'3. 若声明的是 http:plugin-api，再检查 allowList.domains 是否包含请求的实际域名（含子域；需要精确匹配或显式写入父域）。',
-			},
-			{
-				id: 'ts-locale-not-change',
-				title: '10.5 切换语言后插件文字不变',
-				dateLabel: TODAY,
-				description:
-					'1. 确认 App 组件顶部每次 render 都执行了 setLocale(locale)（见 §5.2）。\n' +
-					'2. 不要把 locale 塞进你插件自己的 useState 里，真源始终是 HostBridge 传入的 locale。\n' +
-					'3. 宿主会以新 bridge props 整体 re-render 插件，不需要手动订阅事件。',
-			},
-			{
-				id: 'ts-mf-remote',
-				title:
-					'10.6 Remote 模块找不到 / Shared module is not available for eager consumption',
-				dateLabel: TODAY,
-				description:
-					'1. 启动顺序：先开插件项目，再开宿主（宿主一启动就会尝试去连 remoteEntry）。\n' +
-					'2. 确认两个项目使用了完全相同版本的 @originjs/vite-plugin-federation。\n' +
-					'3. 确认 vite.config.ts 中 build.modulePreload = false 已关闭（Module Federation 默认需要关）。\n' +
-					'4. 如果是第一次起项目且 MF 报错，先在两个项目都 pnpm dev --force 强制重建 deps 缓存。',
-			},
+			item(
+				'faq-styles-host',
+				'12.1 独立预览正常，嵌进 Host 后 Tooltip / 菜单没样式？',
+				'先查 expose 入口是否 import "@/styles.css"。再查弹层是否在 [data-mf-portal-scope] + 同 style-realm。',
+			),
+			item(
+				'faq-vue-blank',
+				'12.2 Vue 插件白屏 / 被当成 React？',
+				'registry 写 "framework": "vue"；Remote 只导出 Vue default；不要自建 React 桥。',
+			),
+			item(
+				'faq-pollute',
+				'12.3 样式污染了 Host？',
+				'first-party 下应由 Host @scope。仍污染则查是否绕过 head 注入、或 untrusted 误配成 MF。不要用旧的「关 Preflight / 加 prefix」当主方案。',
+			),
+			item(
+				'faq-backdrop',
+				'12.4 仅嵌入后毛玻璃失效？',
+				'查 Host PluginPageShell / Layout：圆角容器同层不要 overflow-hidden（会废掉子树 backdrop-filter）。',
+			),
+			item(
+				'faq-cache',
+				'12.5 发版后 Host 仍旧包？',
+				'确认已部署新 dist；Host 会读 Remote 自己的 mf-manifest.json 算指纹。不必为刷缓存去改 Host registry updatedAt。桌面壳需含 bust 逻辑的版本。',
+			),
 		],
 	},
 ];
 
-/* =======================================================================
- *  英文版
- * ======================================================================= */
+/* ========================= English ========================= */
 
 const introEn =
-	'Audience: Front-end developers who want to build independent plugins (sub-apps) for this platform. ' +
-	'Goal: From project init to host integration, step by step produce a working plugin.';
+	'Audience: frontend developers building React / Vue Module Federation remotes (plugins) for this host.\n\n' +
+	'Goal: scaffold the project, export exposes correctly, register in the Host registry, and get Host-embedded styling (including Tooltip / Dialog / Teleport) that matches standalone preview.\n\n' +
+	'References:\n' +
+	'• React: apps/micro in this monorepo (port 9008)\n' +
+	'• Vue: micro-vue sample (port 9009, framework: "vue" in registry)\n' +
+	'• Deep dive: apps/frontend/src/plugins/docs/plugin-development-guide.md\n\n' +
+	'Updated: ' +
+	TODAY;
 
 const sectionsEn: PluginGuideSection[] = [
 	{
 		id: 'arch',
-		title: '1. Architecture Overview',
+		title: '1. Architecture & loading',
 		items: [
-			{
-				id: 'arch-components',
-				title: '1.1 System Components',
-				dateLabel: TODAY,
-				description:
-					'The host project implements the plugin system with three core modules:\n' +
-					'• PluginManager (plugins/core/PluginManager.ts) — Load / unload / activate plugins; manage lifecycle.\n' +
-					'• PluginRegistry (plugins/core/registry.ts) — Fetch & cache plugin metadata; apply user overrides.\n' +
-					'• PluginHostPage (views/pluginHost/index.tsx) — The page that actually mounts the plugin; picks the embed mode by trust level.',
-			},
-			{
-				id: 'arch-trust',
-				title: '1.2 Trust Levels & Embed Modes',
-				dateLabel: TODAY,
-				description:
-					'The host distinguishes three plugin classes via the `trust` field:\n' +
-					'• first-party — Module Federation direct mount; shares host React / dependencies. Highest permissions; every declared host API is available. In-house, fully trusted plugins.\n' +
-					'• partner — Module Federation mount; host injects a strict capability whitelist. Restricted to declared permissions only. Partner-vendor plugins.\n' +
-					'• untrusted — iframe sandboxed bridge via postMessage. Minimal permissions; only explicitly whitelisted interfaces. Unknown / third-party source plugins.',
-			},
-			{
-				id: 'arch-flow',
-				title: '1.3 Loading Flow',
-				dateLabel: TODAY,
-				description:
-					'1. On host startup PluginManager.init() pulls the remote Registry JSON.\n' +
-					"2. PluginRegistry merges with the user's local enabled state producing the final active manifest.\n" +
-					'3. User clicks a plugin → navigates to the PluginHostPage route.\n' +
-					'4. mountShell() renders a skeleton shell first to avoid perceived blank.\n' +
-					'5. loadPlugin() then loads the plugin by trust:\n' +
-					'   • first-party / partner: dynamic MF via container.get(EXPORT_NAME).\n' +
-					'   • untrusted: creates <iframe src="..."> and wires the postMessage HostBridge.\n' +
-					"6. After mount, the plugin's exported activate() hook runs and the lifecycle begins.",
-			},
+			item(
+				'arch-roles',
+				'1.1 Roles',
+				'• Host (apps/frontend): registry, registerRemotes, loadRemote, routes/sidebar, PluginHostPage, runtime @scope CSS isolation, Portal/Teleport retargeting.\n' +
+					'• Remote: Vite + @module-federation/vite exposes; you own default export + HostBridge APIs allowed by permissions.\n' +
+					'• Registry (plugins-registry.json): id / entry / expose / remoteName / framework / permissions / trust. Copy changes only need registry edits—not Host i18n keys.',
+			),
+			item(
+				'arch-trust',
+				'1.2 Trust levels',
+				'• first-party / partner: MF embed; Host scopes CSS with @scope([data-mf-style-realm]); React createPortal + Vue Teleport(to body) are retargeted into [data-mf-portal-scope].\n' +
+					'• untrusted: iframe + postMessage; set iframeUrl (https in prod).\n' +
+					'Missing permissions ⇒ bridge fields undefined—always optional-chain.',
+			),
+			item(
+				'arch-flow',
+				'1.3 MF load flow',
+				'1. PluginManager.init() fetches registry.\n' +
+					'2. Routes/sidebar injected when injectRoute !== false.\n' +
+					'3. ensurePlugin → one GET mf-manifest.json → bust version@manifestHash → remoteEntry.js?v=.\n' +
+					'4. loadRemote → normalizePluginModule (React default, or Vue via createVueHostBridge when framework is "vue").\n' +
+					'5. PluginHostPage sets data-mf-plugin + data-mf-style-realm and attachPluginStyleIsolation.\n' +
+					'6. Optional activate / deactivate.',
+			),
+			item(
+				'arch-tree',
+				'1.4 Suggested layout',
+				'One repo may expose many modules (see apps/micro).',
+				{ lang: 'markdown', code: CODE_TREE },
+			),
 		],
 	},
 	{
 		id: 'init',
-		title: '2. Init Your Plugin Project',
+		title: '2. Environment & scaffolding',
 		items: [
-			{
-				id: 'init-env',
-				title: '2.1 Environment Requirements',
-				dateLabel: TODAY,
-				description:
-					'Recommended tool versions (staying aligned with the host avoids a lot of compatibility pain):\n' +
-					'• Node.js ≥ 18.17 (Node 20 LTS preferred)\n' +
-					'• pnpm ≥ 8.10 (matches host package manager)\n' +
-					'• Vite 5.x (matches the host vite-plugin-federation version)\n' +
-					'• React 18.x (must match the host React major)\n' +
-					'• TypeScript ≥ 5.3 (keep close to the host TS version)',
-			},
-			{
-				id: 'init-create',
-				title: '2.2 Quick Setup Commands',
-				dateLabel: TODAY,
-				description:
-					'Scaffold from the official Vite template, then add Module Federation and host shared dependencies on top:',
-				code: { lang: 'bash', code: CODE_2_2_BASH },
-			},
-			{
-				id: 'init-envfile',
-				title: '2.3 Environment Variables (.env)',
-				dateLabel: TODAY,
-				description:
-					'Create a .env at the project root with the following content (ports should match what your team actually allocates):',
-				code: { lang: 'dotenv', code: CODE_2_3_DOTENV },
-			},
+			item(
+				'init-tools',
+				'2.1 Tooling',
+				'Node ≥ 20, pnpm ≥ 8. Use @module-federation/vite (not legacy @originjs/vite-plugin-federation). Typical ports: Host 9002, React remote 9008, Vue remote 9009.',
+			),
+			item(
+				'init-env',
+				'2.2 .env',
+				'VITE_REMOTE_PUBLIC_ORIGIN must match registry entry origin and vite base.',
+				{ lang: 'dotenv', code: CODE_ENV },
+			),
+			item(
+				'init-react-deps',
+				'2.3 React dependencies',
+				'Share React major with Host; shared singletons: react + react-dom only.',
+				{ lang: 'bash', code: CODE_REACT_DEPS },
+			),
+			item(
+				'init-vue-deps',
+				'2.4 Vue dependencies',
+				'Do not add React or a React bridge in the remote. shared: vue singleton only. Host wraps via createVueHostBridge.',
+				{ lang: 'bash', code: CODE_VUE_DEPS },
+			),
 		],
 	},
 	{
-		id: 'vite',
-		title: '3. Configure Vite + Module Federation',
+		id: 'vite-react',
+		title: '3. React: Vite + Module Federation',
 		items: [
-			{
-				id: 'vite-full-config',
-				title: '3.1 Full vite.config.ts Template',
-				dateLabel: TODAY,
-				description:
-					'This config includes: cache-clear workaround for HMR MF issues, MF shared deps (React singleton), dev CORS turned on, optimized build options.\n' +
-					'Critical reminders: Without `cors: true` the browser blocks remoteEntry.js outright. Without `singleton` you will see cryptic errors like "Invalid hook call".',
-				code: { lang: 'typescript', code: CODE_3_1_VITE_TS },
-			},
+			item(
+				'vite-react-full',
+				'3.1 Full vite.config.ts (React)',
+				'Must-haves: base; name/filename/manifest/exposes; react|react-dom singleton; hostInitInjectLocation: "entry"; optimizeDeps.exclude React; CORS; modulePreload: false. Do not share react-router.',
+				{ lang: 'typescript', code: CODE_VITE_REACT },
+			),
+			item(
+				'vite-react-checklist',
+				'3.2 React Vite checklist',
+				'• base ↔ registry entry\n• name ↔ remoteName; expose path ↔ registry.expose\n• Every expose file imports styles.css\n• Start remote before opening the plugin in Host\n• Invalid hook call ⇒ duplicate React',
+			),
 		],
 	},
 	{
-		id: 'app',
-		title: '4. Implement the Plugin Root (App.tsx)',
+		id: 'vite-vue',
+		title: '4. Vue: Vite + Module Federation',
 		items: [
-			{
-				id: 'app-types',
-				title: '4.1 Copy HostBridgeProps Into src/types.d.ts',
-				dateLabel: TODAY,
-				description:
-					'Refresh this file every time the host plugin contract changes. It contains the minimal subset of the bridge capabilities your plugin can read from the host.',
-				code: { lang: 'typescript', code: CODE_4_1_TYPES },
-			},
-			{
-				id: 'app-root',
-				title: '4.2 Full Root Component Template (App.tsx)',
-				dateLabel: TODAY,
-				description:
-					'The host MF runtime loads this default export and mounts it directly. You MUST NOT wrap it in another ReactDOM.createRoot (that breaks shared deps). ' +
-					'For standalone dev preview use the separate main.tsx in the next section.',
-				code: { lang: 'tsx', code: CODE_4_2_APP_TSX },
-			},
-			{
-				id: 'app-main',
-				title: '4.3 Standalone Preview Entry (main.tsx)',
-				dateLabel: TODAY,
-				description:
-					'Entry for local dev only. Injects a mock HostBridge so you can see the page without ever starting the host. The host never uses this file.',
-				code: { lang: 'tsx', code: CODE_4_3_MAIN_TSX },
-			},
+			item(
+				'vite-vue-full',
+				'4.1 Full vite.config.ts (Vue)',
+				'plugin-vue; shared.vue only; expose an index.ts that re-exports App.vue.',
+				{ lang: 'typescript', code: CODE_VITE_VUE },
+			),
+			item(
+				'vite-vue-rules',
+				'4.2 Hard rules for Vue remotes',
+				'1. Registry MUST set "framework": "vue".\n' +
+					'2. Export Vue default only—no required export const framework when registry has it.\n' +
+					'3. Never build a React bridge inside the remote.\n' +
+					'4. Root props: bridge: HostBridgeProps (reactive), not top-level {api, plugin}.\n' +
+					'5. Do not custom-target Teleport containers; Host retargets body mounts.\n' +
+					'6. Every expose imports "@/styles.css".',
+			),
+		],
+	},
+	{
+		id: 'react-impl',
+		title: '5. Implementing a React plugin',
+		items: [
+			item(
+				'react-types',
+				'5.1 HostBridgeProps',
+				'No api.t. Maintain your own i18n; follow api.locale. Guard optional APIs.',
+				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
+			),
+			item(
+				'react-expose',
+				'5.2 Expose entry (must import styles)',
+				'Host only loads the expose module—not main.tsx. Missing CSS ⇒ overlays look unstyled only when embedded.',
+				{ lang: 'tsx', code: CODE_REACT_EXPOSE },
+			),
+			item(
+				'react-app',
+				'5.3 App.tsx',
+				'Default-export a component; prefer data-plugin-root. Host adds data-mf-plugin / data-mf-style-realm. Avoid double padding if PluginPageShell wraps the route.',
+				{ lang: 'tsx', code: CODE_REACT_APP },
+			),
+			item('react-main', '5.4 Standalone main.tsx', 'For local preview only.', {
+				lang: 'tsx',
+				code: CODE_REACT_MAIN,
+			}),
+			item(
+				'react-api',
+				'5.5 Calling Host APIs safely',
+				'ui:toast / nav:subtree / http:plugin-api / modules:* — check before use.',
+				{ lang: 'tsx', code: CODE_API_USAGE },
+			),
+			item(
+				'react-lifecycle',
+				'5.6 activate / deactivate',
+				'Optional. Keep hooks out of hot component files (Fast Refresh).',
+				{ lang: 'typescript', code: CODE_LIFECYCLE },
+			),
+		],
+	},
+	{
+		id: 'vue-impl',
+		title: '6. Implementing a Vue plugin',
+		items: [
+			item(
+				'vue-bridge-model',
+				'6.1 How Host mounts Vue',
+				'normalizePluginModule → createVueHostBridge: React mounts a div, then createApp(VueRoot, { bridge }).mount(el). Read fields via props.bridge.',
+			),
+			item(
+				'vue-types',
+				'6.2 Types',
+				'Same HostBridgeProps as React; consume via props.bridge.',
+				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
+			),
+			item(
+				'vue-expose',
+				'6.3 Expose index.ts',
+				'Import styles; re-export App.vue.',
+				{ lang: 'typescript', code: CODE_VUE_EXPOSE },
+			),
+			item(
+				'vue-app',
+				'6.4 App.vue sample',
+				'Use normal Teleport overlays; verify [data-mf-portal-scope] + matching style-realm in DevTools.',
+				{ lang: 'vue', code: CODE_VUE_APP },
+			),
+			item(
+				'vue-main',
+				'6.5 Standalone main.ts',
+				'Host never runs this file when embedded.',
+				{ lang: 'typescript', code: CODE_VUE_MAIN },
+			),
+			item(
+				'vue-donts',
+				'6.6 Common Vue mistakes',
+				'• styles only in main.ts\n• missing registry framework: "vue"\n• homemade React bridge\n• hand-written data-mf-* / portal containers\n• expecting top-level {api, plugin} props',
+			),
+		],
+	},
+	{
+		id: 'styles',
+		title: '7. Styles, isolation & overlays',
+		items: [
+			item(
+				'styles-model',
+				'7.1 Host isolation (zero remote invasion)',
+				'Full Tailwind + Preflight is OK for first-party/partner. Host wraps injected CSS in @scope([data-mf-style-realm]). Do not rely on legacy "Tailwind prefix / disable Preflight" advice. Do not pass custom portal containers for MF.',
+			),
+			item(
+				'styles-expose',
+				'7.2 CRITICAL: import styles in every expose',
+				'main.ts(x) CSS runs only in standalone preview. Expose-entry import runs when Host loads the remote. Multi-expose repos: import in each entry.',
+			),
+			item(
+				'styles-file',
+				'7.3 styles.css sample',
+				'Align tokens with apps/micro/src/styles.css.',
+				{ lang: 'css', code: CODE_STYLES_CSS },
+			),
+			item(
+				'styles-portal',
+				'7.4 Overlay acceptance',
+				'Tooltip/Dialog/ContextMenu/Sheet/Sonner keep utilities; nodes sit under [data-mf-portal-scope]; Host toaster stays fixed; do not invent data-mf-* in business UI.',
+			),
 		],
 	},
 	{
 		id: 'i18n',
-		title: '5. i18n & Theme Follow',
+		title: '8. Plugin i18n & Host locale',
 		items: [
-			{
-				id: 'i18n-dict',
-				title: '5.1 Plugin-Owned i18n Dictionary',
-				dateLabel: TODAY,
-				description:
-					'The host does NOT share its translation table with plugins. Every plugin owns its own dictionary. Below is a minimal usable t() + setLocale() implementation.',
-				code: { lang: 'typescript', code: CODE_5_1_I18N_TS },
-			},
-			{
-				id: 'i18n-follow',
-				title: '5.2 Follow Host Locale Changes',
-				dateLabel: TODAY,
-				description:
-					'When the user switches language the host re-renders the whole plugin with a fresh bridge instance (no explicit event subscription needed). ' +
-					'Just call setLocale(locale) at the top of your App() body on every render:',
-				code: { lang: 'tsx', code: CODE_5_2_FOLLOW_LOCALE },
-			},
+			item(
+				'i18n-rules',
+				'8.1 Rules',
+				'No api.t. Own dictionaries. MF: api.locale + event "locale". Standalone: ?lang= / local storage. Isolate storage keys from Host.',
+			),
+			item(
+				'i18n-hook',
+				'8.2 useHostLocale (React)',
+				'Vue: watch bridge.api.locale + event.on("locale").',
+				{ lang: 'typescript', code: CODE_USE_HOST_LOCALE },
+			),
 		],
 	},
 	{
 		id: 'perm',
-		title: '6. Permissions & API Usage',
+		title: '9. Permissions & registry fields',
 		items: [
-			{
-				id: 'perm-list',
-				title: '6.1 Full Permission List (send together with your Registry PR)',
-				dateLabel: TODAY,
-				description:
-					'Supported permissions today. Match against what your plugin actually does, and send the exact subset to host maintainers to be written into Registry.permissions.',
-				code: { lang: 'yaml', code: CODE_6_1_PERMS_YAML },
-			},
-			{
-				id: 'perm-good-bad',
-				title: '6.2 Good vs Bad Usage',
-				dateLabel: TODAY,
-				description:
-					'Before the host hands the bridge to the plugin it filters against Registry.permissions; any missing method becomes undefined. ' +
-					'Feature-detecting before each call is the only robust pattern.',
-				code: { lang: 'tsx', code: CODE_6_2_GOOD_BAD },
-			},
+			item(
+				'perm-list',
+				'9.1 Permissions',
+				'ui:toast, nav:subtree, http:plugin-api, modules:chat, modules:ebook — least privilege; null-check APIs.',
+			),
+			item(
+				'registry-react',
+				'9.2 React registry sample',
+				'No titleKey/descriptionKey/menu.nameKey. hostApiRange covers Host VITE_HOST_API_VERSION—not plugin version.',
+				{ lang: 'json', code: CODE_REGISTRY_REACT },
+			),
+			item(
+				'registry-vue',
+				'9.3 Vue registry (framework required)',
+				'Set framework: "vue". Align remoteName/expose with vite config.',
+				{ lang: 'json', code: CODE_REGISTRY_VUE },
+			),
+			item(
+				'registry-fields',
+				'9.4 Field cheat-sheet',
+				'id, remoteName, expose, framework, entry, routePath, injectRoute, menu, permissions, preload, trust, iframeUrl, host (ebook surfaces). Deploy new dist for cache bust—Host fingerprints mf-manifest.json.',
+			),
+			item('registry-untrusted', '9.5 untrusted iframe sample', '', {
+				lang: 'json',
+				code: CODE_UNTRUSTED,
+			}),
 		],
 	},
 	{
-		id: 'registry',
-		title: '7. Register With the Host (Send This to Maintainers)',
+		id: 'preview-deploy',
+		title: '10. Preview, deploy & debug',
 		items: [
-			{
-				id: 'registry-snippet',
-				title: '7.1 Registry Snippet to Send to Host Maintainers',
-				dateLabel: TODAY,
-				description:
-					'Send the following JSON snippet to the host project maintainers, asking them to append it to the plugin Registry file. ' +
-					'The Registry location depends on deployment: either apps/frontend/src/plugins/registry.json or a remote JSON URL served by backend.',
-				code: { lang: 'json', code: CODE_7_1_REGISTRY_JSON },
-			},
-			{
-				id: 'registry-fields',
-				title: '7.2 Registry Field Reference',
-				dateLabel: TODAY,
-				description:
-					'Quick field reference (keep a copy for both you and the host maintainer):\n' +
-					'• id: Globally unique plugin ID (recommend matching remoteName). Required.\n' +
-					'• remoteName: Module Federation container name; MUST exactly match federation({ name }) in vite.config. Can be omitted when id equals the MF name.\n' +
-					'• expose: MF exposes key, e.g. ./App, ./LearningNotes. Can be omitted when entry is mf-manifest.json (host auto-resolves from manifest).\n' +
-					'• title: Display name per locale (zh-CN / en-US). Required.\n' +
-					'• description: One-line description per locale. Required.\n' +
-					'• routePath: Route path in the host (e.g. /hello-plugin). Required.\n' +
-					'• entry: MF manifest URL (e.g. http://127.0.0.1:5174/mf-manifest.json). Required.\n' +
-					'• version: SemVer x.y.z. Required.\n' +
-					'• hostApiRange: Host API compatibility range (e.g. ^1.0.0). Required.\n' +
-					'• trust: Embed mode selector (first-party/partner/untrusted). Required.\n' +
-					'• permissions: Permissions whitelist; the host uses it to filter bridge methods. Required.\n' +
-					'• preload: Preload strategy; values: route (load on route enter) or none. Defaults to route.\n' +
-					'• enabled: Whether the plugin is enabled by default. Required.\n' +
-					'• menu: Sidebar entry config with order (sort weight) and icon (icon name). Required for standalone-page plugins.\n' +
-					'• injectRoute: Whether to inject into the host route tree; defaults to false. Set false and use the host field when embedding into a specific host page.\n' +
-					'• host: Embed-into-host-page config with surface (host page id), slot (drawer/toolbar), icon, order. Only used when injectRoute=false.',
-			},
-			{
-				id: 'registry-untrusted',
-				title: '7.3 Untrusted (iframe sandboxed) Example',
-				dateLabel: TODAY,
-				description:
-					'Untrusted plugins run inside an iframe, cannot share host dependencies via MF, and must bundle React (and friends) themselves. ' +
-					'Communication goes over postMessage, exposing only the minimum declared in permissions.',
-				code: { lang: 'json', code: CODE_7_3_UNTRUSTED_JSON },
-			},
+			item(
+				'preview',
+				'10.1 Local order',
+				'Start remote → start Host → open plugin route. Expect one mf-manifest.json + remoteEntry.js?v=.',
+			),
+			item(
+				'deploy',
+				'10.2 Build & hosting',
+				'pnpm build; enable CORS; prefer no-store with Host bust.',
+				{ lang: 'nginx', code: CODE_NGINX },
+			),
+			item(
+				'debug',
+				'10.3 Debug tips',
+				'Duplicate React; CORS; missing expose on deployed build; CSS not on expose; Vue missing framework; locale not wired.',
+			),
 		],
 	},
 	{
-		id: 'deploy',
-		title: '8. Deploy & Debug',
+		id: 'checklist',
+		title: '11. Acceptance checklist',
 		items: [
-			{
-				id: 'deploy-build',
-				title: '8.1 Production Build',
-				dateLabel: TODAY,
-				description:
-					'Run pnpm build. At minimum dist/assets/remoteEntry.js (the MF entry) plus its accompanying *.js / *.css assets must be publicly reachable.',
-				code: { lang: 'bash', code: CODE_8_1_BUILD_BASH },
-			},
-			{
-				id: 'deploy-nginx',
-				title: '8.2 Nginx Example',
-				dateLabel: TODAY,
-				description:
-					'Production recommendation: host the build output on Nginx. Key points: wide-open CORS, SPA deep-link fallback, long-cache on hashed assets, short-cache on remoteEntry.js:',
-				code: { lang: 'nginx', code: CODE_8_2_NGINX },
-			},
-			{
-				id: 'deploy-host-debug',
-				title: '8.3 Host Console Debugging Snippets',
-				dateLabel: TODAY,
-				description:
-					'After a successful load, inspect the plugin list / reload / inspect the active bridge via whatever dev surface the host exposes. Example (adjust to actual host API):',
-				code: { lang: 'typescript', code: CODE_8_3_HOST_DEBUG },
-			},
+			item(
+				'checklist-all',
+				'11.1 Before ship',
+				'[Build] MF vite plugin; manifest; entry inject; correct shared singletons; styles on every expose.\n' +
+					'[Component] default export; React {api,plugin} / Vue props.bridge; data-plugin-root; own i18n.\n' +
+					'[Registry] locale maps; hostApiRange; Vue framework; minimal permissions.\n' +
+					'[UX] overlays match standalone; Host toaster intact; fullscreen paired if used.',
+			),
 		],
 	},
 	{
-		id: 'hello',
-		title: '9. Full Hello World (i18n + Toast + HTTP)',
+		id: 'faq',
+		title: '12. FAQ',
 		items: [
-			{
-				id: 'hello-full',
-				title: '9.1 Full Hello World App.tsx',
-				dateLabel: TODAY,
-				description:
-					'A one-shot integration of §5 i18n, §4 base component, §6 permission-guarding, and error handling — a ready-to-copy template. ' +
-					'Drop it straight into your project src/App.tsx and all features are visible.',
-				code: { lang: 'tsx', code: CODE_9_HELLO_WORLD },
-			},
-		],
-	},
-	{
-		id: 'troubleshoot',
-		title: '10. Troubleshooting',
-		items: [
-			{
-				id: 'ts-invalid-hook',
-				title:
-					'10.1 "Invalid hook call. Hooks can only be called inside the body of a function component."',
-				dateLabel: TODAY,
-				description:
-					'Typical root cause: two separate React instances inside your plugin build. How to diagnose:\n' +
-					'1. Both react & react-dom MUST have singleton: true inside vite.config.ts shared.\n' +
-					'2. Remove node_modules/.vite inside the plugin and restart pnpm dev.\n' +
-					'3. Run pnpm ls react in BOTH the plugin AND the host; verify the same React major version.\n' +
-					'4. Make sure when mounted by the host you do NOT call ReactDOM.createRoot(...).render(<App {...bridge} />) inside App again. The host already mounts your component; creating a second root guarantees a duplicate instance bug.',
-			},
-			{
-				id: 'ts-cors',
-				title:
-					'10.2 CORS: "Access to script at remoteEntry.js from origin ... has been blocked"',
-				dateLabel: TODAY,
-				description:
-					'1. Local dev: ensure plugin vite.config.ts server.cors = true.\n' +
-					'2. Production: CDN / Nginx side must set Access-Control-Allow-Origin (see §8.2).\n' +
-					'3. If using a third-party CDN (jsDelivr / unpkg / CF Pages), confirm its default CORS policy allows it.',
-			},
-			{
-				id: 'ts-style-leak',
-				title:
-					'10.3 Style Leakage (plugin Tailwind bleeds into host global styles)',
-				dateLabel: TODAY,
-				description:
-					'Two non-negotiable rules:\n' +
-					'① Give your plugin Tailwind a unique prefix (e.g. hp-) so classes never collide with the host.\n' +
-					'② Never include @tailwind base inside the plugin (it injects resets that break the host); keep only components + utilities.\n' +
-					'Reference config:',
-				code: { lang: 'javascript', code: CODE_10_3_TAILWIND_PREFIX },
-			},
-			{
-				id: 'ts-bridge-undefined',
-				title:
-					'10.4 A bridge field is undefined even though I declared the permission',
-				dateLabel: TODAY,
-				description:
-					'1. Cross-check against §7.2 — confirm Registry.permissions actually contains the value you think it does.\n' +
-					'2. Open host logs; look for "permission filtered" warnings when PluginManager loads this plugin.\n' +
-					'3. If the permission is http:plugin-api, additionally verify allowList.domains covers the exact domain (or parent domain) being requested, including subdomain match semantics.',
-			},
-			{
-				id: 'ts-locale-not-change',
-				title: '10.5 User switches language but plugin text stays the same',
-				dateLabel: TODAY,
-				description:
-					'1. Confirm setLocale(locale) runs at the top of App() on every render (see §5.2).\n' +
-					'2. Do NOT stash locale into a plugin-local useState; the single source of truth is always locale from HostBridge.\n' +
-					'3. Host re-renders the plugin with fresh bridge props automatically; no manual event subscription is needed.',
-			},
-			{
-				id: 'ts-mf-remote',
-				title:
-					'10.6 "Remote module not found" / "Shared module is not available for eager consumption"',
-				dateLabel: TODAY,
-				description:
-					'1. Start order: start the plugin project FIRST, then start the host (host eagerly tries to connect to remoteEntry on boot).\n' +
-					'2. Ensure both projects use the EXACT same version of @originjs/vite-plugin-federation.\n' +
-					'3. Confirm build.modulePreload = false is set (Module Federation requires it off).\n' +
-					'4. If this is your very first run and MF keeps failing, run pnpm dev --force in BOTH projects to bust stale dep caches.',
-			},
+			item(
+				'faq-styles-host',
+				'12.1 Fine standalone, broken overlays in Host?',
+				'Import "@/styles.css" from the expose entry first; then verify portal-scope + style-realm.',
+			),
+			item(
+				'faq-vue-blank',
+				'12.2 Vue blank / treated as React?',
+				'registry "framework": "vue"; export Vue default only; no remote-side React bridge.',
+			),
+			item(
+				'faq-pollute',
+				'12.3 Styles leak into Host?',
+				'Host @scope should contain remote CSS. Check bypass injectors / wrong trust. Do not rely on legacy prefix/Preflight hacks.',
+			),
+			item(
+				'faq-backdrop',
+				'12.4 backdrop-filter only broken when embedded?',
+				'Host shell overflow on the same node as border-radius—see PluginPageShell / Layout guidance.',
+			),
+			item(
+				'faq-cache',
+				'12.5 Host still shows old bundle?',
+				'Deploy new dist; Host busts via remote mf-manifest fingerprint—no need to bump registry updatedAt just for cache.',
+			),
 		],
 	},
 ];
-
-/* =======================================================================
- *  对外导出 API
- * ======================================================================= */
 
 export function getPluginGuideIntro(locale: string): string {
 	return locale === 'en-US' ? introEn : introZh;

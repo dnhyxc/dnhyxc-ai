@@ -6,6 +6,10 @@ import {
 } from '@module-federation/enhanced/runtime';
 import React from 'react';
 import ReactDOM from 'react-dom';
+import {
+	normalizePluginModule,
+	type RawRemoteModule,
+} from './normalizePluginModule';
 import type { PluginDescriptor, PluginModule } from './types';
 
 let mf: ModuleFederation | null = null;
@@ -248,11 +252,12 @@ export async function loadRemoteApp(
 	ensureBustPlugin();
 	const name = remoteNameOf(d);
 	const expose = exposeBaseOf(d);
-	const mod = await getMf().loadRemote<PluginModule>(`${name}/${expose}`);
-	if (!mod?.default) {
+	const raw = await getMf().loadRemote<RawRemoteModule>(`${name}/${expose}`);
+	if (!raw?.default) {
 		throw new Error(
 			`plugin ${d.id}: expose ./${expose} missing default export`,
 		);
 	}
-	return mod;
+	// Vue Remote → Host React 桥；React Remote 原样
+	return normalizePluginModule(raw, d);
 }

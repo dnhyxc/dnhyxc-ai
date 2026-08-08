@@ -5,8 +5,8 @@
 | 文档 | 读者 | 内容 |
 |------|------|------|
 | [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | Host 开发者 | 三种接入模式、侧栏注入、HostBridge、**§11.3 刷新防闪 404**、**§15 应用级全屏 / pageShell**、**附录 B 样式隔离（realm / Portal / Drawer 认领）**、**附录 B.1 overflow 与 backdrop-filter** |
-| [plugin-development-guide.md](./plugin-development-guide.md) | 插件开发者 | Vite/组件/样式/API、**§16 `setAppFullscreen`**、验收清单；Portal / realm 由 Host 负责 |
-| [mf-implementation-guide.md](./mf-implementation-guide.md) | 双方（实现细节） | 逐模块实现、**样式隔离 §2.10.2**（realm / Portal / sonner / reclaim）、**§2.10.0 / §2.14 overflow 分层与 backdrop-filter**、**entry bust（§2.13）**、**§2.11 防闪 404**、**§2.14 影院全屏** |
+| [plugin-development-guide.md](./plugin-development-guide.md) | 插件开发者 | Vite/组件/样式/API、**§4.3 Vue + registry `framework`**、**§5.2 expose 须 `import styles.css`**、**§16 `setAppFullscreen`**、验收清单；Portal / realm 由 Host 负责 |
+| [mf-implementation-guide.md](./mf-implementation-guide.md) | 双方（实现细节） | 逐模块实现、**样式隔离 §2.10.2**（realm / Portal·Teleport / body remove 镜像·antd / transpile·CSSOM / sonner / reclaim；专题见 `docs/app/style-isolation-qiankun-harden.md`）、**§2.10.0 / §2.14 overflow 分层与 backdrop-filter**、**entry bust（§2.13）**、**§2.11 防闪 404**、**§2.14 影院全屏** |
 
 ## 应用级全屏相关（已并入上述手册）
 
@@ -20,9 +20,13 @@
 
 1. `@scope([data-mf-style-realm])`：按 Remote entry 域，同仓多 expose 共享一份 CSS
 2. `reclaimEntryStyles`：切换同 Remote 插件时重包 head 已注入样式
-3. 劫持共享 `react-dom.createPortal` → `[data-mf-portal-scope]`（同 realm）
-4. Host Drawer：`claimPluginPortalTarget` / `clearPluginPortalClaim`（`EbookReadHostPlugins`）；App 根 `data-mf-host-portal` 保护 Host `<Toaster />`
-5. barrel 导出：`styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim`（`@/plugins`）
+3. 劫持 `react-dom.createPortal` **与** body 原型挂载 → `[data-mf-portal-scope]`（同 realm；覆盖 Vue Teleport）
+4. body `removeChild` / `replaceChild` 镜像：antd `getScrollBarSize` 等「`body.append` → `body.remove`」在 append 被重定向后仍能从实际父节点卸载（避免 `NotFoundError`）
+5. Host Drawer：`claimPluginPortalTarget` / `clearPluginPortalClaim`；App 根 `data-mf-host-portal` + Toaster children 识别保护 Host `<Toaster />`
+6. qiankun 级转译：`transpileStyleText` / CSSOM `insertRule`；`captureStack`；详解 [`docs/app/style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)
+7. **Vue 子应用**：Host `createVueHostBridge` + `normalizePluginModule`；**registry 必写 `"framework": "vue"`**；Remote 只导出 Vue 根（勿自建 React 桥）
+8. **Remote 样式入口**：每个 MF expose 须 `import '@/styles.css'`（Host 不执行 `main.ts`）；详见开发手册 §5.2
+9. barrel 导出：`styleRealmKey` / claim / clear / `createVueHostBridge`（`@/plugins`）
 
 ## 刷新子应用防闪 404（已并入上述手册）
 

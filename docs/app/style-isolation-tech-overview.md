@@ -3,12 +3,14 @@
 > **文档角色**：面向主/子应用开发者的样式隔离技术快速参考
 > **阅读时间**：约 5 分钟
 > **目标**：让开发者快速了解主项目使用的样式隔离技术、原理、以及各自需要关注的点
+>
+> **延伸阅读**：[style-isolation-qiankun-harden.md](./style-isolation-qiankun-harden.md)（第三轮：transpile / CSSOM / 跨框架 Portal）· [style-isolation-realm-portal.md](./style-isolation-realm-portal.md) · [style-isolation-implementation.md](./style-isolation-implementation.md)
 
 ---
 
 ## 一、一句话总结
 
-**主项目采用「CSS `@scope` 规则 + DOM 方法劫持 + MutationObserver」的组合方案，实现零侵入的主子项目样式隔离，子项目无需任何改造。**
+**主项目采用「CSS `@scope` + qiankun 式转译 + head/CSSOM 劫持 + MutationObserver + Portal/Teleport 收编」的组合方案，实现零侵入的主子项目样式隔离，子项目无需任何改造。**
 
 ---
 
@@ -16,10 +18,13 @@
 
 | 技术 | 作用 | 所属层级 |
 |------|------|---------|
-| **CSS `@scope` 规则** | 将子项目的所有 CSS 选择器限制在指定容器内 | 浏览器原生能力 |
+| **CSS `@scope` 规则** | 将子项目选择器限制在 `[data-mf-style-realm]` 容器内 | 浏览器原生能力 |
+| **`transpileStyleText`** | `@font-face`/`@import` hoist、`@keyframes` realm 前缀后再包 `@scope` | 运行时转译（对齐 qiankun next） |
 | **`head.appendChild` / `insertBefore` 劫持** | 同步捕获子项目注入的 style/link 标签 | 运行时劫持 |
-| **MutationObserver** | 异步捕获子项目延迟注入的样式（HMR、动态 import 等） | DOM 监听 API |
-| **`data-mf-plugin` 属性** | 作为 `@scope` 的根选择器，标记插件容器边界 | DOM 属性约定 |
+| **`CSSStyleSheet.insertRule` 劫持** | 捕获 CSS-in-JS 单条规则注入 | CSSOM |
+| **MutationObserver** | head 仅 `childList`；空 style / HMR 用节点级观察 | DOM 监听 API |
+| **`createPortal` + body 原型挂载劫持** | React Portal / Vue Teleport 等收进 portal-scope | 运行时劫持 |
+| **`data-mf-style-realm` / `data-mf-plugin`** | `@scope` 根与插件根标识 | DOM 属性约定 |
 | **iframe（untrusted 模式）** | 不可信插件的完全隔离方案 | 浏览器原生能力 |
 
 ---
@@ -47,30 +52,35 @@
 
 ### 3.2 主项目如何自动包裹子项目样式
 
-主项目在子项目加载期间，自动拦截所有注入到 `document.head` 的 style/link 标签：
+主项目在子项目加载期间，自动拦截所有注入到 `document.head` 的 style/link 标签（并拦截 CSSOM `insertRule`）：
 
 ```
-子项目注入样式 → 主项目拦截 → 用 @scope 包裹 → 放回 DOM
+子项目注入样式 → 主项目拦截 → transpile（hoist / keyframes 前缀）→ @scope → 放回 DOM
 ```
 
 具体流程：
 
-1. **加载前**：开启样式捕获模式
+1. **加载前**：开启样式捕获模式（`captureStack` 压栈）
 2. **加载中**：子项目的 CSS 被打包工具注入到 `document.head`
 3. **拦截处理**：
-   - style 标签：直接将内容用 `@scope` 包裹
-   - link 标签：fetch 获取 CSS 内容后转成 scoped style
+   - style 标签：`transpileStyleText` 后写入（全局 at-rule 在 `@scope` 外）
+   - link 标签：先 `disabled`，fetch 后转成 scoped style
+   - CSS-in-JS：`insertRule` 走 `transpileStyleRule`
 4. **加载后**：结束首次捕获
-5. **运行时**：插件页面挂载期间持续捕获（HMR、动态 import）
+5. **运行时**：插件页面挂载期间持续捕获（HMR、动态 import）+ Portal/Teleport 收编
 
 ### 3.3 插件容器约定
 
-每个子项目渲染在一个带有 `data-mf-plugin` 属性的容器内：
+每个子项目渲染在带 `data-mf-plugin` + `data-mf-style-realm` 的容器内（realm 按 Remote entry，同仓多 expose 共享）：
 
 ```html
-<div data-mf-plugin="plugin-id" data-plugin-root>
+<div
+  data-mf-plugin="plugin-id"
+  data-mf-style-realm="entry:http://localhost:9008/"
+  data-plugin-root
+>
   <!-- 子项目渲染在这里 -->
-  <!-- 所有 scoped 样式仅在这个 div 内生效 -->
+  <!-- 所有 scoped 样式仅在这个 realm 子树内生效 -->
 </div>
 ```
 
@@ -202,7 +212,7 @@ location /static/css/ {
 | Shadow DOM | 中（需改挂载） | 完全 | 中 | ❌ 不支持 | ❌ 未采用 |
 | CSS Modules | 中（需用 Modules） | 较好（class 级） | 高 | ✅ 支持 | ❌ 未采用 |
 | qiankun strictStyleIsolation | 低 | 完全 | 中 | ❌ 不支持 | ❌ 未采用 |
-| qiankun experimentalStyleIsolation | 低 | 较好 | 中 | ✅ 支持 | ❌ 未采用（用原生 @scope 更好） |
+| qiankun experimentalStyleIsolation / next `@scope` transpile | 低 | 较好 | 中～高 | ✅ 支持 | ✅ 意图对齐：原生 `@scope` + hoist/keyframes/CSSOM（见 [qiankun-harden](./style-isolation-qiankun-harden.md)） |
 | iframe | 低 | 完全 | 低 | ❌ 不支持 | ✅ untrusted 插件用 |
 
 ### 7.2 选择理由
