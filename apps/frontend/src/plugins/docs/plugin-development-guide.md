@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host，不白名单 remote 目录名）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding。Host 侧见 `host-plugin-integration-guide.md` §15；实现见 `mf-implementation-guide.md` §2.14。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host，不白名单 remote 目录名；**`data-mf-style-realm` 多 expose；Portal `createPortal` 收编；同 Remote 切换 `reclaimEntryStyles`**）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding；**插件侧勿手写 portal container / 勿改 createPortal**（Host 已静默收编）。Host 侧见 `host-plugin-integration-guide.md` §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）。若不一致，以源码为准。
 
 ---
 
@@ -418,10 +418,19 @@ export async function deactivate() {
 
 | 信任等级 | 谁负责隔离 | Remote 可以做什么 |
 |----------|------------|-------------------|
-| `first-party` / `partner` | Host `styleIsolation.ts` 运行时 `@scope([data-mf-plugin])` | 正常 `@import "tailwindcss"`（含 Preflight） |
+| `first-party` / `partner` | Host `styleIsolation.ts` 运行时 `@scope([data-mf-style-realm])`（同 Remote 多插件共享 realm；Portal 由 Host `createPortal` 收编） | 正常 `@import "tailwindcss"`（含 Preflight） |
 | `untrusted` | iframe | 独立文档样式，互不影响 |
 
-Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应用目录改名一般**不必**改 Host；生产无 `data-vite-dev-id`，只在 load/挂载 capture 窗口认领。详见 `mf-implementation-guide.md` §2.10.2。
+Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应用目录改名一般**不必**改 Host；生产无 `data-vite-dev-id`，只在 load/挂载 capture 窗口认领。挂载时还会 `reclaimEntryStyles`，避免同 Remote 切换后样式丢失。详见 `mf-implementation-guide.md` §2.10.2。
+
+**插件侧约定（零侵入）**：
+
+| 事项 | 要求 |
+|------|------|
+| Tailwind / Preflight | 可正常 `@import "tailwindcss"`，不必关 Preflight |
+| Portal / Drawer / POP | **不要**为 MF 特传 `container` / `getPopupContainer`；Host 劫持共享 `createPortal` |
+| `data-mf-*` | 勿在 Remote 业务里手写 `data-mf-style-realm` / `data-mf-portal-scope`（Host 设置） |
+| 独立预览 vs 嵌入 | 独立预览正常、嵌入后毛玻璃失效 → 属 Host 外壳 overflow 分层问题，不是插件 CSS 写错；报给 Host 查 `PluginPageShell` / Layout |
 
 详见 `apps/micro/plugin-info.md` 与 `docs/ideas/mf-css-isolation.md`。
 
@@ -769,7 +778,7 @@ pnpm dev
 | `trust: untrusted` / 第三方不可信 | ✅ |
 | 需要强隔离（独立 JS/CSS 文档） | ✅ |
 | 需要操作顶层 `document`/`window` 且不能污染 Host | ✅ |
-| 第一方/合作方（`first-party` / `partner`） | ❌（MF 嵌入；样式由 Host `@scope` 隔离） |
+| 第一方/合作方（`first-party` / `partner`） | ❌（MF 嵌入；样式由 Host `@scope([data-mf-style-realm])` 隔离） |
 
 ### 11.2 iframe 客户端
 
@@ -992,7 +1001,7 @@ server {
 | 组件导出 | 有 `default` 导出，接收 `HostBridgeProps` |
 | 自有 i18n | 有插件字典；MF 下调用 `useHostLocale(api)` |
 | 无 `api.t` | 不依赖 Host 翻译函数 |
-| 样式 | MF 可用完整 Tailwind；隔离由 Host `@scope` 负责 |
+| 样式 | MF 可用完整 Tailwind；隔离由 Host `@scope([data-mf-style-realm])` + Portal 收编负责 |
 | API 使用 | 使用受限 API 前检查权限 |
 | 独立预览 | 可通过 `pnpm dev` 独立运行 |
 | Host 集成 | 可通过 Registry 加载并正常显示 |
@@ -1038,13 +1047,16 @@ server {
 
 ### Q2：为什么我的样式影响了 Host 页面？
 
-**先确认**：`first-party` / `partner` 下 Host 应对 Remote 注入的 CSS 做 `@scope([data-mf-plugin])`。若仍污染：
+**先确认**：`first-party` / `partner` 下 Host 应对 Remote 注入的 CSS 做 `@scope([data-mf-style-realm])`。若仍污染：
 
 - Host 未走到 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（检查 `PluginHostPage` 与 `PluginManager.runLoad`）
 - 插件用了绕过 head 注入的方式写全局样式
 - 实际是 `untrusted` 却误配成了 MF 嵌入
+- Host sonner 等被误包（应见 `data-mf-host-style` / `repairHostCriticalStyles`）
 
-**Remote 侧**：可继续用 `@import "tailwindcss"`；独立预览勿依赖 Host 私有 class。
+**Remote 侧**：可继续用 `@import "tailwindcss"`；独立预览勿依赖 Host 私有 class；不必手写 portal container。
+
+**若只有嵌入 Host 后 `backdrop-filter` 失效**：先查 Host `PluginPageShell` / Layout 是否在圆角同层写了 `overflow-hidden`（见接入手册附录 B.1），不是插件要关毛玻璃。
 
 ### Q3：如何在插件中使用 shadcn/ui？
 

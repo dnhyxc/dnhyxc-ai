@@ -52,6 +52,7 @@
 | 第三方任意域名插件怎么接 / 加插件不发桌面版                         | [ideas/third-party-mf-plugin-onboarding.md](./ideas/third-party-mf-plugin-onboarding.md)（§14 接入者 / §15 基座）                                          |
 | 桌面插件 RUNTIME-003 / Origin tauri://localhost                     | 对方 CORS 漏配；见上 + [apps/remote-plugins/README.md](../apps/remote-plugins/README.md)                                                   |
 | 插件样式污染主站 / 子应用 Button 无样式                             | [app/style-isolation-implementation.md](./app/style-isolation-implementation.md)（实现手册）、[ideas/mf-css-isolation.md](./ideas/mf-css-isolation.md)（思路）                                                                                                 |
+| 同一 Remote 多插件切换后样式丢失 / Drawer Portal 组件无样式 / sonner Toaster 顶开布局 | [app/style-isolation-realm-portal.md](./app/style-isolation-realm-portal.md)（Realm 键 + createPortal 收编 + sonner 保护 + HMR 重包） |
 | 动态插件加载失败闪烁 / virtual:mf 解析失败                          | [app/mf-plugin-host.md](./app/mf-plugin-host.md)                                                                                                         |
 | 桌面发新版插件仍是旧版 / remoteEntry 被缓存                         | [app/plugin-entry-cache-bust.md](./app/plugin-entry-cache-bust.md)（`version@manifestHash`）+ [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md) |
 | 线上 `/plugins` `useLocation` 无 Router context                     | [app/mf-shared-react-router.md](./app/mf-shared-react-router.md)                                                                                          |
@@ -68,6 +69,7 @@
 | 视频播放器插件 / 影院态全屏（藏侧栏 + Tauri 窗口/Web document 全屏） | [app/video-player-plugin.md](./app/video-player-plugin.md)、[app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)                                                                                   |
 | 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [app/video-player-component-refactor.md](./app/video-player-component-refactor.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
 | 视频播放器进度条 hover 无缩略图 / 画中画 Safari 不可用 / 长视频刻度卡 | [app/video-player-feature-enhancement.md](./app/video-player-feature-enhancement.md)（缩略图预览 + 多平台画中画 + 刻度上限）                                                                 |
+| 视频播放器拖拽松手右抖 / 循环单条不重播 / 控制条毛玻璃慢一拍 / xgplayer 背景不跟随主题 | [app/video-player-drag-scrub.md](./app/video-player-drag-scrub.md)（拖拽重写 + scrubHoldUntil 抑制 + 画布固定 160×90 + visible 显隐） |
 | 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |

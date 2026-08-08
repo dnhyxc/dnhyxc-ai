@@ -4,9 +4,9 @@
 
 | 文档 | 读者 | 内容 |
 |------|------|------|
-| [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | Host 开发者 | 三种接入模式、侧栏注入、HostBridge、**§11.3 刷新防闪 404**、**§15 应用级全屏 / pageShell** |
-| [plugin-development-guide.md](./plugin-development-guide.md) | 插件开发者 | Vite/组件/样式/API、**§16 `setAppFullscreen`**、验收清单 |
-| [mf-implementation-guide.md](./mf-implementation-guide.md) | 双方（实现细节） | 逐模块实现、样式隔离、**entry bust（§2.13：单次 GET manifest + 直连 remoteEntry）**、**§2.11 路由构建与防闪 404**、**§2.14 应用级全屏源码** |
+| [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | Host 开发者 | 三种接入模式、侧栏注入、HostBridge、**§11.3 刷新防闪 404**、**§15 应用级全屏 / pageShell**、**附录 B 样式隔离（realm / Portal / Drawer 认领）**、**附录 B.1 overflow 与 backdrop-filter** |
+| [plugin-development-guide.md](./plugin-development-guide.md) | 插件开发者 | Vite/组件/样式/API、**§16 `setAppFullscreen`**、验收清单；Portal / realm 由 Host 负责 |
+| [mf-implementation-guide.md](./mf-implementation-guide.md) | 双方（实现细节） | 逐模块实现、**样式隔离 §2.10.2**（realm / Portal / sonner / reclaim）、**§2.10.0 / §2.14 overflow 分层与 backdrop-filter**、**entry bust（§2.13）**、**§2.11 防闪 404**、**§2.14 影院全屏** |
 
 ## 应用级全屏相关（已并入上述手册）
 
@@ -14,6 +14,15 @@
 2. Layout 订阅影院态；Web Esc 同步退出
 3. `PluginPageShell`；自动路由 `pageShell: true`；业务内嵌不加壳
 4. 侧栏 `MENUS` / `PLUGINS` 拆分；Tauri fullscreen capability
+5. **勿在圆角容器同层写 `overflow-hidden`**（Layout / `PluginPageShell`）：否则 Chromium 下子树 `backdrop-filter` 采不到更深的 video（独立预览正常、MF 嵌入失效）
+
+## 样式隔离 / Portal（已并入上述手册）
+
+1. `@scope([data-mf-style-realm])`：按 Remote entry 域，同仓多 expose 共享一份 CSS
+2. `reclaimEntryStyles`：切换同 Remote 插件时重包 head 已注入样式
+3. 劫持共享 `react-dom.createPortal` → `[data-mf-portal-scope]`（同 realm）
+4. Host Drawer：`claimPluginPortalTarget` / `clearPluginPortalClaim`（`EbookReadHostPlugins`）；App 根 `data-mf-host-portal` 保护 Host `<Toaster />`
+5. barrel 导出：`styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim`（`@/plugins`）
 
 ## 刷新子应用防闪 404（已并入上述手册）
 

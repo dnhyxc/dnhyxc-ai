@@ -2,7 +2,7 @@
 
 > **文档角色**：记录视频播放器在组件化之后的**功能增强**——进度条缩略图预览（hover 显示视频帧小图）、多平台画中画（Picture-in-Picture）支持（含 xgplayer 插件优先、原生 API 兜底、WebKit 私有 API 兼容）、xgplayer 语言跟随主站 locale、重置逻辑全面清理状态、长视频刻度上限等。
 >
-> **延伸阅读**：[video-player-plugin.md](./video-player-plugin.md)（插件化接入 / 影院态全屏 / 路由挂载）· [video-player-component-refactor.md](./video-player-component-refactor.md)（组件化拆分 / TooltipProvider / 主题色 token）· [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md)（影院态全屏实现）
+> **延伸阅读**：[video-player-plugin.md](./video-player-plugin.md)（插件化接入 / 影院态全屏 / 路由挂载）· [video-player-component-refactor.md](./video-player-component-refactor.md)（组件化拆分 / TooltipProvider / 主题色 token）· [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md)（影院态全屏实现）· [video-player-drag-scrub.md](./video-player-drag-scrub.md)（拖拽重写 / 画布跟随 / 背景主题化 / 控制条 visible）
 
 ## 1. 背景与目标
 

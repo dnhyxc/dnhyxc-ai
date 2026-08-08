@@ -190,7 +190,11 @@ class PluginManagerImpl {
 			}
 
 			registerRemote(meta, bust);
-			const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+			const endCapture = beginPluginStyleCapture(
+				meta.id,
+				meta.entry,
+				meta.remoteName,
+			);
 			let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
 			try {
 				mod = await loadRemoteApp(meta);

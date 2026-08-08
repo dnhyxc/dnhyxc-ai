@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领改为排除 Host，不再白名单 remote 目录名；`data-mf-style-realm` 按 Remote entry 域隔离多 expose；`createPortal` 收编 + Drawer `claimPluginPortalTarget`；sonner 等 Host 关键样式防误包；`@/plugins` 导出 `styleRealmKey` / claim / clear）**；**Layout / `PluginPageShell`：overflow 与 `border-radius` 分层，避免废掉路由页内 `backdrop-filter`（§2.10.0 / §2.14）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**；App 根 **`data-mf-host-portal`**。若与源码不一致，以源码为准。
 
 ---
 
@@ -20,13 +20,13 @@
    - 2.8 插件验证器 (`PluginVerifier.ts`)
    - 2.9 Registry 管理 (`registry.ts`)
    - 2.10 插件宿主页面 (`PluginHostPage.tsx`)
-   - 2.10.0 独立路由外壳 (`PluginPageShell.tsx`)
+   - 2.10.0 独立路由外壳 (`PluginPageShell.tsx`；**勿圆角同层 overflow-hidden**)
    - 2.10.1 错误边界
-   - **2.10.2 主子样式隔离（原理与完整实现）**
-   - **2.11 路由构建与初始化**（含刷新子应用防闪 404）
+   - **2.10.2 主子样式隔离（原理与完整实现）**（realm / Portal / sonner / reclaim / Drawer 认领）
+   - **2.11 路由构建与初始化**（含刷新子应用防闪 404；`data-mf-host-portal`）
    - 2.12 语言（locale）同步
    - **2.13 插件/子应用加载缓存破坏（完整方案）**
-   - **2.14 应用级全屏（影院态）**
+   - **2.14 应用级全屏（影院态）**（含 Layout overflow 分层）
 3. [子项目/插件接入](#3-子项目插件接入)
    - 3.1 Vite 配置
    - 3.2 组件实现规范
@@ -37,7 +37,7 @@
    - 3.7 Registry 配置示例
 4. [完整数据流](#4-完整数据流)
 5. [常见问题与解决方案](#5-常见问题与解决方案)
-   - 5.7 样式隔离相关
+   - 5.7 样式隔离相关（含 Portal / sonner / **backdrop-filter**）
    - **5.9 刷新子应用先闪 404**
 
 ---
@@ -55,10 +55,11 @@
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
-- **样式隔离**：Host 运行时 `@scope([data-mf-plugin])` + head 劫持 + MutationObserver（详解 §2.10.2）；`untrusted` 走 iframe
+- **样式隔离**：Host 运行时 `@scope([data-mf-style-realm])` + head 劫持 + MutationObserver + Portal `createPortal` 收编（详解 §2.10.2）；`untrusted` 走 iframe
 - **entry 缓存破坏**：`pluginBust = version@manifestHash`（指纹来自 Remote 自有 `mf-manifest`；发布者勿改 Host registry）；`resolvePluginBust` **只拉一次** manifest（算指纹并解析 `remoteEntry`），`registerRemote` **直连** `remoteEntry.js?v=`，`afterResolve` 再兜底补 `?v=`（WKWebView 固定名 ESM 强缓存）
 - **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
-- **应用级全屏**：`api.ui.setAppFullscreen`（`ui:toast`）驱动 Layout 影院态 + Tauri/Web 系统全屏；独立路由页 `pageShell` → `PluginPageShell`（§2.14 / 专题文档）
+- **应用级全屏**：`api.ui.setAppFullscreen`（`ui:toast`）驱动 Layout 影院态 + Tauri/Web 系统全屏；独立路由页 `pageShell` → `PluginPageShell`（§2.14）
+- **MF 内 backdrop-filter**：Layout / `PluginPageShell` 将 `overflow-hidden` 与 `border-radius` 分层，避免 Chromium 裁切导致毛玻璃采不到更深 video（§2.10.0 / §2.14.4）
 
 ---
 
@@ -1911,49 +1912,71 @@ export function clearPluginRegistryCache() {
 职责：
 
 1. `ensurePlugin` 加载；失败仅手动重试（`retryKey`）
-2. **MF**：`withLiveLocale` 覆盖 `api.locale` + `eventBus.emit(pluginId, 'locale')`；包装 `data-mf-plugin`；挂载期 `attachPluginStyleIsolation`
+2. **MF**：`withLiveLocale` 覆盖 `api.locale` + `eventBus.emit(pluginId, 'locale')`；包装 `data-mf-plugin` + `data-mf-style-realm`；挂载期 `attachPluginStyleIsolation`（CSS 捕获 + Portal bridge）
 3. **untrusted**：`<iframe sandbox=...>` + `attachIframeBridge`（用 `loaded.bridge`，**不用** liveBridge）
 4. Loading / 失败文案走 Host i18n keys：`plugins.host.*`
 5. **`pageShell?: boolean`**：为 `true` 时用 `PluginPageShell` 包裹激活态内容（**仅** `PluginManager.createPluginRoute` 传 true；业务内嵌勿开）
 
 ```typescript
-// 摘录：pageShell + locale 热更新 + 双路径渲染
+// 摘录：pageShell + locale 热更新 + MF/iframe 双路径；下列为 Props 形状
 type Props = {
+	// Registry / 路由注入用的插件主键
 	pluginId: string;
+	// 宿主容器额外 class（业务槽可收窄高度等）
 	className?: string;
+	// 电子书 surface 槽位：toolbar / drawer 触发器 / drawer 本体
 	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
 	/** 独立路由页：套 Host 统一容器。业务树内嵌勿开。 */
 	pageShell?: boolean;
 };
 
+// 用 Host 当前 locale 覆盖 bridge.api.locale，供 props 热更新
 function withLiveLocale(bridge: HostBridgeProps, locale: HostLocale): HostBridgeProps {
+	// 浅拷贝 bridge 与 api，仅替换 locale，其它 API 引用不变
 	return { ...bridge, api: { ...bridge.api, locale } };
 }
 
+// 插件宿主页：加载态 / MF 根 / iframe / 可选 pageShell
 export function PluginHostPage({ pluginId, className, part, pageShell }: Props) {
+	// Host i18n：locale 驱动热更新；t 用于 loading/失败文案
 	const { locale, t } = useI18n();
-	// ... ensurePlugin(pluginId, { force: retryKey > 0 }) ...
+	// … ensurePlugin(pluginId, { force: retryKey > 0 }) 省略：加载与失败重试 …
 
+	// 激活且非 untrusted：挂载期持续 CSS 捕获 + Portal bridge
 	useEffect(() => {
+		// 未激活 / iframe / 无 entry 时不挂隔离（untrusted 靠独立 document）
 		if (status !== 'activated' || trust === 'untrusted' || !entry) return;
-		return attachPluginStyleIsolation(pluginId, entry);
-	}, [pluginId, status, entry, trust]);
+		// remoteName 参与 styleRealmKey；同 Remote 多 expose 共享一份 CSS realm
+		return attachPluginStyleIsolation(pluginId, entry, loaded?.meta.remoteName);
+		// pluginId/entry/trust/remoteName 变则重绑隔离；status 变出 activated 时卸载
+	}, [pluginId, status, entry, trust, loaded?.meta.remoteName]);
 
+	// 已激活插件经 eventBus 再推一帧 locale（与 props 热更新互补）
 	useEffect(() => {
+		// 未激活时无订阅方，避免空发
 		if (status !== 'activated') return;
+		// 按 pluginId 频道广播，Remote useHostLocale 可重绘文案
 		eventBus.emit(pluginId, 'locale', locale);
+		// locale 切换或插件变为 activated 时重发
 	}, [pluginId, status, locale]);
 
+	// 把最新 locale 叠进 bridge，避免 Remote 只吃到加载瞬间的 props
 	const liveBridge = useMemo(
+		// bridge 未就绪则 null；就绪则 withLiveLocale
 		() => (loaded?.bridge ? withLiveLocale(loaded.bridge, locale) : null),
+		// bridge 引用或 Host locale 变则重算
 		[loaded?.bridge, locale],
 	);
 
+	// 仅独立路由需要统一外边距；业务内嵌直接返回子树
 	const wrap = (node: ReactNode) =>
 		pageShell ? <PluginPageShell>{node}</PluginPageShell> : node;
 
+	// 仅 activated 走内容；loading/failed 省略（见源码）
 	if (loaded?.status === 'activated') {
+		// untrusted：sandbox iframe + 原始 bridge（不用 liveBridge）
 		if (loaded.meta.trust === 'untrusted') {
+			// 套 pageShell（若开）后进入错误边界与 iframe
 			return wrap(
 				<PluginErrorBoundary pluginId={pluginId}>
 					<UntrustedIframe
@@ -1964,12 +1987,21 @@ export function PluginHostPage({ pluginId, className, part, pageShell }: Props) 
 				</PluginErrorBoundary>,
 			);
 		}
+		// MF default 导出即插件根组件
 		const Comp = loaded.mod.default;
+		// 按 entry/remoteName 算样式域，供 data-mf-style-realm 与 @scope 对齐
+		const realm = styleRealmKey(
+			loaded.meta.entry,
+			loaded.meta.remoteName,
+			pluginId,
+		);
+		// 套壳后渲染带 data-mf-* 的插件根
 		return wrap(
 			<PluginErrorBoundary pluginId={pluginId}>
 				<div
 					className={cn(`plugin-${pluginId} h-full w-full min-h-0`, className)}
 					data-mf-plugin={pluginId}
+					data-mf-style-realm={realm}
 					data-plugin-root
 				>
 					<Comp {...liveBridge!} />
@@ -1977,13 +2009,14 @@ export function PluginHostPage({ pluginId, className, part, pageShell }: Props) 
 			</PluginErrorBoundary>,
 		);
 	}
-	// Loading / failed + 手动重试按钮（i18n）；loading 态当前未强制 wrap pageShell
+	// Loading / failed + 手动重试（i18n）；loading 态当前未强制 wrap pageShell
 }
 ```
 
 `PluginManager.createPluginRoute`：
 
 ```typescript
+// 独立路由注入：强制 pageShell，业务内嵌挂载切勿照抄 true
 createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 ```
 
@@ -1991,7 +2024,68 @@ createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 
 **文件路径**：`apps/frontend/src/plugins/host/PluginPageShell.tsx`
 
-订阅 `subscribeAppFullscreen`：正常态 `p-5.5 pt-0` + 圆角内容区；影院态 `p-0` / `rounded-none`。完整说明见 §2.14。
+订阅 `subscribeAppFullscreen`：正常态 `p-5.5 pt-0` + 圆角内容区；影院态 `p-0` / `rounded-none`。完整影院说明见 §2.14。
+
+**现行约束（backdrop-filter）**：圆角内容区**不要**写 `overflow-hidden`。与 `border-radius` 同层时，Chromium 会让子树 `backdrop-filter` 采不到更深的 video——Remote 独立预览正常，MF 嵌入后毛玻璃失效。裁切放到更内层（无圆角）或更外层（无圆角）即可。Layout 侧同样「overflow 不与 rounded 同层」，见 §2.14.4。
+
+```tsx
+/**
+ * 插件独立路由页的 Host 统一外壳（边距 + 圆角内容区）。
+ * 业务内嵌挂载不要用；影院全屏时收起边距以免挡画面。
+ *
+ * 勿在圆角容器上写 overflow-hidden：与 border-radius 同层时，
+ * Chromium 会让子树 backdrop-filter 采不到更深的 video（本地独立跑正常、MF 嵌入失效）。
+ */
+// React：外壳订阅影院态所需 hooks；ReactNode 为 children 类型
+import { type ReactNode, useEffect, useState } from 'react';
+// 合并 className，影院开/关切换 padding 与圆角
+import { cn } from '@/lib/utils';
+// 影院态单源：同步读初值 + 订阅后续变更
+import {
+	getAppFullscreen,
+	subscribeAppFullscreen,
+} from '../host-api/appFullscreen';
+
+// 独立路由页外壳；业务内嵌勿包一层以免双 padding
+export function PluginPageShell({
+	children,
+	className,
+}: {
+	// 插件根或错误边界子树
+	children: ReactNode;
+	// 路由级额外布局 class（可选）
+	className?: string;
+}) {
+	// 初值与 Layout 同源，避免首帧闪出带边距的壳
+	const [theater, setTheater] = useState(getAppFullscreen);
+	// 订阅影院态；卸载时退订；[] 仅挂载一次
+	useEffect(() => subscribeAppFullscreen(setTheater), []);
+
+	// 以下为 JSX 树（标记行不加讲解）；逻辑意图见 className 表达式
+	return (
+		<div
+			className={cn(
+				// 纵向占满；min-h-0 让 flex 子项可收缩滚动
+				'mx-auto flex h-full min-h-0 flex-col',
+				// 影院：去外边距；常态：与业务页一致的 p-5.5 pt-0
+				theater ? 'p-0' : 'p-5.5 pt-0',
+				className,
+			)}
+		>
+			<div
+				className={cn(
+					// 无 overflow-hidden：保留圆角视觉，不裁切 backdrop-filter 采样
+					'h-full min-h-0 bg-theme-background',
+					// 影院去圆角；常态 rounded-md 与 Layout 内容区一致
+					theater ? 'rounded-none p-0' : 'rounded-md',
+				)}
+			>
+				{children}
+			</div>
+		</div>
+	);
+}
+```
 
 #### 2.10.1 错误边界
 
@@ -2003,7 +2097,8 @@ createElement(PluginHostPage, { pluginId: meta.id, pageShell: true });
 
 > **源码**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
 > **姊妹稿**（技术速览 / 落地手册）：`docs/app/style-isolation-tech-overview.md`、`docs/app/style-isolation-implementation.md`、`docs/ideas/mf-css-isolation.md`  
-> **目标**：隔离责任在 **Host**；Remote 可按普通 Vite + Tailwind 工程开发（含 Preflight），主↔子样式互不破坏。
+> **目标**：隔离责任在 **Host**；Remote 可按普通 Vite + Tailwind 工程开发（含 Preflight），主↔子样式互不破坏。  
+> **现行要点（相对早期「按 pluginId `@scope`」）**：样式域改为 **`data-mf-style-realm`（按 Remote entry）**；挂载期 **`reclaimEntryStyles`** 收回同 entry 已注入 CSS；Portal 用劫持共享 **`react-dom.createPortal`** 收进 `[data-mf-portal-scope]`；Host Drawer 等外壳打开前 **`claimPluginPortalTarget`** 防首帧闪烁；sonner 等 Host 关键样式禁止误包。
 
 ##### 172.16.0.5 问题与目标
 
@@ -2014,31 +2109,39 @@ Host 与 Remote **同页共享一个 `document`**：
 | Preflight / `body`/`html` 全局规则 | Remote Tailwind 改坏 Host 字体、边距、表单             |
 | 同名 utility / 组件库类            | 后加载的 Remote 覆盖 Host，或反过来                    |
 | 多插件同仓                         | 学习笔记 / 全书想法等共用 `remotePlugins` 时样式互相串 |
+| 多 expose 共一份 CSS               | 若按 `pluginId` 包 `@scope`，先打开的插件「占走」样式，切换后另一插件匹配不到 |
+| Radix / Drawer Portal → `body`     | 弹层逃出插件子树，utility / 组件样式丢失；或 `createPortal` 容器在 body↔scope 间切换导致闪烁 |
+| Host 全局 Toaster（sonner）        | 被误 `@scope` 后 `position:fixed` 失效，顶开布局       |
 
 **目标**：
 
 1. Remote **零侵入**：正常 `@import "tailwindcss"`，不必禁用 Preflight、不必手写 `[data-plugin-root]` 套 utilities。
-2. Host 运行时把 Remote 注入的 CSS **限制在** `[data-mf-plugin="id"]` 容器内。
+2. Host 运行时把 Remote 注入的 CSS **限制在** `[data-mf-style-realm="…"]` 容器内（同一 Remote 多插件共享同一 realm；`data-mf-plugin` 仍作插件根标识）。
 3. 仍能**继承** Host 主题 CSS 变量（视觉统一）。
 4. `untrusted` 继续走 **iframe**（独立 document，不走本方案）。
+5. Portal 弹层在 **不改 Remote 业务** 的前提下仍命中 `@scope`；打开/悬停不因容器搬迁闪烁。
+6. Host 关键全局样式（如 sonner）永不被收进 Remote `@scope`。
 
 ##### 192.168.1.2 方案选型（为何用 `@scope`）
 
 | 方案                                             | Remote 改造     | 隔离     | 主题变量继承 | 本项目                  |
 | ------------------------------------------------ | --------------- | -------- | ------------ | ----------------------- |
 | **CSS `@scope` + head 劫持 + MutationObserver**  | 零              | 选择器级 | ✅           | ✅ 采用                 |
+| **+ `createPortal` 收编到 portal-scope**         | 零（Host 静默） | 同上     | ✅           | ✅ Portal 逃逸补强      |
 | Shadow DOM                                       | 中（挂载/事件） | 强       | ❌ 差        | ❌                      |
 | 强制 Remote 关 Preflight / 嵌套 utilities        | 高              | 弱～中   | ✅           | ❌ 已弃                 |
 | qiankun experimentalStyleIsolation（改写选择器） | 低              | 中       | ✅           | ❌（改用原生 `@scope`） |
+| 业务传 `getPopupContainer` / portal container    | 中～高          | ✅       | ✅           | ❌（污染主/子业务代码） |
 | iframe                                           | 低              | 完全     | ❌           | ✅ 仅 `untrusted`       |
 
-一句话：**类 qiankun experimentalStyleIsolation 的意图，用浏览器原生 `@scope` 落地。**
+一句话：**类 qiankun experimentalStyleIsolation 的意图，用浏览器原生 `@scope` 落地；Portal 用 Host 静默收编，业务零改。**
 
 ##### 192.168.1.2 `@scope` 原理
 
 ```css
-/* 只有落在 [data-mf-plugin="learningNotes"] 子树内的元素才会匹配括号里的规则 */
-@scope ([data-mf-plugin="learningNotes"]) {
+/* 现行：按 Remote 样式域（realm），不是按单个 pluginId */
+/* 只有落在 [data-mf-style-realm="entry:…"] 子树内的元素才会匹配括号里的规则 */
+@scope ([data-mf-style-realm="entry:http://localhost:9008/"]) {
 	.btn {
 		background: blue;
 	}
@@ -2051,23 +2154,38 @@ Host 与 Remote **同页共享一个 `document`**：
 }
 ```
 
+> **历史说明（仍有效的理解）**：早期文档曾用 `@scope ([data-mf-plugin="learningNotes"])`。多 expose 共用同一 Remote CSS 包时，按 pluginId 会导致「先挂载者独占」。现改为 **`styleRealmKey(entry, remoteName, pluginId)` → `data-mf-style-realm`**；`data-mf-plugin` 仍保留，用于 Portal 归属、调试与兼容。
+
 要点：
 
 - 支持 Chrome 118+ / Firefox 125+ / Safari 17.4+（本项目目标环境已覆盖）。
 - 不改写选择器字符串，性能好；Tailwind / `@keyframes` / CSS 变量均可包进块内。
 - CSS 变量仍可从容器祖先（Host）**继承进来**，主题统一。
+- `unwrapScope`：HMR / 换 realm 时可剥掉最外层 `@scope` 再重包。
 
 宿主必须提供 scope 根（`PluginHostPage`）：
 
 ```html
 <div
 	data-mf-plugin="learningNotes"
+	data-mf-style-realm="entry:http://localhost:9008/"
 	data-plugin-root
 	class="plugin-learningNotes h-full w-full"
 >
 	<!-- Remote default 组件 -->
 </div>
 ```
+
+Portal scope 容器（Host 维护，业务不可见）同样带 `data-mf-plugin` + `data-mf-style-realm` + `data-mf-portal-scope`。
+
+##### 10.20.0.1 样式域 `styleRealmKey`（多 expose 共 Remote）
+
+| 项 | 说明 |
+| -- | ---- |
+| **为何需要** | `apps/micro` 等一个 federation 名暴露多个插件时，CSS 往往只注入一份；`@scope` 根必须是「这份 CSS」的域，不能是某一个 pluginId |
+| **键算法** | 优先 `entry:` + origin + 去掉 `mf-manifest.json` / `remoteEntry.js` 后的目录 path；URL 非法时退到 `remote:<remoteName>` 或 `plugin:<id>` |
+| **写入位置** | `@scope` 选择器、`data-mf-style-owner`（现为 realm）、插件根与 portal-scope 的 `data-mf-style-realm` |
+| **切换插件** | `beginPluginStyleCapture` / `attachPluginStyleIsolation` 开头调用 `reclaimEntryStyles`：把 head 里同 entry 已 scoped 的样式按当前 realm 重包（`unwrapScope` + 再 wrap） |
 
 ##### 192.168.0.2 两阶段捕获（时序）
 
@@ -2079,55 +2197,102 @@ sequenceDiagram
   participant Head as document.head
   participant Page as PluginHostPage
 
-  PM->>SI: beginPluginStyleCapture(id, entry)
+  PM->>SI: beginPluginStyleCapture(id, entry, remoteName)
+  SI->>SI: realm = styleRealmKey；repairHostCriticalStyles；reclaimEntryStyles
   SI->>Head: patch appendChild / insertBefore + MutationObserver
   PM->>MF: loadRemote（Vite/MF 往 head 注 style/link）
-  Head-->>SI: 同步/异步注入 → wrapWithScope
+  Head-->>SI: 同步/异步注入 → wrapWithScope(realm)
   MF-->>PM: module
   PM->>SI: endCapture()（refcount 归零则卸 patch）
-  Page->>SI: attachPluginStyleIsolation（挂载期再开捕获）
-  Note over Page,SI: 覆盖 HMR / 延迟 import 再注入的 CSS
-  Page-->>Page: 卸载时 disconnect + releaseHeadPatch
+  Page->>SI: attachPluginStyleIsolation（CSS 捕获 + Portal bridge）
+  Note over Page,SI: 覆盖 HMR / 延迟 import；createPortal 收编到 portal-scope
+  Page-->>Page: 卸载时 disconnect + releaseHeadPatch + 卸 portal scope
 ```
 
 | 阶段         | API                                                              | 时机                                                         | 捕获什么                          |
 | ------------ | ---------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------- |
-| **初始加载** | `beginPluginStyleCapture`                                        | `registerRemote` 之后、`loadRemoteApp` 前后（`try/finally`） | 入口及依赖首次注入的 CSS          |
-| **挂载期**   | `attachPluginStyleIsolation`（内部同 `beginPluginStyleCapture`） | `status === 'activated'` 且非 untrusted                      | HMR、动态 `import()`、晚到的 link |
+| **初始加载** | `beginPluginStyleCapture(id, entry, remoteName?)`                | `registerRemote` 之后、`loadRemoteApp` 前后（`try/finally`） | 入口及依赖首次注入的 CSS；并 reclaim 同 entry |
+| **挂载期**   | `attachPluginStyleIsolation`（内部 = CSS 捕获 + **Portal bridge**） | `status === 'activated'` 且非 untrusted                      | HMR、动态 `import()`、晚到的 link；Portal 收编 |
 
-嵌套安全：`patchDepth` 引用计数；多次 begin 只 patch 一次 head，全部 end 后才恢复原生方法。`active` 栈用 `prev` 恢复外层上下文。
+嵌套安全：`patchDepth` 引用计数；多次 begin 只 patch 一次 head，全部 end 后才恢复原生方法。`active` 栈用 `prev` 恢复外层上下文（现按 `active.realm` + `pluginId` 判断）。
 
 ##### 192.168.1.4 如何认出「这是 Remote 的样式」
 
-`looksLikeRemoteStyle` 优先级：
+`looksLikeRemoteStyle(el, ctx, mode)` 优先级（`mode`: `'live'` | `'reclaim'`）：
 
-1. `data-mf-style-owner === pluginId`（已认领）
-2. `<link rel="stylesheet">`：`href` 的 **origin === entryOrigin**
-3. `<style data-vite-dev-id>`（**仅 dev / HMR**）：**排除 Host**（`import.meta.url` 推出的 `…/apps/frontend` 根、或 Host 相对 id `/src/*` `/@id/*`）；其余在当前 capture 窗口认领。**不**再维护 `micro|remote-demo|…` 目录白名单——新增/重命名 `apps/<remote>` 无需改此文件
-4. 无 vite id（**生产 MF 常见**）：**仅在当前 capture 窗口**（`active.pluginId === ctx.pluginId`）认领
+1. `data-mf-host-style === '1'` → **永不认领**（Host 关键，如已标记的 sonner）
+2. `data-mf-style-origin === entryOrigin` → 同 Remote 源
+3. `data-mf-style-owner === realm`（或遗留 `=== pluginId`）→ 已认领；若 owner 已是其它 `entry:`/`remote:`/`plugin:` 域则拒绝
+4. `<link rel="stylesheet">`：`href` 的 **origin === entryOrigin**
+5. 文本含 `[data-sonner-toaster]` → 标 Host 关键并拒绝（防 Toaster 失 `fixed`）
+6. `<style data-vite-dev-id>`（**仅 dev / HMR**）：**排除 Host**（`import.meta.url` 推出的 `…/apps/frontend` 根、或 Host 相对 id `/src/*` `/@id/*`）；其余在当前 capture 窗口认领。**不**再维护 `micro|remote-demo|…` 目录白名单——新增/重命名 `apps/<remote>` 无需改此文件
+7. 生产无 vite id、有遗留 owner=pluginId 且 CSS 仍包着该 plugin 的 `@scope` → 可升到当前 realm
+8. **无任何标记**：`reclaim` 模式 **绝不碰**（避免收走 Host sonner 等）；`live` 捕获窗口内才认领新注入（`active.realm === ctx.realm`）
 
-线上构建一般无 `data-vite-dev-id`，走第 4 步；第 3 步只影响本地 Vite 同页注入。
+线上构建一般无 `data-vite-dev-id`，走 origin / owner / live 窗口；第 6 步只影响本地 Vite 同页注入。
 
 处理策略：
 
-- **style**：把 `textContent` 包进 `@scope (...) { ... }`；Vite 常先插空 style 再写内容 → 对该节点再挂一次 MutationObserver。
-- **link**：`fetch(href, { mode: 'cors' })` → 新建 scoped `<style>` 插在 link 后 → `link.disabled = true`。CORS 失败则**优雅降级**（原样生效，不阻断加载）。
+- **style**：把 `textContent` 包进 `@scope (...) { ... }`（可先 `unwrapScope` 再包）；Vite 常先插空 style 再写内容 → 对该节点再挂一次 MutationObserver。
+- **link**：`fetch(href, { mode: 'cors' })` → 新建 scoped `<style>` 插在 link 后 → `link.disabled = true`。CORS 失败则**优雅降级**（原样生效，不阻断加载）。同源已旁路过的 link 会复用 `data-mf-from-link` 节点并按 realm 重包。
+- **repairHostCriticalStyles**：捕获开始时扫描 head，剥掉误包到 sonner 上的 `@scope`。
+
+##### 10.0.0.2 Portal → `@scope`（`createPortal` 收编）
+
+Radix HoverPopover / Sheet / Drawer 等默认 `createPortal(…, document.body)`，子树不在 `[data-mf-style-realm]` 内 → Remote utility 失效。业界正解多是业务改 `getPopupContainer`；本项目约束为 **主/子业务零改**，故在 Host 静默处理：
+
+| 机制 | 作用 |
+| ---- | ---- |
+| 劫持共享 `react-dom.createPortal` | 目标为 `body`/`documentElement` 时，改挂到 `body > [data-mf-portal-scope="<pluginId>"]`（带同 realm） |
+| `data-mf-host-portal` | App 根（含 Host `<Toaster />`）标记后，其内 portal **不**收编，避免 Host Toast 进插件 scope |
+| `pointerover` / `focusin` | 仅在进出插件根 / portal-scope **边界**时更新 `lastTouchedPluginId`（`relatedTarget` 早退，避免 mousemove 热路径） |
+| sticky resolve | scope 内已有子节点时，短暂丢归属也不要把容器打回 `body`（防 POP 闪烁） |
+| `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 等「先 Portal 再挂插件」场景：打开前同步认领，首帧就进 scope；关闭时 clear（不等 `attach`） |
+
+```mermaid
+sequenceDiagram
+  participant UI as Host Drawer / Radix POP
+  participant RD as react-dom.createPortal
+  participant SI as styleIsolation
+  participant Scope as data-mf-portal-scope
+
+  UI->>RD: createPortal(children, body)
+  RD->>SI: patch：retargetPortalContainer
+  alt 有 claim / lastTouched / sticky 子节点
+    SI->>Scope: 挂到带 data-mf-style-realm 的 scope
+  else Host data-mf-host-portal 或无归属
+    SI->>RD: 保持原 body
+  end
+```
+
+**闪烁两类根因（已修）**：
+
+1. 指针进入 POP 时旧逻辑不认 portal-scope → 归属变 `null` → 容器 scope→body → 重挂。  
+2. 电子书 Drawer：首帧无 claim 挂 body，插件激活/聚焦后再搬进 scope → 整树重挂。打开前 `claimPluginPortalTarget`（见 `EbookReadHostPlugins`）。
 
 ##### 192.168.1.3 Host 接入点（调用方）
 
 **① `PluginManager.runLoad`（初始窗口）** — `apps/frontend/src/plugins/core/PluginManager.ts`
 
 ```typescript
-// untrusted 已提前 return，不进 MF，也就不捕获 CSS
+// untrusted 已提前 return；此处只走 MF：先登记 Remote 再开捕获窗
 registerRemote(meta, bust);
-// 开启捕获：劫持 head，active = 当前插件
-const endCapture = beginPluginStyleCapture(meta.id, meta.entry);
+// 开启捕获：劫持 head、repair sonner、reclaim 同 entry；remoteName → realm
+const endCapture = beginPluginStyleCapture(
+	// 插件 id：active.pluginId / 日志与遗留 owner 兼容
+	meta.id,
+	// entry URL：算 entryOrigin 与 styleRealmKey 主路径
+	meta.entry,
+	// federation 名：URL 非法时作 remote: 后备键
+	meta.remoteName,
+);
+// 预声明模块变量，供 try 赋值、外层 activate 使用
 let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
 try {
-	// MF 拉模块时，Remote CSS 会被注入 head → 被 @scope
+	// loadRemote 期间 Vite/MF 往 head 注 style/link → 被 @scope(realm)
 	mod = await loadRemoteApp(meta);
 } finally {
-	// 无论成功失败都结束本轮捕获（refcount -1）
+	// 成功失败都结束本轮捕获（refcount -1，嵌套时不提前卸 patch）
 	endCapture();
 }
 ```
@@ -2135,18 +2300,33 @@ try {
 **② `PluginHostPage`（挂载期 + 容器属性）** — `apps/frontend/src/plugins/host/PluginHostPage.tsx`
 
 ```typescript
-// 已激活且非 iframe：整个页面生命周期持续隔离（HMR）
+// 已激活且非 iframe：整页生命周期持续隔离（HMR / 延迟 CSS）+ Portal bridge
 useEffect(() => {
+	// 未就绪或不走 MF 时不挂；避免对 iframe 误 patch createPortal
 	if (status !== 'activated' || trust === 'untrusted' || !entry) return;
-	return attachPluginStyleIsolation(pluginId, entry);
-}, [pluginId, status, entry, trust]);
+	// 返回 disposer：卸 portal-scope + 结束 CSS 捕获
+	return attachPluginStyleIsolation(
+		pluginId,
+		entry,
+		// 与 runLoad 同一 remoteName，保证挂载期 realm 一致
+		loaded?.meta.remoteName,
+	);
+	// 身份或 entry 变则重绑；离开 activated 时清理
+}, [pluginId, status, entry, trust, loaded?.meta.remoteName]);
 
-// 渲染时必须带 data-mf-plugin，否则 @scope 根不存在，规则匹配不到
+// @scope 根必须存在：用 entry 算 realm，写到插件根 data-mf-style-realm
+const realm = styleRealmKey(
+	loaded.meta.entry,
+	loaded.meta.remoteName,
+	pluginId,
+);
+// 以下 JSX：错误边界 + 带 data-mf-plugin / data-mf-style-realm 的根（标记行不注）
 return (
 	<PluginErrorBoundary pluginId={pluginId}>
 		<div
 			className={cn(`plugin-${pluginId} h-full w-full`, className)}
 			data-mf-plugin={pluginId}
+			data-mf-style-realm={realm}
 			data-plugin-root
 		>
 			<Comp {...liveBridge} />
@@ -2155,289 +2335,1224 @@ return (
 );
 ```
 
-##### 10.0.2.5 核心实现（全文 + 逐行说明）
+**③ Host Drawer 插件槽（打开前认领 Portal）** — `views/ebook/components/plugins/EbookReadHostPlugins.tsx`
 
-**文件路径**：`apps/frontend/src/plugins/host/styleIsolation.ts`
+从 `@/plugins` 引入公开 API（`plugins/index.ts` barrel）：
 
 ```typescript
+// 业务槽只从 barrel 取 Portal 认领 / 样式域 / 宿主页，勿深链 styleIsolation
+import {
+	// Drawer 打开前同步认领，首帧 createPortal 进 scope
+	claimPluginPortalTarget,
+	// 关闭时清 override，避免误收后续 Host portal
+	clearPluginPortalClaim,
+	// drawer 内挂载插件根
+	PluginHostPage,
+	// 与 PluginHostPage 同一套 realm 算法
+	styleRealmKey,
+	// 按 host.surface 列出已启用插件
+	useHostSurfacePlugins,
+} from '@/plugins';
+```
+
+要点（两处认领，缺一不可）：
+
+| 时机 | 代码落点 | 作用 |
+| ---- | -------- | ---- |
+| 点击打开图标 | `drawer-triggers` 的 `onClick`：打开前 `claim`，关闭前 `clear` | 用户手势瞬间已有 override，不等 `attach` |
+| Drawer 渲染 | `part === 'drawer'` 找到 `openMeta` 后、`return <Drawer>` **之前**同步 `claim` | 与 `createPortal` **同一次渲染前**认领，避免「先挂 body 再搬进 scope」整树重挂闪烁 |
+| Drawer 关闭 | `onOpenChange(false)` → `clearPluginPortalClaim` + 清空 `openPluginId` | 释放 override，避免误收后续 Host portal |
+
+```tsx
+// drawer-triggers：点击瞬间认领或清除，再改 openPluginId
+onClick={() => {
+	// 即将打开：先 claim，保证 Drawer 首帧 portal 有归属
+	if (!open) {
+		claimPluginPortalTarget(
+			// 认领目标插件 id
+			p.id,
+			// realm 与插件根 data-mf-style-realm 一致，弹层才能吃到 CSS
+			styleRealmKey(p.entry, p.remoteName, p.id),
+		);
+	} else {
+		// 即将关闭：清 override（不等 Drawer unmount）
+		clearPluginPortalClaim(p.id);
+	}
+	// 切换受控 openPluginId；打开则设 id，关闭则 null
+	onOpenPluginIdChange?.(open ? null : p.id);
+}}
+
+// drawer：与 createPortal 同一次渲染前认领，避免 Drawer 先挂 body 再搬进 scope 闪烁
+claimPluginPortalTarget(
+	openMeta.id,
+	styleRealmKey(openMeta.entry, openMeta.remoteName, openMeta.id),
+);
+
+// 以下 JSX：Drawer 壳 + 关闭时 clear；标记行不注
+return (
+	<Drawer
+		open={!!openPluginId}
+		onOpenChange={(open) => {
+			// 仅处理关闭：释放 claim 并清空受控 id
+			if (!open) {
+				clearPluginPortalClaim(openPluginId);
+				onOpenPluginIdChange?.(null);
+			}
+		}}
+	>
+		{openPluginId ? (
+			<PluginHostPage pluginId={openPluginId} part={part} />
+		) : null}
+	</Drawer>
+);
+```
+
+**④ Host Toaster 防收编** — `router/index.tsx` App 根：
+
+```tsx
+// data-mf-host-portal：retargetPortalContainer 遇到该祖先则保持原 container
+return (
+	<div className="h-full w-full bg-theme-background" data-mf-host-portal>
+		<Toaster />
+		<RouterProvider router={router} />
+	</div>
+);
+```
+
+**⑤ 公开导出** — `apps/frontend/src/plugins/index.ts`：
+
+```typescript
+// 供业务 Host 槽（Drawer/Sheet）认领 Portal / 算 realm，勿深链 host/styleIsolation
+export {
+	// 打开会 portal 到 body 的外壳前同步认领
+	claimPluginPortalTarget,
+	// 关闭外壳时清除认领 override
+	clearPluginPortalClaim,
+	// 与 @scope / data-mf-style-realm 同一套键
+	styleRealmKey,
+} from './host/styleIsolation';
+```
+
+业务 Host 槽（Drawer / Sheet 等）应走 barrel，勿深链 `styleIsolation.ts`。
+
+##### 10.0.2.5 核心实现（全文 + 逐行说明）
+
+**文件路径**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
+> 下列为**全文 + 逐行上方语义注释**（与现行源码正文一致，仅文档层追加 `//`；源码自带 JSDoc/`//` 原位保留）。早期「按 pluginId 生成 `@scope`」已改为 realm；含 head 劫持 / Vite 空 style / CORS 降级 / Portal 收编。
+
+```typescript
+// 模块级文档：说明 Host 侧 CSS 隔离策略、realm 键、Portal 收编目标
 /**
  * Host 侧 CSS 隔离（类 qiankun experimentalStyleIsolation）：
- * 在 Remote 注入 style/link 时用 @scope 包到 [data-mf-plugin="id"]，
- * 使子应用可用正常 `@import "tailwindcss"`，无需在 Remote 做 scoped 特殊配置。
+ * Remote 注入的 CSS 用 @scope 包到 [data-mf-style-realm="…"]。
+ *
+ * 多 expose 共用同一 Remote（如 micro 的 LearningNotes + VideoPlayer）时，
+ * CSS 只注入一份：必须按 Remote realm 隔离，不能按 pluginId，否则先打开的插件
+ * 「占走」样式，切换后另一插件匹配不到 @scope。
+ *
+ * Portal：劫持共享 react-dom.createPortal，收进 body 下带同 realm 的 scope 容器。
  */
 
-/** 当前捕获窗口绑定的插件上下文 */
+// 引入 ReactDOM，后续 monkey-patch createPortal 将 body Portal 收进插件 scope 容器
+import ReactDOM from 'react-dom';
+
+// 样式捕获上下文：记录当前认领 CSS 的插件、共享 realm 与 Remote entry 源
 type CaptureCtx = {
-	/** 插件 id，同时写入 data-mf-style-owner / 生成 scope 选择器 */
+	// 当前插件实例 id，用于 capture 栈匹配与 Portal 认领
 	pluginId: string;
-	/** entry URL 的 origin，用于识别同域 link 样式表 */
+	/** @scope / mfStyleOwner 键：同一 Remote 多插件共享 */
+	// realm 字符串键，写入 mfStyleOwner 与 @scope 根选择器 data-mf-style-realm
+	realm: string;
+	// Remote entry 的 origin，用于 looksLikeRemoteStyle 精确同源判断
 	entryOrigin: string;
+// 结束 CaptureCtx 类型定义
 };
 
-/** 当前活跃捕获；null 表示未在捕获 */
+// 当前激活的 capture 上下文；null 表示不在 loadRemote 注入窗口内
 let active: CaptureCtx | null = null;
-/** head 方法劫持引用计数；归零才恢复原生 appendChild/insertBefore */
+// head.appendChild/insertBefore patch 嵌套深度，支持 begin/end 成对嵌套
 let patchDepth = 0;
-/** 保存的原生 head.appendChild */
+// 缓存 document.head.appendChild 原生实现，release 时还原
 let origAppend: <T extends Node>(node: T) => T;
-/** 保存的原生 head.insertBefore */
+// 缓存 document.head.insertBefore 原生实现，release 时还原
 let origInsert: <T extends Node>(node: T, ref: Node | null) => T;
 
-/** 转义插件 id，避免特殊字符破坏属性选择器 */
+/** 指针/焦点跨越插件边界时更新；多数移动早退，避免 pointerover 热路径开销 */
+// 最近一次 pointer/focus 事件关联的 pluginId，供 Portal 认领兜底
+let lastTouchedPluginId: string | null = null;
+// 是否已在 document 安装 pointerover/focusin 桥接监听
+let touchBridgeInstalled = false;
+
+// 将 CSS 标识符转义，避免 realm 含特殊字符时破坏 [attr="…"] 选择器
 function cssEscapeIdent(id: string): string {
-	if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+	// 环境提供 CSS.escape 时走标准 API
+	if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+		// 返回浏览器转义后的安全 ident 字符串
 		return CSS.escape(id);
+	// 结束 CSS.escape 可用分支
 	}
-	return id.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-}
-
-/** 生成 @scope 根：与 PluginHostPage 上 data-mf-plugin 对齐 */
-function scopeSelector(pluginId: string): string {
-	return `[data-mf-plugin="${cssEscapeIdent(pluginId)}"]`;
-}
-
-/** 幂等：已包过同一 sel 则不再包 */
-function alreadyScoped(text: string, sel: string): boolean {
-	return text.includes(`@scope (${sel})`) || text.includes(`@scope(${sel})`);
-}
-
-/** 把整段 CSS 包进 @scope (sel) { ... } */
-function wrapWithScope(cssText: string, sel: string): string {
-	const trimmed = cssText.trim();
-	if (!trimmed || alreadyScoped(trimmed, sel)) return cssText;
-	return `@scope (${sel}) {\n${trimmed}\n}\n`;
-}
-
-/** 从 entry 解析 origin；非法 URL 返回 '' */
-function entryOriginOf(entry: string): string {
-	try {
-		return new URL(entry).origin;
-	} catch {
-		return "";
-	}
+	// 降级：对非 [a-zA-Z0-9_-] 字符前加反斜杠
+	return id.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+// 结束 cssEscapeIdent 函数
 }
 
 /**
- * Host 源码根（…/apps/frontend），由本模块 URL 推导。
- * 用「排除 Host」替代「白名单 remote 目录名」，与 MF 动态加载一致。
+ * 同一 MF Remote（同 entry 源）共用一个样式域。
+ * 优先 entry origin+目录；显式 remoteName 且异于 id 时作补充键。
  */
-let hostViteRootCache: string | null = null;
-function hostViteRoot(): string {
-	if (hostViteRootCache != null) return hostViteRootCache;
+// 导出：根据 entry URL / remoteName / pluginId 计算跨插件共享的 style realm 键
+export function styleRealmKey(
+	// Remote manifest 或 remoteEntry URL，用于解析 origin 与 realm 主路径
+	entry: string,
+	// Module Federation remote 名称；entry 非 URL 时作 remote: 前缀降级键
+	remoteName?: string,
+	// 插件实例 id；entry 无法解析且无有效 remoteName 时作 plugin: 兜底键
+	pluginId?: string,
+// 返回 realm 字符串
+): string {
+	// 尝试把 entry 当 URL 规范化，成功则生成 entry:origin+path
 	try {
-		const path = decodeURIComponent(
-			new URL(import.meta.url).pathname.replace(/\\/g, "/"),
+		// 将 entry 解析为 URL 对象
+		const u = new URL(entry);
+		// 去掉 query，避免 manifest 带参导致 realm 漂移
+		u.search = '';
+		// 去掉 hash 片段
+		u.hash = '';
+		// 从 pathname 剥掉末尾 mf-manifest.json / remoteEntry.js
+		let path = u.pathname.replace(
+			// replace 正则：匹配 Remote 入口文件名并替换为空
+			/\/(?:mf-manifest\.json|remoteEntry\.js)\/?$/i,
+			// 替换为 empty string，得到 Remote 根目录路径
+			'',
+		// 结束 pathname.replace 调用
 		);
-		const marker = "/apps/frontend";
+		// 目录路径统一以 / 结尾，保证同 Remote 不同 expose 键一致
+		if (!path.endsWith('/')) path += '/';
+		// try 成功：返回 entry:origin+规范化路径作为共享 realm
+		return `entry:${u.origin}${path}`;
+	// entry 非合法 URL 时进入降级分支
+	} catch {
+		// 取 trim 后的 remoteName 供后续判断
+		const named = remoteName?.trim();
+		// 有 remoteName 且与 pluginId 不同 → remote: 键
+		if (named && named !== pluginId) return `remote:${named}`;
+		// 最后兜底 plugin:pluginId（未知时用 unknown）
+		return `plugin:${pluginId || 'unknown'}`;
+	// 结束 styleRealmKey 的 catch 降级分支
+	}
+// 结束 styleRealmKey 函数
+}
+
+// 生成 @scope 根选择器，匹配带 data-mf-style-realm 的 DOM 子树
+function scopeSelector(realm: string): string {
+	// 返回属性选择器字符串，realm 经 cssEscapeIdent 转义
+	return `[data-mf-style-realm="${cssEscapeIdent(realm)}"]`;
+// 结束 scopeSelector 函数
+}
+
+// 判断 CSS 文本是否已用给定选择器包过 @scope，避免重复包裹
+function alreadyScoped(text: string, sel: string): boolean {
+	// 检测 @scope (sel) 或 @scope(sel) 两种写法
+	return text.includes(`@scope (${sel})`) || text.includes(`@scope(${sel})`);
+// 结束 alreadyScoped 函数
+}
+
+/** 去掉最外层 @scope (…) { … }，便于按新 realm 重包 / HMR 后重包 */
+// 若文本被单层 @scope 包裹则剥壳，否则原样返回
+function unwrapScope(cssText: string): string {
+	// 去首尾空白便于正则匹配外层 @scope
+	const trimmed = cssText.trim();
+	// 匹配开头 @scope(selector){ 结构
+	const m = trimmed.match(/^@scope\s*\([^)]*\)\s*\{/);
+	// 结构不完整则视为未包或已损坏，不强行改写
+	if (!m || !trimmed.endsWith('}')) return cssText;
+	// 去掉 @scope 头与最外层 }，返回内部规则体
+	return trimmed.slice(m[0].length, -1).trim();
+// 结束 unwrapScope 函数
+}
+
+// 用 @scope(sel){ body } 包裹 CSS；已 scoped 或空文本则跳过
+function wrapWithScope(cssText: string, sel: string): string {
+	// 读取去空白后的 CSS 文本
+	const trimmed = cssText.trim();
+	// 空 CSS 直接返回，无需包裹
+	if (!trimmed) return cssText;
+	// 已是目标 @scope 则幂等返回
+	if (alreadyScoped(trimmed, sel)) return cssText;
+	// 先剥旧 @scope 再取 body，支持 HMR/切换 realm 重包
+	const body = unwrapScope(trimmed);
+	// 返回带换行的 @scope 包裹结果
+	return `@scope (${sel}) {\n${body}\n}\n`;
+// 结束 wrapWithScope 函数
+}
+
+// 从 entry URL 提取 origin（scheme+host+port）
+function entryOriginOf(entry: string): string {
+	// 尝试解析 entry 为 URL
+	try {
+		// 成功则返回 origin 字符串
+		return new URL(entry).origin;
+	// 解析失败进入 catch
+	} catch {
+		// 无法解析时返回空串，looksLikeRemoteStyle 会走其他启发式
+		return '';
+	// 结束 entryOriginOf 的 catch 分支
+	}
+// 结束 entryOriginOf 函数
+}
+
+/** Host 源码根（…/apps/frontend），由本模块 URL 推导，避免白名单 remote 目录名 */
+// 缓存 Host Vite 根路径，避免重复解析 import.meta.url
+let hostViteRootCache: string | null = null;
+// 懒计算 Host 前端工程根目录，用于识别 Host dev 注入的 style
+function hostViteRoot(): string {
+	// 缓存命中则直接返回
+	if (hostViteRootCache != null) return hostViteRootCache;
+	// 尝试从当前模块 URL 推导 monorepo 内 /apps/frontend 绝对前缀
+	try {
+		// decodeURIComponent 当前模块 pathname，统一为正斜杠
+		const path = decodeURIComponent(
+			// import.meta.url → pathname，反斜杠转正斜杠
+			new URL(import.meta.url).pathname.replace(/\\/g, '/'),
+		// 结束 decodeURIComponent 实参
+		);
+		// monorepo 内 Host 应用目录标记字符串
+		const marker = '/apps/frontend';
+		// 从路径末尾向前找 marker 位置
 		const idx = path.lastIndexOf(marker);
+		// 找到 marker 则切片得到 Host 根并缓存
 		if (idx >= 0) {
+			// 缓存含 /apps/frontend 的绝对路径前缀
 			hostViteRootCache = path.slice(0, idx + marker.length);
+			// 返回刚写入的 hostViteRootCache
 			return hostViteRootCache;
+		// 结束 idx >= 0 分支
 		}
+	// URL 推导异常时忽略，走下方默认值
 	} catch {
 		/* ignore */
+	// 结束 hostViteRoot 的 try 块（catch 体为空）
 	}
-	hostViteRootCache = "/apps/frontend";
+	// 推导失败：写入保守默认 /apps/frontend
+	hostViteRootCache = '/apps/frontend';
+	// 返回默认 hostViteRootCache
 	return hostViteRootCache;
+// 结束 hostViteRoot 函数
 }
 
 /**
  * 是否为 Host 自身 Vite 注入的 style（dev）。
- * 只排除 Host；micro / remote-demo / 未来 apps/<name> 在 capture 窗口内均可认领。
+ * 只排除 Host；其余 app（micro / remote-demo / 未来新目录）在 capture 窗口内一律可认领。
  */
+// 根据 Vite dev 注入 style 的 data-vite-dev-id 判断是否为 Host 样式
 function isHostViteDevStyle(viteId: string): boolean {
-	const id = viteId.replace(/\\/g, "/");
+	// 统一路径分隔符便于 includes/regex
+	const id = viteId.replace(/\\/g, '/');
+	// 取得 Host 根路径供后续匹配
 	const root = hostViteRoot();
+	// vite id 含 Host 根绝对路径 → Host 自身模块
 	if (root && id.includes(root)) return true;
+	// 路径段含 /apps/frontend/ 或以其结尾 → Host 应用
 	if (/\/apps\/frontend(?:\/|$)/i.test(id)) return true;
 	// Host Vite 相对 id（无 monorepo apps/ 段）；Remote 一般是 @fs 绝对路径含 apps/<name>
+	// 见下行源码注释：无 /apps/ 且以 /src/ 或 /@id/ 开头 → Host Vite 虚拟模块
 	if (!/\/apps\//i.test(id) && (/^\/src\//.test(id) || /^\/@id\//.test(id))) {
+		// 命中 Host 相对 id 规则，排除于 Remote 认领
 		return true;
+	// 结束 Host 相对 id 分支
 	}
+	// 其余 id 视为 Remote 或其他应用
 	return false;
+// 结束 isHostViteDevStyle 函数
 }
 
-/**
- * 判断节点是否属于当前插件的 Remote 样式。
- * 顺序：已标记 → link origin →（dev）排除 Host vite-dev-id → 捕获窗口认领。
- */
+// 检测 CSS 是否含 Host 关键全局规则（sonner toaster），不能进 @scope
+function isHostCriticalCss(text: string): boolean {
+	// sonner 用 __insertCSS 注入全局样式；误 @scope 后 Toaster 失 fixed，会顶开布局
+	// 见下行源码注释：含 sonner toaster 选择器即 Host 关键 CSS
+	return text.includes('[data-sonner-toaster]');
+// 结束 isHostCriticalCss 函数
+}
+
+/** 纠正已被误包进 @scope 的 Host 关键全局样式（如 sonner） */
+// 扫描 head 内 style，对误包 @scope 的 Host 关键 CSS 去壳并打 mfHostStyle
+function repairHostCriticalStyles() {
+	// 遍历 head 下所有 style 元素
+	for (const node of document.head.querySelectorAll('style')) {
+		// 非 HTMLStyleElement 跳过
+		if (!(node instanceof HTMLStyleElement)) continue;
+		// 读取 style 内联 CSS 文本
+		const text = node.textContent ?? '';
+		// 非 Host 关键 CSS 不处理
+		if (!isHostCriticalCss(text)) continue;
+		// 标记 mfHostStyle=1，后续 looksLikeRemoteStyle 永久排除
+		node.dataset.mfHostStyle = '1';
+		// 未包 @scope 则无需修复
+		if (!text.includes('@scope')) continue;
+		// 剥掉误包的 @scope，恢复全局 fixed 等规则
+		node.textContent = unwrapScope(text);
+		// 清除 mfScoped，避免被当作已 scoped Remote
+		delete node.dataset.mfScoped;
+		// 清除 mfStyleOwner
+		delete node.dataset.mfStyleOwner;
+		// 清除 mfStyleOrigin
+		delete node.dataset.mfStyleOrigin;
+	// 结束 repairHostCriticalStyles 的 for 循环
+	}
+// 结束 repairHostCriticalStyles 函数
+}
+
+// 判断 style/link 是否应视为当前 ctx 的 Remote 样式
 function looksLikeRemoteStyle(
+	// 待检测的 style 或 link 元素
 	el: HTMLStyleElement | HTMLLinkElement,
+	// 当前 capture/reclaim 上下文
 	ctx: CaptureCtx,
+	// live=捕获新注入；reclaim=挂载时回收已有样式，对无标记节点更保守
+	mode: 'live' | 'reclaim' = 'live',
+// 返回是否应认领并 @scope
 ): boolean {
-	if (el.dataset.mfStyleOwner) {
-		return el.dataset.mfStyleOwner === ctx.pluginId;
+	// 已标记 Host 样式的一律不认领
+	if (el.dataset.mfHostStyle === '1') return false;
+
+	// 读取先前写入的 mfStyleOrigin
+	const origin = el.dataset.mfStyleOrigin;
+	// 有 origin 标记时仅精确匹配 ctx.entryOrigin
+	if (origin) return origin === ctx.entryOrigin;
+
+	// 读取 mfStyleOwner（realm 或历史 pluginId）
+	const owner = el.dataset.mfStyleOwner;
+	// owner 已是当前 realm 或 pluginId → 属于本插件/本 realm
+	if (owner === ctx.realm || owner === ctx.pluginId) return true;
+	// owner 是其他 entry/remote/plugin 键 → 明确属于别的域
+	if (
+		// 条件：owner 以 entry: 开头
+		owner?.startsWith('entry:') ||
+		// 或 owner 以 remote: 开头
+		owner?.startsWith('remote:') ||
+		// 或 owner 以 plugin: 开头
+		owner?.startsWith('plugin:')
+	// 结束「属于其他域」复合条件
+	) {
+		// 命中则拒绝认领
+		return false;
+	// 结束 owner 前缀判断的 if 块
 	}
+
+	// link 元素走 href 同源判断分支
 	if (el instanceof HTMLLinkElement) {
-		if (el.rel !== "stylesheet" || !el.href) return false;
+		// 非 stylesheet 或无 href 则跳过
+		if (el.rel !== 'stylesheet' || !el.href) return false;
+		// 尝试解析 link.href 的 origin
 		try {
+			// href origin 与 entry origin 一致则认领
 			return new URL(el.href).origin === ctx.entryOrigin;
+		// href 解析失败
 		} catch {
+			// 解析失败则拒绝
 			return false;
+		// 结束 link href try/catch
 		}
+	// 结束 HTMLLinkElement 分支
 	}
-	const viteId = el.getAttribute("data-vite-dev-id") || "";
-	// Dev：有 vite id 时排除 Host；生产无 id 同样仅认领 active
-	if (viteId && isHostViteDevStyle(viteId)) return false;
-	return active?.pluginId === ctx.pluginId;
+
+	// style 元素：读取内联 CSS 文本
+	const text = el.textContent ?? '';
+	// Host 关键全局 CSS：打 Host 标记并排除
+	if (isHostCriticalCss(text)) {
+		// 标记 mfHostStyle 防止后续误认领
+		el.dataset.mfHostStyle = '1';
+		// 返回 false 排除 Remote 处理
+		return false;
+	// 结束 isHostCriticalCss 分支
+	}
+
+	// 读取 Vite dev 注入的 data-vite-dev-id
+	const viteId = el.getAttribute('data-vite-dev-id') || '';
+	// 有 vite id 时走 Host/Remote 模块路径启发式
+	if (viteId) {
+		// Host 自身 Vite 样式永不认领
+		if (isHostViteDevStyle(viteId)) return false;
+		// 尝试从 ctx.entryOrigin 取 host 做 vite id 子串匹配
+		try {
+			// 解析 entry origin 得到 host 字符串
+			const host = new URL(ctx.entryOrigin).host;
+			// vite id 含 Remote host → 高置信 Remote 样式
+			if (host && viteId.includes(host)) return true;
+		// entryOrigin 解析异常忽略
+		} catch {
+			/* ignore */
+		// 结束 viteId try 块（catch 体为 /* ignore */）
+		}
+		// 无 host 匹配：仅 active capture 为本 realm 时认领新注入
+		return active?.realm === ctx.realm;
+	// 结束 viteId 分支
+	}
+
+	// 生产无 vite id：旧版 owner=pluginId 且仍包着该 plugin 的 @scope → 可升到 realm
+	// 见下行源码注释：生产无 vite id，兼容旧 owner=pluginId + data-mf-plugin @scope
+	if (owner) {
+		// 旧版 scoped 样式仍含 [data-mf-plugin="owner"] 时可 reclaim 到 realm
+		if (
+			// 条件：active capture 正是本 realm
+			active?.realm === ctx.realm &&
+			// 且 CSS 含双引号版 data-mf-plugin 选择器
+			(text.includes(`[data-mf-plugin="${owner}"]`) ||
+				// 或 CSS 含单引号版 data-mf-plugin 选择器
+				text.includes(`[data-mf-plugin='${owner}']`))
+		// 结束旧版 owner 升级复合条件
+		) {
+			// 满足则认领 true
+			return true;
+		// 结束 inner if
+		}
+		// owner 存在但不满足升级条件则 false
+		return false;
+	// 结束 owner 分支
+	}
+
+	// 无标记的 style：reclaim 绝不碰（避免收走 Host sonner 等）；仅 live 捕获窗口认领新注入
+	// 见下行源码注释：reclaim 对无标记 style 保守拒绝；live 依赖 active capture
+	if (mode === 'reclaim') return false;
+	// live 模式：无标记新注入仅在 active 为本 realm 时认领
+	return active?.realm === ctx.realm;
+// 结束 looksLikeRemoteStyle 函数
 }
 
-/** 改写 <style> 文本；空节点等 Vite 填完再处理 */
-function scopeStyleElement(el: HTMLStyleElement, pluginId: string) {
-	if (el.dataset.mfScoped === "1") return;
-	const sel = scopeSelector(pluginId);
-	const text = el.textContent ?? "";
+// 对单个 style 写入 @scope 包裹并设置 mfScoped/mfStyleOwner/mfStyleOrigin
+function scopeStyleElement(
+	// 待处理的 HTMLStyleElement
+	el: HTMLStyleElement,
+	// 目标 realm 键，用于 @scope 根选择器与 dataset
+	realm: string,
+	// 可选 entry origin，写入 mfStyleOrigin 供后续 reclaim
+	entryOrigin?: string,
+// 函数体开始
+) {
+	// 首次读取 textContent，尽早拦截 Host 关键 CSS
+	const text0 = el.textContent ?? '';
+	// 含 sonner 等 Host 关键规则则标记并退出
+	if (isHostCriticalCss(text0)) {
+		// 打 mfHostStyle=1
+		el.dataset.mfHostStyle = '1';
+		// 提前 return，不写入 @scope
+		return;
+	// 结束 Host 关键 CSS 分支
+	}
+	// 计算本 realm 的 @scope 根选择器
+	const sel = scopeSelector(realm);
+	// 再次读取 textContent（可能已被异步填充）
+	const text = el.textContent ?? '';
+	// 内容为空：Vite 可能先插空 style 再填 textContent
 	if (!text.trim()) {
-		// Vite 常先 append 空 style 再写 textContent
+		// 挂 MutationObserver 等待非空后再递归 scope
 		const mo = new MutationObserver(() => {
-			if ((el.textContent ?? "").trim()) {
+			// observer 回调：检测 textContent 是否已有实质内容
+			if ((el.textContent ?? '').trim()) {
+				// 有内容则 disconnect 避免重复触发
 				mo.disconnect();
-				scopeStyleElement(el, pluginId);
+				// 递归调用完成 @scope 包裹
+				scopeStyleElement(el, realm, entryOrigin);
+			// 结束 observer 内 if 块
 			}
+		// 结束 MutationObserver 回调
 		});
+		// 监听 style 子树与字符数据变化
 		mo.observe(el, {
+			// observe 选项：childList
 			childList: true,
+			// observe 选项：characterData
 			characterData: true,
+			// observe 选项：subtree
 			subtree: true,
+		// 结束 mo.observe 配置对象
 		});
+		// 空内容分支 return，等待 observer 触发
 		return;
+	// 结束空 text 分支
 	}
+	// 已是目标 @scope：只补 dataset，不改 textContent
+	if (alreadyScoped(text, sel)) {
+		// 标记 mfScoped=1
+		el.dataset.mfScoped = '1';
+		// 写入 mfStyleOwner=realm
+		el.dataset.mfStyleOwner = realm;
+		// 有 entryOrigin 则写入 mfStyleOrigin
+		if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
+		// 已 scoped 分支 return
+		return;
+	// 结束 alreadyScoped 分支
+	}
+	// 写入 @scope 包裹后的 CSS 到 textContent
 	el.textContent = wrapWithScope(text, sel);
-	el.dataset.mfScoped = "1";
-	el.dataset.mfStyleOwner = pluginId;
+	// 标记 mfScoped=1
+	el.dataset.mfScoped = '1';
+	// 写入 mfStyleOwner=realm
+	el.dataset.mfStyleOwner = realm;
+	// 有 entryOrigin 则写入 mfStyleOrigin
+	if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
+// 结束 scopeStyleElement 函数
 }
 
-/**
- * 外链 stylesheet：CORS fetch → 旁路插入 scoped style → 禁用原 link。
- * fetch 失败则保持原样（不抛错）。
- */
-async function scopeLinkElement(el: HTMLLinkElement, pluginId: string) {
-	if (el.dataset.mfScoped === "1") return;
+// 将 link[stylesheet] fetch 为内联 style 并 @scope，或复用已有副本
+async function scopeLinkElement(
+	// 待处理的 HTMLLinkElement
+	el: HTMLLinkElement,
+	// 目标 realm 键
+	realm: string,
+	// entry origin，写入 style/link 的 mfStyleOrigin
+	entryOrigin: string,
+// 函数体开始
+) {
+	// 读取 resolved href
 	const href = el.href;
+	// 无 href 则无法 fetch，直接返回
 	if (!href) return;
-	try {
-		const res = await fetch(href, { credentials: "omit", mode: "cors" });
-		if (!res.ok) return;
-		const css = await res.text();
-		const style = document.createElement("style");
-		style.textContent = wrapWithScope(css, scopeSelector(pluginId));
-		style.dataset.mfScoped = "1";
-		style.dataset.mfStyleOwner = pluginId;
-		style.dataset.mfFromLink = href;
-		el.insertAdjacentElement("afterend", style);
-		el.dataset.mfScoped = "1";
+	// 计算 @scope 根选择器
+	const sel = scopeSelector(realm);
+	// 查找 head 内是否已有同 href 的 data-mf-from-link style
+	const existing = Array.from(
+		// querySelectorAll 取所有 from-link 副本
+		document.head.querySelectorAll('style[data-mf-from-link]'),
+	// find 匹配 dataset.mfFromLink === href
+	).find((s) => (s as HTMLElement).dataset.mfFromLink === href) as
+		// 类型断言为 HTMLStyleElement | undefined
+		| HTMLStyleElement
+		// 结束 union 类型第二行
+		| undefined;
+	// 已存在同 href 副本则复用
+	if (existing) {
+		// 对已有 style 确保 realm 标记与 @scope 一致
+		scopeStyleElement(existing, realm, entryOrigin);
+		// link 打 mfScoped=1
+		el.dataset.mfScoped = '1';
+		// link 写 mfStyleOwner=realm
+		el.dataset.mfStyleOwner = realm;
+		// link 写 mfStyleOrigin=entryOrigin
+		el.dataset.mfStyleOrigin = entryOrigin;
+		// 禁用原 link 避免双份样式
 		el.disabled = true;
-		el.dataset.mfStyleOwner = pluginId;
+		// 复用分支 return
+		return;
+	// 结束 existing 分支
+	}
+	// 同一 link 已按本 realm scoped 则跳过重复 fetch
+	if (el.dataset.mfScoped === '1' && el.dataset.mfStyleOwner === realm) return;
+	// 尝试跨域 fetch 外链 CSS
+	try {
+		// fetch href，omit credentials + cors
+		const res = await fetch(href, { credentials: 'omit', mode: 'cors' });
+		// HTTP 非 2xx 则放弃
+		if (!res.ok) return;
+		// 读取 CSS 文本
+		const css = await res.text();
+		// 创建内联 style 承载 scoped 内容
+		const style = document.createElement('style');
+		// 写入 @scope 包裹后的 CSS
+		style.textContent = wrapWithScope(css, sel);
+		// style 打 mfScoped=1
+		style.dataset.mfScoped = '1';
+		// style 写 mfStyleOwner=realm
+		style.dataset.mfStyleOwner = realm;
+		// style 写 mfStyleOrigin=entryOrigin
+		style.dataset.mfStyleOrigin = entryOrigin;
+		// style 写 mfFromLink=href 供 dedupe
+		style.dataset.mfFromLink = href;
+		// 插在 link 之后保持 DOM 顺序
+		el.insertAdjacentElement('afterend', style);
+		// link 打 mfScoped=1
+		el.dataset.mfScoped = '1';
+		// 禁用原 link
+		el.disabled = true;
+		// link 写 mfStyleOwner=realm
+		el.dataset.mfStyleOwner = realm;
+		// link 写 mfStyleOrigin=entryOrigin
+		el.dataset.mfStyleOrigin = entryOrigin;
+	// fetch 失败（CORS/离线）静默忽略
 	} catch {
-		/* CORS / 离线：无法改写则保持原样（partner 仍建议可 CORS） */
+		/* CORS / 离线 */
+	// 结束 scopeLinkElement 的 catch 块（体为 /* CORS / 离线 */）
 	}
+// 结束 scopeLinkElement 函数
 }
 
-/** 分发：只处理 style / stylesheet link */
+// 处理新插入 head 的节点：style 同步 scope，link 异步 scopeLinkElement
 function processNode(node: Node, ctx: CaptureCtx) {
+	// 非 HTMLElement（如 Text）直接忽略
 	if (!(node instanceof HTMLElement)) return;
+	// style 节点走 scopeStyleElement 分支
 	if (node instanceof HTMLStyleElement) {
+		// 非 Remote 样式则跳过
 		if (!looksLikeRemoteStyle(node, ctx)) return;
-		scopeStyleElement(node, ctx.pluginId);
+		// 同步 @scope 并写 dataset
+		scopeStyleElement(node, ctx.realm, ctx.entryOrigin);
+		// style 分支 return
 		return;
+	// 结束 HTMLStyleElement 分支
 	}
-	if (node instanceof HTMLLinkElement && node.rel === "stylesheet") {
+	// link[rel=stylesheet] 走异步 scopeLinkElement
+	if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
+		// 非 Remote 样式则跳过
 		if (!looksLikeRemoteStyle(node, ctx)) return;
-		void scopeLinkElement(node, ctx.pluginId);
+		// void 触发 async fetch+scope，不阻塞 DOM 插入
+		void scopeLinkElement(node, ctx.realm, ctx.entryOrigin);
+	// 结束 HTMLLinkElement 分支
 	}
+// 结束 processNode 函数
 }
 
-/** 首次调用时劫持 head.appendChild / insertBefore；其后只加 refcount */
-function ensureHeadPatch() {
-	if (patchDepth > 0) {
-		patchDepth += 1;
-		return;
+/** 挂载时把 head 里已注入、同 entry 的样式收回当前 realm（修复切换插件后无样式） */
+// 挂载时扫描 head，把同源 Remote 样式收回当前 realm
+function reclaimEntryStyles(ctx: CaptureCtx) {
+	// 先修复可能被误包的 Host 关键样式
+	repairHostCriticalStyles();
+	// 收集 head 内所有 style 与 stylesheet link
+	const nodes = document.head.querySelectorAll('style, link[rel="stylesheet"]');
+	// 逐个节点尝试 reclaim
+	for (const node of nodes) {
+		// 类型收窄：仅处理 style 或 link
+		if (
+			// 条件：非 HTMLStyleElement 且非 HTMLLinkElement
+			!(node instanceof HTMLStyleElement || node instanceof HTMLLinkElement)
+		// 结束类型判断复合条件
+		) {
+			// 非目标节点 continue
+			continue;
+		// 结束类型收窄 if 块
+		}
+		// reclaim 模式：只认领有明确 Remote 标记的节点
+		if (!looksLikeRemoteStyle(node, ctx, 'reclaim')) continue;
+		// style 节点同步 scope
+		if (node instanceof HTMLStyleElement) {
+			// 调用 scopeStyleElement
+			scopeStyleElement(node, ctx.realm, ctx.entryOrigin);
+		// link 节点异步 scope
+		} else {
+			// void scopeLinkElement
+			void scopeLinkElement(node, ctx.realm, ctx.entryOrigin);
+		// 结束 style/link 分支
+		}
+	// 结束 for 循环
 	}
+// 结束 reclaimEntryStyles 函数
+}
+
+// 首次调用 patch head.appendChild/insertBefore；嵌套 begin 只增 patchDepth
+function ensureHeadPatch() {
+	// 已在 patch 栈内：仅递增深度
+	if (patchDepth > 0) {
+		// 嵌套 beginPluginStyleCapture 时再进入：仅递增引用计数
+		patchDepth += 1;
+		// 嵌套 capture 不重复替换方法，直接 return
+		return;
+	// 结束 patchDepth > 0 分支
+	}
+	// 取得 document.head 引用
 	const head = document.head;
+	// 绑定并缓存原生 appendChild
 	origAppend = head.appendChild.bind(head) as typeof origAppend;
+	// 绑定并缓存原生 insertBefore
 	origInsert = head.insertBefore.bind(head) as typeof origInsert;
 
+	// 替换 head.appendChild：插入后若 active 存在则 processNode
 	head.appendChild = function appendScoped<T extends Node>(node: T): T {
+		// 先走原生 appendChild 完成 DOM 插入
 		const ret = origAppend(node);
+		// active capture 窗口内认领并 @scope 新 style/link
 		if (active) processNode(node, active);
+		// 返回原生 appendChild 的返回值
 		return ret;
+	// 结束 appendScoped 函数赋值
 	};
 
+	// 替换 head.insertBefore：逻辑同 appendScoped
 	head.insertBefore = function insertScoped<T extends Node>(
+		// 待插入节点
 		node: T,
+		// 参考节点 ref
 		ref: Node | null,
+	// 返回类型 T
 	): T {
+		// 先走原生 insertBefore
 		const ret = origInsert(node, ref);
+		// active 存在则 processNode
 		if (active) processNode(node, active);
+		// 返回原生 insertBefore 返回值
 		return ret;
+	// 结束 insertScoped 函数赋值
 	};
 
+	// 标记进入第一层 patch，patchDepth=1
 	patchDepth = 1;
+// 结束 ensureHeadPatch 函数
 }
 
-/** refcount -1；归零恢复原生方法 */
+// 与 ensureHeadPatch 成对：递减 depth，归零时还原 head 原生方法
 function releaseHeadPatch() {
+	// patchDepth 已为 0 则 noop
 	if (patchDepth <= 0) return;
+	// 每次 end capture 递减嵌套深度
 	patchDepth -= 1;
+	// 仍有外层 capture 持有 patch，暂不还原
 	if (patchDepth > 0) return;
+	// 还原 head.appendChild 为 origAppend
 	document.head.appendChild = origAppend as typeof document.head.appendChild;
+	// 还原 head.insertBefore 为 origInsert
 	document.head.insertBefore = origInsert as typeof document.head.insertBefore;
+// 结束 releaseHeadPatch 函数
 }
 
 /**
- * 在 loadRemote 前后包一层：捕获本次注入的 CSS 并 @scope。
- * 可嵌套调用（refcount patch）。
- * @returns 结束函数：disconnect Observer + 恢复 active + releaseHeadPatch
+ * 在 loadRemote 前后包一层：捕获本次注入的 CSS 并 @scope 到 realm。
  */
+// 开始插件样式捕获：设置 active、patch head、reclaim、MutationObserver；返回 end 函数
 export function beginPluginStyleCapture(
+	// 当前插件 id，用于 capture 栈匹配与 teardown 条件
 	pluginId: string,
+	// Remote entry URL，传入 styleRealmKey 与 entryOriginOf
 	entry: string,
+	// 可选 MF remote 名称，参与 realm 降级键计算
+	remoteName?: string,
+// 返回 teardown 函数，在插件 unmount 或 loadRemote 结束时调用
 ): () => void {
+	// 计算本插件/shared Remote 的 realm 键
+	const realm = styleRealmKey(entry, remoteName, pluginId);
+	// 构造本次 capture 上下文对象
 	const ctx: CaptureCtx = {
+		// ctx.pluginId
 		pluginId,
+		// ctx.realm
+		realm,
+		// ctx.entryOrigin
 		entryOrigin: entryOriginOf(entry),
+	// 结束 CaptureCtx 字面量
 	};
+	// 保存嵌套 capture 的外层 active，teardown 时恢复
 	const prev = active;
+	// 覆盖模块级 active 为本次 ctx
 	active = ctx;
+	// patch head 插入方法以拦截新 style/link
 	ensureHeadPatch();
+	// 修复 head 内误包 @scope 的 Host 关键样式
+	repairHostCriticalStyles();
+	// reclaim 已注入的同 entry Remote 样式到当前 realm
+	reclaimEntryStyles(ctx);
 
+	// 本 realm 的 @scope 选择器，供 HMR 检测是否丢失 @scope
+	const sel = scopeSelector(realm);
+	// MutationObserver 监听 head 子树：新节点与 style 文本变更
 	const obs = new MutationObserver((mutations) => {
-		if (!active || active.pluginId !== pluginId) return;
+		// capture 已结束或 realm 已切换则忽略回调
+		if (!active || active.realm !== realm) return;
+		// 遍历本次 batch 的 mutation 记录
 		for (const m of mutations) {
+			// 处理 addedNodes 中的新 style/link
 			for (const n of m.addedNodes) processNode(n, ctx);
-			// style 先插入再填 textContent
-			if (
-				m.type === "childList" &&
-				m.target instanceof HTMLStyleElement &&
-				looksLikeRemoteStyle(m.target, ctx)
-			) {
-				scopeStyleElement(m.target, pluginId);
+			// HMR 可能改写已有 style 的 textContent
+			if (m.target instanceof HTMLStyleElement) {
+				// target 非 Remote 样式则 continue
+				if (!looksLikeRemoteStyle(m.target, ctx)) continue;
+				// 读取 HMR 后 style 文本
+				const text = m.target.textContent ?? '';
+				// HMR 可能改写 textContent 丢掉 @scope
+				// 见下行源码注释：有内容但未 scoped 时清 mfScoped 强制重包
+				if (text.trim() && !alreadyScoped(text, sel)) {
+					// 删除 mfScoped 让 scopeStyleElement 重新 wrap
+					delete m.target.dataset.mfScoped;
+				// 结束 HMR 重包条件 if 块
+				}
+				// 对 target style 执行 scope（含 HMR 重包路径）
+				scopeStyleElement(m.target, realm, ctx.entryOrigin);
+			// 结束 HTMLStyleElement target 分支
 			}
+		// 结束 for (mutations) 循环
 		}
+	// 结束 MutationObserver 回调
 	});
+	// 开始 observe document.head
 	obs.observe(document.head, {
+		// 监听 childList：新 style/link 插入
 		childList: true,
+		// 监听 subtree：head 内深层变化
 		subtree: true,
+		// 监听 characterData：style textContent HMR
 		characterData: true,
+	// 结束 observe 配置对象
 	});
 
+	// 返回 teardown 闭包
 	return () => {
+		// 断开 MutationObserver
 		obs.disconnect();
-		if (active?.pluginId === pluginId) active = prev;
+		// 仅当 active 仍指向本次 capture 时才恢复 prev
+		if (active?.realm === realm && active.pluginId === pluginId) {
+			// 恢复嵌套 capture 的外层 active
+			active = prev;
+		// 结束 active 恢复 if 块
+		}
+		// release head patch（递减 patchDepth，可能还原原生方法）
 		releaseHeadPatch();
+	// 结束 teardown 闭包
 	};
+// 结束 beginPluginStyleCapture 函数
+}
+
+/* -------------------- Portal → @scope（createPortal 收编） -------------------- */
+
+// 当前已 attach Portal 桥接的 pluginId 集合
+const portalPlugins = new Set<string>();
+/** pluginId → realm，Portal 容器需带 style-realm 才能吃到 CSS */
+// pluginId → realm 映射，Portal 容器需带 data-mf-style-realm 才能匹配 @scope
+const portalRealmByPlugin = new Map<string, string>();
+
+// 从 DOM 元素向上查找所属 pluginId
+function claimIdFromElement(el: Element | null): string | null {
+	// 无元素则无法认领
+	if (!el) return null;
+	// 查找最近的 data-mf-portal-scope 祖先
+	const scope = el.closest('[data-mf-portal-scope]');
+	// 在 portal-scope 子树内则读 scope 上的 pluginId
+	if (scope) {
+		// 读取 data-mf-portal-scope 属性值
+		const id = scope.getAttribute('data-mf-portal-scope');
+		// id 有效且插件仍注册 Portal 桥接则返回
+		if (id && portalPlugins.has(id)) return id;
+	// 结束 scope 分支
+	}
+	// 否则查插件主挂载根（排除 portal stamp/scope 节点自身）
+	const root = el.closest(
+		// closest 选择器：data-mf-plugin 且非 portal 标记节点
+		'[data-mf-plugin]:not([data-mf-portal-stamp]):not([data-mf-portal-scope])',
+	// 结束 closest 实参
+	);
+	// 从插件根读 data-mf-plugin
+	const id = root?.getAttribute('data-mf-plugin');
+	// 有效且已注册则返回 id，否则 null
+	return id && portalPlugins.has(id) ? id : null;
+// 结束 claimIdFromElement 函数
+}
+
+// 安装 document 级 pointerover/focusin，维护 lastTouchedPluginId
+function ensureTouchBridge() {
+	// 已安装或无 document（SSR）则跳过
+	if (touchBridgeInstalled || typeof document === 'undefined') return;
+	// 标记桥接已安装，避免重复 addEventListener
+	touchBridgeInstalled = true;
+
+	// 注册 pointerover 捕获阶段监听
+	document.addEventListener(
+		// 事件类型 pointerover
+		'pointerover',
+		// pointerover 回调
+		(e) => {
+			// 解析 pointer 进入侧所属 pluginId
+			const to = claimIdFromElement(
+				// e.target 转 Element 或 null 传入 claimIdFromElement
+				e.target instanceof Element ? e.target : null,
+			// 结束 claimIdFromElement(to) 实参
+			);
+			// 解析 pointer 离开侧（relatedTarget）所属 pluginId
+			const from = claimIdFromElement(
+				// relatedTarget 转 Element 或 null
+				e.relatedTarget instanceof Element ? e.relatedTarget : null,
+			// 结束 claimIdFromElement(from) 实参
+			);
+			// 仍在同一插件子树内移动则不更新，减少热路径写入
+			if (to === from) return;
+			// 跨插件边界时更新 lastTouchedPluginId
+			lastTouchedPluginId = to;
+		// 结束 pointerover 回调
+		},
+		// 捕获阶段 true
+		true,
+	// 结束 addEventListener(pointerover)
+	);
+	// 注册 focusin 捕获阶段监听
+	document.addEventListener(
+		// 事件类型 focusin
+		'focusin',
+		// focusin 回调
+		(e) => {
+			// 焦点进入时更新 lastTouchedPluginId
+			lastTouchedPluginId = claimIdFromElement(
+				// e.target 转 Element 传入 claimIdFromElement
+				e.target instanceof Element ? e.target : null,
+			// 结束 claimIdFromElement 实参
+			);
+		// 结束 focusin 回调
+		},
+		// 捕获阶段 true
+		true,
+	// 结束 addEventListener(focusin)
+	);
+// 结束 ensureTouchBridge 函数
+}
+
+/** 打开 Host Portal 外壳前的同步认领（不等 attach）；关闭时 clear */
+// Host Drawer 等打开前强制认领的 pluginId，优先于 pointer/focus 推断
+let portalClaimOverride: string | null = null;
+
+// 解析 createPortal 应重定向到哪个 plugin 的 body portal 容器
+function resolveClaimPluginId(): string | null {
+	// 优先使用显式 portalClaimOverride
+	if (
+		// 条件：override 非空
+		portalClaimOverride &&
+		// 且 override 对应插件仍在 portalPlugins 或仍有 realm 映射
+		(portalPlugins.has(portalClaimOverride) ||
+			// 结束 portalRealmByPlugin.has 条件
+			portalRealmByPlugin.has(portalClaimOverride))
+	// 结束 override 复合条件
+	) {
+		// 命中则直接返回 override pluginId
+		return portalClaimOverride;
+	// 结束 override 分支
+	}
+	// 其次：最近一次 pointer/focus 关联且仍注册的插件
+	if (lastTouchedPluginId && portalPlugins.has(lastTouchedPluginId)) {
+		// 返回 lastTouchedPluginId
+		return lastTouchedPluginId;
+	// 结束 lastTouched 分支
+	}
+	// 再次：当前焦点元素所在插件
+	const ae = document.activeElement;
+	// 若焦点在 Element 上则尝试 claimIdFromElement
+	if (ae instanceof Element) {
+		// 解析焦点元素所属 pluginId
+		const id = claimIdFromElement(ae);
+		// 有 id 则返回
+		if (id) return id;
+	// 结束 focus 分支
+	}
+	// sticky：scope 里已有弹层时不要把 createPortal 打回 body（否则 Drawer/POP 重挂闪烁）
+	// 见下行源码注释：sticky——scope 容器已有子节点时保持该 plugin，防 Drawer 重挂闪烁
+	for (const id of portalPlugins) {
+		// 查该 plugin 的 body portal-scope 容器
+		const host = document.querySelector(
+			// querySelector 带 cssEscapeIdent 转义 id
+			`[data-mf-portal-scope="${cssEscapeIdent(id)}"]`,
+		// 结束 querySelector 实参
+		);
+		// 容器存在且已有 Portal 子节点 → sticky 返回该 id
+		if (host && host.childElementCount > 0) return id;
+	// 结束 for (portalPlugins) 循环
+	}
+	// 所有策略均未命中则 null，createPortal 保持挂 body
+	return null;
+// 结束 resolveClaimPluginId 函数
 }
 
 /**
- * 插件页挂载期间继续隔离（HMR / 延迟注入的 CSS）。
- * 实现上与 beginPluginStyleCapture 相同，语义区分调用场景。
+ * 在 Host 打开会 Portal 的外壳（如 Drawer）之前同步认领，
+ * 让首帧 createPortal 就进 scope，避免「先 body 再搬进 scope」整树重挂闪烁。
  */
-export function attachPluginStyleIsolation(
-	pluginId: string,
-	entry: string,
-): () => void {
-	return beginPluginStyleCapture(pluginId, entry);
+// Host 外壳 Portal 打开前同步设置 claim、realm 并确保 body scope 容器
+export function claimPluginPortalTarget(pluginId: string, realm: string): void {
+	// 确保 pointer/focus 桥接已安装
+	ensureTouchBridge();
+	// 确保 createPortal 已被 patch
+	ensureCreatePortalPatch();
+	// 记录 pluginId → realm 供 Portal 容器写 data-mf-style-realm
+	portalRealmByPlugin.set(pluginId, realm);
+	// 设置同步认领 override，首帧 createPortal 即用
+	portalClaimOverride = pluginId;
+	// 同步更新 lastTouchedPluginId
+	lastTouchedPluginId = pluginId;
+	// 创建或更新 body 下零尺寸 portal-scope 容器
+	ensureBodyPortalScope(pluginId);
+// 结束 claimPluginPortalTarget 函数
 }
+
+// 清除同步认领；可指定 pluginId，仅 override 匹配时才清
+export function clearPluginPortalClaim(pluginId?: string | null): void {
+	// 指定了 pluginId 且 override 不是它则 noop（避免误清新插件 claim）
+	if (pluginId && portalClaimOverride !== pluginId) return;
+	// 清空 portalClaimOverride
+	portalClaimOverride = null;
+// 结束 clearPluginPortalClaim 函数
+}
+
+// 获取或创建 body 下某插件零尺寸 portal-scope 容器，同步 data-mf-style-realm
+function ensureBodyPortalScope(pluginId: string): HTMLElement {
+	// 构造 portal-scope 容器 querySelector
+	const sel = `[data-mf-portal-scope="${cssEscapeIdent(pluginId)}"]`;
+	// 查找是否已有容器
+	let el = document.querySelector(sel) as HTMLElement | null;
+	// 读取该 plugin 当前 realm
+	const realm = portalRealmByPlugin.get(pluginId);
+	// 容器已存在分支
+	if (el) {
+		// realm 变更时更新 data-mf-style-realm，保证 @scope 仍匹配
+		if (realm && el.getAttribute('data-mf-style-realm') !== realm) {
+			// 写入最新 realm 属性
+			el.setAttribute('data-mf-style-realm', realm);
+		// 结束 realm 更新 if 块
+		}
+		// 返回已有容器
+		return el;
+	// 结束 el 已存在分支
+	}
+	// 不存在则创建新 div 容器
+	el = document.createElement('div');
+	// 标记 data-mf-plugin
+	el.setAttribute('data-mf-plugin', pluginId);
+	// 有 realm 则写 data-mf-style-realm
+	if (realm) el.setAttribute('data-mf-style-realm', realm);
+	// 写 data-mf-portal-scope=pluginId 供 claimIdFromElement
+	el.setAttribute('data-mf-portal-scope', pluginId);
+	// 打 mfPortalStamp 排除 closest 插件根误判
+	el.dataset.mfPortalStamp = '1';
+	// 零尺寸绝对定位样式：不占布局，Portal 内容 overflow:visible
+	el.style.cssText =
+		// cssText 赋值：position/size/z-index 详见字符串
+		'position:absolute;left:0;top:0;width:0;height:0;overflow:visible;z-index:2147503646;';
+	// 挂到 document.body
+	document.body.appendChild(el);
+	// 返回新建容器
+	return el;
+// 结束 ensureBodyPortalScope 函数
+}
+
+// 插件卸载时移除 body 下对应 portal-scope 容器
+function removeBodyPortalScope(pluginId: string) {
+	// 查找并 remove portal-scope 节点
+	document
+		// querySelector 带转义 pluginId
+		.querySelector(`[data-mf-portal-scope="${cssEscapeIdent(pluginId)}"]`)
+		// 可选链 remove
+		?.remove();
+// 结束 removeBodyPortalScope 函数
+}
+
+// 判断 Portal 目标是否为 body 或 documentElement（需重定向进 scope）
+function isBodyPortalTarget(
+	// createPortal 的 container 参数
+	container: Element | DocumentFragment | null | undefined,
+// 返回是否为 body/html 根挂载点
+): boolean {
+	// body 或 documentElement 即 true
+	return container === document.body || container === document.documentElement;
+// 结束 isBodyPortalTarget 函数
+}
+
+// body/html 目标且能解析 pluginId 时，替换为 ensureBodyPortalScope 容器
+function retargetPortalContainer(
+	// createPortal 原始 container
+	container: Element | DocumentFragment,
+// 返回重定向后或原样的 container
+): Element | DocumentFragment {
+	// 非 body/html 目标直接返回原 container
+	if (!isBodyPortalTarget(container)) return container;
+	// Host 自身 portal 外壳不重定向，避免 Host UI 进 Remote @scope
+	if (
+		// 条件：container 是 Element
+		container instanceof Element &&
+		// 且在 data-mf-host-portal 子树内
+		container.closest('[data-mf-host-portal]')
+	// 结束 Host portal 排除复合条件
+	) {
+		// 命中则保持原 container
+		return container;
+	// 结束 Host portal 分支
+	}
+	// 解析应认领的 pluginId
+	const id = resolveClaimPluginId();
+	// 无法认领则保持挂 body
+	if (!id) return container;
+	// 返回该 plugin 的 body portal-scope 容器
+	return ensureBodyPortalScope(id);
+// 结束 retargetPortalContainer 函数
+}
+
+// 是否已对 ReactDOM.createPortal 做过 monkey-patch
+let createPortalPatched = false;
+// 保存原始 createPortal，patch 内委托调用
+let origCreatePortal: typeof ReactDOM.createPortal | null = null;
+
+// 一次性 patch ReactDOM.createPortal，body Portal 重定向到插件 scope
+function ensureCreatePortalPatch() {
+	// 已 patch 则直接返回
+	if (createPortalPatched) return;
+	// 标记已 patch，防止重复替换
+	createPortalPatched = true;
+	// 绑定并缓存原生 createPortal
+	origCreatePortal = ReactDOM.createPortal.bind(ReactDOM);
+	// 替换为包装函数：必要时 retarget container 再委托 origCreatePortal
+	ReactDOM.createPortal = ((children, container, key) => {
+		// 有 portal 插件注册或同步 claim 时才尝试 retarget
+		const next =
+			// 条件：portalPlugins 非空或 portalClaimOverride 存在
+			portalPlugins.size > 0 || portalClaimOverride
+				// 是则 retargetPortalContainer(container)
+				? retargetPortalContainer(container as Element | DocumentFragment)
+				// 否则保持原 container
+				: container;
+		// 委托原生 createPortal(children, next, key)
+		return origCreatePortal!(children, next as Element, key);
+	// 结束 createPortal 包装箭头函数
+	}) as typeof ReactDOM.createPortal;
+// 结束 ensureCreatePortalPatch 函数
+}
+
+// 插件页挂载期间注册 Portal 桥接；返回 cleanup
+function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
+	// 确保 pointer/focus 桥接已安装
+	ensureTouchBridge();
+	// 确保 createPortal 已被 patch
+	ensureCreatePortalPatch();
+	// 注册 pluginId 到 portalPlugins
+	portalPlugins.add(pluginId);
+	// 写入 pluginId → realm 映射
+	portalRealmByPlugin.set(pluginId, realm);
+	// 初始化 lastTouchedPluginId
+	lastTouchedPluginId = pluginId;
+	// 确保 body portal-scope 容器存在
+	ensureBodyPortalScope(pluginId);
+	// 返回 unmount cleanup 闭包
+	return () => {
+		// 从 portalPlugins 移除
+		portalPlugins.delete(pluginId);
+		// 删除 realm 映射
+		portalRealmByPlugin.delete(pluginId);
+		// 移除 body portal-scope DOM
+		removeBodyPortalScope(pluginId);
+		// 若 lastTouched 正是本 plugin 则清 null
+		if (lastTouchedPluginId === pluginId) lastTouchedPluginId = null;
+	// 结束 cleanup 闭包
+	};
+// 结束 attachPortalScopeBridge 函数
+}
+
+/**
+ * 插件页挂载期间继续隔离（HMR / 延迟 CSS）+ Portal 静默纳入 @scope。
+ */
+// 组合 CSS capture 与 Portal 桥接；插件页 mount 调用，unmount 执行返回 cleanup
+export function attachPluginStyleIsolation(
+	// 插件 id
+	pluginId: string,
+	// Remote entry URL
+	entry: string,
+	// 可选 remote 名称
+	remoteName?: string,
+// 返回 teardown：先 endPortal 再 endCss
+): () => void {
+	// 计算共享 realm 键
+	const realm = styleRealmKey(entry, remoteName, pluginId);
+	// 启动 CSS capture，得到 endCss
+	const endCss = beginPluginStyleCapture(pluginId, entry, remoteName);
+	// 启动 Portal 桥接，得到 endPortal
+	const endPortal = attachPortalScopeBridge(pluginId, realm);
+	// 返回组合 teardown
+	return () => {
+		// 先 teardown Portal（createPortal/容器/claim）
+		endPortal();
+		// 再 teardown CSS capture（observer/head patch/active）
+		endCss();
+	// 结束 teardown 闭包
+	};
+// 结束 attachPluginStyleIsolation 函数
+}
+
 ```
 
 ##### 10.20.0.5 边界与验收
@@ -2446,7 +3561,11 @@ export function attachPluginStyleIsolation(
 | --------------------- | ----------------------------------------------------------------- |
 | 浏览器不支持 `@scope` | 规则被忽略 → 样式变全局（功能可用，隔离失效）；目标浏览器均已支持 |
 | link CORS 失败        | 原 link 仍生效，可能泄漏全局；partner 应开 CORS 或把 CSS 打进 JS  |
-| 忘记 `data-mf-plugin` | scoped 规则匹配不到插件 UI → **子应用看起来没样式**               |
+| 忘记 `data-mf-style-realm` / `data-mf-plugin` | scoped 规则匹配不到插件 UI → **子应用看起来没样式**               |
+| 同 Remote 多插件切换  | `reclaimEntryStyles` 后两插件应都能吃到同一份 CSS（同一 realm）   |
+| Portal POP / Drawer 闪烁 | 归属 sticky + Drawer 打开前 `claimPluginPortalTarget`             |
+| Host Toaster 顶开布局 | sonner 被误 `@scope`；靠 critical 检测 + `data-mf-host-portal`    |
+| MF 内毛玻璃失效、独立预览正常 | 圆角容器同层 `overflow-hidden` 裁切了 `backdrop-filter` 采样；见 §2.10.0 / §2.14.4 |
 | `untrusted`           | 不调用本模块；sandbox iframe                                      |
 | 打开笔记后再进设置    | Host 字体/标签不应被 Remote Preflight 改坏                        |
 
@@ -2454,13 +3573,20 @@ export function attachPluginStyleIsolation(
 
 1. 英语学习 → 学习笔记：按钮有主题样式。
 2. 再进设置页：主站样式正常。
-3. `apps/remote-plugins` 独立预览（:9008）仍用标准 Tailwind。
+3. 学习笔记 ↔ 视频播放器（同 Remote）：切换后双方样式仍正常。
+4. 视频底栏 POP：鼠标移入不闪；滤镜/音量轨道有色。
+5. 电子书「全书划线」Drawer：首次打开不闪。
+6. Host Toast：仍右上角 fixed，不顶开布局。
+7. `apps/micro` 独立预览（:9008）仍用标准 Tailwind。
+8. 视频播放器嵌入 Host：控制条 / POP 上 `backdrop-filter` 仍能模糊到画面（非纯灰底）。
 
 ##### 10.10.0.5 明确不做
 
 - 不要求 Remote 构建期去掉 Preflight / 嵌套 `@tailwind utilities`。
 - 不恢复「半套 Shadow + 只搬 head」。
 - 不把全体第一方改成 iframe。
+- 不要求业务改 `getPopupContainer` / 传 portal `container`（由 Host `createPortal` 收编）。
+- 不在 reclaim 时认领无标记的裸 `<style>`（避免误伤 Host）。
 
 ---
 
@@ -2506,13 +3632,16 @@ sequenceDiagram
 #### 2.11.3 `buildRoutes.ts`（与源码对齐）
 
 ```typescript
+// 无 JSX 文件：用 createElement 做占位组件
 import { createElement } from "react";
+// 读 PluginManager 已注入的动态 Route 配置
 import { routeInjector } from "@/plugins";
+// 静态壳路由表（含顶层 * → NotFound）
 import routes, { type RouteConfig } from "./routes";
 
 /** 插件壳未就绪时占住 `*`，避免刷新子项目路径先闪 404 */
 function PluginRoutesPending() {
-	// 顶层 * 无 Layout；用主题背景空白即可，不必上 Loading 动画
+	// 顶层 * 无 Layout；主题色空白即可，不必 Loading 动画拖住首屏
 	return createElement("div", {
 		className: "h-full w-full bg-theme-background",
 	});
@@ -2523,26 +3652,32 @@ function PluginRoutesPending() {
  * @param pluginsReady - false：catch-all 用占位；true：真正 NotFound
  */
 export function buildRoutes(pluginsReady = true): RouteConfig[] {
+	// 当前已 inject 的插件路由（可能为空数组）
 	const dynamic = routeInjector.getRoutes();
 	// 未就绪：只替换 *，其它静态 path 不变，首页/聊天仍可立刻匹配
 	const base = pluginsReady
 		? routes
 		: routes.map((route) =>
+				// 仅顶层 catch-all 换成占位；其它路由原样
 				route.path === "*"
 					? { ...route, Component: PluginRoutesPending }
 					: route,
 			);
 
+	// 尚无动态路由时直接返回 base（含占位或 NotFound）
 	if (dynamic.length === 0) return base;
 
+	// 把动态路由挂到 Layout（routes[0]）children 末尾
 	return base.map((route, index) => {
 		// Layout 壳：首条带 children 的路由
 		if (index === 0 && route.children) {
 			return {
 				...route,
+				// 静态业务 children 在前，插件路由在后
 				children: [...route.children, ...dynamic],
 			};
 		}
+		// 非 Layout 顶层路由（含 *）原样返回
 		return route;
 	});
 }
@@ -2551,37 +3686,56 @@ export function buildRoutes(pluginsReady = true): RouteConfig[] {
 #### 2.11.4 `router/index.tsx`（关键片段）
 
 ```typescript
+// App 根：插件 init + 防闪 404 + Host portal 豁免标记
 const App = () => {
+	// 仅输入框显示 Tab 焦点环（全局 UX，与插件无关）
 	useInputsOnlyTab();
-	// 路由世代：inject / init 结束时 +1，触发重建 router
+	// 路由世代：inject / init 结束时 +1，触发重建 createBrowserRouter
 	const [routeEpoch, setRouteEpoch] = useState(0);
-	// false 时 catch-all 不渲染 404，等插件壳挂上后再决断
+	// false：catch-all 用占位，避免刷新子应用路径先闪 NotFound
 	const [pluginsReady, setPluginsReady] = useState(false);
 
+	// 挂载时订阅注入器 + 启动 pluginManager.init
 	useEffect(() => {
+		// 侧栏/路由注入完成时 bump epoch，立刻挂上新 path
 		const unsub = routeInjector.subscribe(() => {
 			setRouteEpoch((n) => n + 1);
 		});
+		// init 异步拉 registry、加载启用插件、注入路由
 		void pluginManager
 			.init()
+			// 失败只打日志；仍须 finally ready，否则真 404 永不出现
 			.catch((e) => console.error("[plugins] init failed", e))
 			.finally(() => {
-				// 成功或失败都 ready，避免假路径永远停在占位
+				// 成功或失败都 ready，占位改为真正 NotFound
 				setPluginsReady(true);
+				// 与 ready 同批重建 router，吃到已注入的动态路由
 				setRouteEpoch((n) => n + 1);
 			});
+		// 卸载时取消 inject 订阅
 		return unsub;
+		// 仅挂载跑一次
 	}, []);
 
+	// pluginsReady / routeEpoch 变则重建 router，并回写 navigate 给 PluginManager
 	const router = useMemo(() => {
+		// 按 ready 决定 * 是占位还是 NotFound，并拼上动态插件路由
 		const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
+		// 插件内跳转走同一 router 实例，避免双实例
 		pluginManager.setNavigate((to) => {
 			void r.navigate(to);
 		});
 		return r;
+		// epoch：注入完成；pluginsReady：catch-all 策略切换
 	}, [routeEpoch, pluginsReady]);
 
-	// ...
+	// JSX：data-mf-host-portal 包住 Toaster，createPortal 收编时跳过（§2.10.2）
+	return (
+		<div className="h-full w-full bg-theme-background" data-mf-host-portal>
+			<Toaster />
+			<RouterProvider router={router} />
+		</div>
+	);
 };
 ```
 
@@ -3316,57 +4470,116 @@ export async function setAppFullscreen(next: boolean): Promise<void> {
 `createHostBridge` 在 `ui:toast` 下：
 
 ```typescript
+// 仅当 permissions 含 ui:toast 时注入整包 api.ui（否则插件侧为 undefined）
 api.ui = Object.freeze({
+	// Host Toast：类型/文案由插件传入
 	showToast: (options) => {
 		/* ... */
 	},
+	// 影院全屏：与 showToast 同门闩，供 VideoPlayer 等调用
 	setAppFullscreen,
+	// 受控下载：走 Host 能力，避免 Remote 直接碰文件系统策略
 	downloadBlob: async (options) => {
 		/* ... */
 	},
+	// 结束 Object.freeze 配置对象
 });
 ```
 
 #### 2.14.3 `PluginPageShell` + `pageShell`
 
+全文与注释见 **§2.10.0**（含「勿在圆角容器写 `overflow-hidden`」）。要点：
+
 ```tsx
-export function PluginPageShell({
-	children,
-	className,
-}: {
-	children: ReactNode;
-	className?: string;
-}) {
-	const [theater, setTheater] = useState(getAppFullscreen);
-	useEffect(() => subscribeAppFullscreen(setTheater), []);
-	return (
-		<div
-			className={cn(
-				"mx-auto flex h-full min-h-0 flex-col",
-				theater ? "p-0" : "p-5.5 pt-0",
-				className,
-			)}
-		>
-			<div
-				className={cn(
-					"h-full min-h-0 overflow-hidden bg-theme-background",
-					theater ? "rounded-none p-0" : "rounded-md",
-				)}
-			>
-				{children}
-			</div>
-		</div>
-	);
-}
+/**
+ * 勿在圆角容器上写 overflow-hidden：与 border-radius 同层时，
+ * Chromium 会让子树 backdrop-filter 采不到更深的 video（本地独立跑正常、MF 嵌入失效）。
+ */
+// 以下为圆角内容区要点（JSX 标记行不注）；className 逻辑：
+// cn 合并：铺满 + 主题底，故意不含 overflow-hidden
+// theater 时去圆角；否则 rounded-md 与 Layout 内容区一致
+<div
+	className={cn(
+		'h-full min-h-0 bg-theme-background', // 无 overflow-hidden
+		theater ? 'rounded-none p-0' : 'rounded-md',
+	)}
+>
+	{children}
+</div>
 ```
 
-`PluginHostPage`：`wrap = (node) => pageShell ? <PluginPageShell>{node}</PluginPageShell> : node`；仅 `createPluginRoute` 传 `pageShell: true`。
+```typescript
+// 独立路由才套壳；业务内嵌直接返回 node，避免双层 p-5.5
+const wrap = (node: ReactNode) =>
+	pageShell ? <PluginPageShell>{node}</PluginPageShell> : node;
+```
+
+仅 `createPluginRoute` 传 `pageShell: true`。
 
 #### 2.14.4 Layout 行为（`apps/frontend/src/layout/index.tsx`）
 
-- `theater === true`：不渲染 Sidebar / Header / Web 备案 footer；去掉 `py-7 pr-7` 与圆角；内容区 `h-full overflow-hidden`
+影院态：
+
+- `theater === true`：不渲染 Sidebar / Header / Web 备案 footer；去掉 `py-7 pr-7` 与圆角；Outlet 内容区 `h-full overflow-hidden`
 - Web：`fullscreenchange` 且无 `document.fullscreenElement` 时 `setAppFullscreen(false)`
 - Tauri：`capabilities/default.json` 含 `core:window:allow-set-fullscreen` / `allow-is-fullscreen`
+
+**overflow 分层（与 `PluginPageShell` 同源约束）**：`main` 可带 `rounded-md`，但 **不要**在同一层写 `overflow-hidden`；裁切放到内层无圆角（或圆角已拆开）的容器，否则路由页内 `backdrop-filter` 失效。
+
+```tsx
+{/* JSX 结构示意：标记行不逐行注；下列 // 只解释 className / 条件表达式意图 */}
+<main
+	className={cn(
+		// main 可带 rounded；同层绝不要 overflow-hidden
+		'relative flex h-full w-full bg-theme-background',
+		// 影院去圆角贴齐窗口；常态与窗口圆角一致
+		theater ? 'rounded-none' : 'rounded-md',
+	)}
+>
+	{/* overflow 不与 rounded 同层，避免废掉路由页内 backdrop-filter */}
+	<div className="relative flex h-full w-full min-w-0 flex-1 overflow-hidden">
+		{/* 影院隐藏侧栏；条件表达式本身是布局逻辑 */}
+		{theater ? null : <Sidebar />}
+		<TooltipProvider>
+			<div
+				data-tauri-drag-region
+				className={cn(
+					// 主内容列：拖拽区 + flex 占满
+					'box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col',
+					// 影院去内边距/圆角；常态 py-7 pr-7 给侧栏留视觉呼吸
+					theater ? 'rounded-none p-0' : 'rounded-md py-7 pr-7',
+				)}
+			>
+				<div
+					className={cn(
+						// 圆角在此层；overflow 再往内一层
+						'relative h-full w-full min-w-0 max-w-full bg-theme-secondary',
+						theater ? 'rounded-none' : 'rounded-md',
+					)}
+				>
+					{/* 裁切层：无 rounded，专责 overflow-hidden */}
+					<div className="relative h-full w-full min-w-0 max-w-full overflow-hidden">
+						{theater ? null : <Header />}
+						<div
+							className={cn(
+								'box-border min-h-0 min-w-0 w-full max-w-full',
+								// 影院：Outlet 占满且裁切；常态：为 Header 留 3.25rem 并可纵向滚动
+								theater
+									? 'h-full overflow-hidden'
+									: 'h-[calc(100%-3.25rem)] overflow-x-hidden overflow-y-auto',
+							)}
+						>
+							{/* 鉴权未过不挂 Outlet，避免闪出需登录页 */}
+							{needAuth && !authed ? null : <Outlet />}
+						</div>
+					</div>
+				</div>
+			</div>
+		</TooltipProvider>
+		{/* Web 备案 footer：非 theater 时 absolute 挂在 overflow 内层 */}
+	</div>
+</main>
+```
 
 #### 2.14.5 侧栏 `MENUS` / `PLUGINS`
 
@@ -3375,8 +4588,10 @@ export function PluginPageShell({
 #### 2.14.6 插件调用
 
 ```typescript
-await api.ui?.setAppFullscreen?.(true); // 需 permissions 含 ui:toast
-await api.ui?.setAppFullscreen?.(false); // 退出 / 卸载时务必回写
+// 进入影院：藏侧栏/顶栏并请求系统全屏（需 permissions 含 ui:toast，否则 api.ui 不存在）
+await api.ui?.setAppFullscreen?.(true);
+// 退出 / 卸载时务必回写 false，避免壳层残留无侧栏状态
+await api.ui?.setAppFullscreen?.(false);
 ```
 
 参考：`apps/micro/src/views/video-player/VideoPlayer.tsx` 的 `onFull`。iframe untrusted 若 RPC 未登记则不可远程调用。
@@ -3627,7 +4842,7 @@ export async function deactivate() {
 | `default` 导出            | **必须**有 default 导出，且是 React 组件         |
 | `HostBridgeProps`         | 组件接收 `{ api, plugin }` 作为 props            |
 | `activate` / `deactivate` | **可选**；勿与组件同文件空导出；有副作用则拆文件 |
-| 样式隔离                  | Host `@scope`；可用正常 Tailwind                 |
+| 样式隔离                  | Host `@scope([data-mf-style-realm])` + Portal 收编；可用正常 Tailwind |
 | API 使用                  | 通过 `api` 对象调用 Host 提供的能力              |
 
 ---
@@ -3640,7 +4855,7 @@ export async function deactivate() {
 
 | 信任等级                  | 隔离方式                                     | Remote 侧要求                                        |
 | ------------------------- | -------------------------------------------- | ---------------------------------------------------- |
-| `first-party` / `partner` | Host 运行时 `@scope ([data-mf-plugin="id"])` | **可用**正常 `@import "tailwindcss"`（含 Preflight） |
+| `first-party` / `partner` | Host 运行时 `@scope ([data-mf-style-realm="…"])`（同 Remote 多插件共享 realm；另有 Portal 收编） | **可用**正常 `@import "tailwindcss"`（含 Preflight） |
 | `untrusted`               | sandbox iframe                               | 天然隔离；`iframeUrl` 指向无壳 embed 页              |
 
 **不要做**：
@@ -3662,7 +4877,7 @@ export async function deactivate() {
 /*
  * 常规 Tailwind v4 + shadcn token。
  * 嵌入 Host 时主题变量由主站继承；独立预览 / iframe 用本文件 :root / .dark。
- * Host 会在注入时用 @scope 包住整段 CSS，不必在此文件手写 data-mf-plugin。
+ * Host 会在注入时用 @scope([data-mf-style-realm]) 包住整段 CSS，不必在此文件手写 data-mf-plugin / realm。
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -3675,16 +4890,20 @@ export async function deactivate() {
 
 1. Remote 按普通 Vite + Tailwind 工程写样式即可。
 2. Host 已在 `PluginManager.runLoad` / `PluginHostPage` 接入捕获；插件开发者**无需**调用 `beginPluginStyleCapture`。
-3. 组件根仍可带 `data-plugin-root`（兼容旧选择器）；**宿主容器**上的 `data-mf-plugin` 由 Host 设置。
+3. 组件根仍可带 `data-plugin-root`（兼容旧选择器）；**宿主容器**上的 `data-mf-plugin` + `data-mf-style-realm` 由 Host 设置。
 4. 外链 `<link rel="stylesheet">`：须对 Host 源开 **CORS**，否则无法改写成 scoped style（见 §5.7）。优先把 CSS 打进 JS（Vite 默认注入 `<style>`）。
 5. `untrusted` 勿依赖 Host CSS；走 embed + iframe。
+6. 勿在插件侧再改 `createPortal` / 强行传 portal container（Host 已静默收编）；Host Drawer 类外壳由宿主调用 `claimPluginPortalTarget`。
+7. 独立预览正常、嵌入后 `backdrop-filter` 失效：属 Host `PluginPageShell` / Layout overflow 分层问题（§2.10.0 / §2.14.4），不是插件要关掉毛玻璃。
 
 #### 3.3.4 嵌入后样式「看起来丢了」怎么查
 
-1. DevTools 看插件根是否有 `data-mf-plugin="你的id"`。
-2. 看 `document.head` 里 Remote 的 `<style>` 是否已含 `@scope ([data-mf-plugin=...])`。
+1. DevTools 看插件根是否有 `data-mf-plugin="你的id"` **与** `data-mf-style-realm="entry:…"`。
+2. 看 `document.head` 里 Remote 的 `<style>` 是否已含 `@scope ([data-mf-style-realm=...])`（早期文档曾写 `data-mf-plugin`，现行以 realm 为准）。
 3. 若只有未禁用的跨域 `<link>`：检查 CORS / 改打进 bundle。
 4. Host 是否走过 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（untrusted 不会走）。
+5. 弹层是否在 `[data-mf-portal-scope]` 下；同 Remote 切换后是否已 reclaim。
+6. 毛玻璃失效：查圆角祖先是否同层带了 `overflow-hidden`（§5.7）。
 
 ---
 
@@ -4559,10 +5778,10 @@ flowchart TD
     K --> L[registerRemote]
     L --> L2[beginPluginStyleCapture]
     L2 --> M[loadRemoteApp]
-    M --> M2[CSS 注入 head 并 @scope]
+    M --> M2[CSS 注入 head 并 @scope realm]
     M2 --> M3[endCapture]
     M3 --> N[mod.activate]
-    N --> O[渲染 data-mf-plugin + attachPluginStyleIsolation]
+    N --> O[渲染 data-mf-plugin + data-mf-style-realm + attachPluginStyleIsolation]
 
     P[失败] --> Q[设置 failed 状态]
     Q --> R[显示错误 UI]
@@ -4671,14 +5890,32 @@ flowchart TD
 
 1. `runLoad` 是否在 `loadRemoteApp` 外包了 `beginPluginStyleCapture` / `finally endCapture`
 2. `PluginHostPage` 是否挂了 `attachPluginStyleIsolation`
-3. head 里 Remote `<style>` 是否已有 `@scope ([data-mf-plugin="..."])`
+3. head 里 Remote `<style>` 是否已有 `@scope ([data-mf-style-realm="..."])`（早期文档曾写 `data-mf-plugin`，现行以 realm 为准）
 4. 是否存在未 `disabled` 的跨域 stylesheet link（CORS 失败降级）
 
 #### 插件 UI 完全无样式
 
-**原因**：有 `@scope`，但页面上没有对应的 `data-mf-plugin` 根；或挂在错误的 portal/宿主外。
+**原因**：有 `@scope`，但页面上没有对应的 `data-mf-style-realm` 根；或挂在错误的 portal/宿主外；或同 Remote 多插件切换后未 `reclaim`。
 
-**解决方案**：确认 `PluginHostPage`（或等价宿主）渲染了 `data-mf-plugin={pluginId}`；Drawer/Portal 内容仍须落在该属性子树内，或单独再包一层。
+**解决方案**：确认 `PluginHostPage` 渲染了 `data-mf-plugin` **与** `data-mf-style-realm`；Drawer/Portal 由 Host `createPortal` 收编进 `[data-mf-portal-scope]`（同 realm）。切换同 Remote 插件时确认走过 `reclaimEntryStyles`。
+
+#### 同 Remote 多插件：刷新正常、切换后样式乱
+
+**原因**：CSS 只注入一份却按 `pluginId` 包 `@scope`，先打开者独占。
+
+**解决方案**：现行按 `styleRealmKey(entry)` → `data-mf-style-realm`；挂载时 reclaim。见 §2.10.2 / `10.20.0.1`。
+
+#### Portal POP / Drawer 瞬间闪一下
+
+**原因**：`createPortal` 容器在 `body` 与 `[data-mf-portal-scope]` 间切换导致重挂。
+
+**解决方案**：portal-scope 也计入归属；scope 有子节点时 sticky；Drawer 打开前 `claimPluginPortalTarget`（`EbookReadHostPlugins`）。
+
+#### Host Toast 把整页往下顶
+
+**原因**：sonner 的 `__insertCSS` 无 vite-id，被 `reclaim` 误 `@scope`，`[data-sonner-toaster]{position:fixed}` 不再命中 Host Toaster。
+
+**解决方案**：`isHostCriticalCss` / `repairHostCriticalStyles`；reclaim 不碰无标记 style；App 根 `data-mf-host-portal`。
 
 #### 外链 CSS 隔离失败
 
@@ -4690,7 +5927,17 @@ flowchart TD
 
 **原因**：仅初始 capture、挂载期未 `attachPluginStyleIsolation`。
 
-**解决方案**：激活态挂载期必须持续捕获（现源码已接）。
+**解决方案**：激活态挂载期必须持续捕获（现源码已接）；Observer 在 HMR 改写 textContent 丢掉 `@scope` 时会重包。
+
+#### MF 嵌入后 `backdrop-filter` 失效，Remote 独立预览正常
+
+**原因**：Host 外壳（`PluginPageShell` / Layout）在带 `border-radius` 的同一节点写了 `overflow-hidden`。Chromium 会为此建立裁切上下文，子树毛玻璃采不到更深的 video / 背景。
+
+**解决方案**：
+
+1. `PluginPageShell` 圆角内容区去掉 `overflow-hidden`（见 §2.10.0 文件头注释）
+2. Layout：`overflow-hidden` 下沉到**无圆角**或与 rounded **不同层**的节点（见 §2.14.4 注释「overflow 不与 rounded 同层」）
+3. 勿在业务里用「给圆角父级加 overflow」当万能裁切；需要裁切时单独加一层无圆角容器
 
 ### 5.8 应用级全屏后侧栏仍在 / Esc 后壳卡住
 
@@ -4726,8 +5973,9 @@ flowchart TD
 - **刷新防闪 404**：`pluginsReady` + catch-all 占位（§2.11），静态路由仍可首屏匹配
 - **entry 缓存破坏**：`version@manifestHash`；**一次** GET manifest + 直连 `remoteEntry.js?v=` + `afterResolve` 兜底（发布者勿改 Host registry）
 - **应用级全屏**：`setAppFullscreen` + Layout 影院态 + 独立路由 `PluginPageShell`
+- **MF 内毛玻璃**：Layout / `PluginPageShell` overflow 与 rounded 分层（§2.10.0 / §2.14.4）
 - **Host shared 收敛**：仅 shared react / react-dom；勿 shared react-router
-- **主子样式隔离**：Host `@scope` + head 劫持 + MutationObserver（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
+- **主子样式隔离**：Host `@scope([data-mf-style-realm])` + head 劫持 + MutationObserver + `createPortal` 收编 + Drawer `claimPluginPortalTarget`（§2.10.2）；Remote 零侵入 Tailwind；`untrusted` 走 iframe
 - **安全验证**：hostApiRange 运行时校验 + 保存 registry 前置校验
 - **幂等注入**：避免重复注入导致的闪烁问题
 - **失败重试**：稳定的失败态管理，支持手动重试

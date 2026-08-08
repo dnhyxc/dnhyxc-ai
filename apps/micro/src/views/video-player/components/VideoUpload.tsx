@@ -110,7 +110,7 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 						ref={ref}
 						className="flex min-h-0 flex-1"
 						zoneClassName={cn(
-							'relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-md border border-theme/5 bg-theme/2',
+							'relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-md border border-theme/5 bg-theme/3',
 							'hover:border-teal-500 data-drag-active:!border-teal-500',
 							zoneClassName,
 						)}
@@ -166,7 +166,7 @@ export const VideoUpload = forwardRef<VideoUploadHandle, VideoUploadProps>(
 					{/* 右侧：功能面板 — 卡片模式 */}
 					<aside
 						className={cn(
-							'relative flex w-60 flex-col overflow-hidden rounded-md border border-dashed border-theme/5 bg-theme/2',
+							'relative flex w-60 flex-col overflow-hidden rounded-md border border-dashed border-theme/5 bg-theme/3',
 						)}
 					>
 						<div className="relative z-10 flex min-h-0 flex-1 flex-col">

@@ -11,7 +11,7 @@ import type { HostBridgeProps, HostLocale } from '../core/types';
 import { eventBus } from '../host-api/EventBus';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
 import { PluginPageShell } from './PluginPageShell';
-import { attachPluginStyleIsolation } from './styleIsolation';
+import { attachPluginStyleIsolation, styleRealmKey } from './styleIsolation';
 
 type Props = {
 	pluginId: string;
@@ -134,8 +134,8 @@ export function PluginHostPage({
 
 	useEffect(() => {
 		if (status !== 'activated' || trust === 'untrusted' || !entry) return;
-		return attachPluginStyleIsolation(pluginId, entry);
-	}, [pluginId, status, entry, trust]);
+		return attachPluginStyleIsolation(pluginId, entry, loaded?.meta.remoteName);
+	}, [pluginId, status, entry, trust, loaded?.meta.remoteName]);
 
 	// 已激活插件经 eventBus 收 locale（与 bridge.api.locale 热更新互补）
 	useEffect(() => {
@@ -175,11 +175,17 @@ export function PluginHostPage({
 
 		if (!liveBridge) return null;
 		const Comp = loaded.mod.default;
+		const realm = styleRealmKey(
+			loaded.meta.entry,
+			loaded.meta.remoteName,
+			pluginId,
+		);
 		return wrap(
 			<PluginErrorBoundary pluginId={pluginId}>
 				<div
 					className={cn(`plugin-${pluginId} h-full w-full min-h-0`, className)}
 					data-mf-plugin={pluginId}
+					data-mf-style-realm={realm}
 					data-plugin-root
 				>
 					<Comp {...liveBridge} />

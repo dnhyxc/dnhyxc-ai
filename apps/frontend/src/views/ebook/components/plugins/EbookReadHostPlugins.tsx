@@ -14,8 +14,11 @@ import { type CSSProperties, useEffect } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	claimPluginPortalTarget,
+	clearPluginPortalClaim,
 	PluginHostPage,
 	pickPluginLocaleText,
+	styleRealmKey,
 	useHostSurfacePlugins,
 } from '@/plugins';
 
@@ -122,7 +125,17 @@ export function EbookReadHostPlugins({
 								)}
 								aria-pressed={open}
 								aria-label={label}
-								onClick={() => onOpenPluginIdChange?.(open ? null : p.id)}
+								onClick={() => {
+									if (!open) {
+										claimPluginPortalTarget(
+											p.id,
+											styleRealmKey(p.entry, p.remoteName, p.id),
+										);
+									} else {
+										clearPluginPortalClaim(p.id);
+									}
+									onOpenPluginIdChange?.(open ? null : p.id);
+								}}
 							>
 								<Icon className="size-4" />
 							</Button>
@@ -136,12 +149,21 @@ export function EbookReadHostPlugins({
 	const openMeta = drawerPlugins.find((p) => p.id === openPluginId);
 	if (!openMeta) return null;
 
+	// 与 createPortal 同一次渲染前认领，避免 Drawer 先挂 body 再搬进 scope 闪烁
+	claimPluginPortalTarget(
+		openMeta.id,
+		styleRealmKey(openMeta.entry, openMeta.remoteName, openMeta.id),
+	);
+
 	return (
 		<Drawer
 			title={pickPluginLocaleText(openMeta.title, locale) || openMeta.id}
 			open={!!openPluginId}
 			onOpenChange={(open) => {
-				if (!open) onOpenPluginIdChange?.(null);
+				if (!open) {
+					clearPluginPortalClaim(openPluginId);
+					onOpenPluginIdChange?.(null);
+				}
 			}}
 			bodyClassName="py-2 pl-0"
 			contentStyle={chromeStyle}

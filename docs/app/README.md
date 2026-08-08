@@ -45,10 +45,12 @@
 | [style-isolation-tech-overview.md](./style-isolation-tech-overview.md) | **主项目样式隔离技术说明**：5 分钟快速了解 @scope 原理、两层捕获机制、trusted/untrusted 两种模式、主子项目各自关注点、常见问题 FAQ |
 | [style-isolation-implementation.md](./style-isolation-implementation.md) | **主子项目样式隔离实现手册**：CSS @scope 原理、DOM 劫持 + MutationObserver 双层捕获、styleIsolation.ts 逐行注释、PluginManager/PluginHostPage 调用链路、子项目零改造、边界情况与降级策略、与 Shadow DOM/qiankun 对比 |
 | [style-isolation-dev-exclude-host.md](./style-isolation-dev-exclude-host.md) | **开发态样式认领：白名单 → 排除 Host**：`looksLikeRemoteStyle` viteId 分支由匹配 `micro\|remote-plugins\|…` 目录名改为 `hostViteRoot` + `isHostViteDevStyle` 排除 Host，新增/重命名 `apps/<remote>` 不必改正则（含改动前/后对比与逐行注释） |
+| [style-isolation-realm-portal.md](./style-isolation-realm-portal.md) | **样式隔离 Realm 键 + Portal 收编 + HMR 修复**：按 Remote 来源 `styleRealmKey` 替代 `pluginId` 粒度、`createPortal` 劫持收编 `body` portal、sonner Toaster 保护、HMR 下 `@scope` 重包、reclaim 旧样式（含改动前/后对比与逐行注释） |
 | [remote-demo-audio-player.md](./remote-demo-audio-player.md) | **remote-demo 插件多音频连续播放**：集成 AudioPlayer 组件、支持三段音频自动连续播放、进度跟踪和手动跳转 |
 | [video-player-plugin.md](./video-player-plugin.md) | **视频播放器插件**：基于 xgplayer 的视频播放插件实现，支持多文件上传、自定义控制条、PiP、影院态全屏、选集、倍速等（含改动前/后对比与逐行注释） |
 | [video-player-component-refactor.md](./video-player-component-refactor.md) | **视频播放器组件化重构**：单体 `VideoPlayer.tsx` 拆为通用 `VideoPlayer` / `VideoUpload` / `Tooltip` / `Popover` / `Segmented` / `Volume`，插件入口变「列表状态 + 组合层」，`TooltipProvider` 全局挂载，`PlaybackRatePanel` 用项目语义 token 替换硬编码白色（含改动前/后对比与逐行注释） |
 | [video-player-feature-enhancement.md](./video-player-feature-enhancement.md) | **视频播放器功能增强**：进度条缩略图预览（离屏 video + canvas）、多平台画中画（xgplayer 插件 → 原生 API → WebKit 兜底）、xgplayer 语言跟随主站 locale、重置逻辑全面清理、长视频刻度上限（含改动前/后对比与逐行注释） |
+| [video-player-drag-scrub.md](./video-player-drag-scrub.md) | **视频播放器进度条拖拽重写与画布跟随修复**：拖拽像素对齐 + `scrubHoldUntilRef` 抑制右抖、固定 160×90 canvas + cover/contain、循环单条原地重播、播放器背景跟随主题、控制条 `visible` 替换 `opacity`、`PluginPageShell` / `Layout` 分层 `overflow-hidden`（含改动前/后对比与逐行注释） |
 | [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md) | **插件影院态全屏与路由防闪 404**：`appFullscreen` 单例、Layout 影院态订阅、`PluginPageShell` 统一外壳、`pluginsReady` + `PluginRoutesPending` 防 404、侧栏菜单拆分、Tauri 全屏 capability（含改动前/后对比与逐行注释） |
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |

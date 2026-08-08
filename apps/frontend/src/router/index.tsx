@@ -100,7 +100,7 @@ const App = () => {
 	}, [router]);
 
 	return (
-		<div className="h-full w-full bg-theme-background">
+		<div className="h-full w-full bg-theme-background" data-mf-host-portal>
 			<Toaster />
 			<RouterProvider router={router} />
 		</div>

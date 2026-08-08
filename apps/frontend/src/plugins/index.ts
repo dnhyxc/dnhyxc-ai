@@ -47,6 +47,11 @@ export { useHostSurfacePlugins } from './hooks/useHostSurfacePlugins';
 export { usePluginEnabled } from './hooks/usePluginEnabled';
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
+export {
+	claimPluginPortalTarget,
+	clearPluginPortalClaim,
+	styleRealmKey,
+} from './host/styleIsolation';
 export { deepFreeze } from './host-api/deepFreeze';
 export { eventBus } from './host-api/EventBus';
 export type {

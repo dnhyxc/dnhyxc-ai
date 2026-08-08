@@ -38,23 +38,6 @@ import {
 import type { VideoPlayerProps } from './types';
 import 'xgplayer/dist/index.min.css';
 
-// /** 底栏操作图标统一尺寸 */
-// const CTRL_ICON = 18;
-
-// function VolumeIcon({
-// 	volume,
-// 	size = CTRL_ICON,
-// }: {
-// 	volume: number;
-// 	size?: number;
-// }) {
-// 	if (volume <= 0) return <VolumeX size={size} />;
-// 	if (volume < 0.6) return <Volume1 size={size} />;
-// 	return <Volume2 size={size} />;
-// }
-
-/* ------------------------------- 主播放器组件 ------------------------------ */
-
 // 底栏操作图标统一尺寸
 const CTRL_ICON = 18;
 // 倍速列表
@@ -93,6 +76,24 @@ export default function VideoPlayer({
 		[controlled, onIndexChange],
 	);
 
+	const [volume, setVolume] = useState(0.6);
+	const [playType, setPlayType] = useState<PlayType>('auto');
+	const [screenType, setScreenType] = useState<ScreenType>('auto');
+	const [playbackRate, setPlaybackRate] = useState(1);
+	const [playStatus, setPlayStatus] = useState(false);
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	/** 系统画中画中：用自绘 i18n 层盖住浏览器英文占位 */
+	const [isPip, setIsPip] = useState(false);
+	/** 标题/控制条是否可见（移动显示，静止隐藏；全屏与非全屏同一套） */
+	const [uiChromeVisible, setUiChromeVisible] = useState(true);
+	const [existDuration, setExistDuration] = useState(false);
+	const [hoverTime, setHoverTime] = useState('');
+	const [previewOn, setPreviewOn] = useState(false);
+	const [playTimeInfo, setPlayTimeInfo] = useState<{
+		currentTime: number;
+		duration: number;
+	}>({ currentTime: 0, duration: 0 });
+
 	const playerRef = useRef<Player | null>(null);
 	const animationRef = useRef<number | null>(null);
 	const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,36 +118,41 @@ export default function VideoPlayer({
 	const previewVideoRef = useRef<HTMLVideoElement>(null);
 	const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 	const previewBoxRef = useRef<HTMLDivElement>(null);
+
 	const previewSeekingRef = useRef(false);
 	const previewPendingTimeRef = useRef<number | null>(null);
-
-	const [volume, setVolume] = useState(0.6);
-	const [playType, setPlayType] = useState<PlayType>('auto');
-	const [screenType, setScreenType] = useState<ScreenType>('auto');
-	const [playbackRate, setPlaybackRate] = useState(1);
-	const [playStatus, setPlayStatus] = useState(false);
-	const [isFullscreen, setIsFullscreen] = useState(false);
-	/** 系统画中画中：用自绘 i18n 层盖住浏览器英文占位 */
-	const [isPip, setIsPip] = useState(false);
-	/** 标题/控制条是否可见（移动显示，静止隐藏；全屏与非全屏同一套） */
-	const [uiChromeVisible, setUiChromeVisible] = useState(true);
-	const [existDuration, setExistDuration] = useState(false);
-	const [hoverTime, setHoverTime] = useState('');
-	const [previewOn, setPreviewOn] = useState(false);
-	const [playTimeInfo, setPlayTimeInfo] = useState<{
-		currentTime: number;
-		duration: number;
-	}>({ currentTime: 0, duration: 0 });
-
 	const oldVolumeRef = useRef(0.6);
-	const timePointMarginXRef = useRef(0);
 	/** 播放列表/方式：xgplayer ended 闭包易过期，一律读 ref */
 	const playTypeRef = useRef(playType);
 	const playIndexRef = useRef(playIndex);
 	const videosRef = useRef(videos);
+	const playbackRateRef = useRef(playbackRate);
+	const lastTimeLabelRef = useRef('');
+	/** 拖进度条中：禁止 rAF 覆盖滑块 */
+	const scrubbingRef = useRef(false);
+	const scrubTimeRef = useRef(0);
+	/** 松手后停在拖拽像素，等 currentTime 追上再跟播（防关键帧/重算导致右抖） */
+	const scrubHoldUntilRef = useRef<number | null>(null);
+	/** clientX - (barLeft + fillWidth)，保证拖中与松手几何一致 */
+	const scrubGrabOffsetRef = useRef(0);
+	const onTimePointUpRef = useRef<() => void>(() => {});
+
+	/** 切集过渡中：忽略 ended 触发的 pause，避免闪出重播/暂停 UI */
+	const switchingRef = useRef(false);
+	/** 退出画中画续播中：忽略浏览器 pause，避免按钮闪暂停 */
+	const pipResumeRef = useRef(false);
+	/** 画中画会话内是否应视为播放中（进窗时初始化，窗内 play/pause 更新） */
+	const pipWasPlayingRef = useRef(false);
+	const isPipRef = useRef(false);
+	/** 延迟清除「PiP 内播放」；退出时取消，避免把浏览器退出 pause 当成用户暂停 */
+	const pipPauseClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+
 	playTypeRef.current = playType;
 	playIndexRef.current = playIndex;
 	videosRef.current = videos;
+	playbackRateRef.current = playbackRate;
 
 	const safeIndex =
 		videos.length === 0
@@ -177,19 +183,22 @@ export default function VideoPlayer({
 		}, 2000);
 	}, []);
 
-	const lastTimeLabelRef = useRef('');
-
 	const setTimeBarWidth = useCallback(() => {
+		if (scrubbingRef.current) return;
 		const player = playerRef.current;
 		if (!player?.duration || !Number.isFinite(player.duration)) return;
+		const hold = scrubHoldUntilRef.current;
+		// 未追上拖拽目标前不改宽度，避免松手瞬间按 currentTime 重算导致右抖
+		if (hold != null && player.currentTime < hold - 0.02) return;
+		if (hold != null) scrubHoldUntilRef.current = null;
 		const percentage = (player.currentTime / player.duration) * 100;
-		if (durationRef.current && currentTimeRef.current) {
-			currentTimeRef.current.style.width = `${(durationRef.current.offsetWidth * percentage) / 100}px`;
+		const barW = durationRef.current?.getBoundingClientRect().width ?? 0;
+		if (durationRef.current && currentTimeRef.current && barW > 0) {
+			currentTimeRef.current.style.width = `${(barW * percentage) / 100}px`;
 		}
 		if (controlsRef.current && miniTimelineRef.current) {
 			miniTimelineRef.current.style.width = `${(controlsRef.current.offsetWidth * percentage) / 100}px`;
 		}
-		// 进度条用 DOM 更新；时间文案仅秒级变化时 setState，避免 rAF 打爆主线程
 		const label = `${formatTime(player.currentTime)} / ${formatTime(player.duration)}`;
 		if (lastTimeLabelRef.current === label) return;
 		lastTimeLabelRef.current = label;
@@ -226,18 +235,6 @@ export default function VideoPlayer({
 			}
 		});
 	}, [screenType]);
-
-	/** 切集过渡中：忽略 ended 触发的 pause，避免闪出重播/暂停 UI */
-	const switchingRef = useRef(false);
-	/** 退出画中画续播中：忽略浏览器 pause，避免按钮闪暂停 */
-	const pipResumeRef = useRef(false);
-	/** 画中画会话内是否应视为播放中（进窗时初始化，窗内 play/pause 更新） */
-	const pipWasPlayingRef = useRef(false);
-	const isPipRef = useRef(false);
-	/** 延迟清除「PiP 内播放」；退出时取消，避免把浏览器退出 pause 当成用户暂停 */
-	const pipPauseClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-		null,
-	);
 
 	const clearPipPauseTimer = useCallback(() => {
 		if (pipPauseClearTimerRef.current) {
@@ -396,6 +393,7 @@ export default function VideoPlayer({
 				volume,
 				playbackRate: PLAYBACK_RATES,
 			} as ConstructorParameters<typeof Player>[0]);
+			player.playbackRate = playbackRateRef.current;
 		},
 		[volume, locale, trackProgress, setScreenTypeFn],
 	);
@@ -418,6 +416,14 @@ export default function VideoPlayer({
 		}
 		if (type === 'loop') {
 			const nextIndex = index < list.length - 1 ? index + 1 : 0;
+			// 仅一条时 url/index 不变，setPlayIndex 不会触发切集，需原地重播
+			if (nextIndex === index) {
+				const player = playerRef.current;
+				if (!player) return false;
+				player.currentTime = 0;
+				void player.play();
+				return true;
+			}
 			switchingRef.current = true;
 			setPlayIndex(nextIndex);
 			return true;
@@ -489,12 +495,13 @@ export default function VideoPlayer({
 
 			player.on('play', () => {
 				switchingRef.current = false;
-				player.playbackRate = playbackRate;
+				player.playbackRate = playbackRateRef.current;
 				trackProgress();
 				setPlayStatus(true);
 			});
 			player.on('replay', () => {
 				switchingRef.current = false;
+				player.playbackRate = playbackRateRef.current;
 				setPlayStatus(true);
 				trackProgress();
 			});
@@ -529,7 +536,6 @@ export default function VideoPlayer({
 		[
 			volume,
 			locale,
-			playbackRate,
 			trackProgress,
 			setTimeBarWidth,
 			setScreenTypeFn,
@@ -686,11 +692,10 @@ export default function VideoPlayer({
 	}, []);
 
 	const onChangePlaybackRate = useCallback((value: number) => {
+		playbackRateRef.current = value;
+		setPlaybackRate(value);
 		const player = playerRef.current;
-		if (player) {
-			player.playbackRate = value;
-			setPlaybackRate(value);
-		}
+		if (player) player.playbackRate = value;
 	}, []);
 
 	const onVolumeChange = useCallback(() => {
@@ -862,10 +867,29 @@ export default function VideoPlayer({
 	const paintPreview = useCallback(() => {
 		const v = previewVideoRef.current;
 		const c = previewCanvasRef.current;
+		const box = previewBoxRef.current;
 		if (!v || !c || v.readyState < 2) return;
+		const vw = v.videoWidth;
+		const vh = v.videoHeight;
+		if (!vw || !vh) return;
+		// 卡片固定横向 160×90
+		const cw = 160;
+		const ch = 90;
+		if (c.width !== cw || c.height !== ch) {
+			c.width = cw;
+			c.height = ch;
+		}
+		if (box) box.style.width = `${cw}px`;
 		const ctx = c.getContext('2d');
 		if (!ctx) return;
-		ctx.drawImage(v, 0, 0, c.width, c.height);
+		// 横向：cover 占满卡片；竖向：contain 不拉伸
+		const scale =
+			vw >= vh ? Math.max(cw / vw, ch / vh) : Math.min(cw / vw, ch / vh);
+		const dw = vw * scale;
+		const dh = vh * scale;
+		ctx.fillStyle = '#000';
+		ctx.fillRect(0, 0, cw, ch);
+		ctx.drawImage(v, 0, 0, vw, vh, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
 	}, []);
 
 	const onPreviewSeeked = useCallback(() => {
@@ -918,50 +942,97 @@ export default function VideoPlayer({
 		[existDuration, getCurrentTime, setTimeBarWidth],
 	);
 
-	// 进度条滑块拖拽
 	const onTimePointMove = useCallback(
 		(e: MouseEvent) => {
 			const player = playerRef.current;
-			if (!player || !existDuration) return;
-			const { time } = getCurrentTime(e);
-			const moveWidth = e.pageX - timePointMarginXRef.current;
-			if (
-				moveWidth > 0 &&
-				moveWidth < (durationRef.current?.clientWidth ?? 0)
-			) {
-				if (currentTimeRef.current)
-					currentTimeRef.current.style.width = `${moveWidth}px`;
-			} else if (moveWidth <= 0) {
-				if (currentTimeRef.current) currentTimeRef.current.style.width = '0px';
-			} else {
+			const bar = durationRef.current;
+			if (!player || !existDuration || !bar) return;
+			const dur = player.duration;
+			if (!Number.isFinite(dur) || dur <= 0) return;
+			const rect = bar.getBoundingClientRect();
+			const barW = rect.width;
+			if (barW <= 0) return;
+
+			let width = e.clientX - rect.left - scrubGrabOffsetRef.current;
+			if (width <= 0) {
+				width = 0;
+			} else if (width >= barW) {
 				if (playType === 'stop') {
-					if (currentTimeRef.current && durationRef.current) {
-						currentTimeRef.current.style.width = `${durationRef.current.clientWidth}px`;
-					}
+					width = barW;
 				} else {
+					width = 0;
+					scrubTimeRef.current = 0;
 					if (currentTimeRef.current)
 						currentTimeRef.current.style.width = '0px';
+					onTimePointUpRef.current();
+					return;
 				}
-				onTimePointUp();
 			}
-			player.currentTime = time;
+
+			const time = (width / barW) * dur;
+			scrubTimeRef.current = time;
+			if (currentTimeRef.current)
+				currentTimeRef.current.style.width = `${width}px`;
+			if (controlsRef.current && miniTimelineRef.current) {
+				miniTimelineRef.current.style.width = `${(controlsRef.current.offsetWidth * width) / barW}px`;
+			}
+			const label = `${formatTime(time)} / ${formatTime(dur)}`;
+			if (lastTimeLabelRef.current !== label) {
+				lastTimeLabelRef.current = label;
+				setPlayTimeInfo({ currentTime: time, duration: dur });
+			}
 		},
-		[existDuration, getCurrentTime, playType],
+		[existDuration, playType],
 	);
 
 	const onTimePointUp = useCallback(() => {
-		playerRef.current?.play();
 		document.removeEventListener('mousemove', onTimePointMove, true);
 		document.removeEventListener('mouseup', onTimePointUp, true);
+		const player = playerRef.current;
+		if (!player) {
+			scrubbingRef.current = false;
+			scrubHoldUntilRef.current = null;
+			return;
+		}
+		const time = scrubTimeRef.current;
+		const finish = () => {
+			if (!scrubbingRef.current) return;
+			// 保持拖拽结束像素，禁止立刻 setTimeBarWidth（会右抖）
+			scrubHoldUntilRef.current = time;
+			scrubbingRef.current = false;
+			void player.play();
+		};
+		if (Math.abs(player.currentTime - time) < 0.05) {
+			finish();
+			return;
+		}
+		player.once('seeked', finish);
+		player.currentTime = time;
+		window.setTimeout(finish, 300);
 	}, [onTimePointMove]);
+	onTimePointUpRef.current = onTimePointUp;
 
 	const onTimePointDragStart = useCallback(
 		(e: React.MouseEvent) => {
 			if (!existDuration) return;
-			playerRef.current?.pause();
-			if (timePointRef.current) {
-				timePointMarginXRef.current = e.pageX - timePointRef.current.offsetLeft;
+			e.preventDefault();
+			e.stopPropagation();
+			const player = playerRef.current;
+			const bar = durationRef.current;
+			if (!player || !bar) return;
+			const rect = bar.getBoundingClientRect();
+			const fillW = currentTimeRef.current?.offsetWidth ?? 0;
+			scrubGrabOffsetRef.current = e.clientX - (rect.left + fillW);
+			scrubHoldUntilRef.current = null;
+			scrubbingRef.current = true;
+			scrubTimeRef.current = player.duration
+				? (fillW / Math.max(rect.width, 1)) * player.duration
+				: player.currentTime;
+			if (animationRef.current != null) {
+				cancelAnimationFrame(animationRef.current);
+				animationRef.current = null;
 			}
+			player.pause();
 			document.addEventListener('mousemove', onTimePointMove, true);
 			document.addEventListener('mouseup', onTimePointUp, true);
 		},
@@ -1128,13 +1199,18 @@ export default function VideoPlayer({
 		<div
 			ref={videoShellRef}
 			className={cn(
-				'relative flex h-full w-full justify-center overflow-hidden rounded-md text-center contain-[layout_paint]',
+				/* 勿 contain：paint/layout 都可能影响同壳内 video 的 backdrop 采样 */
+				'relative flex h-full w-full justify-center overflow-hidden rounded-md text-center bg-theme-background',
 				'[:fullscreen]:fixed [:fullscreen]:inset-0 [:fullscreen]:z-9999 [:fullscreen]:h-screen [:fullscreen]:w-screen [:fullscreen]:rounded-none [:fullscreen]:bg-black',
 				'[&:-webkit-full-screen]:fixed [&:-webkit-full-screen]:inset-0 [&:-webkit-full-screen]:z-9999 [&:-webkit-full-screen]:h-screen [&:-webkit-full-screen]:w-screen [&:-webkit-full-screen]:rounded-none [&:-webkit-full-screen]:bg-black',
 				'[&.vp-css-fullscreen]:fixed [&.vp-css-fullscreen]:inset-0 [&.vp-css-fullscreen]:z-9999 [&.vp-css-fullscreen]:h-screen [&.vp-css-fullscreen]:w-screen [&.vp-css-fullscreen]:rounded-none [&.vp-css-fullscreen]:bg-black',
 				/* 藏 xgplayer 原生 UI（挂在 shell，避免 #vp-player 被改 class 后失效） */
 				'[&_.xgplayer-controls]:hidden! [&_.xgplayer-replay]:hidden! [&_.xgplayer-start]:hidden! [&_xg-start]:hidden!',
 				'[&_.xg-spot-info]:hidden! [&_.xgplayer-progress-point]:hidden!',
+				/* xgplayer 默认 background:#000，会盖掉主题底；非影院态强制跟 theme */
+				!theater &&
+					'[&_.xgplayer]:bg-theme-background! [&_video]:bg-theme-background!',
+				theater && 'bg-black [&_.xgplayer]:bg-black! [&_video]:bg-black!',
 				theater && 'rounded-none',
 				chromeHidden && 'cursor-none',
 				embedded && className,
@@ -1149,11 +1225,11 @@ export default function VideoPlayer({
 				ref={playerContainerRef}
 				id="vp-player"
 				className={cn(
-					'box-border flex h-full! w-full items-center justify-center overflow-hidden rounded-b-md',
+					'box-border flex h-full! w-full items-center justify-center overflow-hidden rounded-b-md bg-theme-background',
 					'[&_.xgplayer]:h-full! [&_.xgplayer]:w-full!',
 					'[&_.xgplayer-video]:h-full! [&_.xgplayer-video]:w-full!',
-					'[&_video]:box-border [&_video]:h-full [&_video]:w-full [&_video]:rounded-md [&_video]:object-contain [&_video]:bg-theme-background',
-					theater && 'rounded-none',
+					'[&_video]:box-border [&_video]:h-full [&_video]:w-full [&_video]:rounded-md [&_video]:object-contain',
+					theater && 'rounded-none bg-black',
 				)}
 			/>
 
@@ -1174,7 +1250,7 @@ export default function VideoPlayer({
 			/>
 
 			{isPip ? (
-				<div className="pointer-events-none absolute inset-0 z-5 flex flex-col items-center justify-center gap-3 bg-black text-white/70">
+				<div className="pointer-events-none absolute inset-0 z-5 flex flex-col items-center justify-center gap-3 bg-theme-background text-textcolor">
 					<PictureInPicture2 size={56} strokeWidth={1.25} />
 					<p className="px-4 text-center text-sm">
 						{t('videoPlayer.pipPlaying')}
@@ -1209,9 +1285,9 @@ export default function VideoPlayer({
 				ref={controlsRef}
 				className={cn(
 					'absolute bottom-0 left-0 z-3 box-border flex w-full flex-col overflow-visible rounded-b-[5px] bg-transparent pt-2.5 pr-2.5 pb-0 pl-2.5 has-[[data-vp=progress]:hover]:*:data-[vp=bar-bg]:top-[-20px]',
-					/* 不用 opacity 过渡：父级 opacity 动画会拖慢子级 backdrop-filter，导致滤镜慢一拍 */
-					chromeOn ? 'opacity-100' : 'opacity-0',
-					chromeHidden && 'pointer-events-none opacity-0!',
+					/* 勿用父级 opacity 显隐：会建立 backdrop root，子级 backdrop-filter 采不到背后 video */
+					chromeOn ? 'visible' : 'invisible',
+					chromeHidden && 'pointer-events-none invisible!',
 					theater && 'rounded-none',
 				)}
 				onClick={(e) => e.stopPropagation()}
@@ -1220,12 +1296,12 @@ export default function VideoPlayer({
 			>
 				<div
 					data-vp="bar-bg"
-					className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 rounded-[inherit] bg-theme/10 backdrop-blur-xs transition-[top] duration-300 ease-in-out"
+					className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 rounded-[inherit] bg-theme/5 backdrop-blur-sm transition-[top] duration-300 ease-in-out"
 					aria-hidden
 				/>
 				<div
 					data-vp="progress"
-					className="group/progress relative z-1 box-border h-2 min-h-2 w-full shrink-0 rounded-[5px]"
+					className="group/progress relative z-1 box-border h-2 min-h-2 w-full shrink-0 rounded-md"
 				>
 					{/* 交互热区恒为展开高度；可视轨道仍 8px→28px，避免边缘 hover 跳动 */}
 					<div
@@ -1258,7 +1334,7 @@ export default function VideoPlayer({
 										ref={previewCanvasRef}
 										width={160}
 										height={90}
-										className="block h-auto w-full bg-theme-background"
+										className="block h-[90px] w-[160px] bg-theme-background"
 									/>
 								</div>
 								<div className='relative rounded-[3px] bg-teal-500 px-1.5 py-0.5 text-xs whitespace-nowrap text-white select-none after:absolute after:top-full after:left-1/2 after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-7 after:border-t-7 after:border-x-transparent after:border-t-teal-500 after:content-[""]'>

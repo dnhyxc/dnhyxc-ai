@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**）。详解见本文 §11.3 / §15。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离——dev 认领排除 Host、不白名单 remote 目录；**`data-mf-style-realm` 多 expose 共 Remote；`createPortal` 收编 + Drawer `claimPluginPortalTarget`；sonner 防误包；`@/plugins` 导出 realm/claim API**；**Layout / `PluginPageShell` overflow 与 rounded 分层（backdrop-filter）**；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**；App 根 **`data-mf-host-portal`**）。详解见本文 §11.3 / §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2 / §2.14。若不一致，以源码为准。
 
 ---
 
@@ -66,10 +66,10 @@ Host 应用
 │   │   ├── RouteInjector.ts     # 路由注入器
 │   │   └── SidebarInjector.ts   # 侧栏注入器
 │   ├── host/
-│   │   ├── PluginHostPage.tsx   # 插件宿主（MF / iframe / locale；可选 pageShell）
-│   │   ├── PluginPageShell.tsx  # 独立路由页统一边距；订阅影院态
+│   │   ├── PluginHostPage.tsx   # 插件宿主（MF / iframe / locale；data-mf-style-realm；可选 pageShell）
+│   │   ├── PluginPageShell.tsx  # 独立路由页统一边距；订阅影院态；圆角层无 overflow-hidden
 │   │   ├── PluginErrorBoundary.tsx # 错误边界
-│   │   └── styleIsolation.ts    # Remote CSS @scope 隔离
+│   │   └── styleIsolation.ts    # Remote CSS @scope(realm) + Portal 收编 + claim/clear
 │   ├── host-api/
 │   │   ├── EventBus.ts          # 事件总线
 │   │   ├── ebookHostApi.ts      # 电子书模块 API
@@ -1508,15 +1508,19 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 | 路径 | 变更类型 | 作用 |
 |------|----------|------|
 | `apps/frontend/src/plugins/host-api/appFullscreen.ts` | **新增** | 影院态状态、订阅、`setAppFullscreen` |
-| `apps/frontend/src/plugins/host/PluginPageShell.tsx` | **新增** | 独立路由页统一外边距/圆角；影院态收起 |
-| `apps/frontend/src/plugins/host/PluginHostPage.tsx` | 修改 | `pageShell?`；激活态用 `wrap()` 套壳；根节点加 `min-h-0` |
-| `apps/frontend/src/plugins/core/PluginManager.ts` | 修改 | `createPluginRoute` → `pageShell: true` |
+| `apps/frontend/src/plugins/host/PluginPageShell.tsx` | **新增/续改** | 独立路由统一外边距/圆角；影院态收起；**圆角层勿 `overflow-hidden`**（backdrop-filter） |
+| `apps/frontend/src/plugins/host/PluginHostPage.tsx` | 修改 | `pageShell?`；`data-mf-style-realm`；`attachPluginStyleIsolation(..., remoteName)` |
+| `apps/frontend/src/plugins/core/PluginManager.ts` | 修改 | `createPluginRoute` → `pageShell: true`；`beginPluginStyleCapture(..., remoteName)` |
 | `apps/frontend/src/plugins/core/createHostBridge.ts` | 修改 | `ui:toast` 权限下注入 `setAppFullscreen` |
 | `apps/frontend/src/plugins/core/types.ts` | 修改 | `HostBridgeProps.api.ui.setAppFullscreen?` |
-| `apps/frontend/src/layout/index.tsx` | 修改 | 订阅影院态；藏侧栏/顶栏/footer；Web Esc 同步 |
+| `apps/frontend/src/layout/index.tsx` | 修改 | 订阅影院态；藏侧栏/顶栏/footer；Web Esc 同步；**overflow 与 rounded 分层** |
 | `apps/frontend/src/components/design/Sidebar/enum.tsx` | 修改 | `/plugins` 迁入 `PLUGINS`；图标 `TvMinimalPlay` |
 | `apps/frontend/src/components/design/Sidebar/index.tsx` | （已用） | 菜单顺序：`MENUS + dynamic + PLUGINS` |
 | `apps/frontend/src-tauri/capabilities/default.json` | 修改 | `allow-set-fullscreen` / `allow-is-fullscreen` |
+| `apps/frontend/src/plugins/host/styleIsolation.ts` | 续改 | realm / Portal / reclaim / sonner / claim（详表见附录 B.0） |
+| `apps/frontend/src/plugins/index.ts` | 修改 | 导出 `styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim` |
+| `apps/frontend/src/router/index.tsx` | 修改 | App 根 `data-mf-host-portal`（保护 Host Toaster） |
+| `apps/frontend/src/views/ebook/.../EbookReadHostPlugins.tsx` | 修改 | Drawer 打开前 claim / 关闭 clear |
 | `apps/micro/.../VideoPlayer.tsx` | 消费方 | 全屏优先 `hostUi.setAppFullscreen` |
 
 ### 15.3 整体架构与数据流
@@ -1535,7 +1539,8 @@ host-api/appFullscreen.ts
         ▼                              ▼
 Layout (theater)                PluginPageShell (theater)
   藏 Sidebar/Header/footer         p-0 / rounded-none
-  内容区 h-full overflow-hidden
+  Outlet 区 h-full overflow-hidden
+  （rounded 与 overflow 不同层，保 backdrop-filter）
 ```
 
 ```mermaid
@@ -1616,31 +1621,52 @@ Layout
 
 MF 根增加 `min-h-0`，避免 flex 子项撑破 `h-full`。
 
+**backdrop-filter**：圆角内容区**禁止** `overflow-hidden`（与 `border-radius` 同层会废掉子树毛玻璃采样）。源码文件头注释：
+
+```tsx
+/**
+ * 勿在圆角容器上写 overflow-hidden：与 border-radius 同层时，
+ * Chromium 会让子树 backdrop-filter 采不到更深的 video（本地独立跑正常、MF 嵌入失效）。
+ */
+```
+
+实现见 `mf-implementation-guide.md` §2.10.0 / §2.14.3。
+
 ### 15.7 Layout 影院态
 
 **文件路径**：`apps/frontend/src/layout/index.tsx`
 
 ```tsx
+// 影院初值与 setAppFullscreen 模块态同步，避免首帧仍画出侧栏
 const [theater, setTheater] = useState(getAppFullscreen);
+// 订阅影院态；卸载退订；[] 只挂一次
 useEffect(() => subscribeAppFullscreen(setTheater), []);
 
 // theater === true：不渲染 Sidebar/Header；去掉 py-7 pr-7 / rounded-md；
-// 内容区 h-full overflow-hidden；Web 备案 footer 隐藏
+// Outlet 内容区 h-full overflow-hidden；Web 备案 footer 隐藏
+// 注意：main 可 rounded，但 overflow-hidden 必须在内层——
+// 「overflow 不与 rounded 同层，避免废掉路由页内 backdrop-filter」
 
-// Web Esc 兜底
+// Web：系统 Esc 退出 document 全屏时，把影院态一并关掉，防止壳层卡住
 useEffect(() => {
 	const onFs = () => {
+		// 仍在系统全屏则忽略（进入全屏也会触发本事件）
 		if (document.fullscreenElement) return;
+		// 影院本就关着则无需回写
 		if (!getAppFullscreen()) return;
+		// Tauri 走窗口 API，不跟 document.fullscreenElement
 		if (isTauriRuntime()) return;
+		// 回写 false → Layout / PluginPageShell 恢复侧栏与边距
 		void setAppFullscreen(false);
 	};
 	document.addEventListener('fullscreenchange', onFs);
+	// 卸载时移除监听，避免泄漏到其它页
 	return () => document.removeEventListener('fullscreenchange', onFs);
+	// 监听器无闭包依赖，挂载一次即可
 }, []);
 ```
 
-插件退出全屏时应 **主动** `setAppFullscreen(false)`；本监听防止 Esc 后壳层卡住。
+插件退出全屏时应 **主动** `setAppFullscreen(false)`；本监听防止 Esc 后壳层卡住。分层结构全文见 `mf-implementation-guide.md` §2.14.4。
 
 ### 15.8 侧栏 `MENUS` 与 `PLUGINS`
 
@@ -1804,10 +1830,89 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 ### B. 样式隔离（Host 责任）
 
 `first-party` / `partner`：Host `styleIsolation.ts` 在 loadRemote / 挂载期间把 Remote 注入的 CSS 包进  
-`@scope ([data-mf-plugin="id"])`。Remote **可用**正常 `@import "tailwindcss"`。  
+`@scope ([data-mf-style-realm="…"])`（**按 Remote entry 域**，不是按单个 `pluginId`——同一 MF 多 expose 共用一份 CSS）。  
+`PluginHostPage` 根同时写 `data-mf-plugin` + `data-mf-style-realm`。Remote **可用**正常 `@import "tailwindcss"`。  
 `untrusted` 走 iframe，天然隔离。
 
-开发态认领 Remote `<style>` 时**排除 Host**（由本模块 URL 推导 `…/apps/frontend`），不维护子项目目录白名单；新增/重命名 `apps/<remote>` 一般不必改 Host。生产构建通常无 `data-vite-dev-id`，仍只在 capture 窗口认领，行为与原先一致。详见 [mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md)。
+#### B.0 改动点清单（与现行源码一一对应）
+
+| # | 改动点 | 落点 | 说明 |
+|---|--------|------|------|
+| 1 | `styleRealmKey(entry, remoteName?, pluginId?)` | `styleIsolation.ts`；`@/plugins` 导出 | 优先 `entry:origin+path`；失败退 `remote:` / `plugin:` |
+| 2 | `@scope` 根改为 `data-mf-style-realm` | `PluginHostPage` + portal-scope | 同 Remote 多插件共享一份 CSS，避免先开者「占走」样式 |
+| 3 | `beginPluginStyleCapture(id, entry, remoteName?)` | `PluginManager.runLoad` | load 窗口捕获 + `repairHostCriticalStyles` + `reclaimEntryStyles` |
+| 4 | `attachPluginStyleIsolation(…, remoteName?)` | `PluginHostPage` useEffect | 挂载期 CSS + Portal bridge |
+| 5 | `unwrapScope` / HMR 重包 | MutationObserver | HMR 改写 textContent 丢掉 `@scope` 时清 `mfScoped` 再包 |
+| 6 | `looksLikeRemoteStyle(..., 'live'\|'reclaim')` | 认领策略 | reclaim **绝不**碰无标记 style（防误伤 sonner） |
+| 7 | `isHostCriticalCss` / `repairHostCriticalStyles` | sonner | 文本含 `[data-sonner-toaster]` 永不 `@scope` |
+| 8 | 劫持 `react-dom.createPortal` | Portal 收编 | body 弹层进 `[data-mf-portal-scope]`（同 realm） |
+| 9 | `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 槽 | 首帧进 scope，避免 body→scope 闪烁 |
+| 10 | `data-mf-host-portal` | `router/index.tsx` App 根 | Host `<Toaster />` 不被收编 |
+| 11 | barrel 导出 | `plugins/index.ts` | `styleRealmKey` / claim / clear 供业务 Host 槽使用 |
+| 12 | 圆角层去掉 `overflow-hidden` | `PluginPageShell` + Layout | 保 MF 内 `backdrop-filter`（见 B.1） |
+
+#### B.1 overflow 与 `backdrop-filter`（Host 外壳）
+
+| 位置 | 规则 |
+|------|------|
+| `PluginPageShell` 圆角内容区 | **不要** `overflow-hidden`（文件头注释已写明原因） |
+| Layout `main` | 可有 `rounded-md`，**同层不要** `overflow-hidden`；裁切放到内层 |
+| 业务新建外壳 | 需要圆角 + 裁切时拆两层：外层 rounded，内层 overflow |
+
+独立预览正常、嵌入 Host 后毛玻璃变灰/失效 → 先查这两处，再查 CSS `@scope`。
+
+#### B.2 Portal / Drawer 接入模板
+
+业务打开会 `createPortal` 到 `body` 的 Host 外壳（Drawer / Sheet）时：
+
+```tsx
+// 业务 Drawer/Sheet 槽：只从 barrel 取认领 API，勿深链 styleIsolation
+import {
+	// 打开会 portal 到 body 的外壳前同步认领
+	claimPluginPortalTarget,
+	// 关闭时清 override，避免误收后续 Host Toast/弹层
+	clearPluginPortalClaim,
+	// drawer 内挂载插件（本模板可省略展示）
+	PluginHostPage,
+	// 与插件根 data-mf-style-realm 同一算法
+	styleRealmKey,
+} from '@/plugins';
+
+// 1) 打开前（点击）与 2) 渲染 Drawer 前各认领一次
+claimPluginPortalTarget(
+	// 认领目标：当前要打开的插件 id
+	meta.id,
+	// realm 必须与 @scope 一致，弹层 utility 才生效
+	styleRealmKey(meta.entry, meta.remoteName, meta.id),
+);
+
+// 关闭时释放 override（可传 pluginId，避免清掉别人的认领）
+clearPluginPortalClaim(meta.id);
+```
+
+参考实现：`apps/frontend/src/views/ebook/components/plugins/EbookReadHostPlugins.tsx`（`drawer-triggers` 点击认领；`drawer` 渲染前认领；关闭 `clear`）。源码注释保留：
+
+```tsx
+// 与 createPortal 同一次渲染前认领，避免 Drawer 先挂 body 再搬进 scope 闪烁
+claimPluginPortalTarget(
+	// 当前打开的 drawer 插件 id
+	openMeta.id,
+	// entry/remoteName 算 realm，与 PluginHostPage 根属性对齐
+	styleRealmKey(openMeta.entry, openMeta.remoteName, openMeta.id),
+);
+```
+
+#### B.3 能力速查
+
+| 能力 | 说明 |
+| ---- | ---- |
+| `reclaimEntryStyles` | 切换同 Remote 插件时，把 head 里已注入 CSS 按当前 realm 重包 |
+| Portal 收编 | 劫持共享 `react-dom.createPortal`，body 弹层进 `[data-mf-portal-scope]`（同 realm） |
+| `claimPluginPortalTarget` | Host Drawer 等打开前同步认领，避免首帧 body→scope 闪烁 |
+| Host 关键样式 | sonner 等禁止误 `@scope`；App 根 `data-mf-host-portal` 包住 `<Toaster />` |
+| overflow 分层 | Layout / `PluginPageShell` 保 `backdrop-filter`（B.1） |
+
+开发态认领 Remote `<style>` 时**排除 Host**（由本模块 URL 推导 `…/apps/frontend`），不维护子项目目录白名单；新增/重命名 `apps/<remote>` 一般不必改 Host。生产构建通常无 `data-vite-dev-id`，仍只在 capture 窗口认领。详解见 [mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md)。
 
 ### C. 参考文档
 
