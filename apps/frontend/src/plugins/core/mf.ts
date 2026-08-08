@@ -207,6 +207,7 @@ function ensureShared() {
 				requiredVersion: `^${ReactDOM.version || React.version}`,
 			},
 		},
+		// 故意不 shared vue：Host 不安装 Vue；Vue Remote 自带 runtime + mount API
 	});
 	sharedReady = true;
 }

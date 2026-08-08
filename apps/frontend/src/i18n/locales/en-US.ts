@@ -1936,7 +1936,7 @@ export const enUS = {
 	'plugins.registry.help.expose':
 		'MF expose path; default ./App (e.g. ./LearningNotes, ./EbookIdeas).',
 	'plugins.registry.help.framework':
-		'Optional react | vue. For vue, Host wraps default via createVueHostBridge (or export framework = "vue" from the expose).',
+		'Optional react | vue. For vue, Remote must export mount(el, bridge); Host has no Vue and only calls mount.',
 	'plugins.registry.help.injectRoute':
 		'Whether PluginManager injects a top-level route. false means the host tree already mounts PluginHostPage.',
 	'plugins.registry.help.preload':

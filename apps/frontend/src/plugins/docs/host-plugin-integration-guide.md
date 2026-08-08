@@ -145,7 +145,7 @@ flowchart TD
 
 > 插件中心标题、注入路由面包屑都读 `title` locale map；侧栏只显示 icon，不必也不应配置 `menu.nameKey` / Host i18n key。
 
-**Vue Remote**：在条目上增加 `"framework": "vue"`，Host 经 `normalizePluginModule` → `createVueHostBridge` 挂载；Remote **勿**自建 React 桥。插件侧每个 expose 仍须 `import '@/styles.css'`（见 [plugin-development-guide.md §4.3 / §5.2](./plugin-development-guide.md#43-vue-子应用)）。
+**Vue Remote**：条目写 `"framework": "vue"`；Remote 导出 `mount(el, bridge)`（Host **不装 Vue**，只调 mount）；勿自建 React 桥、勿直接 export SFC。expose 须 `import '@/styles.css'`（见 [plugin-development-guide.md §4.3 / §5.2](./plugin-development-guide.md#43-vue-子应用)）。
 
 ### 3.3 自动注入的代码流程
 
@@ -1520,7 +1520,7 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 | `apps/frontend/src/components/design/Sidebar/index.tsx` | （已用） | 菜单顺序：`MENUS + dynamic + PLUGINS` |
 | `apps/frontend/src-tauri/capabilities/default.json` | 修改 | `allow-set-fullscreen` / `allow-is-fullscreen` |
 | `apps/frontend/src/plugins/host/styleIsolation.ts` | 续改 | realm / Portal·Teleport / body remove·replace 镜像（antd getScrollBarSize）/ transpile·CSSOM / reclaim / sonner / claim（详表见附录 B.0；专题 `docs/app/style-isolation-qiankun-harden.md`） |
-| `apps/frontend/src/plugins/core/createVueHostBridge.tsx` | 新增 | Host 侧 Vue 桥；`loadRemoteApp` → `normalizePluginModule` 自动包装 |
+| `apps/frontend/src/plugins/core/createVueHostBridge.tsx` | 续改 | Host 不依赖 vue；调用 Remote `mount(el, bridge)` |
 | `apps/frontend/src/plugins/index.ts` | 修改 | 导出 `styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim` |
 | `apps/frontend/src/router/index.tsx` | 修改 | App 根 `data-mf-host-portal`（保护 Host Toaster） |
 | `apps/frontend/src/views/ebook/.../EbookReadHostPlugins.tsx` | 修改 | Drawer 打开前 claim / 关闭 clear |

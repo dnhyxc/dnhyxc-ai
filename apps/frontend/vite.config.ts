@@ -16,14 +16,13 @@ const host = process.env.TAURI_DEV_HOST;
  * 见 module-federation/vite#708 / #768。
  */
 // 只 exclude react*：exclude react-router 会让其直连 CJS cookie，浏览器报 parse named export 不存在
+// 不 shared/不 exclude vue：Host 不安装 Vue；Vue Remote 自带 runtime
 const MF_SHARED_EXCLUDE = [
 	'react',
 	'react/jsx-runtime',
 	'react/jsx-dev-runtime',
 	'react-dom',
 	'react-dom/client',
-	// Vue 子应用与 Host 桥共享同一运行时（createVueHostBridge）
-	'vue',
 ];
 
 // https://vite.dev/config/
@@ -59,10 +58,10 @@ export default defineConfig(({ mode }) => {
 				remotes: {},
 				// 勿 shared react-router：生产 loadShare 易与 react-router/dom 拆成双实例，
 				// 导致 useLocation 找不到 Router context（线上 /plugins 白屏）。Remote 也未共享它。
+				// 勿 shared vue：Host 不装 Vue；Vue 插件自带 runtime + mount API。
 				shared: {
 					react: { singleton: true, requiredVersion: '^19.1.0' },
 					'react-dom': { singleton: true, requiredVersion: '^19.1.0' },
-					vue: { singleton: true, requiredVersion: '^3.5.0' },
 				},
 				// 默认 html：clientInjected 前会把任意 src/*.ts 包成无 export 的 entry bootstrap
 				hostInitInjectLocation: 'entry',

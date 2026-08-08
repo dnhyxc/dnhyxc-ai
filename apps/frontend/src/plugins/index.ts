@@ -5,7 +5,11 @@ export {
 	MF_IFRAME_CHANNEL,
 } from './core/attachIframeBridge';
 export { createHostBridge } from './core/createHostBridge';
-export type { VuePluginRootProps } from './core/createVueHostBridge';
+export type {
+	VuePluginRootProps,
+	VueRemoteExpose,
+	VueRemoteMount,
+} from './core/createVueHostBridge';
 export { createVueHostBridge } from './core/createVueHostBridge';
 export {
 	isPluginEnabled,

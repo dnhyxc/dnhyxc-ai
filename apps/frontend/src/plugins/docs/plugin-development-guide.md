@@ -415,20 +415,31 @@ export async function deactivate() {
 
 ### 4.3 Vue 子应用
 
-Host 已支持 Vue Remote：`loadRemote` → `normalizePluginModule` → `createVueHostBridge` 挂载。**Remote 只导出 Vue 根组件，勿自建 React 桥。**
+Host 支持 Vue Remote，且**不安装 Vue**：`loadRemote` → `normalizePluginModule` → `createVueHostBridge` 只调 Remote 的 `mount`。**勿自建 React 桥；勿把 SFC 直接当 default。**
 
 | 事项 | 要求 |
 | ---- | ---- |
-| Registry | **必须**写 `"framework": "vue"`（见 §13.3）。Host 优先读该字段，再决定走 Vue 桥 |
-| expose 导出 | `export { default } from './App.vue'` 即可；**不必**再 `export const framework = 'vue'`（registry 已声明时冗余） |
-| 根 props | Host 注入 `props.bridge`（`HostBridgeProps`，reactive）；与 React 的 `{ api, plugin }` 展开不同 |
-| shared | `vite` federation `shared.vue`：`singleton: true`，与 Host 对齐 |
+| Registry | **必须**写 `"framework": "vue"`（见 §13.3） |
+| expose 导出 | **必须** `export default { mount }` 或 `export default function mount(el, bridge)`；在 mount 内 `createApp` |
+| 根 props | Host 传入同一 `bridge` 对象（可变）；Remote 宜 `reactive(bridge)` 后交给根组件 `props.bridge` |
+| shared | Host **不** shared `vue`；Remote 自带 vue 即可（可按需本仓 singleton） |
+| HMR | `dev.remoteHmr: true`；Vue runtime 只在 Remote，SFC 热更新走 Remote 自己的 Vite |
 | 样式 | 与 React 相同：**每个 expose 入口** `import '@/styles.css'`（§5.2）；仅 `main.ts` 不够 |
 
 ```ts
 // src/views/my-lab/index.ts — MF expose（Vue）
 import '@/styles.css';
-export { default } from './App.vue';
+import { createApp, reactive } from 'vue';
+import App from './App.vue';
+import type { HostBridgeProps } from '@/types/host';
+
+export function mount(el: HTMLElement, bridge: HostBridgeProps) {
+	const app = createApp(App, { bridge: reactive(bridge) });
+	app.mount(el);
+	return () => app.unmount();
+}
+
+export default { mount };
 ```
 
 ```json
@@ -463,7 +474,7 @@ Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应�
 | Tailwind / Preflight  | 可正常 `@import "tailwindcss"`，不必关 Preflight                                                                            |
 | **expose 引入 CSS**   | **每个** MF `exposes` 入口必须 `import '@/styles.css'`（或等价路径）；仅写在 `main.ts` / `main.tsx` **不够**（见 §5.2）   |
 | Portal / Drawer / POP | **不要**为 MF 特传 `container` / `getPopupContainer`；Host 劫持共享 `createPortal` + body 挂载（含 Vue `Teleport`）；antd Modal/Drawer 的 `getScrollBarSize` 由 Host 镜像 `removeChild`，插件侧无需改 |
-| Vue 子应用            | Remote 只导出 Vue 根；registry **`"framework": "vue"`**（§4.3 / §13.3）；**勿自建 React 桥**；`vue` shared singleton      |
+| Vue 子应用            | Remote 导出 **`mount(el, bridge)`**；registry **`"framework": "vue"`**；Host **不装 Vue**；勿自建 React 桥 / 勿直接 export SFC |
 | `data-mf-*`           | 勿在 Remote 业务里手写 `data-mf-style-realm` / `data-mf-portal-scope`（Host 设置）                                          |
 | 独立预览 vs 嵌入      | 独立预览正常、嵌入后毛玻璃失效 → 属 Host 外壳 overflow 分层问题，不是插件 CSS 写错；报给 Host 查 `PluginPageShell` / Layout |
 
@@ -490,9 +501,18 @@ export { activate, deactivate } from './lifecycle';
 ```
 
 ```ts
-// ✅ Vue expose
+// ✅ Vue expose（Host 不装 Vue：必须 mount）
 import '@/styles.css';
-export { default } from './App.vue';
+import { createApp, reactive } from 'vue';
+import App from './App.vue';
+
+export default {
+	mount(el: HTMLElement, bridge: import('@/types/host').HostBridgeProps) {
+		const app = createApp(App, { bridge: reactive(bridge) });
+		app.mount(el);
+		return () => app.unmount();
+	},
+};
 ```
 
 ```ts
@@ -974,6 +994,7 @@ localStorage.removeItem("dnhyxc.plugin.registry.dev.v1");
 | `missing default export`                          | 模块导出错误                           | 确保组件有 `default` 导出                                                                                                  |
 | `HOST_API` 版本不兼容                             | API 版本冲突                           | `hostApiRange` 须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）；**不要**把插件 `version` bump 误写成 `hostApiRange` |
 | HMR 整页刷两次 / Importing a module script failed | 同文件混出 `activate` 或中途发现新 dep | 删空钩子或拆 lifecycle；`optimizeDeps.include` 预打包 tiptap 等；重启 remote `pnpm dev`                                    |
+| Vue 嵌 Host 白屏 / 报须导出 mount                 | 仍 `export default` SFC                | 改为 `export default { mount }`，在 mount 内 `createApp`（Host 不装 Vue）                                              |
 
 ---
 
@@ -1065,7 +1086,7 @@ Vue 子应用在对应条目上**增加**（其余字段同上）：
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `title`        | 插件中心与注入路由面包屑的多语言名                                                                                                                          |
 | `description`  | 插件中心卡片说明（locale map 或单语字符串）                                                                                                                 |
-| `framework`    | 可选；**`"vue"`** 时 Host 用 `createVueHostBridge` 挂载。Vue 插件**必须写**；React 可省略（默认按 React）。不必在 expose 再 `export const framework`     |
+| `framework`    | 可选；**`"vue"`** 时 Remote 须导出 `mount(el, bridge)`，Host 只调 mount（不装 Vue）。Vue 插件**必须写**；React 可省略     |
 | `version`      | **插件资源版本**；发版可 bump，与 Host API 无关                                                                                                             |
 | `hostApiRange` | **Host 契约兼容范围**（如 `^1.0.0`）；须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）。保存 registry 时 Host 会校验；**勿**把 `version` 误写成 range |
 | `menu`         | 可选；仅 `order` + `icon`（侧栏不展示文字）                                                                                                                 |
@@ -1082,7 +1103,7 @@ Vue 子应用在对应条目上**增加**（其余字段同上）：
 | -------------------- | -------------------------------------------------------------------------------------------------- |
 | Vite 配置            | `shared.singleton: true`（仅 react/react-dom）、`optimizeDeps.exclude` React、重依赖建议 `include` |
 | 组件导出             | 有 `default` 导出；React 收 `HostBridgeProps`，Vue 收 `props.bridge`                               |
-| Vue registry         | Vue 插件已写 `"framework": "vue"`；Remote **无**自建 React 桥                                      |
+| Vue registry         | `"framework": "vue"` + expose `mount(el, bridge)`；Host 不装 Vue                                |
 | 自有 i18n            | 有插件字典；MF 下调用 `useHostLocale(api)`                                                         |
 | 无 `api.t`           | 不依赖 Host 翻译函数                                                                               |
 | 样式                 | **每个 expose 入口** `import '@/styles.css'`；隔离由 Host `@scope` + Portal/Teleport 收编负责      |
@@ -1152,7 +1173,7 @@ Vue 子应用在对应条目上**增加**（其余字段同上）：
 
 ### Q2.2：Vue 插件在 Host 里白屏 / 当 React 渲染？
 
-确认 registry 该条目有 **`"framework": "vue"`**（§4.3 / §13.3）。Remote 只导出 Vue `default`，不要自建 React 桥。
+确认 registry 有 **`"framework": "vue"`**，且 expose 为 `mount(el, bridge)` / `{ mount }`（勿直接 export SFC）。
 
 ### Q3：如何在插件中使用 shadcn/ui？
 

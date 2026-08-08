@@ -1,56 +1,79 @@
 /**
  * Host 侧 Vue 桥：PluginHostPage 只渲染 React `default`。
- * Vue Remote 导出 SFC / 组件后，由 loadRemoteApp → normalizePluginModule 调用本工厂包装。
+ * Host **不依赖 vue**——Vue Remote 自己 createApp，expose 导出 mount(el, bridge)。
  */
 import { type ComponentType, createElement, useEffect, useRef } from 'react';
-import {
-	createApp,
-	reactive,
-	type App as VueApp,
-	type Component as VueComponent,
-} from 'vue';
 import type { HostBridgeProps } from './types';
 
-/** Vue 根组件 props：Host 注入的 bridge（reactive，可热更新 api/locale） */
+/** Vue 根组件 props：Remote 在 mount 内对 bridge 做 reactive */
 export type VuePluginRootProps = {
 	bridge: HostBridgeProps;
 };
 
+/** Remote mount 返回的卸载函数 */
+export type VueRemoteDisposer = () => void;
+
+/** Remote mount：挂到 el，可返回 disposer；Host 会把同一 bridge 对象上的字段热更新 */
+export type VueRemoteMount = (
+	el: HTMLElement,
+	bridge: HostBridgeProps,
+) => VueRemoteDisposer | undefined;
+
+export type VueRemoteExpose =
+	| VueRemoteMount
+	| { mount: VueRemoteMount; unmount?: () => void };
+
+function resolveMount(expose: unknown, pluginId: string): VueRemoteMount {
+	if (typeof expose === 'function') return expose as VueRemoteMount;
+	if (
+		expose &&
+		typeof expose === 'object' &&
+		typeof (expose as { mount?: unknown }).mount === 'function'
+	) {
+		return (expose as { mount: VueRemoteMount }).mount;
+	}
+	throw new Error(
+		`plugin ${pluginId}: framework "vue" 须 default 导出 mount(el, bridge) 或 { mount }（Host 不内置 Vue，勿直接 export SFC）`,
+	);
+}
+
 /**
- * 把 Vue 根组件包成 Host 可用的 React 组件。
- * 子应用勿自建 React 桥；registry `framework: 'vue'` 或 expose `export const framework = 'vue'`。
+ * 把 Vue Remote 的 mount 包成 Host 可用的 React 组件。
+ * registry `framework: 'vue'`；Remote 勿自建 React 桥、勿让 Host 安装 vue。
  */
 export function createVueHostBridge(
-	VueRoot: VueComponent,
+	expose: VueRemoteExpose,
+	pluginId = 'unknown',
 ): ComponentType<HostBridgeProps> {
+	const mount = resolveMount(expose, pluginId);
+
 	function VueHostBridge(props: HostBridgeProps) {
 		const elRef = useRef<HTMLDivElement | null>(null);
-		const appRef = useRef<VueApp | null>(null);
-		const bridgeRef = useRef(
-			reactive({
-				api: props.api,
-				plugin: props.plugin,
-			}) as HostBridgeProps,
-		);
+		// 可变 bag：Remote 侧 reactive(bridge) 后可收到 api/locale 热更新
+		const bridgeRef = useRef<HostBridgeProps>({
+			api: props.api,
+			plugin: props.plugin,
+		});
 
 		useEffect(() => {
 			bridgeRef.current.api = props.api;
 			bridgeRef.current.plugin = props.plugin;
 		}, [props.api, props.plugin]);
 
+		// ponytail: 空 deps——mount 一次；SFC HMR 由 Remote 自有 Vue runtime 处理
 		useEffect(() => {
 			const el = elRef.current;
 			if (!el) return;
 
-			const app = createApp(VueRoot, {
-				bridge: bridgeRef.current,
-			});
-			app.mount(el);
-			appRef.current = app;
+			const dispose = mount(el, bridgeRef.current);
+			const explicitUnmount =
+				typeof expose === 'object' && expose && 'unmount' in expose
+					? expose.unmount
+					: undefined;
 
 			return () => {
-				app.unmount();
-				appRef.current = null;
+				if (typeof dispose === 'function') dispose();
+				else explicitUnmount?.();
 			};
 		}, []);
 

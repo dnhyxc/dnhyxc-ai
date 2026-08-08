@@ -1,8 +1,11 @@
 import type { ComponentType } from 'react';
-import { createVueHostBridge } from './createVueHostBridge';
+import {
+	createVueHostBridge,
+	type VueRemoteExpose,
+} from './createVueHostBridge';
 import type { HostBridgeProps, PluginDescriptor, PluginModule } from './types';
 
-/** Remote 原始模块：React 组件，或 Vue 组件 + framework 标记 */
+/** Remote 原始模块：React 组件，或 Vue mount API + framework 标记 */
 export type RawRemoteModule = {
 	default: unknown;
 	framework?: string;
@@ -11,24 +14,16 @@ export type RawRemoteModule = {
 	deactivate?: PluginModule['deactivate'];
 };
 
-function looksLikeVueComponent(comp: unknown): boolean {
-	if (!comp || (typeof comp !== 'object' && typeof comp !== 'function')) {
-		return false;
-	}
-	const c = comp as Record<string, unknown>;
-	// React memo / forwardRef
-	if ('$$typeof' in c) return false;
-	if ('__vccOpts' in c) return true;
-	if (typeof c.setup === 'function' || typeof c.render === 'function') {
-		return true;
-	}
-	if (typeof comp === 'function' && '__vccOpts' in (comp as object)) {
-		return true;
-	}
-	return false;
+/** default 是否为 { mount }（裸 function 易与 React FC 混淆，须显式 framework: vue） */
+function looksLikeVueMount(comp: unknown): boolean {
+	return (
+		!!comp &&
+		typeof comp === 'object' &&
+		typeof (comp as { mount?: unknown }).mount === 'function'
+	);
 }
 
-/** registry `framework: 'vue'` 或 expose `export const framework = 'vue'`，再辅以组件形态启发式 */
+/** registry / expose `framework: 'vue'`，或 default 形如 `{ mount }` */
 export function isVueRemoteModule(
 	raw: RawRemoteModule,
 	meta: PluginDescriptor,
@@ -38,11 +33,11 @@ export function isVueRemoteModule(
 	const tag = raw.framework ?? raw.mfFramework;
 	if (tag === 'vue') return true;
 	if (tag === 'react') return false;
-	return looksLikeVueComponent(raw.default);
+	return looksLikeVueMount(raw.default);
 }
 
 /**
- * 将 loadRemote 原始模块规范为 Host 可用的 PluginModule（Vue → React 桥）。
+ * 将 loadRemote 原始模块规范为 Host 可用的 PluginModule（Vue mount → React 桥）。
  */
 export function normalizePluginModule(
 	raw: RawRemoteModule,
@@ -54,9 +49,7 @@ export function normalizePluginModule(
 
 	if (isVueRemoteModule(raw, meta)) {
 		return {
-			default: createVueHostBridge(
-				raw.default as Parameters<typeof createVueHostBridge>[0],
-			),
+			default: createVueHostBridge(raw.default as VueRemoteExpose, meta.id),
 			activate: raw.activate,
 			deactivate: raw.deactivate,
 		};

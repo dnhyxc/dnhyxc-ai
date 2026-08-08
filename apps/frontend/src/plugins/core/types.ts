@@ -56,8 +56,8 @@ export interface PluginDescriptor {
 	/** MF expose 路径；默认 `./App`（如 `./IdeasList`） */
 	expose?: string;
 	/**
-	 * 子应用 UI 框架。`vue` 时 Host 用 `createVueHostBridge` 包装 default（Vue SFC/组件）。
-	 * 省略时：看 expose 是否 `export const framework = 'vue'`，再启发式识别 Vue 组件。
+	 * 子应用 UI 框架。`vue` 时 Host 用 `createVueHostBridge` 包装 default（须为 mount API，Host 不内置 Vue）。
+	 * 省略时：看 expose 是否 `framework: 'vue'`，或 default 是否 `{ mount }`。
 	 */
 	framework?: 'react' | 'vue';
 	permissions: PluginPermission[];

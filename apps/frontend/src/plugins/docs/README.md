@@ -24,7 +24,7 @@
 4. body `removeChild` / `replaceChild` 镜像：antd `getScrollBarSize` 等「`body.append` → `body.remove`」在 append 被重定向后仍能从实际父节点卸载（避免 `NotFoundError`）
 5. Host Drawer：`claimPluginPortalTarget` / `clearPluginPortalClaim`；App 根 `data-mf-host-portal` + Toaster children 识别保护 Host `<Toaster />`
 6. qiankun 级转译：`transpileStyleText` / CSSOM `insertRule`；`captureStack`；详解 [`docs/app/style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)
-7. **Vue 子应用**：Host `createVueHostBridge` + `normalizePluginModule`；**registry 必写 `"framework": "vue"`**；Remote 只导出 Vue 根（勿自建 React 桥）
+7. **Vue 子应用**：Host **不装 Vue**；Remote 导出 `mount(el, bridge)`；registry **`"framework": "vue"`**；`createVueHostBridge` 只调 mount
 8. **Remote 样式入口**：每个 MF expose 须 `import '@/styles.css'`（Host 不执行 `main.ts`）；详见开发手册 §5.2
 9. barrel 导出：`styleRealmKey` / claim / clear / `createVueHostBridge`（`@/plugins`）
 

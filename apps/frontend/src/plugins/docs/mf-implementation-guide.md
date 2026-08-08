@@ -191,7 +191,7 @@ import {
 	type ModuleFederationRuntimePlugin,
 } from "@module-federation/enhanced/runtime";
 
-// 引入 React 和 ReactDOM，用于 registerShared
+// 引入 React 和 ReactDOM，用于 registerShared（Host 不装 / 不 shared vue）
 import React from "react";
 import ReactDOM from "react-dom";
 
@@ -294,7 +294,7 @@ function ensureShared() {
 	// 获取 MF 实例
 	const instance = getMf();
 
-	// 注册共享依赖
+	// 注册共享依赖（仅 react / react-dom；Vue 由 Remote 自带 + mount API）
 	instance.registerShared({
 		// React 共享配置
 		react: {
@@ -6692,12 +6692,18 @@ flowchart TD
 
 **现象**：修改 Remote 代码后整页刷两次；Host 报 `Importing a module script failed`
 
-**解决方案**：
+**解决方案（React Remote）**：
 
-1. 确保 Remote 配置 `dev.remoteHmr: true` 与 `reactRefreshHost`
+1. 确保 Remote 配置 `dev.remoteHmr: true` 与 `reactRefreshHost`（指向 Host，如 `http://127.0.0.1:9002`）
 2. **不要**在组件同文件导出空 `activate`/`deactivate`（Fast Refresh 整页 reload）
 3. 重依赖（如 `@tiptap/*`）写入 `optimizeDeps.include` 并**重启** remote `pnpm dev`
 4. 检查端口是否正确
+
+#### Vue Remote 契约（Host 不安装 Vue）
+
+**现行**：Host **不**依赖 `vue`、**不** `registerShared(vue)`。`framework: "vue"` 时 Remote 须导出 `mount(el, bridge)`（或 `{ mount }`）；Host `createVueHostBridge` 只提供挂载点并调用 mount。SFC / `createApp` 全部在 Remote。
+
+若仍 `export { default } from './App.vue'`，Host 会报错提示改 mount API。
 
 ### 5.6 桌面发新版插件仍是旧模块
 

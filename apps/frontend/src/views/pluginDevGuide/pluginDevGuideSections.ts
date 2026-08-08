@@ -211,6 +211,7 @@ export default defineConfig(({ mode }) => {
         },
         hostInitInjectLocation: 'entry',
         dts: false,
+        // 与 Host remoteHmr 配合；Vue 无 reactRefreshHost，靠 shared vue + Host HMR guard
         dev: { remoteHmr: true },
       }),
     ],
@@ -219,7 +220,10 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, 'src'),
         '@ui': path.resolve(__dirname, 'src/components/ui'),
       },
+      dedupe: ['vue'],
     },
+    // 禁止预打包 vue，否则与 Host registerShared(vue) 拆成双实例，嵌入后 HMR 失效
+    optimizeDeps: { exclude: ['vue'] },
     server: {
       host,
       port,
@@ -324,11 +328,21 @@ createRoot(document.getElementById('root')!).render(
 );`;
 
 const CODE_VUE_EXPOSE = String.raw`// src/views/style-isolation-lab/index.ts —— MF expose（Vue）
-// Host 不执行 main.ts：样式必须挂在本入口
+// Host 不装 Vue：须导出 mount(el, bridge)，勿直接 export SFC
 import '@/styles.css';
+import { createApp, reactive } from 'vue';
+import App from './App.vue';
+import type { HostBridgeProps } from '@/types/host';
 
-export { default } from './App.vue';
-// framework 由 registry "framework": "vue" 声明即可，不必再 export const framework`;
+export function mount(el: HTMLElement, bridge: HostBridgeProps) {
+  // 同一 bridge 对象会被 Host 热更新 api/locale；用 reactive 包一层即可响应
+  const app = createApp(App, { bridge: reactive(bridge) });
+  app.mount(el);
+  return () => app.unmount();
+}
+
+export default { mount };
+// framework 由 registry "framework": "vue" 声明即可`;
 
 const CODE_VUE_APP = String.raw`<!-- src/views/style-isolation-lab/App.vue -->
 <script setup lang="ts">
@@ -613,7 +627,7 @@ const sectionsZh: PluginGuideSection[] = [
 					'3. 进入插件路由 → ensurePlugin → GET 一次 mf-manifest.json 算 bust（version@manifestHash）→ 加载 remoteEntry.js?v=…。\n' +
 					'4. loadRemote(expose) 得到原始模块 → normalizePluginModule：\n' +
 					'   • React：default 即组件；\n' +
-					'   • Vue：registry.framework === "vue"（或启发式）→ createVueHostBridge 包成 React 组件。\n' +
+					'   • Vue：registry.framework === "vue" → createVueHostBridge 调用 Remote.mount(el, bridge)。\n' +
 					'5. PluginHostPage 渲染带 data-mf-plugin + data-mf-style-realm 的根，并 attachPluginStyleIsolation（CSS 捕获 + Portal 桥）。\n' +
 					'6. 可选调用 activate；卸载时 deactivate + 释放隔离。',
 			),
@@ -649,7 +663,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'init-vue-deps',
 				'2.4 初始化 Vue 子应用依赖',
-				'Host 已内置 createVueHostBridge：Remote 不要安装 React、不要写 React 桥接层。shared 仅 vue singleton。',
+				'Host 不装 Vue：Remote 自带 vue，expose 导出 mount(el, bridge)（或 { mount }）。勿自建 React 桥；vue 不必与 Host shared。',
 				{ lang: 'bash', code: CODE_VUE_DEPS },
 			),
 		],
@@ -682,15 +696,15 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'vite-vue-full',
 				'4.1 完整 vite.config.ts（Vue）',
-				'与 React 差异：plugin-vue；shared 只配 vue；无 reactRefreshHost。expose 指向 index.ts（再 export App.vue）。',
+				'与 React 差异：plugin-vue；shared 只配 vue；optimizeDeps.exclude vue；无 reactRefreshHost（靠 Host registerShared(vue)+HMR guard）。expose 指向 index.ts（再 export App.vue）。',
 				{ lang: 'typescript', code: CODE_VITE_VUE },
 			),
 			item(
 				'vite-vue-rules',
 				'4.2 Vue Remote 硬性约定',
 				'1. Registry 必须写 "framework": "vue"（Host normalizePluginModule 优先读该字段）。\n' +
-					'2. expose 只导出 Vue 根（default）；不必 export const framework = "vue"（registry 已写时冗余）。\n' +
-					'3. 禁止在 Remote 内自建 React 桥（Host 的 createVueHostBridge 负责把 Vue 挂进 React 树）。\n' +
+					'2. expose default 须为 mount(el, bridge) 或 { mount }（Host 不 createApp）；不必再 export framework。\n' +
+					'3. 禁止在 Remote 内自建 React 桥；Vue 的 createApp 只写在 Remote mount 里。\n' +
 					'4. 根组件接收 props.bridge（reactive HostBridgeProps），不是顶层展开的 api/plugin。\n' +
 					'5. Teleport→body 的弹层：不要手写 container；Host body 原型 patch 会收编进同 realm 的 portal-scope。\n' +
 					'6. 同样：每个 expose 入口 import "@/styles.css"。',
@@ -746,8 +760,8 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'vue-bridge-model',
 				'6.1 Host 如何挂载 Vue',
-				'loadRemote → normalizePluginModule（见 framework: vue）→ createVueHostBridge(VueRoot)：\n' +
-					'• React 侧渲染挂载点 div[data-plugin-root][data-mf-framework=vue]\n' +
+				'loadRemote → normalizePluginModule（framework: vue）→ createVueHostBridge(mount)：\n' +
+					'• React 渲染 div[data-plugin-root][data-mf-framework=vue]，再调用 Remote.mount(el, bridge)\n' +
 					'• createApp(VueRoot, { bridge: reactiveProps }).mount(el)\n' +
 					'• bridge.api / bridge.plugin 热更新时写入同一 reactive 对象\n' +
 					'因此 Vue 根必须 defineProps<{ bridge: HostBridgeProps }>()，用 toRef/computed 读字段。',
@@ -960,7 +974,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'faq-vue-blank',
 				'12.2 Vue 插件白屏 / 被当成 React？',
-				'registry 写 "framework": "vue"；Remote 只导出 Vue default；不要自建 React 桥。',
+				'registry 写 "framework": "vue"；Remote 导出 mount(el, bridge)；不要自建 React 桥；Host 不装 vue。',
 			),
 			item(
 				'faq-pollute',
@@ -1054,7 +1068,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'init-vue-deps',
 				'2.4 Vue dependencies',
-				'Do not add React or a React bridge in the remote. shared: vue singleton only. Host wraps via createVueHostBridge.',
+				'Host has no Vue. Remote owns vue + exports mount(el, bridge). No homemade React bridge.',
 				{ lang: 'bash', code: CODE_VUE_DEPS },
 			),
 		],
@@ -1145,7 +1159,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'vue-bridge-model',
 				'6.1 How Host mounts Vue',
-				'normalizePluginModule → createVueHostBridge: React mounts a div, then createApp(VueRoot, { bridge }).mount(el). Read fields via props.bridge.',
+				'normalizePluginModule → createVueHostBridge: React mounts a div, then Remote.mount(el, bridge). Remote createApp + reactive(bridge).',
 			),
 			item(
 				'vue-types',
@@ -1302,7 +1316,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'faq-vue-blank',
 				'12.2 Vue blank / treated as React?',
-				'registry "framework": "vue"; export Vue default only; no remote-side React bridge.',
+				'registry "framework": "vue"; export mount(el, bridge); Host has no vue package.',
 			),
 			item(
 				'faq-pollute',
