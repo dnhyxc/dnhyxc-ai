@@ -1,6 +1,13 @@
 import Tooltip from '@design/Tooltip';
 import { CircleQuestionMark } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type ReactNode,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import Loading from '@/components/design/Loading';
 import { Button, Spinner } from '@/components/ui';
 import { useI18n } from '@/hooks';
@@ -132,7 +139,10 @@ export function PluginHostPage({
 	const trust = loaded?.meta.trust;
 	const status = loaded?.status;
 
-	useEffect(() => {
+	// useLayoutEffect：须早于子树 useEffect（Vue mount）。
+	// Element Plus 在 onBeforeMount 就把 #el-popper-container-* append 到 body；
+	// 若此时 Portal 桥未装，容器落在真实 body、后续 Teleport 进不了 @scope。
+	useLayoutEffect(() => {
 		if (status !== 'activated' || trust === 'untrusted' || !entry) return;
 		return attachPluginStyleIsolation(pluginId, entry, loaded?.meta.remoteName);
 	}, [pluginId, status, entry, trust, loaded?.meta.remoteName]);

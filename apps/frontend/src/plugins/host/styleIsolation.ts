@@ -1,13 +1,16 @@
 /**
- * Host 侧 CSS 隔离（对齐 qiankun next `@scope` runtime isolation）：
- * Remote 注入的 CSS 用 @scope 包到 [data-mf-style-realm="…"]；
- * @font-face/@namespace 提升出 scope；@keyframes 按 realm 前缀防撞名；
- * CSSOM insertRule 拦截补齐 CSS-in-JS；body 挂载劫持覆盖 React/Vue 等 Portal/Teleport。
- * body removeChild/replaceChild 同步镜像：antd getScrollBarSize 等「body.append → body.remove」
- * 在 append 被重定向后仍能按实际父节点卸载，避免 NotFoundError。
- *
- * 多 expose 共用同一 Remote 时按 realm（非 pluginId）隔离。
- * 不改主/子业务逻辑：仅改写注入的 CSS 与 body 级 Portal 挂载点。
+ * Host 侧 CSS 隔离（对齐 qiankun experimentalStyleIsolation + 社区 body 弹层修法）：
+ * 1) 选择器前缀：:root → realm（CSS 变量，浮层根也要）；html/body →
+ *    `[realm][data-plugin-root]`（布局规则勿打到 Teleport Toast，否则 height:100% 拉成竖条）；
+ *    其余：`[realm] .x` + `[realm].x`。
+ *    `:root`/`:host` 上的 Host 语义主题 token（`--brand-accent` / `--theme-*` / shadcn 底色等）
+ *    会剥离，避免盖住主站主题；保留 `--color-*`、`--el-*` 等别名与组件库变量。
+ *    括号扫描须识别选择器 `\` 转义（Tailwind `content-[\"\"]`），否则 @layer 配对失败会整段泄漏。
+ *    **不改 @keyframes 名**：antd 把 keyframes 与 animation-name 分到两个 style（updateCSS），
+ *    按单标签改名会对不上，Message/Toast 离开动画永不触发。
+ * 2) Portal：全屏 fixed + pointer-events:none 的 overlay 根；子节点恢复 pointer-events。
+ * 3) body 挂载时给节点打 data-mf-style-realm（qiankun#2391 同类思路）。
+ * @font-face/@import 全局；选择器前缀隔离；CSSOM / removeChild 镜像照旧。
  */
 
 // React：isValidElement 与 ReactNode，供 Portal 子树改挂时判定
@@ -19,8 +22,7 @@ import ReactDOM from 'react-dom';
 type CaptureCtx = {
 	// 发起捕获的插件标识，用于 owner 兼容与 Portal 认领
 	pluginId: string;
-	/** @scope / mfStyleOwner 键：同一 Remote 多插件共享 */
-	// 见上行 JSDoc：@scope / mfStyleOwner 键，同 Remote 多插件共享
+	/** realm / mfStyleOwner 键：同一 Remote 多插件共享 */
 	realm: string;
 	// Remote entry 的 origin，用于认领同域 link/style
 	entryOrigin: string;
@@ -50,24 +52,19 @@ let lastTouchedPluginId: string | null = null;
 // pointer/focus 桥是否已装，避免重复 addEventListener
 let touchBridgeInstalled = false;
 
-// 匹配 @keyframes 名，供按 realm 加前缀防撞
-const KEYFRAMES_RE = /@keyframes\s+([\w-]+)/g;
-// 匹配整段 @font-face（含嵌套大括号），供 hoist 出 @scope
+// 匹配整段 @font-face（含嵌套大括号），供 hoist 为全局
 const FONT_FACE_RE = /@font-face\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}/g;
+/** 隔离协议版本标记；升版后强制重写 head 里旧前缀 CSS */
+const MF_ISO_MARK = '/*mf-iso:3*/';
+const MF_ISO_MARK_RE = /\/\*mf-iso(?::\d+)?\*\//g;
+/** html/body 布局选择器后缀：只命中插件根，不命中打了 realm 的浮层 */
+const PLUGIN_ROOT_ATTR = '[data-plugin-root]';
 // 匹配 @namespace 声明，须 hoist 到文件顶
 const NAMESPACE_RE = /@namespace\s+[^;]+;/g;
 // @import 正则续行声明：整句提到文件最前
 const IMPORT_RE =
 	// 匹配 url(...) 或字符串形式的 @import 整句
 	/@import\s+(?:url\(\s*["']?[^"')]+["']?\s*\)|["'][^"']+["'])[^;]*;/g;
-// 匹配 animation-name 声明，便于把值里的 kf 名换成前缀名
-const ANIMATION_NAME_DECL_RE = /(animation-name\s*:\s*)([^;}]+)/gi;
-// 匹配 animation 简写声明（需排除 animation-* 长属性）
-const ANIMATION_SHORTHAND_DECL_RE = /(animation\s*:\s*)([^;}]+)/gi;
-// 从 animation 值里抠标识符 token，对照 nameMap 替换
-const IDENT_TOKEN_RE = /([\w-]+)/g;
-// 已加前缀的 keyframes 标记串，避免二次改写
-const KF_PREFIX_MARK = '__mf';
 
 // 把选择器里的特殊字符转义，避免 realm 含 : / 时属性选择器非法
 function cssEscapeIdent(id: string): string {
@@ -129,35 +126,33 @@ export function styleRealmKey(
 	// 结束 styleRealmKey
 }
 
-// 生成 @scope 与 DOM 上 data-mf-style-realm 共用的属性选择器
+// 生成与 DOM data-mf-style-realm 匹配的属性选择器（引号内转义，勿用 CSS.escape）
 function scopeSelector(realm: string): string {
-	// 返回转义后的 [data-mf-style-realm="…"]
-	return `[data-mf-style-realm="${cssEscapeIdent(realm)}"]`;
-	// 结束 scopeSelector
+	const v = realm.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	return `[data-mf-style-realm="${v}"]`;
 }
 
-// 为 realm 生成稳定短前缀，给 @keyframes 名防跨 Remote 撞名
-function kfPrefixForRealm(realm: string): string {
-	// FNV-1a 32 位初始偏移基础
-	let h = 2166136261;
-	// 逐字节混入 realm 字符
-	for (let i = 0; i < realm.length; i++) {
-		// 异或当前字符码
-		h ^= realm.charCodeAt(i);
-		// 乘 FNV 质数完成一轮混叠
-		h = Math.imul(h, 16777619);
-		// 结束 for 循环
-	}
-	// 无符号化后转 36 进制，拼上固定标记与下划线
-	return `${KF_PREFIX_MARK}${(h >>> 0).toString(36)}_`;
-	// 结束 kfPrefixForRealm
-}
-
-// 判断 css 是否已包过该 sel 的 @scope（含有无空格两种写法）
+/** 已带当前协议标记 + realm 前缀（transpile 可跳过） */
 function alreadyScoped(text: string, sel: string): boolean {
-	// 命中任一种 @scope(sel) 写法即视为已隔离
-	return text.includes(`@scope (${sel})`) || text.includes(`@scope(${sel})`);
-	// 结束 alreadyScoped
+	return (
+		text.includes(MF_ISO_MARK) &&
+		text.includes('data-mf-style-realm=') &&
+		text.includes(sel)
+	);
+}
+
+/**
+ * HMR/回写是否还需要再 wrap。
+ * 已有 realm 前缀且无旧 @scope → false（避免与 antd cssinjs 互殴卡死）。
+ */
+function styleNeedsRescope(text: string, sel: string): boolean {
+	const t = text.trim();
+	if (!t) return false;
+	if (/@scope\s*\(/.test(t)) return true;
+	// 任意版本 mf-iso 且已含本 realm 选择器 → 视为已前缀，勿再写 textContent
+	if (text.includes(sel) && /\/\*mf-iso(?::\d+)?\*\//.test(text)) return false;
+	if (text.includes(sel)) return false;
+	return true;
 }
 
 /** 按大括号深度剥最外层 @scope (…) { … }，保留 hoist 段 */
@@ -227,191 +222,402 @@ function extractAtRules(
 	// 结束 extractAtRules
 }
 
-// 按 nameMap 改写 animation 值里的 keyframes 标识符（保留时长等）
-function rewriteAnimationValueTokens(
-	// 逗号分隔的多段 animation 值
-	value: string,
-	// 原名 → 带 realm 前缀的新名
-	nameMap: Map<string, string>,
-	// 返回改写后的 animation 值；函数体开始
-): string {
-	// 对每段 animation 列表项替换 ident
-	return (
-		value
-			// 按逗号拆成多条动画定义
-			.split(',')
-			// 对单条定义做 map，准备替换其中的 ident
-			.map(
-				(entry) =>
-					// 命中 nameMap 则换前缀名，否则保留原 token（如 ease、1s）
-					entry.replace(IDENT_TOKEN_RE, (token) => nameMap.get(token) ?? token),
-				// 结束 map 回调
-			)
-			// 再拼回逗号分隔列表
-			.join(',')
-	);
-	// 结束 rewriteAnimationValueTokens
-}
-
-// 给 CSS 内 @keyframes 名加 realm 前缀，并同步改写 animation 引用
-function prefixKeyframes(cssText: string, realm: string): string {
-	// 本 realm 的稳定前缀
-	const prefix = kfPrefixForRealm(realm);
-	// 收集「原名 → 前缀名」，供 animation 声明第二遍替换
-	const nameMap = new Map<string, string>();
-	// 第一遍：改写 @keyframes 规则名并填充 nameMap
-	let result = cssText.replace(KEYFRAMES_RE, (match, name: string) => {
-		// 已带 __mf 标记则跳过，避免重复前缀
-		if (name.startsWith(KF_PREFIX_MARK)) return match;
-		// 拼出带 realm 前缀的新 keyframes 名
-		const next = `${prefix}${name}`;
-		// 记下映射，供 animation-name / animation 简写使用
-		nameMap.set(name, next);
-		// 返回改写后的 @keyframes 行
-		return `@keyframes ${next}`;
-		// 结束 KEYFRAMES_RE replace 回调
-	});
-	// 没有改过任何 kf 名则无需动 animation 声明
-	if (nameMap.size === 0) return result;
-
-	// 第二遍：改写 animation-name: … 中的名字列表
-	result = result.replace(
-		// 匹配 animation-name 声明
-		ANIMATION_NAME_DECL_RE,
-		// 保留「animation-name:」头，只改值里的 kf 名
-		(_m, head: string, value: string) =>
-			// 头 + 按 nameMap 改写后的值
-			`${head}${rewriteAnimationValueTokens(value, nameMap)}`,
-		// 结束 animation-name replace
-	);
-	// 第三遍：改写 animation 简写（排除 animation-* 长属性误伤）
-	result = result.replace(
-		// 匹配疑似 animation 简写的声明
-		ANIMATION_SHORTHAND_DECL_RE,
-		// 简写回调：先过滤 animation-xxx 长属性
-		(match, head: string, value: string) => {
-			// animation-duration 等长属性整段 match 以 animation- 开头则原样
-			if (/^animation-[a-z]/i.test(match)) return match;
-			// 真正的 animation 简写：改写值里的 kf 名
-			return `${head}${rewriteAnimationValueTokens(value, nameMap)}`;
-			// 结束 animation 简写回调
-		},
-		// 结束 animation 简写 replace
-	);
-	// 返回完成 kf 前缀与引用同步的 CSS
-	return result;
-	// 结束 prefixKeyframes
+/** :root → realm；html/body → realm + [data-plugin-root] */
+function mapDocRootToken(token: string, sel: string): string {
+	if (/^:root$/i.test(token)) return sel;
+	if (/^(?:html|body)$/i.test(token)) return `${sel}${PLUGIN_ROOT_ATTR}`;
+	return token;
 }
 
 /**
- * 类 qiankun transpileStyleText：hoist 全局 at-rule + keyframes 前缀 + @scope。
- * @import 提到文件顶部（必须在任何规则前）；导入内容本身仍可能全局生效——CORS/外链场景的已知上限。
+ * Remote `:root` 写死的 Host 语义变量；remap 到 realm 后会挡住继承。
+ * 不匹配 `--color-*`（@theme 别名）与 `--el-*` 等组件库变量。
  */
-// 见上行 JSDoc：整段 style 文本转译（hoist + kf 前缀 + @scope）
+const HOST_THEME_CUSTOM_PROP =
+	/^--(?:brand-accent(?:-soft|-light|-dark)?|theme-[a-z0-9-]+|background|foreground|card(?:-foreground)?|popover(?:-foreground)?|primary(?:-foreground)?|secondary(?:-foreground)?|muted(?:-foreground)?|accent(?:-foreground)?|destructive|border|input|ring|radius)$/i;
+
+/** 选择器列表是否仅为 `:root` / `:host`（Tailwind @theme 常写成二者并列） */
+function isDocRootOnlySelectors(selectors: string): boolean {
+	const parts = selectors
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean);
+	return parts.length > 0 && parts.every((s) => /^(:root|:host)$/i.test(s));
+}
+
+/** 从 `{…}` 声明块去掉 Host 主题自定义属性 */
+function stripHostThemeDecls(declBlock: string): string {
+	if (declBlock.length < 2 || declBlock[0] !== '{') return declBlock;
+	const inner = declBlock.slice(1, -1);
+	const cleaned = inner.replace(
+		/(^|;)\s*(--[\w-]+)\s*:\s*[^;]*/g,
+		(full, lead: string, prop: string) =>
+			HOST_THEME_CUSTOM_PROP.test(prop) ? lead : full,
+	);
+	const tidy = cleaned
+		.replace(/;\s*;+/g, ';')
+		.replace(/^\s*;\s*/, '')
+		.replace(/;\s*$/, '')
+		.trim();
+	return `{${tidy}}`;
+}
+
+/**
+ * 单个选择器加前缀（对齐 qiankun css.ts + body 弹层双选择器）：
+ * - :root → realm（变量可打在浮层根）
+ * - html/body → `[realm][data-plugin-root]`（避免 Toast 吃到 height:100%）
+ * - 其余：`[realm] .x` + `[realm].x`
+ */
+function prefixOneSelector(selector: string, sel: string): string {
+	// 去掉首尾空白，后续一律基于规范化后的选择器串处理
+	const s = selector.trim();
+	// 空串或已含 realm 选择器（避免重复加前缀）则原样返回
+	if (!s || s.includes(sel)) return s;
+	// 检测是否以 :root / html / body 开头（后跟空白、组合符、伪类/属性等或串尾）
+	const lead = s.match(/^(?::root|html|body)(?=[\s.:#[\]>|+~*,]|$)/i);
+	// 文档根令牌打头：只改写该令牌，后缀（如 .foo、> .bar）原样拼接
+	if (lead) {
+		// :root→realm；html/body→realm+[data-plugin-root]，再接剩余选择器
+		return mapDocRootToken(lead[0], sel) + s.slice(lead[0].length);
+	}
+	// 非打头：组合符 / :is()/:where() 参数里的 :root/html/body 也要映射
+	// （如「div > body .x」「:is(html, body) ol」——后者若不改会双前缀后永远匹配不到，或切分坏时泄漏）
+	const rooted = s.replace(
+		// 边界含 `(`, `,`，供 :is(html, body) 内替换
+		/(^|[\s>+~,(])(?::root|html|body)(?=[\s.:#[\]>|+~*,)]|$)/gi,
+		// full=边界+令牌，p=边界；令牌部分走 mapDocRootToken
+		(full, p: string) => `${p}${mapDocRootToken(full.slice(p.length), sel)}`,
+	);
+	// 若发生过文档根映射，直接返回改写结果（不再套双选择器）
+	if (rooted !== s) return rooted;
+	// 普通选择器：对齐 qiankun——后代 `[realm] .x` + 同元素 `[realm].x`（覆盖弹层根自身）
+	return `${sel} ${s},${sel}${s}`;
+}
+
+/**
+ * 按顶层逗号拆选择器列表（括号 / 方括号 / 字符串内的逗号不拆）。
+ * 避免 `:is(html, body) ol` 被切成残片后泄漏或错前缀。
+ */
+function splitSelectorList(list: string): string[] {
+	const parts: string[] = [];
+	let start = 0;
+	let depth = 0;
+	for (let i = 0; i < list.length; i++) {
+		const ch = list[i];
+		if (ch === '\\') {
+			i++;
+			continue;
+		}
+		if (ch === '"' || ch === "'") {
+			const q = ch;
+			i++;
+			while (i < list.length) {
+				if (list[i] === '\\') {
+					i += 2;
+					continue;
+				}
+				if (list[i] === q) break;
+				i++;
+			}
+			continue;
+		}
+		if (ch === '(' || ch === '[') depth++;
+		else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+		else if (ch === ',' && depth === 0) {
+			parts.push(list.slice(start, i));
+			start = i + 1;
+		}
+	}
+	parts.push(list.slice(start));
+	return parts;
+}
+
+/** 逗号分组选择器列表加前缀 */
+function prefixSelectorList(list: string, sel: string): string {
+	return splitSelectorList(list)
+		.map((part) => prefixOneSelector(part, sel))
+		.join(',');
+}
+
+/** 从 openIdx（指向 `{`）起找配对 `}`，返回闭合下标；失败返回 -1 */
+function findMatchingBrace(css: string, openIdx: number): number {
+	// 大括号嵌套深度：从 openIdx 的 `{` 起算，回到 0 即找到配对 `}`
+	let depth = 0;
+	// 自开括号位置线性扫描到串尾
+	for (let i = openIdx; i < css.length; i++) {
+		// 当前字符，用于分支识别注释 / 字符串 / 括号
+		const ch = css[i];
+		// 选择器里常见 `\"`（如 .after\:content-\[\"\"\]）：勿把转义引号当成字符串起点，
+		// 否则 @layer utilities 配对失败会把后续 html/body/#root 整段泄漏到 Host
+		if (ch === '\\') {
+			i++;
+			continue;
+		}
+		// 块注释 /* ... */：内部的 `{` `}` 不计深度，整段跳过
+		if (ch === '/' && css[i + 1] === '*') {
+			// 定位注释结束符；缺失则视为直到串尾
+			const end = css.indexOf('*/', i + 2);
+			// 将 i 落到 `*/` 末字符（或串尾），for 循环还会再 +1
+			i = end < 0 ? css.length : end + 1;
+			// 跳过本轮后续括号逻辑
+			continue;
+		}
+		// 引号字符串：内部的 `{` `}` 不计深度，需正确处理转义
+		if (ch === '"' || ch === "'") {
+			// 记录开引号类型，用于匹配同型闭引号
+			const q = ch;
+			// 从开引号后一字符开始扫字符串体
+			i++;
+			// 扫到串尾或配对闭引号为止
+			while (i < css.length) {
+				// 反斜杠转义：跳过转义符与下一字符，避免把 `\"` 当结束
+				if (css[i] === '\\') {
+					i += 2;
+					continue;
+				}
+				// 遇到同型闭引号则结束字符串扫描
+				if (css[i] === q) break;
+				// 普通字符继续前进
+				i++;
+			}
+			// 字符串已消费完，本轮不再计括号
+			continue;
+		}
+		// 遇 `{` 加深一层嵌套
+		if (ch === '{') depth++;
+		// 遇 `}` 进入减深分支
+		else if (ch === '}') {
+			// 减一层深度
+			depth--;
+			// 回到 0 说明 openIdx 处那层 `{` 已配对闭合
+			if (depth === 0) return i;
+		}
+	}
+	// 扫描结束仍未配对：CSS 残缺或括号不平衡
+	return -1;
+}
+
+/**
+ * 类 qiankun 选择器前缀：遍历规则，@media 等递归；@keyframes 原样（名已在外层加前缀）。
+ * 手写轻量 CSS 扫描器：按注释 / 空白 / at-rule / 普通规则分段处理，
+ * 把普通选择器改写成带 data-mf-style-realm 前缀的形式，实现 Remote 样式隔离。
+ */
+function prefixCssRules(css: string, sel: string): string {
+	// 累积改写后的 CSS 文本
+	let out = '';
+	// 当前扫描下标
+	let i = 0;
+	// 源串长度，循环上界
+	const n = css.length;
+	// 线性扫描整段 CSS，直到耗尽
+	while (i < n) {
+		// 块注释 /* ... */：原样拷贝，避免把注释内容当选择器改写
+		if (css.startsWith('/*', i)) {
+			// 找注释结束符；缺失则视为直到串尾
+			const end = css.indexOf('*/', i + 2);
+			// 切片终点：含 */ 两字符，或直接到 n
+			const j = end < 0 ? n : end + 2;
+			// 注释整段追加到输出
+			out += css.slice(i, j);
+			// 跳过已消费的注释区间
+			i = j;
+			continue;
+		}
+		// 当前字符，用于分支判断
+		const ch = css[i];
+		// 空白（空格/换行/制表等）原样保留，维持可读格式
+		if (/\s/.test(ch)) {
+			out += ch;
+			i++;
+			continue;
+		}
+
+		// at-rule：以 @ 开头（@media / @keyframes / @import 等）
+		if (ch === '@') {
+			// 记录 at-rule 起始，便于整段切片
+			const preludeStart = i;
+			// 从 @ 后扫描 prelude，直到块起始 `{` 或语句结束 `;`
+			let j = i + 1;
+			while (j < n && css[j] !== '{' && css[j] !== ';') j++;
+			// 提取 at-rule 名（小写），用于决定是否递归改写内部
+			const name =
+				css
+					.slice(i, j)
+					.match(/^@[\w-]+/i)?.[0]
+					?.toLowerCase() ?? '';
+			// 形如 `@import "...";` / `@charset "...";`：无块体，整句原样输出
+			if (css[j] === ';') {
+				out += css.slice(preludeStart, j + 1);
+				i = j + 1;
+				continue;
+			}
+			// 既无 `{` 也无 `;`：畸形片段，逐字吐出避免死循环
+			if (css[j] !== '{') {
+				out += css[i++];
+				continue;
+			}
+			// 配对找到 at-rule 块的闭合 `}`
+			const close = findMatchingBrace(css, j);
+			// 括号不匹配：剩余原文直接拼上并结束，防止越界
+			if (close < 0) {
+				out += css.slice(i);
+				break;
+			}
+			// 块内 CSS（不含两侧大括号），供可嵌套 at-rule 递归
+			const inner = css.slice(j + 1, close);
+			// `@xxx ...` 到 `{` 之前的 prelude（含条件表达式）
+			const prelude = css.slice(preludeStart, j);
+			// keyframes / font-face / property / page：内部是关键帧或描述符，不是选择器，整块原样
+			if (
+				name.startsWith('@keyframes') ||
+				name === '@-webkit-keyframes' ||
+				name === '@font-face' ||
+				name === '@property' ||
+				name === '@page'
+			) {
+				out += css.slice(preludeStart, close + 1);
+			} else if (
+				// 条件/分组类 at-rule：内部仍是普通规则，需递归加 realm 前缀
+				name === '@media' ||
+				name === '@supports' ||
+				name === '@layer' ||
+				name === '@container' ||
+				name === '@document'
+			) {
+				// 保留 prelude 与外层大括号，只改写内部规则
+				out += `${prelude}{${prefixCssRules(inner, sel)}}`;
+			} else {
+				// 未知 at-rule：保守原样，避免误伤第三方扩展语法
+				out += css.slice(preludeStart, close + 1);
+			}
+			// 消费完整 at-rule（含闭合 `}`）
+			i = close + 1;
+			continue;
+		}
+
+		// 普通规则：selector { declarations }
+		// 从当前位置找规则块的 `{`
+		const open = css.indexOf('{', i);
+		// 找不到开括号：剩余文本无法构成规则，原样输出后结束
+		if (open < 0) {
+			out += css.slice(i);
+			break;
+		}
+		// 配对闭合 `}`，正确跳过字符串与注释内的括号
+		const close = findMatchingBrace(css, open);
+		// 闭合失败：剩余原文拼上并结束
+		if (close < 0) {
+			out += css.slice(i);
+			break;
+		}
+		// `{` 前的选择器列表（可能含逗号分组）
+		const selectors = css.slice(i, open);
+		// 从 `{` 到 `}` 的声明块本体
+		let body = css.slice(open, close + 1);
+		// :root/:host 上的 Host 主题绝对值剥掉，嵌入后继承主站；--color-* / --el-* 保留
+		if (isDocRootOnlySelectors(selectors)) {
+			body = stripHostThemeDecls(body);
+		}
+		// 对选择器列表逐段加 realm 前缀
+		out += `${prefixSelectorList(selectors, sel)}${body}`;
+		// 跳到本规则之后，继续扫描下一条
+		i = close + 1;
+	}
+	// 返回完成选择器前缀隔离后的 CSS
+	return out;
+}
+
+/**
+ * hoist 全局 at-rule + keyframes 前缀 + 选择器前缀隔离。
+ * @import 顶置；旧 @scope 会先 unwrap 再按前缀重写。
+ */
 function transpileStyleText(
-	// 原始 CSS 文本
 	cssText: string,
-	// 目标 @scope 选择器
 	sel: string,
-	// realm：keyframes 前缀与 owner 语义
-	realm: string,
-	// 返回可写入 style 标签的转译结果；函数体开始
+	_realm: string,
 ): string {
-	// 去首尾空白，便于空串与 alreadyScoped 判断
+	// 去掉首尾空白，便于空串判断与后续匹配
 	const trimmed = cssText.trim();
-	// 全空白则原样返回，保留原有空白形态
+	// 空样式直接原样返回，避免无意义改写
 	if (!trimmed) return cssText;
-	// 已包过该 sel 则不再二次 transpile
-	if (alreadyScoped(trimmed, sel)) return cssText;
 
-	// 若曾误包 scope，先剥到裸 CSS 再重新 hoist/包
-	const bare = unwrapScope(trimmed);
-	// 抽出所有 @import，剩余交给后续 font-face 等
+	// 已是当前 realm 的 v2 前缀协议 → 幂等跳过，防止重复 wrap
+	if (alreadyScoped(trimmed, sel)) return trimmed;
+
+	// 旧 @scope 外壳先剥掉，再清掉历史 mf-iso 标记，得到可重写的裸 CSS
+	const bare = unwrapScope(trimmed).replace(MF_ISO_MARK_RE, '').trim();
+	// 抽出顶层 @import（须保持文档最前，不能进前缀作用域）
 	const { extracted: imports, remaining: afterImport } = extractAtRules(
-		// 从裸 CSS 抽 @import
 		bare,
-		// 使用 IMPORT_RE
 		IMPORT_RE,
-		// 结束 extractAtRules(@import) 调用
 	);
-	// 抽出 @font-face，剩余继续抽 namespace
+	// 抽出 @font-face（全局字体描述，hoist 到前缀规则之外）
 	const { extracted: fontFaces, remaining: afterFont } = extractAtRules(
-		// 在去 import 后的串上抽 font-face
 		afterImport,
-		// 使用 FONT_FACE_RE
 		FONT_FACE_RE,
-		// 结束 extractAtRules(@font-face)
 	);
-	// 抽出 @namespace
+	// 抽出 @namespace（同样须全局生效，不能被 realm 选择器包裹）
 	const { extracted: namespaces, remaining: afterNs } = extractAtRules(
-		// 在去 font-face 后的串上抽 namespace
 		afterFont,
-		// 使用 NAMESPACE_RE
 		NAMESPACE_RE,
-		// 结束 extractAtRules(@namespace)
 	);
 
-	// 对剩余规则做 kf 前缀，作为 @scope 正文
-	const scopedContent = prefixKeyframes(afterNs, realm).trim();
-	// hoist 顺序：@import → @namespace → @font-face（符合 CSS 顶置约束）
+	// 选择器前缀隔离；@keyframes 名不改（antd effect style 与 animation-name 分标签注入）
+	const prefixed = prefixCssRules(afterNs, sel).trim();
+	// hoist 段顺序：@import → @namespace → @font-face（符合 CSS 顶置约定）
 	const hoisted = [...imports, ...namespaces, ...fontFaces].join('\n');
-	// 没有可 scope 的正文则只返回 hoist 段
-	if (!scopedContent) return hoisted.trim();
-
-	// 用 @scope (sel) 包住插件局部规则
-	const scoped = `@scope (${sel}) {\n${scopedContent}\n}\n`;
-	// 有 hoist 则拼在 scope 块前，否则只返回 scope 块
-	return hoisted ? `${hoisted}\n${scoped}` : scoped;
-	// 结束 transpileStyleText
+	// 正文打上 MF_ISO_MARK，供 alreadyScoped / HMR 识别已转译
+	const body = prefixed ? `${MF_ISO_MARK}\n${prefixed}` : MF_ISO_MARK;
+	// 有 hoist 则拼在正文前；否则只返回带标记的隔离正文
+	return hoisted ? `${hoisted}\n${body}` : body;
 }
 
-/** 单条 CSSOM 规则（无 @import） */
-// 见上行 JSDoc：单条 CSSOM insertRule 文本转译（无 @import 流程）
+/**
+ * 单条 CSSOM insertRule 文本转译。
+ * 注意：antd cssinjs 会把 `@keyframes X` 与 `animation-name:X` 分成两次 insertRule；
+ * 若只给 keyframes 加 realm 前缀、不同步改名引用，离开动画永不触发，Message 会挂住不消失。
+ * 故 CSSOM 路径保留原 keyframes 名（cssinjs 已带 hash），只做选择器前缀。
+ */
 function transpileStyleRule(
-	// insertRule 传入的单条 rule 文本
+	// 单条 CSSOM insertRule 的原始文本
 	ruleText: string,
-	// 目标 scope 选择器
+	// 当前 Remote 的选择器前缀（如 [data-mf-style-realm="…"]）
 	sel: string,
-	// realm 供 keyframes 前缀
-	realm: string,
-	// 返回可 insertRule 的字符串；函数体开始
+	// realm 仅整段 transpileStyleText 改 keyframes 名时需要；CSSOM 分条路径刻意不用
+	_realm: string,
 ): string {
-	// 去空白后判断规则类型
+	// 去掉首尾空白，便于空串与 at-rule 前缀匹配
 	const trimmed = ruleText.trim();
-	// 空规则原样返回
+	// 空规则原样返回，避免无意义改写
 	if (!trimmed) return ruleText;
-	// 已是目标 @scope 开头则不重复包
-	if (
-		// 有空格的 @scope (sel) 写法
-		trimmed.startsWith(`@scope (${sel})`) ||
-		// 无空格的 @scope(sel) 写法
-		trimmed.startsWith(`@scope(${sel})`)
-		// 结束已 scope 判定条件，进入分支
-	) {
-		// 已隔离则直接返回 trimmed
+	// 已带隔离标记或已含本 realm 选择器 → 视为已转译，幂等跳过
+	if (trimmed.includes(MF_ISO_MARK) || trimmed.includes(sel)) {
+		// 防止 HMR / 重复 insertRule 时二次前缀
 		return trimmed;
-		// 结束已 scope 分支
 	}
-	// @font-face / @namespace 必须全局，不进 @scope
+	// @font-face / @namespace 必须全局生效，不能包进 realm 选择器
 	if (/^@font-face\b/i.test(trimmed) || /^@namespace\b/i.test(trimmed)) {
-		// 原样返回这类全局 at-rule
+		// 原样放行，与 transpileStyleText 的 hoist 语义一致
 		return trimmed;
-		// 结束全局 at-rule 分支
 	}
-	// @import 不能经 insertRule 可靠处理，原样放行
+	// @import 须保持文档顶置语义，单条路径也不改写
 	if (/^@import\b/i.test(trimmed)) return trimmed;
-	// 其余规则先做 kf 前缀再包一层 @scope
-	const prefixed = prefixKeyframes(trimmed, realm);
-	// 单行 @scope 包装，供 CSSOM 插入
-	return `@scope (${sel}) { ${prefixed} }`;
-	// 结束 transpileStyleRule
+	// @keyframes 保留原名：antd cssinjs 把 keyframes 与 animation-name 分两次 insertRule，
+	// 若此处改名而引用侧未同步，离开动画失效（如 Message 挂住不消失）
+	if (
+		/^@keyframes\b/i.test(trimmed) ||
+		/^@-webkit-keyframes\b/i.test(trimmed)
+	) {
+		// cssinjs 自身已带 hash，跨 Remote 撞名风险可接受
+		return trimmed;
+	}
+	// 普通规则：只做选择器前缀；勿对单条跑 prefixKeyframes（会与分条的 animation-name 脱节）
+	return prefixCssRules(trimmed, sel);
 }
 
-// wrapWithScope：委托 transpileStyleText，统一整段文本入口
+// wrapWithScope：历史名，现为选择器前缀隔离入口
 function wrapWithScope(cssText: string, sel: string, realm: string): string {
-	// 直接转译整段 CSS
 	return transpileStyleText(cssText, sel, realm);
-	// 结束 wrapWithScope
 }
 
 // 从 entry URL 取 origin，供 link 同域认领与 data-mf-style-origin
@@ -494,40 +700,27 @@ function isHostViteDevStyle(viteId: string): boolean {
 	// 结束 isHostViteDevStyle
 }
 
-// 检测 Host 关键全局 CSS（如 sonner），禁止被 @scope 包坏
+// 检测 Host 关键全局 CSS（如 sonner），禁止被隔离改写
 function isHostCriticalCss(text: string): boolean {
-	// sonner 用 __insertCSS 注入全局样式；误 @scope 后 Toaster 失 fixed，会顶开布局
-	// 含 sonner toaster 选择器即视为 Host 关键样式
+	// sonner 用 __insertCSS 注入全局样式；误隔离后 Toaster 失 fixed，会顶开布局
 	return text.includes('[data-sonner-toaster]');
-	// 结束 isHostCriticalCss
 }
 
-/** 纠正已被误包进 @scope 的 Host 关键全局样式（如 sonner） */
-// 见上行 JSDoc：扫描 head，剥掉误加 @scope 的 Host 关键样式并打标
+/** 纠正已被误隔离的 Host 关键全局样式（如 sonner） */
 function repairHostCriticalStyles() {
-	// 遍历 head 下所有 style 节点
 	for (const node of document.head.querySelectorAll('style')) {
-		// 非 HTMLStyleElement 则跳过
 		if (!(node instanceof HTMLStyleElement)) continue;
-		// 读当前 CSS 文本
 		const text = node.textContent ?? '';
-		// 非关键样式则不动
 		if (!isHostCriticalCss(text)) continue;
-		// 打上 Host 标记，后续 looksLikeRemoteStyle 直接排除
 		node.dataset.mfHostStyle = '1';
-		// 没有 @scope 则只需打标
-		if (!text.includes('@scope')) continue;
-		// 剥掉最外层误包的 @scope，恢复全局生效
-		node.textContent = unwrapScope(text);
-		// 清除旧隔离标记，避免后续逻辑以为仍 scoped
+		// 旧 @scope：剥开；前缀隔离难以无损还原，仅清标记（认领阶段本就不会收 sonner）
+		if (text.includes('@scope')) {
+			node.textContent = unwrapScope(text);
+		}
 		delete node.dataset.mfScoped;
-		// 清除 owner，避免被某 realm 收回
 		delete node.dataset.mfStyleOwner;
-		// 清除 origin 标记
 		delete node.dataset.mfStyleOrigin;
-		// 结束 for 循环
 	}
-	// 结束 repairHostCriticalStyles
 }
 
 // 判断 style/link 是否应归当前捕获 ctx 的 Remote（live 或 reclaim）
@@ -652,39 +845,47 @@ const pendingStyleObservers = new WeakMap<HTMLStyleElement, MutationObserver>();
 // 已 scoped 的 style 监听 HMR 改文，弱键防泄漏
 const hmrStyleObservers = new WeakMap<HTMLStyleElement, MutationObserver>();
 
-// 监听已隔离 style 的文本被 HMR 改写后重新 scope
+/**
+ * 仅对 Vite HMR style（data-vite-dev-id）监听换文重隔离。
+ * antd cssinjs 等运行时靠 insertRule patch；对其 textContent 再 wrap 会互殴卡死整页。
+ */
 function watchScopedStyleHmr(
-	// 目标 style 元素
+	// 已打过 mf 隔离标记的 style 元素
 	el: HTMLStyleElement,
-	// 期望的 owner realm
+	// 当前归属的 style realm（与 data-mf-style-owner 对齐）
 	realm: string,
-	// 可选 origin，回写 data-mf-style-origin
+	// Remote 入口 origin，重 scope 时原样传回
 	entryOrigin: string | undefined,
-	// alreadyScoped / wrap 使用的选择器
+	// 本 realm 的 [data-mf-style-realm="…"] 选择器，供 styleNeedsRescope 判断
 	sel: string,
-	// 函数体开始（无显式返回类型）
+	// 函数体开始
 ) {
-	// 已在监听则跳过，避免重复 MO
+	// 同一元素已挂 HMR observer 则跳过，防止重复监听
 	if (hmrStyleObservers.has(el)) return;
-	// 子树/字符变化时检查是否需重新隔离
+	// 非 Vite 开发态 style（无 data-vite-dev-id）不监听：antd cssinjs 等靠 insertRule，再 wrap text 会互殴卡死
+	if (!el.getAttribute('data-vite-dev-id')) return;
+
+	// 子树文本/节点变化时检查是否需要重新隔离
 	const mo = new MutationObserver(() => {
-		// owner 已不是本 realm 则忽略（可能被其它插件接管）
+		// owner 已不是本 realm：可能被别的插件认领，本观察者不再处理
 		if (el.dataset.mfStyleOwner !== realm) return;
-		// 读最新 CSS 文本
+		// 读取当前 CSS 文本（null 当空串）
 		const text = el.textContent ?? '';
-		// 有内容且不再带本 sel 的 @scope → 清标记并重跑 scope
-		if (text.trim() && !alreadyScoped(text, sel)) {
-			// 去掉 mfScoped，允许 scopeStyleElement 重写
-			delete el.dataset.mfScoped;
-			// 再次 wrap/@scope
-			scopeStyleElement(el, realm, entryOrigin);
-			// 结束需重 scope 分支
-		}
+		// 已带本 realm 前缀且无需剥旧 @scope → 不必重写，避免无意义写回
+		if (!styleNeedsRescope(text, sel)) return;
+		// 先断开，避免 set textContent 同步再进本回调形成死循环
+		mo.disconnect();
+		// 从弱表摘掉，允许后续再次 watch（scopeStyleElement 末尾会重挂）
+		hmrStyleObservers.delete(el);
+		// 清掉 scoped 标，让 scopeStyleElement 重新走完整 wrap 路径
+		delete el.dataset.mfScoped;
+		// 按原 realm/origin 重新隔离（内部会再调用本函数挂新 observer）
+		scopeStyleElement(el, realm, entryOrigin);
 		// 结束 MutationObserver 回调
 	});
-	// 记下 MO，供 has 判断与生命周期
+	// 登记弱引用，便于去重与元素回收时自动释放
 	hmrStyleObservers.set(el, mo);
-	// 观察子节点、字符数据与子树，覆盖 Vite HMR 换文
+	// 监听子节点与字符数据（含文本节点替换），覆盖 Vite HMR 改 style 内容的常见路径
 	mo.observe(el, { childList: true, characterData: true, subtree: true });
 	// 结束 watchScopedStyleHmr
 }
@@ -754,25 +955,21 @@ function scopeStyleElement(
 		return;
 		// 结束空 text 分支
 	}
-	// 已正确 scoped 到本 realm 则只补 origin 与 HMR 监听
+	// 已隔离到本 realm：旧 @scope 迁移；协议升版（缺当前 mf-iso 标记）时重写一次
 	if (
-		// 已标 mfScoped
 		el.dataset.mfScoped === '1' &&
-		// owner 仍是本 realm
 		el.dataset.mfStyleOwner === realm &&
-		// 文本已含本 sel 的 @scope
-		alreadyScoped(text, sel)
-		// 结束「已隔离」条件
+		!styleNeedsRescope(text, sel)
 	) {
-		// 补写 origin（切换插件 reclaim 时可能原先缺失）
+		if (!alreadyScoped(text, sel)) {
+			// 已有前缀但标记过旧 → 升到当前协议（html/body→plugin-root 等）
+			el.textContent = wrapWithScope(text, sel, realm);
+		}
 		if (entryOrigin) el.dataset.mfStyleOrigin = entryOrigin;
-		// 确保 HMR 监听已挂
 		watchScopedStyleHmr(el, realm, entryOrigin, sel);
-		// 无需改写文本
 		return;
-		// 结束已隔离早退
 	}
-	// 正式把 CSS wrap 进 @scope 写回 textContent
+	// 正式把 CSS 前缀隔离写回 textContent
 	el.textContent = wrapWithScope(text, sel, realm);
 	// 标记已完成隔离
 	el.dataset.mfScoped = '1';
@@ -1356,53 +1553,89 @@ export function clearPluginPortalClaim(pluginId?: string | null): void {
 	// 结束 clearPluginPortalClaim
 }
 
-// 获取或创建 body 上某插件的零尺寸 portal scope 容器（弹层实际挂载点）
+/**
+ * Portal overlay 根：全屏 fixed + pointer-events:none（点击穿透到主界面），
+ * 子树由 ensurePortalPointerCss 恢复事件。避免 0×0 / height:0 压缩 absolute 浮层。
+ */
+const PORTAL_SCOPE_STYLE =
+	'position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:visible;pointer-events:none;z-index:2147503646;';
+
+let portalPointerCssInstalled = false;
+
+/** 一次注入：portal 子节点可点（父级 pointer-events:none） */
+function ensurePortalPointerCss() {
+	if (portalPointerCssInstalled || typeof document === 'undefined') return;
+	portalPointerCssInstalled = true;
+	const style = document.createElement('style');
+	style.dataset.mfHostStyle = '1';
+	// 父级 inline pointer-events:none；仅恢复直接子树可点（子代默认跟着可点）
+	style.textContent = '[data-mf-portal-scope]>*{pointer-events:auto;}';
+	document.head.appendChild(style);
+}
+
+/** body 弹层节点打上 realm，使 `[realm].el-popper` 自身选择器生效 */
+function stampRealmOnPortalNode(node: Node) {
+	if (node instanceof DocumentFragment) {
+		for (const child of node.childNodes) stampRealmOnPortalNode(child);
+		return;
+	}
+	if (!(node instanceof HTMLElement)) return;
+	const id = resolveClaimPluginId();
+	const realm = id ? portalRealmByPlugin.get(id) : undefined;
+	if (!realm) return;
+	node.setAttribute('data-mf-style-realm', realm);
+	if (id) node.setAttribute('data-mf-plugin', id);
+}
+
+// 获取或创建 body 上某插件的 portal scope 容器（弹层实际挂载点）
 function ensureBodyPortalScope(pluginId: string): HTMLElement {
-	// 按 data-mf-portal-scope 查已有容器
+	// 确保已注入「portal 子节点可点」的全局 CSS
+	ensurePortalPointerCss();
+	// 按插件 id 构造 portal scope 选择器（cssEscapeIdent 防特殊字符）
 	const sel = `[data-mf-portal-scope="${cssEscapeIdent(pluginId)}"]`;
-	// 查 DOM 中是否已有 scope 节点
+	// 复用已存在的 scope 容器，避免重复挂载
 	let el = document.querySelector(sel) as HTMLElement | null;
-	// 取该插件当前 realm 以同步 style-realm 属性
+	// 取该插件当前绑定的样式 realm（可能晚于首次创建才写入 map）
 	const realm = portalRealmByPlugin.get(pluginId);
-	// 已存在则只校正 realm 并复用
+	// 已有容器：同步 realm / 样式后直接返回
 	if (el) {
-		// realm 变化时更新 data-mf-style-realm
+		// realm 已就绪且与 DOM 不一致时补打，保证 `[realm]` 选择器命中
 		if (realm && el.getAttribute('data-mf-style-realm') !== realm) {
-			// 写入新 realm
+			// 写回最新 realm
 			el.setAttribute('data-mf-style-realm', realm);
-			// 结束 realm 校正 if
+			// 结束 realm 同步
 		}
-		// 复用已有 scope 容器
+		// 每次取用都重刷 overlay 样式，防止被外部改坏
+		el.style.cssText = PORTAL_SCOPE_STYLE;
+		// 复用现有节点
 		return el;
-		// 结束 el 已存在分支
+		// 结束已存在分支
 	}
-	// 首次：创建零尺寸绝对定位 div 作为 Portal 挂载锚点
+	// 新建全屏 fixed 的 portal 根容器
 	el = document.createElement('div');
-	// 标记所属插件
+	// 标记所属插件，便于排查与清理
 	el.setAttribute('data-mf-plugin', pluginId);
-	// 有 realm 则写入，使 @scope 选择器命中其子树
+	// 有 realm 则立刻打上，使 scoped CSS 对弹层生效
 	if (realm) el.setAttribute('data-mf-style-realm', realm);
-	// 标记为 portal scope 容器，供 claimIdFromElement 识别
+	// 核心标记：append 重定向与卸载清理都靠它定位
 	el.setAttribute('data-mf-portal-scope', pluginId);
-	// stamp 避免被当作插件业务根参与 claim
+	// stamp 标记：shouldSkipPortalNode 据此跳过，避免 scope 再被重定向
 	el.dataset.mfPortalStamp = '1';
-	// 零尺寸+高 z-index+overflow:visible：不挡点击，弹层可溢出显示
-	el.style.cssText =
-		// 内联样式字符串
-		'position:absolute;left:0;top:0;width:0;height:0;overflow:visible;z-index:2147503646;';
-	// 置 busy：append 自身触发的 body patch 不再递归重定向
+	// 全屏穿透容器样式（子树由 ensurePortalPointerCss 恢复可点）
+	el.style.cssText = PORTAL_SCOPE_STYLE;
+	// 挂 body 前抬忙标，避免自身 append 被 body patch 再次拦截
 	bodyPatchBusy = true;
-	// try/finally 保证 busy 一定复位
+	// try/finally 保证忙标一定落下
 	try {
-		// 挂到 body；经 patch 时因 busy 走原生 append
+		// 挂到 document.body 作为该插件弹层根
 		document.body.appendChild(el);
-		// finally 块
+		// 结束 try
 	} finally {
-		// 清除 busy，恢复对外部 Portal append 的拦截
+		// 无论成败都清除忙标
 		bodyPatchBusy = false;
-		// 结束 try/finally
+		// 结束 finally
 	}
-	// 返回新建或复用的 scope 容器
+	// 返回新建的 scope 容器
 	return el;
 	// 结束 ensureBodyPortalScope
 }
@@ -1631,11 +1864,10 @@ function ensureBodyPortalPatch() {
 			return origBodyAppend!.call(this, node) as T;
 			// 走原生 appendChild
 		}
-		// 结束早退 if 块
 		const parent = retargetBodyMount(this, node);
-		// retargetBodyMount 解析 parent
-		return origBodyAppend!.call(parent, node) as T;
-		// 向 scope 容器 appendChild
+		const ret = origBodyAppend!.call(parent, node) as T;
+		if (parent !== this) stampRealmOnPortalNode(node);
+		return ret;
 	};
 
 	// 结束 appendChild 包装
@@ -1660,13 +1892,20 @@ function ensureBodyPortalPatch() {
 			return origBodyInsert!.call(this, node, ref) as T;
 			// 原生 insertBefore
 		}
-		// 结束早退 if 块
+		// 结束早退 if 块：需要把挂到 body/html 的节点重定向到插件 Portal
+		// 按当前 node 解析实际应挂载的父节点（可能是某插件的 portal 容器）
 		const parent = retargetBodyMount(this, node);
-		// retarget parent
-		if (parent !== this) return origBodyAppend!.call(parent, node) as T;
-		// parent 变则 appendChild 到 scope
+		// 父节点已被改写：说明该节点应进 Portal，而非真实 body/html
+		if (parent !== this) {
+			// Portal 内通常没有原 ref 对应节点，改用 append 挂到重定向父上
+			const ret = origBodyAppend!.call(parent, node) as T;
+			// 给 Portal 节点打上 realm 标记，供样式隔离 / 归属识别
+			stampRealmOnPortalNode(node);
+			// 返回已挂载节点，保持与原生 insertBefore 相同的返回约定
+			return ret;
+		}
+		// 未重定向：父仍是 this，按原语义在 body/html 上 insertBefore
 		return origBodyInsert!.call(this, node, ref) as T;
-		// parent 未变则原生 insertBefore
 	};
 
 	// 结束 insertBefore 包装
@@ -1740,11 +1979,12 @@ function ensureBodyPortalPatch() {
 			}
 			// 结束字符串 if 块
 			const parent = retargetBodyMount(this, n);
-			// Element 节点走 retargetBodyMount
-			if (parent !== this) origBodyAppend!.call(parent, n);
-			// parent 变则 appendChild 到 scope
-			else origBodyAppendFn!.call(this, n);
-			// 否则 Element.append 到 this
+			if (parent !== this) {
+				origBodyAppend!.call(parent, n);
+				stampRealmOnPortalNode(n);
+			} else {
+				origBodyAppendFn!.call(this, n);
+			}
 		}
 		// 结束 for 循环
 	};
@@ -1783,11 +2023,12 @@ function ensureBodyPortalPatch() {
 			}
 			// 结束字符串 if 块
 			const parent = retargetBodyMount(this, n);
-			// Element 节点 retarget
-			if (parent !== this) origBodyAppend!.call(parent, n);
-			// parent 变则 appendChild（prepend 语义简化为 append）
-			else origBodyPrepend!.call(this, n);
-			// parent 未变则 prepend
+			if (parent !== this) {
+				origBodyAppend!.call(parent, n);
+				stampRealmOnPortalNode(n);
+			} else {
+				origBodyPrepend!.call(this, n);
+			}
 		}
 		// 结束 for 循环
 	};
@@ -1829,6 +2070,27 @@ function maybeReleaseBodyPortalPatch() {
 	// 允许下次 attach 重新 patch
 }
 
+/**
+ * Element Plus 等会先在 body 建 `#*-popper-container-*`，再 Teleport 进该容器。
+ * 若建容器时 Portal 桥尚未装上，节点会落在真实 body（无 style-realm），样式全失效。
+ * attach 时把已游离的容器收进当前插件的 portal scope。
+ */
+function reclaimOrphanPopperContainers(pluginId: string) {
+	// 取（或创建）当前插件在 body 上的 portal scope 容器，作为收编目标
+	const scope = ensureBodyPortalScope(pluginId);
+	// 快照 body 直接子节点：遍历中可能 append 改动 children，避免 live 集合跳项
+	for (const node of Array.from(document.body.children)) {
+		// 非元素节点（文本/注释等）无 id，跳过
+		if (!(node instanceof HTMLElement)) continue;
+		// 只认 Element Plus 一类 `#*-popper-container-*` 游离容器
+		if (!/-popper-container-/i.test(node.id || '')) continue;
+		// 已在任一 portal scope 内则不必再搬（含本插件与其它插件）
+		if (node.closest('[data-mf-portal-scope]')) continue;
+		// 挂入本插件 scope，使后续 Teleport/弹层继承 data-mf-style-realm
+		scope.appendChild(node);
+	}
+}
+
 // 结束 maybeReleaseBodyPortalPatch
 function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
 	// 插件 attach 期间注册 Portal 桥：touch/createPortal/body patch + scope 容器
@@ -1846,6 +2108,8 @@ function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
 	// 默认最近交互为该插件
 	ensureBodyPortalScope(pluginId);
 	// 确保 body 上存在 portal scope 容器
+	// 收回竞态下已挂到真实 body 的 EP popper 容器
+	reclaimOrphanPopperContainers(pluginId);
 	return () => {
 		// 返回 teardown：卸载时撤销 Portal 桥与 DOM
 		portalPlugins.delete(pluginId);
@@ -1863,7 +2127,7 @@ function attachPortalScopeBridge(pluginId: string, realm: string): () => void {
 }
 
 /**
- * 插件页挂载期间继续隔离（HMR / 延迟 CSS）+ Portal/Teleport 静默纳入 @scope。
+ * 插件页挂载期间继续隔离（HMR / 延迟 CSS）+ Portal/Teleport 静默纳入 realm。
  */
 // 见上行 JSDoc：插件挂载期 CSS 捕获 + Portal 收编的统一入口
 export function attachPluginStyleIsolation(
@@ -1895,17 +2159,11 @@ export function attachPluginStyleIsolation(
 /** @internal smoke / 自检用 */
 // 见上行 JSDoc：导出内部 transpile/scope 工具供 smoke 自检
 export const __styleIsolationTest = {
-	// CSS 全文 @scope 包装入口
 	transpileStyleText,
-	// 单条 CSSOM rule 改写
 	transpileStyleRule,
-	// 从已 scope 文本还原
 	unwrapScope,
-	// 生成 [data-mf-style-realm=…] 选择器
 	scopeSelector,
-	// 生成 realm 专属 @keyframes 前缀
-	kfPrefixForRealm,
-	// body.removeChild 镜像：解析 retarget 后的实际父节点
 	resolveRetargetedChildParent,
-	// 结束 __styleIsolationTest 对象
+	alreadyScoped,
+	styleNeedsRescope,
 };

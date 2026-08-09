@@ -2,7 +2,7 @@
 
 > **文档角色**：详细的实现过程文档，包含主项目具体实现方式和子项目/插件接入方式，代码含逐行注释。
 > **适用读者**：主项目开发者、插件/子项目开发者。
-> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host `@scope` 样式隔离完整方案（§2.10.2：原理 / 时序 / `styleIsolation.ts` 全文注释 / 接入点；dev 认领排除 Host；`data-mf-style-realm` 多 expose；`createPortal` + body 挂载收编 Vue Teleport；body `removeChild`/`replaceChild` 镜像修 antd `getScrollBarSize`；qiankun 式 transpile / CSSOM `insertRule` / `captureStack`；Drawer `claimPluginPortalTarget`；sonner 防误包；详解 `docs/app/style-isolation-qiankun-harden.md`；`@/plugins` 导出 realm/claim）**；**Layout / `PluginPageShell`：overflow 与 `border-radius` 分层，避免废掉路由页内 `backdrop-filter`（§2.10.0 / §2.14）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**；App 根 **`data-mf-host-portal`**。若与源码不一致，以源码为准。
+> **同步说明**：已对齐最新 HostBridge（`api.locale`，无 `api.t`）、PluginHostPage locale 热更新、iframe `locale` 消息、**Host 样式隔离 §2.10.2（`mf-iso:3` 选择器前缀；`html/body→[realm][data-plugin-root]`；全屏 portal + 打标；HMR 仅 vite-id；CSSOM；Vue useLayoutEffect；body remove 镜像；`@/plugins` 导出 realm/claim）**；**Layout / `PluginPageShell`：overflow 与 `border-radius` 分层，避免废掉路由页内 `backdrop-filter`（§2.10.0 / §2.14）**；Registry `title`/`description` locale map；**Host 勿 shared `react-router`**；entry bust 用 **`version@manifestHash`**（`fetchManifestMeta` / `fetchEntryBuildId` + `resolvePluginBust`，**不依赖**改 registry `updatedAt`）——**进入插件只 GET 一次 `mf-manifest.json`**（指纹 + 解析 `remoteEntry`），`registerRemote` 直连 `remoteEntry.js?v=`，`afterResolve` 兜底补 `?v=`；`ensurePlugin` 按 bust 判断重载；保存 registry 校验 `hostApiRange`；remotes 静态 `no-store`；**`api.ui.setAppFullscreen` + `PluginPageShell` / `pageShell`（§2.7 / §2.10 / §2.14）**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位，§2.11）**；App 根 **`data-mf-host-portal`**。若与源码不一致，以源码为准。
 
 ---
 
@@ -22,7 +22,7 @@
    - 2.10 插件宿主页面 (`PluginHostPage.tsx`)
    - 2.10.0 独立路由外壳 (`PluginPageShell.tsx`；**勿圆角同层 overflow-hidden**)
    - 2.10.1 错误边界
-   - **2.10.2 主子样式隔离（原理与完整实现）**（realm / Portal·Teleport / body remove 镜像·antd getScrollBarSize / transpile·CSSOM / sonner / reclaim / Drawer 认领）
+   - **2.10.2 主子样式隔离（原理与完整实现）**（`mf-iso:3` 选择器前缀；`html/body→[realm][data-plugin-root]`；全屏 portal-scope + 打标；HMR 仅 vite-id；body remove 镜像·antd；CSSOM；Vue useLayoutEffect）
    - **2.11 路由构建与初始化**（含刷新子应用防闪 404；`data-mf-host-portal`）
    - 2.12 语言（locale）同步
    - **2.13 插件/子应用加载缓存破坏（完整方案）**
@@ -55,7 +55,7 @@
 - **失败重试**：失败态稳定，仅手动触发重试，避免自动死循环
 - **语言同步**：Host 只推送 `locale`（`zh-CN` | `en-US`）；插件自维护文案字典
 - **Registry 文案解耦**：插件中心标题/说明与注入路由面包屑读 registry 的 `title`/`description` locale map，改名不必改 Host 语言包
-- **样式隔离**：Host 运行时 `@scope([data-mf-style-realm])` + transpile/CSSOM + head 劫持 + MutationObserver + Portal/`Teleport` 收编（含 body `removeChild`/`replaceChild` 镜像）+ antd Modal/Drawer 兼容（详解 §2.10.2 / `docs/app/style-isolation-qiankun-harden.md`）；`untrusted` 走 iframe
+- **样式隔离**：Host 运行时 **选择器前缀 `/*mf-iso:3*/`**（`:root`→realm；`html/body`→`[realm][data-plugin-root]`；双选择器）+ transpile/CSSOM + head 劫持 + 全屏 portal-scope 打标 + body remove/replace 镜像（详解 §2.10.2）；`untrusted` 走 iframe
 - **entry 缓存破坏**：`pluginBust = version@manifestHash`（指纹来自 Remote 自有 `mf-manifest`；发布者勿改 Host registry）；`resolvePluginBust` **只拉一次** manifest（算指纹并解析 `remoteEntry`），`registerRemote` **直连** `remoteEntry.js?v=`，`afterResolve` 再兜底补 `?v=`（WKWebView 固定名 ESM 强缓存）
 - **Host shared**：只 shared `react` / `react-dom`；**不要** shared `react-router`（生产易双 Router，`useLocation` 白屏）
 - **应用级全屏**：`api.ui.setAppFullscreen`（`ui:toast`）驱动 Layout 影院态 + Tauri/Web 系统全屏；独立路由页 `pageShell` → `PluginPageShell`（§2.14）
@@ -2095,11 +2095,14 @@ export function PluginPageShell({
 
 #### 2.10.2 主子样式隔离（原理与完整实现）
 
-> **源码**：`apps/frontend/src/plugins/host/styleIsolation.ts`  
-> **姊妹稿**（技术速览 / 落地手册）：`docs/app/style-isolation-tech-overview.md`、`docs/app/style-isolation-implementation.md`、`docs/app/style-isolation-realm-portal.md`、`docs/app/style-isolation-qiankun-harden.md`（**本轮 qiankun 级加固**）、`docs/ideas/mf-css-isolation.md`  
+> **源码**：`apps/frontend/src/plugins/host/styleIsolation.ts`（协议标记 **`/*mf-iso:3*/`**）  
+> **自检**：`apps/frontend/src/plugins/host/styleIsolation.smoke.ts`（`pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/host/styleIsolation.smoke.ts`）  
+> **姊妹稿**：`docs/app/style-isolation-qiankun-harden.md`、`docs/ideas/mf-css-isolation.md`（历史 `@scope` 叙述以**本文件 + 源码**为准）  
 > **目标**：隔离责任在 **Host**；Remote 可按普通 Vite + Tailwind 工程开发（含 Preflight），主↔子样式互不破坏。  
-> **现行要点（相对早期「按 pluginId `@scope`」）**：样式域改为 **`data-mf-style-realm`（按 Remote entry）**；挂载期 **`reclaimEntryStyles`** 收回同 entry 已注入 CSS；Portal 用劫持共享 **`react-dom.createPortal`** + **body 原型挂载**（覆盖 Vue Teleport 等）收进 `[data-mf-portal-scope]`；body **`removeChild` / `replaceChild` 镜像**（`resolveRetargetedChildParent`）修 antd `getScrollBarSize` 等「`body.append` → `body.remove`」在 append 重定向后抛 `NotFoundError`；Host Drawer 等外壳打开前 **`claimPluginPortalTarget`** 防首帧闪烁；sonner 等 Host 关键样式禁止误包。  
-> **第三轮加固（对齐 qiankun next）**：`transpileStyleText`（`@font-face`/`@namespace`/`@import` hoist、`@keyframes` realm 前缀）；`CSSStyleSheet.insertRule` 拦截；`captureStack` 替代单例 `active`；head MO 仅 `childList`（HMR 改节点级）；sticky 认领改为 scope **`:hover`**；Toaster children 识别永不收编。详解见 [`style-isolation-qiankun-harden.md`](../../../../docs/app/style-isolation-qiankun-harden.md)。
+> **现行协议（相对早期「整包 `@scope`」）**：**qiankun 式选择器前缀**——`:root` → `[data-mf-style-realm]`（CSS 变量可打在浮层根）；**`html`/`body` → `[realm][data-plugin-root]`**（布局规则只打插件根，避免 Message/Toast 吃到 `height:100%` 拉成竖条）；其余规则双选择器 **`[realm] .x,[realm].x`**（后代 + 浮层根自身打标）。旧 `@scope` 文本会 `unwrapScope` 后升到前缀协议。  
+> **Portal**：全屏 `fixed;inset:0;pointer-events:none` 的 `[data-mf-portal-scope]` + 子节点 `pointer-events:auto`；`createPortal` / body 挂载收编；append 时 **`stampRealmOnPortalNode`**；body **`removeChild`/`replaceChild` 镜像**修 antd `getScrollBarSize`；`claimPluginPortalTarget` 防 Drawer 首帧闪烁。  
+> **HMR / cssinjs**：**仅**带 `data-vite-dev-id` 的 style 挂换文重隔离；antd 等靠 `insertRule` patch——对其 `textContent` 再 wrap 会互殴卡死（见 FAQ）。  
+> **Vue**：`PluginHostPage` 用 **`useLayoutEffect`** 挂 `attachPluginStyleIsolation`；`createVueHostBridge` 用 **`useLayoutEffect`** 调 `mount`，避免 EP 在 `onBeforeMount` 建 `#el-popper-container-*` 时 Portal 桥未就绪。
 
 ##### 172.16.0.5 问题与目标
 
@@ -2115,84 +2118,94 @@ Host 与 Remote **同页共享一个 `document`**：
 | Vue Teleport / 原生 append → `body` | 非 React 栈同样逃出 realm，仅 patch `createPortal` 不够 |
 | antd Modal/Drawer `getScrollBarSize` | `body.appendChild(measure)` 被重定向到 portal-scope 后，仍 `body.removeChild` → WebKit `NotFoundError`，Portal 崩溃 |
 | CSS-in-JS `insertRule`             | 绕过改写 `style.textContent`，规则仍全局泄漏 |
-| 整包 `@scope`                      | `@font-face` 失效；跨 Remote `@keyframes` 撞名 |
-| Host 全局 Toaster（sonner）        | 被误 `@scope` 后 `position:fixed` 失效，顶开布局；或 sticky 误收进插件 portal-scope |
+| 整包 `@scope`（历史） | `:root` 变量在 scope 内失效；浮层根自身带 realm 时后代选择器不够；旧文档仍见，**现行已改为选择器前缀** |
+| 浮层根误吃 `html,body{height:100%}` | Message/Toast 被拉成竖条（`mf-iso:3` 用 `[data-plugin-root]` 限定） |
+| CSSOM 单条改 keyframes 名 | `@keyframes` 与 `animation-name` 分条 insert → 离开动画永不触发，Message 挂住不消失 |
+| cssinjs ↔ HMR 互殴 | 对 antd style `textContent` 反复 wrap → 卡死 + 全页样式错乱 |
+| Host 全局 Toaster（sonner） | 被误隔离后 `position:fixed` 失效，顶开布局；或 sticky 误收进插件 portal-scope |
 
 **目标**：
 
-1. Remote **零侵入**：正常 `@import "tailwindcss"`，不必禁用 Preflight、不必手写 `[data-plugin-root]` 套 utilities。
-2. Host 运行时把 Remote 注入的 CSS **限制在** `[data-mf-style-realm="…"]` 容器内（同一 Remote 多插件共享同一 realm；`data-mf-plugin` 仍作插件根标识）。
-3. 仍能**继承** Host 主题 CSS 变量（视觉统一）。
-4. `untrusted` 继续走 **iframe**（独立 document，不走本方案）。
-5. Portal / Teleport 弹层在 **不改 Remote 业务** 的前提下仍命中 `@scope`；打开/悬停不因容器搬迁闪烁。
-6. Host 关键全局样式（如 sonner）永不被收进 Remote `@scope`，亦不被误收编进 portal-scope。
-7. 转译对齐 qiankun：全局 at-rule hoist、keyframes 前缀；CSSOM 与文本注入双路径覆盖。
+1. Remote **零侵入**：正常 `@import "tailwindcss"`，不必禁用 Preflight。
+2. Host 运行时把 Remote CSS **改写成带 `[data-mf-style-realm]` 前缀的选择器**（同 Remote 多插件共享 realm；`data-mf-plugin` 仍作插件根标识）。
+3. 仍能**继承** Host 主题 CSS 变量；`:root` 规则映射到 realm，浮层根打标后也能吃到 `--el-*` / token。
+4. `untrusted` 继续走 **iframe**。
+5. Portal / Teleport 弹层在 **不改 Remote 业务** 的前提下命中前缀选择器（portal-scope + 节点打标）。
+6. Host 关键全局样式（sonner）永不被隔离改写，亦不被误收编进 portal-scope。
+7. 转译对齐 qiankun：全局 at-rule hoist、选择器前缀（**不改 keyframes 名**）；CSSOM 与文本注入双路径；协议升版靠 `/*mf-iso:N*/`。
 
-##### 192.168.1.2 方案选型（为何用 `@scope`）
+##### 192.168.1.2 方案选型（为何用选择器前缀）
 
-| 方案                                             | Remote 改造     | 隔离     | 主题变量继承 | 本项目                  |
-| ------------------------------------------------ | --------------- | -------- | ------------ | ----------------------- |
-| **CSS `@scope` + head 劫持 + MutationObserver**  | 零              | 选择器级 | ✅           | ✅ 采用                 |
-| **+ `createPortal` / body 挂载收编到 portal-scope** | 零（Host 静默） | 同上     | ✅           | ✅ 跨框架 Portal 补强 |
-| **+ qiankun 式 transpile / CSSOM `insertRule`** | 零              | 更强     | ✅           | ✅ 第三轮加固           |
-| Shadow DOM                                       | 中（挂载/事件） | 强       | ❌ 差        | ❌                      |
-| 强制 Remote 关 Preflight / 嵌套 utilities        | 高              | 弱～中   | ✅           | ❌ 已弃                 |
-| qiankun experimentalStyleIsolation（改写选择器） | 低              | 中       | ✅           | ❌（改用原生 `@scope` + 同类 transpile） |
-| 业务传 `getPopupContainer` / portal container    | 中～高          | ✅       | ✅           | ❌（污染主/子业务代码） |
-| iframe                                           | 低              | 完全     | ❌           | ✅ 仅 `untrusted`       |
+| 方案 | Remote 改造 | 隔离 | 主题变量 | 本项目 |
+| ---- | ----------- | ---- | -------- | ------ |
+| **qiankun 式选择器前缀 + head/CSSOM 劫持**（现行 `mf-iso:3`） | 零 | 选择器级 | ✅（`:root`→realm） | ✅ 采用 |
+| **+ 全屏 portal-scope + 浮层打标** | 零（Host 静默） | 同上 | ✅ | ✅ Portal/Teleport |
+| 整包 CSS `@scope`（历史） | 零 | 选择器级 | ⚠️ `:root`/浮层易丢 | ❌ 已迁移走前缀 |
+| Shadow DOM | 中 | 强 | ❌ | ❌ |
+| 强制 Remote 关 Preflight | 高 | 弱～中 | ✅ | ❌ |
+| 业务改 `getPopupContainer` | 中～高 | ✅ | ✅ | ❌ |
+| iframe | 低 | 完全 | ❌ | ✅ 仅 `untrusted` |
 
-一句话：**类 qiankun next `@scope` runtime isolation 的意图落地（原生 `@scope` + hoist/keyframes 转译 + CSSOM）；Portal/Teleport 用 Host 静默收编，业务零改。**
+一句话：**对齐 qiankun `experimentalStyleIsolation` 的选择器前缀 + hoist/keyframes/CSSOM；Portal 用全屏透明壳收编并打 realm；业务零改。**
 
-##### 192.168.1.2 `@scope` 原理
+##### 192.168.1.2 选择器前缀原理（`/*mf-iso:3*/`）
+
+设 `sel = [data-mf-style-realm="entry:http://localhost:9008/"]`：
+
+| 原选择器 | 转译后 | 用意 |
+| -------- | ------ | ---- |
+| `:root { --el-color-primary: … }` | `sel { --el-color-primary: … }` | 组件库变量打在插件根 / 浮层根 |
+| `:root { --brand-accent / --theme-* / shadcn 底色 }` | **剥离**（不写入 realm） | 避免盖住主站主题；`--color-*` 别名保留，解析时继承 Host |
+| `html, body { height: 100% }` | `sel[data-plugin-root] { height: 100% }` | **只**打插件根；勿让 Toast/Message 吃到 `height:100%` |
+| `.el-button { … }` | `sel .el-button, sel.el-button { … }` | 插件子树内 + 浮层根自身 class |
+| `@font-face` / `@import` / `@namespace` | **提升出**隔离正文（全局） | 字体/导入不被前缀破坏 |
+| `@keyframes spin` | **原样保留**名（不改） | antd 把 keyframes 与 `animation-name` 分两个 `<style>`（updateCSS）；按单标签改名会对不上，Toast 不消失 |
 
 ```css
-/* 现行：按 Remote 样式域（realm），不是按单个 pluginId */
-/* 只有落在 [data-mf-style-realm="entry:…"] 子树内的元素才会匹配括号里的规则 */
-@scope ([data-mf-style-realm="entry:http://localhost:9008/"]) {
-	.btn {
-		background: blue;
-	}
-	body {
-		margin: 0;
-	} /* 不会改 Host 的 body；只在容器内找匹配 */
-	:root {
-		--x: 1;
-	} /* 不会污染 Host 的 :root */
+/*mf-iso:3*/
+[data-mf-style-realm="entry:http://localhost:9008/"] {
+	--el-color-primary: #409eff;
+}
+[data-mf-style-realm="entry:http://localhost:9008/"][data-plugin-root] {
+	height: 100%;
+	width: 100%;
+}
+[data-mf-style-realm="entry:http://localhost:9008/"] .el-button,
+[data-mf-style-realm="entry:http://localhost:9008/"].el-button {
+	color: var(--el-color-primary);
 }
 ```
 
-> **历史说明（仍有效的理解）**：早期文档曾用 `@scope ([data-mf-plugin="learningNotes"])`。多 expose 共用同一 Remote CSS 包时，按 pluginId 会导致「先挂载者独占」。现改为 **`styleRealmKey(entry, remoteName, pluginId)` → `data-mf-style-realm`**；`data-mf-plugin` 仍保留，用于 Portal 归属、调试与兼容。
+> **历史**：早期按 `pluginId` 包 `@scope`；后改为 realm + `@scope`；再改为 **选择器前缀**（旧 `@scope` 文本会 unwrap 升版）。`data-mf-plugin` 仍保留，用于 Portal 归属与调试。
 
 要点：
 
-- 支持 Chrome 118+ / Firefox 125+ / Safari 17.4+（本项目目标环境已覆盖）。
-- 不改写普通选择器字符串；`@font-face` / `@namespace` / `@import` **提升出** `@scope`；`@keyframes` 按 realm **加前缀**并改写 `animation*` 引用（防撞名）。
-- CSS 变量仍可从容器祖先（Host）**继承进来**，主题统一。
-- `unwrapScope`：按大括号深度剥最外层 `@scope`，保留 hoist 段，便于 HMR / 换 realm 重包。
-
-宿主必须提供 scope 根（`PluginHostPage`）：
+- `alreadyScoped`：须含**当前** `/*mf-iso:3*/` + 本 `sel`（升版强制重写）。
+- `styleNeedsRescope`：已有 realm 前缀且无旧 `@scope` → 不再 wrap（防死循环）；任意旧 `mf-iso:N`+sel 亦视为「已前缀」。
+- `unwrapScope`：剥最外层历史 `@scope`，再走前缀。
+- 宿主根（`PluginHostPage`）**必须**同时带 `data-mf-style-realm` + **`data-plugin-root`**（html/body 布局规则依赖后者）。
 
 ```html
 <div
 	data-mf-plugin="learningNotes"
 	data-mf-style-realm="entry:http://localhost:9008/"
 	data-plugin-root
-	class="plugin-learningNotes h-full w-full"
+	class="plugin-learningNotes h-full w-full min-h-0"
 >
-	<!-- Remote default 组件 -->
+	<!-- Remote default / VueHostBridge -->
 </div>
 ```
 
-Portal scope 容器（Host 维护，业务不可见）同样带 `data-mf-plugin` + `data-mf-style-realm` + `data-mf-portal-scope`。
+Portal scope：`data-mf-portal-scope` + 同 realm；**不要**加 `data-plugin-root`（避免全屏壳再吃一遍 `html,body` 布局规则以外的误伤——壳本身用 inline `PORTAL_SCOPE_STYLE`）。浮层子节点再 `stampRealmOnPortalNode`。
 
 ##### 10.20.0.1 样式域 `styleRealmKey`（多 expose 共 Remote）
 
 | 项 | 说明 |
 | -- | ---- |
-| **为何需要** | `apps/micro` 等一个 federation 名暴露多个插件时，CSS 往往只注入一份；`@scope` 根必须是「这份 CSS」的域，不能是某一个 pluginId |
-| **键算法** | 优先 `entry:` + origin + 去掉 `mf-manifest.json` / `remoteEntry.js` 后的目录 path；URL 非法时退到 `remote:<remoteName>` 或 `plugin:<id>` |
-| **写入位置** | `@scope` 选择器、`data-mf-style-owner`（现为 realm）、插件根与 portal-scope 的 `data-mf-style-realm` |
-| **切换插件** | `beginPluginStyleCapture` / `attachPluginStyleIsolation` 开头调用 `reclaimEntryStyles`：把 head 里同 entry 已 scoped 的样式按当前 realm 重包（`unwrapScope` + 再 wrap） |
+| **为何需要** | 一个 federation 多 expose 时 CSS 往往只注入一份；前缀根必须是「这份 CSS」的 realm，不能是某一个 pluginId |
+| **键算法** | 优先 `entry:` + origin + 去掉 `mf-manifest.json` / `remoteEntry.js` 后的目录 path；失败退 `remote:` / `plugin:` |
+| **写入位置** | 选择器前缀、`data-mf-style-owner`、插件根 / portal-scope / 浮层节点的 `data-mf-style-realm` |
+| **切换插件** | `reclaimEntryStyles`：同 entry 已隔离样式按当前 realm 重写（剥旧标记 + 再 `transpileStyleText`） |
 
 ##### 192.168.0.2 两阶段捕获（时序）
 
@@ -2211,15 +2224,15 @@ sequenceDiagram
   Head-->>SI: 同步/异步注入 → transpileStyleText / wrapWithScope(realm)
   MF-->>PM: module
   PM->>SI: endCapture()（refcount 归零则卸 patch）
-  Page->>SI: attachPluginStyleIsolation（CSS 捕获 + Portal/Teleport bridge）
-  Note over Page,SI: 覆盖 HMR / 延迟 import；createPortal + body 挂载收编到 portal-scope
+  Page->>SI: useLayoutEffect → attachPluginStyleIsolation
+  Note over Page,SI: 早于 Vue mount paint；createPortal + body 收编到全屏 portal-scope 并打标
   Page-->>Page: 卸载时 disconnect + releaseHeadPatch + 卸 portal scope
 ```
 
 | 阶段         | API                                                              | 时机                                                         | 捕获什么                          |
 | ------------ | ---------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------- |
 | **初始加载** | `beginPluginStyleCapture(id, entry, remoteName?)`                | `registerRemote` 之后、`loadRemoteApp` 前后（`try/finally`） | 入口及依赖首次注入的 CSS；并 reclaim 同 entry |
-| **挂载期**   | `attachPluginStyleIsolation`（内部 = CSS 捕获 + **Portal bridge**） | `status === 'activated'` 且非 untrusted                      | HMR、动态 `import()`、晚到的 link；Portal/Teleport 收编 |
+| **挂载期**   | `attachPluginStyleIsolation`（CSS 捕获 + **Portal bridge**） | `PluginHostPage` **`useLayoutEffect`**（须早于子树 Vue `mount`） | HMR、延迟 CSS；Portal/Teleport 收编 + 打标 |
 
 嵌套安全：`patchDepth` / `cssomPatchDepth` 引用计数；多次 begin 只 patch 一次 head/CSSOM，全部 end 后才恢复原生方法。捕获上下文用 **`captureStack` + `activeCtx()`**（替代单例 `active`），dispose 时按 ctx 引用 `splice`，避免并行加载互相覆盖。
 
@@ -2240,26 +2253,27 @@ sequenceDiagram
 
 处理策略：
 
-- **style**：`transpileStyleText` → hoist 全局 at-rule + keyframes 前缀 + `@scope`；Vite 常先插空 style 再写内容 → **立刻打 `mfStyleOwner`**（供 CSSOM）并挂节点级 MO；已 scoped 节点另挂 HMR 观察器。
-- **link**：先 `disabled` 再 `fetch` → 新建 scoped `<style>` 插在 link 后。CORS 失败则**优雅降级**（原样生效，不阻断加载）。同源已旁路过的 link 会复用 `data-mf-from-link` 节点并按 realm 重包。
-- **CSSOM**：`ensureCssomPatch` 劫持 `insertRule`；`ownerNode` 带 `mfStyleOwner` 时对单条规则 `transpileStyleRule`。
-- **repairHostCriticalStyles**：捕获开始时扫描 head，剥掉误包到 sonner 上的 `@scope`。
-- **观察器性能**：head 只听 **`childList`**；空 style / HMR 改写由**节点级** MO 负责（不再对 head 开 `subtree + characterData`）。
+- **style**：`transpileStyleText` → hoist 全局 at-rule + **选择器前缀**（打 `/*mf-iso:3*/`；**不改** `@keyframes` 名）；Vite 常先插空 style 再写内容 → **立刻打 `mfStyleOwner`**（供 CSSOM）并挂 pending MO；已隔离节点：**仅** `data-vite-dev-id` 挂 HMR 观察器（见下）。
+- **link**：先 `disabled` 再 `fetch` → 新建隔离 `<style>`。CORS 失败则优雅降级。
+- **CSSOM**：`insertRule` → `transpileStyleRule`（antd cssinjs 主路径）：**不**给单条 `@keyframes` 加 realm 前缀（与分条的 `animation-name` 对齐）；普通规则只做选择器前缀。
+- **repairHostCriticalStyles**：捕获开始时扫描 head，纠正误隔离的 sonner。
+- **HMR**：`watchScopedStyleHmr` **跳过**无 `data-vite-dev-id` 的 style；写回前 `disconnect`，且 `styleNeedsRescope===false` 时不写——避免与 cssinjs 互殴卡死。
+- **观察器性能**：head 只听 **`childList`**；空 style / Vite HMR 由节点级 MO 负责。
 
-##### 10.0.0.2 Portal → `@scope`（`createPortal` + body 挂载收编）
+##### 10.0.0.2 Portal → realm（全屏壳 + 打标）
 
-Radix HoverPopover / Sheet / Drawer 等默认 `createPortal(…, document.body)`，Vue `Teleport to="body"` / 原生 `appendChild` 同理：子树不在 `[data-mf-style-realm]` 内 → Remote utility 失效。业界正解多是业务改 `getPopupContainer`；本项目约束为 **主/子业务零改**，故在 Host 静默处理：
+Radix / antd / Vue `Teleport` 默认挂 `document.body`：子树若不在带 realm 的祖先下，且自身无 realm，则前缀选择器命中失败。Host 静默处理：
 
 | 机制 | 作用 |
 | ---- | ---- |
-| 劫持共享 `react-dom.createPortal` | 目标为 `body`/`documentElement` 时，改挂到 `body > [data-mf-portal-scope="<pluginId>"]`（带同 realm） |
-| 劫持 `Node.appendChild` / `insertBefore` / `Element.append` / `prepend` | 同上认领逻辑，覆盖 **Vue Teleport** 与原生 body 挂载（跳过 SCRIPT/STYLE/LINK/META… 与 Host 标记节点） |
-| 劫持 `Node.removeChild` / `replaceChild`（`resolveRetargetedChildParent`） | append 已重定向时，调用方仍对 `body` 做 remove/replace → 改从 **实际父节点** 操作，避免 `NotFoundError`（典型：antd/`rc-util` `getScrollBarSize`） |
-| `isHostProtectedPortalChildren` | children 可识别为 sonner Toaster / `data-mf-host-portal` 时**永不收编** |
-| `data-mf-host-portal` | App 根标记后，container 落在该子树内的 portal **不**收编 |
-| `pointerover` / `focusin` | 仅在进出插件根 / portal-scope **边界**时更新 `lastTouchedPluginId`（`relatedTarget` 早退） |
-| sticky resolve | scope **仍 `:hover`（含弹层）** 且有子节点时沿用认领；比「有子节点就占」更安全，降低误收 Host Toast |
-| `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 等「先 Portal 再挂插件」：打开前同步认领；关闭 clear 并可 `maybeReleaseBodyPortalPatch` |
+| `[data-mf-portal-scope]` 全屏壳 | `position:fixed;inset:0;pointer-events:none;z-index:…`（`PORTAL_SCOPE_STYLE`）；避免宽高为 0 把 absolute 下拉压成竖条；**点击穿透**到主界面 |
+| `[data-mf-portal-scope]>*{pointer-events:auto}` | Host 注入一次（`data-mf-host-style`），恢复弹层可点 |
+| 劫持 `createPortal` + body `append*` | 目标为 body/html 时改挂到该插件的 portal-scope（带同 realm） |
+| `stampRealmOnPortalNode` | 收编进 scope 的节点写上 `data-mf-style-realm`（`[realm].el-popper` 自身选择器生效） |
+| `removeChild` / `replaceChild` 镜像 | 修 antd `getScrollBarSize` 的 `NotFoundError` |
+| `isHostProtectedPortalChildren` / `data-mf-host-portal` | Host Toaster 等永不收编 |
+| `claimPluginPortalTarget` / `clearPluginPortalClaim` | Drawer 等打开前同步认领 |
+| `reclaimOrphanPopperContainers` | attach 时把已落在真实 body 的 `#*-popper-container-*` 收回 scope（Vue EP 竞态） |
 
 ```mermaid
 sequenceDiagram
@@ -2312,7 +2326,7 @@ const endCapture = beginPluginStyleCapture(
 // 预声明模块变量，供 try 赋值、外层 activate 使用
 let mod: Awaited<ReturnType<typeof loadRemoteApp>>;
 try {
-	// loadRemote 期间 Vite/MF 往 head 注 style/link → 被 @scope(realm)
+	// loadRemote 期间 Vite/MF 往 head 注 style/link → 选择器前缀隔离（mf-iso:3）
 	mod = await loadRemoteApp(meta);
 } finally {
 	// 成功失败都结束本轮捕获（refcount -1，嵌套时不提前卸 patch）
@@ -2323,21 +2337,17 @@ try {
 **② `PluginHostPage`（挂载期 + 容器属性）** — `apps/frontend/src/plugins/host/PluginHostPage.tsx`
 
 ```typescript
-// 已激活且非 iframe：整页生命周期持续隔离（HMR / 延迟 CSS）+ Portal bridge
-useEffect(() => {
-	// 未就绪或不走 MF 时不挂；避免对 iframe 误 patch createPortal
+// useLayoutEffect：须早于子树 useEffect / Vue mount（EP onBeforeMount 会建 popper 容器）
+useLayoutEffect(() => {
 	if (status !== 'activated' || trust === 'untrusted' || !entry) return;
-	// 返回 disposer：卸 portal-scope + 结束 CSS 捕获
 	return attachPluginStyleIsolation(
 		pluginId,
 		entry,
-		// 与 runLoad 同一 remoteName，保证挂载期 realm 一致
 		loaded?.meta.remoteName,
 	);
-	// 身份或 entry 变则重绑；离开 activated 时清理
 }, [pluginId, status, entry, trust, loaded?.meta.remoteName]);
 
-// @scope 根必须存在：用 entry 算 realm，写到插件根 data-mf-style-realm
+// 插件根必须带 realm + data-plugin-root（html/body 布局前缀依赖后者）
 const realm = styleRealmKey(
 	loaded.meta.entry,
 	loaded.meta.remoteName,
@@ -2347,7 +2357,7 @@ const realm = styleRealmKey(
 return (
 	<PluginErrorBoundary pluginId={pluginId}>
 		<div
-			className={cn(`plugin-${pluginId} h-full w-full`, className)}
+			className={cn(`plugin-${pluginId} h-full w-full min-h-0`, className)}
 			data-mf-plugin={pluginId}
 			data-mf-style-realm={realm}
 			data-plugin-root
@@ -2357,6 +2367,22 @@ return (
 	</PluginErrorBoundary>
 );
 ```
+
+**②′ `createVueHostBridge`（Vue mount 时序）** — `apps/frontend/src/plugins/core/createVueHostBridge.tsx`
+
+```typescript
+// 排在父级 attachPluginStyleIsolation（useLayoutEffect）之后、浏览器 paint 之前
+useLayoutEffect(() => {
+	const el = elRef.current;
+	if (!el) return;
+	const dispose = mount(el, bridgeRef.current);
+	return () => {
+		if (typeof dispose === 'function') dispose();
+	};
+}, []); // ponytail: mount 一次；SFC HMR 由 Remote Vue runtime 处理
+```
+
+挂载点带 `data-plugin-root` + `data-mf-framework="vue"`（外层 `PluginHostPage` 已写 realm）。若用 `useEffect` mount，Element Plus 可能在 Portal 桥安装前就把 `#el-popper-container-*` 挂到真实 body。
 
 **③ Host Drawer 插件槽（打开前认领 Portal）** — `views/ebook/components/plugins/EbookReadHostPlugins.tsx`
 
@@ -2451,7 +2477,7 @@ export {
 	claimPluginPortalTarget,
 	// 关闭外壳时清除认领 override
 	clearPluginPortalClaim,
-	// 与 @scope / data-mf-style-realm 同一套键
+	// 与选择器前缀 / data-mf-style-realm 同一套键
 	styleRealmKey,
 } from './host/styleIsolation';
 ```
@@ -4386,7 +4412,8 @@ export const __styleIsolationTest = {
 | Vue Teleport / 非 React 弹层无样式 | body 原型挂载劫持与 `createPortal` 同一套认领 |
 | antd Modal/Drawer 打开崩溃（`getScrollBarSize` / `NotFoundError`） | body `removeChild`/`replaceChild` 镜像到实际父节点（`resolveRetargetedChildParent`） |
 | CSS-in-JS 全局泄漏 | `insertRule` → `transpileStyleRule`（需 style 已打 `mfStyleOwner`） |
-| `@font-face` / 动画异常 | hoist 出 scope；keyframes 按 realm 前缀 |
+| `@font-face` / 动画异常 | hoist 全局 at-rule；**不改** keyframes 名（antd 分标签注入） |
+| antd Message 嵌入 Host 不自动关闭 | 勿按单标签改 keyframes 名（effect style 与 animation-name 分离） |
 | MF 内毛玻璃失效、独立预览正常 | 圆角容器同层 `overflow-hidden` 裁切了 `backdrop-filter` 采样；见 §2.10.0 / §2.14.4 |
 | `untrusted`           | 不调用本模块；sandbox iframe                                      |
 | 打开笔记后再进设置    | Host 字体/标签不应被 Remote Preflight 改坏                        |
@@ -4400,9 +4427,10 @@ export const __styleIsolationTest = {
 5. 电子书「全书划线」Drawer：首次打开不闪。
 6. Host Toast：仍右上角 fixed，不顶开布局；插件弹层打开时 Toast 仍挂 Host。
 7. Remote 内 antd Modal / Drawer：打开不抛 `NotFoundError`（`getScrollBarSize`）。
-8. `apps/micro` 独立预览（:9008）仍用标准 Tailwind。
-9. 视频播放器嵌入 Host：控制条 / POP 上 `backdrop-filter` 仍能模糊到画面（非纯灰底）。
-10. 转译自检：`pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/host/styleIsolation.smoke.ts`。
+8. Remote（如 remote-react）antd Message：Host 内应按时自动关闭（离开动画能跑完）。
+9. `apps/micro` 独立预览（:9008）仍用标准 Tailwind。
+10. 视频播放器嵌入 Host：控制条 / POP 上 `backdrop-filter` 仍能模糊到画面（非纯灰底）。
+11. 转译自检：`pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/host/styleIsolation.smoke.ts`。
 
 ##### 10.10.0.5 明确不做
 
@@ -6720,53 +6748,89 @@ flowchart TD
 **排查**：
 
 1. `runLoad` 是否在 `loadRemoteApp` 外包了 `beginPluginStyleCapture` / `finally endCapture`
-2. `PluginHostPage` 是否挂了 `attachPluginStyleIsolation`
-3. head 里 Remote `<style>` 是否已有 `@scope ([data-mf-style-realm="..."])`（早期文档曾写 `data-mf-plugin`，现行以 realm 为准）
+2. `PluginHostPage` 是否 **`useLayoutEffect`** 挂了 `attachPluginStyleIsolation`
+3. head 里 Remote `<style>` 是否含 **`/*mf-iso:3*/`** 与 `[data-mf-style-realm="…"]` 前缀（旧 `@scope` / `mf-iso:2` 应被升版重写）
 4. 是否存在未 `disabled` 的跨域 stylesheet link（CORS 失败降级）
 
 #### 插件 UI 完全无样式
 
-**原因**：有 `@scope`，但页面上没有对应的 `data-mf-style-realm` 根；或挂在错误的 portal/宿主外；或同 Remote 多插件切换后未 `reclaim`。
+**原因**：有前缀 CSS，但页面上没有对应的 `data-mf-style-realm` 根；或 Teleport 浮层未打标 / 未进 portal-scope；或同 Remote 切换后未 `reclaim`。
 
-**解决方案**：确认 `PluginHostPage` 渲染了 `data-mf-plugin` **与** `data-mf-style-realm`；Drawer/Portal 由 Host `createPortal` 收编进 `[data-mf-portal-scope]`（同 realm）。切换同 Remote 插件时确认走过 `reclaimEntryStyles`。
+**解决方案**：确认插件根有 `data-mf-plugin` + `data-mf-style-realm` + **`data-plugin-root`**；弹层在 `[data-mf-portal-scope]` 内且节点带 realm。Vue 确认 `createVueHostBridge` 用 `useLayoutEffect` mount。
+
+#### Message / Notification 变成竖条占满高度
+
+**原因**：Remote `html,body{height:100%}` 被映射到裸 `[data-mf-style-realm]`，Toast 浮层自身也打了 realm → 吃到 `height:100%`。
+
+**解决方案（`mf-iso:3`）**：`html`/`body` 映射为 `[realm][data-plugin-root]`；浮层勿加 `data-plugin-root`。硬刷新后 head 样式应升到 `/*mf-iso:3*/`。
+
+#### 点 antd Message「重置」等导致卡死 + 全页样式错乱
+
+**原因**：HMR 观察器对 cssinjs 管理的 style 反复 `textContent = wrap(...)`，与运行时互殴。
+
+**解决方案**：`watchScopedStyleHmr` 仅绑定 `data-vite-dev-id`；`styleNeedsRescope` 已前缀则跳过；写回前 disconnect。antd 样式只走 `insertRule` patch。
+
+#### 打开插件后主站布局被 padding / 间距顶开（如知识库头栏与工具栏之间空一大块）
+
+**原因**：Tailwind 选择器含转义引号（如 `.after\:content-\[\"\"\]:after`）。旧 `findMatchingBrace` 把选择器里的 `"` 当成字符串起点，`@layer utilities {…}` 配对失败，从该层起到文件末尾（含 `html,body` / `#root` / Radix）**未加前缀泄漏到 Host**。
+
+**解决方案**：括号扫描在字符串外识别 `\` 转义；选择器按括号深度拆逗号；`:is(html, body)` 内的 `html`/`body` 映射到 `[realm][data-plugin-root]`。硬刷新后再进知识库验证。
+
+#### 嵌入 Host 后 `bg-teal-500` / `bg-theme-background` 不是主站颜色
+
+**原因**：Remote `styles.css` 的 `:root` 写死了 `--brand-accent` / `--theme-background` 等；隔离把 `:root` remap 到 `[data-mf-style-realm]`，在插件根上盖住 Host 从 `html`/`body` 继承下来的主题。独立预览没有 remap，看起来「正常」。默认 accent 同为 `#14b8a6` 时（如部分 micro 模板）不易察觉；`remote-vue` 写成 `#409eff` 时一眼假。
+
+**解决方案（Host）**：对纯 `:root`/`:host` 规则剥离 Host 语义 token，保留 `--color-*`、`--el-*` 等。Remote 仍可在独立预览用完整 `:root`；嵌入后走主站主题。
+
+#### antd Message / Toast 嵌入 Host 不自动消失（独立运行正常）
+
+**原因**：antd cssinjs 用 `updateCSS`：`@keyframes …MessageMoveOut` 进 `_effect-*` 标签，含 `animation-name` 的规则进另一个标签。Host 若按**单标签**给 keyframes 加 `__mf…_` 前缀，引用侧仍是旧名 → 离开动画不跑 → CSSMotion 一直等 `animationend`。
+
+**解决方案**：文本与 CSSOM 路径都**不改** `@keyframes` / `animation*` 名；隔离只靠选择器前缀。cssinjs 自身已带 hash，撞名风险可接受。防 Host 泄漏的括号/`\` 转义扫描与此正交，须同时保留。
+
+#### Element Plus Dropdown 图标撑满视口
+
+**原因**：`@element-plus/icons-vue` SVG 无宽高，靠 `.el-icon svg{width:1em}`；裸图标 + Host/Remote Tailwind `svg{display:block}` + 浮层未吃到 EP 样式 → 按视口宽度放大。
+
+**解决方案**：Host 保证浮层 realm 打标 + EP CSS 在 expose 入口引入；Remote 下拉项图标包 `<el-icon>` / `<ElIcon>`。
 
 #### 同 Remote 多插件：刷新正常、切换后样式乱
 
-**原因**：CSS 只注入一份却按 `pluginId` 包 `@scope`，先打开者独占。
+**原因**：CSS 只注入一份却按 `pluginId` 隔离，先打开者独占。
 
-**解决方案**：现行按 `styleRealmKey(entry)` → `data-mf-style-realm`；挂载时 reclaim。见 §2.10.2 / `10.20.0.1`。
+**解决方案**：`styleRealmKey(entry)` → 共享 `data-mf-style-realm`；挂载时 `reclaimEntryStyles`。
 
 #### Portal POP / Drawer 瞬间闪一下
 
 **原因**：`createPortal` 容器在 `body` 与 `[data-mf-portal-scope]` 间切换导致重挂。
 
-**解决方案**：portal-scope 也计入归属；scope 有子节点时 sticky；Drawer 打开前 `claimPluginPortalTarget`（`EbookReadHostPlugins`）。
+**解决方案**：Drawer 打开前 `claimPluginPortalTarget`；portal-scope sticky hover 认领。
 
 #### antd Modal / Drawer 打开即崩溃（`getScrollBarSize` / `NotFoundError`）
 
-**现象**：插件内打开 antd `Modal`/`Drawer`，控制台 `NotFoundError: The object can not be found here.`（`getScrollBarSize.js`），`<Portal>` 被 `PluginErrorBoundary` 接住。
+**现象**：`NotFoundError`（`getScrollBarSize.js`），`<Portal>` 被错误边界接住。
 
-**原因**：Host 把 `document.body.appendChild` 重定向到 `[data-mf-portal-scope]`；`rc-util` `getScrollBarSize` 测量完仍调用 `document.body.removeChild(measureEle)`，节点已不在 body 下。
+**原因**：`body.appendChild(measure)` 被重定向后仍 `body.removeChild`。
 
-**解决方案**：`ensureBodyPortalPatch` 同步劫持 `Node.removeChild` / `replaceChild`，经 `resolveRetargetedChildParent` 从实际父节点卸载。见 §2.10.2 / `10.0.0.2`。插件侧**无需**改 `getContainer`。
+**解决方案**：`removeChild` / `replaceChild` 镜像到实际父节点。插件侧无需改 `getContainer`。
 
 #### Host Toast 把整页往下顶
 
-**原因**：sonner 的 `__insertCSS` 无 vite-id，被 `reclaim` 误 `@scope`，`[data-sonner-toaster]{position:fixed}` 不再命中 Host Toaster。
+**原因**：sonner 被误隔离，`position:fixed` 失效。
 
-**解决方案**：`isHostCriticalCss` / `repairHostCriticalStyles`；reclaim 不碰无标记 style；App 根 `data-mf-host-portal`。
+**解决方案**：`isHostCriticalCss` / `repairHostCriticalStyles`；App 根 `data-mf-host-portal`。
 
 #### 外链 CSS 隔离失败
 
-**原因**：`scopeLinkElement` 需 CORS `fetch`；失败则原 link 全局生效。
+**原因**：`scopeLinkElement` 需 CORS `fetch`。
 
-**解决方案**：Remote/CDN 开 CORS；或把 CSS 打进 JS（推荐）。
+**解决方案**：开 CORS；或把 CSS 打进 JS（推荐）。
 
 #### HMR 后样式又污染 Host
 
-**原因**：仅初始 capture、挂载期未 `attachPluginStyleIsolation`。
+**原因**：挂载期未持续捕获，或旧协议未升版。
 
-**解决方案**：激活态挂载期必须持续捕获（现源码已接）；Observer 在 HMR 改写 textContent 丢掉 `@scope` 时会重包。
+**解决方案**：`attachPluginStyleIsolation` 必须挂上；Vite style 换文时 `styleNeedsRescope` 为真才重写。
 
 #### MF 嵌入后 `backdrop-filter` 失效，Remote 独立预览正常
 

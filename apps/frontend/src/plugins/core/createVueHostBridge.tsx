@@ -2,7 +2,13 @@
  * Host 侧 Vue 桥：PluginHostPage 只渲染 React `default`。
  * Host **不依赖 vue**——Vue Remote 自己 createApp，expose 导出 mount(el, bridge)。
  */
-import { type ComponentType, createElement, useEffect, useRef } from 'react';
+import {
+	type ComponentType,
+	createElement,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+} from 'react';
 import type { HostBridgeProps } from './types';
 
 /** Vue 根组件 props：Remote 在 mount 内对 bridge 做 reactive */
@@ -60,8 +66,10 @@ export function createVueHostBridge(
 			bridgeRef.current.plugin = props.plugin;
 		}, [props.api, props.plugin]);
 
+		// useLayoutEffect：排在父级 attachPluginStyleIsolation 之后、paint 之前，
+		// 避免 Element Plus onBeforeMount 建 popper 容器时 Portal 桥尚未就绪。
 		// ponytail: 空 deps——mount 一次；SFC HMR 由 Remote 自有 Vue runtime 处理
-		useEffect(() => {
+		useLayoutEffect(() => {
 			const el = elRef.current;
 			if (!el) return;
 

@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host `@scope` 样式隔离（dev 排除 Host；**`data-mf-style-realm` 多 expose；Portal/`Teleport` 由 Host 收编（含 body remove 镜像，antd Modal/Drawer 无需改 getContainer）；transpile/CSSOM；同 Remote 切换 `reclaimEntryStyles`**）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**每个 MF expose 入口须 `import '@/styles.css'`（Host 不跑 `main.ts`）**；**Vue 子应用在 registry 写 `"framework": "vue"`**（Host `createVueHostBridge`；Remote 勿自建 React 桥）；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding；**插件侧勿手写 portal container / 勿改 createPortal**（Host 已静默收编）。Host 侧见 `host-plugin-integration-guide.md` §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）、Vue 样例见仓外 `micro-vue`（**9009**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host **`mf-iso:3` 选择器前缀**隔离（dev 排除 Host；**`data-mf-style-realm` + `data-plugin-root`；Portal/`Teleport` 收编打标；body remove 镜像；同 Remote `reclaimEntryStyles`**）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**每个 MF expose 入口须 `import '@/styles.css'`（Host 不跑 `main.ts`）**；**Vue 子应用在 registry 写 `"framework": "vue"`**（Host `createVueHostBridge`；Remote 勿自建 React 桥）；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding；**插件侧勿手写 portal container / 勿改 createPortal**（Host 已静默收编）。Host 侧见 `host-plugin-integration-guide.md` §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）、Vue 样例见仓外 `micro-vue`（**9009**）。若不一致，以源码为准。
 
 ---
 
@@ -460,23 +460,23 @@ export default { mount };
 
 ### 5.1 现行模型（Host 隔离）
 
-| 信任等级                  | 谁负责隔离                                                                                                                                        | Remote 可以做什么                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `first-party` / `partner` | Host `styleIsolation.ts` 运行时 `@scope([data-mf-style-realm])`（同 Remote 多插件共享 realm；Portal/`Teleport` 由 Host 收编；含 transpile/CSSOM） | 正常 `@import "tailwindcss"`（含 Preflight） |
-| `untrusted`               | iframe                                                                                                                                            | 独立文档样式，互不影响                       |
+| 信任等级 | 谁负责隔离 | Remote 可以做什么 |
+| -------- | ---------- | ----------------- |
+| `first-party` / `partner` | Host `styleIsolation.ts`：**选择器前缀 `/*mf-iso:3*/`**（同 Remote 共享 `data-mf-style-realm`；Portal/`Teleport` 收编 + 打标；CSSOM） | 正常 `@import "tailwindcss"`（含 Preflight） |
+| `untrusted` | iframe | 独立文档样式 |
 
-Host 开发态用「排除 `apps/frontend`」识别 Remote Vite 样式，子应用目录改名一般**不必**改 Host；生产无 `data-vite-dev-id`，只在 load/挂载 capture 窗口认领。挂载时还会 `reclaimEntryStyles`，避免同 Remote 切换后样式丢失。详见 `mf-implementation-guide.md` §2.10.2。
+Host 开发态排除 `apps/frontend` 的 Vite style；挂载期 `reclaimEntryStyles`。详见 `mf-implementation-guide.md` §2.10.2。
 
 **插件侧约定（零侵入）**：
 
-| 事项                  | 要求                                                                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Tailwind / Preflight  | 可正常 `@import "tailwindcss"`，不必关 Preflight                                                                            |
-| **expose 引入 CSS**   | **每个** MF `exposes` 入口必须 `import '@/styles.css'`（或等价路径）；仅写在 `main.ts` / `main.tsx` **不够**（见 §5.2）   |
-| Portal / Drawer / POP | **不要**为 MF 特传 `container` / `getPopupContainer`；Host 劫持共享 `createPortal` + body 挂载（含 Vue `Teleport`）；antd Modal/Drawer 的 `getScrollBarSize` 由 Host 镜像 `removeChild`，插件侧无需改 |
-| Vue 子应用            | Remote 导出 **`mount(el, bridge)`**；registry **`"framework": "vue"`**；Host **不装 Vue**；勿自建 React 桥 / 勿直接 export SFC |
-| `data-mf-*`           | 勿在 Remote 业务里手写 `data-mf-style-realm` / `data-mf-portal-scope`（Host 设置）                                          |
-| 独立预览 vs 嵌入      | 独立预览正常、嵌入后毛玻璃失效 → 属 Host 外壳 overflow 分层问题，不是插件 CSS 写错；报给 Host 查 `PluginPageShell` / Layout |
+| 事项 | 要求 |
+| ---- | ---- |
+| Tailwind / Preflight | 可正常引入，不必关 Preflight |
+| **expose 引入 CSS** | **每个** expose 入口 `import '@/styles.css'`（及组件库全量/按需 CSS，如 `element-plus/dist/index.css`）；仅写在 `main.ts` **不够**（§5.2） |
+| Portal / Drawer / POP | **不要**改 `getPopupContainer` / portal container；Host 收编 |
+| Vue | `mount(el, bridge)` + registry `"framework": "vue"`；图标建议包 `<el-icon>`（裸 SVG 在 Tailwind `svg{display:block}` 下易撑满） |
+| `data-mf-*` / `data-plugin-root` | 业务勿手写 realm/portal-scope；独立预览根仍建议 `data-plugin-root` |
+| 独立预览 vs 嵌入 | 毛玻璃失效 → Host 外壳 overflow；Toast 竖条 / 卡死 → 报 Host 查 §2.10.2 FAQ |
 
 详见 `apps/micro/plugin-info.md` 与 `docs/ideas/mf-css-isolation.md`。
 
@@ -489,9 +489,9 @@ Host 嵌入时 **只加载 federation expose 模块**，**不会**执行独立�
 | 入口 | 作用 | 嵌入 Host 时是否执行 |
 | ---- | ---- | -------------------- |
 | `main.ts` / `main.tsx` 里的 `import './styles.css'` | 独立 `pnpm dev` 预览 | ❌ 不执行 |
-| **每个** `exposes` 指向的入口（如 `views/foo/index.ts`）里的 `import '@/styles.css'` | 随 Remote 模块注入 CSS，供 Host `@scope` | ✅ 必须 |
+| **每个** `exposes` 指向的入口（如 `views/foo/index.ts`）里的 `import '@/styles.css'` | 随 Remote 模块注入 CSS，供 Host **选择器前缀隔离** | ✅ 必须 |
 
-漏写时典型症状：**独立预览正常，嵌进 Host 后 Tooltip / Dialog / Context Menu 等只剩裸 DOM**（无 bubble、字体回落到 Host）。
+漏写时典型症状：**独立预览正常，嵌进 Host 后 Tooltip / Dialog / Context Menu 等只剩裸 DOM**（无 bubble、字体回落到 Host）。Vue + Element Plus 还须在 expose 引入 `element-plus/dist/index.css`（或保证按需 style 覆盖 Teleport 组件）。
 
 ```ts
 // ✅ React expose（对齐 apps/micro 各页面入口）
@@ -1154,22 +1154,22 @@ Vue 子应用在对应条目上**增加**（其余字段同上）：
 
 ### Q2：为什么我的样式影响了 Host 页面？
 
-**先确认**：`first-party` / `partner` 下 Host 应对 Remote 注入的 CSS 做 `@scope([data-mf-style-realm])`。若仍污染：
+**先确认**：Host 应对 Remote CSS 做 **`/*mf-iso:3*/` 选择器前缀**。若仍污染：
 
-- Host 未走到 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（检查 `PluginHostPage` 与 `PluginManager.runLoad`）
-- 插件用了绕过 head 注入的方式写全局样式
-- 实际是 `untrusted` 却误配成了 MF 嵌入
-- Host sonner 等被误包（应见 `data-mf-host-style` / `repairHostCriticalStyles`）
+- 未走到 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（`PluginHostPage` 须 **useLayoutEffect**）
+- head 仍是旧 `@scope` / `mf-iso:2`（硬刷新升版）
+- 插件绕过 head 写全局样式；或误配 `untrusted`
+- Host sonner 被误包（应见 `data-mf-host-style`）
 
-**Remote 侧**：可继续用 `@import "tailwindcss"`；独立预览勿依赖 Host 私有 class；不必手写 portal container。
+**Remote 侧**：可继续用 Tailwind；勿手写 portal container。
 
-**若只有嵌入 Host 后 `backdrop-filter` 失效**：先查 Host `PluginPageShell` / Layout 是否在圆角同层写了 `overflow-hidden`（见接入手册附录 B.1），不是插件要关毛玻璃。
+**若只有嵌入后 `backdrop-filter` 失效**：查 Host `PluginPageShell` / Layout 圆角同层 `overflow-hidden`（接入手册附录 B.1）。
 
 ### Q2.1：独立预览正常，嵌进 Host 后 Tooltip / 菜单没样式？
 
-**最先查**：对应 MF expose 入口是否 `import '@/styles.css'`（§5.2）。只在 `main.ts` 引入时，独立预览有 CSS、Host 加载 expose 时没有。
+**最先查**：expose 是否 `import '@/styles.css'`（及 EP 全量 CSS）（§5.2）。
 
-其次再查：弹层是否在 `[data-mf-portal-scope]` + 同 `data-mf-style-realm` 内（Host 收编失败时 utility 也打不上）。
+其次：弹层是否在 `[data-mf-portal-scope]` 内且带 `data-mf-style-realm`；插件根是否有 **`data-plugin-root`**。
 
 ### Q2.2：Vue 插件在 Host 里白屏 / 当 React 渲染？
 
