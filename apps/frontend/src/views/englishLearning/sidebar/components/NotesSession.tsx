@@ -1,7 +1,7 @@
 import { NotebookPen } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { usePluginEnabled } from '@/federation';
 import { useI18n } from '@/hooks';
-import { usePluginEnabled } from '@/plugins';
 import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
 import { EnglishSidebarActions } from './EnglishSidebarActions';
 import { EnglishSidebarHeader } from './EnglishSidebarHeader';

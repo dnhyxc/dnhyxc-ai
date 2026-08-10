@@ -105,7 +105,7 @@ const Toast = ({
 	toast.custom(
 		(toastId) => {
 			return (
-				<div className="group relative flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 pl-3 pr-9">
+				<div className="group relative flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 pl-3 pr-9 pointer-events-auto">
 					<button
 						type="button"
 						className={cn(
@@ -206,7 +206,7 @@ const Toaster = (props: ToasterProps) => {
 		<Sonner
 			{...props}
 			theme={theme as ToasterProps['theme']}
-			className={cn('toaster group', props.className)}
+			className={cn('toaster group pointer-events-auto', props.className)}
 			duration={props.duration ?? DEFAULT_TOAST_DURATION_MS}
 			offset={props.offset ?? 30}
 			position={props.position ?? DEFAULT_TOAST_POSITION}
@@ -233,7 +233,11 @@ const Toaster = (props: ToasterProps) => {
 				),
 				loading: <Loader2Icon className="size-4 animate-spin" />,
 			}}
-			style={{ ...baseStyle, ...props.style }}
+			style={{
+				...baseStyle,
+				pointerEvents: 'auto',
+				...props.style,
+			}}
 		/>
 	);
 };

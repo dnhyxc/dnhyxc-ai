@@ -11,9 +11,8 @@ import {
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
-import { useI18n } from '@/hooks';
-import { cn } from '@/lib/utils';
 import {
+	ensurePluginEnabledPrefsLoaded,
 	fetchPluginRegistry,
 	isPluginEnabled,
 	overlayUserEnabled,
@@ -21,8 +20,9 @@ import {
 	pickPluginLocaleText,
 	pluginManager,
 	subscribePluginEnabled,
-} from '@/plugins';
-import { ensurePluginEnabledPrefsLoaded } from '@/plugins/core/enabled/pluginEnabledPrefs';
+} from '@/federation';
+import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { getRequestErrorMessage } from '@/utils/fetch';
 
 /** 标题只认 registry.title[locale]，缺省回退 id */

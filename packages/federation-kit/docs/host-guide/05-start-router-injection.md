@@ -1,0 +1,398 @@
+# 05 · 启动与注入：`mf.start()`、动态路由、防闪 404、侧栏
+
+> **本章目标**：讲清「启动那一刻发生了什么」「动态路由如何进入路由表」「如何防止刷新插件路由时闪一下 404」「侧栏菜单如何动态出现」。
+>
+> 对应源码：`packages/federation-kit/src/runtime/createPluginRuntime.ts`、`apps/frontend/src/router/index.tsx`、`apps/frontend/src/router/buildRoutes.ts`、`apps/frontend/src/components/design/Sidebar/index.tsx`。
+
+---
+
+## 1. `mf.start()` 内部发生了什么
+
+`start()` 就是 `runtime.init()`，最终调用 `PluginManager.init()`：
+
+```ts
+// PluginManager.init()（packages/federation-kit/src/runtime/createPluginRuntime.ts）
+async init() {
+  // 1) 先加载上架偏好：确保 enabledStore.get 能返回真实偏好
+  //    语义：账号场景下这一步可能要去服务端拉用户已上架的插件 id 列表
+  await this.config.enabledStore.load?.();
+
+  // 2) 拉取 registry（force: true 强制不走缓存，保证拿到最新清单）
+  const registry = await this.config.fetchRegistry({ force: true });
+
+  // 3) 过滤出"已上架"的插件：registry.enabled 与账号偏好共同决定
+  const enabled = registry.plugins.filter((p) => isPluginEnabled(p.id));
+
+  // 4) 对每个已上架插件挂"壳"：注入路由 + 侧栏菜单（先不加载远端代码）
+  //    语义：壳只是入口（路由页壳 / 菜单项），真正下载子应用代码要等访问路由时
+  for (const meta of enabled) {
+    this.mountShell(meta);
+  }
+
+  // 5) 若存在 preload: 'eager' 的插件，启动后微任务里立即加载（核心插件可加快首屏）
+  const eager = enabled.filter((p) => p.preload === 'eager');
+  if (eager.length === 0) return;
+  queueMicrotask(() => {
+    void Promise.all(eager.map((p) => this.loadPlugin(p)));
+  });
+}
+```
+
+`mountShell` 是「动态」的关键：
+
+```ts
+// 挂壳：把一条 registry 记录变成"路由 + 侧栏"入口
+private mountShell(meta: PluginDescriptor) {
+  // 除非显式 injectRoute: false，否则注入路由壳
+  if (meta.injectRoute !== false && this.createRoute) {
+    // 语义：routeInjector 存下 插件id → 路由列表，并 notify 所有订阅者（触发宿主重建 router）
+    this.routeInjector.inject(meta.id, [this.createRoute(meta)]);
+  }
+  // 若声明了 menu，则注入侧栏菜单项
+  if (meta.menu) {
+    this.sidebarInjector.add({
+      pluginId: meta.id,
+      path: meta.routePath,
+      nameKey: meta.id,          // 侧栏只展示图标，nameKey 仅作稳定 key
+      icon: meta.menu.icon ?? 'Puzzle',
+      order: meta.menu.order,
+    });
+  }
+}
+```
+
+> **语义**：`mountShell` **不下载任何子应用代码**，只做「声明」。子应用代码真正下载发生在 `ensurePlugin`（路由被访问 / 页面挂载 `PluginHostPage`）时。这就是「按需加载」——启动瞬间只多出几个轻量路由壳。
+
+---
+
+## 2. 路由注入器 `RouteInjector`
+
+```ts
+// 泛型路由注入器：宿主自行定义 TRoute（本仓为 RouteConfig）
+export class RouteInjector<TRoute extends { path?: string } = { path?: string }> {
+  // 内部存储：pluginId → 该插件贡献的路由数组
+  private byPlugin = new Map<string, TRoute[]>();
+  // 订阅者集合：路由变化时通知（宿主用它重建 router）
+  private listeners = new Set<Listener>();
+
+  // 注入：把插件路由写进表；内容相同则跳过（幂等），否则 notify
+  inject(pluginId: string, routes: TRoute[]) {
+    const prev = this.byPlugin.get(pluginId);
+    // 幂等判断：path 集合没变就不触发重建，避免无谓重渲染
+    if (prev && prev.length === routes.length && prev.every((r, i) => r.path === routes[i]?.path)) {
+      return;
+    }
+    this.byPlugin.set(pluginId, routes);
+    this.notify();
+  }
+
+  // 移除插件路由（下架/卸载时）
+  remove(pluginId: string) {
+    if (!this.byPlugin.delete(pluginId)) return;
+    this.notify();
+  }
+
+  // 读取全部动态路由：router 构建时用
+  getRoutes(): TRoute[] {
+    return [...this.byPlugin.values()].flat();
+  }
+
+  // 订阅路由变化：返回取消订阅函数
+  subscribe(fn: Listener) {
+    this.listeners.add(fn);
+    return () => { this.listeners.delete(fn); };
+  }
+
+  private notify() {
+    for (const fn of this.listeners) fn();
+  }
+}
+```
+
+> **为什么需要它**：React Router / Vue Router 的路由表是构建期静态的，而插件路由是运行期才知道的。注入器承担「动态路由的内存表 + 变化通知」职责，宿主只需在变化时重建 router。
+
+---
+
+## 3. 宿主侧接线：`router/index.tsx`
+
+`apps/frontend/src/router/index.tsx`（本仓 App 组件）逐行注释：
+
+```tsx
+import { Toaster } from '@ui/sonner';
+import { useEffect, useMemo, useState } from 'react';
+import { createBrowserRouter, type RouteObject, RouterProvider } from 'react-router';
+// ★ 业务侧只从适配层拿 mf
+import { mf } from '@/federation';
+import { buildRoutes } from './buildRoutes';
+
+const App = () => {
+  // routeEpoch：路由"代数"。每次动态路由变化 +1，触发 useMemo 重建 router
+  const [routeEpoch, setRouteEpoch] = useState(0);
+
+  /** false 时 catch-all 不渲染 404，等插件壳挂上后再决断 */
+  const [pluginsReady, setPluginsReady] = useState(false);
+
+  useEffect(() => {
+    // 订阅动态路由变化：插件上架/下架 → 抬 epoch → 重建 router
+    // 语义：这是"路由动态"的核心订阅点
+    const unsub = mf.onRoutesChange(() => {
+      setRouteEpoch((n) => n + 1);
+    });
+
+    // 启动 federation：异步拉 registry + 挂壳
+    // 语义：start 可能因网络失败 reject；但无论如何都要在 finally 里把 pluginsReady 置 true，
+    // 否则 catch-all 永远用占位、真正的 404 永远不会出现
+    void mf
+      .start()
+      .catch((e) => console.error('[federation] start failed', e))
+      .finally(() => {
+        // 不管成功失败，都认为"插件决策阶段结束"，可以显示真 404
+        setPluginsReady(true);
+        // 最后再抬一次 epoch，让"* 从占位变 404"这次变更生效
+        setRouteEpoch((n) => n + 1);
+      });
+
+    return unsub;
+  }, []);
+
+  // 根据 epoch + pluginsReady 重建 router
+  const router = useMemo(() => {
+    // buildRoutes(pluginsReady)：静态路由 + routeInjector 的动态插件路由
+    const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
+
+    // 把 SPA 导航回写给 mf：插件 api.navigate 时调用它（比 window.location 更顺滑、不整页刷新）
+    mf.setNavigate((to) => {
+      void r.navigate(to);
+    });
+
+    return r;
+  }, [routeEpoch, pluginsReady]);
+
+  return (
+    // data-mf-host-portal：标记 Host 应用根，供样式隔离 Portal 桥识别（详见第 9 章）
+    <div className="h-full w-full bg-theme-background" data-mf-host-portal>
+      <Toaster />
+      <RouterProvider router={router} />
+    </div>
+  );
+};
+
+export default App;
+```
+
+### 3.1 这段代码的意图
+
+| 变量/调用 | 意图 |
+|-----------|------|
+| `routeEpoch` | 「路由代数」——每次动态路由变化或启动完成，+1 强制重建 router，让新增插件路由进路由表 |
+| `pluginsReady` | 「插件决策是否完成」——未完成时 catch-all 用占位，避免刷新插件路由先闪 404 |
+| `mf.onRoutesChange` | 订阅注入器变化；等价于手写 `routeInjector.subscribe` |
+| `mf.setNavigate(r.navigate)` | 把 React Router 的 navigate 注入插件导航通道，插件跳转不发整页刷新 |
+| `data-mf-host-portal` | 保护宿主自身的弹层（Toaster 等）不被插件样式域收走（见样式隔离章） |
+
+---
+
+## 4. 路由合并：`buildRoutes.ts`
+
+`apps/frontend/src/router/buildRoutes.ts` 逐行注释：
+
+```ts
+import { createElement } from 'react';
+// 只从适配层拿 routeInjector（它由 mf 创建并导出）
+import { routeInjector } from '@/federation';
+import routes, { type RouteConfig } from './routes';
+
+/** 插件壳未就绪时占住 `*`，避免刷新子项目路径先闪 404 */
+function PluginRoutesPending() {
+  // 渲染一个纯背景占位：看起来是空白页，而不是"404 不存在"
+  return createElement('div', {
+    className: 'h-full w-full bg-theme-background',
+  });
+}
+
+/** 静态壳路由 + PluginManager 注入的动态插件路由 */
+export function buildRoutes(pluginsReady = true): RouteConfig[] {
+  // 1) 读当前动态插件路由（来自 routeInjector 的内存表）
+  const dynamic = routeInjector.getRoutes();
+
+  // 2) 决定基础路由表：
+  //    - pluginsReady=true：静态路由原样（含真 404 的 `*`）
+  //    - pluginsReady=false：把 `*` 换成占位组件（防闪 404）
+  const base = pluginsReady
+    ? routes
+    : routes.map((route) =>
+        route.path === '*'
+          ? { ...route, Component: PluginRoutesPending }
+          : route,
+      );
+
+  // 3) 没有动态路由就直接返回基础表
+  if (dynamic.length === 0) return base;
+
+  // 4) 把动态插件路由挂到 Layout 壳（第一条带 children 的路由）的 children 末尾
+  //    语义：这样插件路由享受 Layout（侧栏 + 顶栏）布局，且与静态路由同层
+  return base.map((route, index) => {
+    if (index === 0 && route.children) {
+      return {
+        ...route,
+        children: [...route.children, ...dynamic],
+      };
+    }
+    return route;
+  });
+}
+```
+
+### 4.1 防闪 404 的完整时序
+
+```
+硬刷新 /video-player（插件路由）
+  │
+  ▼
+App 挂载，pluginsReady = false
+  │
+  ▼
+buildRoutes(false)：`*` = PluginRoutesPending（空白占位，不渲染 NotFound）
+  │
+  ▼
+mf.start() 异步进行中：routeInjector.inject('/video-player') → onRoutesChange → epoch+1
+  │
+  ▼
+重建 router：此时动态路由已含 /video-player，匹配成功 → 渲染插件路由壳
+  │
+  ▼
+start 结束 → finally：pluginsReady=true → epoch+1 → 再次重建（`*` 恢复真 404）
+  │
+  ▼
+此后访问不存在的路径：正常 404；访问 /video-player：正常命中插件路由
+```
+
+> **注意**：不要「等 `mf.start()` 完再挂 `RouterProvider`」——那会阻塞所有静态页首屏。正确做法是上面的「占位 + 渐进重建」。
+
+---
+
+## 5. 侧栏菜单动态注入
+
+侧栏组件订阅 `sidebarInjector`，插件 `mountShell` 注入菜单时自动重渲染。
+
+`apps/frontend/src/components/design/Sidebar/index.tsx` 关键片段：
+
+```tsx
+// 从适配层拿侧栏注入器
+import { sidebarInjector } from '@/federation';
+
+const Sidebar = observer(() => {
+  // 初始值：直接读当前已注入的菜单（首屏前 start 可能已完成，或还未完成都兼容）
+  const [pluginMenus, setPluginMenus] = useState(() => [...sidebarInjector.items]);
+
+  // 订阅侧栏注入变化：插件上架/下架 → 同步重渲染
+  useEffect(() => {
+    const sync = () => setPluginMenus([...sidebarInjector.items]);
+    sync(); // 先同步一次，避免时序窗口
+    return sidebarInjector.subscribe(sync);
+  }, []);
+
+  // 合并：业务主菜单 + 动态插件菜单 + 固定"插件中心"等
+  const visibleMenus = useMemo(() => {
+    const loggedIn = hasValidAuthToken();
+    // 把注入项映射成统一菜单配置（图标按 name 查表）
+    const dynamic: SidebarMenuConfig[] = pluginMenus.map((m) => ({
+      nameKey: m.nameKey,
+      icon: m.icon,
+      path: m.path,
+      requiresAuth: m.requiresAuth,
+    }));
+    return [...MENUS, ...dynamic, ...PLUGINS].filter(
+      (menu) => !menu.requiresAuth || loggedIn,
+    );
+  }, [storageInfo, pluginMenus]);
+
+  // 渲染：菜单点击 → onJump(path) → navigate
+  // （下文 processedMenus 会做 ICON_MAP 图标映射与 onClick 注入）
+  // ...
+});
+```
+
+`sidebarInjector` 的实现（`packages/federation-kit/src/inject/SidebarInjector.ts`）：
+
+```ts
+export class SidebarInjector {
+  private _items: PluginSidebarItem[] = [];
+  private listeners = new Set<Listener>();
+
+  get items() { return this._items; }
+
+  // 添加菜单项；字段全相同则跳过（幂等），否则重排（按 order）并 notify
+  add(item: PluginSidebarItem) {
+    const prev = this._items.find((x) => x.pluginId === item.pluginId);
+    if (prev && prev.path === item.path && prev.nameKey === item.nameKey &&
+        prev.icon === item.icon && prev.order === item.order) {
+      return;
+    }
+    this._items = [
+      ...this._items.filter((x) => x.pluginId !== item.pluginId),
+      item,
+    ].sort((a, b) => a.order - b.order);
+    this.notify();
+  }
+
+  remove(pluginId: string) {
+    const next = this._items.filter((x) => x.pluginId !== pluginId);
+    if (next.length === this._items.length) return;
+    this._items = next;
+    this.notify();
+  }
+
+  subscribe(fn: Listener) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
+  private notify() { for (const fn of this.listeners) fn(); }
+}
+```
+
+> **语义**：侧栏组件是**订阅者**，注入器是**发布者**。插件上架 → `mountShell` → `sidebarInjector.add` → 侧栏重渲染，图标立刻出现；下架 → `unloadPlugin` → `remove` → 图标消失。整个过程**业务侧无需改代码**。
+
+---
+
+## 6. 下架/卸载时如何摘除
+
+```ts
+// PluginManager.unloadPlugin（packages/federation-kit/src/runtime/createPluginRuntime.ts）
+async unloadPlugin(id: string) {
+  const loaded = this.plugins.get(id);
+  if (!loaded) {
+    // 若从未加载过，只摘路由和侧栏即可
+    this.routeInjector.remove(id);
+    this.sidebarInjector.remove(id);
+    return;
+  }
+  try {
+    // 调用插件的 deactivate 生命周期（若有）：让插件自己清理副作用
+    await loaded.mod.deactivate?.();
+  } catch (e) {
+    console.error(`[PluginManager] deactivate ${id}`, e);
+  }
+  // 清空插件域事件总线
+  eventBus.clearPlugin(id);
+  // 摘除路由与侧栏
+  this.routeInjector.remove(id);
+  this.sidebarInjector.remove(id);
+  // 标记为 unloaded
+  this.plugins.set(id, { ...loaded, status: 'unloaded' });
+}
+```
+
+> 上架/下架的完整闭环（`setEnabled`）见 [08](./08-enabled-registry-impl.md)。
+
+---
+
+## 7. 本章小结（一张清单）
+
+| 你要做的 | 代码位置 | 关键点 |
+|----------|----------|--------|
+| 订阅路由变化 + 启动 | `router/index.tsx` | `mf.onRoutesChange` + `mf.start().finally(pluginsReady)` |
+| 重建 router | 同上 `useMemo` | epoch 递增驱动 `buildRoutes` |
+| 合并动态路由 | `router/buildRoutes.ts` | `routeInjector.getRoutes()` 挂到 Layout children 末尾 |
+| 防闪 404 | `buildRoutes.ts` | `pluginsReady=false` 时 `*` 用占位 |
+| 侧栏动态菜单 | `Sidebar/index.tsx` | 订阅 `sidebarInjector` |
+| 回写导航 | `router/index.tsx` | `mf.setNavigate(r.navigate)` |
+
+> 下一步：[06-mount-modes.md](./06-mount-modes.md) 三种挂载模式 + 组件与 slots。

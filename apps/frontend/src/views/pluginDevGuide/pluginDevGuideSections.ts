@@ -1,6 +1,6 @@
 /**
  * 插件 / 子应用开发手册（页面数据驱动）。
- * 与 apps/frontend/src/plugins/docs/plugin-development-guide.md 及现行 Host 契约对齐。
+ * 与 docs/app/mf-plugins/plugin-development-guide.md 及现行 Host 契约对齐。
  * - 正文：标题 + description（视图层渲染）
  * - 代码：交给 ParserMarkdownPreviewPane 高亮
  */

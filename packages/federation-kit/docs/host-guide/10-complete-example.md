@@ -1,0 +1,730 @@
+# 10 · 完整接入示例：从零到可运行
+
+> **本章目标**：把前 9 章串成一条真实可走通的接入路线——从新建空项目开始，一步步把 `@dnhyxc-ai/federation-kit` 接进来，实现「插件中心管理上/下架 + 路由自动注入 + 侧栏入口 + 内嵌/抽屉/iframe 三种挂载」。每一步都给出完整代码与「为什么这么写」。
+>
+> 参考仓库真实文件：`apps/frontend/src/federation/**`、`apps/frontend/src/router/**`、`apps/frontend/src/components/design/Sidebar/**`。若与源码不一致，以源码为准。
+
+---
+
+## 0. 前置：接入前必须想清楚的一件事
+
+**原则：业务代码只从你自己的 adapter 层（`@/federation`）导入，永远不直接写 `@dnhyxc-ai/federation-kit`。**
+
+理由：
+
+1. 业务侧关心的是「我的能力」——Toast、登录态、上传、主题；kit 关心的是「微前端机制」。两者中间必须有一层翻译。
+2. 产品能力会变（加一个上传接口、换主题方案），集中在 adapter 里改动一次，业务零感知。
+3. 依赖升级只动 adapter，业务代码不用翻。
+
+所以本示例的目录是：
+
+```
+src/federation/            # 你的微前端 adapter 层
+├── index.ts               # 统一出口（业务只 import 这里）
+├── runtime/index.ts       # createFederation 门面（mf / pluginManager）
+├── registry/index.ts      # registry 拉取/落盘/保存
+├── enabled/prefs.ts       # 账号上架偏好（服务端同步）
+├── host/                  # 统一挂载模版
+│   ├── PluginHostPage.tsx
+│   ├── PluginHostSurface.tsx
+│   ├── PluginPageShell.tsx
+│   └── PluginErrorBoundary.tsx
+└── capabilities/          # 产品能力（全屏、ebook API 等）
+```
+
+---
+
+## Step 1 · 安装依赖与 Vite 配置
+
+```bash
+# 安装 kit 本体
+pnpm add @dnhyxc-ai/federation-kit
+```
+
+`vite.config.ts` 里必须加 **Module Federation 插件**（详见第 2 章）：
+
+```ts
+// vite.config.ts —— 只列微前端相关的关键片段
+import federation from '@originjs/vite-plugin-federation';
+
+export default defineConfig({
+	plugins: [
+		// 其他插件...
+		// Host 也必须加 federation 插件：提供共享的 react/react-dom 单例给 Remote 用
+		federation({
+			name: 'host',
+			remotes: {}, // Host 不声明静态 remote：全部动态注册
+			shared: {
+				// react / react-dom 必须是 singleton，否则 Remote 会再打一份 React，
+				// 出现 hooks 版本不匹配、两份 store 的经典双实例问题
+				react: { singleton: true },
+				'react-dom': { singleton: true },
+			},
+		}),
+	],
+	optimizeDeps: {
+		// 关键：把 react 系排除出预构建，否则 MF 的 externals 会把 shared 认成两份
+		exclude: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'],
+	},
+	// Tauri/Web 联调：把远端地址代理到本地，配合 entryUrlAllowed 的 localhost 白名单
+	server: {
+		proxy: {
+			'/remotes': 'http://127.0.0.1:9008',
+		},
+	},
+});
+```
+
+> **语义**：Host 不声明任何静态 remote（`remotes: {}`），因为插件是**运行时动态注册**的（`registerRemote`，见第 9 章）。`shared` 与 `optimizeDeps.exclude` 是一对：一个负责运行时提供单例，一个负责让 Vite 预构建不去碰它们。
+
+`.env`：
+
+```bash
+VITE_HOST_API_VERSION=1.0.0            # 当前 Host API 版本（registry 的 hostApiRange 要覆盖它）
+VITE_PLUGIN_SKIP_INTEGRITY=true        # 是否跳过完整性校验（默认真）
+VITE_DEV_PLUGIN_REGISTRY_URL=          # 可选：开发环境 registry URL 覆盖
+VITE_PROD_PLUGIN_REGISTRY_URL=         # 可选：生产环境 registry URL 覆盖
+```
+
+---
+
+## Step 2 · registry 与账号偏好（第 8 章的成品）
+
+这两个文件直接复用第 8 章讲过的实现，这里只给「文件头注释 + 出口」，完整代码见 `08-enabled-registry-impl.md`：
+
+- `src/federation/registry/index.ts`：`fetchPluginRegistry`（带缓存、force 击穿）、`savePluginRegistry`（写回服务端）、`persistPluginEnabled`（账号偏好持久化）、`overlayUserEnabled`、`assertRegistryHostApiCompatible`。
+- `src/federation/enabled/prefs.ts`：`getPluginEnabledPref`（同步读内存）、`setPluginEnabledPref`（乐观更新+写服务端）、`ensurePluginEnabledPrefsLoaded`（启动预拉取）、`arePluginEnabledPrefsReady`（就绪信号）。
+
+> 这两个文件依赖你的产品服务（`getPluginEnabledPrefs` / `updatePluginEnabledPrefs` / `putUploadRemoteJson`）。新项目可以先用第 3 章的 localStorage 默认版起步，等有账号服务再接服务端版。
+
+---
+
+## Step 3 · `createFederation` 门面（最核心的一步）
+
+`src/federation/runtime/index.ts` 是本示例的核心。它把产品差异（Toast、http、主题、偏好）全部翻译成 kit 的配置：
+
+```ts
+// src/federation/runtime/index.ts
+import {
+	createFederation,
+	DEFAULT_HOST_THEME_CUSTOM_PROP,
+	type HostHttpClient,
+	type PluginDescriptor,
+} from '@dnhyxc-ai/federation-kit';
+import { Toast } from '你的 toast 组件';
+import { type ComponentType, createElement } from 'react';
+import { getActiveLocale, translateSync } from '你的 i18n';
+import type { RouteConfig } from '@/router/routes';
+import { http } from '你的 http 封装';
+import {
+	arePluginEnabledPrefsReady,
+	ensurePluginEnabledPrefsLoaded,
+	getPluginEnabledPref,
+	setPluginEnabledPref,
+} from '../enabled/prefs';
+import {
+	fetchPluginRegistry,
+	PLUGIN_REGISTRY_CACHE_KEY,
+	persistPluginEnabled,
+} from '../registry';
+
+// —— 1. 宿主能力读取：主题、语言（给 bridge 的 api.getTheme / api.getLocale）——
+function readTheme(): 'light' | 'dark' {
+	try {
+		const t = document.documentElement.getAttribute('data-theme');
+		if (t === 'dark' || t === 'light') return t;
+		if (document.documentElement.classList.contains('dark')) return 'dark';
+	} catch { /* ignore */ }
+	return 'light';
+}
+function readLocale(): 'zh-CN' | 'en-US' {
+	return getActiveLocale() === 'en-US' ? 'en-US' : 'zh-CN';
+}
+
+// —— 2. Host 页面壳注册：PluginHostPage 在文件末尾自注册（避免循环依赖）——
+let hostPage: ComponentType<{ pluginId: string; pageShell?: boolean }> | null = null;
+export function registerPluginHostPage(
+	page: ComponentType<{ pluginId: string; pageShell?: boolean }>,
+) {
+	hostPage = page;
+}
+
+// —— 3. 动态路由工厂：把插件 meta 变成一条真实路由 ——
+function createPluginRoute(meta: PluginDescriptor): RouteConfig {
+	const Page: ComponentType = () => {
+		if (!hostPage) throw new Error('PluginHostPage not registered');
+		return createElement(hostPage, { pluginId: meta.id, pageShell: true });
+	};
+	return {
+		path: meta.routePath, // registry 里的 routePath，如 /plugins/my-tool
+		Component: Page,      // 一律走统一 Host 页壳
+		meta: { titleI18n: meta.title, title: meta.id },
+	};
+}
+
+// —— 4. 全局 MF Host（asDefault：供 <Plugin /> / FederationPlugin 使用）——
+export const mf = createFederation<RouteConfig>({
+	hostApiVersion: import.meta.env.VITE_HOST_API_VERSION?.trim() || '1.0.0',
+	prod: import.meta.env.PROD,                       // 生产=禁止 http 本地地址
+	skipIntegrity: import.meta.env.VITE_PLUGIN_SKIP_INTEGRITY !== 'false',
+	storagePrefix: 'myapp.plugin',
+	registryCacheKey: PLUGIN_REGISTRY_CACHE_KEY,      // 本地缓存 key（与 registry 一致）
+	iframeChannel: 'myapp-mf-iframe',                 // iframe postMessage 频道
+	fetchRegistry: fetchPluginRegistry,               // registry 拉取
+	persistEnabled: persistPluginEnabled,             // 上架/下架持久化
+	enabledStore: {
+		get: getPluginEnabledPref,                     // 同步读偏好
+		set: setPluginEnabledPref,                     // 乐观更新+写服务端
+		load: ensurePluginEnabledPrefsLoaded,          // 启动预拉取
+		isReady: arePluginEnabledPrefsReady,           // 就绪信号（防闪跳）
+	},
+	styleIsolation: {
+		// 本产品 Host 主题 CSS 变量：Remote 的同名变量定义会被剥掉
+		themePropPattern: DEFAULT_HOST_THEME_CUSTOM_PROP,
+		hostViteRootMarker: '/apps/frontend',
+	},
+	translate: (key, params) => translateSync(key, params as Record<string, string>),
+	createRoute: createPluginRoute,                   // 动态路由工厂
+	capabilities: {
+		// —— bridge 的 api 各能力：只有声明了权限的插件才能拿到 ——
+		getTheme: readTheme,
+		getLocale: readLocale,
+		navigate: (to) => window.location.assign(to),
+		toast: (options) => {
+			Toast({ type: options.type ?? 'info', title: options.message });
+		},
+		http: {
+			get: ((url: string) => http.get(url)) as HostHttpClient['get'],
+			post: ((url: string, body?: unknown) => http.post(url, body)) as HostHttpClient['post'],
+			put: ((url: string, body?: unknown) => http.put(url, body)) as HostHttpClient['put'],
+			delete: ((url: string) => http.delete(url)) as HostHttpClient['delete'],
+		},
+		// buildModules：按权限组装产品模块
+		buildModules: (allow) => {
+			const modules: Record<string, unknown> = {};
+			if (allow.has('modules:chat')) {
+				modules.openThread = (id: unknown) => {
+					if (typeof id !== 'string') throw new Error('INVALID_THREAD_ID');
+					window.location.assign(`/chat/c/${id}`);
+				};
+			}
+			return Object.keys(modules).length > 0 ? modules : undefined;
+		},
+	},
+	iframeRpcHandlers: {
+		// untrusted 插件的 RPC：如 'ebook.getBookId' 等，key 即插件侧 invoke 名
+		// 'mycap.getSomething': (bridge, args) => {...},
+	},
+});
+
+export const pluginManager = mf.manager;
+export const routeInjector = mf.routeInjector;
+export const sidebarInjector = mf.sidebarInjector;
+export const HOST_API_VERSION = mf.runtime.hostApiVersion;
+export const appRuntime = mf.runtime;
+
+export const getAppIframeBridgeOptions = () => mf.getIframeBridgeOptions();
+export const startFederation = () => mf.start();
+```
+
+> **语义**：这一步是整个接入的「翻译层」。业务侧后面所有交互（`pluginManager.setEnabled`、`routeInjector.getRoutes()`、`mf.start()`）都从 `mf` 身上拿。`capabilities` 定义「插件能用什么」，`permissions`（registry 里写）决定「这个插件能用哪些」，最终由 `createHostBridge` 按权限裁剪后交给插件（见第 7 章）。
+
+统一出口 `src/federation/index.ts`：
+
+```ts
+// src/federation/index.ts —— 业务只从这里 import
+export {
+	claimPluginPortalTarget,
+	clearPluginPortalClaim,
+	isPluginEnabled,
+	isEnabledPrefsReady,
+	notifyPluginEnabled,
+	type PluginDescriptor,
+	type PluginRegistry,
+	styleRealmKey,
+	subscribePluginEnabled,
+} from '@dnhyxc-ai/federation-kit';
+export {
+	FederationPlugin,
+	type FederationPluginProps,
+	useHostSurfacePlugins,
+	usePluginEnabled,
+	usePluginEnabledState,
+} from '@dnhyxc-ai/federation-kit/react';
+export {
+	arePluginEnabledPrefsReady,
+	clearPluginEnabledPrefsCache,
+	ensurePluginEnabledPrefsLoaded,
+	getPluginEnabledPref,
+	prefetchPluginEnabledPrefs,
+	setPluginEnabledPref,
+} from './enabled/prefs';
+export { PluginErrorBoundary } from './host/PluginErrorBoundary';
+export { PluginHostPage } from './host/PluginHostPage';
+export {
+	DEFAULT_PLUGIN_HOST_ICONS,
+	PluginHostSurface,
+	type PluginHostSurfacePart,
+	type PluginHostSurfaceProps,
+} from './host/PluginHostSurface';
+export { PluginPageShell } from './host/PluginPageShell';
+export {
+	assertRegistryHostApiCompatible,
+	clearPluginRegistryCache,
+	fetchPluginRegistry,
+	fetchPluginRegistryRawText,
+	overlayUserEnabled,
+	PLUGIN_REGISTRY_CACHE_KEY,
+	PLUGIN_REGISTRY_FILENAME,
+	PLUGIN_REGISTRY_STATIC_PATH,
+	persistPluginEnabled,
+	savePluginRegistry,
+} from './registry';
+export {
+	appRuntime,
+	getAppIframeBridgeOptions,
+	HOST_API_VERSION,
+	mf,
+	pluginManager,
+	routeInjector,
+	sidebarInjector,
+	startFederation,
+} from './runtime';
+```
+
+---
+
+## Step 4 · 统一挂载模版（host/）
+
+### 4.1 `PluginErrorBoundary.tsx`
+
+```tsx
+// src/federation/host/PluginErrorBoundary.tsx
+// 插件渲染抛错时兜底，不让错误打穿整个宿主页面
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+
+type Props = { pluginId: string; children: ReactNode };
+type State = { error: Error | null };
+
+export class PluginErrorBoundary extends Component<Props, State> {
+	state: State = { error: null };
+
+	// 只要子树渲染抛错就进入 error 状态
+	static getDerivedStateFromError(error: Error): State {
+		return { error };
+	}
+
+	// 记录日志方便排查
+	componentDidCatch(error: Error, info: ErrorInfo) {
+		console.error(`[plugin:${this.props.pluginId}]`, error, info);
+	}
+
+	render() {
+		if (this.state.error) {
+			return (
+				<div className="p-6 text-sm text-muted-foreground">
+					<p className="font-medium text-foreground mb-1">
+						插件加载失败（{this.props.pluginId}）
+					</p>
+					<p className="opacity-70">{this.state.error.message}</p>
+				</div>
+			);
+		}
+		return this.props.children;
+	}
+}
+```
+
+### 4.2 `PluginPageShell.tsx`（独立路由页外壳）
+
+```tsx
+// src/federation/host/PluginPageShell.tsx
+// 插件独立路由页的统一外壳：边距 + 圆角内容区
+import { type ReactNode } from 'react';
+
+export function PluginPageShell({ children }: { children: ReactNode }) {
+	return (
+		<div className="mx-auto flex h-full min-h-0 flex-col p-5.5 pt-0">
+			{/* 注意：圆角容器不要写 overflow-hidden，否则子树 backdrop-filter 会失效 */}
+			<div className="h-full min-h-0 bg-theme-background overflow-auto rounded-md">
+				{children}
+			</div>
+		</div>
+	);
+}
+```
+
+### 4.3 `PluginHostPage.tsx`（业务页面壳，包装 `FederationPlugin`）
+
+```tsx
+// src/federation/host/PluginHostPage.tsx
+// 用 kit 的 <FederationPlugin /> + 本产品 slots（loading/error/shell 统一风格）
+import {
+	FederationPlugin,
+	type PluginHostViewSlots,
+} from '@dnhyxc-ai/federation-kit/react';
+import { useI18n } from '你的 i18n hooks';
+import { cn } from '你的 cn 工具';
+import { mf, registerPluginHostPage } from '../runtime';
+import { PluginErrorBoundary } from './PluginErrorBoundary';
+import { PluginPageShell } from './PluginPageShell';
+
+type Props = {
+	pluginId: string;
+	className?: string;
+	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
+	pageShell?: boolean;
+	slots?: PluginHostViewSlots;
+};
+
+export function PluginHostPage({
+	pluginId,
+	className,
+	part,
+	pageShell,
+	slots: slotsOverride,
+}: Props) {
+	const { locale, t } = useI18n();
+
+	// 默认 slots：所有插件的 loading / error / shell 长一个样
+	const defaultSlots: PluginHostViewSlots = {
+		rootClassName: cn(className),
+		// 独立路由页才套 shell；内嵌挂载不加
+		shell: (node) => <PluginPageShell>{node}</PluginPageShell>,
+		missingIframeUrl: ({ pluginId: id }) => (
+			<div className="text-muted-foreground p-6 text-sm">
+				{t('plugins.host.missingIframeUrl', { id })}
+			</div>
+		),
+		loading: ({ pluginId: id }) => (
+			<div className="flex h-full items-center justify-center">
+				{t('plugins.host.loadingNamed', { id })}...
+			</div>
+		),
+		error: ({ pluginId: id, error, retry, busy }) => (
+			<div className="p-6 text-sm">
+				<span>{t('plugins.host.unavailable', { id })}</span>
+				{error ? `: ${error}` : ''}
+				<button onClick={retry} disabled={busy}>
+					{t('plugins.host.reload')}
+				</button>
+			</div>
+		),
+	};
+
+	const slots: PluginHostViewSlots = {
+		...defaultSlots,
+		...slotsOverride,
+		// shell 可被覆盖；默认按 pageShell 决定是否套壳
+		shell: slotsOverride?.shell ?? (pageShell ? defaultSlots.shell : (node) => node),
+	};
+
+	return (
+		<FederationPlugin
+			host={mf}                      // 用全局 asDefault Host
+			name={pluginId}                 // 插件 id
+			className={className}
+			pageShell={pageShell}
+			part={part}
+			locale={locale === 'en-US' ? 'en-US' : 'zh-CN'}
+			slots={slots}
+			ErrorBoundary={PluginErrorBoundary}
+		/>
+	);
+}
+
+// 自注册到 runtime：createPluginRoute 用它造路由页
+registerPluginHostPage(PluginHostPage);
+```
+
+### 4.4 `PluginHostSurface.tsx`（业务页抽屉/工具栏插槽）
+
+完整代码见 `apps/frontend/src/federation/host/PluginHostSurface.tsx`。核心是三步：
+
+```tsx
+// 关键片段
+import {
+	claimPluginPortalTarget,
+	clearPluginPortalClaim,
+	styleRealmKey,
+} from '@dnhyxc-ai/federation-kit';
+import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
+
+// 按 surface 取已上架的插件列表（自动按 registry order 排序）
+const listed = useHostSurfacePlugins('ebook.read'); // 例：电子书阅读页
+const drawerPlugins = listed.filter((p) => p.host?.slot === 'drawer');
+
+// 打开 Drawer 前同步认领 Portal，防首帧闪烁（第 9 章 §4.5）
+claimPluginPortalTarget(p.id, styleRealmKey(p.entry, p.remoteName, p.id));
+
+// Drawer 关闭时释放认领
+clearPluginPortalClaim(openPluginId);
+
+// 插件内容一律走 PluginHostPage，保证 loading/error/隔离 UI 一致
+<PluginHostPage pluginId={openPluginId} part="drawer" />
+```
+
+> **语义**：`PluginHostSurface` 是「业务页插件槽」的通用模版。`surface` 由 registry 的 `host.surface` 声明（如 `ebook.read`），业务页只要渲染 `<PluginHostSurface surface="ebook.read" part="drawer" />`，这个页面的所有 drawer 插件自动出现——**新增插件只需改 registry，不用再写一套抽屉**。
+
+---
+
+## Step 5 · 接线路由
+
+### 5.1 `src/router/routes.ts`：加静态壳路由
+
+在路由表里加一个「插件中心」静态路由（壳 + 子页）：
+
+```tsx
+{
+	path: '/plugins',
+	Component: PluginsLayout,      // 你自己的布局（含侧栏/头部）
+	meta: { titleKey: 'route.plugins.title' },
+	children: [
+		{ index: true, Component: PluginsPage, meta: { titleKey: 'route.plugins.title' } },
+		{ path: 'registry', Component: PluginRegistryEditorPage, meta: { titleKey: 'route.plugins.registry.title' } },
+	],
+},
+// ...其他静态路由...
+{
+	path: '*',
+	Component: NotFound,           // 兜底 404
+},
+```
+
+### 5.2 `src/router/buildRoutes.ts`：合并动态路由 + 防闪 404
+
+```tsx
+// src/router/buildRoutes.ts
+import { createElement } from 'react';
+import { routeInjector } from '@/federation';
+import routes, { type RouteConfig } from './routes';
+
+// 插件壳未就绪时占住 `*`：刷新插件路径时先不渲染 404，等插件壳挂上再决断
+function PluginRoutesPending() {
+	return createElement('div', { className: 'h-full w-full bg-theme-background' });
+}
+
+export function buildRoutes(pluginsReady = true): RouteConfig[] {
+	// PluginManager 启动后注入的动态插件路由（第 5 章）
+	const dynamic = routeInjector.getRoutes();
+	// 插件未就绪时把兜底 404 换成空白占位，避免闪一下「页面不存在」
+	const base = pluginsReady
+		? routes
+		: routes.map((route) =>
+				route.path === '*'
+					? { ...route, Component: PluginRoutesPending }
+					: route,
+			);
+
+	if (dynamic.length === 0) return base;
+
+	// 动态路由挂到 Layout 壳（第一条带 children 的路由）的 children 里
+	return base.map((route, index) => {
+		if (index === 0 && route.children) {
+			return {
+				...route,
+				children: [...route.children, ...dynamic],
+			};
+		}
+		return route;
+	});
+}
+```
+
+### 5.3 `src/router/index.tsx`：启动 + 订阅路由变化
+
+```tsx
+// src/router/index.tsx
+import { createBrowserRouter, type RouteObject, RouterProvider } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { mf } from '@/federation';
+import { buildRoutes } from './buildRoutes';
+
+const App = () => {
+	const [routeEpoch, setRouteEpoch] = useState(0);
+	/** false 时 catch-all 不渲染 404，等插件壳挂上后再决断 */
+	const [pluginsReady, setPluginsReady] = useState(false);
+
+	useEffect(() => {
+		// 插件路由注入/移除时重建 router
+		const unsub = mf.onRoutesChange(() => {
+			setRouteEpoch((n) => n + 1);
+		});
+		// 启动微前端：拉 registry → 过滤偏好 → 注入壳路由/侧栏
+		void mf
+			.start()
+			.catch((e) => console.error('[federation] start failed', e))
+			.finally(() => {
+				// 无论成败，都认为插件壳已就绪，此时才允许渲染真正的 404
+				setPluginsReady(true);
+				setRouteEpoch((n) => n + 1);
+			});
+		return unsub;
+	}, []);
+
+	const router = useMemo(() => {
+		const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
+		// 给插件 bridge 的 api.navigate 提供路由能力
+		mf.setNavigate((to) => {
+			void r.navigate(to);
+		});
+		return r;
+	}, [routeEpoch, pluginsReady]);
+
+	return (
+		// data-mf-host-portal：Host 根标记，插件 Portal 收编时跳过，保证 Host 浮层样式不被污染
+		<div className="h-full w-full bg-theme-background" data-mf-host-portal>
+			{/* <Toaster /> 等 Host 全局浮层放在这里 */}
+			<RouterProvider router={router} />
+		</div>
+	);
+};
+
+export default App;
+```
+
+> **语义**：`routeEpoch` + `useMemo` 是「动态路由重建」的机制——`mf.onRoutesChange` 每触发一次就 bump epoch，router 随即重建并包含最新的动态路由。`pluginsReady` 防闪 404 的原理见第 5 章时序图。
+
+---
+
+## Step 6 · 侧边栏接入
+
+`src/components/design/Sidebar/index.tsx`（你的侧栏组件）里订阅 `sidebarInjector`：
+
+```tsx
+import { sidebarInjector } from '@/federation';
+import { useEffect, useState } from 'react';
+
+const [pluginMenus, setPluginMenus] = useState(() => [...sidebarInjector.items]);
+
+useEffect(() => {
+	const sync = () => setPluginMenus([...sidebarInjector.items]);
+	sync();
+	return sidebarInjector.subscribe(sync); // 插件注入/移除侧栏项时自动重渲染
+}, []);
+
+// 渲染时把动态项拼进你的静态菜单
+const dynamic = pluginMenus.map((m) => ({
+	nameKey: m.nameKey, icon: m.icon, path: m.path, requiresAuth: m.requiresAuth,
+}));
+const visibleMenus = [...MENUS, ...dynamic, ...PLUGINS].filter(
+	(menu) => !menu.requiresAuth || loggedIn,
+);
+```
+
+> **语义**：`sidebarInjector` 是全局单例；`PluginManager.mountShell` 注入侧栏项后 `notify`，侧栏通过 `subscribe` 拿到最新列表并重渲染。业务侧唯一要做的就是「把 `sidebarInjector.items` 拼进你的菜单渲染」。
+
+---
+
+## Step 7 · 登录态预拉取偏好
+
+在登录成功/进入主界面的地方调用：
+
+```ts
+// 登录后：预拉取账号上架偏好，让已上架插件尽早出现
+import { prefetchPluginEnabledPrefs } from '@/federation';
+
+prefetchPluginEnabledPrefs();
+```
+
+登出时清缓存：
+
+```ts
+import { clearPluginEnabledPrefsCache } from '@/federation';
+
+function onLogout() {
+	clearPluginEnabledPrefsCache(); // 清掉旧账号偏好，避免残留
+	// ...你的登出逻辑
+}
+```
+
+---
+
+## Step 8 · 插件中心（可选但强烈建议）
+
+做一个 `/plugins` 页，展示 registry 全量插件 + 上/下架按钮：
+
+```tsx
+// 伪代码：列出 catalog 并支持切换上架状态
+import { pluginManager, fetchPluginRegistry, persistPluginEnabled } from '@/federation';
+
+// 展示：用偏好覆盖后的 catalog（用户已上架但 catalog 标 false 的也显示为启用）
+const data = await fetchPluginRegistry();
+const display = overlayUserEnabled(data); // 见第 8 章 §5
+
+// 上架/下架：写账号偏好 + 通知刷新；下架还会卸载已加载的插件
+await pluginManager.setEnabled(id, enabled);
+// 等价于 await persistPluginEnabled(id, enabled);
+```
+
+> 这一步让「动态接入」真正闭环：运营改 catalog 上架新插件 → 用户刷新即可见；用户在插件中心上/下架 → 立即生效并持久化。
+
+---
+
+## Step 9 · 业务页插槽（可选）
+
+在你想让插件出现的业务页加 `<PluginHostSurface />`：
+
+```tsx
+import { PluginHostSurface } from '@/federation';
+
+// 例：电子书阅读页，顶栏抽屉 + 工具栏各留一个槽
+<div>
+	<PluginHostSurface surface="ebook.read" part="drawer-triggers" />
+	<PluginHostSurface surface="ebook.read" part="toolbar" />
+</div>
+```
+
+新增一个该页面的插件时，只改 registry：
+
+```json
+{
+	"id": "my-ebook-tool",
+	"entry": "https://plugins.example.com/my-ebook-tool/mf-manifest.json",
+	"routePath": "/plugins/my-ebook-tool",
+	"hostApiRange": "^1.0.0",
+	"permissions": ["ui:toast"],
+	"host": { "surface": "ebook.read", "slot": "toolbar", "icon": "Sparkle" },
+	"enabled": true,
+	"version": "1.0.0"
+}
+```
+
+---
+
+## Step 10 · 发布与验收
+
+### 发布清单
+
+| 事项 | 说明 |
+|------|------|
+| Remote 构建 | 远端项目用 `@originjs/vite-plugin-federation`，`exposes` 出 `./App`，产物含 `mf-manifest.json` + `remoteEntry.js` |
+| 静态托管 | 部署到 https（或开发环境 localhost）；WebView 对 `域名:端口` + `tauri://localhost` 开 CORS |
+| registry | `plugins-registry.json` 上传到服务端 `/remotes/`（Host 已实现编辑页可保存） |
+| hostApiRange | 必须覆盖当前 `VITE_HOST_API_VERSION`（保存前会校验） |
+| 版本号 | 发新版改 `version` 并更新静态资源；客户端下次进入自动拿到新代码（cache bust） |
+
+### 验收清单
+
+- [ ] `npm run dev` 启动 Host，无 federation 报错
+- [ ] 插件中心能看到 registry 里的插件（`overlayUserEnabled` 后状态正确）
+- [ ] 勾选上架 → 侧栏出现入口、路由可访问（`routeInjector` + `sidebarInjector` 生效）
+- [ ] 点击进入 → 正确下载 Remote 代码并渲染（loading → 内容，失败有兜底）
+- [ ] 刷新插件路径不闪 404（`pluginsReady` + 占位生效）
+- [ ] 插件样式不影响 Host 主题（样式隔离生效；Host Toaster 不被污染）
+- [ ] 下架插件 → 入口消失、已加载代码卸载
+- [ ] 登录不同账号，上架偏好互相独立（`enabledStore` 生效）
+
+---
+
+## 结语
+
+至此，一个完整的主项目微前端接入完成。回顾关键决策：
+
+1. **adapter 层收口**：业务只 import `@/federation`，产品能力集中翻译。
+2. **一个门面**：`createFederation` 一次调用，`mf` 对象贯穿所有机制（路由、侧栏、bridge、偏好）。
+3. **三行启动**：`mf.onRoutesChange()` + `mf.start()` + 把 `routeInjector.getRoutes()` 合并进路由。
+4. **三种挂载**：独立路由页（`routePath` + `FederationPlugin`）、业务页插槽（`PluginHostSurface`）、不可信插件（`untrusted` + iframe RPC）。
+5. **安全默认**：https 白名单、hostApiRange 校验、cache bust、样式隔离——全部开箱即用。
+
+从注册表到样式隔离，从偏好持久化到安全校验，本指南的 01–09 章就是「为什么」；本章就是「怎么做」。对照源码逐文件走一遍，就能在自己的项目里落地同样完整的能力。

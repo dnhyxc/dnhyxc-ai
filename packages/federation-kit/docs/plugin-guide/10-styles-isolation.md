@@ -1,0 +1,147 @@
+# 10 · 样式规范与隔离
+
+> **本章目标**：讲清子项目**在样式上要遵守的规矩**，避免「独立预览正常、嵌进 Host 后样式坏了」这类最常见问题。核心两条：**① 每个 expose 入口都要 `import '@/styles.css'`**；**② 不要手写 portal container**。
+>
+> Host 侧隔离机制见 host-guide 第 9 章 §4（realm / capture / portal）；本处以子项目视角讲「你要做什么」。
+
+---
+
+## 1. 最重要的规则：expose 必须引入 styles.css
+
+Host 嵌入时**只加载 federation expose 模块**，**不会执行**你独立预览用的 `src/main.ts` / `main.tsx`。
+
+| 入口 | 作用 | 嵌入 Host 时是否执行 |
+|------|------|----------------------|
+| `main.tsx` 里的 `import './styles.css'` | 独立 `pnpm dev` 预览 | ❌ 不执行 |
+| **每个** `exposes` 指向的入口（如 `views/foo/index.ts`）里的 `import '@/styles.css'` | 随 Remote 模块注入 CSS，供 Host 前缀隔离 | ✅ 必须 |
+
+**漏写时的典型症状**：独立预览正常，嵌进 Host 后 Tooltip / Dialog / Context Menu 只剩裸 DOM（无 bubble、字体回落到 Host）。
+
+```ts
+// ✅ React expose（对齐 apps/micro 各页面入口）
+import '@/styles.css';
+export { default } from './App';
+export { activate, deactivate } from './lifecycle';
+```
+
+```ts
+// ✅ Vue expose（Host 不装 Vue：必须 mount）
+import '@/styles.css';
+import { createApp, reactive } from 'vue';
+import App from './App.vue';
+
+export default {
+	mount(el: HTMLElement, bridge: HostBridgeProps) {
+		const app = createApp(App, { bridge: reactive(bridge) });
+		app.mount(el);
+		return () => app.unmount();
+	},
+};
+```
+
+```ts
+// ❌ 只在 main 引入——嵌入 Host 时 utility / token 不会随 expose 加载
+// main.ts
+import './styles.css';
+```
+
+一仓多 expose 时：**每个 expose 入口都要 import**（可重复；构建会按模块图打包，Host 侧同 realm 再 `reclaimEntryStyles`）。
+
+---
+
+## 2. 样式文件示例
+
+`src/styles.css`（对齐 `apps/micro` / `apps/remote-plugins`）：
+
+```css
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* :root / .dark token、#root / #app / [data-plugin-root] 等按 shadcn 配置即可 */
+```
+
+> **Tailwind / Preflight 可以正常用，不必关**。Host 用 `@scope([data-mf-style-realm])` 选择器前缀做隔离，你的 Preflight 会被限制在你的 realm 内。
+
+---
+
+## 3. 组件根节点
+
+```tsx
+// Host 会再包一层 data-mf-plugin + data-mf-style-realm；你根节点加 data-plugin-root 即可
+<div className="plugin-standalone h-full" data-plugin-root>
+	{/* ... */}
+</div>
+```
+
+| 属性 | 必须 | 说明 |
+|------|------|------|
+| `data-plugin-root` | ✅ | 插件根标记；Host 的 `html/body` 选择器改写依赖它 |
+| `plugin-standalone` | ✅ React / 等价类名 | 独立预览样式自洽；Vue 用等价 class |
+
+---
+
+## 4. 信任等级与隔离方式
+
+| 信任等级 | 谁负责隔离 | Remote 可以做什么 |
+|----------|-----------|-------------------|
+| `first-party` / `partner` | Host `style-isolation`：`/*mf-iso:3*/` 选择器前缀 + `data-mf-style-realm` + Portal 收编 | 正常 `@import "tailwindcss"`（含 Preflight） |
+| `untrusted` | iframe | 独立文档样式，完全自由 |
+
+---
+
+## 5. Portal / Drawer / 悬浮层：零侵入
+
+**插件侧不要**：
+
+```tsx
+// ❌ 不要这样
+<Drawer getContainer={() => document.body}>
+// ❌ 不要这样
+const portal = document.createElement('div');
+document.body.appendChild(portal);
+ReactDOM.createPortal(node, portal);
+```
+
+**Host 会自动**：劫持 `createPortal` / body Teleport，把插件浮层搬进 `[data-mf-portal-scope]` 并打 `data-mf-style-realm`，让带 realm 前缀的 CSS 能命中悬浮层。antd Modal/Drawer、EP `el-popper` 等**无需改 `getContainer`**。
+
+> 你如果强行指定 container，浮层会**逃逸**出隔离域：要么被 Host 样式污染，要么失去插件样式。
+
+---
+
+## 6. 主题 token 剥离（Host 保护）
+
+Host 会把插件的 `:root{--background:...}` 之类**语义主题变量**剥掉（见 host-guide 第 9 章 §4.3），避免你的定义覆盖 Host 全局主题。**这对你是透明的**——你的业务变量（`--card-width` 等）不受影响，插件仍可**读取** Host 主题变量来跟随主题：
+
+```css
+/* 插件里可以这样跟随 Host 主题（变量可继承 Host） */
+.plugin-standalone {
+	background: var(--background);
+	color: var(--foreground);
+}
+```
+
+> 别依赖 Host 未公开的私有 class 名——主题变量可以继承，私有样式类不属于契约。
+
+---
+
+## 7. 独立预览 vs 嵌入：样式一致性自查
+
+| 症状 | 排查 |
+|------|------|
+| 独立预览正常，嵌入后 Tooltip/菜单没样式 | ① expose 是否 `import '@/styles.css'`；② 弹层是否在 `[data-mf-portal-scope]` 内且带 realm；③ 根节点是否有 `data-plugin-root` |
+| `backdrop-filter` 失效 | Host `PluginPageShell` / Layout 圆角容器同层 `overflow-hidden`（Chromium 行为）。报 Host 排查，不是你的问题 |
+| 插件样式影响 Host 页面 | 正常情况下不会；若会，确认 Host 走没走 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（要报 Host） |
+| Toast 竖条 / 卡死 | 报 Host 查样式隔离 FAQ |
+
+---
+
+## 8. 检查表
+
+- [ ] **每个** expose 入口 `import '@/styles.css'`（勿只依赖 main）
+- [ ] Tailwind/Preflight 正常引入（不必禁用）
+- [ ] 独立预览样式自洽（`:root` / `.dark` token 完整）
+- [ ] 不手写 portal container / 不改 `createPortal`
+- [ ] 根节点 `data-plugin-root`
+- [ ] 不修改 `html` / `body` 全局样式（污染 Host）

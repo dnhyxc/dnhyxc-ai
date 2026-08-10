@@ -5,9 +5,9 @@ import {
 	type RouteObject,
 	RouterProvider,
 } from 'react-router';
+import { mf } from '@/federation';
 import { useInputsOnlyTab } from '@/hooks';
 import { readWindowChromeThemeSync } from '@/hooks/theme';
-import { pluginManager, routeInjector } from '@/plugins';
 import {
 	attachTauriPlainFieldClipboardShortcuts,
 	onCreateWindow,
@@ -24,17 +24,16 @@ const App = () => {
 
 	useEffect(() => {
 		if (import.meta.env.PROD && isTauriRuntime()) {
-			// 线上桌面端禁 WebView 系统右键（后退/刷新/检查元素）；仅 preventDefault，不拦截项目自定义菜单
 			document.addEventListener('contextmenu', (e) => {
 				e.preventDefault();
 			});
 		}
-		const unsub = routeInjector.subscribe(() => {
+		const unsub = mf.onRoutesChange(() => {
 			setRouteEpoch((n) => n + 1);
 		});
-		void pluginManager
-			.init()
-			.catch((e) => console.error('[plugins] init failed', e))
+		void mf
+			.start()
+			.catch((e) => console.error('[federation] start failed', e))
 			.finally(() => {
 				setPluginsReady(true);
 				setRouteEpoch((n) => n + 1);
@@ -44,7 +43,7 @@ const App = () => {
 
 	const router = useMemo(() => {
 		const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
-		pluginManager.setNavigate((to) => {
+		mf.setNavigate((to) => {
 			void r.navigate(to);
 		});
 		return r;

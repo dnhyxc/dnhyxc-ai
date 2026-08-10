@@ -21,9 +21,13 @@ import {
 	useState,
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import {
+	type EbookHostThought,
+	PluginHostSurface,
+	setEbookHostHandlers,
+} from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { type EbookHostThought, setEbookHostHandlers } from '@/plugins';
 import {
 	createEbookHighlight,
 	createEbookThought,
@@ -46,7 +50,6 @@ import { EbookReadSplitLayout } from './components/layout/EbookReadSplitLayout';
 import { EbookTocDrawer } from './components/layout/EbookTocDrawer';
 import { EpubListenFollowFab } from './components/listen/EpubListenFollowFab';
 import { EpubListenPlayerBar } from './components/listen/EpubListenPlayerBar';
-import { EbookReadHostPlugins } from './components/plugins/EbookReadHostPlugins';
 import { EbookAssistant } from './components/reader/EbookAssistant';
 import { EpubPane } from './components/reader/EpubPane';
 import {
@@ -2508,12 +2511,14 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
-				<EbookReadHostPlugins
+				{/* PluginHostSurface drawer-triggers 渲染图标插件开关 */}
+				<PluginHostSurface
+					surface="ebook.read"
 					part="drawer-triggers"
 					openPluginId={hostDrawerPluginId}
 					onOpenPluginIdChange={setHostDrawerPluginId}
 				/>
-				<EbookReadHostPlugins part="toolbar" />
+				<PluginHostSurface surface="ebook.read" part="toolbar" />
 				{canSetPublic && book ? (
 					<EbookBookVisibilitySwitch
 						book={book}
@@ -2995,8 +3000,10 @@ function EbookReadPage() {
 				/>
 			) : null}
 
+			{/* drawer 渲染抽屉插件 */}
 			{book?.fmt === 'epub' ? (
-				<EbookReadHostPlugins
+				<PluginHostSurface
+					surface="ebook.read"
 					part="drawer"
 					openPluginId={hostDrawerPluginId}
 					onOpenPluginIdChange={setHostDrawerPluginId}

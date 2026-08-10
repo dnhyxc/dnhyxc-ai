@@ -13,13 +13,13 @@ import { Toast } from '@ui/sonner';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
-import { useI18n, useTheme } from '@/hooks';
-import { cn } from '@/lib/utils';
 import {
 	getAppFullscreen,
 	setAppFullscreen,
 	subscribeAppFullscreen,
-} from '@/plugins/host-api/appFullscreen';
+} from '@/federation';
+import { useI18n, useTheme } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
 import { formatRoutePageLabel } from '@/router/routeMeta';
 import { isTauriRuntime } from '@/utils/runtime';

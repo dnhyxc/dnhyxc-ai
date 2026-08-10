@@ -74,6 +74,8 @@
 | 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [app/video-player-component-refactor.md](./app/video-player-component-refactor.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
 | 视频播放器进度条 hover 无缩略图 / 画中画 Safari 不可用 / 长视频刻度卡 | [app/video-player-feature-enhancement.md](./app/video-player-feature-enhancement.md)（缩略图预览 + 多平台画中画 + 刻度上限）                                                                 |
 | 视频播放器拖拽松手右抖 / 循环单条不重播 / 控制条毛玻璃慢一拍 / xgplayer 背景不跟随主题 | [app/video-player-drag-scrub.md](./app/video-player-drag-scrub.md)（拖拽重写 + scrubHoldUntil 抑制 + 画布固定 160×90 + visible 显隐） |
+| 微前端插件目录 `plugins/` 被整包抽走、业务 import 全失效           | [app/federation-kit-migration.md](./app/federation-kit-migration.md)（`@dnhyxc-ai/federation-kit` + `src/federation` 薄适配 + `PluginHostSurface` 通用模版 + `mf.start()` 迁移） |
+| sonner Toast 点击失效 / 关闭按钮按不动                             | [app/sonner-pointer-events-fix.md](./app/sonner-pointer-events-fix.md)（Toast 根 + `<Sonner>` className + style 三处 `pointer-events: auto` 加固） |
 | 富文本编辑器标题与正文分离 / Tab 缩进失效 / Cmd+↑↓ 无响应 / 空段落删不掉 | [app/rich-editor-feature.md](./app/rich-editor-feature.md)（TitleNode + TabIndent + DocEdgeNav + EmptyParagraphDelete 自定义扩展） |
 | 学习笔记列表不分页 / 无法导出 DOCX / 公开状态切换失败 / 保存无 Toast | [app/learning-notes-implementation.md](./app/learning-notes-implementation.md)（MobX Store + HostHttp 注入 + 累积分页 + 双端 downloadBlob） |
 | 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [app/video-player-chrome-cinema-theme.md](./app/video-player-chrome-cinema-theme.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |

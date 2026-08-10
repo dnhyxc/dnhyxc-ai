@@ -1,0 +1,383 @@
+# 13 · 发布、部署、Registry 注册与验收
+
+> **本章目标**：讲清从「本地跑通」到「生产上线」的全流程：生产构建（`base` 对齐）、Nginx 静态部署（含 CORS）、Registry 注册（所有字段逐项 + Vue 特例）、**缓存破坏机制**（为什么发版不用动 Host registry）、以及上线前的功能 / 安全 / 性能验收清单与 FAQ。
+>
+> 对应源码：`packages/federation-kit/src/mf/mf.ts`（`resolvePluginBust` / `fetchManifestMeta` / `bustRemoteEntryPlugin`）、`packages/federation-kit/src/runtime/PluginVerifier.ts`（`verifyPlugin`）。
+
+---
+
+## 1. 发布全流程总览
+
+```text
+本地改代码 → pnpm dev 自测 → pnpm build（prod origin）→ 上传 dist 到静态服务器（Nginx）
+→ 联系 Host 管理员在 plugins-registry.json 加/改一条 registry 条目
+→ 用户进 Host，Host 自动拉 manifest 指纹、加载你的 remoteEntry —— 完成
+```
+
+> **关键认知**：你**只发布自己的静态资源**，Host 侧「拉 manifest 算指纹 → 直连 remoteEntry」是自动的。见 §5 缓存破坏。
+
+---
+
+## 2. 生产构建
+
+### 2.1 环境变量
+
+```bash
+# .env.production —— 生产环境 Remote 公共 origin
+# 必须与 registry 的 entry 一致（entry 是「manifest 地址」，base 是「静态资源根」）
+VITE_REMOTE_PUBLIC_ORIGIN=https://your-domain.com:9008
+```
+
+```bash
+# 构建
+pnpm build
+```
+
+> `build` 脚本通常是 `tsc && vite build`（第 12 章 §5）。`vite build` 会读 `.env.production` 里的 `VITE_REMOTE_PUBLIC_ORIGIN`，把它作为 `base` 写进所有产物 URL。
+
+### 2.2 `base` 对齐规则（第 3 章核心）
+
+| 项                            | 值                                              | 说明                                              |
+| ----------------------------- | ----------------------------------------------- | ------------------------------------------------- |
+| `registry.entry`              | `https://your-domain.com:9008/mf-manifest.json` | Host 拉指纹的地址                                 |
+| `vite base`                   | `https://your-domain.com:9008/`                 | 产物里所有资源路径的根                            |
+| 两者的 **协议 / 域名 / 端口** | **必须一致**                                    | 否则 manifest 里的 remoteEntry URL 或资源路径错位 |
+
+> 生产必须 **https**：`verifyPlugin` 里 `entryUrlAllowed` 在生产环境只放行 `https`（`localhost` 的 http 仅 dev 放行）。`untrusted` 的 `iframeUrl` 同理。
+
+---
+
+## 3. 部署（Nginx）
+
+把 `dist` 目录放到静态服务器。以 Nginx 为例：
+
+```nginx
+# 允许跨域访问的域名
+map $http_origin $mf_cors_origin {
+  default "";
+  "https://dnhyxc.cn:9002" $http_origin;
+  "http://tauri.localhost"  $http_origin;
+  "https://tauri.localhost" $http_origin;
+  "tauri://localhost"       $http_origin;
+}
+
+# /etc/nginx/conf.d/plugin-demo.conf
+server {
+	# 端口与 registry entry 的端口一致（9008）
+	listen 9008 ssl;
+	# 域名与 registry entry 一致
+	server_name your-domain.com;
+
+	# TLS 证书（生产必须 https）
+	ssl_certificate     /path/to/cert.pem;
+	ssl_certificate_key /path/to/key.pem;
+
+  location / {
+    if ($request_method = OPTIONS) {
+      add_header Access-Control-Allow-Origin $mf_cors_origin;
+      add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
+      add_header Access-Control-Allow-Headers "Content-Type, Range";
+      add_header Access-Control-Max-Age 86400;
+      add_header Content-Length 0;
+      return 204;
+    }
+
+    root  /usr/local/nginx/plugin-demo/dist;
+    index   index.html  index.htm;
+    try_files   $uri  $uri/ /index.html;
+  }
+
+	# 接口前缀
+  location /api/ {
+    proxy_set_header  Host  $http_host;
+    proxy_set_header  X-Real-IP $remote_addr;
+    proxy_set_header  REMOTE-HOST $remote_addr;
+    proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header  X-Forwarded-Proto $scheme;  # 添加这一行
+    proxy_pass  https://172.17.0.1:9112;
+  }
+
+	# —— 缓存策略 ——
+	# manifest 会被 Host 以 no-store 拉取，不用特殊处理；
+	# 产物文件名带 hash，可放心长缓存
+	location ~* \.(js|css|woff2?)$ {
+		root /path/to/plugin-demo/dist;
+		add_header Cache-Control "public, max-age=31536000, immutable";
+		# 同样补 CORS 头
+		add_header Access-Control-Allow-Origin "*" always;
+	}
+}
+```
+
+> **要点**：
+>
+> - `try_files ... /index.html` 保证独立预览路由（含 `/embed/...`）能直达；但生产 iframe 的 `iframeUrl` 应指向一个**完整页面 URL**，且该页是 no-host 的裸页面（第 8 章）。
+> - 长缓存只对 **hash 文件名** 资源开；`remoteEntry.js` 由 Host 的 `?v=` 参数破坏缓存（§5），Nginx 侧不必额外处理。
+> - 若有 CDN，让 CDN 透传 CORS 头，或在其上配置同款 header。
+
+---
+
+## 4. Registry 注册
+
+联系 Host 管理员在 `plugins-registry.json` 添加 / 更新一条。**只改 registry，不必改 Host 语言包**（Host 用 `pickPluginLocaleText` 读 locale map，见第 11 章 §1）。
+
+### 4.1 标准条目（React，方式一独立路由页）
+
+```json
+{
+	"id": "myPlugin",
+	"title": {
+		"zh-CN": "我的插件",
+		"en-US": "My plugin"
+	},
+	"description": {
+		"zh-CN": "插件一句话说明。",
+		"en-US": "One-line plugin description."
+	},
+	"routePath": "/my-plugin",
+	"entry": "https://your-domain.com:9008/mf-manifest.json",
+	"version": "1.0.0",
+	"hostApiRange": "^1.0.0",
+	"menu": {
+		"order": 10,
+		"icon": "Puzzle"
+	},
+	"permissions": ["ui:toast", "http:plugin-api"],
+	"enabled": true,
+	"trust": "first-party"
+}
+```
+
+### 4.2 方式二（业务页内嵌）在标准条目上**追加**
+
+```json
+{
+	"id": "myPlugin",
+	"host": {
+		"surface": "learningNotes",
+		"slot": "drawer",
+		"icon": "Notebook",
+		"order": 5
+	}
+}
+```
+
+> 字段细节见第 7 章 §2；`surface` / `slot` / `icon` / `order` 决定它在业务页的哪个位置出现。
+
+### 4.3 方式三（iframe 隔离）在标准条目上**改两个字段**
+
+```json
+{
+	"id": "thirdPartyPlugin",
+	"trust": "untrusted",
+	"iframeUrl": "https://partner.example.com:9007/embed/third-party",
+	"entry": "https://partner.example.com:9007/mf-manifest.json",
+	"version": "1.0.0",
+	"hostApiRange": "^1.0.0"
+}
+```
+
+> `untrusted` 要求 `iframeUrl` 且**生产必须 https**（`verifyPlugin` 会抛 `ORIGIN` 错误）。`routePath` 不适用于 iframe（Host 用 iframe 承载，不注入路由）。
+
+### 4.4 Vue 子应用（第 9 章）——**必须**追加 `framework` 与 `expose`
+
+```json
+{
+	"id": "vuePlugin",
+	"framework": "vue",
+	"expose": "./App",
+	"entry": "https://your-domain.com:9009/mf-manifest.json",
+	"title": { "zh-CN": "Vue 插件", "en-US": "Vue plugin" },
+	"version": "1.0.0",
+	"hostApiRange": "^1.0.0",
+	"enabled": true,
+	"trust": "first-party"
+}
+```
+
+### 4.5 字段逐项说明
+
+| 字段           | 必须   | 说明                                                                                                                                                                             |
+| -------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | ✅     | 插件唯一 id，也是事件命名空间、`plugin.id`                                                                                                                                       |
+| `title`        | ✅     | 插件中心与面包屑的**多语言名**（locale map）                                                                                                                                     |
+| `description`  | ✅     | 插件中心卡片说明（locale map 或单语字符串）                                                                                                                                      |
+| `routePath`    | 方式一 | 独立路由页路径；Host 注入路由 + `plugin.routePath`                                                                                                                               |
+| `entry`        | ✅     | 指向 `mf-manifest.json` 的 URL（见 §2.2 对齐规则）                                                                                                                               |
+| `expose`       | Vue    | 要加载的 expose 名，默认 `./App`；Vue 必须显式写                                                                                                                                 |
+| `version`      | ✅     | **插件资源版本**，发版可 bump；与 Host API 无关                                                                                                                                  |
+| `hostApiRange` | ✅     | **Host 契约兼容范围**（如 `^1.0.0`），须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）。保存时 Host 会校验（`verifyPlugin` → `HOST_API`）。**勿**把 `version` 误写成 range |
+| `menu`         | 方式一 | 侧栏图标，仅 `order` + `icon`（侧栏不展示文字）                                                                                                                                  |
+| `permissions`  | ✅     | 声明插件能用的 api（第 5 章权限表）                                                                                                                                              |
+| `host`         | 方式二 | `{ surface, slot, icon?, order? }` 内嵌位置                                                                                                                                      |
+| `trust`        | ✅     | `first-party` / `partner` / `untrusted`                                                                                                                                          |
+| `enabled`      | ✅     | 是否启用（用户可自行开关）                                                                                                                                                       |
+| `framework`    | Vue    | **`"vue"`** 时 Remote 必须导出 `mount(el, bridge)`，Host 只调 mount（不装 Vue）。Vue 插件**必须写**；React 可省略                                                                |
+| `iframeUrl`    | 方式三 | `untrusted` 时必填；生产必须 https                                                                                                                                               |
+| `integrity`    | 可选   | SRI hash，`skipIntegrity` 关闭时 Host 会校验                                                                                                                                     |
+
+> **不要写** `titleKey` / `descriptionKey` / `menu.nameKey`。插件**内部** UI 文案用自有字典 + `api.locale`（第 11 章），与 registry 标题是**两套东西**。
+
+---
+
+## 5. 发版与缓存破坏（重要）
+
+### 5.1 机制（Host 侧自动完成）
+
+看 `packages/federation-kit/src/mf/mf.ts` 的 `fetchManifestMeta` / `resolvePluginBust`：
+
+```ts
+// 1. Host 对 entry（mf-manifest.json）做一次 GET（no-store，不落缓存）
+//    → 读 manifest 内容，算出 remoteEntry 绝对地址（不再二次请求 manifest）
+// 2. 用 manifest 内容的 hash 作为指纹：bust = version@manifestHash
+// 3. registerRemote 时给 remoteEntry.js 追加 ?v=<bust>，破坏浏览器对固定名的强缓存
+// 4. bust 变化 → ensurePlugin 判定需要重新加载，从而拿到你的新代码
+```
+
+| 场景                      | bust                   | Host 行为                                 |
+| ------------------------- | ---------------------- | ----------------------------------------- |
+| trusted MF（方式一 / 二） | `version@manifestHash` | 拉 manifest → 指纹 → `remoteEntry.js?v=…` |
+| untrusted（方式三）       | 仅 `version`           | 直接走 `iframeUrl`，不经过 MF entry       |
+
+### 5.2 你只需要做一件事
+
+```bash
+# 改了代码 → 重新构建 → 重新部署 dist（覆盖旧产物）
+pnpm build && <upload dist to Nginx>
+```
+
+> **不需要**（也**不应该**）为刷新缓存去改 Host 的 `plugins-registry.json`。`version` 可以 bump（作为语义化版本记录），但真正的缓存破坏靠 manifest 内容指纹——**你新构建的 manifest 内容变了，指纹就变**，Host 自动感知。
+>
+> 桌面端用户需安装含该逻辑的 Host 壳（缓存破坏发生在 Host 运行时，不在浏览器 HTTP 缓存层面强依赖）。
+
+### 5.3 验证发版生效
+
+- 进插件时 Network 里 `mf-manifest.json` 应**只有一条**。
+- `remoteEntry.js?v=<新指纹>` 与上次不同 = 新版本已生效。
+- 若 Network 出现两条 manifest，是 Host 缓存逻辑异常，报 Host 排查。
+
+---
+
+## 6. 验收清单
+
+### 6.1 功能验收
+
+| 检查项               | 验收标准                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Vite 配置            | `shared.singleton: true`（仅 react/react-dom）；`optimizeDeps.exclude` React；重依赖建议 `include`（第 3 章） |
+| 组件导出             | React 有 `default` 导出且收 `HostBridgeProps`；Vue 收 `props.bridge`（第 4 章 / 第 9 章）                     |
+| Vue registry         | `"framework": "vue"` + expose `mount(el, bridge)`（第 9 章）                                                  |
+| 自有 i18n            | 有插件字典；MF 下调用 `useHostLocale(api)`（第 11 章）                                                        |
+| 无 `api.t` 依赖      | 不依赖 Host 翻译函数（第 11 章）                                                                              |
+| 样式                 | **每个 expose 入口** `import '@/styles.css'`；隔离由 Host 负责（第 10 章）                                    |
+| API 使用             | 受限 API 用前判空（第 5 章）                                                                                  |
+| 独立预览             | 可 `pnpm dev` 独立运行；`?lang=en-US` 正常（第 12 章）                                                        |
+| Host 集成            | 通过 Registry 加载并正常显示；悬浮层样式与独立预览一致                                                        |
+| Registry 文案        | 配了 `title` / `description` locale map；**无** `titleKey` / `descriptionKey` / `menu.nameKey`                |
+| 路由导航             | `routePath` 配置正确，可正常访问；面包屑标题正确                                                              |
+| 应用级全屏（若需要） | 声明 `ui:toast`；进出调用 `api.ui.setAppFullscreen`；卸载时退出影院态                                         |
+| 独立路由边距         | Host 已套 `PluginPageShell`；插件**勿**再叠同等外层 padding（第 6 章 §3）                                     |
+| 缓存生效             | 发版后 `remoteEntry.js?v=` 指纹变化，无二次请求 manifest                                                      |
+
+### 6.2 安全验收
+
+| 检查项     | 验收标准                                                           |
+| ---------- | ------------------------------------------------------------------ |
+| 信任等级   | 按实际选择 `first-party` / `partner` / `untrusted`                 |
+| 权限声明   | **最小权限**，只声明必要的（第 5 章）                              |
+| CORS 配置  | 生产环境正确（§3）；`untrusted` 的 iframeUrl 生产必须 https        |
+| 无全局污染 | 不修改 `html` / `body` 全局样式；不动 portal container（第 10 章） |
+
+### 6.3 性能验收
+
+| 检查项   | 验收标准                                              |
+| -------- | ----------------------------------------------------- |
+| 懒加载   | 首次进入页面时才加载（Host `ensurePlugin` 按需触发）  |
+| 缓存策略 | 资源带 hash 长缓存；manifest 每次 no-store 拉取（§5） |
+| 资源大小 | 打包产物体积合理；重依赖拆出来按需加载                |
+
+---
+
+## 7. 常见问题
+
+### Q1：为什么我的插件无法加载？
+
+**可能原因**：`entry` URL 不正确 / CORS 配置错误 / `shared` 依赖版本不匹配 / 缺少 `default` 导出。
+
+**排查步骤**：
+
+1. Console 是否有错误信息（`[PluginManager] load xxx failed` 会带原因）。
+2. Network：进入插件时 `mf-manifest.json` 通常**仅 1 条**；`remoteEntry.js?v=…` 须 200。
+3. 报 `Module ./X does not exist in container`：线上 Remote 未部署含该 expose 的构建（勿只发 Host）。
+4. 确认 registry 配置正确；Remote CORS 允许 Host fetch manifest。
+
+### Q2：为什么我的样式影响了 Host 页面？
+
+Host 应对 Remote CSS 做选择器前缀隔离（`/*mf-iso:3*/` + `data-mf-style-realm`）。若仍污染：
+
+- 未走到 `beginPluginStyleCapture` / `attachPluginStyleIsolation`（第 10 章；`PluginHostPage` 须 useLayoutEffect）。
+- head 仍是旧 `@scope` / `mf-iso:2`（硬刷新升版 Host）。
+- 插件绕过 head 写全局样式；或误配 `trust: "untrusted"`（该隔离由 iframe 负责）。
+- Host sonner 被误包（应见 `data-mf-host-style`）。
+
+**Remote 侧**：可继续用 Tailwind；**勿**手写 portal container / 改 createPortal（第 10 章）。
+
+### Q2.1：独立预览正常，嵌进 Host 后 Tooltip / 菜单没样式？
+
+**最先查**：expose 是否 `import '@/styles.css'`（第 10 章 §2）。其次：弹层是否在 `[data-mf-portal-scope]` 内且带 `data-mf-style-realm`；插件根是否有 `data-plugin-root`。
+
+### Q2.2：Vue 插件在 Host 里白屏 / 被当 React 渲染？
+
+确认 registry 有 `"framework": "vue"`，且 expose 为 `mount(el, bridge)` / `{ mount }`（勿直接 export SFC）。见第 9 章。
+
+### Q3：如何在插件中使用 shadcn/ui？
+
+```bash
+# 在插件项目里初始化并添加组件
+pnpm dlx shadcn@latest init
+pnpm dlx shadcn@latest add button
+```
+
+对齐参考实现的 `components.json` / `styles.css` token（第 10 章 §3）；确保 expose 入口 import 了 `styles.css`。
+
+### Q4：iframe 模式下如何调试？
+
+1. Chrome DevTools 选择 **iframe 上下文**。
+2. 用 `window.parent` 检查父窗口。
+3. Console 里 `postMessage` 到 `window.parent` 测试协议（channel `dnhyxc-mf-iframe`，见第 8 章）。
+
+### Q5：如何更新插件版本？
+
+1. 更新 `package.json` 版本号（可选，语义化记录）。
+2. 更新 registry `version` 字段。
+3. 重新构建并部署（§5：真正的缓存破坏靠 manifest 指纹，发版不必改 Host registry 其他字段）。
+4. Host 自动检测版本 / 指纹变化并重新加载。
+
+### Q6：全屏后 Host 侧栏还在？
+
+元素级 `requestFullscreen` 不会藏 Host 壳。用应用级 API：
+
+```ts
+// 进入（藏侧栏/顶栏；Tauri 窗口 / Web document 全屏）
+await api.ui?.setAppFullscreen?.(true);
+// 退出（务必回写 false，否则离开页后 Host 仍无侧栏）
+await api.ui?.setAppFullscreen?.(false);
+```
+
+前提：registry 有 `ui:toast` 权限（`api.ui` 才有 `setAppFullscreen`）。**全局唯一态**：多插件不要同时抢影院开关；drawer / Tab 内嵌一般不要调用。
+
+### Q7：`HOST_API` 版本不兼容（保存 registry 时报错）？
+
+`hostApiRange`（如 `^1.0.0`）必须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）。**不要**把插件 `version` 的 bump 误写成 `hostApiRange`——一个是资源版本，一个是契约范围。
+
+---
+
+## 8. 参考与延伸
+
+| 主题                                        | 章节 / 源码                                                          |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `resolvePluginBust` / manifest 指纹         | `packages/federation-kit/src/mf/mf.ts`                               |
+| `verifyPlugin`（hostApiRange / https 校验） | `packages/federation-kit/src/runtime/PluginVerifier.ts`              |
+| registry 读取 / 缓存                        | Host `createFederation` → `fetchRegistry`（见 host-guide）           |
+| 完整缓存破坏方案                            | `apps/frontend/docs/plugin-entry-cache-bust.md`、host-guide 相应章节 |
+| Host 侧如何注册插件                         | `docs/host-guide`（Host 视角）                                       |

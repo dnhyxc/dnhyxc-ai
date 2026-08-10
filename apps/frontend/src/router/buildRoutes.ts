@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { routeInjector } from '@/plugins';
+import { routeInjector } from '@/federation';
 import routes, { type RouteConfig } from './routes';
 
 /** 插件壳未就绪时占住 `*`，避免刷新子项目路径先闪 404 */

@@ -1,0 +1,325 @@
+# 12 · 独立预览、生命周期钩子与调试
+
+> **本章目标**：让你的子项目能脱离 Host 独立跑起来自测（`pnpm dev`），讲清 `activate` / `deactivate` 钩子的时序与正确写法，并给出 Host 控制台调试命令与常见错误对照表。
+>
+> 对应源码：`packages/federation-kit/src/runtime/createPluginRuntime.ts`（`runLoad` / `unloadPlugin` 是钩子调用方）；参考实现：本仓外 `apps/remote-plugins/src/utils/mockHost.ts`、`apps/micro/src/views`。
+
+---
+
+## 1. 为什么必须能「独立预览」
+
+> 铁律（第 1 章已立）：**你的子项目必须能单独 `pnpm dev` 跑起来**。否则你没法快速迭代 UI，每次改一点都要去 Host 里点进来验证。
+
+三种模式里，独立预览是自测的基础，Mock 的重点就是模拟 Host 会怎么调你的组件：
+
+| 嵌入场景 | 独立预览要模拟什么 |
+|----------|--------------------|
+| MF 嵌入（方式一 / 二） | `props = { api, plugin }`：mock 出 `api` 与 `plugin` |
+| iframe 隔离（方式三） | `connectIframeHost` 握手 → 之后才是业务组件（见第 8 章） |
+
+> 本章只讲 MF 嵌入的预览；iframe 的预览是打开 `/embed/...` 路径。
+
+---
+
+## 2. `src/utils/mockHost.ts`：Mock HostBridge 全实现
+
+```ts
+// src/utils/mockHost.ts —— 独立预览用的假 HostBridge
+// 设计目标：与 createHostBridge 组装出来的 api「长得一样」，能触发你的组件所有分支
+export function mockApi(extra?: Record<string, unknown>) {
+	return {
+		// —— 永远有的三样：theme / locale / event ——
+		// theme 给个默认值即可；想测暗色主题就 theme: 'dark'
+		theme: 'light' as const,
+
+		// 关键：刻意不传 locale！
+		// useHostLocale 快照分支是 isLocale(undefined) → false，静默跳过；
+		// 独立预览的语言完全由 URL ?lang= 或手动 applyHostLocale 控制（第 11 章 §8）
+		// event 提供 no-op 实现，让 useHostLocale 的事件分支安全退订
+		event: {
+			on: () => undefined,
+			off: () => undefined,
+			emit: () => undefined,
+		},
+
+		// —— 需要权限的 API：mock 时按需提供 ——
+		// showToast 在独立预览只是打日志；嵌入后由 Host 的真实现接管
+		ui: {
+			showToast: (o: { message: string }) => console.info('[toast]', o.message),
+			// setAppFullscreen：独立预览没有 Layout 影院态，no-op 即可；
+			// 嵌入主站时用真实现（藏 Host 壳），这里只是占位让组件不报错
+			setAppFullscreen: async (full: boolean) => {
+				console.info('[setAppFullscreen]', full);
+			},
+		},
+		// ...extra：用不上的能力（navigate/http/modules）按需通过 extra 追加
+		...extra,
+	};
+}
+
+// mock 插件元信息：与 Host 传给你的 plugin 字段一致
+export function mockPlugin(id: string, routePath: string, version = '1.0.0') {
+	return { id, version, routePath };
+}
+```
+
+> **意图**：`mockApi` 是「测试替身」，把 `createHostBridge` 的**形状**复刻出来——永远有的三样 + 按权限的可选能力。`...extra` 让你在 main.tsx 里临时追加某个能力（如 `http`、`navigate`）来测对应分支。**不传 locale 是刻意的**（见注释），保证独立预览与嵌入模式的 i18n 逻辑互不串扰。
+
+---
+
+## 3. `src/main.tsx`：独立预览入口
+
+```tsx
+// src/main.tsx —— 仅独立预览使用；嵌入 Host 时不执行（Host 只加载 exposes）
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';          // 预览样式：嵌入时靠每个 expose 入口 import（第 10 章）
+import App from './App';
+import { mockApi, mockPlugin } from '@/utils/mockHost';
+import { applyHostLocale } from '@/i18n';
+import { isLocale } from '@/i18n/types';
+
+// ① URL ?lang=en-US 切语言（第 11 章 §8）
+const urlLang = new URLSearchParams(window.location.search).get('lang');
+if (isLocale(urlLang)) applyHostLocale(urlLang);
+
+// ② 组装 mock bridge：需要测哪个能力就在这临时加
+const api = mockApi({
+	http: {
+		get: async (url: string) => {
+			console.log('[mock-get]', url);
+			return { data: 'mock data' };
+		},
+		post: async (url: string, body?: unknown) => {
+			console.log('[mock-post]', url, body);
+			return { success: true };
+		},
+		put: async (url: string, body?: unknown) => {
+			console.log('[mock-put]', url, body);
+			return { success: true };
+		},
+		delete: async (url: string) => {
+			console.log('[mock-delete]', url);
+			return { success: true };
+		},
+	},
+	navigate: (to: string) => console.info('[mock-navigate]', to),
+});
+
+// ③ plugin 元信息：id / routePath / version
+const plugin = mockPlugin('myPlugin', '/my-plugin', '1.0.0');
+
+// ④ 直接渲染你的主组件，props 与嵌入时一致
+createRoot(document.getElementById('root')!).render(
+	<StrictMode>
+		<App api={api} plugin={plugin} />
+	</StrictMode>,
+);
+```
+
+> **意图**：预览入口就是「把 mock bridge 传进主组件」。你的组件在这里跟嵌入 Host 时**拿到的 props 结构完全一样**，所以 UI 逻辑、`useI18n`、`useHostLocale`、权限判空都会被覆盖测试到。`navigate` 在 mock 里只打日志，避免开发时误触发真路由跳走。
+
+---
+
+## 4. 若你有内部路由（子页面）
+
+如果主组件内部用 `react-router` 管理子页面（第 6 章 §4 的 basename 写法），预览入口要包 `BrowserRouter`：
+
+```tsx
+// src/main.tsx —— 含内部路由时
+import { BrowserRouter } from 'react-router';
+import App from './App';
+import { mockApi, mockPlugin } from '@/utils/mockHost';
+
+// basename 与嵌入时保持一致（plugin.routePath），这样子链接行为一致
+createRoot(document.getElementById('root')!).render(
+	<StrictMode>
+		<BrowserRouter basename="/my-plugin">
+			<App api={mockApi()} plugin={mockPlugin('myPlugin', '/my-plugin')} />
+		</BrowserRouter>
+	</StrictMode>,
+);
+```
+
+---
+
+## 5. package.json 脚本
+
+```json
+{
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview"
+	}
+}
+```
+
+```bash
+# 独立预览：访问 http://127.0.0.1:9008/
+pnpm dev
+
+# 换语言预览：http://127.0.0.1:9008/?lang=en-US
+```
+
+---
+
+## 6. 生命周期钩子：时序与正确写法
+
+### 6.1 谁在什么时候调用
+
+看 Host 的 `runLoad` / `unloadPlugin`（`packages/federation-kit/src/runtime/createPluginRuntime.ts`）：
+
+```ts
+// —— 加载时（简化）——
+// 1. verifyPlugin(meta)：校验 hostApiRange 等契约
+// 2. registerRemote(meta, bust)：注册 remote（带缓存指纹）
+// 3. beginPluginStyleCapture：开始捕获你的 CSS
+// 4. loadRemoteApp(meta)：加载你 exposes 里的 default
+// 5. mod.activate?.(bridge.api)：加载成功后再调 activate，把 bridge.api 交给钩子
+// 6. status 置为 'activated'，Host 开始渲染你的组件
+```
+
+```ts
+// —— 卸载时（简化）——
+// 1. await loaded.mod.deactivate?.()：先调 deactivate（异常会被捕获，不阻断卸载）
+// 2. eventBus.clearPlugin(id)：清空你的事件订阅
+// 3. routeInjector.remove / sidebarInjector.remove：移除你的路由与侧栏项
+// 4. status 置为 'unloaded'
+```
+
+| 钩子 | 调用时机 | 参数 | 返回值 |
+|------|----------|------|--------|
+| `activate(api)` | 模块**加载成功**后、渲染前 | `HostBridgeProps['api']` | `Promise<void>` 或 `void` |
+| `deactivate()` | 模块**卸载前** | 无 | `Promise<void>` 或 `void` |
+
+> **时序要点**：`activate` 在 **组件还没渲染** 时执行——适合做一次性初始化（订阅 Host 事件、预取数据、注册定时器）。`deactivate` 在 **路由/侧栏移除前** 执行——适合清理。两者都是**可选**的。
+
+### 6.2 必须拆文件（Fast Refresh 铁律）
+
+> **HMR 注意**：`activate` / `deactivate` 与 React 组件写在**同一文件**，Vite Fast Refresh 会把整个模块当「非组件导出」处理 → **整页刷新**。开发态会连刷两次，并打断 Host 对 remote 的 `import()`，报「Importing a module script failed」。
+
+正确结构：
+
+```tsx
+// src/App.tsx —— 只放 React 组件，绝不放钩子
+export default function App({ api, plugin }: HostBridgeProps) {
+	// 页面副作用放组件里（比如 useEffect 订阅），不依赖 activate
+	return <div className="plugin-standalone" data-plugin-root>{/* ... */}</div>;
+}
+```
+
+```ts
+// src/lifecycle.ts —— 非组件导出单独放一个文件
+import type { HostBridgeProps } from '@/types/host';
+
+// 一次性初始化：订阅 Host 事件、预取数据
+export async function activate(api: HostBridgeProps['api']) {
+	// 示例：订阅业务事件（event 以你的插件 id 为命名空间，见第 5 章 §6）
+	api.event.on('book-changed', (data) => {
+		console.log('书籍变更:', data);
+	});
+
+	// 示例：预取初始化数据（需要 http:plugin-api 权限，用前判空）
+	await api.http?.get('/api/init-data');
+}
+
+// 卸载清理：退订 / 清定时器 / 关连接
+export async function deactivate() {
+	console.log('插件停用，清理资源');
+}
+```
+
+```ts
+// src/index.ts —— MF expose 入口（尽量少改，避免触发整页 reload）
+import '@/styles.css'; // Host 不跑 main；样式必须挂在 expose 上（第 10 章 §2）
+export { default } from './App';
+export { activate, deactivate } from './lifecycle';
+```
+
+> **为什么这样**：每次你改 `App.tsx`，Fast Refresh 只热更组件；`lifecycle.ts` 的钩子不在同文件，不会把组件模块标记成「不可热更」。而 `index.ts` 只做 re-export，稳定不动。
+
+### 6.3 钩子注意事项
+
+| 注意事项 | 说明 |
+|----------|------|
+| **可选** | 无全局副作用就不要导出空钩子（空钩子也属于「非组件导出」，会害了 Fast Refresh） |
+| **与组件分离** | 钩子放 `lifecycle.ts`，组件放 `App.tsx`，入口 re-export |
+| **异步支持** | 钩子支持 `async/await`，Host 会 await 完成后再置状态 |
+| **错误处理** | 钩子抛错会被 Host 捕获并记录（`console.error('[PluginManager] load/deactivate …')`），不阻断整体 |
+| **资源清理** | 实现了 `deactivate` 就必须清理订阅 / 定时器 / 连接；Host 也会 `eventBus.clearPlugin(id)` 兜底清事件，但定时器不会 |
+
+---
+
+## 7. Host 侧调试（在 Host 的控制台里）
+
+嵌入 Host 后出问题，先在 Host 的 DevTools Console 里诊断：
+
+```javascript
+// 查看所有插件及状态（status: loading/activated/failed/unloaded）
+pluginManager.list().map((p) => ({ id: p.meta.id, status: p.status }));
+
+// 看单个插件的元信息
+pluginManager.get('myPlugin')?.meta;
+
+// 强制重新加载（重新拉 registry + 重新解析 manifest 指纹 + 重新 import）
+await pluginManager.ensurePlugin('myPlugin', { force: true });
+
+// 启用 / 停用（同步侧栏）
+await pluginManager.setEnabled('myPlugin', false);
+await pluginManager.setEnabled('myPlugin', true);
+
+// 清掉 registry 缓存（Host 把 registry 缓存进 localStorage）
+localStorage.removeItem('dnhyxc.plugin.registry.dev.v1');
+location.reload();
+```
+
+### 7.1 Network 面板该看到什么
+
+| 请求 | 出现时机 | 正常表现 |
+|------|----------|----------|
+| `mf-manifest.json` | 每次 `ensurePlugin` | **只有一条**（Host 缓存指纹） |
+| `remoteEntry.js?v=<hash>` | 首次加载 / 指纹变化 | 200，带 `?v=` 参数 |
+| `assets/*.js`、`*.css` | remoteEntry 执行后按需加载 | 200 |
+
+> 常见异常：进入插件时 Network 里 **两条以上** `mf-manifest.json` → Host 缓存逻辑没生效，属于 Host 问题（报 Host）。`remoteEntry.js` 加载失败 → 检查 CORS 与 `base`（第 13 章）。
+
+### 7.2 Chrome DevTools 面板速查
+
+| 面板 | 用途 |
+|------|------|
+| Console | `pluginManager.list()`、钩子错误日志、你自己的 `console.log` |
+| Network | `mf-manifest.json` / `remoteEntry.js?v=` 加载情况 |
+| Elements | 检查 `[data-mf-style-realm]`、`data-plugin-root`、`[data-mf-portal-scope]`（第 10 章） |
+| Application → Local Storage | 检查 registry 缓存 key、你的 `remote_plugins_locale_bootstrap` |
+| iframe 模式 | 选择 iframe 上下文；`window.parent` 看父窗口（第 8 章 §7） |
+
+---
+
+## 8. 常见错误对照表
+
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| `Invalid hook call` | 双 React（你的实例和 Host 实例不共享） | 检查 `shared.react/react-dom.singleton: true` 和 `optimizeDeps.exclude`（第 3 章） |
+| `Failed to resolve virtual:mf` | Vite 依赖缓存失效 | 删除 `node_modules/.vite`，或确认 `clearMfViteDepCache` 插件在跑；重启 `pnpm dev` |
+| `Access-Control-Allow-Origin` | CORS 被拦 | 检查 `server.cors`、`server.headers`、生产 Nginx 配置（第 3 章 / 第 13 章） |
+| `missing default export` | expose 模块没 default 导出 | React：`export default function App`；Vue：`export default { mount }`（第 4 章） |
+| `HOST_API` 版本不兼容 | `hostApiRange` 没覆盖 Host 版本 | `hostApiRange` 须覆盖 Host `VITE_HOST_API_VERSION`（默认 `1.0.0`）；**别**把插件 `version` bump 误写成 `hostApiRange`（第 13 章） |
+| 加载报 `Module ./X does not exist in container` | 线上 Remote 没部署含该 expose 的构建 | 确认线上 Remote 已部署；只发 Host 没用 |
+| HMR 整页刷两次 / `Importing a module script failed` | 同文件混出 `activate`；或运行中发现新依赖触发重打包 | 拆 `lifecycle.ts`；`optimizeDeps.include` 预打包重依赖（如 tiptap）；重启 remote `pnpm dev` |
+| Vue 嵌 Host 白屏 / 报须导出 mount | 还 `export default` SFC | 改为 `export default { mount }`，在 mount 内 `createApp`（Host 不装 Vue，第 9 章） |
+| 组件没跑 `activate` | 钩子没在 `exposes` 里 re-export | `index.ts` 里 `export { activate, deactivate } from './lifecycle'` |
+| 进入插件后 Network 有两条 manifest | Host 缓存逻辑异常 | 报 Host 查 `resolvePluginBust` / registry 缓存（第 13 章 §5） |
+
+---
+
+## 9. 检查表
+
+| 检查项 | 要求 |
+|--------|------|
+| 独立可跑 | `pnpm dev` 能独立预览；`?lang=en-US` 能切语言 |
+| mock 完整 | `mockApi` 覆盖你用到的最小能力集；`mockPlugin` 传对 id/routePath/version |
+| 钩子可选且分离 | 无副作用不导出空钩子；有钩子则放 `lifecycle.ts`，入口 re-export |
+| 钩子语义正确 | `activate` 做一次性初始化；`deactivate` 做资源清理 |
+| 权限判空 | 受限 API 用前判空（第 5 章） |
+| Host 自测 | 嵌入 Host 后 Console 无报错；`pluginManager.list()` 状态为 `activated` |

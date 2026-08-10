@@ -1,5 +1,5 @@
 import { matchPath } from 'react-router';
-import { pickPluginLocaleText } from '@/plugins/core/types/localeText';
+import { pickPluginLocaleText } from '@/federation';
 import { buildRoutes } from '@/router/buildRoutes';
 import { type RouteConfig, type RouteMeta } from '@/router/routes';
 

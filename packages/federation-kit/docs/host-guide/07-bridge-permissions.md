@@ -1,0 +1,384 @@
+# 07 · HostBridge 与权限：子应用能拿到什么
+
+> **本章目标**：讲清「插件通过什么拿到宿主能力」「权限如何裁剪能力」「宿主如何注入 capabilities」，以及 untrusted 插件的 iframe RPC 扩展。
+>
+> 对应源码：`packages/federation-kit/src/bridge/createHostBridge.ts`、`packages/federation-kit/src/bridge/attachIframeBridge.ts`、`packages/federation-kit/src/host-api/EventBus.ts`、`packages/federation-kit/src/config/types.ts`。
+
+---
+
+## 1. 一句话模型
+
+> **HostBridge = 宿主发给插件的「能力钱包」**。它是一个 props 对象 `{ api, plugin }`：
+> - `api` 里按插件**声明的 permissions** 裁剪出能力（Toast / 导航 / http / 业务模块 / 事件总线）；
+> - `plugin` 里是插件自身身份（id / version / routePath）。
+>
+> 整个对象被**深度冻结**（`deepFreeze`），插件只能调用、不能篡改。
+
+类型定义（`packages/federation-kit/src/types/index.ts`）：
+
+```ts
+export interface HostBridgeProps {
+  api: Readonly<{
+    // 主题快照（'light' | 'dark'），创建时读取，无热同步
+    theme: 'light' | 'dark';
+    // 当前 locale（zh-CN | en-US）；会随宿主语言热更新
+    locale: HostLocale;
+    // 受限导航：仅允许跳转到自己 routePath 前缀内（需要 nav:subtree 权限）
+    navigate?: (to: string) => void;
+    // 插件域事件总线：插件内部模块通信 / 宿主 ↔ 插件事件
+    event: {
+      on: (event: string, handler: (data?: unknown) => void) => void;
+      off: (event: string, handler: (data?: unknown) => void) => void;
+      emit: (event: string, data?: unknown) => void;
+    };
+    // 宿主 http 客户端（需要 http:plugin-api 权限）
+    http?: { get: ...; post: ...; put: ...; delete: ... };
+    // 宿主 UI 能力（需要 ui:toast 权限）
+    ui?: {
+      showToast: (options: { message: string; type?: 'success' | 'error' | 'info' }) => void;
+      setAppFullscreen?: (full: boolean) => Promise<void>;
+      downloadBlob?: (options: { fileName: string; data: ArrayBuffer | Uint8Array; mimeType?: string }) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
+    };
+    // 业务模块（需要 modules:xxx 权限），如 modules.ebook / modules.openThread
+    modules?: Readonly<Record<string, unknown>>;
+  }>;
+  // 插件身份
+  plugin: Readonly<Pick<PluginDescriptor, 'id' | 'version' | 'routePath'>>;
+}
+```
+
+---
+
+## 2. `createHostBridge`：按权限裁剪能力
+
+`packages/federation-kit/src/bridge/createHostBridge.ts`（逐行注释）：
+
+```ts
+import type { HostCapabilities } from '../config/types';
+import { deepFreeze } from '../host-api/deepFreeze';
+import { eventBus } from '../host-api/EventBus';
+import type { HostBridgeProps, PluginDescriptor } from '../types';
+
+// 按 permissions ∩ capabilities 组装并密封
+export function createHostBridge(
+  d: PluginDescriptor,           // 插件描述符（含 permissions）
+  capabilities: HostCapabilities, // 宿主能力（适配层注入）
+  navigate: (to: string) => void = capabilities.navigate, // 导航实现
+): HostBridgeProps {
+  // 把权限字符串放进 Set，O(1) 判断
+  const allow = new Set(d.permissions);
+
+  // 基础能力：theme / locale / event 无需任何权限，永远提供
+  const api: Record<string, unknown> = {
+    // 主题快照：创建时读一次（MF 无主题热推送）
+    theme: capabilities.getTheme(),
+    // 当前 locale：创建时读一次；热更新靠 PluginHostView 的 withLiveLocale + eventBus
+    locale: capabilities.getLocale(),
+    // 事件总线：作用域限定在"该插件"内（eventBus.on(d.id, ...)）
+    event: {
+      // on：绑定插件域事件
+      on: (event: string, handler: (data?: unknown) => void) => eventBus.on(d.id, event, handler),
+      // off：解绑
+      off: (event: string, handler: (data?: unknown) => void) => eventBus.off(d.id, event, handler),
+      // emit：触发插件域事件
+      emit: (event: string, data?: unknown) => eventBus.emit(d.id, event, data),
+    },
+  };
+
+  // 权限 ui:toast → 提供 api.ui（Toast / 全屏 / 下载共用此门闩）
+  if (allow.has('ui:toast') && capabilities.toast) {
+    const ui: Record<string, unknown> = {
+      // 宿主 Toast
+      showToast: capabilities.toast,
+    };
+    // 宿主若实现了全屏能力，一并提供
+    if (capabilities.setAppFullscreen) {
+      ui.setAppFullscreen = capabilities.setAppFullscreen;
+    }
+    // 宿主若实现了下载能力，一并提供（自动补上 pluginId）
+    if (capabilities.downloadBlob) {
+      ui.downloadBlob = (options: { fileName: string; data: ArrayBuffer | Uint8Array; mimeType?: string }) =>
+        capabilities.downloadBlob!({ ...options, pluginId: d.id });
+    }
+    api.ui = Object.freeze(ui);
+  }
+
+  // 权限 nav:subtree → 提供受限导航（白名单 = 自己 routePath 前缀）
+  if (allow.has('nav:subtree')) {
+    api.navigate = (to: string) => {
+      // 越界即抛错：插件只能跳自己的子树
+      if (!to.startsWith(d.routePath)) {
+        throw new Error(`NAV_OUT_OF_SCOPE: ${to}`);
+      }
+      navigate(to);
+    };
+  }
+
+  // 权限 http:plugin-api → 提供宿主 http 客户端
+  if (allow.has('http:plugin-api') && capabilities.http) {
+    api.http = Object.freeze({ ...capabilities.http });
+  }
+
+  // 业务模块：优先 buildModules（权限驱动装配器），否则按 modules:xxx 简单键匹配
+  if (capabilities.buildModules) {
+    // 语义：把"权限集合"交给装配器，由宿主决定给哪些模块
+    const built = capabilities.buildModules(allow);
+    if (built && Object.keys(built).length > 0) {
+      api.modules = Object.freeze(built);
+    }
+  } else {
+    // 简单键匹配：permissions 里 modules:ebook → api.modules.ebook
+    const modules: Record<string, unknown> = {};
+    const hostMods = capabilities.modules ?? {};
+    for (const [key, value] of Object.entries(hostMods)) {
+      if (allow.has(`modules:${key}`)) {
+        modules[key] = value;
+      }
+    }
+    if (Object.keys(modules).length > 0) {
+      api.modules = Object.freeze(modules);
+    }
+  }
+
+  // 深度冻结整个 bridge：插件只能读、只能调用提供的方法，不能改结构
+  return deepFreeze({
+    api,
+    plugin: {
+      id: d.id,
+      version: d.version,
+      routePath: d.routePath,
+    },
+  }) as HostBridgeProps;
+}
+```
+
+### 2.1 权限 → 能力 对照表
+
+| registry `permissions` | 提供的 bridge 能力 | 说明 |
+|------------------------|-------------------|------|
+| （无） | `api.theme` / `api.locale` / `api.event` | 永远提供，无需权限 |
+| `ui:toast` | `api.ui.showToast` | 宿主 Toast |
+| `ui:toast` | `api.ui.setAppFullscreen` | 应用级影院全屏（与 Toast 共用门闩）|
+| `ui:toast` | `api.ui.downloadBlob` | Web/Tauri 统一落盘 |
+| `nav:subtree` | `api.navigate` | 仅允许跳 `routePath` 前缀内 |
+| `http:plugin-api` | `api.http.get/post/put/delete` | 宿主 http 客户端 |
+| `modules:chat` | `api.modules.openThread` | 打开 `/chat/c/:id`（buildModules 装配）|
+| `modules:ebook` | `api.modules.ebook.*` | 电子书能力（buildModules 装配）|
+
+> **安全语义**：权限是**最小授权**。没声明 `http:plugin-api` 的插件拿不到 `api.http`（`api.http` 字段不存在，调用即报错）；没声明 `nav:subtree` 的插件没有 `navigate`。任何越权访问都以「字段不存在 / 抛错」兜底。
+
+---
+
+## 3. EventBus：插件域事件总线
+
+```ts
+// packages/federation-kit/src/host-api/EventBus.ts（语义摘录）
+// eventBus 是全局单例，但事件都按「插件 id 域」隔离：
+// eventBus.on(pluginId, event, handler) / emit(pluginId, event, data)
+
+// 用途举例：
+// 1) locale 热更新：PluginHostView 在 locale 变化时 eventBus.emit(pluginId, 'locale', locale)
+// 2) 插件内部模块通信：插件 A 模块 emit('ideas:open', thought)，插件 B 模块 on 订阅
+// 3) 宿主 ↔ 插件自定义事件
+```
+
+> **语义**：所有事件都带上 `pluginId` 域，避免不同插件的事件串扰。这也让 `unloadPlugin` 能 `eventBus.clearPlugin(id)` 一键清空某插件所有事件。
+
+---
+
+## 4. capabilities 注入时机（回顾）
+
+`capabilities` 是 `createHostBridge` 的输入，由适配层在 `createFederation` 时注入（详见 [04](./04-create-federation.md)）。它**不是**直接暴露给插件的——中间经过权限裁剪。
+
+```
+适配层 createFederation({ capabilities: { toast, http, getTheme, ... } })
+        │
+        ▼
+PluginManager.runLoad → createHostBridge(meta, capabilities, nav)
+        │
+        ▼
+按 meta.permissions 裁剪 → api.{ theme, locale, event, ui?, navigate?, http?, modules? }
+        │
+        ▼
+deepFreeze → 作为 props 传给插件组件 <Comp {...bridge} />
+```
+
+---
+
+## 5. iframe 隔离下的 Bridge（untrusted 插件）
+
+untrusted 插件**不能**直接拿到 bridge 对象（它是 iframe，与宿主不同 JS 上下文），只能通过 `postMessage` 走 **RPC 协议**。
+
+`packages/federation-kit/src/bridge/attachIframeBridge.ts`（逐行注释核心）：
+
+```ts
+// 通信 channel：默认 'dnhyxc-mf-iframe'
+export const DEFAULT_MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
+
+// RPC 消息格式（iframe → Host）：请求调用某方法
+type RpcMsg = { channel: string; type: 'rpc'; id: string; method: string; args: unknown[] };
+// ready 消息（iframe → Host）：握手，Host 回 init
+type ReadyMsg = { channel: string; type: 'ready'; pluginId: string };
+
+// 分发 RPC：先查扩展 extraRpc，再走内置 http/ui
+async function dispatchRpc(
+  bridge: HostBridgeProps,
+  method: string,
+  args: unknown[],
+  extra?: Record<string, (bridge, args) => unknown | Promise<unknown>>,
+): Promise<unknown> {
+  // 扩展 RPC 优先：iframeRpcHandlers 里的方法（如 ebook.getBookId）
+  if (extra?.[method]) {
+    return extra[method](bridge, args);
+  }
+  const { api } = bridge;
+  // 内置 RPC 白名单：http.* 与 ui.* 方法（方法名 = 能力路径）
+  switch (method) {
+    case 'http.get':   if (!api.http) throw new Error('HTTP_DENIED'); return api.http.get(String(args[0] ?? ''));
+    case 'http.post':  if (!api.http) throw new Error('HTTP_DENIED'); return api.http.post(String(args[0] ?? ''), args[1]);
+    case 'http.put':   if (!api.http) throw new Error('HTTP_DENIED'); return api.http.put(String(args[0] ?? ''), args[1]);
+    case 'http.delete':if (!api.http) throw new Error('HTTP_DENIED'); return api.http.delete(String(args[0] ?? ''));
+    case 'ui.showToast':
+      if (!api.ui) throw new Error('UI_DENIED');
+      api.ui.showToast(args[0] as { message: string; type?: 'success' | 'error' | 'info' });
+      return null;
+    case 'ui.downloadBlob': { /* 校验参数后调用 api.ui.downloadBlob */ }
+    default:
+      throw new Error(`UNKNOWN_RPC: ${method}`);
+  }
+}
+
+// 把 bridge 能力经 postMessage 暴露给 iframe
+export function attachIframeBridge(
+  iframe: HTMLIFrameElement,
+  bridge: HostBridgeProps,
+  targetOrigin: string,
+  opts: AttachIframeBridgeOptions,
+): () => void {
+  const channel = opts.channel ?? DEFAULT_MF_IFRAME_CHANNEL;
+  const win = () => iframe.contentWindow;
+
+  // 发送 init：iframe 加载后宿主下发初始上下文（主题/locale/插件身份）
+  const sendInit = () => {
+    const w = win();
+    if (!w) return;
+    w.postMessage({ channel, type: 'init', theme: bridge.api.theme, locale: opts.getLocale(), plugin: bridge.plugin }, targetOrigin);
+  };
+
+  // locale 热更新推送
+  const pushLocale = (locale: HostLocale | string) => {
+    const w = win(); if (!w) return;
+    w.postMessage({ channel, type: 'locale', locale }, targetOrigin);
+  };
+
+  // 订阅宿主语言变化 → 推送 iframe
+  const unlistenLocale = opts.onLocaleChange?.((next) => {
+    if (next === 'zh-CN' || next === 'en-US') pushLocale(next);
+  });
+
+  // 监听 iframe 消息
+  const onMessage = (ev: MessageEvent) => {
+    // 只收自己 iframe 发来的、且 origin 匹配的消息
+    if (ev.source !== win()) return;
+    if (targetOrigin !== '*' && ev.origin !== targetOrigin) return;
+    const data = ev.data;
+    if (!isRecord(data) || data.channel !== channel) return;
+
+    // ready 握手：回 init（带最新上下文）
+    if (data.type === 'ready') {
+      const ready = data as ReadyMsg;
+      if (ready.pluginId && ready.pluginId !== bridge.plugin.id) return;
+      sendInit();
+      return;
+    }
+
+    // rpc 调用：分发并回 rpc-result
+    if (data.type !== 'rpc') return;
+    const rpc = data as RpcMsg;
+    if (typeof rpc.id !== 'string' || typeof rpc.method !== 'string') return;
+    const args = Array.isArray(rpc.args) ? rpc.args : [];
+    void (async () => {
+      try {
+        const value = await dispatchRpc(bridge, rpc.method, args, opts.extraRpc);
+        win()?.postMessage({ channel, type: 'rpc-result', id: rpc.id, ok: true, value }, targetOrigin);
+      } catch (e) {
+        win()?.postMessage({ channel, type: 'rpc-result', id: rpc.id, ok: false, error: e instanceof Error ? e.message : String(e) }, targetOrigin);
+      }
+    })();
+  };
+
+  window.addEventListener('message', onMessage);
+  const onLoad = () => sendInit();
+  iframe.addEventListener('load', onLoad);
+  if (iframe.contentDocument?.readyState === 'complete') sendInit();
+
+  // 返回清理函数
+  return () => {
+    window.removeEventListener('message', onMessage);
+    iframe.removeEventListener('load', onLoad);
+    unlistenLocale?.();
+  };
+}
+```
+
+### 5.1 iframe 通信协议表
+
+| type | 方向 | 载荷 | 用途 |
+|------|------|------|------|
+| `ready` | iframe → Host | `{ pluginId }` | 握手；Host 回 `init` |
+| `init` | Host → iframe | `{ theme, locale, plugin }` | 初始上下文 |
+| `locale` | Host → iframe | `{ locale }` | 语言热更新 |
+| `rpc` | iframe → Host | `{ id, method, args }` | 能力调用 |
+| `rpc-result` | Host → iframe | `{ id, ok, value?/error? }` | RPC 响应 |
+
+### 5.2 扩展 RPC（`iframeRpcHandlers`）
+
+宿主通过 `createFederation({ iframeRpcHandlers })` 追加自定义能力给 iframe：
+
+```ts
+// apps/frontend/src/federation/runtime/index.ts（摘录）
+iframeRpcHandlers: {
+  // 例子：把 ebook 能力经 bridge.api.modules.ebook 转发给 iframe
+  'ebook.getBookId': (bridge) => {
+    const ebook = bridge.api.modules?.ebook as { getBookId: () => string | null } | undefined;
+    return ebook?.getBookId() ?? null;
+  },
+  'ebook.navigateToCfi': async (bridge, args) => {
+    const ebook = bridge.api.modules?.ebook as { navigateToCfi: (cfi: string) => void | Promise<void> } | undefined;
+    await ebook?.navigateToCfi(String(args[0] ?? ''));
+    return null;
+  },
+},
+```
+
+> **语义**：iframe 插件想用 ebook 能力，只需在注册页 `postMessage({ channel, type:'rpc', method:'ebook.getBookId', args:[] })`，宿主 `dispatchRpc` 会优先查 `extraRpc`，命中即调用宿主侧实现。**能力仍受 bridge 权限约束**（这里依赖 `modules:ebook` 权限先注入了 `api.modules.ebook`）。
+
+---
+
+## 6. 插件侧如何使用 bridge（概念预览）
+
+```tsx
+// 插件组件签名：props 就是 HostBridgeProps
+export default function IdeasListApp({ api }: HostBridgeProps) {
+  // 直接读主题/语言
+  const isDark = api.theme === 'dark';
+  const locale = api.locale;
+
+  // 调宿主 Toast（需 ui:toast 权限）
+  api.ui?.showToast({ type: 'success', message: '保存成功' });
+
+  // 调宿主 http（需 http:plugin-api 权限）
+  const data = await api.http?.get('/api/xxx');
+
+  // 受限导航（需 nav:subtree 权限）
+  api.navigate?.('/ideas/1');
+
+  // 业务模块（需 modules:ebook 权限）
+  const ebook = api.modules?.ebook as EbookModules | undefined;
+  const bookId = ebook?.getBookId();
+}
+```
+
+> **语义**：插件从不 import 宿主代码——一切能力都是 props 传入的 bridge。这保证了「宿主 ↔ 插件零静态耦合」，插件可以换到任何兼容宿主上运行。
+
+> 下一步：[08-enabled-registry-impl.md](./08-enabled-registry-impl.md) 上架偏好与 registry 实现。

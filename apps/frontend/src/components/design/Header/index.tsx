@@ -1,8 +1,8 @@
 import { ChevronRight, Languages, Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
+import { routeInjector } from '@/federation';
 import { useI18n, useStorageInfo } from '@/hooks';
-import { routeInjector } from '@/plugins';
 import { buildRoutes } from '@/router/buildRoutes';
 import { resolveRouteMetaLabel } from '@/router/routeMeta';
 import { type RouteConfig } from '@/router/routes';

@@ -1,0 +1,66 @@
+{
+	"name": "@dnhyxc-ai/federation-kit",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Generic Module Federation host runtime: registry, load, bridge, style isolation",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"author": "dnhyxc <dnhyxc@163.com>",
+	"license": "MIT",
+	"scripts": {
+		"clean": "rm -rf dist",
+		"build": "pnpm clean && tsup",
+		"prepack": "pnpm build",
+		"test": "tsx src/style-isolation/styleIsolation.smoke.ts",
+		"test:watch": "tsx watch src/style-isolation/styleIsolation.smoke.ts"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./style-isolation": {
+			"types": "./dist/style-isolation/index.d.ts",
+			"import": "./dist/style-isolation/index.js",
+			"require": "./dist/style-isolation/index.cjs"
+		},
+		"./react": {
+			"types": "./dist/react/index.d.ts",
+			"import": "./dist/react/index.js",
+			"require": "./dist/react/index.cjs"
+		}
+	},
+	"peerDependencies": {
+		"@module-federation/enhanced": ">=0.0.0",
+		"react": ">=18.0.0",
+		"react-dom": ">=18.0.0"
+	},
+	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
+		"react-dom": {
+			"optional": true
+		},
+		"@module-federation/enhanced": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@module-federation/enhanced": "^2.8.0",
+		"@types/react": "^19.1.8",
+		"@types/react-dom": "^19.1.6",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"tsup": "^8.5.1",
+		"tsx": "^4.20.3",
+		"typescript": "^5.8.3"
+	}
+}

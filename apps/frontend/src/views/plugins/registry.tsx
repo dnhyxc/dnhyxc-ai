@@ -3,14 +3,14 @@ import { ListRestart, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button } from '@/components/ui/button';
-import { useI18n, useTheme } from '@/hooks';
 import {
 	fetchPluginRegistryRawText,
 	PLUGIN_REGISTRY_FILENAME,
 	type PluginRegistry,
 	pluginManager,
 	savePluginRegistry,
-} from '@/plugins';
+} from '@/federation';
+import { useI18n, useTheme } from '@/hooks';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import { RegistryFieldsHelp } from './RegistryFieldsHelp';
 
@@ -111,7 +111,7 @@ export default function PluginRegistryEditorPage() {
 			setText(payload);
 			textRef.current = payload;
 			setDocEpoch((n) => n + 1);
-			await pluginManager.init();
+			await pluginManager.init(); // 与 mf.start() 相同
 			Toast({
 				type: 'success',
 				title: t('plugins.registry.saveOk'),
