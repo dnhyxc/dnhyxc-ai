@@ -612,7 +612,7 @@ export function useHostLocale(api?: {
 
 ## 9. 生命周期钩子
 
-> **HMR 注意**：`activate` / `deactivate` 为**可选**。与 React 组件写在同一文件会导致 Vite Fast Refresh 整页刷新（开发态易连刷两次并打断 Host `import()`）。无全局副作用时不要导出空钩子；确需钩子时拆到独立文件再由入口 re-export。详见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)。
+> **HMR**：禁止与组件同文件 `export function activate/deactivate`（会整页刷新）。推荐挂在 default 静态属性上；旧写法拆 `lifecycle.ts` 仍兼容。详见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)。
 
 ### 9.1 钩子说明
 
@@ -621,37 +621,43 @@ export function useHostLocale(api?: {
 | `activate` | 模块加载后 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate` | 模块卸载前 | 无 | `Promise<void>` 或 `void` |
 
-### 9.2 钩子使用示例（建议拆文件）
+### 9.2 推荐：组件静态属性（同文件、保 Fast Refresh）
 
 ```typescript
-// App.tsx — 仅导出 React 组件
-export default function App({ api }: HostBridgeProps) {
+function App({ api }: HostBridgeProps) {
 	return <div className="plugin-standalone" data-plugin-root>...</div>;
 }
 
-// lifecycle.ts — 非组件导出单独放
-export async function activate(api: HostBridgeProps['api']) {
-	api.event.on('book-changed', (data) => {
-		console.log('书籍变更:', data);
-	});
+App.activate = async (api: HostBridgeProps['api']) => {
+	api.event.on('book-changed', (data) => console.log(data));
 	await api.http?.get('/api/init-data');
-}
+};
 
-export async function deactivate() {
-	// 清理订阅 / 定时器
-}
+App.deactivate = () => {
+	/* 清理订阅 / 定时器 */
+};
 
-// index.ts — MF expose 入口
+export default App;
+```
+
+### 9.3 兼容：拆文件 + named export
+
+```typescript
+// lifecycle.ts
+export async function activate(api: HostBridgeProps['api']) { /* ... */ }
+export async function deactivate() { /* ... */ }
+
+// index.ts
 export { default } from './App';
 export { activate, deactivate } from './lifecycle';
 ```
 
-### 9.3 钩子注意事项
+### 9.4 钩子注意事项
 
 | 注意事项 | 说明 |
 |---------|------|
-| 可选 | 无全局副作用可不导出钩子 |
-| 与组件分离 | 勿与频繁改动的组件实现同文件 |
+| 可选 | 无全局副作用可不挂/导出钩子 |
+| HMR 安全 | 同文件用 `App.activate`；禁止 `export function activate` |
 | 异步支持 | 钩子支持 `async/await` |
 | 错误处理 | 错误会被 Host 捕获并记录 |
 | 资源清理 | 若实现了 `deactivate`，须清理订阅与定时器 |

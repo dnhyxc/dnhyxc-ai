@@ -21,7 +21,7 @@ Host 嵌入时**只加载 federation expose 模块**，**不会执行**你独立
 // ✅ React expose（对齐 apps/micro 各页面入口）
 import '@/styles.css';
 export { default } from './App';
-export { activate, deactivate } from './lifecycle';
+// 生命周期：优先 App.activate 静态属性；详见 implements-guide/08
 ```
 
 ```ts

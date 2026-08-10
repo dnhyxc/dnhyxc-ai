@@ -115,7 +115,7 @@ optimizeDeps: {
 ## 5. 兼容性与影响
 
 - 修改 `optimizeDeps.include` 后需 **重启** `apps/remote-plugins` 的 `pnpm dev`。
-- 若插件确需生命周期：单独 `lifecycle.ts` + 入口只做 re-export，**不要**与组件实现写在同一会频繁改动的文件。
+- 若插件确需生命周期：优先挂在 default 静态属性（`App.activate` / `App.deactivate`，模块仍只 `export default`）；或单独 `lifecycle.ts` + 入口 re-export。**禁止**与组件同文件 `export function activate`。
 
 ## 6. 相关源码路径
 

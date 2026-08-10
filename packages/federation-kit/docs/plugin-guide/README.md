@@ -8,7 +8,7 @@
 >
 > **写法约定**：每一份代码都带**逐行中文注释**（注释写在代码上方），并在代码块前后用正文充分解释**意图与语义**。读者照抄即可接入。
 >
-> **对照源码**：本文以当前仓库 `packages/federation-kit/src/**`（kit 内核）为契约依据；子项目侧的真实参考实现见本仓外的 `apps/micro` / `apps/remote-plugins`（多 expose，端口 **9008**）、`apps/remote-demo`（最小插件，端口 **9007**）、`micro-vue`（Vue 样例，端口 **9009**）。若与源码不一致，以源码为准。
+> **对照源码**：本文以当前仓库 `packages/federation-kit/src/**`（kit 内核）为契约依据；子项目侧的真实参考实现见本仓外的 `apps/micro` / `apps/remote-plugins`（多 expose，端口 **9008**）、`apps/remote-demo`（最小插件，端口 **9007**）、`remote-vue` / **`remote-vue-shadcn`（Vue + vue-router 多页，端口 9009）**、`remote-react-shadcn`（React 内部多页壳，端口 **9010**）。若与源码不一致，以源码为准。
 >
 > **与 `docs/host-guide` 的区别**：host-guide 讲「主项目怎么接子项目」（Host 视角）；本目录讲「子项目怎么被接入、怎么在不同形态下运行」（Remote 视角）。两边互补，遇到 Host 侧机制（registry、bridge 组装、样式隔离）会交叉引用。
 
@@ -23,14 +23,16 @@
 | 3 | [03-vite-config.md](./03-vite-config.md) | Vite federation 配置：`federation()` 每一项为什么这么写 | 核心 |
 | 4 | [04-expose-contract.md](./04-expose-contract.md) | expose 契约：React 默认导出 / 生命周期钩子 / Vue `mount`，Host 如何规范化 | 核心 |
 | 5 | [05-host-bridge.md](./05-host-bridge.md) | HostBridge API 全参考：`api.*` 有什么、权限门、用法示例 | 能力 |
-| 6 | [06-connect-auto-route.md](./06-connect-auto-route.md) | **接入方式一**：独立路由页（自动注入路由 + 侧栏） | 接入 |
+| 6 | [06-connect-auto-route.md](./06-connect-auto-route.md) | **接入方式一**：独立路由页；含**多页壳**（内存路由 / BrowserRouter / `api.navigate`）完整示例与踩坑 | 接入 |
 | 7 | [07-connect-surface-slot.md](./07-connect-surface-slot.md) | **接入方式二**：业务页内嵌（抽屉 / 工具栏插槽） | 接入 |
 | 8 | [08-connect-iframe.md](./08-connect-iframe.md) | **接入方式三**：iframe 隔离（untrusted）+ 完整协议 + 客户端 | 接入 |
-| 9 | [09-vue-plugin.md](./09-vue-plugin.md) | Vue 子应用接入：`mount` 契约、registry、Element Plus | 专项 |
+| 9 | [09-vue-plugin.md](./09-vue-plugin.md) | Vue 子应用：`mount` 契约、registry、**vue-router 多页（Memory/WebHistory）**、Element Plus / shadcn-vue | 专项 |
 | 10 | [10-styles-isolation.md](./10-styles-isolation.md) | 样式规范：expose 引入 CSS、Tailwind、Portal、主题 token | 规范 |
 | 11 | [11-i18n-locale.md](./11-i18n-locale.md) | 插件内 i18n：自有字典、`useHostLocale`、三种 locale 来源 | 规范 |
-| 12 | [12-preview-lifecycle-debug.md](./12-preview-lifecycle-debug.md) | 独立预览、生命周期钩子、调试技巧 | 实操 |
+| 12 | [12-preview-lifecycle-debug.md](./12-preview-lifecycle-debug.md) | 独立预览、生命周期钩子、调试技巧（实现见 implements-guide/08） | 实操 |
 | 13 | [13-publish-registry.md](./13-publish-registry.md) | 构建、部署、Nginx、Registry 注册、缓存破坏、验收清单 | 发布 |
+
+> **生命周期 Host 实现专章**（`pickPluginLifecycle` / 缺钩子 `console.info` / `runLoad`）：[../implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。
 
 > 时间紧只看：README 速览 → [02](./02-scaffold.md) → [03](./03-vite-config.md) → [04](./04-expose-contract.md) → 选一种接入方式（[06](./06-connect-auto-route.md) / [07](./07-connect-surface-slot.md) / [08](./08-connect-iframe.md)），即可跑通 MVP。
 
@@ -102,7 +104,7 @@ export default function App({ api, plugin }) {
 
 | 接入方式 | registry 关键字段 | Host 如何呈现 | 插件需要额外做什么 | 详细章节 |
 |----------|-------------------|---------------|--------------------|----------|
-| **① 独立路由页** | `routePath`（+ 可选 `menu`） | 自动注入一条路由，侧栏出现图标入口 | 一个整页组件即可（Host 会套页壳） | [06](./06-connect-auto-route.md) |
+| **① 独立路由页** | `routePath`（+ 可选 `menu`） | 自动注入一条路由，侧栏出现图标入口 | 一个整页组件即可；多页时 expose **壳 App**（见 [06 §5](./06-connect-auto-route.md)） | [06](./06-connect-auto-route.md) |
 | **② 业务页内嵌** | `host: { surface, slot }` | 在业务页的抽屉 / 工具栏位置渲染 | 一个聚焦组件（无整页 chrome）；不改 portal container | [07](./07-connect-surface-slot.md) |
 | **③ iframe 隔离** | `trust: "untrusted"` + `iframeUrl` | 独立 `<iframe>` 沙箱 + `postMessage` RPC | 一个 `/embed/...` 页面 + `connectIframeHost` 客户端 | [08](./08-connect-iframe.md) |
 

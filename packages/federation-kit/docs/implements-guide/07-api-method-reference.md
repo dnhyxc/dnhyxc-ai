@@ -149,13 +149,28 @@ resolvePluginBust
 | 项 | 说明 |
 |----|------|
 | **作用** | 执行 `mf.loadRemote('<remoteName>/<expose>')`，并把结果规范成 Host 可用的 `PluginModule`。 |
-| **目的** | 拿到可渲染的 `default` 组件；Vue Remote 在此转成 React 包装组件。 |
+| **目的** | 拿到可渲染的 `default` 组件；解析生命周期；Vue Remote 在此转成 React 包装组件。 |
 | **签名** | `async loadRemoteApp(d: PluginDescriptor): Promise<PluginModule>` |
 | **参数** | 完整 descriptor（用 `remoteName\|\|id`、`expose` 默认 `./App`）。 |
-| **返回** | `{ default, activate?, deactivate? }`。 |
+| **返回** | `{ default, activate?, deactivate? }`（经 `normalizePluginModule` / `pickPluginLifecycle`）。 |
 | **谁调谁** | ← `runLoad`（且位于样式捕获窗内）；→ `normalizePluginModule`。 |
-| **副作用** | 下载并执行 Remote 脚本；注入 CSS（须在捕获窗内，否则污染 Host）。 |
+| **副作用** | 下载并执行 Remote 脚本；注入 CSS（须在捕获窗内）；缺钩子时 `console.info`。 |
 | **失败** | 无 `default` → `plugin ${id}: expose ./X missing default export`；网络/MF 错误向上抛（由 `runLoad` 收成 `failed`）。 |
+
+> 生命周期解析细节见 [08-lifecycle-hooks.md](./08-lifecycle-hooks.md)。
+
+---
+
+### 1.6b `pickPluginLifecycle(raw)` / `normalizePluginModule(raw, meta)`
+
+| 项 | 说明 |
+|----|------|
+| **作用** | 从 MF 原始模块提取钩子并产出 `PluginModule`。 |
+| **解析顺序** | ① `raw.activate` named export → ② `raw.default.activate` 静态属性（React FC / Vue `{ mount, activate }`）。 |
+| **缺钩子** | `console.info('[federation-kit] plugin "…": 未导出 activate/deactivate …')`，**不抛错**。 |
+| **Vue** | 先 `pickPluginLifecycle`，再 `createVueHostBridge`（桥组件不携带钩子，钩子摊到 `PluginModule` 顶层）。 |
+| **导出** | 均从 `@dnhyxc-ai/federation-kit` 公开导出。 |
+| **详解** | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md)（含完整带注释源码）。 |
 
 ---
 
@@ -288,9 +303,10 @@ resolvePluginBust
 | **作用** | **单次真实加载流水线**（verify → 注册 → 捕获 CSS → loadRemote → activate）。 |
 | **目的** | 把「安全校验、样式隔离短窗、MF 加载、生命周期钩子」收成一个原子过程；错误统一落成 `failed`。 |
 | **签名** | `private async runLoad(meta: PluginDescriptor, bust: string): Promise<void>` |
-| **步骤** | 1. 写入 `status:'loading'` + 临时 bridge<br>2. `verifyPlugin(meta)`<br>3. 若 `trust==='untrusted'`：标 activated（空 default），**不**走 MF<br>4. `registerRemote(meta, bust)`<br>5. `beginPluginStyleCapture`（短窗，`claimUnmarked` 默认 true）<br>6. `try { loadRemoteApp } finally { endCapture }`<br>7. `createHostBridge` + `mod.activate?.(bridge.api)`<br>8. 写入 `status:'activated'` |
-| **失败** | catch 后 `status:'failed'` + `console.error`，**不 rethrow**（由 `ensurePlugin` 再检查并抛）。 |
+| **步骤** | 1. 写入 `status:'loading'` + 临时 bridge<br>2. `verifyPlugin(meta)`<br>3. 若 `trust==='untrusted'`：标 activated（空 default），**不**走 MF<br>4. `registerRemote(meta, bust)`<br>5. `beginPluginStyleCapture`<br>6. `try { loadRemoteApp } finally { endCapture }`（内部 `pickPluginLifecycle`；缺钩子 `console.info`）<br>7. `createHostBridge` + `await mod.activate?.(bridge.api)`（渲染前）<br>8. 写入 `status:'activated'` |
+| **失败** | catch 后 `status:'failed'` + `console.error`，**不 rethrow**（由 `ensurePlugin` 再检查并抛）。`activate` 抛错同样进此路径。 |
 | **为何 finally 关捕获窗** | 无论加载成败都要拆 head 劫持，防止泄漏到后续 Host 样式注入。 |
+| **生命周期专章** | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md) |
 
 ---
 

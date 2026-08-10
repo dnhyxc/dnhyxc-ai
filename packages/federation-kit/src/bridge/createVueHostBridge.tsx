@@ -27,7 +27,12 @@ export type VueRemoteMount = (
 
 export type VueRemoteExpose =
 	| VueRemoteMount
-	| { mount: VueRemoteMount; unmount?: () => void };
+	| {
+			mount: VueRemoteMount;
+			unmount?: () => void;
+			activate?: (api: HostBridgeProps['api']) => Promise<void> | void;
+			deactivate?: () => Promise<void> | void;
+	  };
 
 function resolveMount(expose: unknown, pluginId: string): VueRemoteMount {
 	if (typeof expose === 'function') return expose as VueRemoteMount;

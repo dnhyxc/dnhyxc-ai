@@ -166,26 +166,31 @@ pnpm dev
 
 ## 6. 生命周期钩子：时序与正确写法
 
+> **Host 实现全量（normalize / pick / runLoad / unload）**：[implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。
+
 ### 6.1 谁在什么时候调用
 
 看 Host 的 `runLoad` / `unloadPlugin`（`packages/federation-kit/src/runtime/createPluginRuntime.ts`）：
 
 ```ts
-// —— 加载时（简化）——
-// 1. verifyPlugin(meta)：校验 hostApiRange 等契约
-// 2. registerRemote(meta, bust)：注册 remote（带缓存指纹）
-// 3. beginPluginStyleCapture：开始捕获你的 CSS
-// 4. loadRemoteApp(meta)：加载你 exposes 里的 default
-// 5. mod.activate?.(bridge.api)：加载成功后再调 activate，把 bridge.api 交给钩子
-// 6. status 置为 'activated'，Host 开始渲染你的组件
+// —— 加载时（trusted MF）——
+// 1. verifyPlugin(meta)
+// 2. registerRemote(meta, bust)
+// 3. beginPluginStyleCapture
+// 4. loadRemoteApp(meta)
+//      → loadRemote → normalizePluginModule
+//        → pickPluginLifecycle（named | default 静态属性）
+//        → 缺钩子则 console.info
+// 5. createHostBridge → await mod.activate?.(bridge.api)  // 渲染前
+// 6. status = 'activated' → PluginHostView 渲染 mod.default
 ```
 
 ```ts
-// —— 卸载时（简化）——
-// 1. await loaded.mod.deactivate?.()：先调 deactivate（异常会被捕获，不阻断卸载）
-// 2. eventBus.clearPlugin(id)：清空你的事件订阅
-// 3. routeInjector.remove / sidebarInjector.remove：移除你的路由与侧栏项
-// 4. status 置为 'unloaded'
+// —— 卸载时 ——
+// 1. await loaded.mod.deactivate?.()  // 异常只打日志
+// 2. eventBus.clearPlugin(id)
+// 3. routeInjector / sidebarInjector remove
+// 4. status = 'unloaded'
 ```
 
 | 钩子 | 调用时机 | 参数 | 返回值 |
@@ -193,61 +198,54 @@ pnpm dev
 | `activate(api)` | 模块**加载成功**后、渲染前 | `HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate()` | 模块**卸载前** | 无 | `Promise<void>` 或 `void` |
 
-> **时序要点**：`activate` 在 **组件还没渲染** 时执行——适合做一次性初始化（订阅 Host 事件、预取数据、注册定时器）。`deactivate` 在 **路由/侧栏移除前** 执行——适合清理。两者都是**可选**的。
+> **时序要点**：`activate` 在 **组件还没渲染** 时执行。`deactivate` 在 **路由/侧栏移除前** 执行。可选；缺省时 Host `console.info` 提示。
 
-### 6.2 必须拆文件（Fast Refresh 铁律）
+### 6.2 Fast Refresh 铁律：不要同文件 named export 钩子
 
-> **HMR 注意**：`activate` / `deactivate` 与 React 组件写在**同一文件**，Vite Fast Refresh 会把整个模块当「非组件导出」处理 → **整页刷新**。开发态会连刷两次，并打断 Host 对 remote 的 `import()`，报「Importing a module script failed」。
+> **HMR**：同文件 `export function activate/deactivate` → Vite 判定「非组件导出」→ **整页刷新**，并可能打断 Host `import()`（`Importing a module script failed`）。
 
-正确结构：
+**推荐（与组件同文件、保 HMR）**：挂在 default 静态属性上——模块仍只有一个组件导出：
 
 ```tsx
-// src/App.tsx —— 只放 React 组件，绝不放钩子
-export default function App({ api, plugin }: HostBridgeProps) {
-	// 页面副作用放组件里（比如 useEffect 订阅），不依赖 activate
+// src/App.tsx
+function App({ api, plugin }: HostBridgeProps) {
 	return <div className="plugin-standalone" data-plugin-root>{/* ... */}</div>;
 }
-```
 
-```ts
-// src/lifecycle.ts —— 非组件导出单独放一个文件
-import type { HostBridgeProps } from '@/types/host';
-
-// 一次性初始化：订阅 Host 事件、预取数据
-export async function activate(api: HostBridgeProps['api']) {
-	// 示例：订阅业务事件（event 以你的插件 id 为命名空间，见第 5 章 §6）
-	api.event.on('book-changed', (data) => {
-		console.log('书籍变更:', data);
-	});
-
-	// 示例：预取初始化数据（需要 http:plugin-api 权限，用前判空）
+App.activate = async (api: HostBridgeProps['api']) => {
+	api.event.on('book-changed', (data) => console.log(data));
 	await api.http?.get('/api/init-data');
-}
+};
 
-// 卸载清理：退订 / 清定时器 / 关连接
-export async function deactivate() {
+App.deactivate = () => {
 	console.log('插件停用，清理资源');
-}
+};
+
+export default App;
 ```
 
 ```ts
-// src/index.ts —— MF expose 入口（尽量少改，避免触发整页 reload）
-import '@/styles.css'; // Host 不跑 main；样式必须挂在 expose 上（第 10 章 §2）
-export { default } from './App';
-export { activate, deactivate } from './lifecycle';
+// src/index.ts —— 入口：样式 + default；可选 named 兼容
+import '@/styles.css';
+import App from './App';
+export default App;
+export const activate = App.activate;
+export const deactivate = App.deactivate;
 ```
 
-> **为什么这样**：每次你改 `App.tsx`，Fast Refresh 只热更组件；`lifecycle.ts` 的钩子不在同文件，不会把组件模块标记成「不可热更」。而 `index.ts` 只做 re-export，稳定不动。
+> **多页壳**：有内部路由时，钩子必须挂在 expose 的壳 `App` 上，不能挂在 `InfoPage` 等叶子页。完整接入见 [06 §5](./06-connect-auto-route.md)。
+
+**兼容（拆文件 + named export）**：钩子放 `lifecycle.ts`，入口 `export { activate, deactivate } from './lifecycle'`。Host：`named export` 优先于静态属性。
 
 ### 6.3 钩子注意事项
 
 | 注意事项 | 说明 |
 |----------|------|
-| **可选** | 无全局副作用就不要导出空钩子（空钩子也属于「非组件导出」，会害了 Fast Refresh） |
-| **与组件分离** | 钩子放 `lifecycle.ts`，组件放 `App.tsx`，入口 re-export |
-| **异步支持** | 钩子支持 `async/await`，Host 会 await 完成后再置状态 |
-| **错误处理** | 钩子抛错会被 Host 捕获并记录（`console.error('[PluginManager] load/deactivate …')`），不阻断整体 |
-| **资源清理** | 实现了 `deactivate` 就必须清理订阅 / 定时器 / 连接；Host 也会 `eventBus.clearPlugin(id)` 兜底清事件，但定时器不会 |
+| **可选** | 无全局副作用可不挂；缺则 Host `console.info` |
+| **写在组件旁** | 用 `App.activate` / `App.deactivate`；禁止同文件 `export function activate` |
+| **异步支持** | Host 会 `await` 完成后再置 `activated` |
+| **错误处理** | `activate` 抛错 → 插件 `failed`；`deactivate` 抛错只打日志 |
+| **资源清理** | 有 `deactivate` 须清订阅/定时器；`eventBus.clearPlugin` 只兜底事件 |
 
 ---
 
@@ -306,9 +304,11 @@ location.reload();
 | `missing default export` | expose 模块没 default 导出 | React：`export default function App`；Vue：`export default { mount }`（第 4 章） |
 | `HOST_API` 版本不兼容 | `hostApiRange` 没覆盖 Host 版本 | `hostApiRange` 须覆盖 Host `VITE_HOST_API_VERSION`（默认 `1.0.0`）；**别**把插件 `version` bump 误写成 `hostApiRange`（第 13 章） |
 | 加载报 `Module ./X does not exist in container` | 线上 Remote 没部署含该 expose 的构建 | 确认线上 Remote 已部署；只发 Host 没用 |
-| HMR 整页刷两次 / `Importing a module script failed` | 同文件混出 `activate`；或运行中发现新依赖触发重打包 | 拆 `lifecycle.ts`；`optimizeDeps.include` 预打包重依赖（如 tiptap）；重启 remote `pnpm dev` |
+| HMR 整页刷两次 / `Importing a module script failed` | 同文件 `export function activate`；或运行中发现新依赖触发重打包 | 改挂 `App.activate`；或拆 `lifecycle.ts`；`optimizeDeps.include`；重启 remote |
 | Vue 嵌 Host 白屏 / 报须导出 mount | 还 `export default` SFC | 改为 `export default { mount }`，在 mount 内 `createApp`（Host 不装 Vue，第 9 章） |
-| 组件没跑 `activate` | 钩子没在 `exposes` 里 re-export | `index.ts` 里 `export { activate, deactivate } from './lifecycle'` |
+| 组件没跑 `activate` | 钩子挂在叶子页，或未挂到 expose 的 default / named | 钩子挂**壳 App**；`export const activate = App.activate`；见 [06 §5](./06-connect-auto-route.md) |
+| 列表点详情无反应 | expose 了叶子页，Host 树无 `NavigationProvider` | expose 带壳的 `App`；见 [06 §5](./06-connect-auto-route.md) |
+| Vue 嵌 Host 跳详情跳出主站 | 嵌入用了 `createWebHistory` | 改用 `createMemoryHistory`；见 [09 §5](./09-vue-plugin.md) |
 | 进入插件后 Network 有两条 manifest | Host 缓存逻辑异常 | 报 Host 查 `resolvePluginBust` / registry 缓存（第 13 章 §5） |
 
 ---
@@ -319,7 +319,7 @@ location.reload();
 |--------|------|
 | 独立可跑 | `pnpm dev` 能独立预览；`?lang=en-US` 能切语言 |
 | mock 完整 | `mockApi` 覆盖你用到的最小能力集；`mockPlugin` 传对 id/routePath/version |
-| 钩子可选且分离 | 无副作用不导出空钩子；有钩子则放 `lifecycle.ts`，入口 re-export |
+| 钩子可选且 HMR 安全 | 无副作用不挂空钩子；有钩子用 `App.activate` 或独立 `lifecycle.ts` |
 | 钩子语义正确 | `activate` 做一次性初始化；`deactivate` 做资源清理 |
 | 权限判空 | 受限 API 用前判空（第 5 章） |
 | Host 自测 | 嵌入 Host 后 Console 无报错；`pluginManager.list()` 状态为 `activated` |

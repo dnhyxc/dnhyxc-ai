@@ -65,6 +65,7 @@ export {
 export {
 	isVueRemoteModule,
 	normalizePluginModule,
+	pickPluginLifecycle,
 	type RawRemoteModule,
 } from './mf/normalizePluginModule';
 

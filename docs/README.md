@@ -62,6 +62,7 @@
 | 线上 `/plugins` `useLocation` 无 Router context                     | [app/mf-shared-react-router.md](./app/mf-shared-react-router.md)                                                                                          |
 | 保存 registry 报 hostApi 不兼容 / 误改 hostApiRange                   | [app/plugin-registry-hostapi.md](./app/plugin-registry-hostapi.md)                                                                                        |
 | 改 remote-plugins 内容页面刷两次 / Importing a module script failed | [app/remote-plugin-hmr.md](./app/remote-plugin-hmr.md)                                                                                                    |
+| 插件生命周期钩子同文件挂载 + Fast Refresh 兼容（App.activate / default 静态属性） | [app/plugin-lifecycle-colocation.md](./app/plugin-lifecycle-colocation.md)                                                                               |
 | MF 插件语言同步（Host → Remote locale 推送 / i18n 完整接入）         | [app/mf-plugin-locale-sync.md](./app/mf-plugin-locale-sync.md)                                                                                            |
 | MF 动态插件系统完整实现（Vite / PluginManager / 路由注入）          | [app/dynamic-plugin-system.md](./app/dynamic-plugin-system.md)（含改动前/后对比与逐行注释）                                                              |
 | 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [app/plugin-development-guide.md](./app/plugin-development-guide.md)                                                                                      |

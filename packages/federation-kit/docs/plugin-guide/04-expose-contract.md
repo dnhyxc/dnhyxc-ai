@@ -8,24 +8,34 @@
 
 ## 1. Host 期望的模块形态
 
-Host 用 Module Federation 动态 import 你的 expose 模块后，得到一个「原始模块」，然后交给 `normalizePluginModule` 规范化：
+Host 用 Module Federation 动态 import 你的 expose 模块后，得到「原始模块」，再交给 `normalizePluginModule`。**生命周期解析已升级**：除 named export 外，还会读 `default.activate` / `default.deactivate`。
+
+完整实现专章（含逐行注释、调用链、排障）：[implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。
 
 ```ts
-// packages/federation-kit/src/mf/normalizePluginModule.ts（Host 侧源码，逐行注释）
+// packages/federation-kit/src/mf/normalizePluginModule.ts（与磁盘一致，关键路径）
 import type { ComponentType } from 'react';
-import { createVueHostBridge, type VueRemoteExpose } from '../bridge/createVueHostBridge';
+import {
+	createVueHostBridge,
+	type VueRemoteExpose,
+} from '../bridge/createVueHostBridge';
 import type { HostBridgeProps, PluginDescriptor, PluginModule } from '../types';
 
-// Remote 原始模块：React 组件，或 Vue mount API + framework 标记
+/** MF loadRemote 原始模块 */
 export type RawRemoteModule = {
-	default: unknown;                    // 核心：default 导出
-	framework?: string;                  // 构建期打上的 framework 标记（可选）
-	mfFramework?: string;                // 旧名兼容
-	activate?: PluginModule['activate'];     // 可选生命周期钩子
-	deactivate?: PluginModule['deactivate']; // 可选生命周期钩子
+	default: unknown;
+	framework?: string;
+	mfFramework?: string;
+	activate?: PluginModule['activate'];
+	deactivate?: PluginModule['deactivate'];
 };
 
-// 启发式：default 形如 { mount: fn } 的对象 → 视为 Vue mount（避免裸函数误判为 React FC）
+/** 可挂在 default 上的钩子（React 静态属性 / Vue { mount, activate }） */
+type LifecycleCarrier = {
+	activate?: PluginModule['activate'];
+	deactivate?: PluginModule['deactivate'];
+};
+
 function looksLikeVueMount(comp: unknown): boolean {
 	return (
 		!!comp &&
@@ -34,42 +44,83 @@ function looksLikeVueMount(comp: unknown): boolean {
 	);
 }
 
-// 判断「这个模块是不是 Vue」：registry/expose 显式标记 > 构建标记 > 启发式
-export function isVueRemoteModule(raw: RawRemoteModule, meta: PluginDescriptor): boolean {
-	// registry 里写了 framework: 'vue' → 是 Vue
+export function isVueRemoteModule(
+	raw: RawRemoteModule,
+	meta: PluginDescriptor,
+): boolean {
 	if (meta.framework === 'vue') return true;
 	if (meta.framework === 'react') return false;
-	// 模块自带的标记
 	const tag = raw.framework ?? raw.mfFramework;
 	if (tag === 'vue') return true;
 	if (tag === 'react') return false;
-	// 兜底启发式：default 是 { mount } → Vue
 	return looksLikeVueMount(raw.default);
 }
 
-// 规范化：Vue → createVueHostBridge 包成 React 组件；React → 原样
-export function normalizePluginModule(raw: RawRemoteModule, meta: PluginDescriptor): PluginModule {
+/**
+ * named export 优先，否则读 default 静态属性。
+ * 同文件可写钩子且不破坏 Fast Refresh（模块仍只有 export default）。
+ */
+export function pickPluginLifecycle(
+	raw: RawRemoteModule,
+): Pick<PluginModule, 'activate' | 'deactivate'> {
+	const carrier =
+		raw.default &&
+		(typeof raw.default === 'function' || typeof raw.default === 'object')
+			? (raw.default as LifecycleCarrier)
+			: undefined;
+	return {
+		activate:
+			typeof raw.activate === 'function'
+				? raw.activate
+				: typeof carrier?.activate === 'function'
+					? carrier.activate
+					: undefined,
+		deactivate:
+			typeof raw.deactivate === 'function'
+				? raw.deactivate
+				: typeof carrier?.deactivate === 'function'
+					? carrier.deactivate
+					: undefined,
+	};
+}
+
+export function normalizePluginModule(
+	raw: RawRemoteModule,
+	meta: PluginDescriptor,
+): PluginModule {
 	if (!raw?.default) {
 		throw new Error(`plugin ${meta.id}: expose missing default export`);
 	}
+
+	const lifecycle = pickPluginLifecycle(raw);
+
+	// 缺钩子只提示，不阻断（控制台 console.info）
+	if (typeof lifecycle.activate !== 'function') {
+		console.info(
+			`[federation-kit] plugin "${meta.id}": 未导出 activate 生命周期钩子（named export 或 default.activate）`,
+		);
+	}
+	if (typeof lifecycle.deactivate !== 'function') {
+		console.info(
+			`[federation-kit] plugin "${meta.id}": 未导出 deactivate 生命周期钩子（named export 或 default.deactivate）`,
+		);
+	}
+
 	if (isVueRemoteModule(raw, meta)) {
-		// Vue：把 mount 包成 React 组件（createVueHostBridge），Host 侧只管 React 渲染
 		return {
 			default: createVueHostBridge(raw.default as VueRemoteExpose, meta.id),
-			activate: raw.activate,
-			deactivate: raw.deactivate,
+			...lifecycle,
 		};
 	}
-	// React：default 就是可渲染组件，props 接收 HostBridgeProps
+
 	return {
 		default: raw.default as ComponentType<HostBridgeProps>,
-		activate: raw.activate,
-		deactivate: raw.deactivate,
+		...lifecycle,
 	};
 }
 ```
 
-> **对你的意义**：Host 只认「模块的 `default` 导出」。React 子项目：`default` 导出组件；Vue 子项目：`default` 导出 `mount(el, bridge)` 或 `{ mount }`。生命周期钩子 `activate` / `deactivate` 从入口 `named export` 出来即可。
+> **对你的意义**：Host 只认 expose 的 `default`。生命周期：`named export` **或** `default` 静态属性；挂在非 expose 的叶子组件上无效。缺钩子会 `console.info`，仍可加载渲染。
 
 ---
 
@@ -147,68 +198,94 @@ export type HostBridgeProps = {
 多 expose 时，每个 expose 入口文件应该是「薄壳」——尽量少逻辑，避免 HMR 整页 reload：
 
 ```ts
-// src/views/ideas-list/index.ts —— MF expose 入口（对齐 apps/micro 各页面入口）
-// 必须：Host 不执行 main.tsx，样式必须挂在 expose 入口上（第 10 章）
+// src/views/ideas-list/index.ts —— MF expose 入口
 import '@/styles.css';
-
-// 再导出主组件
 export { default } from './App';
-
-// 再导出生命周期钩子（放在独立文件，避免与组件同文件导致 Fast Refresh 整页刷新）
-export { activate, deactivate } from './lifecycle';
 ```
 
-```ts
-// src/views/ideas-list/lifecycle.ts —— 生命周期钩子独立文件（第 12 章有专门讲解）
-import type { HostBridgeProps } from '@/types/host';
+钩子写在组件文件内时，用**静态属性**挂在 default 上（见 §4），入口可再 `export const activate = App.activate` 兼容旧 Host。
 
-// 模块加载完成、挂载前执行（可 async）
-export async function activate(api: HostBridgeProps['api']) {
-	// 注册全局事件 / 预拉数据
-	api.event.on('book-changed', (data) => {
-		console.log('书籍变更:', data);
-	});
-	await api.http?.get('/api/init-data');
-}
-
-// 插件卸载前执行（清理订阅 / 定时器）
-export async function deactivate() {
-	// 清理
-}
-```
+> **多页插件**：若内部有列表→详情，expose 的 default 必须是带路由壳的 `App`，生命周期也挂在 `App` 上——不要 expose 叶子页。完整示例见 [06 §5](./06-connect-auto-route.md)。
 
 ---
 
 ## 4. 生命周期钩子（activate / deactivate）
 
-Host 的 `PluginManager.runLoad` 这样调用它们（`packages/federation-kit/src/runtime/createPluginRuntime.ts`）：
+> **实现全量摘录**（Host 调用链 + Remote 正误对照）：[implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。
+
+Host 的 `PluginManager.runLoad` / `unloadPlugin`（`packages/federation-kit/src/runtime/createPluginRuntime.ts`）：
 
 ```ts
-// 加载成功、拿到模块后：调用 activate，传入组装好的 api
+// 加载成功、拿到规范化模块后：渲染前调用 activate
 const bridge = createHostBridge(meta, this.config.capabilities, nav);
 await mod.activate?.(bridge.api);
 
-// 卸载时：先调 deactivate，再清事件、路由、侧栏
+// 卸载：先 deactivate，再清事件 / 路由 / 侧栏
 async unloadPlugin(id: string) {
-	const loaded = this.plugins.get(id);
-	if (!loaded) { /* 未加载：直接清路由/侧栏 */ return; }
 	try {
 		await loaded.mod.deactivate?.();
 	} catch (e) {
 		console.error(`[PluginManager] deactivate ${id}`, e);
 	}
-	eventBus.clearPlugin(id);
-	this.routeInjector.remove(id);
-	this.sidebarInjector.remove(id);
 	// ...
 }
 ```
 
-> **⚠️ HMR 注意**：`activate` / `deactivate` 与 React 组件写在同一文件会导致 Vite Fast Refresh 整页刷新（开发态连刷两次，并打断 Host 对 remote 的 `import()`，报「Importing a module script failed」）。**无全局副作用时不要导出空钩子**；确需钩子时拆到独立文件再由入口 re-export（见上方 lifecycle.ts）。
+`normalizePluginModule` 解析顺序：**模块 named export** → **`default` 上的静态属性**（`pickPluginLifecycle`）。缺任一钩子时 Host 会 `console.info`（不阻断加载）。
+
+### 4.1 推荐：写在组件文件里（静态属性，保 Fast Refresh）
+
+Vite Fast Refresh 要求「模块导出全是 React 组件」。同文件 `export function activate` 会触发整页 reload。挂在 default 上则模块仍只有一个组件导出：
+
+```tsx
+// src/App.tsx —— 钩子与组件同文件，且不破坏 HMR
+import type { HostBridgeProps } from '@/types/host';
+
+function App({ api, plugin }: HostBridgeProps) {
+	return (
+		<div className="plugin-standalone" data-plugin-root>
+			{plugin.id}
+		</div>
+	);
+}
+
+App.activate = async (api: HostBridgeProps['api']) => {
+	console.log('[plugin] activate', api.locale);
+};
+
+App.deactivate = () => {
+	console.log('[plugin] deactivate');
+};
+
+export default App;
+// 勿再 export function activate —— 那会破坏 Fast Refresh
+```
+
+`export default observer(X)` 时先赋给常量再挂属性：`const App = observer(X); App.activate = …; export default App`。
+
+### 4.2 兼容：独立 lifecycle.ts + named export
+
+旧写法仍可用（named export 优先于静态属性）：
+
+```ts
+export { default } from './App';
+export { activate, deactivate } from './lifecycle';
+```
+
+入口也可从静态属性再导出 named：
+
+```ts
+import App from './App';
+export default App;
+export const activate = App.activate;
+export const deactivate = App.deactivate;
+```
+
+> **⚠️ HMR**：禁止与组件同文件 `export function activate/deactivate`。无副作用不要挂空钩子（仍会触发缺失提示的反面：你挂了空函数就不会 info，但无意义）。
 
 | 钩子 | 调用时机 | 参数 | 返回值 |
 |------|----------|------|--------|
-| `activate` | 模块加载后 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
+| `activate` | 模块加载后、渲染前 | `api: HostBridgeProps['api']` | `Promise<void>` 或 `void` |
 | `deactivate` | 模块卸载前 | 无 | `Promise<void>` 或 `void` |
 
 ---
@@ -216,7 +293,8 @@ async unloadPlugin(id: string) {
 ## 5. 总结：你的「模块契约」就是这几条
 
 1. **必须**有 `default` 导出（React 组件 / Vue `mount`）。
-2. `activate` / `deactivate` 可选，但**建议独立成文件**。
+2. `activate` / `deactivate` 可选：优先挂在 default 静态属性；或独立文件 named export；缺则 Host `console.info`。
 3. 每个 expose 入口**必须** `import '@/styles.css'`（否则嵌入 Host 后没样式）。
 4. 组件根元素加 `data-plugin-root`。
 5. Host 会调用 `verifyPlugin`（安全校验）——`hostApiRange` 不符会拒绝加载（见 host-guide 第 9 章）。
+6. 生命周期实现细节与逐行源码见 [implements-guide/08](../implements-guide/08-lifecycle-hooks.md)。

@@ -17,7 +17,6 @@
 		"clean": "rm -rf dist",
 		"build": "pnpm clean && tsup",
 		"prepack": "pnpm build",
-		"test": "tsx src/style-isolation/styleIsolation.smoke.ts",
 		"test:watch": "tsx watch src/style-isolation/styleIsolation.smoke.ts"
 	},
 	"exports": {

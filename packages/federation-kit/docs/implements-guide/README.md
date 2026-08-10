@@ -15,6 +15,7 @@
 | 5 | [04-react-host-view.md](./04-react-host-view.md) | `FederationPlugin` / `PluginHostView` / slots / untrusted iframe / hooks | React 挂载 |
 | 6 | [05-host-adapter-frontend.md](./05-host-adapter-frontend.md) | 本仓 `@/federation` 适配层（Toast/COS/偏好/ebook/全屏/design slots） | Host 接线 |
 | 7 | [06-replication-playbook.md](./06-replication-playbook.md) | **跨项目复刻**：前置条件、建造顺序、MVP、验收清单、常见失误 | 可落地手册 |
+| 8 | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md) | **生命周期变更**：`pickPluginLifecycle`、缺钩子 `console.info`、`runLoad`/`unload`、React/Vue 导出（逐行注释） | 生命周期 |
 
 ## 三层心智模型（30 秒）
 

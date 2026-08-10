@@ -1,6 +1,6 @@
 /**
  * 插件 / 子应用开发手册（页面数据驱动）。
- * 与 docs/app/mf-plugins/plugin-development-guide.md 及现行 Host 契约对齐。
+ * 与 packages/federation-kit/docs/plugin-guide 及现行 Host 契约对齐。
  * - 正文：标题 + description（视图层渲染）
  * - 代码：交给 ParserMarkdownPreviewPane 高亮
  */
@@ -37,7 +37,7 @@ export interface PluginGuideSection {
 	items: PluginGuideBullet[];
 }
 
-const TODAY = '2026-08-08';
+const TODAY = '2026-08-10';
 
 function item(
 	id: string,
@@ -50,8 +50,9 @@ function item(
 
 /* ========================= 共用代码片段 ========================= */
 
-const CODE_ENV = String.raw`# 与 Host registry entry 同源（React 示例常用 9008；Vue 示例常用 9009）
-VITE_REMOTE_PUBLIC_ORIGIN=http://127.0.0.1:9008
+const CODE_ENV = String.raw`# 与 Host registry entry 同源
+# React 多页样例 remote-react-shadcn 常用 9010；Vue 多页样例 remote-vue-shadcn 常用 9009
+VITE_REMOTE_PUBLIC_ORIGIN=http://127.0.0.1:9010
 
 # React 插件：指向 Host 开发服，供 React Refresh
 VITE_REACT_REFRESH_HOST=http://127.0.0.1:9002`;
@@ -72,7 +73,7 @@ pnpm add -D vite @vitejs/plugin-vue @module-federation/vite \
   typescript @types/node vue-tsc \
   tailwindcss @tailwindcss/vite
 
-# UI（可选，与样例 micro-vue 对齐）
+# UI（可选，与样例 remote-vue-shadcn 对齐）
 pnpm add reka-ui class-variance-authority clsx tailwind-merge @vueuse/core @lucide/vue`;
 
 const CODE_VITE_REACT = String.raw`import fs from 'node:fs';
@@ -203,7 +204,7 @@ export default defineConfig(({ mode }) => {
         filename: 'remoteEntry.js',
         manifest: true,
         exposes: {
-          './StyleIsolationLab': './src/views/style-isolation-lab/index.ts',
+          './StyleIsolationLab': './src/views/info/index.ts',
         },
         shared: {
           // Vue 只 shared vue；勿在 Remote 自建 React 桥
@@ -237,7 +238,7 @@ export default defineConfig(({ mode }) => {
   };
 });`;
 
-const CODE_HOST_BRIDGE_TYPES = String.raw`/** 与 Host apps/frontend/src/plugins/core/types/index.ts 对齐的最小子集（无 api.t） */
+const CODE_HOST_BRIDGE_TYPES = String.raw`/** 与 @dnhyxc-ai/federation-kit HostBridgeProps 对齐的最小子集（无 api.t） */
 export type HostLocale = 'zh-CN' | 'en-US';
 
 export type HostBridgeProps = {
@@ -275,24 +276,24 @@ export type HostBridgeProps = {
   plugin: { id: string; version: string; routePath: string };
 };`;
 
-const CODE_REACT_EXPOSE = String.raw`// src/views/app/index.tsx —— MF expose 入口（Host 只加载这里，不跑 main.tsx）
+const CODE_REACT_EXPOSE = String.raw`// src/index.ts —— MF expose 入口（Host 只加载这里，不跑 main.tsx）
+// ★ default 必须是带 NavigationProvider 的壳 App，不要再导出叶子页 InfoPage
 import '@/styles.css';
-export { default } from './App';
-// 可选生命周期：拆到 lifecycle.ts，勿与频繁改动的组件同文件（Fast Refresh）
-// export { activate, deactivate } from './lifecycle';`;
+import App from './App';
 
-const CODE_REACT_APP = String.raw`// src/views/app/App.tsx
-import { useHostLocale, useI18n } from '@/hooks';
+export default App;
+// 兼容只读 named export 的 Host；入口无 JSX，不影响 App.tsx Fast Refresh
+export const activate = App.activate;
+export const deactivate = App.deactivate;`;
+
+const CODE_REACT_APP = String.raw`// src/App.tsx —— 单页插件最小形态
 import type { HostBridgeProps } from '@/types/host';
 
-export default function App({ api, plugin }: HostBridgeProps) {
-  const { t } = useI18n();
-  useHostLocale(api); // 跟随 Host locale；独立预览无 locale 时无操作
-
+function App({ api, plugin }: HostBridgeProps) {
   return (
     <div className="plugin-standalone h-full" data-plugin-root>
       <h1>
-        {t('home.title')} · {plugin.id} v{plugin.version}
+        {plugin.id} v{plugin.version}
       </h1>
       <p>
         theme={api.theme} · locale={api.locale}
@@ -303,91 +304,252 @@ export default function App({ api, plugin }: HostBridgeProps) {
           api.ui?.showToast({ message: 'Hello from React plugin', type: 'success' })
         }
       >
-        {t('common.toast')}
+        Toast
       </button>
     </div>
   );
-}`;
+}
+
+// 钩子挂在 expose 的 default 上（勿同文件 export function activate —— 会破坏 Fast Refresh）
+App.activate = async (api: HostBridgeProps['api']) => {
+  console.log('[plugin] activate', api.locale);
+};
+App.deactivate = () => {
+  console.log('[plugin] deactivate');
+};
+
+export default App;`;
 
 const CODE_REACT_MAIN = String.raw`// src/main.tsx —— 仅独立预览；Host 嵌入时不会执行
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
-import App from './views/app/App';
-import { mockApi, mockPlugin } from '@/utils/mockHost';
-
-const api = mockApi({
-  ui: { showToast: (o) => console.info('[toast]', o.message) },
-});
-const plugin = mockPlugin('myReactPlugin', '/my-react-plugin', '1.0.0');
+import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App api={api} plugin={plugin} />
+    <App />
   </StrictMode>,
 );`;
 
-const CODE_VUE_EXPOSE = String.raw`// src/views/style-isolation-lab/index.ts —— MF expose（Vue）
-// Host 不装 Vue：须导出 mount(el, bridge)，勿直接 export SFC
+const CODE_REACT_NAV_CTX = String.raw`// src/router/NavigationContext.tsx —— 内存路由（不改 Host URL）
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode,
+} from 'react';
+
+type NavigationContextValue = {
+  path: string;
+  navigate: (to: string) => void;
+};
+
+// 默认 navigate 为空函数：忘记包 Provider 时点击「没反应」，便于发现 expose 接错
+const NavigationContext = createContext<NavigationContextValue>({
+  path: '/home',
+  navigate: () => {},
+});
+
+export function NavigationProvider({
+  children,
+  initialPath = '/home',
+}: {
+  children: ReactNode;
+  initialPath?: string;
+}) {
+  const [path, setPath] = useState(initialPath);
+  const navigate = useCallback((to: string) => setPath(to), []);
+  return (
+    <NavigationContext.Provider value={{ path, navigate }}>
+      {children}
+    </NavigationContext.Provider>
+  );
+}
+
+export function useNavigation() {
+  return useContext(NavigationContext);
+}`;
+
+const CODE_REACT_APP_SHELL = String.raw`// src/App.tsx —— 多页壳（参考 remote-react-shadcn）
+import { NavigationProvider } from '@/router/NavigationContext';
+import { AppRouter } from '@/router/AppRouter';
+import type { HostBridgeProps } from '@/types/host';
+
+type AppProps = Partial<Pick<HostBridgeProps, 'api' | 'plugin'>>;
+
+function App(props: AppProps = {}) {
+  const hasBridge = !!(props.api && props.plugin);
+  // 嵌入 Host 默认进业务页；独立预览进首页
+  const initialPath = hasBridge ? '/info' : '/home';
+
+  return (
+    <NavigationProvider initialPath={initialPath}>
+      <AppRouter bridge={hasBridge ? (props as HostBridgeProps) : undefined} />
+    </NavigationProvider>
+  );
+}
+
+// ★ 生命周期必须挂在壳 App 上；挂 InfoPage 无效（Host 只读 expose default）
+App.activate = async (api: HostBridgeProps['api']) => {
+  console.log('[remote-react-shadcn] activate', api.locale);
+};
+App.deactivate = () => {
+  console.log('[remote-react-shadcn] deactivate');
+};
+
+export default App;`;
+
+const CODE_REACT_APP_ROUTER = String.raw`// src/router/AppRouter.tsx
+import { useNavigation } from './NavigationContext';
+import HomePage from '@/views/home/HomePage';
+import InfoPage from '@/views/info';
+import DetailPage from '@/views/detail/DetailPage';
+import type { HostBridgeProps } from '@/types/host';
+
+export function AppRouter({ bridge }: { bridge?: HostBridgeProps }) {
+  const { path } = useNavigation();
+  switch (path) {
+    case '/info':
+      return <InfoPage bridge={bridge} />;
+    case '/detail':
+      return <DetailPage />;
+    case '/home':
+    default:
+      return <HomePage />;
+  }
+}`;
+
+const CODE_REACT_PAGE_NAV = String.raw`// 子页跳转：只用内部 useNavigation，不要 expose 叶子页
+import { useNavigation } from '@/router/NavigationContext';
+
+function InfoPage({ bridge }: { bridge?: HostBridgeProps }) {
+  const { navigate } = useNavigation();
+  return (
+    <div data-plugin-root>
+      <button type="button" onClick={() => navigate('/detail')}>
+        查看详情
+      </button>
+    </div>
+  );
+}
+export default InfoPage;`;
+
+const CODE_VUE_EXPOSE = String.raw`// src/views/info/index.ts —— MF expose（Vue，参考 remote-vue-shadcn）
+// Host 不装 Vue：须导出 mount(el, bridge)；嵌入用 MemoryHistory，不改主站 URL
 import '@/styles.css';
 import { createApp, reactive } from 'vue';
-import App from './App.vue';
+import App from '@/App.vue';
+import { createHostRouter } from '@/router';
 import type { HostBridgeProps } from '@/types/host';
 
 export function mount(el: HTMLElement, bridge: HostBridgeProps) {
-  // 同一 bridge 对象会被 Host 热更新 api/locale；用 reactive 包一层即可响应
-  const app = createApp(App, { bridge: reactive(bridge) });
+  const router = createHostRouter(); // createMemoryHistory
+  const app = createApp(App, { bridge: reactive(bridge) as HostBridgeProps });
+  app.use(router);
+  void router.replace({ name: 'info' }); // 嵌入默认进业务页
   app.mount(el);
   return () => app.unmount();
 }
 
-export default { mount };
-// framework 由 registry "framework": "vue" 声明即可`;
+async function activate(api: HostBridgeProps['api']) {
+  console.log('[vue-shadcn] activate', api.locale);
+}
+async function deactivate() {
+  console.log('[vue-shadcn] deactivate');
+}
 
-const CODE_VUE_APP = String.raw`<!-- src/views/style-isolation-lab/App.vue -->
+export default { mount, activate, deactivate };`;
+
+const CODE_VUE_APP = String.raw`<!-- src/App.vue —— 根壳：provide bridge + RouterView -->
 <script setup lang="ts">
-import { computed, toRef } from 'vue';
+import { provide, toRef } from 'vue';
+import { RouterView } from 'vue-router';
+import { HOST_BRIDGE_KEY } from '@/composables/useHostBridge';
 import type { HostBridgeProps } from '@/types/host';
 
-/**
- * Host createVueHostBridge 注入：props.bridge（reactive）
- * 注意：不是 React 那样的 { api, plugin } 顶层展开
- */
 const props = defineProps<{ bridge: HostBridgeProps }>();
-const bridge = toRef(props, 'bridge');
-const theme = computed(() => bridge.value.api.theme);
-const pluginId = computed(() => bridge.value.plugin.id);
+provide(HOST_BRIDGE_KEY, toRef(props, 'bridge'));
+</script>
 
-function hostToast() {
-  bridge.value.api.ui?.showToast?.({
-    message: 'Hello from Vue plugin',
-    type: 'info',
-    title: 'micro-vue',
-  });
+<template>
+  <RouterView />
+</template>`;
+
+const CODE_VUE_MAIN = String.raw`// src/main.ts —— 独立预览：WebHistory + 同一套 App / routes
+import { createApp } from 'vue';
+import App from './App.vue';
+import { previewBridge } from './previewBridge';
+import { router } from './router';
+import './styles.css';
+
+createApp(App, { bridge: previewBridge }).use(router).mount('#app');`;
+
+const CODE_VUE_ROUTER = String.raw`// src/router/index.ts —— 预览 WebHistory / 嵌入 MemoryHistory
+import {
+  createMemoryHistory,
+  createRouter,
+  createWebHistory,
+  type Router,
+  type RouterHistory,
+} from 'vue-router';
+import HomePage from '@/views/home/HomePage.vue';
+import InfoPage from '@/views/info/App.vue';
+import DetailPage from '@/views/detail/index.vue';
+
+const routes = [
+  { path: '/', name: 'home', component: HomePage },
+  { path: '/info', name: 'info', component: InfoPage },
+  { path: '/detail', name: 'detail', component: DetailPage },
+];
+
+export function createAppRouter(
+  history: RouterHistory = createWebHistory(),
+): Router {
+  return createRouter({ history, routes });
+}
+
+/** 独立预览：可改浏览器地址栏 */
+export const router = createAppRouter(createWebHistory());
+
+/** Host 嵌入：不改写主站 URL（等价 React 内存路由） */
+export function createHostRouter(): Router {
+  return createAppRouter(createMemoryHistory());
+}`;
+
+const CODE_VUE_PAGE_NAV = String.raw`<!-- 子页：标准 vue-router；嵌入与预览写法相同 -->
+<script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { useHostBridge } from '@/composables/useHostBridge';
+
+const bridge = useHostBridge();
+const router = useRouter();
+
+function goDetail() {
+  void router.push('/detail');
 }
 </script>
 
 <template>
-  <div
-    class="box-border flex h-full min-h-0 w-full flex-col gap-4 p-5.5"
-    data-plugin-root
-    :class="theme === 'dark' ? 'dark' : ''"
-  >
-    <h1 class="text-xl font-semibold">Vue 子应用 · {{ pluginId }}</h1>
-    <button type="button" class="rounded-md border px-3 py-1.5" @click="hostToast">
-      Host Toast
-    </button>
-    <!-- Tooltip / Dialog / Sheet 等可正常 Teleport→body；Host 会收编进 data-mf-portal-scope -->
+  <div data-plugin-root>
+    <p>plugin={{ bridge.plugin.id }}</p>
+    <button type="button" @click="goDetail">跳转到详情页</button>
   </div>
 </template>`;
 
-const CODE_VUE_MAIN = String.raw`// src/main.ts —— 仅独立预览
-import { createApp } from 'vue';
-import App from './App.vue';
-import { router } from './router';
-import './styles.css';
+const CODE_VUE_HOST_BRIDGE = String.raw`// src/composables/useHostBridge.ts
+import { inject, type InjectionKey, type Ref } from 'vue';
+import type { HostBridgeProps } from '@/types/host';
 
-createApp(App).use(router).mount('#app');`;
+export const HOST_BRIDGE_KEY: InjectionKey<Ref<HostBridgeProps>> =
+  Symbol('hostBridge');
+
+export function useHostBridge(): Ref<HostBridgeProps> {
+  const bridge = inject(HOST_BRIDGE_KEY);
+  if (!bridge) throw new Error('useHostBridge() 须在 App.vue 子树内使用');
+  return bridge;
+}`;
 
 const CODE_STYLES_CSS = String.raw`/* src/styles.css —— 可完整 @import tailwind（含 Preflight）；隔离由 Host @scope 负责 */
 @import "tailwindcss";
@@ -501,24 +663,25 @@ const CODE_API_USAGE = String.raw`export default function App({ api, plugin }: H
   return null;
 }`;
 
-const CODE_LIFECYCLE = String.raw`// lifecycle.ts —— 与组件文件分离
-import type { HostBridgeProps } from '@/types/host';
-
-export async function activate(api: HostBridgeProps['api']) {
-  api.event.on('book-changed', (data) => {
-    console.log('book-changed', data);
-  });
-  await api.http?.get('/api/init-data');
+const CODE_LIFECYCLE = String.raw`// 推荐：挂在 default 组件静态属性上（与组件同文件且保 Fast Refresh）
+function App(props: HostBridgeProps) {
+  return <div data-plugin-root>...</div>;
 }
+App.activate = async (api: HostBridgeProps['api']) => {
+  api.event.on('book-changed', (data) => console.log(data));
+};
+App.deactivate = () => {
+  /* 清理订阅 / 定时器 */
+};
+export default App;
 
-export async function deactivate() {
-  // 清理订阅 / 定时器
-}
-
-// expose 入口：
-// import '@/styles.css';
-// export { default } from './App';
-// export { activate, deactivate } from './lifecycle';`;
+// expose 入口再导出 named（兼容旧 Host）：
+// export const activate = App.activate;
+// export const deactivate = App.deactivate;
+//
+// ✗ 禁止：同文件 export function activate —— Vite Fast Refresh 整页刷新
+// ✗ 禁止：钩子挂在叶子页，expose 却是壳 App —— Host 读不到
+// 缺钩子时 Host normalizePluginModule 会 console.warn，不阻断加载`;
 
 const CODE_USE_HOST_LOCALE = String.raw`// src/hooks/useHostLocale.ts
 import { useEffect } from 'react';
@@ -574,29 +737,28 @@ const CODE_NGINX = String.raw`server {
 const CODE_TREE = String.raw`my-plugin/
 ├── src/
 │   ├── main.tsx / main.ts     # 仅独立预览
-│   ├── styles.css             # Tailwind + token（expose 也要 import）
-│   ├── types/host.ts          # HostBridgeProps 最小类型
-│   ├── views/
-│   │   └── app/
-│   │       ├── index.tsx      # MF expose：import styles + export default
-│   │       └── App.tsx / App.vue
-│   ├── hooks/                 # useI18n / useHostLocale（React）
-│   ├── i18n/                  # 插件自有字典（无 api.t）
-│   ├── utils/mockHost.ts      # 独立预览 mock
-│   └── components/ui/         # 可选 shadcn / shadcn-vue
+│   ├── index.ts               # MF expose：styles + default App（+ activate 再导出）
+│   ├── App.tsx / App.vue      # 壳：Provider/RouterView；挂 activate
+│   ├── styles.css
+│   ├── types/host.ts
+│   ├── router/                # React: NavigationContext；Vue: vue-router
+│   ├── views/home|info|detail # 叶子页（勿作为 expose default）
+│   ├── composables/           # Vue: useHostBridge
+│   ├── hooks/ / i18n/
+│   └── components/ui/
 ├── vite.config.ts
-├── package.json
-└── .env`;
+└── package.json`;
 
 /* ========================= 中文 ========================= */
 
 const introZh =
 	'阅读对象：为本平台开发 React / Vue Module Federation 子应用（插件）的前端开发者。\n\n' +
-	'目标：从零搭好工程、正确导出 expose、配置 Registry，并在 Host 内获得与独立预览一致的样式（含 Tooltip / Dialog / Teleport）。\n\n' +
-	'参考实现：\n' +
-	'• React：仓库内 apps/micro（端口 9008，federation name 可为 micro / remotePlugins）\n' +
-	'• Vue：仓外 micro-vue 样例（端口 9009，name: microVue，registry framework: vue）\n' +
-	'• 更细的源码级说明见 Host 仓库 apps/frontend/src/plugins/docs/plugin-development-guide.md\n\n' +
+	'目标：从零搭好工程、正确导出 expose、配置 Registry，并在 Host 内获得与独立预览一致的样式（含 Tooltip / Dialog / Teleport）；多页插件须 expose 路由壳并正确挂载 activate。\n\n' +
+	'参考实现（仓外 micro-apps）：\n' +
+	'• React 多页：remote-react-shadcn（端口 9010，内存 NavigationProvider）\n' +
+	'• Vue 多页：remote-vue-shadcn（端口 9009，vue-router：预览 WebHistory / 嵌入 MemoryHistory）\n' +
+	'• 契约文档：packages/federation-kit/docs/plugin-guide（尤其 06 多页 React、09 多页 Vue）\n' +
+	'• Host 适配层：apps/frontend/src/federation（再导出 @dnhyxc-ai/federation-kit）\n\n' +
 	'更新日期：' +
 	TODAY;
 
@@ -608,7 +770,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'arch-roles',
 				'1.1 角色分工',
-				'• Host（apps/frontend）：拉 Registry、registerRemotes、loadRemote、注入路由/侧栏、挂载 PluginHostPage、运行时 CSS @scope 隔离、Portal/Teleport 收编。\n' +
+				'• Host（apps/frontend + @dnhyxc-ai/federation-kit）：拉 Registry、registerRemotes、loadRemote、注入路由/侧栏、挂载 PluginHostPage、运行时 CSS @scope 隔离、Portal/Teleport 收编。\n' +
 					'• Remote（子应用）：Vite + @module-federation/vite 暴露模块；业务只关心 default 导出与权限内的 HostBridge API。\n' +
 					'• Registry（plugins-registry.json）：声明 id / entry / expose / remoteName / framework / permissions / trust 等；改标题文案只改 registry，不必改 Host 语言包。',
 			),
@@ -625,11 +787,12 @@ const sectionsZh: PluginGuideSection[] = [
 				'1. Host PluginManager.init() 拉取 Registry（可有本地启用覆盖）。\n' +
 					'2. injectRoute !== false 时注入顶层路由与侧栏 icon。\n' +
 					'3. 进入插件路由 → ensurePlugin → GET 一次 mf-manifest.json 算 bust（version@manifestHash）→ 加载 remoteEntry.js?v=…。\n' +
-					'4. loadRemote(expose) 得到原始模块 → normalizePluginModule：\n' +
-					'   • React：default 即组件；\n' +
-					'   • Vue：registry.framework === "vue" → createVueHostBridge 调用 Remote.mount(el, bridge)。\n' +
-					'5. PluginHostPage 渲染带 data-mf-plugin + data-mf-style-realm 的根，并 attachPluginStyleIsolation（CSS 捕获 + Portal 桥）。\n' +
-					'6. 可选调用 activate；卸载时 deactivate + 释放隔离。',
+					'4. loadRemote(expose) → normalizePluginModule（pickPluginLifecycle：named export 或 default.activate）：\n' +
+					'   • React：default 即组件（多页时须为带 NavigationProvider 的壳）；\n' +
+					'   • Vue：framework === "vue" → createVueHostBridge 调 Remote.mount(el, bridge)。\n' +
+					'5. 缺 activate/deactivate 时 console.warn（不阻断）；有则先 await activate(api)。\n' +
+					'6. PluginHostPage 渲染 data-mf-plugin + data-mf-style-realm，并 attachPluginStyleIsolation。\n' +
+					'7. 卸载：deactivate + 释放隔离。',
 			),
 			item(
 				'arch-tree',
@@ -646,7 +809,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'init-tools',
 				'2.1 工具版本',
-				'• Node.js ≥ 20\n• pnpm ≥ 8\n• Host 开发服默认常见端口 9002；Remote 示例 9007（demo）/ 9008（React micro）/ 9009（Vue）——勿与 Host 冲突。\n• MF 插件用 @module-federation/vite（不是旧的 @originjs/vite-plugin-federation）。',
+				'• Node.js ≥ 20\n• pnpm ≥ 8\n• Host 开发服默认 9002；Remote 示例 9009（Vue）/ 9010（React 多页）——勿与 Host 冲突。\n• MF 插件用 @module-federation/vite（不是旧的 @originjs/vite-plugin-federation）。',
 			),
 			item(
 				'init-env',
@@ -696,7 +859,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'vite-vue-full',
 				'4.1 完整 vite.config.ts（Vue）',
-				'与 React 差异：plugin-vue；shared 只配 vue；optimizeDeps.exclude vue；无 reactRefreshHost（靠 Host registerShared(vue)+HMR guard）。expose 指向 index.ts（再 export App.vue）。',
+				'与 React 差异：plugin-vue；shared 只配 vue；optimizeDeps.exclude vue；无 reactRefreshHost。expose 指向含 mount 的 index.ts（参考 remote-vue-shadcn）。',
 				{ lang: 'typescript', code: CODE_VITE_VUE },
 			),
 			item(
@@ -724,31 +887,65 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'react-expose',
 				'5.2 expose 入口（必须 import styles）',
-				'Host 只 loadRemote(expose)，不会执行 main.tsx。漏掉 styles → 独立预览正常、嵌入后 Tooltip/菜单「裸奔」。',
+				'Host 只 loadRemote(expose)，不会执行 main.tsx。多页插件：default 必须是壳 App，不要导出叶子 InfoPage。漏 styles → 独立预览正常、嵌入后 Tooltip「裸奔」。',
 				{ lang: 'tsx', code: CODE_REACT_EXPOSE },
 			),
 			item(
 				'react-app',
-				'5.3 根组件 App.tsx',
-				'default 导出 React 组件；根节点建议 data-plugin-root + plugin-standalone。Host 还会再包一层 data-mf-plugin / data-mf-style-realm。独立路由页若 Host 已套 PluginPageShell，勿再叠同等外层 padding。',
+				'5.3 单页根组件 + 生命周期静态属性',
+				'default 导出组件；根节点 data-plugin-root。activate/deactivate 挂在 App 上（勿 export function activate，会破坏 Fast Refresh）。缺钩子时 Host 会 warn。',
 				{ lang: 'tsx', code: CODE_REACT_APP },
 			),
 			item(
 				'react-main',
 				'5.4 独立预览 main.tsx',
-				'mockApi 可不传 locale，便于本地切语言。嵌入 Host 时此文件完全不跑。',
+				'渲染同一套壳 App。嵌入 Host 时此文件完全不跑。',
 				{ lang: 'tsx', code: CODE_REACT_MAIN },
 			),
 			item(
+				'react-multipage-rule',
+				'5.5 多页铁律（参考 remote-react-shadcn）',
+				'Host 只注入一条 routePath。列表→详情由子应用内部解决。\n' +
+					'• expose default = 带 NavigationProvider 的壳 App\n' +
+					'• 叶子页用 useNavigation().navigate("/detail")\n' +
+					'• 若 expose 叶子页：Context 默认 navigate 为空函数 → 点击无反应\n' +
+					'• activate 必须挂在壳 App，挂 InfoPage 无效\n' +
+					'详见 packages/federation-kit/docs/plugin-guide/06-connect-auto-route.md §5',
+			),
+			item(
+				'react-nav-ctx',
+				'5.6 内存路由 NavigationContext',
+				'不改浏览器 URL（始终停在 Host routePath）。适合多数插件内切页。',
+				{ lang: 'tsx', code: CODE_REACT_NAV_CTX },
+			),
+			item(
+				'react-app-shell',
+				'5.7 多页壳 App.tsx',
+				'包 Provider + AppRouter；生命周期挂在此函数上。',
+				{ lang: 'tsx', code: CODE_REACT_APP_SHELL },
+			),
+			item(
+				'react-app-router',
+				'5.8 AppRouter 按 path 渲染',
+				'按内部 path switch 子页；需要 Host API 的页面把 bridge 往下传。',
+				{ lang: 'tsx', code: CODE_REACT_APP_ROUTER },
+			),
+			item(
+				'react-page-nav',
+				'5.9 子页跳转示例',
+				'只用内部 navigate；不要在叶子页挂 activate。',
+				{ lang: 'tsx', code: CODE_REACT_PAGE_NAV },
+			),
+			item(
 				'react-api',
-				'5.5 调用 Host API（权限安全）',
-				'常用：api.ui.showToast / setAppFullscreen / downloadBlob（需 ui:toast）；api.navigate（nav:subtree）；api.http.*（http:plugin-api）；api.modules.*（modules:*）。',
+				'5.10 调用 Host API（权限安全）',
+				'常用：api.ui.showToast / setAppFullscreen / downloadBlob（需 ui:toast）；api.navigate（nav:subtree，路径须带 routePath 前缀）；api.http.*；api.modules.*。',
 				{ lang: 'tsx', code: CODE_API_USAGE },
 			),
 			item(
 				'react-lifecycle',
-				'5.6 生命周期 activate / deactivate',
-				'可选。勿与频繁改动的组件同文件导出空钩子（会打断 Fast Refresh / Host import）。有副作用时拆 lifecycle.ts。',
+				'5.11 生命周期写法对照',
+				'推荐静态属性；入口可 named 再导出。禁止同文件 export function activate。',
 				{ lang: 'typescript', code: CODE_LIFECYCLE },
 			),
 		],
@@ -762,42 +959,70 @@ const sectionsZh: PluginGuideSection[] = [
 				'6.1 Host 如何挂载 Vue',
 				'loadRemote → normalizePluginModule（framework: vue）→ createVueHostBridge(mount)：\n' +
 					'• React 渲染 div[data-plugin-root][data-mf-framework=vue]，再调用 Remote.mount(el, bridge)\n' +
-					'• createApp(VueRoot, { bridge: reactiveProps }).mount(el)\n' +
+					'• createApp(App, { bridge: reactive(bridge) }).use(router).mount(el)\n' +
 					'• bridge.api / bridge.plugin 热更新时写入同一 reactive 对象\n' +
-					'因此 Vue 根必须 defineProps<{ bridge: HostBridgeProps }>()，用 toRef/computed 读字段。',
+					'因此 Vue 根必须 defineProps<{ bridge: HostBridgeProps }>()。',
 			),
 			item(
 				'vue-types',
 				'6.2 类型（与 React 同一套 HostBridgeProps）',
-				'可把 5.1 的类型放到 src/types/host.ts 共用。Vue 只是消费方式变为 props.bridge。',
+				'放到 src/types/host.ts。Vue 消费方式为 props.bridge / useHostBridge()。',
 				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
 			),
 			item(
-				'vue-expose',
-				'6.3 expose 入口 index.ts',
-				'务必 import styles；只 re-export App.vue。',
-				{ lang: 'typescript', code: CODE_VUE_EXPOSE },
+				'vue-multipage-rule',
+				'6.3 多页铁律（参考 remote-vue-shadcn）',
+				'• mount 必须挂带 <RouterView /> 的根 App.vue，并 app.use(router)\n' +
+					'• 独立预览：createWebHistory；Host 嵌入：createMemoryHistory（否则 push("/detail") 会改掉主站 URL）\n' +
+					'• 预览与嵌入共用同一 routes 表\n' +
+					'• activate 参数是 api，不是整个 bridge\n' +
+					'详见 packages/federation-kit/docs/plugin-guide/09-vue-plugin.md §5',
+			),
+			item(
+				'vue-router',
+				'6.4 vue-router：WebHistory / MemoryHistory',
+				'嵌入用 Memory，主站地址栏仍停在 routePath。',
+				{ lang: 'typescript', code: CODE_VUE_ROUTER },
+			),
+			item(
+				'vue-host-bridge',
+				'6.5 useHostBridge（provide / inject）',
+				'App.vue provide；子页 inject，避免层层 props。',
+				{ lang: 'typescript', code: CODE_VUE_HOST_BRIDGE },
 			),
 			item(
 				'vue-app',
-				'6.4 根组件 App.vue 示例',
-				'弹层组件（Tooltip/Popover/Dialog/Sheet/ContextMenu/Sonner）可按 shadcn-vue 正常写 Teleport。验收时在 DevTools 看弹层是否落在 [data-mf-portal-scope] 且带同一 data-mf-style-realm。',
+				'6.6 根组件 App.vue',
+				'provide bridge + RouterView；业务页不要当作 expose default。',
 				{ lang: 'vue', code: CODE_VUE_APP },
 			),
 			item(
+				'vue-expose',
+				'6.7 expose 入口 mount + 生命周期',
+				'务必 import styles；每次 mount 新建 Memory router；钩子挂在 default 对象上。',
+				{ lang: 'typescript', code: CODE_VUE_EXPOSE },
+			),
+			item(
+				'vue-page-nav',
+				'6.8 子页 router.push',
+				'与独立预览写法完全相同；嵌入时走 MemoryHistory。',
+				{ lang: 'vue', code: CODE_VUE_PAGE_NAV },
+			),
+			item(
 				'vue-main',
-				'6.5 独立预览 main.ts + 路由',
-				'独立预览可用 vue-router 挂实验室页，并向 App 传入 mock bridge（形状与 Host 一致）。Host 嵌入时不会走 main。',
+				'6.9 独立预览 main.ts',
+				'WebHistory + previewBridge；Host 嵌入不会走 main。',
 				{ lang: 'typescript', code: CODE_VUE_MAIN },
 			),
 			item(
 				'vue-donts',
-				'6.6 Vue 常见错误',
-				'• 只在 main.ts import styles → Host 内无 utility（箭头在、气泡没了；Context Menu 字体错乱）\n' +
-					'• registry 漏 framework: vue → 可能被当成 React 渲染而白屏\n' +
-					'• Remote 自建 React 桥 + shared react → 与 Host 方案冲突、体积翻倍\n' +
-					'• 在业务里手写 data-mf-style-realm / portal container → 干扰 Host 认领\n' +
-					'• 根 props 写成 { api, plugin } 顶层 —— Host 传的是 { bridge }',
+				'6.10 Vue 常见错误',
+				'• 只在 main.ts import styles → Host 内无 utility\n' +
+					'• registry 漏 framework: vue → 白屏\n' +
+					'• 嵌入仍用 createWebHistory → 主站 URL 被改成 /detail\n' +
+					'• mount 只挂叶子页、未 app.use(router) → useRouter 报错\n' +
+					'• 根 props 写成 { api, plugin } 顶层 —— Host 传的是 { bridge }\n' +
+					'• 手写 data-mf-* / portal container → 干扰 Host 认领',
 			),
 		],
 	},
@@ -824,7 +1049,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'styles-file',
 				'7.3 styles.css 示例',
-				'token / @theme 建议对齐 apps/micro/src/styles.css。嵌入时部分变量可继承 Host :root。',
+				'token / @theme 建议对齐 Host 或 remote-*-shadcn 的 styles.css。嵌入时部分变量可继承 Host :root。',
 				{ lang: 'css', code: CODE_STYLES_CSS },
 			),
 			item(
@@ -932,7 +1157,10 @@ const sectionsZh: PluginGuideSection[] = [
 					'• 样式进 Host 却污染：查是否绕过 head 注入；Host sonner 应有 data-mf-host-style 保护\n' +
 					'• 嵌入无样式：expose 是否 import styles.css\n' +
 					'• Vue 白屏：registry framework: vue\n' +
-					'• 语言不跟随：useHostLocale / watch bridge.api.locale',
+					'• 语言不跟随：useHostLocale / watch bridge.api.locale\n' +
+					'• React 详情跳转无效：expose 是否为壳 App\n' +
+					'• Vue 跳转改主站 URL：嵌入是否误用 WebHistory\n' +
+					'• activate 未跑：钩子是否挂在 expose default',
 			),
 		],
 	},
@@ -948,8 +1176,9 @@ const sectionsZh: PluginGuideSection[] = [
 					'□ React：shared 仅 react/react-dom singleton；Vue：shared 仅 vue singleton\n' +
 					'□ 每个 expose 入口 import "@/styles.css"\n\n' +
 					'【组件】\n' +
-					'□ default 导出；React 收 {api,plugin}；Vue 收 props.bridge\n' +
-					'□ 根 data-plugin-root；无空 activate 与组件同文件\n' +
+					'□ default 导出；React 收 {api,plugin}；Vue 收 props.bridge / mount\n' +
+					'□ 根 data-plugin-root；activate 挂在壳 App（静态属性或 default 对象）\n' +
+					'□ 多页：React expose 壳+NavigationProvider；Vue 嵌入 MemoryHistory\n' +
 					'□ 自有 i18n；无 api.t\n\n' +
 					'【Registry】\n' +
 					'□ title/description locale map；hostApiRange 正确\n' +
@@ -957,6 +1186,8 @@ const sectionsZh: PluginGuideSection[] = [
 					'□ permissions 最小集；trust/iframeUrl 匹配\n\n' +
 					'【体验】\n' +
 					'□ 独立预览与 Host 嵌入样式一致（含悬浮层）\n' +
+					'□ 列表→详情跳转在 Host 内正常\n' +
+					'□ activate 日志可见（或确认 warn 后按需补钩子）\n' +
 					'□ Host Toast 不被插件样式顶开\n' +
 					'□ 若用影院全屏：成对 setAppFullscreen，卸载退出',
 			),
@@ -991,6 +1222,21 @@ const sectionsZh: PluginGuideSection[] = [
 				'12.5 发版后 Host 仍旧包？',
 				'确认已部署新 dist；Host 会读 Remote 自己的 mf-manifest.json 算指纹。不必为刷缓存去改 Host registry updatedAt。桌面壳需含 bust 逻辑的版本。',
 			),
+			item(
+				'faq-react-nav',
+				'12.6 React：info 点详情没反应？',
+				'多半 expose 了叶子 InfoPage，Host 树没有 NavigationProvider，navigate 是空函数。改为 expose 壳 App（见 5.5–5.9）。',
+			),
+			item(
+				'faq-vue-nav',
+				'12.7 Vue：嵌 Host 跳详情跳出主站 / 404？',
+				'嵌入用了 createWebHistory。改用 createMemoryHistory（createHostRouter），见 6.3–6.4。',
+			),
+			item(
+				'faq-activate',
+				'12.8 activate 没执行 / 控制台 warn？',
+				'钩子须在 expose 的 default 上（App.activate 或 { mount, activate }）。挂叶子页无效。缺钩子会 warn 不阻断；force 重载：pluginManager.ensurePlugin(id, { force: true })。',
+			),
 		],
 	},
 ];
@@ -999,11 +1245,12 @@ const sectionsZh: PluginGuideSection[] = [
 
 const introEn =
 	'Audience: frontend developers building React / Vue Module Federation remotes (plugins) for this host.\n\n' +
-	'Goal: scaffold the project, export exposes correctly, register in the Host registry, and get Host-embedded styling (including Tooltip / Dialog / Teleport) that matches standalone preview.\n\n' +
-	'References:\n' +
-	'• React: apps/micro in this monorepo (port 9008)\n' +
-	'• Vue: micro-vue sample (port 9009, framework: "vue" in registry)\n' +
-	'• Deep dive: apps/frontend/src/plugins/docs/plugin-development-guide.md\n\n' +
+	'Goal: scaffold the project, export exposes correctly, register in the Host registry, match standalone styling when embedded (Tooltip / Dialog / Teleport), and for multi-page remotes expose a router shell with activate on that shell.\n\n' +
+	'References (micro-apps outside this monorepo):\n' +
+	'• React multi-page: remote-react-shadcn (port 9010, in-memory NavigationProvider)\n' +
+	'• Vue multi-page: remote-vue-shadcn (port 9009, vue-router WebHistory preview / MemoryHistory embed)\n' +
+	'• Contracts: packages/federation-kit/docs/plugin-guide (ch.06 React multi-page, ch.09 Vue multi-page)\n' +
+	'• Host adapter: apps/frontend/src/federation (re-exports @dnhyxc-ai/federation-kit)\n\n' +
 	'Updated: ' +
 	TODAY;
 
@@ -1015,7 +1262,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'arch-roles',
 				'1.1 Roles',
-				'• Host (apps/frontend): registry, registerRemotes, loadRemote, routes/sidebar, PluginHostPage, runtime @scope CSS isolation, Portal/Teleport retargeting.\n' +
+				'• Host (apps/frontend + @dnhyxc-ai/federation-kit): registry, registerRemotes, loadRemote, routes/sidebar, PluginHostPage, runtime @scope CSS isolation, Portal/Teleport retargeting.\n' +
 					'• Remote: Vite + @module-federation/vite exposes; you own default export + HostBridge APIs allowed by permissions.\n' +
 					'• Registry (plugins-registry.json): id / entry / expose / remoteName / framework / permissions / trust. Copy changes only need registry edits—not Host i18n keys.',
 			),
@@ -1032,9 +1279,11 @@ const sectionsEn: PluginGuideSection[] = [
 				'1. PluginManager.init() fetches registry.\n' +
 					'2. Routes/sidebar injected when injectRoute !== false.\n' +
 					'3. ensurePlugin → one GET mf-manifest.json → bust version@manifestHash → remoteEntry.js?v=.\n' +
-					'4. loadRemote → normalizePluginModule (React default, or Vue via createVueHostBridge when framework is "vue").\n' +
-					'5. PluginHostPage sets data-mf-plugin + data-mf-style-realm and attachPluginStyleIsolation.\n' +
-					'6. Optional activate / deactivate.',
+					'4. loadRemote → normalizePluginModule (pickPluginLifecycle: named export or default.activate).\n' +
+					'   React default must be the shell for multi-page; Vue uses createVueHostBridge(mount).\n' +
+					'5. Missing activate/deactivate → console.warn (non-blocking); else await activate(api).\n' +
+					'6. PluginHostPage sets data-mf-plugin + data-mf-style-realm and attachPluginStyleIsolation.\n' +
+					'7. Unload: deactivate + teardown isolation.',
 			),
 			item(
 				'arch-tree',
@@ -1051,7 +1300,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'init-tools',
 				'2.1 Tooling',
-				'Node ≥ 20, pnpm ≥ 8. Use @module-federation/vite (not legacy @originjs/vite-plugin-federation). Typical ports: Host 9002, React remote 9008, Vue remote 9009.',
+				'Node ≥ 20, pnpm ≥ 8. Use @module-federation/vite (not legacy @originjs/vite-plugin-federation). Typical ports: Host 9002, Vue remote 9009, React multi-page 9010.',
 			),
 			item(
 				'init-env',
@@ -1125,29 +1374,63 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'react-expose',
 				'5.2 Expose entry (must import styles)',
-				'Host only loads the expose module—not main.tsx. Missing CSS ⇒ overlays look unstyled only when embedded.',
+				'Host loads only the expose module. Multi-page: default must be the shell App—not a leaf InfoPage.',
 				{ lang: 'tsx', code: CODE_REACT_EXPOSE },
 			),
 			item(
 				'react-app',
-				'5.3 App.tsx',
-				'Default-export a component; prefer data-plugin-root. Host adds data-mf-plugin / data-mf-style-realm. Avoid double padding if PluginPageShell wraps the route.',
+				'5.3 Single-page App + static lifecycle',
+				'Hang activate/deactivate on App (do not export function activate—breaks Fast Refresh). Missing hooks → Host warns.',
 				{ lang: 'tsx', code: CODE_REACT_APP },
 			),
-			item('react-main', '5.4 Standalone main.tsx', 'For local preview only.', {
-				lang: 'tsx',
-				code: CODE_REACT_MAIN,
-			}),
+			item(
+				'react-main',
+				'5.4 Standalone main.tsx',
+				'Render the same shell App. Host never runs this file.',
+				{
+					lang: 'tsx',
+					code: CODE_REACT_MAIN,
+				},
+			),
+			item(
+				'react-multipage-rule',
+				'5.5 Multi-page rules (remote-react-shadcn)',
+				'Host injects one routePath. Expose a NavigationProvider shell; leaves call useNavigation().navigate. activate must live on the shell App. See federation-kit plugin-guide ch.06 §5.',
+			),
+			item(
+				'react-nav-ctx',
+				'5.6 In-memory NavigationContext',
+				'Does not change the browser URL (stays on Host routePath).',
+				{ lang: 'tsx', code: CODE_REACT_NAV_CTX },
+			),
+			item(
+				'react-app-shell',
+				'5.7 Multi-page shell App.tsx',
+				'Provider + AppRouter; lifecycle on this function.',
+				{ lang: 'tsx', code: CODE_REACT_APP_SHELL },
+			),
+			item(
+				'react-app-router',
+				'5.8 AppRouter',
+				'Switch child pages by internal path.',
+				{ lang: 'tsx', code: CODE_REACT_APP_ROUTER },
+			),
+			item(
+				'react-page-nav',
+				'5.9 Leaf navigation',
+				'Use internal navigate only; never hang activate on a leaf.',
+				{ lang: 'tsx', code: CODE_REACT_PAGE_NAV },
+			),
 			item(
 				'react-api',
-				'5.5 Calling Host APIs safely',
-				'ui:toast / nav:subtree / http:plugin-api / modules:* — check before use.',
+				'5.10 Calling Host APIs safely',
+				'ui:toast / nav:subtree (must prefix routePath) / http:plugin-api / modules:* — check before use.',
 				{ lang: 'tsx', code: CODE_API_USAGE },
 			),
 			item(
 				'react-lifecycle',
-				'5.6 activate / deactivate',
-				'Optional. Keep hooks out of hot component files (Fast Refresh).',
+				'5.11 Lifecycle patterns',
+				'Prefer static props; optional named re-export from the expose entry.',
 				{ lang: 'typescript', code: CODE_LIFECYCLE },
 			),
 		],
@@ -1159,36 +1442,57 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'vue-bridge-model',
 				'6.1 How Host mounts Vue',
-				'normalizePluginModule → createVueHostBridge: React mounts a div, then Remote.mount(el, bridge). Remote createApp + reactive(bridge).',
+				'normalizePluginModule → createVueHostBridge: React mounts a div, then Remote.mount(el, bridge). Remote createApp(App, { bridge: reactive(bridge) }).use(router).mount(el).',
 			),
 			item(
 				'vue-types',
 				'6.2 Types',
-				'Same HostBridgeProps as React; consume via props.bridge.',
+				'Same HostBridgeProps; consume via props.bridge / useHostBridge().',
 				{ lang: 'typescript', code: CODE_HOST_BRIDGE_TYPES },
 			),
 			item(
+				'vue-multipage-rule',
+				'6.3 Multi-page rules (remote-vue-shadcn)',
+				'mount the RouterView root App; preview = WebHistory, embed = MemoryHistory; share one routes table; activate receives api. See federation-kit plugin-guide ch.09 §5.',
+			),
+			item(
+				'vue-router',
+				'6.4 vue-router Web / Memory',
+				'Memory embed keeps Host URL on routePath.',
+				{ lang: 'typescript', code: CODE_VUE_ROUTER },
+			),
+			item(
+				'vue-host-bridge',
+				'6.5 useHostBridge',
+				'provide in App.vue; inject in leaves.',
+				{ lang: 'typescript', code: CODE_VUE_HOST_BRIDGE },
+			),
+			item('vue-app', '6.6 Root App.vue', 'provide bridge + RouterView.', {
+				lang: 'vue',
+				code: CODE_VUE_APP,
+			}),
+			item(
 				'vue-expose',
-				'6.3 Expose index.ts',
-				'Import styles; re-export App.vue.',
+				'6.7 Expose mount + lifecycle',
+				'Import styles; new Memory router per mount; hooks on default object.',
 				{ lang: 'typescript', code: CODE_VUE_EXPOSE },
 			),
 			item(
-				'vue-app',
-				'6.4 App.vue sample',
-				'Use normal Teleport overlays; verify [data-mf-portal-scope] + matching style-realm in DevTools.',
-				{ lang: 'vue', code: CODE_VUE_APP },
+				'vue-page-nav',
+				'6.8 Leaf router.push',
+				'Same API standalone and embedded.',
+				{ lang: 'vue', code: CODE_VUE_PAGE_NAV },
 			),
 			item(
 				'vue-main',
-				'6.5 Standalone main.ts',
-				'Host never runs this file when embedded.',
+				'6.9 Standalone main.ts',
+				'WebHistory + previewBridge; Host never runs this file.',
 				{ lang: 'typescript', code: CODE_VUE_MAIN },
 			),
 			item(
 				'vue-donts',
-				'6.6 Common Vue mistakes',
-				'• styles only in main.ts\n• missing registry framework: "vue"\n• homemade React bridge\n• hand-written data-mf-* / portal containers\n• expecting top-level {api, plugin} props',
+				'6.10 Common Vue mistakes',
+				'• styles only in main.ts\n• missing registry framework: "vue"\n• WebHistory while embedded\n• mount leaf without app.use(router)\n• expecting top-level {api, plugin} props\n• hand-written data-mf-* / portal containers',
 			),
 		],
 	},
@@ -1209,7 +1513,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'styles-file',
 				'7.3 styles.css sample',
-				'Align tokens with apps/micro/src/styles.css.',
+				'Align tokens with Host or remote-*-shadcn styles.css.',
 				{ lang: 'css', code: CODE_STYLES_CSS },
 			),
 			item(
@@ -1286,7 +1590,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'debug',
 				'10.3 Debug tips',
-				'Duplicate React; CORS; missing expose on deployed build; CSS not on expose; Vue missing framework; locale not wired.',
+				'Duplicate React; CORS; missing expose on deployed build; CSS not on expose; Vue missing framework; locale not wired; React leaf expose without Provider; Vue WebHistory while embedded; activate not on expose default.',
 			),
 		],
 	},
@@ -1298,9 +1602,9 @@ const sectionsEn: PluginGuideSection[] = [
 				'checklist-all',
 				'11.1 Before ship',
 				'[Build] MF vite plugin; manifest; entry inject; correct shared singletons; styles on every expose.\n' +
-					'[Component] default export; React {api,plugin} / Vue props.bridge; data-plugin-root; own i18n.\n' +
+					'[Component] default export; React {api,plugin} / Vue props.bridge+mount; data-plugin-root; activate on shell; multi-page shell (React NavigationProvider / Vue MemoryHistory).\n' +
 					'[Registry] locale maps; hostApiRange; Vue framework; minimal permissions.\n' +
-					'[UX] overlays match standalone; Host toaster intact; fullscreen paired if used.',
+					'[UX] overlays match standalone; in-plugin navigation works; activate visible or intentional warn; Host toaster intact; fullscreen paired if used.',
 			),
 		],
 	},
@@ -1332,6 +1636,21 @@ const sectionsEn: PluginGuideSection[] = [
 				'faq-cache',
 				'12.5 Host still shows old bundle?',
 				'Deploy new dist; Host busts via remote mf-manifest fingerprint—no need to bump registry updatedAt just for cache.',
+			),
+			item(
+				'faq-react-nav',
+				'12.6 React: detail click does nothing?',
+				'You likely exposed a leaf InfoPage without NavigationProvider. Expose the shell App (sections 5.5–5.9).',
+			),
+			item(
+				'faq-vue-nav',
+				'12.7 Vue: navigating detail breaks Host URL?',
+				'Embedded remotes must use createMemoryHistory (createHostRouter), not WebHistory (sections 6.3–6.4).',
+			),
+			item(
+				'faq-activate',
+				'12.8 activate missing / console warn?',
+				'Hooks must sit on the expose default (App.activate or { mount, activate }). Leaf hooks are ignored. Force reload: pluginManager.ensurePlugin(id, { force: true }).',
 			),
 		],
 	},
