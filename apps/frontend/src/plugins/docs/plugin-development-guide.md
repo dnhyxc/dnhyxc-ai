@@ -3,7 +3,7 @@
 > **文档角色**：面向插件/子项目开发者的实操手册，包含开发全流程要求和条件。
 > **适用读者**：第一方插件开发者、合作方插件开发者、第三方插件开发者。
 > **目标**：帮助开发者快速落地插件开发，确保符合系统规范。
-> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host **`mf-iso:3` 选择器前缀**隔离（dev 排除 Host；**`data-mf-style-realm` + `data-plugin-root`；Portal/`Teleport` 收编打标；body remove 镜像；同 Remote `reclaimEntryStyles`**）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**每个 MF expose 入口须 `import '@/styles.css'`（Host 不跑 `main.ts`）**；**Vue 子应用在 registry 写 `"framework": "vue"`**（Host `createVueHostBridge`；Remote 勿自建 React 桥）；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding；**插件侧勿手写 portal container / 勿改 createPortal**（Host 已静默收编）。Host 侧见 `host-plugin-integration-guide.md` §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）、Vue 样例见仓外 `micro-vue`（**9009**）。若不一致，以源码为准。
+> **同步说明**：对齐最新契约——`api.locale`（无 `api.t`）、自维护 i18n + `useHostLocale`、Host **`mf-iso:3` 选择器前缀**隔离（实现于 `plugins/style-isolation/`；dev 排除 Host；**`data-mf-style-realm` + `data-plugin-root`；Portal/`Teleport` 收编打标；body remove 镜像；同 Remote `reclaimEntryStyles`**）、iframe `locale` 推送；Host Registry 用 `title`/`description` locale map；**每个 MF expose 入口须 `import '@/styles.css'`（Host 不跑 `main.ts`）**；**Vue 子应用在 registry 写 `"framework": "vue"`**（Host `createVueHostBridge`；Remote 勿自建 React 桥）；**勿**在组件同文件导出空 `activate`（Fast Refresh）；重依赖建议 `optimizeDeps.include`；保存 registry 时校验 `hostApiRange` 覆盖 Host `VITE_HOST_API_VERSION`；**`api.ui.setAppFullscreen` 应用级影院全屏**（需 `ui:toast`）；独立路由页由 Host 套 `PluginPageShell`，插件勿重复外层 padding；**插件侧勿手写 portal container / 勿改 createPortal**（Host 已静默收编）。Host 侧见 `host-plugin-integration-guide.md` §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2。参考实现：`apps/micro`（端口 **9008**，MF 名仍可为 `remotePlugins`）、`apps/remote-demo`（**9007**）、Vue 样例见仓外 `micro-vue`（**9009**）。若不一致，以源码为准。
 
 ---
 
@@ -462,7 +462,7 @@ export default { mount };
 
 | 信任等级 | 谁负责隔离 | Remote 可以做什么 |
 | -------- | ---------- | ----------------- |
-| `first-party` / `partner` | Host `styleIsolation.ts`：**选择器前缀 `/*mf-iso:3*/`**（同 Remote 共享 `data-mf-style-realm`；Portal/`Teleport` 收编 + 打标；CSSOM） | 正常 `@import "tailwindcss"`（含 Preflight） |
+| `first-party` / `partner` | Host `plugins/style-isolation/`：**选择器前缀 `/*mf-iso:3*/`**（同 Remote 共享 `data-mf-style-realm`；Portal/`Teleport` 收编 + 打标；CSSOM） | 正常 `@import "tailwindcss"`（含 Preflight） |
 | `untrusted` | iframe | 独立文档样式 |
 
 Host 开发态排除 `apps/frontend` 的 Vite style；挂载期 `reclaimEntryStyles`。详见 `mf-implementation-guide.md` §2.10.2。

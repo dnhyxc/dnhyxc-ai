@@ -2,11 +2,11 @@ import { Toast } from '@ui/sonner';
 import { getActiveLocale, type Locale } from '@/i18n';
 import { downloadBlob, isTauriRuntime } from '@/utils';
 import { http } from '@/utils/fetch';
-import { setAppFullscreen } from '../host-api/appFullscreen';
-import { deepFreeze } from '../host-api/deepFreeze';
-import { eventBus } from '../host-api/EventBus';
-import { createEbookModulesApi } from '../host-api/ebookHostApi';
-import type { HostBridgeProps, PluginDescriptor } from './types';
+import { setAppFullscreen } from '../../host-api/appFullscreen';
+import { deepFreeze } from '../../host-api/deepFreeze';
+import { eventBus } from '../../host-api/EventBus';
+import { createEbookModulesApi } from '../../host-api/ebookHostApi';
+import type { HostBridgeProps, PluginDescriptor } from '../types';
 
 const DOCX_MIME =
 	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';

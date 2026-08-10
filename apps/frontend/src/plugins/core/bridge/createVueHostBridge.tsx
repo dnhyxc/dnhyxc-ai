@@ -9,7 +9,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from 'react';
-import type { HostBridgeProps } from './types';
+import type { HostBridgeProps } from '../types';
 
 /** Vue 根组件 props：Remote 在 mount 内对 bridge 做 reactive */
 export type VuePluginRootProps = {

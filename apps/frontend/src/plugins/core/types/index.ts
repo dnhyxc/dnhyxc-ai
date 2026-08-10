@@ -1,5 +1,8 @@
 import type React from 'react';
-import type { PluginLocaleMap } from './localeText';
+import type { HostLocale, PluginLocaleMap } from './localeText';
+
+export type { HostLocale, PluginLocaleMap } from './localeText';
+export { pickPluginLocaleText } from './localeText';
 
 /**
  * Host 插件契约 semver；破坏性变更才升 major。
@@ -82,8 +85,6 @@ export interface PluginRegistry {
 	updatedAt: string;
 	plugins: PluginDescriptor[];
 }
-
-export type HostLocale = 'zh-CN' | 'en-US';
 
 export interface HostBridgeProps {
 	api: Readonly<{

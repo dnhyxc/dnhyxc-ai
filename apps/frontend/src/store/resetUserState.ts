@@ -1,4 +1,4 @@
-import { clearPluginEnabledPrefsCache } from '@/plugins/core/pluginEnabledPrefs';
+import { clearPluginEnabledPrefsCache } from '@/plugins/core/enabled/pluginEnabledPrefs';
 import { clearMinimaxTtsUserPrefsCache } from '@/utils/minimaxTtsPrefs';
 import assistantStore from './assistant';
 import ebookStore from './ebook';

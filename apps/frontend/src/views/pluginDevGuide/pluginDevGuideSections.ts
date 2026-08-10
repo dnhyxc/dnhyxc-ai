@@ -237,7 +237,7 @@ export default defineConfig(({ mode }) => {
   };
 });`;
 
-const CODE_HOST_BRIDGE_TYPES = String.raw`/** 与 Host apps/frontend/src/plugins/core/types.ts 对齐的最小子集（无 api.t） */
+const CODE_HOST_BRIDGE_TYPES = String.raw`/** 与 Host apps/frontend/src/plugins/core/types/index.ts 对齐的最小子集（无 api.t） */
 export type HostLocale = 'zh-CN' | 'en-US';
 
 export type HostBridgeProps = {

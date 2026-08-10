@@ -22,7 +22,7 @@ import {
 	pluginManager,
 	subscribePluginEnabled,
 } from '@/plugins';
-import { ensurePluginEnabledPrefsLoaded } from '@/plugins/core/pluginEnabledPrefs';
+import { ensurePluginEnabledPrefsLoaded } from '@/plugins/core/enabled/pluginEnabledPrefs';
 import { getRequestErrorMessage } from '@/utils/fetch';
 
 /** 标题只认 registry.title[locale]，缺省回退 id */

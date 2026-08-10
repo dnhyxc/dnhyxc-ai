@@ -2,10 +2,13 @@ import { translateSync } from '@/i18n';
 import { putUploadRemoteJson } from '@/service';
 import { getPlatformFetch } from '@/utils/fetch';
 import { resolveUploadedFileUrl } from '@/utils/upload-file-url';
-import { isPluginEnabled, notifyPluginEnabled } from './enabledOverrides';
-import { satisfiesRange } from './PluginVerifier';
-import { setPluginEnabledPref } from './pluginEnabledPrefs';
-import { HOST_API_VERSION, type PluginRegistry } from './types';
+import {
+	isPluginEnabled,
+	notifyPluginEnabled,
+} from '../enabled/enabledOverrides';
+import { setPluginEnabledPref } from '../enabled/pluginEnabledPrefs';
+import { satisfiesRange } from '../runtime/PluginVerifier';
+import { HOST_API_VERSION, type PluginRegistry } from '../types';
 
 const CACHE_KEY = `dnhyxc.plugin.registry.${import.meta.env.PROD ? 'prod' : 'dev'}.v1`;
 export const PLUGIN_REGISTRY_CACHE_KEY = CACHE_KEY;

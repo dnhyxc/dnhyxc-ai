@@ -1,17 +1,23 @@
 import { type ComponentType, createElement } from 'react';
 import type { RouteConfig } from '@/router/routes';
-import { PluginHostPage } from '../host/PluginHostPage';
-import { beginPluginStyleCapture } from '../host/styleIsolation';
-import { eventBus } from '../host-api/EventBus';
-import { routeInjector } from '../inject/RouteInjector';
-import { sidebarInjector } from '../inject/SidebarInjector';
-import { createHostBridge } from './createHostBridge';
-import { isPluginEnabled, notifyPluginEnabled } from './enabledOverrides';
-import { loadRemoteApp, registerRemote, resolvePluginBust } from './mf';
+import { PluginHostPage } from '../../host/PluginHostPage';
+import { eventBus } from '../../host-api/EventBus';
+import { routeInjector } from '../../inject/RouteInjector';
+import { sidebarInjector } from '../../inject/SidebarInjector';
+import { beginPluginStyleCapture } from '../../style-isolation';
+import { createHostBridge } from '../bridge/createHostBridge';
+import {
+	isPluginEnabled,
+	notifyPluginEnabled,
+} from '../enabled/enabledOverrides';
+import { ensurePluginEnabledPrefsLoaded } from '../enabled/pluginEnabledPrefs';
+import { loadRemoteApp, registerRemote, resolvePluginBust } from '../mf/mf';
+import {
+	fetchPluginRegistry,
+	persistPluginEnabled,
+} from '../registry/registry';
+import type { LoadedPlugin, PluginDescriptor } from '../types';
 import { verifyPlugin } from './PluginVerifier';
-import { ensurePluginEnabledPrefsLoaded } from './pluginEnabledPrefs';
-import { fetchPluginRegistry, persistPluginEnabled } from './registry';
-import type { LoadedPlugin, PluginDescriptor } from './types';
 
 function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 	const Page: ComponentType = () =>

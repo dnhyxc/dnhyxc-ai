@@ -3,7 +3,7 @@
 > **文档角色**：面向主项目开发者的插件接入实操手册，包含所有接入方式的具体代码和当前项目中的真实示例。
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
-> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host **选择器前缀 `mf-iso:3`** 样式隔离——dev 认领排除 Host；**`data-mf-style-realm` + `data-plugin-root`；`html/body` 仅打插件根；全屏 portal-scope 打标；body remove/replace 镜像；HMR 仅 vite-id；`@/plugins` 导出 realm/claim**；**Layout / `PluginPageShell` overflow 与 rounded 分层（backdrop-filter）**；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**；App 根 **`data-mf-host-portal`**）。详解见本文 §11.3 / §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2 / §2.14。若不一致，以源码为准。
+> **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/micro`（及 remote-demo 等）最新源码对齐（含 `api.locale`、iframe locale 推送、Host **`plugins/style-isolation/`（protocol/css/sandbox/portal）选择器前缀 `mf-iso:3`**——dev 认领排除 Host；**`data-mf-style-realm` + `data-plugin-root`；`html/body` 仅打插件根；全屏 portal-scope 打标；body remove/replace 镜像；HMR 仅 vite-id；`@/plugins` 自 `./style-isolation` 导出 realm/claim**；**Layout / `PluginPageShell` overflow 与 rounded 分层（backdrop-filter）**；Registry `title`/`description` locale map；**entry bust / afterResolve**；**勿 shared react-router**；保存 registry 校验 `hostApiRange`；remotes `no-store`；**应用级全屏 `api.ui.setAppFullscreen` + Layout 影院态**；**独立路由 `pageShell` / `PluginPageShell`**；侧栏 **`MENUS` + 动态项 + `PLUGINS`**；**刷新插件路由防闪 404（`pluginsReady` + catch-all 占位）**；App 根 **`data-mf-host-portal`**）。详解见本文 §11.3 / §15 / 附录 B；实现见 `mf-implementation-guide.md` §2.10.2 / §2.14。若不一致，以源码为准。
 
 ---
 
@@ -53,23 +53,26 @@ Host 应用
 ├── plugins/
 │   ├── index.ts              # 统一导出
 │   ├── core/
-│   │   ├── mf.ts             # MF Runtime API
-│   │   ├── PluginManager.ts  # 插件生命周期管理
-│   │   ├── types.ts          # 类型定义
-│   │   ├── localeText.ts     # registry title/description 多语言解析
-│   │   ├── registry.ts       # Registry 拉取/缓存
-│   │   ├── createHostBridge.ts  # HostBridge 构建
-│   │   ├── PluginVerifier.ts    # 插件验证
-│   │   ├── enabledOverrides.ts  # 本地上架/下架覆盖
-│   │   └── attachIframeBridge.ts # iframe 通信桥
+│   │   ├── index.ts          # core 对内 barrel
+│   │   ├── types/            # 类型 + locale 文案（HostLocale / PluginDescriptor…）
+│   │   ├── runtime/          # PluginManager 生命周期 + PluginVerifier
+│   │   ├── mf/               # Module Federation 加载 / normalize 模块
+│   │   ├── bridge/           # HostBridge / Vue 桥 / iframe 桥
+│   │   ├── registry/         # Registry 拉取/缓存/保存
+│   │   └── enabled/          # 上架偏好、订阅、Host surface 列表
 │   ├── inject/
 │   │   ├── RouteInjector.ts     # 路由注入器
 │   │   └── SidebarInjector.ts   # 侧栏注入器
 │   ├── host/
 │   │   ├── PluginHostPage.tsx   # 插件宿主（MF / iframe / locale；data-mf-style-realm；可选 pageShell）
 │   │   ├── PluginPageShell.tsx  # 独立路由页统一边距；订阅影院态；圆角层无 overflow-hidden
-│   │   ├── PluginErrorBoundary.tsx # 错误边界
-│   │   └── styleIsolation.ts    # Remote CSS 选择器前缀(mf-iso:3) + Portal 收编 + claim/clear
+│   │   └── PluginErrorBoundary.tsx # 错误边界
+│   ├── style-isolation/         # 主子样式隔离（mf-iso:3；protocol/css/sandbox/portal 分层）
+│   │   ├── index.ts             # 对外导出 + smoke 用 __styleIsolationTest
+│   │   ├── protocol/            # realm 键、选择器契约、幂等判定
+│   │   ├── css/                 # transpile + Host 主题 token 剥离
+│   │   ├── sandbox/             # begin/attach 捕获、head/CSSOM、reclaim/HMR
+│   │   └── portal/              # claim、scope DOM、body/createPortal 劫持
 │   ├── host-api/
 │   │   ├── EventBus.ts          # 事件总线
 │   │   ├── ebookHostApi.ts      # 电子书模块 API
@@ -300,7 +303,7 @@ import { useEffect, useState } from "react";
 import {
 	isPluginEnabled,
 	subscribePluginEnabled,
-} from "../core/enabledOverrides";
+} from "../core/enabled/enabledOverrides";
 
 /** 订阅本地上架状态，用于业务入口条件渲染 */
 export function usePluginEnabled(pluginId: string): boolean {
@@ -461,7 +464,7 @@ if (loaded?.status === 'activated') {
 （是否真正可用仍取决于 bridge 上 permissions 是否注入了对应能力）
 
 ```typescript
-// apps/frontend/src/plugins/core/attachIframeBridge.ts（摘录）
+// apps/frontend/src/plugins/core/bridge/attachIframeBridge.ts（摘录）
 export function attachIframeBridge(
 	iframe: HTMLIFrameElement,
 	bridge: HostBridgeProps,
@@ -1427,10 +1430,10 @@ await pluginManager.setEnabled("myPlugin", false);
 
 ### 13.1 Bridge 构建
 
-**文件路径**：`apps/frontend/src/plugins/core/createHostBridge.ts`
+**文件路径**：`apps/frontend/src/plugins/core/bridge/createHostBridge.ts`
 
 ```typescript
-// apps/frontend/src/plugins/core/createHostBridge.ts（摘录）
+// apps/frontend/src/plugins/core/bridge/createHostBridge.ts（摘录）
 export function createHostBridge(
 	d: PluginDescriptor,
 	navigate: (to: string) => void,
@@ -1512,16 +1515,16 @@ Host 语言切换入口：`apps/frontend/src/hooks/i18n.ts` → `setLocale` → 
 | `apps/frontend/src/plugins/host-api/appFullscreen.ts` | **新增** | 影院态状态、订阅、`setAppFullscreen` |
 | `apps/frontend/src/plugins/host/PluginPageShell.tsx` | **新增/续改** | 独立路由统一外边距/圆角；影院态收起；**圆角层勿 `overflow-hidden`**（backdrop-filter） |
 | `apps/frontend/src/plugins/host/PluginHostPage.tsx` | 修改 | `pageShell?`；`data-mf-style-realm`；`attachPluginStyleIsolation(..., remoteName)` |
-| `apps/frontend/src/plugins/core/PluginManager.ts` | 修改 | `createPluginRoute` → `pageShell: true`；`beginPluginStyleCapture(..., remoteName)` |
-| `apps/frontend/src/plugins/core/createHostBridge.ts` | 修改 | `ui:toast` 权限下注入 `setAppFullscreen` |
-| `apps/frontend/src/plugins/core/types.ts` | 修改 | `HostBridgeProps.api.ui.setAppFullscreen?` |
+| `apps/frontend/src/plugins/core/runtime/PluginManager.ts` | 修改 | `createPluginRoute` → `pageShell: true`；`beginPluginStyleCapture(..., remoteName)` |
+| `apps/frontend/src/plugins/core/bridge/createHostBridge.ts` | 修改 | `ui:toast` 权限下注入 `setAppFullscreen` |
+| `apps/frontend/src/plugins/core/types/index.ts` | 修改 | `HostBridgeProps.api.ui.setAppFullscreen?` |
 | `apps/frontend/src/layout/index.tsx` | 修改 | 订阅影院态；藏侧栏/顶栏/footer；Web Esc 同步；**overflow 与 rounded 分层** |
 | `apps/frontend/src/components/design/Sidebar/enum.tsx` | 修改 | `/plugins` 迁入 `PLUGINS`；图标 `TvMinimalPlay` |
 | `apps/frontend/src/components/design/Sidebar/index.tsx` | （已用） | 菜单顺序：`MENUS + dynamic + PLUGINS` |
 | `apps/frontend/src-tauri/capabilities/default.json` | 修改 | `allow-set-fullscreen` / `allow-is-fullscreen` |
-| `apps/frontend/src/plugins/host/styleIsolation.ts` | 续改 | `mf-iso:3` 选择器前缀；`html/body→[realm][data-plugin-root]`；全屏 portal + 打标；HMR 仅 vite-id；body remove 镜像；CSSOM（详表见附录 B.0） |
-| `apps/frontend/src/plugins/core/createVueHostBridge.tsx` | 续改 | Host 不依赖 vue；调用 Remote `mount(el, bridge)` |
-| `apps/frontend/src/plugins/index.ts` | 修改 | 导出 `styleRealmKey` / `claimPluginPortalTarget` / `clearPluginPortalClaim` |
+| `apps/frontend/src/plugins/style-isolation/` | **分层重写** | 自巨石拆出：`protocol` / `css` / `sandbox` / `portal`；`mf-iso:3`；Portal claim/body 劫持；smoke 迁此目录（详表见附录 B.0） |
+| `apps/frontend/src/plugins/core/bridge/createVueHostBridge.tsx` | 续改 | Host 不依赖 vue；调用 Remote `mount(el, bridge)` |
+| `apps/frontend/src/plugins/index.ts` | 修改 | 自 `./style-isolation` 导出 `styleRealmKey` / claim / clear |
 | `apps/frontend/src/router/index.tsx` | 修改 | App 根 `data-mf-host-portal`（保护 Host Toaster） |
 | `apps/frontend/src/views/ebook/.../EbookReadHostPlugins.tsx` | 修改 | Drawer 打开前 claim / 关闭 clear |
 | `apps/micro/.../VideoPlayer.tsx` | 消费方 | 全屏优先 `hostUi.setAppFullscreen` |
@@ -1832,7 +1835,7 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 
 ### B. 样式隔离（Host 责任）
 
-`first-party` / `partner`：Host `styleIsolation.ts` 在 loadRemote / 挂载期间把 Remote 注入的 CSS **改写为选择器前缀协议 `/*mf-iso:3*/`**（**按 Remote entry 域** `data-mf-style-realm`，不是单个 `pluginId`）。  
+`first-party` / `partner`：Host [`plugins/style-isolation/`](../style-isolation/) 在 loadRemote / 挂载期间把 Remote 注入的 CSS **改写为选择器前缀协议 `/*mf-iso:3*/`**（**按 Remote entry 域** `data-mf-style-realm`，不是单个 `pluginId`）。  
 
 要点：
 
@@ -1842,6 +1845,7 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 - Portal：全屏 `[data-mf-portal-scope]`（`pointer-events:none`）+ 子节点可点 + **打标**
 - `PluginHostPage` 根：`data-mf-plugin` + `data-mf-style-realm` + **`data-plugin-root`**；隔离用 **`useLayoutEffect`**
 - Remote 可正常 `@import "tailwindcss"`；`untrusted` 走 iframe
+- **分层**：`protocol`（契约）→ `css`（转译）→ `sandbox`（捕获）→ `portal`（弹层收编）；组合入口 `sandbox/attach.ts`
 
 详解：[mf-implementation-guide.md §2.10.2](./mf-implementation-guide.md#2102-主子样式隔离原理与完整实现)
 
@@ -1849,24 +1853,25 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 
 | # | 改动点 | 落点 | 说明 |
 |---|--------|------|------|
-| 1 | `styleRealmKey` | `styleIsolation.ts`；`@/plugins` | `entry:origin+path` / `remote:` / `plugin:` |
-| 2 | 选择器前缀 `/*mf-iso:3*/` | `transpileStyleText` / `prefixOneSelector` | 取代整包 `@scope`；旧 scope 会 unwrap 升版 |
-| 3 | `html`/`body` → `[realm][data-plugin-root]` | `mapDocRootToken` | 防 Message/Toast 竖条 |
-| 4 | 双选择器 `[realm] .x,[realm].x` | 同上 | 浮层根自身 class 也能命中 |
-| 5 | `beginPluginStyleCapture` | `PluginManager.runLoad` | load 窗口 + repair + reclaim |
-| 6 | `attachPluginStyleIsolation` | `PluginHostPage` **useLayoutEffect** | 早于 Vue mount；CSS + Portal |
-| 7 | `createVueHostBridge` **useLayoutEffect** mount | `core/createVueHostBridge.tsx` | EP popper 容器不抢跑 |
-| 8 | HMR 仅 `data-vite-dev-id` | `watchScopedStyleHmr` / `styleNeedsRescope` | 防 antd cssinjs 互殴卡死 |
-| 9 | CSSOM `insertRule` | `ensureCssomPatch` | cssinjs 主路径 |
-| 10 | 全屏 portal-scope + `stampRealmOnPortalNode` | Portal bridge | 穿透点击；浮层吃样式 |
-| 11 | body `removeChild`/`replaceChild` 镜像 | `resolveRetargetedChildParent` | antd `getScrollBarSize` |
-| 12 | `claimPluginPortalTarget` / `clearPluginPortalClaim` | Host Drawer 槽 | 首帧进 scope |
-| 13 | `data-mf-host-portal` + Toaster 识别 | App 根 / createPortal | Host Toast 不收编 |
-| 14 | `reclaimOrphanPopperContainers` | attach 时 | EP `#el-popper-container-*` 竞态 |
-| 15 | `looksLikeRemoteStyle` live/reclaim | 认领 | reclaim 不碰无标记 style |
-| 16 | barrel 导出 | `plugins/index.ts` | realm / claim / clear / Vue bridge |
-| 17 | 圆角层勿 `overflow-hidden` | `PluginPageShell` + Layout | 保 `backdrop-filter`（B.1） |
-| 18 | smoke | `styleIsolation.smoke.ts` | 前缀 / plugin-root / rescope 断言 |
+| 1 | `styleRealmKey` | `style-isolation/protocol`；`@/plugins` | `entry:origin+path` / `remote:` / `plugin:` |
+| 2 | 选择器前缀 `/*mf-iso:3*/` | `css/transpile.ts` | 取代整包 `@scope`；旧 scope 会 unwrap 升版 |
+| 3 | `html`/`body` → `[realm][data-plugin-root]` | `css/themeStrip.ts` `mapDocRootToken` | 防 Message/Toast 竖条 |
+| 4 | 双选择器 `[realm] .x,[realm].x` | `css/transpile.ts` | 浮层根自身 class 也能命中 |
+| 5 | Host 主题 token 剥离 | `css/themeStrip.ts` | `:root` 上 `--brand-accent` / `--theme-*` 等不写入 realm |
+| 6 | `beginPluginStyleCapture` | `sandbox/capture.ts` ← `PluginManager.runLoad` | load 窗口 + repair + reclaim |
+| 7 | `attachPluginStyleIsolation` | `sandbox/attach.ts` ← `PluginHostPage` **useLayoutEffect** | 早于 Vue mount；CSS + Portal |
+| 8 | `createVueHostBridge` **useLayoutEffect** mount | `core/createVueHostBridge.tsx` | EP popper 容器不抢跑 |
+| 9 | HMR 仅 `data-vite-dev-id` | `sandbox/reclaim.ts` | 防 antd cssinjs 互殴卡死 |
+| 10 | CSSOM `insertRule` | `sandbox/cssomPatch.ts` | cssinjs 主路径 |
+| 11 | 全屏 portal-scope + 打标 | `portal/scopeDom.ts` | 穿透点击；浮层吃样式 |
+| 12 | body / `createPortal` 劫持 + remove 镜像 | `portal/bodyPatch.ts` | antd `getScrollBarSize` |
+| 13 | `claim` / `clear` | `portal/claim.ts`；Host Drawer 槽 | 首帧进 scope |
+| 14 | `data-mf-host-portal` + Toaster 识别 | App 根 / `bodyPatch` | Host Toast 不收编 |
+| 15 | `reclaimOrphanPopperContainers` | `portal/attachPortal.ts` | EP `#el-popper-container-*` 竞态 |
+| 16 | `looksLikeRemoteStyle` live/reclaim | `sandbox/reclaim.ts` | reclaim 不碰无标记 style |
+| 17 | barrel 导出 | `plugins/index.ts` → `./style-isolation` | realm / claim / clear |
+| 18 | 圆角层勿 `overflow-hidden` | `PluginPageShell` + Layout | 保 `backdrop-filter`（B.1） |
+| 19 | smoke | `style-isolation/styleIsolation.smoke.ts` | 前缀 / plugin-root / rescope 断言 |
 
 #### B.1 overflow 与 `backdrop-filter`（Host 外壳）
 
@@ -1883,7 +1888,7 @@ Host federation **不要** `shared` `react-router`（易双实例）。用 `reso
 业务打开会 `createPortal` 到 `body` 的 Host 外壳（Drawer / Sheet）时：
 
 ```tsx
-// 业务 Drawer/Sheet 槽：只从 barrel 取认领 API，勿深链 styleIsolation
+// 业务 Drawer/Sheet 槽：只从 barrel 取认领 API，勿深链 style-isolation 实现
 import {
 	claimPluginPortalTarget,
 	clearPluginPortalClaim,

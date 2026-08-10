@@ -1,5 +1,5 @@
 import { translateSync } from '@/i18n';
-import { HOST_API_VERSION, type PluginDescriptor } from './types';
+import { HOST_API_VERSION, type PluginDescriptor } from '../types';
 
 function parseSemver(v: string): [number, number, number] | null {
 	const m = v

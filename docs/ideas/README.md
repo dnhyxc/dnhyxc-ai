@@ -33,6 +33,7 @@
 | [tauri-window-zoom-unveil.md](./tauri-window-zoom-unveil.md) | **macOS 窗口缩放零露白**（已落地）：swizzle `NSWindow.zoom:`、目标尺寸预布局 + 顶对齐 cover + 窗口揭开、dispatch2 帧循环、注入 JS 钉 `#root`/body 尺寸、首帧立刻 tick、移除 `background-attachment:fixed`；含架构/主流程/时序三图 + 完整源码逐行注释 + 几何数学 + 验收/排查清单 |
 | [tauri-system-menu-shortcuts.md](./tauri-system-menu-shortcuts.md) | **系统菜单 + 全局/页面快捷键体系**（已上线）：store 为唯一真相源串起菜单加速键/全局热键/页面快捷键三类；IconMenuItem 运行时 `set_accelerator` 可改键、失焦反注册（显隐应用例外）、改键前 `clear_all_shortcuts` + `SHORTCUT_HANDLING_ENABLED` 双保险防误触、前端 `chordStringsSemanticallyEqual` 写法归一化冲突检测、页面键 `registerGlobally=false` 仅 store+DOM、macOS 编辑菜单系统项三延迟点中文化；含架构/改键流程/触发时序/失焦时序四图 + 完整源码逐行注释 + 键 ID 编排表 + 验收/排查清单 |
 | [vue-plugin-hmr-bridge.md](./vue-plugin-hmr-bridge.md) | **Vue 插件桥接与 HMR 保障**（规划→已落地）：React Host 加载 Vue Remote 插件，Host 零 Vue 依赖，Remote 自管 `createApp` 生命周期；解决 MF 下 `optimizeDeps` 预打包冲突、双实例、React 重渲染劫持三大 HMR 根因；含架构图 + 主流程图 + HMR 时序图 + 分阶段落地与验收清单 |
+| [mf-style-isolation-implementation.md](./mf-style-isolation-implementation.md) | **微前端样式隔离实现思路**（核心已落地）：Host 侧「选择器前缀 + CSSOM insertRule patch + Portal body 收编」三层架构，覆盖静态 CSS / CSS-in-JS / body 弹层 / HMR / 同 Remote 多插件共享 realm / 嵌套插件引用计数 / Host 关键样式保护 / untrusted iframe 兜底；含架构图 + 主流程图 + 时序图 + 完整 TS 代码逐行中文注释 + 分阶段落地 + 验收清单 + 读者 5 步复用方案 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

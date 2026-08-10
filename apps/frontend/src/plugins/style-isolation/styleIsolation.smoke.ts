@@ -1,8 +1,8 @@
 /**
  * 样式隔离转译自检：断言失败即 exit 1。
- * 运行：pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/host/styleIsolation.smoke.ts
+ * 运行：pnpm --filter @dnhyxc-ai/frontend exec tsx src/plugins/style-isolation/styleIsolation.smoke.ts
  */
-import { styleRealmKey, __styleIsolationTest as T } from './styleIsolation';
+import { styleRealmKey, __styleIsolationTest as T } from './index';
 
 function assert(cond: unknown, msg: string): asserts cond {
 	if (!cond) throw new Error(msg);

@@ -1,5 +1,5 @@
+import type { PluginDescriptor } from '../types';
 import { isPluginEnabled } from './enabledOverrides';
-import type { PluginDescriptor } from './types';
 
 const REGISTRY_CACHE_KEY = `dnhyxc.plugin.registry.${import.meta.env.PROD ? 'prod' : 'dev'}.v1`;
 

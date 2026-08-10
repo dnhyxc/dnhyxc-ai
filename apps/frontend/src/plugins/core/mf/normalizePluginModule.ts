@@ -2,8 +2,8 @@ import type { ComponentType } from 'react';
 import {
 	createVueHostBridge,
 	type VueRemoteExpose,
-} from './createVueHostBridge';
-import type { HostBridgeProps, PluginDescriptor, PluginModule } from './types';
+} from '../bridge/createVueHostBridge';
+import type { HostBridgeProps, PluginDescriptor, PluginModule } from '../types';
 
 /** Remote 原始模块：React 组件，或 Vue mount API + framework 标记 */
 export type RawRemoteModule = {

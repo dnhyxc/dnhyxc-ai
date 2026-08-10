@@ -12,13 +12,13 @@ import Loading from '@/components/design/Loading';
 import { Button, Spinner } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { attachIframeBridge } from '../core/attachIframeBridge';
-import { pluginManager } from '../core/PluginManager';
+import { attachIframeBridge } from '../core/bridge/attachIframeBridge';
+import { pluginManager } from '../core/runtime/PluginManager';
 import type { HostBridgeProps, HostLocale } from '../core/types';
 import { eventBus } from '../host-api/EventBus';
+import { attachPluginStyleIsolation, styleRealmKey } from '../style-isolation';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
 import { PluginPageShell } from './PluginPageShell';
-import { attachPluginStyleIsolation, styleRealmKey } from './styleIsolation';
 
 type Props = {
 	pluginId: string;

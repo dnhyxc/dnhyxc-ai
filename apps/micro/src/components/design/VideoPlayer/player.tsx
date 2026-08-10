@@ -1195,6 +1195,9 @@ export default function VideoPlayer({
 
 	const theater = isFullscreen;
 	const chromeHidden = !chromeOn;
+	/** 全屏黑底上主题色偏暗，chrome 强制白字 */
+	const chromeFg = theater ? 'text-white' : 'text-textcolor';
+	const chromeFgMuted = theater ? 'text-white/50' : 'text-textcolor/50';
 
 	const shell = (
 		<div
@@ -1262,7 +1265,8 @@ export default function VideoPlayer({
 			{currentVideoName ? (
 				<div
 					className={cn(
-						'pointer-events-none absolute top-0 left-0 z-2 box-border w-full overflow-hidden p-[9px_10px_0] text-left text-base text-ellipsis whitespace-nowrap text-textcolor',
+						'pointer-events-none absolute top-0 left-0 z-2 box-border w-full overflow-hidden p-[9px_10px_0] text-left text-base text-ellipsis whitespace-nowrap',
+						chromeFg,
 						chromeHidden && 'pointer-events-none opacity-0!',
 					)}
 				>
@@ -1372,19 +1376,25 @@ export default function VideoPlayer({
 				</div>
 
 				<div className="relative z-1 my-[15px] flex items-end justify-between">
-					<div className="flex items-center text-textcolor">
+					<div className={cn('flex items-center', chromeFg)}>
 						<div
 							className={cn(
-								'flex cursor-pointer items-center text-textcolor hover:text-teal-500',
+								'flex cursor-pointer items-center hover:text-teal-500',
+								chromeFg,
 								safeIndex === 0 &&
 									playType !== 'loop' &&
-									'pointer-events-none cursor-not-allowed text-textcolor/50',
+									cn('pointer-events-none cursor-not-allowed', chromeFgMuted),
 							)}
 							onClick={onPrev}
 						>
 							<SkipBack size={CTRL_ICON} />
 						</div>
-						<div className="mx-3 flex cursor-pointer items-center text-textcolor hover:text-teal-500">
+						<div
+							className={cn(
+								'mx-3 flex cursor-pointer items-center hover:text-teal-500',
+								chromeFg,
+							)}
+						>
 							{!playStatus ? (
 								<Play size={CTRL_ICON} onClick={onPlay} />
 							) : (
@@ -1393,10 +1403,11 @@ export default function VideoPlayer({
 						</div>
 						<div
 							className={cn(
-								'mr-5 flex cursor-pointer items-center text-textcolor hover:text-teal-500',
+								'mr-5 flex cursor-pointer items-center hover:text-teal-500',
+								chromeFg,
 								safeIndex === videos.length - 1 &&
 									playType !== 'loop' &&
-									'pointer-events-none cursor-not-allowed text-textcolor/50',
+									cn('pointer-events-none cursor-not-allowed', chromeFgMuted),
 							)}
 							onClick={onNext}
 						>
@@ -1411,7 +1422,10 @@ export default function VideoPlayer({
 						{onAdd ? (
 							<Tip label={t('videoPlayer.continueSelect')}>
 								<div
-									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+									className={cn(
+										'flex cursor-pointer items-center justify-center hover:text-teal-500',
+										chromeFg,
+									)}
 									onClick={onAdd}
 								>
 									<FolderPlus size={CTRL_ICON} />
@@ -1421,7 +1435,10 @@ export default function VideoPlayer({
 						{onClear ? (
 							<Tip label={t('videoPlayer.reset')}>
 								<div
-									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+									className={cn(
+										'flex cursor-pointer items-center justify-center hover:text-teal-500',
+										chromeFg,
+									)}
 									onClick={onReset}
 								>
 									<ListRestart size={CTRL_ICON} />
@@ -1439,7 +1456,10 @@ export default function VideoPlayer({
 								onContentPointer={bumpChrome}
 								trigger={
 									<div
-										className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+										className={cn(
+											'flex cursor-pointer items-center justify-center hover:text-teal-500',
+											chromeFg,
+										)}
 										onClick={(e) => {
 											e.stopPropagation();
 										}}
@@ -1492,7 +1512,10 @@ export default function VideoPlayer({
 							onContentPointer={bumpChrome}
 							trigger={
 								<div
-									className="flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 text-textcolor hover:text-teal-500"
+									className={cn(
+										'flex min-w-7.5 cursor-pointer items-center justify-center text-center text-[15px] leading-4.5 hover:text-teal-500',
+										chromeFg,
+									)}
 									onClick={(e) => {
 										e.stopPropagation();
 									}}
@@ -1516,7 +1539,10 @@ export default function VideoPlayer({
 							onContentPointer={bumpChrome}
 							trigger={
 								<div
-									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+									className={cn(
+										'flex cursor-pointer items-center justify-center hover:text-teal-500',
+										chromeFg,
+									)}
 									onClick={(e) => {
 										e.stopPropagation();
 										onVolumeChange();
@@ -1577,7 +1603,10 @@ export default function VideoPlayer({
 							onContentPointer={bumpChrome}
 							trigger={
 								<div
-									className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+									className={cn(
+										'flex cursor-pointer items-center justify-center hover:text-teal-500',
+										chromeFg,
+									)}
 									onClick={(e) => {
 										e.stopPropagation();
 									}}
@@ -1618,7 +1647,10 @@ export default function VideoPlayer({
 
 						<Tip label={t('videoPlayer.pip')}>
 							<div
-								className="flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+								className={cn(
+									'flex cursor-pointer items-center justify-center hover:text-teal-500',
+									chromeFg,
+								)}
 								onClick={onPictureToPicture}
 							>
 								<PictureInPicture2 size={CTRL_ICON} />
@@ -1632,7 +1664,10 @@ export default function VideoPlayer({
 							}
 						>
 							<div
-								className="-mt-0.5 flex cursor-pointer items-center justify-center text-textcolor hover:text-teal-500"
+								className={cn(
+									'-mt-0.5 flex cursor-pointer items-center justify-center hover:text-teal-500',
+									chromeFg,
+								)}
 								onClick={onFull}
 							>
 								{isFullscreen ? (

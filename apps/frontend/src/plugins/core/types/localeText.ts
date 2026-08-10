@@ -1,4 +1,5 @@
-import type { HostLocale } from './types';
+/** 与 Host 顶栏语言一致 */
+export type HostLocale = 'zh-CN' | 'en-US';
 
 /** registry 内嵌多语言文案（与 Host `locale` 对齐） */
 export type PluginLocaleMap = Partial<Record<HostLocale, string>>;

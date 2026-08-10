@@ -54,7 +54,11 @@
 | [video-player-component-refactor.md](./video-player-component-refactor.md) | **视频播放器组件化重构**：单体 `VideoPlayer.tsx` 拆为通用 `VideoPlayer` / `VideoUpload` / `Tooltip` / `Popover` / `Segmented` / `Volume`，插件入口变「列表状态 + 组合层」，`TooltipProvider` 全局挂载，`PlaybackRatePanel` 用项目语义 token 替换硬编码白色（含改动前/后对比与逐行注释） |
 | [video-player-feature-enhancement.md](./video-player-feature-enhancement.md) | **视频播放器功能增强**：进度条缩略图预览（离屏 video + canvas）、多平台画中画（xgplayer 插件 → 原生 API → WebKit 兜底）、xgplayer 语言跟随主站 locale、重置逻辑全面清理、长视频刻度上限（含改动前/后对比与逐行注释） |
 | [video-player-drag-scrub.md](./video-player-drag-scrub.md) | **视频播放器进度条拖拽重写与画布跟随修复**：拖拽像素对齐 + `scrubHoldUntilRef` 抑制右抖、固定 160×90 canvas + cover/contain、循环单条原地重播、播放器背景跟随主题、控制条 `visible` 替换 `opacity`、`PluginPageShell` / `Layout` 分层 `overflow-hidden`（含改动前/后对比与逐行注释） |
+| [video-player-chrome-cinema-theme.md](./video-player-chrome-cinema-theme.md) | **视频播放器影院态控制条主题适配**：`chromeFg` / `chromeFgMuted` 派生语义色、影院态黑底切白字、顶部标题 + 底部全控制条（播放/上一集/下一集/选集/重置/倍速/音量/画中画/全屏）统一复用（含改动前/后对比与逐行注释） |
 | [plugin-cinema-fullscreen.md](./plugin-cinema-fullscreen.md) | **插件影院态全屏与路由防闪 404**：`appFullscreen` 单例、Layout 影院态订阅、`PluginPageShell` 统一外壳、`pluginsReady` + `PluginRoutesPending` 防 404、侧栏菜单拆分、Tauri 全屏 capability（含改动前/后对比与逐行注释） |
+| [style-isolation-layered-refactor.md](./style-isolation-layered-refactor.md) | **样式隔离分层重构（巨石 → protocol / css / sandbox / portal）**：`host/styleIsolation.ts` 单文件拆为四层目录、新增 `themeStrip` 剥离 Host 主题 token、对外 barrel 不变、smoke 迁位（含改动前/后对比与逐行注释） |
+| [plugins-core-refactor.md](./plugins-core-refactor.md) | **插件 Core 模块分层重构**：`core/` 扁平单文件（PluginManager/PluginVerifier/types/mf/createHostBridge）拆为 runtime/bridge/types/mf 子目录、新增 `core/index.ts` barrel 对外接口稳定 |
+| [style-isolation-modularization.md](./style-isolation-modularization.md) | **样式隔离模块化与 PluginHostPage 接入**：样式隔离逻辑独立为 `plugins/style-isolation/`、PluginManager 在 `loadRemoteApp` 前后包裹样式捕获、PluginHostPage 用 `useLayoutEffect` 激活运行时隔离并挂 `data-mf-style-realm` 标记（含改动前/后对比与逐行注释） |
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |

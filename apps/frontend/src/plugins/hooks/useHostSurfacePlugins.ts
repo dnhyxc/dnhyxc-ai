@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { subscribePluginEnabled } from '../core/enabledOverrides';
+import { subscribePluginEnabled } from '../core/enabled/enabledOverrides';
 import {
 	listHostSurfacePlugins,
 	type PluginHostSurface,
-} from '../core/hostSurface';
+} from '../core/enabled/hostSurface';
 import type { PluginDescriptor } from '../core/types';
 
 /** 订阅某 Host surface 上已声明且上架的插件列表（registry 缓存变更时刷新） */

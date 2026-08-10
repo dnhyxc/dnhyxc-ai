@@ -6,11 +6,11 @@ import {
 } from '@module-federation/enhanced/runtime';
 import React from 'react';
 import ReactDOM from 'react-dom';
+import type { PluginDescriptor, PluginModule } from '../types';
 import {
 	normalizePluginModule,
 	type RawRemoteModule,
 } from './normalizePluginModule';
-import type { PluginDescriptor, PluginModule } from './types';
 
 let mf: ModuleFederation | null = null;
 let sharedReady = false;

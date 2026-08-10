@@ -1,6 +1,6 @@
 import { getActiveLocale, type Locale } from '@/i18n';
 import { onListen } from '@/utils';
-import type { HostBridgeProps } from './types';
+import type { HostBridgeProps } from '../types';
 
 export const MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
 

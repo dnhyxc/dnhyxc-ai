@@ -1,68 +1,54 @@
-/** 插件运行时对外 barrel；实现按 core / inject / host / host-api 分目录 */
+/** 插件运行时对外 barrel；实现按 core / inject / host / host-api / style-isolation 分目录 */
 
-export {
-	attachIframeBridge,
-	MF_IFRAME_CHANNEL,
-} from './core/attachIframeBridge';
-export { createHostBridge } from './core/createHostBridge';
 export type {
+	HostBridgeProps,
+	LoadedPlugin,
+	PluginDescriptor,
+	PluginHostSurface,
+	PluginLocaleMap,
+	PluginRegistry,
+	PluginSidebarItem,
+	RawRemoteModule,
 	VuePluginRootProps,
 	VueRemoteExpose,
 	VueRemoteMount,
-} from './core/createVueHostBridge';
-export { createVueHostBridge } from './core/createVueHostBridge';
-export {
-	isPluginEnabled,
-	subscribePluginEnabled,
-} from './core/enabledOverrides';
-export type { PluginHostSurface } from './core/hostSurface';
-export { listHostSurfacePlugins } from './core/hostSurface';
-export type { PluginLocaleMap } from './core/localeText';
-export { pickPluginLocaleText } from './core/localeText';
-export {
-	fetchEntryBuildId,
-	loadRemoteApp,
-	pluginBust,
-	registerRemote,
-	resolvePluginBust,
-} from './core/mf';
-export type { RawRemoteModule } from './core/normalizePluginModule';
-export {
-	isVueRemoteModule,
-	normalizePluginModule,
-} from './core/normalizePluginModule';
-export { pluginManager } from './core/PluginManager';
-export { satisfiesRange, verifyPlugin } from './core/PluginVerifier';
+} from './core';
 export {
 	assertRegistryHostApiCompatible,
+	attachIframeBridge,
 	clearPluginRegistryCache,
+	createHostBridge,
+	createVueHostBridge,
+	fetchEntryBuildId,
 	fetchPluginRegistry,
 	fetchPluginRegistryRawText,
 	formatRegistryUpdatedAt,
+	HOST_API_VERSION,
+	isPluginEnabled,
+	isVueRemoteModule,
+	listHostSurfacePlugins,
+	loadRemoteApp,
+	MF_IFRAME_CHANNEL,
+	normalizePluginModule,
 	overlayUserEnabled,
 	PLUGIN_REGISTRY_CACHE_KEY,
 	PLUGIN_REGISTRY_FILENAME,
 	PLUGIN_REGISTRY_STATIC_PATH,
 	persistPluginEnabled,
+	pickPluginLocaleText,
+	pluginBust,
+	pluginManager,
+	registerRemote,
+	resolvePluginBust,
+	satisfiesRange,
 	savePluginRegistry,
-} from './core/registry';
-export type {
-	HostBridgeProps,
-	LoadedPlugin,
-	PluginDescriptor,
-	PluginRegistry,
-	PluginSidebarItem,
-} from './core/types';
-export { HOST_API_VERSION } from './core/types';
+	subscribePluginEnabled,
+	verifyPlugin,
+} from './core';
 export { useHostSurfacePlugins } from './hooks/useHostSurfacePlugins';
 export { usePluginEnabled } from './hooks/usePluginEnabled';
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
-export {
-	claimPluginPortalTarget,
-	clearPluginPortalClaim,
-	styleRealmKey,
-} from './host/styleIsolation';
 export { deepFreeze } from './host-api/deepFreeze';
 export { eventBus } from './host-api/EventBus';
 export type {
@@ -76,3 +62,8 @@ export {
 } from './host-api/ebookHostApi';
 export { routeInjector } from './inject/RouteInjector';
 export { sidebarInjector } from './inject/SidebarInjector';
+export {
+	claimPluginPortalTarget,
+	clearPluginPortalClaim,
+	styleRealmKey,
+} from './style-isolation';

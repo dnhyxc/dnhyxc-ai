@@ -2,7 +2,7 @@ import { makeAutoObservable } from 'mobx';
 import {
 	ensurePluginEnabledPrefsLoaded,
 	prefetchPluginEnabledPrefs,
-} from '@/plugins/core/pluginEnabledPrefs';
+} from '@/plugins/core/enabled/pluginEnabledPrefs';
 import { getStorage, removeStorage, setStorage } from '@/utils';
 import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
@@ -62,7 +62,9 @@ function syncPluginShellsAfterUserChange(userId: number): void {
 	void (async () => {
 		try {
 			if (userId > 0) await ensurePluginEnabledPrefsLoaded(userId);
-			const { pluginManager } = await import('@/plugins/core/PluginManager');
+			const { pluginManager } = await import(
+				'@/plugins/core/runtime/PluginManager'
+			);
 			await pluginManager.syncEnabledShells();
 		} catch (e) {
 			console.error('[plugins] sync after user change failed', e);
