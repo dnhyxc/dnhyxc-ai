@@ -59,12 +59,16 @@ export {
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
 export {
-	DEFAULT_PLUGIN_HOST_ICONS,
 	PluginHostSurface,
 	type PluginHostSurfacePart,
 	type PluginHostSurfaceProps,
 } from './host/PluginHostSurface';
+export { PluginIcon, type PluginIconProps } from './host/PluginIcon';
 export { PluginPageShell } from './host/PluginPageShell';
+export {
+	applyPluginIconUrl,
+	isPluginIconUrl,
+} from './host/pluginIconUrl';
 export {
 	assertRegistryHostApiCompatible,
 	clearPluginRegistryCache,

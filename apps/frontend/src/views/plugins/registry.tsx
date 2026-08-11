@@ -1,9 +1,17 @@
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@ui/select';
 import { Toast } from '@ui/sonner';
-import { ListRestart, Save } from 'lucide-react';
+import { ImageUp, ListRestart, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button } from '@/components/ui/button';
 import {
+	applyPluginIconUrl,
 	fetchPluginRegistryRawText,
 	PLUGIN_REGISTRY_FILENAME,
 	type PluginRegistry,
@@ -11,6 +19,7 @@ import {
 	savePluginRegistry,
 } from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
+import { uploadCosFile } from '@/service';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import { RegistryFieldsHelp } from './RegistryFieldsHelp';
 
@@ -33,11 +42,14 @@ export default function PluginRegistryEditorPage() {
 	const [text, setText] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [uploadingIcon, setUploadingIcon] = useState(false);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	const [iconPluginId, setIconPluginId] = useState<string>('');
 	/** 递增以强制 Monaco 在仍有焦点时也写入外部 value（含保存后的 updatedAt） */
 	const [docEpoch, setDocEpoch] = useState(0);
 	const textRef = useRef<string>(text);
 	const getEditorTextRef = useRef<(() => string) | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const jsonParseError = useMemo(() => {
 		if (!text.trim()) return true;
@@ -48,6 +60,26 @@ export default function PluginRegistryEditorPage() {
 			return true;
 		}
 	}, [text]);
+
+	const pluginIds = useMemo(() => {
+		if (jsonParseError) return [] as string[];
+		try {
+			const data = JSON.parse(text) as PluginRegistry;
+			return data.plugins.map((p) => p.id).filter(Boolean);
+		} catch {
+			return [];
+		}
+	}, [text, jsonParseError]);
+
+	useEffect(() => {
+		if (!pluginIds.length) {
+			setIconPluginId('');
+			return;
+		}
+		if (!iconPluginId || !pluginIds.includes(iconPluginId)) {
+			setIconPluginId(pluginIds[0]);
+		}
+	}, [pluginIds, iconPluginId]);
 
 	const textDiff = useMemo(() => {
 		return textRef.current !== text;
@@ -75,9 +107,21 @@ export default function PluginRegistryEditorPage() {
 		void load();
 	}, [load]);
 
+	const persistRegistry = useCallback(
+		async (data: PluginRegistry, okTitle: string) => {
+			const saved = await savePluginRegistry(data);
+			const payload = `${JSON.stringify(saved, null, 2)}\n`;
+			setText(payload);
+			textRef.current = payload;
+			setDocEpoch((n) => n + 1);
+			await pluginManager.init();
+			Toast({ type: 'success', title: okTitle });
+		},
+		[],
+	);
+
 	const onSave = useCallback(async () => {
-		if (loading || saving) return;
-		// 从 Monaco 刷出最新正文（onChange 有 rAF 合并，父级 text 可能滞后）
+		if (loading || saving || uploadingIcon) return;
 		const latest = getEditorTextRef.current?.() ?? text;
 		if (latest === textRef.current) {
 			Toast({
@@ -105,17 +149,7 @@ export default function PluginRegistryEditorPage() {
 		}
 		setSaving(true);
 		try {
-			// updatedAt 由 savePluginRegistry 统一写成当前时间
-			const saved = await savePluginRegistry(data);
-			const payload = `${JSON.stringify(saved, null, 2)}\n`;
-			setText(payload);
-			textRef.current = payload;
-			setDocEpoch((n) => n + 1);
-			await pluginManager.init(); // 与 mf.start() 相同
-			Toast({
-				type: 'success',
-				title: t('plugins.registry.saveOk'),
-			});
+			await persistRegistry(data, t('plugins.registry.saveOk'));
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -126,9 +160,67 @@ export default function PluginRegistryEditorPage() {
 		} finally {
 			setSaving(false);
 		}
-	}, [loading, saving, t, text]);
+	}, [loading, saving, uploadingIcon, t, text, persistRegistry]);
 
-	// ⌘/Ctrl+S → 保存到服务器（捕获阶段，避免 Monaco/浏览器默认另存为）
+	const onUploadIcon = useCallback(
+		async (file: File) => {
+			if (!iconPluginId || loading || saving || uploadingIcon) return;
+			const latest = getEditorTextRef.current?.() ?? text;
+			let data: PluginRegistry;
+			try {
+				data = JSON.parse(latest) as PluginRegistry;
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('plugins.registry.invalidJson'),
+				});
+				return;
+			}
+			if (!data.plugins.some((p) => p.id === iconPluginId)) {
+				Toast({
+					type: 'warning',
+					title: t('plugins.registry.pluginNotFound', { id: iconPluginId }),
+				});
+				return;
+			}
+
+			setUploadingIcon(true);
+			try {
+				const res = await uploadCosFile(file);
+				const url = res?.data?.url as string | undefined;
+				if (!url) {
+					Toast({
+						type: 'error',
+						title: t('plugins.registry.iconUploadFail'),
+					});
+					return;
+				}
+				const { next, wrote } = applyPluginIconUrl(data, iconPluginId, url);
+				if (wrote.length === 0) {
+					Toast({
+						type: 'warning',
+						title: t('plugins.registry.iconNoTarget'),
+					});
+					return;
+				}
+				await persistRegistry(next, t('plugins.registry.iconUploadOk'));
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('plugins.registry.iconUploadFail'),
+					message:
+						e instanceof Error
+							? e.message
+							: t('plugins.registry.iconUploadFail'),
+				});
+			} finally {
+				setUploadingIcon(false);
+				if (fileInputRef.current) fileInputRef.current.value = '';
+			}
+		},
+		[iconPluginId, loading, saving, uploadingIcon, text, t, persistRegistry],
+	);
+
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
@@ -139,6 +231,8 @@ export default function PluginRegistryEditorPage() {
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, [onSave]);
+
+	const busy = loading || saving || uploadingIcon;
 
 	return (
 		<div className="box-border flex h-full min-h-0 w-full flex-col p-5.5 pt-0">
@@ -151,6 +245,51 @@ export default function PluginRegistryEditorPage() {
 				</p>
 			) : null}
 
+			<div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
+				<span className="text-textcolor/70 text-sm">
+					{t('plugins.registry.iconUploadLabel')}
+				</span>
+				<Select
+					value={iconPluginId || undefined}
+					onValueChange={setIconPluginId}
+					disabled={busy || pluginIds.length === 0}
+				>
+					<SelectTrigger className="h-8 w-[min(16rem,100%)]">
+						<SelectValue placeholder={t('plugins.registry.iconPickPlugin')} />
+					</SelectTrigger>
+					<SelectContent>
+						{pluginIds.map((id) => (
+							<SelectItem key={id} value={id}>
+								{id}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept="image/*"
+					className="hidden"
+					onChange={(e) => {
+						const file = e.target.files?.[0];
+						if (file) void onUploadIcon(file);
+					}}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={busy || !iconPluginId || jsonParseError}
+					className="gap-1.5"
+					onClick={() => fileInputRef.current?.click()}
+				>
+					<ImageUp className="size-4" />
+					{uploadingIcon
+						? t('plugins.registry.iconUploading')
+						: t('plugins.registry.iconUpload')}
+				</Button>
+			</div>
+
 			<div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col">
 				<div className="border-theme-border min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md border">
 					{loading ? (
@@ -161,7 +300,7 @@ export default function PluginRegistryEditorPage() {
 						<MarkdownEditor
 							className="h-full min-h-0"
 							value={text}
-							readOnly={saving}
+							readOnly={saving || uploadingIcon}
 							onChange={setText}
 							language="json"
 							theme={monacoTheme}
@@ -187,7 +326,7 @@ export default function PluginRegistryEditorPage() {
 											type="button"
 											variant="link"
 											size="sm"
-											disabled={loading || saving}
+											disabled={busy}
 											className="text-textcolor px-0! gap-1 lucide-stroke-draw-hover"
 											onClick={() => void load()}
 										>
@@ -198,9 +337,7 @@ export default function PluginRegistryEditorPage() {
 											type="button"
 											variant="link"
 											size="sm"
-											disabled={
-												loading || saving || jsonParseError || !text.trim()
-											}
+											disabled={busy || jsonParseError || !text.trim()}
 											className="text-textcolor px-0! gap-1 lucide-stroke-draw-hover"
 											onClick={() => void onSave()}
 										>

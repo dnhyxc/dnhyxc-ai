@@ -13,27 +13,11 @@ import {
 } from '@dnhyxc-ai/federation-kit';
 import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
 import { Button } from '@ui/index';
-import {
-	BookMarked,
-	Highlighter,
-	type LucideIcon,
-	Puzzle,
-	Sparkle,
-	Sparkles,
-} from 'lucide-react';
 import { type CSSProperties, useEffect } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { PluginHostPage } from './PluginHostPage';
-
-/** 默认 lucide 图标名 → 组件（registry `host.icon`） */
-export const DEFAULT_PLUGIN_HOST_ICONS: Record<string, LucideIcon> = {
-	Sparkle,
-	Puzzle,
-	Sparkles,
-	BookMarked,
-	Highlighter,
-};
+import { PluginIcon } from './PluginIcon';
 
 export type PluginHostSurfacePart = 'toolbar' | 'drawer-triggers' | 'drawer';
 
@@ -49,22 +33,12 @@ export type PluginHostSurfaceProps = {
 	openPluginId?: string | null;
 	onOpenPluginIdChange?: (id: string | null) => void;
 	chromeStyle?: CSSProperties;
-	/** 覆盖默认图标表 */
-	icons?: Record<string, LucideIcon>;
 	/** 过滤/排序；默认按 registry order */
 	filterPlugins?: (list: PluginDescriptor[]) => PluginDescriptor[];
 	className?: string;
 	triggerClassName?: string;
 	drawerBodyClassName?: string;
 };
-
-function resolveIcon(
-	name: string | undefined,
-	icons: Record<string, LucideIcon>,
-): LucideIcon {
-	if (!name) return Puzzle;
-	return icons[name] ?? Puzzle;
-}
 
 /**
  * 业务页插件槽统一模版。
@@ -76,7 +50,6 @@ export function PluginHostSurface({
 	openPluginId = null,
 	onOpenPluginIdChange,
 	chromeStyle,
-	icons = DEFAULT_PLUGIN_HOST_ICONS,
 	filterPlugins,
 	className,
 	triggerClassName,
@@ -129,7 +102,6 @@ export function PluginHostSurface({
 		return (
 			<div className={cn('contents', className)}>
 				{drawerPlugins.map((p) => {
-					const Icon = resolveIcon(p.host?.icon, icons);
 					const label = pickPluginLocaleText(p.title, locale) || p.id;
 					const open = openPluginId === p.id;
 					return (
@@ -168,7 +140,7 @@ export function PluginHostSurface({
 									onOpenPluginIdChange?.(open ? null : p.id);
 								}}
 							>
-								<Icon className="size-4" />
+								<PluginIcon name={p.host?.icon} className="size-4" />
 							</Button>
 						</Tooltip>
 					);

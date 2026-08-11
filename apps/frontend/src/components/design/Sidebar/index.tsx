@@ -16,7 +16,7 @@ import { observer } from 'mobx-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
-import { sidebarInjector } from '@/federation';
+import { PluginIcon, sidebarInjector } from '@/federation';
 import { useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken } from '@/router/authPaths';
@@ -65,7 +65,9 @@ const Sidebar = observer(() => {
 
 	const processedMenus = visibleMenus.map((menu) => ({
 		...menu,
-		icon: ICON_MAP[menu.icon as keyof typeof ICON_MAP],
+		icon: ICON_MAP[menu.icon as keyof typeof ICON_MAP] ?? (
+			<PluginIcon name={menu.icon} className="size-5.5" />
+		),
 		onClick: () => onJump(menu.path),
 	}));
 

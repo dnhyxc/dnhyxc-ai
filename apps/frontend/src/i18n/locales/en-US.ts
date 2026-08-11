@@ -1943,10 +1943,18 @@ export const enUS = {
 		'Load timing: route/idle (lazy, default) or eager (background preload after init; rarely needed).',
 	'plugins.registry.help.permissions':
 		'Permission list, e.g. ui:toast, nav:subtree, http:plugin-api, modules:ebook.',
+	'plugins.registry.iconUploadLabel': 'Plugin icon',
+	'plugins.registry.iconPickPlugin': 'Select plugin',
+	'plugins.registry.iconUpload': 'Upload & write',
+	'plugins.registry.iconUploading': 'Uploading…',
+	'plugins.registry.iconUploadOk': 'Icon uploaded and written to registry',
+	'plugins.registry.iconUploadFail': 'Icon upload failed',
+	'plugins.registry.iconNoTarget':
+		'Plugin has no menu / host; cannot write icon',
 	'plugins.registry.help.menu':
-		'Sidebar entry: order and optional lucide icon name.',
+		'Sidebar entry: order; icon is an image URL (upload to COS, optional).',
 	'plugins.registry.help.host':
-		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon, order.',
+		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon (image URL), order.',
 	'plugins.registry.help.iframeUrl':
 		'Required when trust is untrusted: standalone HTTPS page opened in an iframe.',
 	'plugins.registry.help.integrity':
