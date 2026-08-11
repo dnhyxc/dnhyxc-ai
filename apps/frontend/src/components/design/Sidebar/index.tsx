@@ -5,6 +5,7 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
+import { ScrollArea } from '@ui/scroll-area';
 import {
 	ArrowLeftRight,
 	CircleUserRound,
@@ -83,11 +84,11 @@ const Sidebar = observer(() => {
 			data-tauri-drag-region
 			className="w-20 h-full flex flex-col items-center py-7 px-2"
 		>
-			<div className="h-full flex flex-col justify-between">
-				<div className="flex flex-col items-center">
+			<div className="h-full flex flex-col justify-between w-full">
+				<div className="flex flex-col items-center overflow-hidden">
 					<div
 						data-tauri-drag-region
-						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer mb-8 rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
+						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 						onClick={() => onJump('/')}
 					>
 						<Image
@@ -97,103 +98,113 @@ const Sidebar = observer(() => {
 							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>
-					{processedMenus.map((item) => {
-						const active = isMenuActive(item.path, pathname);
-						return (
-							<div
-								key={item.path}
-								role="button"
-								tabIndex={0}
-								aria-current={active ? 'page' : undefined}
-								className={cn(
-									'lucide-stroke-draw-hover group mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
-									active
-										? 'bg-teal-400/15 text-teal-300'
-										: 'text-theme-white hover:bg-theme-white/8 hover:text-teal-300',
-								)}
-								onClick={item.onClick}
-							>
-								<span
+					<div className="my-7.5 w-full flex-1 h-10 flex flex-col items-center justify-center overflow-auto">
+						<ScrollArea scrollbarClassName="hidden">
+							{processedMenus.map((item) => {
+								const active = isMenuActive(item.path, pathname);
+								return (
+									<div
+										key={item.path}
+										role="button"
+										tabIndex={0}
+										aria-current={active ? 'page' : undefined}
+										className={cn(
+											'lucide-stroke-draw-hover group mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
+											active
+												? 'bg-teal-500/15 text-teal-500'
+												: 'text-textcolor bg-theme/10 hover:bg-teal-500/15 hover:text-teal-300',
+										)}
+										onClick={item.onClick}
+									>
+										<span
+											className={cn(
+												'flex size-full items-center justify-center [&>svg]:size-5.5 [&>svg]:shrink-0 [&>svg]:overflow-visible',
+												item.nameKey === 'nav.home' && '[&>svg]:size-6',
+												item.nameKey === 'nav.chat' && '[&>svg]:size-6',
+												item.nameKey === 'nav.plugins' && '[&>svg]:size-6',
+											)}
+										>
+											{item.icon}
+										</span>
+									</div>
+								);
+							})}
+						</ScrollArea>
+					</div>
+				</div>
+				<div className="w-full flex justify-center items-center">
+					{storageInfo?.access_token ? (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<div
 									className={cn(
-										'flex size-full items-center justify-center [&>svg]:size-5.5 [&>svg]:shrink-0 [&>svg]:overflow-visible',
-										item.nameKey === 'nav.home' && '[&>svg]:size-6',
-										item.nameKey === 'nav.chat' && '[&>svg]:size-6',
-										item.nameKey === 'nav.plugins' && '[&>svg]:size-6',
+										'lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
+										'bg-theme/10 text-textcolor hover:bg-teal-500/15 hover:text-teal-300',
 									)}
 								>
-									{item.icon}
-								</span>
-							</div>
-						);
-					})}
-				</div>
-				{storageInfo?.access_token ? (
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<div
-								className={cn(
-									'lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
-									'bg-theme-white/5 text-theme-white hover:bg-theme-white/10 hover:text-teal-300',
-								)}
+									<ShieldUser className="size-6.5 shrink-0 overflow-visible" />
+								</div>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								side="right"
+								align="end"
+								className="min-w-26"
 							>
-								<ShieldUser className="size-6.5 shrink-0 overflow-visible" />
-							</div>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent side="right" align="end" className="min-w-26">
-							<DropdownMenuLabel className="flex flex-col justify-center items-center">
-								<div
-									data-tauri-drag-region
-									className="flex justify-center items-center w-12 h-12 bg-theme-white/5 cursor-pointer rounded-md hover:text-teal-400 hover:bg-theme-white/10 transition-all duration-200 ease-in-out"
+								<DropdownMenuLabel className="flex flex-col justify-center items-center">
+									<div
+										data-tauri-drag-region
+										className="flex justify-center items-center w-12 h-12 bg-theme-white/5 cursor-pointer rounded-md hover:text-teal-400 hover:bg-theme-white/10 transition-all duration-200 ease-in-out"
+									>
+										<img
+											src={avatarUrl || ICON}
+											alt=""
+											className={`${storageInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
+										/>
+									</div>
+									<div className="mt-2 font-bold text-lg">
+										<div>{storageInfo?.username}</div>
+									</div>
+								</DropdownMenuLabel>
+								<DropdownMenuItem
+									className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									onClick={() => onJump('/profile')}
 								>
-									<img
-										src={avatarUrl || ICON}
-										alt=""
-										className={`${storageInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
-									/>
-								</div>
-								<div className="mt-2 font-bold text-lg">
-									<div>{storageInfo?.username}</div>
-								</div>
-							</DropdownMenuLabel>
-							<DropdownMenuItem
-								className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
-								onClick={() => onJump('/profile')}
-							>
-								<CircleUserRound className="text-textcolor group-hover:text-teal-300" />
-								<span className="group-hover:text-teal-300">
-									{t('nav.profile')}
-								</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
-								onClick={() => onJump('/login')}
-							>
-								<ArrowLeftRight className="text-textcolor group-hover:text-teal-300" />
-								<span className="group-hover:text-teal-300">
-									{t('nav.switchAccount')}
-								</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								className="min-w-20 text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
-								onClick={onLogout}
-							>
-								<LogOut className="text-textcolor group-hover:text-teal-300" />
-								<span className="group-hover:text-teal-300">
-									{t('auth.logout')}
-								</span>
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				) : (
-					<div
-						role="button"
-						tabIndex={0}
-						className="lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-white/5 text-theme-white transition-[color,background-color] duration-200 ease-out hover:bg-theme-white/10 hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
-						onClick={() => onJump('/login')}
-					>
-						<CircleUserRound className="size-6 shrink-0 overflow-visible" />
-					</div>
-				)}
+									<CircleUserRound className="text-textcolor group-hover:text-teal-300" />
+									<span className="group-hover:text-teal-300">
+										{t('nav.profile')}
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									onClick={() => onJump('/login')}
+								>
+									<ArrowLeftRight className="text-textcolor group-hover:text-teal-300" />
+									<span className="group-hover:text-teal-300">
+										{t('nav.switchAccount')}
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className="min-w-20 text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									onClick={onLogout}
+								>
+									<LogOut className="text-textcolor group-hover:text-teal-300" />
+									<span className="group-hover:text-teal-300">
+										{t('auth.logout')}
+									</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					) : (
+						<div
+							role="button"
+							tabIndex={0}
+							className="lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-white/5 text-theme-white transition-[color,background-color] duration-200 ease-out hover:bg-theme-white/10 hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+							onClick={() => onJump('/login')}
+						>
+							<CircleUserRound className="size-6 shrink-0 overflow-visible" />
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);

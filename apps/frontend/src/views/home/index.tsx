@@ -1,225 +1,31 @@
 import { Button } from '@ui/index';
 import { ScrollArea } from '@ui/scroll-area';
 import { motion } from 'framer-motion';
-import {
-	ChevronLeft,
-	ChevronRight,
-	Code2,
-	FileText,
-	Flower,
-	Globe,
-	LibraryBig,
-	MessageSquare,
-	NotebookTabs,
-	Puzzle,
-	Rocket,
-	Shield,
-	Sparkles,
-	SquareArrowOutUpRight,
-	Vegan,
-	Zap,
-} from 'lucide-react';
+import { Sparkles, SquareArrowOutUpRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
 import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
 import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
-import { getProjectGuideAbsoluteUrl } from '@/views/projectGuide/paths';
-
-/** 每張 slide 的色系映射，避免在 JSX 中重複長漸變 class 字串 */
-const HUE_STYLES: Record<
-	string,
-	{ rail: string; icon: string; btn: string; glow: string }
-> = {
-	teal: {
-		rail: 'bg-teal-400',
-		icon: 'from-teal-400 to-[#14b8a6] shadow-teal-500/25',
-		btn: 'from-teal-600 to-teal-300 hover:shadow-teal-500/30',
-		glow: 'from-teal-600/15 via-cyan-500/8',
-	},
-	emerald: {
-		rail: 'bg-emerald-400',
-		icon: 'from-emerald-400 to-[#14b8a6] shadow-emerald-500/25',
-		btn: 'from-emerald-400 to-[#14b8a6] hover:shadow-emerald-500/30',
-		glow: 'from-emerald-500/15 via-teal-500/8',
-	},
-	amber: {
-		rail: 'bg-amber-400',
-		icon: 'from-amber-400 to-orange-500 shadow-amber-500/20',
-		btn: 'from-amber-400 to-orange-500 hover:shadow-amber-500/30',
-		glow: 'from-amber-500/15 via-orange-500/8',
-	},
-	rose: {
-		rail: 'bg-rose-400',
-		icon: 'from-rose-400 to-amber-600 shadow-rose-500/20',
-		btn: 'from-rose-400 to-amber-600 hover:shadow-rose-500/30',
-		glow: 'from-rose-500/15 via-amber-500/8',
-	},
-	violet: {
-		rail: 'bg-violet-400',
-		icon: 'from-violet-400 to-purple-600 shadow-violet-500/25',
-		btn: 'from-violet-400 to-purple-600 hover:shadow-violet-500/30',
-		glow: 'from-violet-500/15 via-purple-500/8',
-	},
-};
+import {
+	createChevrons,
+	createFeatures,
+	createHeroSlides,
+	createQuicklinks,
+	createShowcase,
+	createSteps,
+	HUE_STYLES,
+} from './content';
 
 const Home = () => {
 	const navigate = useNavigate();
 	const { t, locale } = useI18n();
 
-	const SHOWCASE = useMemo(
-		() => [
-			{
-				icon: Puzzle,
-				title: t('home.showcase.plugin.title'),
-				desc: t('home.showcase.plugin.desc'),
-				color: 'from-violet-400 to-purple-500',
-			},
-			{
-				icon: Rocket,
-				title: t('home.showcase.fast.title'),
-				desc: t('home.showcase.fast.desc'),
-				color: 'from-orange-400 to-yellow-400',
-			},
-			{
-				icon: Shield,
-				title: t('home.showcase.privacy.title'),
-				desc: t('home.showcase.privacy.desc'),
-				color: 'from-yellow-400 to-orange-400',
-			},
-			{
-				icon: Globe,
-				title: t('home.showcase.i18n.title'),
-				desc: t('home.showcase.i18n.desc'),
-				color: 'from-green-400 to-cyan-400',
-			},
-			{
-				icon: Zap,
-				title: t('home.showcase.lightweight.title'),
-				desc: t('home.showcase.lightweight.desc'),
-				color: 'from-green-400 to-emerald-400',
-			},
-		],
-		[t],
-	);
-
-	const STEPS = useMemo(
-		() => [
-			{
-				step: '1',
-				title: t('home.steps.install.title'),
-				desc: t('home.steps.install.desc'),
-				icon: Rocket,
-				/* 固定原版 teal hex，不跟随全局主题色 */
-				color: 'from-[#14b8a6] to-cyan-600',
-				/** 在默认浏览器打开桌面端下载落地页 */
-				downloadDesktop: true,
-			},
-			{
-				step: '2',
-				title: t('home.steps.register.title'),
-				desc: t('home.steps.register.desc'),
-				icon: Shield,
-				color: 'from-cyan-500 to-blue-500',
-				/** 点击后进入登录页「账号注册」视图 */
-				navigateRegister: true,
-			},
-			{
-				step: '3',
-				title: t('home.steps.start.title'),
-				desc: t('home.steps.start.desc'),
-				icon: Zap,
-				color: 'from-orange-500 to-amber-500',
-				/** 点击后进入智能对话 */
-				navigateChat: true,
-			},
-			{
-				step: '4',
-				title: t('home.steps.pluginDev.title'),
-				desc: t('home.steps.pluginDev.desc'),
-				icon: Puzzle,
-				color: 'from-violet-500 to-purple-600',
-				/** 在默认浏览器打开插件开发手册 */
-				openPluginDevGuide: true,
-			},
-		],
-		[t, locale],
-	);
-
-	const FEATURES = useMemo(() => {
-		return [
-			{
-				index: '01',
-				icon: MessageSquare,
-				title: t('home.features.chat.title'),
-				subtitle: t('home.features.chat.subtitle'),
-				desc: t('home.features.chat.desc'),
-				/* 固定原版 teal hex，不跟随全局主题色 */
-				color: 'from-emerald-400 to-[#14b8a6]',
-				glow: 'shadow-emerald-500/25',
-				hoverBg:
-					'group-hover:bg-linear-to-br group-hover:from-emerald-500/15 group-hover:to-[#0d9488]/5',
-				onClick: () => navigate('/chat'),
-			},
-			{
-				index: '02',
-				icon: Code2,
-				title: t('home.features.coding.title'),
-				subtitle: t('home.features.coding.subtitle'),
-				desc: t('home.features.coding.desc'),
-				color: 'from-amber-400 to-orange-500',
-				glow: 'shadow-amber-500/20',
-				hoverBg:
-					'group-hover:bg-linear-to-br group-hover:from-amber-500/12 group-hover:to-orange-600/5',
-				onClick: () => navigate('/coding'),
-			},
-			{
-				index: '03',
-				icon: FileText,
-				title: t('home.features.document.title'),
-				subtitle: t('home.features.document.subtitle'),
-				desc: t('home.features.document.desc'),
-				color: 'from-rose-400 to-amber-600',
-				glow: 'shadow-rose-500/20',
-				hoverBg:
-					'group-hover:bg-linear-to-br group-hover:from-rose-500/12 group-hover:to-amber-700/5',
-				onClick: () => navigate('/document'),
-			},
-		];
-	}, [navigate, t]);
-
-	const QUICKLINKS = useMemo(() => {
-		return [
-			{
-				index: '1',
-				icon: Rocket,
-				title: t('home.quicklinks.dnhyxc-ai.title'),
-				desc: t('home.quicklinks.dnhyxc-ai.desc'),
-				color: 'from-lime-300 to-emerald-500',
-				downloadDesktop: true,
-				onClick: () => void openExternalUrl('https://dnhyxc.cn:9002'),
-			},
-			{
-				index: '2',
-				icon: Code2,
-				title: t('home.quicklinks.blog.title'),
-				desc: t('home.quicklinks.blog.desc'),
-				color: 'from-indigo-300 to-blue-400',
-				downloadDesktop: true,
-				onClick: () => void openExternalUrl('https://dnhyxc.cn'),
-			},
-			{
-				index: '3',
-				icon: Code2,
-				title: t('home.quicklinks.github.title'),
-				desc: t('home.quicklinks.github.desc'),
-				color: 'from-red-300 to-rose-400',
-				downloadDesktop: true,
-				onClick: () => void openExternalUrl('https://github.com/dnhyxc'),
-			},
-		];
-	}, [t]);
+	const SHOWCASE = useMemo(() => createShowcase(t), [t]);
+	const STEPS = useMemo(() => createSteps(t), [t, locale]);
+	const FEATURES = useMemo(() => createFeatures(navigate, t), [navigate, t]);
+	const QUICKLINKS = useMemo(() => createQuicklinks(t), [t]);
 
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
@@ -242,137 +48,23 @@ const Home = () => {
 	};
 
 	// ─────────────────── Hero 轮播：左侧 sidebar 功能页介绍 ───────────────────
-	const HERO_SLIDES = useMemo(() => {
-		return [
-			{
-				id: 'overview',
-				badge: t('common.appTitle') ?? '智能工作台',
-				number: '01',
-				icon: Sparkles,
-				titleMain: t('home.hero.welcome'),
-				titleAccent: t('home.hero.product'),
-				subtitle: t('home.hero.subtitle'),
-				spotlightA: 'from-teal-500/25',
-				spotlightB: 'via-cyan-400/15',
-				spotlightC: 'to-amber-300/0',
-				hue: 'teal',
-				cta: [
-					{
-						label: t('home.hero.quickStart'),
-						primary: true,
-						onClick: onClickQuickStart,
-					},
-					{
-						label: t('home.hero.learnMore'),
-						primary: false,
-						onClick: () =>
-							void openExternalUrl(getProjectGuideAbsoluteUrl(locale)),
-					},
-				],
-				tags: [
-					t('home.hero.knowledge.title'),
-					t('home.hero.ebook.title'),
-					t('home.hero.english.title'),
-					t('home.hero.plugins.title'),
-				],
-			},
-			{
-				id: 'knowledge',
-				badge: t('home.hero.knowledge.subtitle'),
-				number: '02',
-				icon: NotebookTabs,
-				titleMain: t('home.hero.knowledge.title'),
-				titleAccent: t('home.hero.knowledge.subtitle'),
-				subtitle: t('home.hero.knowledge.desc'),
-				spotlightA: 'from-emerald-500/25',
-				spotlightB: 'via-teal-400/18',
-				spotlightC: 'to-cyan-300/0',
-				hue: 'emerald',
-				cta: [
-					{
-						label: t('home.features.enter'),
-						primary: true,
-						onClick: () => navigate('/knowledge'),
-					},
-				],
-				tags: [],
-			},
-			{
-				id: 'ebook',
-				badge: t('home.hero.ebook.subtitle'),
-				number: '03',
-				icon: LibraryBig,
-				titleMain: t('home.hero.ebook.title'),
-				titleAccent: t('home.hero.ebook.subtitle'),
-				subtitle: t('home.hero.ebook.desc'),
-				spotlightA: 'from-amber-500/25',
-				spotlightB: 'via-orange-400/18',
-				spotlightC: 'to-yellow-300/0',
-				hue: 'amber',
-				cta: [
-					{
-						label: t('home.features.enter'),
-						primary: true,
-						onClick: () => navigate('/ebook'),
-					},
-				],
-				tags: [],
-			},
-			{
-				id: 'english',
-				badge: t('home.hero.english.subtitle'),
-				number: '04',
-				icon: Vegan,
-				titleMain: t('home.hero.english.title'),
-				titleAccent: t('home.hero.english.subtitle'),
-				subtitle: t('home.hero.english.desc'),
-				spotlightA: 'from-rose-500/22',
-				spotlightB: 'via-amber-400/16',
-				spotlightC: 'to-pink-300/0',
-				hue: 'rose',
-				cta: [
-					{
-						label: t('home.features.enter'),
-						primary: true,
-						onClick: () => navigate('/english-learning'),
-					},
-				],
-				tags: [],
-			},
-			{
-				id: 'plugins',
-				badge: t('home.hero.plugins.subtitle'),
-				number: '05',
-				icon: Flower,
-				titleMain: t('home.hero.plugins.title'),
-				titleAccent: t('home.hero.plugins.subtitle'),
-				subtitle: t('home.hero.plugins.desc'),
-				spotlightA: 'from-violet-500/25',
-				spotlightB: 'via-purple-400/18',
-				spotlightC: 'to-indigo-300/0',
-				hue: 'violet',
-				cta: [
-					{
-						label: t('home.features.enter'),
-						primary: true,
-						onClick: () => navigate('/plugins'),
-					},
-					{
-						label: t('home.steps.pluginDev.title'),
-						primary: false,
-						onClick: () =>
-							void openExternalUrl(getPluginDevGuideAbsoluteUrl(locale)),
-					},
-				],
-				tags: [],
-			},
-		] as const;
-	}, [t, locale]);
+	const HERO_SLIDES = useMemo(
+		() =>
+			createHeroSlides({
+				t,
+				locale,
+				navigate,
+				onQuickStart: onClickQuickStart,
+			}),
+		// ponytail: 与原先一致，故意不把 navigate / onClickQuickStart 列入 deps
+		[t, locale],
+	);
 
 	const [heroIndex, setHeroIndex] = useState(0);
 	const heroTimerRef = useRef<number | null>(null);
 	const heroHoverRef = useRef<boolean>(false);
 	const HERO_AUTOPLAY_MS = 5200;
+	const heroNumber = HERO_SLIDES[heroIndex]?.number ?? '01';
 
 	const resetHeroTimer = () => {
 		if (heroTimerRef.current != null) {
@@ -388,6 +80,9 @@ const Home = () => {
 		});
 		resetHeroTimer();
 	};
+
+	const CHEVRONS = useMemo(() => createChevrons(goHero), [goHero]);
+
 	const setHero = (idx: number) => {
 		setHeroIndex(idx);
 		resetHeroTimer();
@@ -426,24 +121,36 @@ const Home = () => {
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
+							className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md"
 							style={{
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
 						>
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 pb-4.5 pt-4 md:px-6 md:pt-6 bg-theme-background/80 border-b border-theme/3 overflow-hidden">
-								<div className="relative z-10 flex flex-col gap-3 mb-1">
+							<header className="relative z-10 shrink-0 overflow-hidden border-b border-theme/3 bg-theme-background/80 pb-4.5 pt-4 md:px-6 md:pt-6">
+								{/* 右上角大号水印序号：随轮播切换，不挡左右箭头 */}
+								<div
+									className="pointer-events-none absolute right-5 -top-4 z-0 select-none font-extrabold leading-none tracking-tighter"
+									style={{ fontFamily: '"Syne", sans-serif' }}
+									aria-hidden
+								>
+									<span className="inline-flex text-[8rem]">
+										<span className="text-theme/5">{heroNumber[0]}</span>
+										<span className="text-theme/5">{heroNumber[1]}</span>
+									</span>
+								</div>
+
+								<div className="relative z-10 mb-1 flex flex-col gap-3">
 									{/* Row 1：品牌徽標（左） + 控制按鈕（右） —— 左右邊界對齊 */}
-									<div className="flex items-center justify-between mb-2.5">
+									<div className="mb-2.5 flex items-center justify-between">
 										<motion.div
 											initial={{ opacity: 0, x: -12 }}
 											animate={{ opacity: 1, x: 0 }}
 											transition={{ delay: 0.08, duration: 0.4 }}
-											className="inline-flex h-10 items-center gap-2.5 rounded-md border border-teal-400/5 bg-teal-500/10 px-4 backdrop-blur-sm"
+											className="inline-flex h-10 items-center gap-2.5 rounded-md border border-teal-500/10 bg-teal-500/15 px-4 backdrop-blur-sm"
 										>
 											<Sparkles
-												className="h-[18px] w-[18px] text-teal-500"
+												className="h-4.5 w-4.5 text-teal-500"
 												aria-hidden
 											/>
 											<span
@@ -454,12 +161,29 @@ const Home = () => {
 											</span>
 										</motion.div>
 
-										<div className="flex items-center gap-1.5">
-											<Button
+										<div className="relative z-10 flex items-center gap-1.5">
+											{CHEVRONS.map((i) => {
+												return (
+													<Button
+														key={i.ariaLabel}
+														onClick={i.onClick}
+														aria-label={i.ariaLabel}
+														className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-500/10 bg-teal-500/15 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
+														style={{ touchAction: 'manipulation' }}
+													>
+														<i.icon
+															className="h-4 w-4"
+															strokeWidth={2.2}
+															aria-hidden
+														/>
+													</Button>
+												);
+											})}
+											{/* <Button
 												onClick={() => goHero(-1)}
 												aria-label="上一张"
-												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/10 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
-												style={{ touchAction: 'manipulation' }}
+												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/20 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
+												style={{ touchAction: "manipulation" }}
 											>
 												<ChevronLeft
 													className="h-4 w-4"
@@ -470,15 +194,15 @@ const Home = () => {
 											<Button
 												onClick={() => goHero(1)}
 												aria-label="下一张"
-												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/10 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
-												style={{ touchAction: 'manipulation' }}
+												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/20 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
+												style={{ touchAction: "manipulation" }}
 											>
 												<ChevronRight
 													className="h-4 w-4"
 													strokeWidth={2.2}
 													aria-hidden
 												/>
-											</Button>
+											</Button> */}
 										</div>
 									</div>
 
@@ -521,7 +245,7 @@ const Home = () => {
 															{/* Row 1：图标 + 标题 —— 顶部对齐，标题铺满剩余宽度 */}
 															<div className="flex shrink-0 items-center gap-3">
 																<div
-																	className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-linear-to-br shadow-lg ${hue.icon}`}
+																	className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-linear-to-br ${hue.icon}`}
 																>
 																	<Icon
 																		className="h-6 w-6 text-textcolor"
@@ -529,18 +253,18 @@ const Home = () => {
 																		aria-hidden
 																	/>
 																</div>
-																<h1
-																	className="min-w-0 flex-1 text-balance font-extrabold leading-tight tracking-tight text-theme-white line-clamp-1 sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]"
+																<div
+																	className="mt-1 bg-linear-to-r from-teal-500 via-cyan-500 to-amber-300 bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-tight tracking-tight line-clamp-1 sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]"
 																	style={{
 																		fontFamily:
 																			'"Syne", "Noto Sans SC", sans-serif',
 																	}}
 																>
 																	{s.titleMain}
-																	<span className="ml-1.5 bg-linear-to-r from-teal-300 via-cyan-400 to-amber-400 bg-clip-text text-transparent sm:ml-2">
+																	<span className="ml-1.5 sm:ml-2">
 																		{s.titleAccent}
 																	</span>
-																</h1>
+																</div>
 															</div>
 
 															{/* Row 2：描述 —— flex-1 占满中部空间，2 行截断 */}
@@ -560,8 +284,8 @@ const Home = () => {
 																			onClick={c.onClick}
 																			className={
 																				c.primary
-																					? `relative flex h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-md bg-linear-to-br px-5 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none ${hue.btn}`
-																					: 'flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-theme/5 bg-theme-white/5 px-5 text-sm font-medium text-textcolor backdrop-blur-sm transition-[border-color,background-color] hover:border-theme/10 hover:bg-theme-white/10 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none'
+																					? `relative flex h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-md bg-linear-to-br px-5 text-sm font-semibold text-textcolor hover:shadow-md transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none ${hue.btn}`
+																					: 'flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-theme/5 bg-teal-500/20 px-5 text-sm font-medium text-textcolor backdrop-blur-sm transition-[border-color,background-color] hover:border-theme/10 hover:bg-teal-500/30 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none'
 																			}
 																			style={{
 																				fontFamily:
@@ -577,7 +301,7 @@ const Home = () => {
 																		</button>
 																	))}
 																</div>
-																<div className="absolute right-0 -bottom-2 flex items-center gap-1.5">
+																<div className="absolute right-0 -bottom-1 flex items-center gap-1.5">
 																	{HERO_SLIDES.map((_it, idx) => {
 																		const active = idx === heroIndex;
 																		return (
@@ -624,7 +348,6 @@ const Home = () => {
 									</div>
 								</div>
 							</header>
-
 							{/* 三大入口：与欢迎同属一块，纵向吃满剩余高度 */}
 							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 p-3 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme/2 md:p-0">
 								{FEATURES.map((feature, tileIndex) => (
@@ -645,7 +368,7 @@ const Home = () => {
 										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-background/80 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
 									>
 										<div
-											className={`pointer-events-none absolute -right-6 -top-10 text-[5.5rem] font-extrabold leading-none text-theme-white/4 transition-colors duration-300 group-hover:text-theme-white/7 sm:text-[6.5rem]`}
+											className={`pointer-events-none absolute right-5 -top-1 text-[5.5rem] font-extrabold leading-none text-theme/5 transition-colors duration-300`}
 											style={{ fontFamily: '"Syne", sans-serif' }}
 											aria-hidden
 										>
@@ -653,7 +376,7 @@ const Home = () => {
 										</div>
 
 										<div
-											className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg ${feature.glow} sm:h-14 sm:w-14`}
+											className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} group-hover:shadow-md ${feature.glow} sm:h-14 sm:w-14`}
 										>
 											<feature.icon
 												className="h-6 w-6 text-textcolor"
@@ -694,7 +417,7 @@ const Home = () => {
 								whileInView={{ opacity: 1, y: 0 }}
 								viewport={{ once: true, margin: '-40px' }}
 								transition={{ duration: 0.35 }}
-								className="mb-6 bg-linear-to-r from-teal-400 via-cyan-400 to-amber-400 bg-clip-text text-2xl font-bold text-transparent"
+								className="mb-6 text-xl font-semibold text-textcolor"
 								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
 							>
 								{t('home.sections.showcase')}
@@ -708,7 +431,7 @@ const Home = () => {
 										viewport={{ once: true, margin: '-20px' }}
 										transition={{ delay: idx * 0.05, duration: 0.35 }}
 										whileHover={{ scale: 1.04, y: -2 }}
-										className="group relative cursor-pointer rounded-md border border-transparent bg-theme-white/5 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:border-theme-white/15 hover:bg-theme-white/10"
+										className="group relative cursor-pointer rounded-md border border-transparent bg-theme/10 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:shadow-sm hover:shadow-teal-500/10"
 									>
 										<div
 											className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg group-hover:shadow-xl`}
@@ -749,7 +472,7 @@ const Home = () => {
 										viewport={{ once: true }}
 										transition={{ delay: idx * 0.06, duration: 0.35 }}
 										whileHover={{ scale: 1.01 }}
-										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme/10 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme/5 hover:shadow-sm hover:shadow-teal-500/10"
 										onClick={() => {
 											if (item.downloadDesktop) {
 												void openExternalUrl(
@@ -767,20 +490,20 @@ const Home = () => {
 										}}
 									>
 										<div
-											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-lg group-hover:shadow-xl md:mr-5`}
+											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
 										>
-											<span className="text-lg font-bold text-textcolor">
+											<span className="text-2xl font-bold text-textcolor">
 												{item.step}
 											</span>
 										</div>
 										<div className="min-w-0 flex-1 h-14 flex flex-col justify-between">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-500">
+											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>
 										</div>
 										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme-white/5 group-hover:bg-theme-white/10"
+											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
 											whileHover={{ x: 4 }}
 										>
 											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/40 group-hover:text-teal-500" />
@@ -813,24 +536,24 @@ const Home = () => {
 										viewport={{ once: true }}
 										transition={{ delay: idx * 0.06, duration: 0.35 }}
 										whileHover={{ scale: 1.01 }}
-										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme/10 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme/5 hover:shadow-sm hover:shadow-teal-500/10"
 										onClick={item.onClick}
 									>
 										<div
-											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-lg group-hover:shadow-xl md:mr-5`}
+											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
 										>
-											<span className="text-lg font-bold text-textcolor">
+											<span className="text-2xl font-bold text-textcolor">
 												{item.index}
 											</span>
 										</div>
 										<div className="min-w-0 flex-1 h-14 flex flex-col justify-between">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-500">
+											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>
 										</div>
 										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme-white/5 group-hover:bg-theme-white/10"
+											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
 											whileHover={{ x: 4 }}
 										>
 											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/40 group-hover:text-teal-500" />
