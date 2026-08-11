@@ -153,7 +153,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's3-8': {
 		title: 'Plugin center & enable/disable (shelf toggle)',
 		description:
-			'A new Plugin Center page lists every available module as a card with a switch. Toggle it on to enable (publish) a module—state is persisted to your account and takes effect immediately: the sidebar entry appears and the module is usable. Toggle it off to disable (unpublish)—the entry disappears and any open page is unloaded. A registry editor page (sign-in required) lets you view and edit the raw module list (JSON); saving it reloads the configuration automatically.',
+			'A new Plugin Center page lists every available module as a card with a switch. Toggle it on to enable (publish) a module—state is persisted to your account and takes effect immediately: the sidebar entry appears and the module is usable. Toggle it off to disable (unpublish)—the entry disappears and any open page is unloaded. A registry editor page (sign-in required) lets you view and edit the raw module list (JSON); saving it reloads the configuration automatically. Added: in the registry editor title bar you can set a module icon—upload an SVG for a chosen module, and the sidebar/trigger icon fields are written automatically; monochrome custom icons follow the host selected color and hover stroke animation, without changing host code.',
 	},
 	's3-9': {
 		title: 'Plugin UI follows host language',

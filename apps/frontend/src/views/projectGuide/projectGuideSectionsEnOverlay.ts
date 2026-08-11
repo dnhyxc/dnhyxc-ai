@@ -452,7 +452,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s17-3': {
 		title: '17.3 Registry editor (advanced)',
 		description:
-			'Entry: the registry editor entry inside the plugin center (sign-in required). Purpose: view and edit the raw module list as JSON; saving reloads the configuration automatically. Field help: the info icon beside the title explains each field (including the difference between version and Host API compatibility range). Shortcuts: ⌘/Ctrl+S saves; an orange dot on the save control indicates unsaved changes. Validation: structural checks run on save, and each module’s Host API compatibility range is verified; invalid content is rejected with a message and not written.',
+			'Entry: the registry editor entry inside the plugin center (sign-in required). Purpose: view and edit the raw module list as JSON; saving reloads the configuration automatically. Field help: the info icon beside the title explains each field (including the difference between version and Host API compatibility range). Set module icon: open the module list from the title bar and upload an SVG for a chosen module; on success the sidebar and (if present) surface trigger icon fields are written. Monochrome artwork follows the host selected color and the same hover stroke animation; changing an icon only needs the registry upload, not a host code change. Shortcuts: ⌘/Ctrl+S saves; an orange dot on the save control indicates unsaved changes. Validation: structural checks run on save, and each module’s Host API compatibility range is verified; invalid content is rejected with a message and not written.',
 	},
 	'pg-s17-4': {
 		title: '17.4 Video player plugin',

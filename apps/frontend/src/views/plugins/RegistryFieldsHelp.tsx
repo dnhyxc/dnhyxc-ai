@@ -105,6 +105,7 @@ export function RegistryFieldsHelp({ dirty }: { dirty?: boolean }) {
 			<DropdownMenuContent
 				align="start"
 				sideOffset={8}
+				scrollable={false}
 				className="w-[min(22rem,calc(100vw-2rem))] p-0"
 			>
 				<DropdownMenuLabel className="text-textcolor px-3 py-2.5 text-sm font-semibold">

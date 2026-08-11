@@ -32,7 +32,8 @@
 | 12 | [12-preview-lifecycle-debug.md](./12-preview-lifecycle-debug.md) | 独立预览、生命周期钩子、调试技巧（实现见 implements-guide/08） | 实操 |
 | 13 | [13-publish-registry.md](./13-publish-registry.md) | 构建、部署、Nginx、Registry 注册、缓存破坏、验收清单 | 发布 |
 
-> **生命周期 Host 实现专章**（`pickPluginLifecycle` / 缺钩子 `console.info` / `runLoad`）：[../implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。
+> **生命周期 Host 实现专章**（`pickPluginLifecycle` / 缺钩子 `console.info` / `runLoad`）：[../implements-guide/08-lifecycle-hooks.md](../implements-guide/08-lifecycle-hooks.md)。  
+> **动态插件图标**（`menu.icon` / `host.icon` = SVG URL → `PluginIcon`）：[../implements-guide/09-plugin-host-icons.md](../implements-guide/09-plugin-host-icons.md)。
 
 > 时间紧只看：README 速览 → [02](./02-scaffold.md) → [03](./03-vite-config.md) → [04](./04-expose-contract.md) → 选一种接入方式（[06](./06-connect-auto-route.md) / [07](./07-connect-surface-slot.md) / [08](./08-connect-iframe.md)），即可跑通 MVP。
 

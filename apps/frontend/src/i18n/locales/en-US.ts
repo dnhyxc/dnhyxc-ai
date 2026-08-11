@@ -1943,10 +1943,19 @@ export const enUS = {
 		'Load timing: route/idle (lazy, default) or eager (background preload after init; rarely needed).',
 	'plugins.registry.help.permissions':
 		'Permission list, e.g. ui:toast, nav:subtree, http:plugin-api, modules:ebook.',
+	'plugins.registry.iconUploadLabel': 'Set plugin icon',
+	'plugins.registry.iconPickPlugin': 'Select plugin',
+	'plugins.registry.iconUpload': 'Upload & write',
+	'plugins.registry.iconUploading': 'Uploading…',
+	'plugins.registry.iconUploadOk': 'SVG icon uploaded and written to registry',
+	'plugins.registry.iconUploadFail': 'Icon upload failed',
+	'plugins.registry.iconSvgOnly': 'Only SVG files are supported',
+	'plugins.registry.iconNoTarget':
+		'Plugin has no menu / host; cannot write icon',
 	'plugins.registry.help.menu':
-		'Sidebar entry: order and optional lucide icon name.',
+		'Sidebar entry: order; icon is an SVG image URL (upload, optional).',
 	'plugins.registry.help.host':
-		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon, order.',
+		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon (SVG URL), order.',
 	'plugins.registry.help.iframeUrl':
 		'Required when trust is untrusted: standalone HTTPS page opened in an iframe.',
 	'plugins.registry.help.integrity':

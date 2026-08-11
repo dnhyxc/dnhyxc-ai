@@ -38,6 +38,7 @@
 | F9 | 应用级影院全屏 | 藏侧栏/顶栏；Tauri/Web 全屏 | `capabilities/appFullscreen.ts` | §4.9 |
 | F10 | ebook Host API 可变绑定 | 插件能跳 CFI / 开想法 | `capabilities/ebookHostApi.ts` | §4.10 |
 | F11 | 消费方接线（router 等） | 启动、导航、槽位、笔记页 | 多文件调用点 | §4.11 |
+| F12 | 动态插件 SVG 图标 | 侧栏/Surface 自定义图标跟选中色 | `host/PluginIcon*` | [09](./09-plugin-host-icons.md) |
 
 ### 0.3 架构一图（必填）
 
@@ -75,6 +76,7 @@ flowchart TD
 | 7 | `host/PluginPageShell.tsx` | 路由外壳 | fullscreen |
 | 8 | `host/PluginHostPage.tsx` | design slots + 注册路由页 | runtime + shell |
 | 9 | `host/PluginHostSurface.tsx` | surface 槽模版 | Page + kit hooks |
+| 9b | `host/PluginIcon.tsx` + `pluginIconUrl.ts` | 动态 SVG 图标 | 见 [09](./09-plugin-host-icons.md) |
 | 10 | `index.ts` | 再导出 | 全部 |
 | 11 | 消费方接线 | router/Header/… | 10 |
 
@@ -231,11 +233,20 @@ export {
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
 export {
-	DEFAULT_PLUGIN_HOST_ICONS,
 	PluginHostSurface,
 	type PluginHostSurfacePart,
 	type PluginHostSurfaceProps,
 } from './host/PluginHostSurface';
+export { PluginIcon, type PluginIconProps } from './host/PluginIcon';
+export {
+	applyPluginIconUrl,
+	type HostSvgParts,
+	isPluginIconUrl,
+	isThemeablePaint,
+	normalizeSvgForHostIcon,
+	type PluginIconKind,
+	type PluginIconTheme,
+} from './host/pluginIconUrl';
 export { PluginPageShell } from './host/PluginPageShell';
 // 本仓：registry
 export {
@@ -1156,6 +1167,8 @@ registerPluginHostPage(PluginHostPage);
 
 #### （5）完整源码（逐行上方注释）
 
+> **图标专章**：`PluginIcon` / `pluginIconUrl` 的逐行实现见 [09-plugin-host-icons.md](./09-plugin-host-icons.md)。下文已去掉已废弃的 `DEFAULT_PLUGIN_HOST_ICONS` 白名单。
+
 ```tsx
 /**
  * 统一 Host Surface 模版：抽屉 / 顶栏触发器 / 内联 toolbar。
@@ -1172,27 +1185,11 @@ import {
 } from '@dnhyxc-ai/federation-kit';
 import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
 import { Button } from '@ui/index';
-import {
-	BookMarked,
-	Highlighter,
-	type LucideIcon,
-	Puzzle,
-	Sparkle,
-	Sparkles,
-} from 'lucide-react';
 import { type CSSProperties, useEffect } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { PluginHostPage } from './PluginHostPage';
-
-/** 默认 lucide 图标名 → 组件（registry `host.icon`） */
-export const DEFAULT_PLUGIN_HOST_ICONS: Record<string, LucideIcon> = {
-	Sparkle,
-	Puzzle,
-	Sparkles,
-	BookMarked,
-	Highlighter,
-};
+import { PluginIcon } from './PluginIcon';
 
 export type PluginHostSurfacePart = 'toolbar' | 'drawer-triggers' | 'drawer';
 
@@ -1208,22 +1205,12 @@ export type PluginHostSurfaceProps = {
 	openPluginId?: string | null;
 	onOpenPluginIdChange?: (id: string | null) => void;
 	chromeStyle?: CSSProperties;
-	/** 覆盖默认图标表 */
-	icons?: Record<string, LucideIcon>;
 	/** 过滤/排序；默认按 registry order */
 	filterPlugins?: (list: PluginDescriptor[]) => PluginDescriptor[];
 	className?: string;
 	triggerClassName?: string;
 	drawerBodyClassName?: string;
 };
-
-function resolveIcon(
-	name: string | undefined,
-	icons: Record<string, LucideIcon>,
-): LucideIcon {
-	if (!name) return Puzzle;
-	return icons[name] ?? Puzzle;
-}
 
 /**
  * 业务页插件槽统一模版。
@@ -1235,7 +1222,6 @@ export function PluginHostSurface({
 	openPluginId = null,
 	onOpenPluginIdChange,
 	chromeStyle,
-	icons = DEFAULT_PLUGIN_HOST_ICONS,
 	filterPlugins,
 	className,
 	triggerClassName,
@@ -1288,7 +1274,6 @@ export function PluginHostSurface({
 		return (
 			<div className={cn('contents', className)}>
 				{drawerPlugins.map((p) => {
-					const Icon = resolveIcon(p.host?.icon, icons);
 					const label = pickPluginLocaleText(p.title, locale) || p.id;
 					const open = openPluginId === p.id;
 					return (
@@ -1305,6 +1290,7 @@ export function PluginHostSurface({
 								variant="ghost"
 								size="icon-sm"
 								className={cn(
+									'lucide-stroke-draw-hover [&_svg]:overflow-visible',
 									open
 										? 'bg-theme/15 text-teal-500'
 										: 'text-textcolor/80 hover:text-teal-500',
@@ -1327,7 +1313,7 @@ export function PluginHostSurface({
 									onOpenPluginIdChange?.(open ? null : p.id);
 								}}
 							>
-								<Icon className="size-4" />
+								<PluginIcon name={p.host?.icon} className="size-4" />
 							</Button>
 						</Tooltip>
 					);
@@ -1376,7 +1362,8 @@ export function PluginHostSurface({
 #### （6）复刻提示
 
 - ebook 调用见 §4.11。  
-- 新 surface 只需 registry 配 `host.surface/slot/icon`。
+- 新 surface 只需 registry 配 `host.surface/slot/icon`（`icon` 推荐 SVG URL）。  
+- 图标加载/消毒/动画完整实现见 [09-plugin-host-icons.md](./09-plugin-host-icons.md)。
 
 ---
 

@@ -207,7 +207,7 @@ server {
 | `expose`       | Vue    | 要加载的 expose 名，默认 `./App`；Vue 必须显式写                                                                                                                                 |
 | `version`      | ✅     | **插件资源版本**，发版可 bump；与 Host API 无关                                                                                                                                  |
 | `hostApiRange` | ✅     | **Host 契约兼容范围**（如 `^1.0.0`），须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`）。保存时 Host 会校验（`verifyPlugin` → `HOST_API`）。**勿**把 `version` 误写成 range |
-| `menu`         | 方式一 | 侧栏图标，仅 `order` + `icon`（侧栏不展示文字）                                                                                                                                  |
+| `menu`         | 方式一 | 侧栏图标，仅 `order` + `icon`（`icon` **推荐 SVG URL**；详见 [implements-guide/09](../implements-guide/09-plugin-host-icons.md)）                                                                                                                                  |
 | `permissions`  | ✅     | 声明插件能用的 api（第 5 章权限表）                                                                                                                                              |
 | `host`         | 方式二 | `{ surface, slot, icon?, order? }` 内嵌位置                                                                                                                                      |
 | `trust`        | ✅     | `first-party` / `partner` / `untrusted`                                                                                                                                          |

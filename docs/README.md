@@ -67,6 +67,7 @@
 | MF 动态插件系统完整实现（Vite / PluginManager / 路由注入）          | [app/dynamic-plugin-system.md](./app/dynamic-plugin-system.md)（含改动前/后对比与逐行注释）                                                              |
 | 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [app/plugin-development-guide.md](./app/plugin-development-guide.md)                                                                                      |
 | 主项目接入插件方式（自动路由 / 手动挂载 / iframe 隔离）             | [app/host-plugin-integration-guide.md](./app/host-plugin-integration-guide.md)                                                                            |
+| 插件图标 SVG URL 动态加载与内联（侧栏 / Host Surface）              | [app/plugin-host-icons.md](./app/plugin-host-icons.md)                                                                                                    |
 | 插件上架/下架（setEnabled / 持久化 / Switch / Registry 编辑页）     | [app/plugin-shelf-toggle.md](./app/plugin-shelf-toggle.md)                                                                                                |
 | 插件开关偏好换号不同步 / Web 与桌面不一致 / 默认全关 / 偏好写回 catalog 污染全局 | [app/plugin-enabled-prefs-persistence.md](./app/plugin-enabled-prefs-persistence.md)                                                                       |
 | 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [app/switch-dynamic-id-fix.md](./app/switch-dynamic-id-fix.md)                                                                                            |
@@ -214,6 +215,8 @@
 | 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md) · [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) |
 | 预览切编辑丢位置 / 助手开时编辑切预览总在文首                     | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md)                                                       |
 | 主题色（强调色）怎么换 / 全站 hover/选中色不跟随 / 首帧闪回 teal  | [setting/accent-color-settings.md](./setting/accent-color-settings.md)（10 色预设 + CSS 变量覆盖 + 首屏防闪 + 原版 teal 豁免）                            |
+| 插件图标 SVG 渲染 / stroke/fill 动画不触发 / 主题色不跟随         | [app/plugin-icon-system.md](./app/plugin-icon-system.md)（PluginIcon + normalizeSvgForHostIcon + pathLength=1 动画） · [app/plugin-host-icons.md](./app/plugin-host-icons.md) |
+| Registry 上传 SVG 图标失败 / 菜单选择后无反应 / 文件选择框闪退   | [app/registry-icon-upload.md](./app/registry-icon-upload.md)（Upload button 模式 + openRef + DropdownMenu scrollable） |
 
 ---
 

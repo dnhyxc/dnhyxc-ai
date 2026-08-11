@@ -1,15 +1,26 @@
 import { Button, Input, Spinner } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	type ComponentProps,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import { cn } from '@/lib/utils';
 import { FileWithPreview } from '@/types';
 import { donwnloadWithUrl } from '@/utils';
 import Image from '../Image';
 import Tooltip from '../Tooltip';
 
-interface IProps {
+type ButtonVariant = ComponentProps<typeof Button>['variant'];
+type ButtonSize = ComponentProps<typeof Button>['size'];
+
+export type UploadProps = {
 	validTypes?: string[];
+	/** 扩展名兜底（如 `.svg`）；MIME 为空时仍可通过校验 */
+	validExtensions?: string[];
 	multiple?: boolean;
 	maxSize?: number;
 	maxCount?: number;
@@ -22,16 +33,44 @@ interface IProps {
 	fileUrl?: string;
 	onClearFileUrl?: () => void;
 	children?: React.ReactNode;
-	uploadType?: string;
+	/** image：方块预览区；button：触发按钮（聊天附件等） */
+	uploadType?: 'image' | 'button';
 	showTooltip?: boolean;
 	tooltipContent?: React.ReactNode | string;
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: (key: string, params?: Record<string, unknown>) => string;
 	disabled?: boolean;
 	loading?: boolean;
+	/** uploadType=button 时透传 Button */
+	buttonVariant?: ButtonVariant;
+	buttonSize?: ButtonSize;
+	buttonClassName?: string;
+	/** 外部打开文件选择（挂在会卸载的菜单内时，把 Upload 放菜单外并用此 ref 触发） */
+	openRef?: React.MutableRefObject<(() => void) | null>;
+};
+
+function fileMatchesType(
+	file: File,
+	validTypes: string[],
+	validExtensions: string[],
+): boolean {
+	if (file.type && validTypes.includes(file.type)) return true;
+	if (validTypes.some((t) => t.endsWith('/*'))) {
+		const prefix = validTypes.find((t) => t.endsWith('/*'))?.slice(0, -1);
+		if (prefix && file.type.startsWith(prefix)) return true;
+	}
+	const name = file.name.toLowerCase();
+	if (validExtensions.some((ext) => name.endsWith(ext.toLowerCase()))) {
+		return true;
+	}
+	// image/svg+xml 常伴随空 MIME，默认按 .svg 放行
+	if (validTypes.includes('image/svg+xml') && name.endsWith('.svg')) {
+		return true;
+	}
+	return false;
 }
 
-const Upload: React.FC<IProps> = ({
+const Upload: React.FC<UploadProps> = ({
 	className,
 	getFileList,
 	onUpload,
@@ -46,9 +85,10 @@ const Upload: React.FC<IProps> = ({
 		'image/svg+xml',
 		'image/webp',
 	],
+	validExtensions = [],
 	multiple = false,
 	accept = 'image/*',
-	maxSize = 10 * 1024 * 1024, // 10MB
+	maxSize = 10 * 1024 * 1024,
 	maxCount = 5,
 	countValidText = '',
 	uploadedCount = 0,
@@ -57,6 +97,10 @@ const Upload: React.FC<IProps> = ({
 	t,
 	disabled = false,
 	loading,
+	buttonVariant = 'ghost',
+	buttonSize,
+	buttonClassName,
+	openRef,
 }) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 
@@ -88,16 +132,23 @@ const Upload: React.FC<IProps> = ({
 	};
 
 	const triggerFileInput = () => {
+		if (disabled || loading) return;
 		fileInputRef.current?.click();
 	};
 
-	// 🔧 关键修复: 验证文件（同步但轻量）
+	useEffect(() => {
+		if (!openRef) return;
+		openRef.current = triggerFileInput;
+		return () => {
+			openRef.current = null;
+		};
+	}, [openRef, disabled, loading]);
+
 	const validateFiles = useCallback(
 		(
 			selectedFiles: File[] | FileList,
 			currentFilesLength: number,
 		): { valid: boolean; files: File[] } => {
-			// 文件数量检查
 			if (
 				(multiple && selectedFiles.length + currentFilesLength > maxCount) ||
 				uploadedCount + selectedFiles.length > maxCount
@@ -113,18 +164,17 @@ const Upload: React.FC<IProps> = ({
 			}
 
 			const validFiles = Array.from(selectedFiles).filter((file) => {
-				// 文件类型检查
-				if (!validTypes.includes(file.type)) {
+				if (!fileMatchesType(file, validTypes, validExtensions)) {
 					Toast({
 						type: 'error',
 						title:
-							t?.('upload.error.invalidType', { type: file.type }) ||
-							`不支持的文件类型: ${file.type}`,
+							t?.('upload.error.invalidType', {
+								type: file.type || file.name,
+							}) || `不支持的文件类型: ${file.type || file.name}`,
 					});
 					return false;
 				}
 
-				// 文件大小检查
 				if (file.size > maxSize) {
 					Toast({
 						type: 'error',
@@ -141,14 +191,22 @@ const Upload: React.FC<IProps> = ({
 
 			return { valid: true, files: validFiles };
 		},
-		[multiple, maxCount, uploadedCount, countValidText, validTypes, maxSize],
+		[
+			multiple,
+			maxCount,
+			uploadedCount,
+			countValidText,
+			validTypes,
+			validExtensions,
+			maxSize,
+			t,
+		],
 	);
 
 	const createPreviewURLs = useCallback(
 		(fileList: File[]): FileWithPreview[] => {
 			return fileList.map((file) => {
-				// 仅对图片类型创建预览 URL
-				if (file.type.startsWith('image/')) {
+				if (file.type.startsWith('image/') || /\.svg$/i.test(file.name)) {
 					const preview = URL.createObjectURL(file);
 					return {
 						file,
@@ -171,34 +229,30 @@ const Upload: React.FC<IProps> = ({
 			return;
 		}
 
-		// 创建预览URL
 		const filesWithPreview = createPreviewURLs(validation.files);
 
-		const fileList = multiple
-			? [...filesWithPreview, ...files]
-			: filesWithPreview[0];
-		if (multiple) {
-			setFiles((prev) => [...filesWithPreview, ...prev]);
-			getFileList?.(fileList);
-			await onUpload(fileList);
-			revokeAllObjectURLs(filesWithPreview);
-			setFiles([]);
-		} else {
-			setFiles(filesWithPreview);
-			getFileList?.(filesWithPreview?.[0]);
-			await onUpload(filesWithPreview?.[0]);
-			if (filesWithPreview[0]?.preview) {
-				revokeObjectURL(filesWithPreview[0].preview);
+		try {
+			if (multiple) {
+				const fileList = [...filesWithPreview, ...files];
+				setFiles((prev) => [...filesWithPreview, ...prev]);
+				getFileList?.(fileList);
+				await onUpload(fileList);
+			} else {
+				setFiles(filesWithPreview);
+				getFileList?.(filesWithPreview?.[0]);
+				await onUpload(filesWithPreview?.[0]);
 			}
+		} finally {
+			revokeAllObjectURLs(filesWithPreview);
 			setFiles([]);
 		}
 	};
 
-	const onFileInputChange = (e: any) => {
-		if (e.target.files.length > 0) {
-			onFileSelect(e.target.files);
-			// 重置input值，允许选择相同文件
-			e.target.value = null;
+	const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const list = e.target.files;
+		if (list && list.length > 0) {
+			void onFileSelect(list);
+			e.target.value = '';
 		}
 	};
 
@@ -211,9 +265,7 @@ const Upload: React.FC<IProps> = ({
 	};
 
 	const onPreview = () => {
-		if (imageRef.current) {
-			imageRef.current.onPreview();
-		}
+		imageRef.current?.onPreview();
 	};
 
 	const onDownload = async () => {
@@ -227,36 +279,37 @@ const Upload: React.FC<IProps> = ({
 	};
 
 	return (
-		<div className={cn('w-32.5 h-32.5', className)}>
+		<div className={cn(uploadType === 'image' && 'h-32.5 w-32.5', className)}>
 			<Input
 				type="file"
 				ref={fileInputRef}
 				onChange={onFileInputChange}
 				accept={accept}
 				multiple={multiple}
+				disabled={disabled || loading}
 				className="hidden"
 			/>
 			{uploadType === 'image' &&
 				(files?.length || fileUrl ? (
-					<div className="relative flex items-center justify-center w-full h-full z-1 group">
+					<div className="relative z-1 group flex h-full w-full items-center justify-center">
 						<Image
 							ref={imageRef}
 							src={fileUrl || files[0]?.preview || ''}
 							showOnError
 							t={t}
-							className="relative w-full h-full rounded-md"
+							className="relative h-full w-full rounded-md"
 						>
-							<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+							<div className="bg-theme-background/50 absolute inset-0 z-1 hidden w-full h-full items-center justify-center rounded-md group-hover:flex">
 								<Download
-									className="w-5 h-5 cursor-pointer hover:text-textcolor/80"
+									className="hover:text-textcolor/80 h-5 w-5 cursor-pointer"
 									onClick={onDownload}
 								/>
 								<Eye
-									className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+									className="hover:text-textcolor/80 ml-2 h-5 w-5 cursor-pointer"
 									onClick={onPreview}
 								/>
 								<Trash2
-									className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+									className="hover:text-textcolor/80 ml-2 h-5 w-5 cursor-pointer"
 									onClick={() => onDelete(files[0])}
 								/>
 								{children}
@@ -265,10 +318,13 @@ const Upload: React.FC<IProps> = ({
 					</div>
 				) : (
 					<div
-						className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-theme/20 hover:border-theme/80 hover:bg-theme-background/90"
+						className={cn(
+							'border-theme/20 hover:border-theme/80 hover:bg-theme-background/90 flex h-full w-full cursor-pointer items-center justify-center rounded-md border border-dashed p-8 text-center transition-all duration-300 select-none',
+							(disabled || loading) && 'pointer-events-none opacity-50',
+						)}
 						onClick={triggerFileInput}
 					>
-						<UploadIcon className="w-8 h-8 mx-auto text-textcolor" />
+						<UploadIcon className="text-textcolor mx-auto h-8 w-8" />
 					</div>
 				))}
 			{uploadType === 'button' && (
@@ -282,24 +338,29 @@ const Upload: React.FC<IProps> = ({
 					disabled={!showTooltip}
 				>
 					<Button
-						variant="ghost"
-						className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-						disabled={disabled}
+						type="button"
+						variant={buttonVariant}
+						size={buttonSize}
+						className={cn(
+							'bg-theme/5 mb-1 flex h-8 items-center rounded-md text-sm',
+							buttonClassName,
+						)}
+						disabled={disabled || loading}
 						onClick={triggerFileInput}
 					>
-						{loading && (
+						{loading ? (
 							<div className="flex items-center gap-2">
 								<Spinner className="text-textcolor" />
 								{t?.('upload.uploading') ?? '上传中...'}
 							</div>
-						)}
-						{!loading &&
-							(children || (
+						) : (
+							children || (
 								<div className="flex items-center">
-									<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
+									<UploadIcon className="text-textcolor mx-auto mr-2 h-8 w-8" />
 									{t?.('upload.button') ?? '上传文件'}
 								</div>
-							))}
+							)
+						)}
 					</Button>
 				</Tooltip>
 			)}

@@ -29,7 +29,7 @@ Host 在某个业务页面渲染 `<PluginHostSurface surface="ebook.read" />`，
 	"host": {                             // ★ 方式二的关键字段
 		"surface": "ebook.read",          //   业务面：Host 哪个页面展示你
 		"slot": "drawer",                 //   位置：drawer（抽屉）或 toolbar（顶栏）
-		"icon": "Sparkle",                //   顶栏图标（slot=drawer 时显示在触发器按钮）
+		"icon": "https://cdn.example.com/icons/tool.svg", // 顶栏触发器：推荐 SVG URL（PluginIcon 内联）
 		"order": 1                        //   同 surface 插件间的排序
 	},
 	"permissions": ["ui:toast"],
@@ -42,7 +42,7 @@ Host 在某个业务页面渲染 `<PluginHostSurface surface="ebook.read" />`，
 |------|------|
 | `host.surface` | **必填（方式二）**。业务面标识，如 `ebook.read`。Host 的 `<PluginHostSurface surface="ebook.read">` 与之匹配 |
 | `host.slot` | **必填**。`drawer` = 底部抽屉；`toolbar` = 顶栏内联 |
-| `host.icon` | 可选。`drawer` 时是顶栏触发器图标名；`toolbar` 时通常不需要 |
+| `host.icon` | 可选。`drawer` 时是顶栏触发器图标；**推荐 SVG URL**（不必再进 Host Lucide 白名单）；`toolbar` 时通常不需要。详见 [implements-guide/09](../implements-guide/09-plugin-host-icons.md) |
 | `host.order` | 可选。同 surface 下排序，默认 100 |
 
 ---

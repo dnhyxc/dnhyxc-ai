@@ -11,6 +11,14 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
+/** 固定 16×16；裁切转圈/描边溢出，避免行高被带着上下晃 */
+const iconSlot =
+	'relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden [&_svg]:size-4';
+
+/** 关掉 transition-all，避免 loading 重渲染时和描边动画叠出抖动 */
+const linkBtn =
+	'lucide-stroke-draw-hover flex items-center gap-1 px-0! has-[>svg]:px-0! text-textcolor transition-none hover:text-teal-500 disabled:hover:text-textcolor';
+
 /** 编辑器顶栏：知识库 / 草稿 / 保存 */
 const KnowledgeEditorToolbar = (props: {
 	onOpenLibrary: () => void;
@@ -52,8 +60,6 @@ const KnowledgeEditorToolbar = (props: {
 		shortcutHintOpenTrash,
 		shortcutHintShare,
 	} = props;
-	const linkBtn =
-		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
 		<div className="flex items-center pr-3 gap-3">
 			<Tooltip
@@ -67,8 +73,10 @@ const KnowledgeEditorToolbar = (props: {
 					disabled={importLoading}
 					aria-busy={importLoading}
 				>
-					<SquareArrowRight className="mt-0.5" />
-					<span className="mt-0.5">{t('knowledge.toolbar.import')}</span>
+					<span className={iconSlot}>
+						<SquareArrowRight aria-hidden />
+					</span>
+					<span>{t('knowledge.toolbar.import')}</span>
 				</Button>
 			</Tooltip>
 			<Tooltip
@@ -82,8 +90,10 @@ const KnowledgeEditorToolbar = (props: {
 					disabled={saveLoading}
 					aria-busy={saveLoading}
 				>
-					<SaveIcon className="mt-0.5" />
-					<span className="mt-0.5">{t('knowledge.toolbar.save')}</span>
+					<span className={iconSlot}>
+						<SaveIcon aria-hidden />
+					</span>
+					<span>{t('knowledge.toolbar.save')}</span>
 				</Button>
 			</Tooltip>
 			<Tooltip
@@ -95,8 +105,10 @@ const KnowledgeEditorToolbar = (props: {
 					className={cn(linkBtn, 'hover:text-orange-500')}
 					onClick={onNewDraft}
 				>
-					<OctagonX className="mt-0.5" />
-					<span className="mt-0.5">{t('knowledge.toolbar.clear')}</span>
+					<span className={iconSlot}>
+						<OctagonX aria-hidden />
+					</span>
+					<span>{t('knowledge.toolbar.clear')}</span>
 				</Button>
 			</Tooltip>
 			{isCloudLoggedIn && (
@@ -105,8 +117,10 @@ const KnowledgeEditorToolbar = (props: {
 					content={shortcutHintShare ?? t('knowledge.shortcuts.share')}
 				>
 					<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
-						<Share2 className="mt-0.5" />
-						<span className="mt-0.5">{t('knowledge.toolbar.share')}</span>
+						<span className={iconSlot}>
+							<Share2 aria-hidden />
+						</span>
+						<span>{t('knowledge.toolbar.share')}</span>
 					</Button>
 				</Tooltip>
 			)}
@@ -117,8 +131,10 @@ const KnowledgeEditorToolbar = (props: {
 				}
 			>
 				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
-					<LibraryBig className="mt-0.5" />
-					<span className="mt-0.5">{t('knowledge.toolbar.library')}</span>
+					<span className={iconSlot}>
+						<LibraryBig aria-hidden />
+					</span>
+					<span>{t('knowledge.toolbar.library')}</span>
 				</Button>
 			</Tooltip>
 			{isCloudLoggedIn ? (
@@ -127,8 +143,10 @@ const KnowledgeEditorToolbar = (props: {
 					content={shortcutHintOpenTrash ?? t('knowledge.shortcuts.openTrash')}
 				>
 					<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
-						<Trash2 className="mt-0.5" />
-						<span className="mt-0.5">{t('knowledge.toolbar.trash')}</span>
+						<span className={iconSlot}>
+							<Trash2 aria-hidden />
+						</span>
+						<span>{t('knowledge.toolbar.trash')}</span>
 					</Button>
 				</Tooltip>
 			) : null}

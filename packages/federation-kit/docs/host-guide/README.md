@@ -19,7 +19,7 @@
 | 3 | [03-registry.md](./03-registry.md) | `plugins-registry.json` **全字段详解**（每个字段的作用与取值），这是「动态接入」的源头 | 配置 |
 | 4 | [04-create-federation.md](./04-create-federation.md) | `createFederation()` 门面**全部配置项**逐项讲解 + 返回值 `mf` 对象每个方法 | 核心 |
 | 5 | [05-start-router-injection.md](./05-start-router-injection.md) | `mf.start()`、动态路由注入、防刷新闪 404、侧栏菜单注入 | 核心 |
-| 6 | [06-mount-modes.md](./06-mount-modes.md) | 三种挂载模式：自动路由 / 业务内嵌 / iframe；`FederationPlugin`、`PluginHostPage`、`PluginHostSurface`、slots、hooks | 核心 |
+| 6 | [06-mount-modes.md](./06-mount-modes.md) | 三种挂载模式：自动路由 / 业务内嵌 / iframe；`FederationPlugin`、`PluginHostPage`、`PluginHostSurface`（含 **动态 SVG 图标**）、slots、hooks | 核心 |
 | 7 | [07-bridge-permissions.md](./07-bridge-permissions.md) | HostBridge API：子应用能拿到什么；permissions 权限表；capabilities 能力注入；iframe RPC 扩展 | 能力 |
 | 8 | [08-enabled-registry-impl.md](./08-enabled-registry-impl.md) | 上架偏好 `enabledStore` + registry 拉取/缓存/保存的实现 | 数据 |
 | 9 | [09-security-isolation.md](./09-security-isolation.md) | 安全校验（origin / hostApiRange / integrity / trust）、缓存破坏、样式隔离、untrusted iframe | 安全 |
@@ -132,7 +132,7 @@ flowchart TD
 | `apps/frontend/src/federation/runtime/index.ts` | `createFederation` 唯一调用点 |
 | `apps/frontend/src/federation/registry/index.ts` | registry 拉取/缓存/保存 |
 | `apps/frontend/src/federation/enabled/prefs.ts` | 账号上架偏好 |
-| `apps/frontend/src/federation/host/*` | `PluginHostPage` / `PluginHostSurface` / `PluginPageShell` / `PluginErrorBoundary` |
+| `apps/frontend/src/federation/host/*` | `PluginHostPage` / `PluginHostSurface` / `PluginIcon` / `PluginPageShell` / `PluginErrorBoundary` |
 | `apps/frontend/src/router/index.tsx` | `mf.start()` + 动态路由重建 |
 | `apps/frontend/src/router/buildRoutes.ts` | 静态路由 + 动态插件路由合并 |
 | `packages/federation-kit/src/createFederation.ts` | kit 门面实现 |

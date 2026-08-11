@@ -363,7 +363,9 @@ function LearningNotesPage() {
 
 `PluginHostSurface` 解决「一个业务区要挂多个插件，且不想手写 Drawer/触发器」的问题。它按 `surface` 从 registry 过滤出插件，再按 `part` 渲染成工具栏 / 抽屉触发器 / 抽屉内容。
 
-`apps/frontend/src/federation/host/PluginHostSurface.tsx` 核心（逐行注释）：
+`host.icon` 推荐存 **SVG 图片 URL**，由 `PluginIcon` 动态内联（**不必**再维护 Lucide 白名单）。完整实现见 [implements-guide/09-plugin-host-icons.md](../implements-guide/09-plugin-host-icons.md)。
+
+`apps/frontend/src/federation/host/PluginHostSurface.tsx` 核心（逐行注释；图标已切到 `PluginIcon`）：
 
 ```tsx
 import {
@@ -372,21 +374,17 @@ import {
 } from '@dnhyxc-ai/federation-kit';
 import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
 import { Button } from '@ui/index';
-import { BookMarked, Highlighter, type LucideIcon, Puzzle, Sparkle, Sparkles } from 'lucide-react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { PluginHostPage } from './PluginHostPage';
-
-// registry `host.icon` 字符串 → lucide 组件 的映射表
-export const DEFAULT_PLUGIN_HOST_ICONS: Record<string, LucideIcon> = {
-  Sparkle, Puzzle, Sparkles, BookMarked, Highlighter,
-};
+// 动态插件图标：registry host.icon 为 SVG URL 时 fetch 内联
+import { PluginIcon } from './PluginIcon';
 
 export type PluginHostSurfacePart = 'toolbar' | 'drawer-triggers' | 'drawer';
 
 export function PluginHostSurface({
   surface, part, openPluginId = null, onOpenPluginIdChange, chromeStyle,
-  icons = DEFAULT_PLUGIN_HOST_ICONS, filterPlugins, className, triggerClassName, drawerBodyClassName = 'py-2 pl-0',
+  filterPlugins, className, triggerClassName, drawerBodyClassName = 'py-2 pl-0',
 }: PluginHostSurfaceProps) {
   const { locale } = useI18n();
   // 订阅：列出该 surface 下所有已上架插件（按 order 排序）
@@ -417,13 +415,17 @@ export function PluginHostSurface({
     return (
       <div className={cn('contents', className)}>
         {drawerPlugins.map((p) => {
-          const Icon = resolveIcon(p.host?.icon, icons);
           const label = pickPluginLocaleText(p.title, locale) || p.id;
           const open = openPluginId === p.id;
           return (
             <Tooltip key={p.id} side="bottom" content={label}>
               <Button
                 type="button" variant="ghost" size="icon-sm"
+                className={cn(
+                  'lucide-stroke-draw-hover [&_svg]:overflow-visible',
+                  open ? 'bg-theme/15 text-teal-500' : 'text-textcolor/80 hover:text-teal-500',
+                  triggerClassName,
+                )}
                 aria-pressed={open} aria-label={label}
                 data-plugin-host-slot="drawer-trigger" data-plugin-host-surface={surface} data-plugin-id={p.id}
                 onClick={() => {
@@ -437,7 +439,8 @@ export function PluginHostSurface({
                   onOpenPluginIdChange?.(open ? null : p.id);
                 }}
               >
-                <Icon className="size-4" />
+                {/* 不再 resolveIcon(白名单)；URL → 内联 SVG，失败 Puzzle */}
+                <PluginIcon name={p.host?.icon} className="size-4" />
               </Button>
             </Tooltip>
           );
@@ -495,7 +498,7 @@ const [openPluginId, setOpenPluginId] = useState<string | null>(null);
 <PluginHostSurface surface="ebook.read" part="drawer" openPluginId={openPluginId} onOpenPluginIdChange={setOpenPluginId} />
 ```
 
-> **语义**：新增一个「电子书阅读页」插件，只需在 registry 里写 `host: { surface: 'ebook.read', slot: 'drawer', icon: 'Sparkle' }` 并部署——阅读页代码**一行都不用改**。这就是「槽位」模式的价值：**插件自动出现在对应业务区**。
+> **语义**：新增一个「电子书阅读页」插件，只需在 registry 里写 `host: { surface: 'ebook.read', slot: 'drawer', icon: '<SVG URL>' }` 并部署——阅读页代码**一行都不用改**。这就是「槽位」模式的价值：**插件自动出现在对应业务区**。
 
 ---
 

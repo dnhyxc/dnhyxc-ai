@@ -231,6 +231,7 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 						</DropdownMenuTrigger>
 						<DropdownMenuContent
 							align="start"
+							scrollable={false}
 							className="w-[min(100%,20rem)] overflow-hidden p-0"
 						>
 							<ScrollArea

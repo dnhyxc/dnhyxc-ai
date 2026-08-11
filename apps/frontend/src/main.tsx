@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client';
+import { bindLucideStrokePathLength } from './utils/lucideStrokePathLength';
 
 const el = document.getElementById('root') as HTMLElement;
 const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -8,6 +9,7 @@ const isAboutWindow = path === '/about';
 if (isAboutWindow) {
 	void import('./about').then((m) => m.mount(el));
 } else {
+	bindLucideStrokePathLength();
 	void import('./router').then((m) => {
 		ReactDOM.createRoot(el).render(<m.default />);
 	});

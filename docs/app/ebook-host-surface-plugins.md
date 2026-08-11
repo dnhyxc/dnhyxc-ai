@@ -1,6 +1,6 @@
 # Ebook 阅读页插件动态接入（Host Surface 发现机制）
 
-> **延伸阅读（后续增量）**：入口勿再同文件导出空 `activate`/`deactivate`（已删），见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)；桌面插件缓存见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。
+> **延伸阅读（后续增量）**：入口勿再同文件导出空 `activate`/`deactivate`（已删），见 [remote-plugin-hmr.md](./remote-plugin-hmr.md)；桌面插件缓存见 [plugin-entry-cache-bust.md](./plugin-entry-cache-bust.md)。**`host.icon` 现为 SVG URL**，由统一 `PluginIcon` 内联渲染（不再用 Lucide 名白名单），见 [plugin-host-icons.md](./plugin-host-icons.md)。
 
 ## 1. 背景与目标
 

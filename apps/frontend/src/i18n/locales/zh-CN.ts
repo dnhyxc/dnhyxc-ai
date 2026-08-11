@@ -1791,10 +1791,18 @@ export const zhCN = {
 		'加载时机：route/idle（默认懒加载）或 eager（启动后后台预拉，一般勿用）。',
 	'plugins.registry.help.permissions':
 		'权限声明，如 ui:toast、nav:subtree、http:plugin-api、modules:ebook。',
+	'plugins.registry.iconUploadLabel': '设置插件图标',
+	'plugins.registry.iconPickPlugin': '选择插件',
+	'plugins.registry.iconUpload': '上传并写入',
+	'plugins.registry.iconUploading': '上传中…',
+	'plugins.registry.iconUploadOk': 'SVG 图标已上传并写入 registry',
+	'plugins.registry.iconUploadFail': '图标上传失败',
+	'plugins.registry.iconSvgOnly': '仅支持上传 SVG 文件',
+	'plugins.registry.iconNoTarget': '该插件没有 menu / host，无法写入 icon',
 	'plugins.registry.help.menu':
-		'侧栏入口：order 排序、icon 为 lucide 图标名（可选）。',
+		'侧栏入口：order 排序；icon 为 SVG 图片 URL（上传后写入，可选）。',
 	'plugins.registry.help.host':
-		'业务页自动挂载：surface（如 ebook.read）、slot（drawer/toolbar）、icon、order。',
+		'业务页自动挂载：surface（如 ebook.read）、slot（drawer/toolbar）、icon（SVG URL）、order。',
 	'plugins.registry.help.iframeUrl':
 		'trust 为 untrusted 时必填：独立 HTTPS 页，Host 用 iframe 打开。',
 	'plugins.registry.help.integrity': '可选：entry 资源的 sha384 完整性校验。',

@@ -77,8 +77,12 @@
   "menu": {
     // order：排序权重，越小越靠前
     "order": 90,
-    // icon：侧栏图标名（宿主维护 name→组件 的映射表，本仓为 lucide 图标名，如 Puzzle/Sparkle）
-    "icon": "Puzzle"
+    // icon：侧栏图标字符串。
+    // 动态插件推荐写 **SVG 图片 URL**（https://…、/ext-cos/…、/remotes/…），
+    // Host 用 PluginIcon fetch 后内联渲染（跟 currentColor / 选中色）；详见
+    // implements-guide/09-plugin-host-icons.md。
+    // 静态 Host 菜单仍可用 Lucide 导出名（如 Puzzle），由侧栏 ICON_MAP 映射。
+    "icon": "https://cdn.example.com/icons/plugin.svg"
   },
 
   // ── 是否自动注入路由（可选，默认 true）────────────────────────
@@ -95,8 +99,8 @@
     "surface": "ebook.read",
     // slot：抽屉(drawer) 或 顶栏(toolbar)
     "slot": "drawer",
-    // icon：抽屉触发器图标名
-    "icon": "Sparkle",
+    // icon：抽屉触发器图标（推荐 SVG URL，与 menu.icon 同契约；不再依赖 Host Lucide 白名单）
+    "icon": "/ext-cos/plugins/icons/tool.svg",
     // order：同 surface 内排序
     "order": 10
   },

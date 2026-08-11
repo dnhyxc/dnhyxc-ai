@@ -4,6 +4,7 @@
 > **适用读者**：主项目前端开发者、需要在业务页面中接入插件的开发者。
 > **目标**：帮助开发者清楚了解主项目如何接入、使用和管理插件。
 > **同步说明**：与 `apps/frontend/src/plugins/**`、`apps/remote-plugins` 最新源码对齐（含 `api.locale`、iframe locale 推送、Host `@scope` 样式隔离）。若不一致，以源码为准。
+> **插件图标**：动态 `menu.icon` / `host.icon` 现为 **SVG URL + `PluginIcon` 内联**，详见 [plugin-host-icons.md](./plugin-host-icons.md)（本手册中部分示例仍写旧 Lucide 名，以专题与源码为准）。
 
 ---
 

@@ -70,7 +70,7 @@ Host 通过 registry 字段决定**以哪种形态**呈现你。三种方式不�
 {
 	"id": "learningNotes",
 	"routePath": "/plugins/learning-notes",  // 路由路径
-	"menu": { "order": 10, "icon": "Puzzle" } // 可选：侧栏图标入口
+	"menu": { "order": 10, "icon": "https://cdn.example.com/icons/demo.svg" } // 可选：侧栏图标（推荐 SVG URL）
 }
 ```
 

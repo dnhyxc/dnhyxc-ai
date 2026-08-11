@@ -1139,6 +1139,8 @@ flowchart TD
 
 ## 10. 侧栏菜单动态注入
 
+> **图标**：动态项 `menu.icon` 为 SVG URL 时走 `PluginIcon`；静态项仍用 `ICON_MAP`。上传与规范化见 [plugin-host-icons.md](../plugin-host-icons.md)。
+
 ### 10.1 Sidebar 组件订阅插件菜单
 
 **文件路径**：`apps/frontend/src/components/design/Sidebar/index.tsx`
@@ -1680,7 +1682,7 @@ useEffect(() => {
 
 合并顺序：`[...MENUS, ...sidebarInjector 动态项, ...PLUGINS]`。
 
-`ICON_MAP` 含 `TvMinimalPlay`，供 Registry `menu.icon` 使用。
+`ICON_MAP` 含 `TvMinimalPlay` 等，仅供**静态** `MENUS` / `PLUGINS`（Lucide 导出名）。**动态插件**的 `menu.icon` / `host.icon` 现为 **SVG 图片 URL**，由 `PluginIcon` 拉取并内联渲染（不再维护 Host Lucide 白名单）。详见 [plugin-host-icons.md](../plugin-host-icons.md)。
 
 ### 15.9 Tauri capability
 

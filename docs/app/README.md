@@ -33,6 +33,7 @@
 | [plugin-development-guide.md](./plugin-development-guide.md) | **子项目/插件开发手册**：环境准备、Vite 配置、组件规范、全局样式隔离、HostBridge API、权限声明、生命周期、iframe 隔离模式、调试与发布 |
 | [host-plugin-integration-guide.md](./host-plugin-integration-guide.md) | **主项目接入插件方式**：自动路由注入、业务内手动挂载、iframe 隔离；电子书/英语学习接入示例、插件中心管理、Registry 配置、侧栏菜单注入 |
 | [ebook-host-surface-plugins.md](./ebook-host-surface-plugins.md) | **Ebook 阅读页插件动态接入（Host Surface 发现机制）**：`PluginDescriptor.host` 声明、`listHostSurfacePlugins`/`useHostSurfacePlugins` 同步枚举、`EbookReadHostPlugins` 三 part 槽位、阅读页去硬编码、后端 highlights 分页端点、remote 仓 ebook 视图重组与新增 expose（含改动前/后对比与逐行注释） |
+| [plugin-host-icons.md](./plugin-host-icons.md) | **Host 插件图标 SVG URL 动态加载**：`PluginIcon` 内联渲染、`normalizeSvgForHostIcon`（stroke/fill + currentColor 主题）、注册表上传写回 `menu.icon`/`host.icon`、去掉 Lucide 白名单、React 19 `__html` 引用稳定避免点击重播画线（含改动前/后对比与逐行注释） |
 | [plugin-docs-update.md](./plugin-docs-update.md) | **插件开发文档路径同步**：`ebook-ideas` → `ebook/ideas` 目录重组后，同步 host-plugin-integration-guide / mf-implementation-guide 两份文档中的文件路径引用 |
 | [federation-kit-migration.md](./federation-kit-migration.md) | **微前端通用包 federation-kit 迁移与本仓 Host 适配层重写**：原 `plugins/` 抽为 `@dnhyxc-ai/federation-kit` + 本仓 `federation/` 薄适配；`createFederation` DI、`PluginHostSurface` 通用模版、`mf.start()`/`mf.onRoutesChange` 调用点迁移、englishLearning 防闪烁；含改动前/后对比与逐行注释 |
 | [sonner-pointer-events-fix.md](./sonner-pointer-events-fix.md) | **sonner Toaster 点击失效修复**：插件样式隔离场景下 Toast 根节点 + `<Sonner>` className 与 inline style 三处显式注入 `pointer-events: auto`；含改动前/后对比与逐行注释 |
@@ -65,6 +66,8 @@
 | [plugins-core-refactor.md](./plugins-core-refactor.md) | **插件 Core 模块分层重构**：`core/` 扁平单文件（PluginManager/PluginVerifier/types/mf/createHostBridge）拆为 runtime/bridge/types/mf 子目录、新增 `core/index.ts` barrel 对外接口稳定 |
 | [style-isolation-modularization.md](./style-isolation-modularization.md) | **样式隔离模块化与 PluginHostPage 接入**：样式隔离逻辑独立为 `plugins/style-isolation/`、PluginManager 在 `loadRemoteApp` 前后包裹样式捕获、PluginHostPage 用 `useLayoutEffect` 激活运行时隔离并挂 `data-mf-style-realm` 标记（含改动前/后对比与逐行注释） |
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
+| [plugin-icon-system.md](./plugin-icon-system.md) | **SVG 插件图标系统**：`PluginIcon` 组件（fetch + 缓存 + 归一化 + 内联渲染）、`pluginIconUrl` 工具集（`normalizeSvgForHostIcon`、`detectPluginIconKind`、`isThemeablePaint`）、Sidebar / PluginHostSurface 集成、CSS 动画 `pathLength=1` 单位方案（含改动前/后对比与逐行注释） |
+| [registry-icon-upload.md](./registry-icon-upload.md) | **Registry 图标上传**：Upload 组件新增 `uploadType="button"` + `openRef` + `validExtensions`、DropdownMenu scrollable、Registry 页面图标上传 UI（DropdownMenu 插件选择 + COS 上传 + `applyPluginIconUrl` 写入 + 热加载）、i18n 文案（含改动前/后对比与逐行注释） |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |
 

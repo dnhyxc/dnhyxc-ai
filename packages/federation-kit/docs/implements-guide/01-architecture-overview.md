@@ -5,7 +5,7 @@
 > **入口（代码）**：`mf.start()` → 路由重建 → `<PluginHostPage />` / `<PluginHostSurface />` / `<FederationPlugin />`。  
 > **文档目标**：建立整图后再下钻分册；分册含全文级逐行注释代码。  
 > **非目标**：不讲某个插件业务功能本身；不改源码。  
-> **分册**：[README](./README.md) · [07 方法字典](./07-api-method-reference.md) · [02 Runtime](./02-runtime-mf-bridge.md) · [03 样式隔离](./03-style-isolation.md) · [04 React](./04-react-host-view.md) · [05 适配层](./05-host-adapter-frontend.md) · [06 复刻](./06-replication-playbook.md)
+> **分册**：[README](./README.md) · [07 方法字典](./07-api-method-reference.md) · [02 Runtime](./02-runtime-mf-bridge.md) · [03 样式隔离](./03-style-isolation.md) · [04 React](./04-react-host-view.md) · [05 适配层](./05-host-adapter-frontend.md) · [06 复刻](./06-replication-playbook.md) · [09 插件图标](./09-plugin-host-icons.md)
 
 ---
 
@@ -71,6 +71,7 @@ sequenceDiagram
 | 5 | `style-isolation/**` | CSS + Portal | [03](./03-style-isolation.md) |
 | 6 | `react/**` | 声明式挂载 | [04](./04-react-host-view.md) |
 | 7 | `apps/frontend/src/federation/**` | 本仓接线 | [05](./05-host-adapter-frontend.md) |
+| 8 | `federation/host/PluginIcon*` + Sidebar / Surface | 动态插件 SVG 图标 | [09](./09-plugin-host-icons.md) |
 
 ### 0.5 全库功能点索引（跨分册）
 
@@ -81,6 +82,7 @@ sequenceDiagram
 | S1–S12 | realm、claimUnmarked、head/CSSOM、Portal、z-index | [03](./03-style-isolation.md) F1–F12 |
 | V1–V10 | FederationPlugin、slots、iframe、hooks | [04](./04-react-host-view.md) F1–F10 |
 | A1–A11 | `@/federation`、Surface、ebook、全屏 | [05](./05-host-adapter-frontend.md) F1–F11 |
+| I1–I7 | 动态插件 SVG 图标：URL / 消毒 / 内联 / 上传 / CSS | [09](./09-plugin-host-icons.md) |
 
 ---
 
@@ -214,8 +216,9 @@ PluginHostView 渲染 + attachPluginStyleIsolation
 | T5 | 下架插件 | 入口消失或页内「已下架」 | A4 |
 | T6 | ebook 开插件抽屉 | surface 插件出现 | A6 |
 | T7 | 不受信插件 | iframe 沙箱；RPC 可用 | R16+V6 |
+| T8 | registry `menu.icon`/`host.icon` 为 SVG URL | 侧栏与 Surface 触发器出自定义图标；选中色对齐 | [09](./09-plugin-host-icons.md) |
 
-更细验收见 [06](./06-replication-playbook.md)。
+更细验收见 [06](./06-replication-playbook.md)、图标专章 [09](./09-plugin-host-icons.md)。
 
 ---
 
@@ -232,3 +235,4 @@ PluginHostView 渲染 + attachPluginStyleIsolation
 | 日期 | 说明 |
 |------|------|
 | 2026-08-10 | 初版：按抽包后 kit + `@/federation` 适配层整理总览与分册索引 |
+| 2026-08-11 | 增补 [09 插件图标](./09-plugin-host-icons.md) 与功能点 I1–I7 / 验收 T8 |

@@ -32,10 +32,10 @@ export const ICON_MAP = {
 	BookOpenText: <BookOpenText />,
 	WalletCards: <WalletCards />,
 	Vegan: <Vegan />,
-	Puzzle: <Puzzle />,
 	Flower: <Flower />,
 	TvMinimalPlay: <TvMinimalPlay />,
 	FlaskConical: <FlaskConical />,
+	Puzzle: <Puzzle />,
 };
 
 export const MENUS: SidebarMenuConfig[] = [

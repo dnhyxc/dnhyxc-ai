@@ -1315,10 +1315,36 @@ body.theme-beige {
 	}
 }
 
-/* Lucide 描边图标：hover 时子级 SVG 线性「画线」（stroke-dashoffset）；侧栏、聊天输入条等共用 */
+/* Lucide / 插件图标画线：统一时长；描边一律 pathLength=1 + dash 1（见 bindLucideStrokePathLength） */
+.lucide-stroke-draw-hover {
+	--icon-draw-duration: 0.5s;
+}
+
+/* 描边画线：单位路径长度 0→1，与路径真实周长无关 */
 @keyframes lucide-stroke-draw {
+	from {
+		stroke-dashoffset: 1;
+	}
 	to {
 		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes plugin-icon-stroke-draw {
+	from {
+		stroke-dashoffset: 1;
+	}
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes plugin-icon-fill-draw {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+	to {
+		clip-path: inset(0 0 0 0);
 	}
 }
 
@@ -1401,25 +1427,46 @@ body.theme-beige {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.lucide-stroke-draw-hover:hover svg path,
-	.lucide-stroke-draw-hover:hover svg line,
-	.lucide-stroke-draw-hover:hover svg circle,
-	.lucide-stroke-draw-hover:hover svg polyline,
-	.lucide-stroke-draw-hover:hover svg rect,
-	.lucide-stroke-draw-hover:hover svg ellipse {
-		/*
-			实现 Lucide 图标「线性画线」动画（stroke-dashoffset）：
-			- dash 与 gap 取同一足够大的长度，使整条路径落在「一段实线」内，避免结束时仍落在 gap 上导致「差一点没闭合」
-			- 800 可覆盖常见 24px Lucide 单路径周长；仍不足的图标可再略调大
-			- linecap/linejoin 圆角可减轻端点与拐角处的细缝感
-		*/
+	/*
+		静态 Lucide 与插件 stroke 共用单位 dash：依赖 pathLength=1
+		（插件在 normalize 写入；Lucide 由 bindLucideStrokePathLength 在 mouseover 补上）。
+	*/
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) path,
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) line,
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) circle,
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) polyline,
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) rect,
+	.lucide-stroke-draw-hover:hover svg:not(.plugin-host-icon) ellipse,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		path,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		line,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		circle,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		polyline,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		rect,
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="stroke"]
+		ellipse {
 		stroke-linecap: round;
 		stroke-linejoin: round;
-		stroke-dasharray: 80;
-		stroke-dashoffset: 80;
-		/* stroke-dasharray: 800 800;
-		stroke-dashoffset: 800; */
-		animation: lucide-stroke-draw 0.5s linear forwards;
+		stroke-dasharray: 1;
+		stroke-dashoffset: 1;
+		animation: lucide-stroke-draw var(--icon-draw-duration, 0.5s) linear
+			forwards;
+	}
+
+	.lucide-stroke-draw-hover:hover
+		svg.plugin-host-icon[data-plugin-icon-kind="fill"] {
+		animation: plugin-icon-fill-draw var(--icon-draw-duration, 0.5s) linear
+			forwards;
 	}
 }
 
@@ -1430,7 +1477,6 @@ body.theme-beige {
 	body {
 		@apply bg-background text-textcolor;
 	}
-	/* 文本选区与输入光标：随主题变量变化 */
 	::selection {
 		background-color: var(--theme-selection-bg);
 		color: var(--theme-selection-fg);
@@ -1443,5 +1489,20 @@ body.theme-beige {
 	textarea,
 	[contenteditable="true"] {
 		caret-color: var(--theme-caret);
+	}
+	/* 近黑灰单色插件图标：跟侧栏 text-*（选中 text-teal-500） */
+	svg.plugin-host-icon--theme {
+		color: inherit;
+	}
+	/*
+		仅 fill 用 !important 压内联 fill。
+		stroke 不要对 path 写 stroke:currentColor！——选中态改 color 时会重算
+		同元素上的 stroke-dashoffset 画线动画（上传 Lucide 会点一下重播；
+		iconfont 动画在 svg clip-path 上，改 path fill 不触发；静态 Lucide 无此规则）。
+		描边色已由 normalize 写成 attribute currentColor，跟静态 Lucide 一样继承即可。
+	*/
+	svg.plugin-host-icon--theme[data-plugin-icon-kind="fill"]
+	:is(path, circle, rect, ellipse, polygon, polyline) {
+		fill: currentColor !important;
 	}
 }

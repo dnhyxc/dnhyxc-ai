@@ -37,7 +37,7 @@
 | 字段 | 说明 |
 |------|------|
 | `routePath` | 必填。Host 注入的路由路径；`nav:subtree` 的导航也以它为界 |
-| `menu` | 可选。有 `menu` 才出现侧栏图标；`icon` 是 Host 图标表里的名字（如 `Puzzle` / `Sparkle`），`order` 控制排序 |
+| `menu` | 可选。有 `menu` 才出现侧栏图标；`icon` **推荐 SVG 图片 URL**（`https://…` / `/ext-cos/…` / `/remotes/…`），Host 用 `PluginIcon` 内联渲染；也可写 Lucide 名（仅当 Host 侧栏 `ICON_MAP` 命中）。`order` 控制排序。详见 [implements-guide/09](../implements-guide/09-plugin-host-icons.md) |
 | `injectRoute` | 可选，默认 `true`。设为 `false` 则**不自动注入路由**（罕见） |
 
 ---

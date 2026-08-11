@@ -55,7 +55,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
-						className="w-40 max-h-80 border-theme/10 bg-theme-secondary text-textcolor"
+						className="w-40 border-theme/10 bg-theme-secondary text-textcolor"
+						scrollClassName="max-h-80"
 						align="start"
 					>
 						{TEMPLATES.map((i) => {
