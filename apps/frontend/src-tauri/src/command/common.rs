@@ -1,7 +1,7 @@
 use crate::system::shortcut::{
     SHORTCUT_HANDLING_ENABLED, load_shortcuts_from_store, parse_shortcut,
 };
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
 use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::Ordering;
@@ -50,12 +50,14 @@ fn parse_accept_extensions(accept: &str) -> Vec<String> {
     out
 }
 
-/// 通用选文件：支持 accept 过滤与单/多选；取消返回 `canceled`
+/// 通用选文件：支持 accept 过滤与单/多选；取消返回 `canceled`。
+/// 必须用 AsyncFileDialog：同步 FileDialog 在 macOS 会泵 AppKit runloop，
+/// 对话框未关时再往窗口拖文件易 SIGABRT 闪退。
 #[tauri::command]
-pub fn select_files(input: Option<SelectFilesInput>) -> Result<Vec<String>, String> {
+pub async fn select_files(input: Option<SelectFilesInput>) -> Result<Vec<String>, String> {
     let input = input.unwrap_or_default();
     let multiple = input.multiple.unwrap_or(false);
-    let mut dialog = FileDialog::new();
+    let mut dialog = AsyncFileDialog::new();
 
     if let Some(title) = input
         .title
@@ -77,16 +79,16 @@ pub fn select_files(input: Option<SelectFilesInput>) -> Result<Vec<String>, Stri
     }
 
     if multiple {
-        match dialog.pick_files() {
+        match dialog.pick_files().await {
             Some(paths) if !paths.is_empty() => Ok(paths
                 .into_iter()
-                .map(|p| p.to_string_lossy().into_owned())
+                .map(|p| p.path().to_string_lossy().into_owned())
                 .collect()),
             _ => Err("canceled".to_string()),
         }
     } else {
-        match dialog.pick_file() {
-            Some(path) => Ok(vec![path.to_string_lossy().into_owned()]),
+        match dialog.pick_file().await {
+            Some(path) => Ok(vec![path.path().to_string_lossy().into_owned()]),
             None => Err("canceled".to_string()),
         }
     }
@@ -94,21 +96,21 @@ pub fn select_files(input: Option<SelectFilesInput>) -> Result<Vec<String>, Stri
 
 #[tauri::command]
 pub async fn select_file() -> Result<String, String> {
-    let dialog = FileDialog::new()
+    let dialog = AsyncFileDialog::new()
         .add_filter("所有文件", &["*"])
         .add_filter("文本文件", &["txt", "md", "json"])
         .add_filter("图片文件", &["png", "jpg", "jpeg", "gif", "bmp"]);
 
-    match dialog.pick_file() {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
+    match dialog.pick_file().await {
+        Some(path) => Ok(path.path().to_string_lossy().into_owned()),
         None => Err("未选择文件".to_string()),
     }
 }
 
 #[tauri::command]
 pub async fn select_directory() -> Result<String, String> {
-    match FileDialog::new().pick_folder() {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
+    match AsyncFileDialog::new().pick_folder().await {
+        Some(path) => Ok(path.path().to_string_lossy().into_owned()),
         None => Err("未选择目录".to_string()),
     }
 }

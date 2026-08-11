@@ -66,3 +66,8 @@ tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-store = "2.4.2"
 tauri-plugin-updater = "2"
+
+# macOS: wry 0.53.5 panics on some file drags (nil NSFilenamesPboardType). See vendor/README.md.
+# Drop this patch once upstream wry includes tauri-apps/wry#1723.
+[patch.crates-io]
+wry = { path = "vendor/wry" }

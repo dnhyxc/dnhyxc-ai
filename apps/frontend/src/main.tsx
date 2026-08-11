@@ -1,9 +1,19 @@
 import ReactDOM from 'react-dom/client';
 import { bindLucideStrokePathLength } from './utils/lucideStrokePathLength';
+import { isTauriRuntime } from './utils/runtime';
 
 const el = document.getElementById('root') as HTMLElement;
 const path = window.location.pathname.replace(/\/+$/, '') || '/';
 const isAboutWindow = path === '/about';
+
+// Tauri + dragDropEnabled:false：未 preventDefault 时 WKWebView 会把落盘文件当导航打开。
+if (isTauriRuntime()) {
+	const blockFileNav = (e: DragEvent) => {
+		if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+	};
+	window.addEventListener('dragover', blockFileNav);
+	window.addEventListener('drop', blockFileNav);
+}
 
 // 关于窗只拉轻量 chunk，避免冷启整站路由/插件
 if (isAboutWindow) {

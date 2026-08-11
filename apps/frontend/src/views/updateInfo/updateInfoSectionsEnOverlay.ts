@@ -1531,4 +1531,19 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While reading an EPUB, the toolbar now has All ideas (lightbulb) and All highlights (highlighter) buttons. Tap to browse every idea or highlight in the current book in a bottom drawer with scroll pagination; tap an item to jump to its position and open the detail. Requires sign-in. EPUB only; PDF not supported.',
 	},
+	's25-97': {
+		title: 'Unified cross-platform file selection',
+		description:
+			'File selection for Markdown import, JSON import, and registry icon upload now uses a single cross-platform entry point—Web and desktop behave identically. Wrong file types show a unified "type mismatch" prompt; cancelling no longer triggers error popups.',
+	},
+	's25-98': {
+		title: 'macOS drag-and-drop crash fix',
+		description:
+			'Fixed a crash where dragging a file from the system file dialog into the app window caused the app to quit. Also fixed an underlying crash when dragging certain file types from outside the app.',
+	},
+	's25-99': {
+		title: 'Dropped files no longer replace the page',
+		description:
+			'Fixed an issue where dragging a file directly into the desktop app window replaced the current page with the file contents. Dropping a file now only triggers the upload zone—your page stays put.',
+	},
 };

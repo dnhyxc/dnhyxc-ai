@@ -219,6 +219,9 @@
 | Registry 上传 SVG 图标失败 / 菜单选择后无反应 / 文件选择框闪退   | [app/registry-icon-upload.md](./app/registry-icon-upload.md)（Upload button 模式 + openRef + DropdownMenu scrollable） |
 | 桌面端选文件 / 新增导入类型需写 Rust 命令 / accept 过滤器不灵活   | [app/unified-file-selection.md](./app/unified-file-selection.md)（通用 `select_files` 替代 3 个专用命令 + `select-files.ts` 模块） |
 | 插件选本地文件 / iframe untrusted 无法选文件 / `convertFileSrc` 配置 | [app/plugin-pick-local-files.md](./app/plugin-pick-local-files.md)（bridge `api.ui.pickLocalFiles` + Host 适配层 + `assetProtocol` 配置） |
+| Web/Tauri 选文件双路径重复 / `pickFileObject` 跨端 / Rust 读文件命令删除 | [app/pick-file-object.md](./app/pick-file-object.md)（跨端 `pickFileObject` + `pickBrowserFiles` + `convertFileSrc` + `fetch` + 错误码统一） |
+| macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./app/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
+| 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
 
 ---
 

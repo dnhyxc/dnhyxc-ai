@@ -270,6 +270,11 @@ export type HostBridgeProps = {
         data: ArrayBuffer | Uint8Array;
         mimeType?: string;
       }) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
+      /** 让用户选本地文件（跨端）；需 ui:toast */
+      pickLocalFiles?: (options?: {
+        accept?: string;
+        multiple?: boolean;
+      }) => Promise<{ path: string; name: string; src: string }[] | null>;
     };
     modules?: Readonly<Record<string, (...args: unknown[]) => unknown>>;
   };
@@ -939,7 +944,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'react-api',
 				'5.10 调用 Host API（权限安全）',
-				'常用：api.ui.showToast / setAppFullscreen / downloadBlob（需 ui:toast）；api.navigate（nav:subtree，路径须带 routePath 前缀）；api.http.*；api.modules.*。',
+				'常用：api.ui.showToast / setAppFullscreen / downloadBlob / pickLocalFiles（需 ui:toast）；api.navigate（nav:subtree，路径须带 routePath 前缀）；api.http.*；api.modules.*。',
 				{ lang: 'tsx', code: CODE_API_USAGE },
 			),
 			item(
@@ -1092,7 +1097,7 @@ const sectionsZh: PluginGuideSection[] = [
 			item(
 				'perm-list',
 				'9.1 权限列表',
-				'• ui:toast — showToast / setAppFullscreen / downloadBlob\n' +
+				'• ui:toast — showToast / setAppFullscreen / downloadBlob / pickLocalFiles\n' +
 					'• nav:subtree — api.navigate\n' +
 					'• http:plugin-api — api.http.*\n' +
 					'• modules:chat — 聊天模块\n' +
@@ -1424,7 +1429,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'react-api',
 				'5.10 Calling Host APIs safely',
-				'ui:toast / nav:subtree (must prefix routePath) / http:plugin-api / modules:* — check before use.',
+				'ui:toast (showToast / setAppFullscreen / downloadBlob / pickLocalFiles) / nav:subtree (must prefix routePath) / http:plugin-api / modules:* — check before use.',
 				{ lang: 'tsx', code: CODE_API_USAGE },
 			),
 			item(
@@ -1547,7 +1552,7 @@ const sectionsEn: PluginGuideSection[] = [
 			item(
 				'perm-list',
 				'9.1 Permissions',
-				'ui:toast, nav:subtree, http:plugin-api, modules:chat, modules:ebook — least privilege; null-check APIs.',
+				'ui:toast (showToast / setAppFullscreen / downloadBlob / pickLocalFiles), nav:subtree, http:plugin-api, modules:chat, modules:ebook — least privilege; null-check APIs.',
 			),
 			item(
 				'registry-react',
