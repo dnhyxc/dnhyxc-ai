@@ -186,31 +186,33 @@ const Loading: FC<LoadingProps> = ({
 
 				{/* 文字波浪动画 */}
 				<div className="flex justify-center text-textcolor text-md font-medium tracking-wider">
-					{animate
-						? textArray.map((char, index) => (
-								<motion.span
-									key={index}
-									className="inline-block" // 确保 transform 生效
-									animate={{
-										y: [0, -8, 0], // 增大浮动幅度
-										scale: [1, 1.1, 1], // 弹性缩放
-										opacity: [0.6, 1, 0.6], // 呼吸透明度
-									}}
-									transition={{
-										duration: 1.5,
-										ease: 'easeInOut',
-										repeat: Infinity,
-										delay: index * 0.08,
-									}}
-									// 新增：文字拖尾/发光效果
-									style={{
-										filter: `drop-shadow(0 0 1px currentColor)`,
-									}}
-								>
-									{char === ' ' ? '\u00A0' : char}
-								</motion.span>
-							))
-						: text}
+					{animate ? (
+						textArray.map((char, index) => (
+							<motion.span
+								key={index}
+								className="inline-block text-textcolor" // 确保 transform 生效
+								animate={{
+									y: [0, -8, 0], // 增大浮动幅度
+									scale: [1, 1.1, 1], // 弹性缩放
+									opacity: [0.6, 1, 0.6], // 呼吸透明度
+								}}
+								transition={{
+									duration: 1.5,
+									ease: 'easeInOut',
+									repeat: Infinity,
+									delay: index * 0.08,
+								}}
+								// 新增：文字拖尾/发光效果
+								style={{
+									filter: `drop-shadow(0 0 1px currentColor)`,
+								}}
+							>
+								{char === ' ' ? '\u00A0' : char}
+							</motion.span>
+						))
+					) : (
+						<span className="text-textcolor">{text}</span>
+					)}
 				</div>
 			</div>
 			{children && <div className="mt-4">{children}</div>}

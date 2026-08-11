@@ -88,8 +88,14 @@ const Layout = () => {
 					theater ? 'rounded-none' : 'rounded-md',
 				)}
 			>
-				{/* overflow 不与 rounded 同层，避免废掉路由页内 backdrop-filter */}
-				<div className="relative flex h-full w-full min-w-0 flex-1 overflow-hidden">
+				{/*
+				  裁剪用 overflow-clip，勿用 overflow-hidden：
+				  hidden 仍是 scroll container，contenteditable / TipTap 的
+				  scrollIntoView、focus 会改其 scrollTop，把 Sidebar/Header 顶出视口
+				  （MF 嵌入后笔记编辑器落在此壳内才复现；独立预览顶栏不在壳内）。
+				  overflow 不与 rounded 同层，避免废掉路由页内 backdrop-filter。
+				*/}
+				<div className="relative flex h-full w-full min-w-0 flex-1 overflow-clip">
 					{theater ? null : <Sidebar />}
 					<TooltipProvider>
 						<div
@@ -105,13 +111,13 @@ const Layout = () => {
 									theater ? 'rounded-none' : 'rounded-md',
 								)}
 							>
-								<div className="relative h-full w-full min-w-0 max-w-full overflow-hidden">
+								<div className="relative h-full w-full min-w-0 max-w-full overflow-clip">
 									{theater ? null : <Header />}
 									<div
 										className={cn(
 											'box-border min-h-0 min-w-0 w-full max-w-full',
 											theater
-												? 'h-full overflow-hidden'
+												? 'h-full overflow-clip'
 												: 'h-[calc(100%-3.25rem)] overflow-x-hidden overflow-y-auto',
 										)}
 									>

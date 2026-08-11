@@ -28,13 +28,19 @@ export default function EnglishLearningNotesPage() {
 	}, []);
 
 	return (
-		<div className="flex min-h-0 h-full w-full flex-col">
-			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col">
-				<div className="min-h-0 flex-1 overflow-auto px-5.5 pb-5.5">
+		<div className="flex h-full min-h-0 w-full flex-col">
+			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
+				{/* 与 mistakes 等姊妹页一致：钳高度，滚动只在插件 RichEditor 内 */}
+				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 					{prefsReady && !enabled ? (
-						<p className="text-textcolor/55">{t('plugins.host.delisted')}</p>
+						<p className="text-textcolor/55 p-4.5">
+							{t('plugins.host.delisted')}
+						</p>
 					) : (
-						<PluginHostPage pluginId="learningNotes" className="p-0" />
+						<PluginHostPage
+							pluginId="learningNotes"
+							className="h-full min-h-0 p-0"
+						/>
 					)}
 				</div>
 			</div>

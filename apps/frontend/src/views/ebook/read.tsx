@@ -2456,7 +2456,7 @@ function EbookReadPage() {
 	if (!bookDetailReady || bookResolving) {
 		return (
 			<EbookPageShell>
-				<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
+				<div className="flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 					<Loading text={t('common.loading')} />
 				</div>
 			</EbookPageShell>
@@ -2485,7 +2485,7 @@ function EbookReadPage() {
 		if (bookResolving) {
 			return (
 				<EbookPageShell>
-					<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
+					<div className="flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 						<Loading text={t('common.loading')} />
 					</div>
 				</EbookPageShell>
@@ -2838,7 +2838,7 @@ function EbookReadPage() {
 		>
 			<div className="flex min-h-0 flex-1 flex-col">
 				{!open ? (
-					<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-sm">
+					<div className="flex flex-1 flex-col items-center justify-center py-12 text-sm">
 						<Loading text={t('common.loading')} />
 					</div>
 				) : book.fmt === 'epub' ? (

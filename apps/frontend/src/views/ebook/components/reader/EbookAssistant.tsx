@@ -238,7 +238,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 					{historyLoading ? (
 						<div
 							className={cn(
-								'absolute inset-0 z-10 flex items-center justify-center text-sm text-textcolor/70',
+								'absolute inset-0 z-10 flex items-center justify-center text-sm text-textcolor',
 								epubReaderSurfaceOverlayClass,
 							)}
 						>

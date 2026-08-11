@@ -316,7 +316,7 @@ function EbookShelfPage() {
 						<EbookShelfUploadBanner state={ebookStore.uploadState} />
 					) : null}
 					{showInitialLoading ? (
-						<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
+						<div className="flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 							<Loading text={t('common.loading')} />
 						</div>
 					) : showEmpty ? (

@@ -245,7 +245,9 @@ export function PluginHostView({
 	// 尚未 ensure / 加载中：一律 Loading，勿把「not loaded」当成不可用
 	if (busy || loaded?.status === 'loading' || !failed) {
 		return wrap(
-			slots?.loading?.({ pluginId, variant }) ?? <div>loading {pluginId}…</div>,
+			slots?.loading?.({ pluginId, variant }) ?? (
+				<div className="text-textcolor">loading {pluginId}...</div>
+			),
 		);
 	}
 
@@ -259,7 +261,7 @@ export function PluginHostView({
 			retry: () => setRetryKey((n) => n + 1),
 			variant,
 		}) ?? (
-			<div>
+			<div className="text-textcolor">
 				unavailable {pluginId}: {detail}
 				<button type="button" onClick={() => setRetryKey((n) => n + 1)}>
 					retry
