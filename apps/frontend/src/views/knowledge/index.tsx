@@ -888,7 +888,7 @@ const Knowledge = observer(() => {
 				}
 			} catch (err) {
 				const code = err instanceof Error ? err.message : String(err ?? '');
-				if (code === 'not_md') {
+				if (code === 'accept' || code === 'not_md') {
 					Toast({
 						type: 'warning',
 						title: t('knowledge.import.notMd'),

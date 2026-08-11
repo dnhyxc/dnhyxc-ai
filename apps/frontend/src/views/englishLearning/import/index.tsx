@@ -264,7 +264,7 @@ const EnglishLearningImportPage = () => {
 			const file = await pickEnglishLearningJsonFile();
 			return file ? [file] : null;
 		} catch (e) {
-			if (e instanceof Error && e.message === 'not_json') {
+			if (e instanceof Error && e.message === 'accept') {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.import.dropReject'),

@@ -145,7 +145,7 @@ export default function PluginsPage() {
 														/>
 													</div>
 												</div>
-												<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed text-justify">
+												<CardDescription className="text-textcolor/70 line-clamp-3 text-sm leading-relaxed">
 													{pluginBlurb(p, locale, t)}
 												</CardDescription>
 											</CardHeader>

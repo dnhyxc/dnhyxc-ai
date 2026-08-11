@@ -23,8 +23,7 @@ use utils::common::set_screen_center;
 use command::common::{
     clear_all_shortcuts, clear_updater_cache, disable_auto_start, enable_auto_start,
     get_cache_size, greet_name, is_auto_start_enabled, register_shortcut, reload_all_shortcuts,
-    read_english_learning_import_json_file, select_directory, select_file, select_files,
-    sync_window_menu_shortcuts,
+    select_directory, select_file, select_files, sync_window_menu_shortcuts,
 };
 use command::clipboard::{
     read_clipboard_html, read_clipboard_image_base64, read_clipboard_image_files_base64,
@@ -72,7 +71,6 @@ pub fn run() {
             greet_name,
             select_file,           // 选择文件（旧：固定过滤器）
             select_files,          // 通用选文件：accept + 单/多选
-            read_english_learning_import_json_file, // 读取导入用 .json
             select_directory,      // 选择目录
             save_file_with_picker, // 通用保存
             read_ebook_file,         // 读取电子书字节

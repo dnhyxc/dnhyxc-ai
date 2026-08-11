@@ -9,7 +9,6 @@ import { ImageUp, ListRestart, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Loading from '@/components/design/Loading';
 import MarkdownEditor from '@/components/design/Monaco';
-import Upload from '@/components/design/Upload';
 import { Spinner } from '@/components/ui';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +22,7 @@ import {
 } from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
 import { uploadCosFile } from '@/service';
-import type { FileWithPreview } from '@/types';
+import { pickFileObject } from '@/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import { RegistryFieldsHelp } from './RegistryFieldsHelp';
 
@@ -33,6 +32,9 @@ const titleIconSlot =
 
 const titleBarBtn =
 	'lucide-stroke-draw-hover px-0! gap-1 text-textcolor transition-none hover:text-teal-500 focus-visible:border-transparent focus-visible:ring-0';
+
+const ICON_ACCEPT = '.svg';
+const ICON_MAX_BYTES = 2 * 1024 * 1024;
 
 type PluginListItem = {
 	id: string;
@@ -69,8 +71,6 @@ export default function PluginRegistryEditorPage() {
 	const getEditorTextRef = useRef<(() => string) | null>(null);
 	const textLiveRef = useRef(text);
 	textLiveRef.current = text;
-	const uploadOpenRef = useRef<(() => void) | null>(null);
-	const pendingIconPluginIdRef = useRef('');
 
 	const jsonParseError = useMemo(() => {
 		if (!text.trim()) return true;
@@ -172,10 +172,8 @@ export default function PluginRegistryEditorPage() {
 	}, [loading, saving, uploadingPluginId, t, text, persistRegistry]);
 
 	const onUploadIcon = useCallback(
-		async (pluginId: string, picked: FileWithPreview | FileWithPreview[]) => {
-			const item = Array.isArray(picked) ? picked[0] : picked;
-			const file = item?.file;
-			if (!file || !pluginId || loading || saving || uploadingPluginId) return;
+		async (pluginId: string, file: File) => {
+			if (!pluginId || loading || saving || uploadingPluginId) return;
 
 			const latest = getEditorTextRef.current?.() ?? textLiveRef.current;
 			let data: PluginRegistry;
@@ -245,31 +243,29 @@ export default function PluginRegistryEditorPage() {
 	const onPickPluginIcon = useCallback(
 		(id: string) => {
 			if (busy || jsonParseError) return;
-			pendingIconPluginIdRef.current = id;
-			uploadOpenRef.current?.();
+			void (async () => {
+				try {
+					const file = await pickFileObject({
+						accept: ICON_ACCEPT,
+						maxBytes: ICON_MAX_BYTES,
+						title: t('plugins.registry.iconUploadLabel'),
+					});
+					if (!file) return;
+					await onUploadIcon(id, file);
+				} catch (e) {
+					Toast({
+						type: 'warning',
+						title: t('plugins.registry.iconUploadFail'),
+						message: e instanceof Error ? e.message : undefined,
+					});
+				}
+			})();
 		},
-		[busy, jsonParseError],
+		[busy, jsonParseError, onUploadIcon, t],
 	);
 
 	return (
 		<div className="box-border flex h-full min-h-0 w-full flex-col p-5.5 pt-0">
-			{/* Upload 挂在菜单外：系统文件框抢焦点会关掉 Dropdown，菜单内 Upload 会被卸载 */}
-			<Upload
-				t={t}
-				uploadType="button"
-				className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
-				accept=".svg,image/svg+xml"
-				validTypes={['image/svg+xml']}
-				validExtensions={['.svg']}
-				maxCount={1}
-				maxSize={2 * 1024 * 1024}
-				disabled={busy || jsonParseError}
-				loading={!!uploadingPluginId}
-				openRef={uploadOpenRef}
-				onUpload={(picked) =>
-					onUploadIcon(pendingIconPluginIdRef.current, picked)
-				}
-			/>
 			{loadError ? (
 				<p className="text-destructive mb-2 shrink-0 text-sm">{loadError}</p>
 			) : null}

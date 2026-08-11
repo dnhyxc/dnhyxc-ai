@@ -1,7 +1,6 @@
-/** 知识库编辑器：从本地 .md 文件导入（Web 用 input accept；Tauri 用通用 selectFile） */
+/** 知识库编辑器：从本地 .md 文件导入（跨端 pickFileObject） */
 
-import { isTauriRuntime, selectFile } from '@/utils';
-import { invokeReadKnowledgeMarkdownFile } from '@/utils/knowledge-save';
+import { pickFileObject } from '@/utils';
 
 /** 文件选择器仅展示 .md（部分浏览器仍会依赖后续校验） */
 const IMPORT_ACCEPT = '.md';
@@ -29,87 +28,24 @@ export function importFileNameToTitle(fileName: string): string {
 	return trimmed;
 }
 
-function assertImportSize(bytes: number): void {
-	if (bytes > MAX_IMPORT_BYTES) {
-		throw new Error('file_too_large');
-	}
-}
-
-function readFileAsText(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(String(reader.result ?? ''));
-		reader.onerror = () => reject(reader.error ?? new Error('read_failed'));
-		reader.readAsText(file, 'UTF-8');
-	});
-}
-
-function fileNameFromPath(filePath: string): string {
-	const parts = filePath.split(/[/\\]/).filter(Boolean);
-	return parts[parts.length - 1] ?? 'import.md';
-}
-
-function pickKnowledgeImportFileWeb(): Promise<KnowledgeImportFileResult | null> {
-	return new Promise((resolve, reject) => {
-		const input = document.createElement('input');
-		input.type = 'file';
-		input.accept = IMPORT_ACCEPT;
-		input.style.display = 'none';
-		document.body.appendChild(input);
-
-		const cleanup = () => {
-			input.remove();
-		};
-
-		input.addEventListener('change', () => {
-			const file = input.files?.[0];
-			cleanup();
-			if (!file) {
-				resolve(null);
-				return;
-			}
-			if (!isKnowledgeImportMdFile(file.name)) {
-				reject(new Error('not_md'));
-				return;
-			}
-			assertImportSize(file.size);
-			void readFileAsText(file)
-				.then((content) =>
-					resolve({ content, fileName: file.name || 'import.md' }),
-				)
-				.catch(() => reject(new Error('read_failed')));
-		});
-
-		input.addEventListener('cancel', () => {
-			cleanup();
-			resolve(null);
-		});
-
-		input.click();
-	});
-}
-
-async function pickKnowledgeImportFileTauri(): Promise<KnowledgeImportFileResult | null> {
-	const filePath = await selectFile({
-		accept: IMPORT_ACCEPT,
-		title: '导入 Markdown',
-	});
-	if (!filePath) return null;
-	const fileName = fileNameFromPath(filePath);
-	if (!isKnowledgeImportMdFile(fileName)) {
-		throw new Error('not_md');
-	}
-	const content = await invokeReadKnowledgeMarkdownFile(filePath);
-	assertImportSize(new TextEncoder().encode(content).length);
-	return { content, fileName };
-}
-
 /**
  * 打开文件选择器并读取 .md 文本；用户取消时返回 null。
+ * 扩展名不符 / 过大 → throw（`accept` / `file_too_large` / `read_failed`）。
  */
-export function pickKnowledgeImportFile(): Promise<KnowledgeImportFileResult | null> {
-	if (isTauriRuntime()) {
-		return pickKnowledgeImportFileTauri();
+export async function pickKnowledgeImportFile(): Promise<KnowledgeImportFileResult | null> {
+	const file = await pickFileObject({
+		accept: IMPORT_ACCEPT,
+		maxBytes: MAX_IMPORT_BYTES,
+		title: '导入 Markdown',
+	});
+	if (!file) return null;
+	if (!isKnowledgeImportMdFile(file.name)) {
+		throw new Error('accept');
 	}
-	return pickKnowledgeImportFileWeb();
+	try {
+		const content = await file.text();
+		return { content, fileName: file.name || 'import.md' };
+	} catch {
+		throw new Error('read_failed');
+	}
 }
