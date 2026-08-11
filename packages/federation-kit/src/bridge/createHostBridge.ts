@@ -40,6 +40,9 @@ export function createHostBridge(
 					pluginId: d.id,
 				});
 		}
+		if (capabilities.pickLocalFiles) {
+			ui.pickLocalFiles = capabilities.pickLocalFiles;
+		}
 		api.ui = Object.freeze(ui);
 	}
 

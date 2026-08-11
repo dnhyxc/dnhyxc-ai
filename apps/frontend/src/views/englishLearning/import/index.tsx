@@ -290,7 +290,7 @@ const EnglishLearningImportPage = () => {
 		});
 	}, [t]);
 
-	/** 标题栏「重新上传」：与拖拽区共用 pickImportJsonFiles（Tauri 为仅 .json 系统对话框） */
+	/** 标题栏「重新上传」：与拖拽区共用 pickImportJsonFiles（Tauri 走通用 selectFile） */
 	const onReupload = useCallback(() => {
 		setFileReadError(false);
 		setPreviewText('');

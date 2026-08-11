@@ -2,6 +2,7 @@ use crate::system::shortcut::{
     SHORTCUT_HANDLING_ENABLED, load_shortcuts_from_store, parse_shortcut,
 };
 use rfd::FileDialog;
+use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::Ordering;
 use tauri::Manager;
@@ -15,6 +16,82 @@ pub fn greet_name(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+/// 通用文件选择入参（与前端 camelCase 对齐）
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectFilesInput {
+    /// HTML 风格 accept，如 `.mp4,.webm`；空/省略则不限制
+    #[serde(default)]
+    pub accept: Option<String>,
+    /// 多选；默认 false
+    #[serde(default)]
+    pub multiple: Option<bool>,
+    /// 对话框标题
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+/// 从 accept 抽出扩展名（去掉点、小写）；仅识别 `.ext` 规则
+fn parse_accept_extensions(accept: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for part in accept.split(',') {
+        let s = part.trim();
+        if !s.starts_with('.') || s.len() < 2 {
+            continue;
+        }
+        let ext = s[1..].trim().to_lowercase();
+        if ext.is_empty() || ext.contains('*') || ext.contains('/') {
+            continue;
+        }
+        if !out.iter().any(|e| e == &ext) {
+            out.push(ext);
+        }
+    }
+    out
+}
+
+/// 通用选文件：支持 accept 过滤与单/多选；取消返回 `canceled`
+#[tauri::command]
+pub fn select_files(input: Option<SelectFilesInput>) -> Result<Vec<String>, String> {
+    let input = input.unwrap_or_default();
+    let multiple = input.multiple.unwrap_or(false);
+    let mut dialog = FileDialog::new();
+
+    if let Some(title) = input
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
+        dialog = dialog.set_title(title);
+    }
+
+    let exts = input
+        .accept
+        .as_deref()
+        .map(parse_accept_extensions)
+        .unwrap_or_default();
+    if !exts.is_empty() {
+        let refs: Vec<&str> = exts.iter().map(String::as_str).collect();
+        dialog = dialog.add_filter("Files", &refs);
+    }
+
+    if multiple {
+        match dialog.pick_files() {
+            Some(paths) if !paths.is_empty() => Ok(paths
+                .into_iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect()),
+            _ => Err("canceled".to_string()),
+        }
+    } else {
+        match dialog.pick_file() {
+            Some(path) => Ok(vec![path.to_string_lossy().into_owned()]),
+            None => Err("canceled".to_string()),
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn select_file() -> Result<String, String> {
     let dialog = FileDialog::new()
@@ -25,15 +102,6 @@ pub async fn select_file() -> Result<String, String> {
     match dialog.pick_file() {
         Some(path) => Ok(path.to_string_lossy().to_string()),
         None => Err("未选择文件".to_string()),
-    }
-}
-
-/// 英语学习导入：系统文件对话框仅展示 `.json`
-#[tauri::command]
-pub fn select_english_learning_import_json_file() -> Result<String, String> {
-    match FileDialog::new().add_filter("JSON", &["json"]).pick_file() {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
-        None => Err("canceled".to_string()),
     }
 }
 

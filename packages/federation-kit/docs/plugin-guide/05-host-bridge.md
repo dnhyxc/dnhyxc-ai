@@ -87,6 +87,7 @@ export function createHostBridge(
 | `api.ui.showToast` | `ui:toast` | 显示 Toast | 按权限 |
 | `api.ui.setAppFullscreen` | `ui:toast` | 应用级影院全屏（藏 Host 壳） | 按权限 + Host 能力 |
 | `api.ui.downloadBlob` | `ui:toast` | 统一落盘下载 | 按权限 + Host 能力 |
+| `api.ui.pickLocalFiles` | `ui:toast` | 选本地文件（`{ path, name, src }[]`） | 按权限 + Host 能力 |
 | `api.modules.*` | `modules:xxx` | 业务模块（如 `modules:chat` → `openThread`） | 按权限 |
 
 ---

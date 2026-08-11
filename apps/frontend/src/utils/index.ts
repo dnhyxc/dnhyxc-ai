@@ -18,6 +18,7 @@ export * from './format-bytes';
 export * from './knowledge-save';
 export { openExternalUrl } from './open-external';
 export { isTauriRuntime } from './runtime';
+export * from './select-files';
 export * from './store';
 export * from './tauri';
 export * from './updater';

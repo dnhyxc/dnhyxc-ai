@@ -8,6 +8,23 @@ import type {
 
 export type HostTheme = 'light' | 'dark';
 
+/** 插件选本地文件选项（与宿主 select-files 对齐） */
+export type PickLocalFilesOptions = {
+	/** 如 `.mp4,.webm`；不传则不限制 */
+	accept?: string;
+	/** 默认 false（单选，仍返回 length≤1 的数组） */
+	multiple?: boolean;
+	/** 系统对话框标题（部分平台可能忽略） */
+	title?: string;
+};
+
+/** 选中项：path 为桌面绝对路径（Web 可能仅为文件名）；src 可直接作 media URL */
+export type HostPickedLocalFile = {
+	path: string;
+	name: string;
+	src: string;
+};
+
 export interface HostHttpClient {
 	get: <T = unknown>(url: string) => Promise<T>;
 	post: <T = unknown>(url: string, body?: unknown) => Promise<T>;
@@ -31,6 +48,14 @@ export interface HostCapabilities {
 		pluginId: string;
 	}) => Promise<{ ok: boolean; hostToasted: boolean; message?: string }>;
 	setAppFullscreen?: (full: boolean) => Promise<void>;
+	/**
+	 * 系统选文件（桌面 Tauri 对话框 / Web 回退 input）。
+	 * 取消返回 null；成功始终为数组（单选 1 项）。
+	 * 权限门闩与 toast 相同：`ui:toast`。
+	 */
+	pickLocalFiles?: (
+		options?: PickLocalFilesOptions,
+	) => Promise<HostPickedLocalFile[] | null>;
 	/** 业务模块挂载点（如 ebook）；按 permission `modules:xxx` 装配 */
 	modules?: Record<string, unknown>;
 	/**

@@ -74,6 +74,22 @@ export interface HostBridgeProps {
 				hostToasted: boolean;
 				message?: string;
 			}>;
+			/**
+			 * 选本地文件；取消 null。需 `ui:toast`。
+			 * @see PickLocalFilesOptions / HostPickedLocalFile（config/types）
+			 */
+			pickLocalFiles?: (options?: {
+				accept?: string;
+				multiple?: boolean;
+				title?: string;
+			}) => Promise<
+				| {
+						path: string;
+						name: string;
+						src: string;
+				  }[]
+				| null
+			>;
 		};
 		modules?: Readonly<Record<string, unknown>>;
 	}>;

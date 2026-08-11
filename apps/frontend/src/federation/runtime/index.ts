@@ -16,6 +16,7 @@ import { downloadBlob, isTauriRuntime, onListen } from '@/utils';
 import { http } from '@/utils/fetch';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
 import { createEbookModulesApi } from '../capabilities/ebookHostApi';
+import { pickLocalFilesForPlugins } from '../capabilities/pickLocalFiles';
 import {
 	arePluginEnabledPrefsReady,
 	ensurePluginEnabledPrefsLoaded,
@@ -115,6 +116,7 @@ export const mf = createFederation<RouteConfig>({
 			delete: ((url: string) => http.delete(url)) as HostHttpClient['delete'],
 		},
 		setAppFullscreen,
+		pickLocalFiles: pickLocalFilesForPlugins,
 		downloadBlob: async (options) => {
 			const mime = options.mimeType?.trim() || DOCX_MIME;
 			const raw = options.data;

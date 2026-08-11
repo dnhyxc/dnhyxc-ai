@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { fetchEbookBytes } from '@/service';
 import { isTauriRuntime } from '@/utils/runtime';
+import { selectFile } from '@/utils/select-files';
 import type { BookFmt, BookSrc } from '../../types';
 
 export function fmtFromName(name: string): BookFmt | null {
@@ -77,12 +78,17 @@ export async function resolveOpen(
 	return { data, source: 'online' };
 }
 
+const EBOOK_ACCEPT = '.epub,.pdf';
+
 export async function pickTauri(): Promise<{
 	path: string;
 	fmt: BookFmt;
 } | null> {
 	if (!isTauriRuntime()) return null;
-	const path = await invoke<string | null>('pick_ebook_file');
+	const path = await selectFile({
+		accept: EBOOK_ACCEPT,
+		title: '选择电子书',
+	});
 	if (!path) return null;
 	const fmt = fmtFromName(path);
 	if (!fmt) throw new Error('仅支持 epub / pdf');

@@ -199,6 +199,7 @@ export function createFederation<
 		http: userCaps.http,
 		downloadBlob: userCaps.downloadBlob,
 		setAppFullscreen: userCaps.setAppFullscreen,
+		pickLocalFiles: userCaps.pickLocalFiles,
 		modules: userCaps.modules,
 		buildModules: userCaps.buildModules,
 		onLocaleChange: userCaps.onLocaleChange,

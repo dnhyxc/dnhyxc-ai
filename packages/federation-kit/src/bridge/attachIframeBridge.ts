@@ -72,6 +72,15 @@ async function dispatchRpc(
 				mimeType: opt.mimeType,
 			});
 		}
+		case 'ui.pickLocalFiles': {
+			if (!api.ui?.pickLocalFiles) throw new Error('UI_DENIED');
+			const opt = (args[0] ?? {}) as {
+				accept?: string;
+				multiple?: boolean;
+				title?: string;
+			};
+			return api.ui.pickLocalFiles(opt);
+		}
 		default:
 			throw new Error(`UNKNOWN_RPC: ${method}`);
 	}

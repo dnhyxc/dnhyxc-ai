@@ -1,10 +1,7 @@
-/** 知识库编辑器：从本地 .md 文件导入（Web 用 input accept；Tauri 用仅 .md 的系统对话框） */
+/** 知识库编辑器：从本地 .md 文件导入（Web 用 input accept；Tauri 用通用 selectFile） */
 
-import { isTauriRuntime } from '@/utils';
-import {
-	invokeReadKnowledgeMarkdownFile,
-	invokeSelectKnowledgeImportMdFile,
-} from '@/utils/knowledge-save';
+import { isTauriRuntime, selectFile } from '@/utils';
+import { invokeReadKnowledgeMarkdownFile } from '@/utils/knowledge-save';
 
 /** 文件选择器仅展示 .md（部分浏览器仍会依赖后续校验） */
 const IMPORT_ACCEPT = '.md';
@@ -93,7 +90,10 @@ function pickKnowledgeImportFileWeb(): Promise<KnowledgeImportFileResult | null>
 }
 
 async function pickKnowledgeImportFileTauri(): Promise<KnowledgeImportFileResult | null> {
-	const filePath = await invokeSelectKnowledgeImportMdFile();
+	const filePath = await selectFile({
+		accept: IMPORT_ACCEPT,
+		title: '导入 Markdown',
+	});
 	if (!filePath) return null;
 	const fileName = fileNameFromPath(filePath);
 	if (!isKnowledgeImportMdFile(fileName)) {

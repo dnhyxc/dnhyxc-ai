@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
@@ -347,15 +346,6 @@ pub struct ReadKnowledgeMarkdownFileInput {
 #[serde(rename_all = "camelCase")]
 pub struct ReadKnowledgeMarkdownFileResult {
 	pub content: String,
-}
-
-/// 知识库导入：仅允许选择 `.md` 文件（系统文件对话框过滤器）
-#[tauri::command]
-pub fn select_knowledge_import_md_file() -> Result<String, String> {
-	match FileDialog::new().add_filter("Markdown", &["md"]).pick_file() {
-		Some(path) => Ok(path.to_string_lossy().to_string()),
-		None => Err("canceled".to_string()),
-	}
 }
 
 /// 读取单个 `.md` 文件正文（UTF-8）

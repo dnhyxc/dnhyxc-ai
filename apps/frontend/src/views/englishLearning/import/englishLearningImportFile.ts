@@ -1,6 +1,6 @@
-/** 英语学习 JSON 导入：Web 用 input accept；Tauri 用仅 .json 的系统对话框 */
+/** 英语学习 JSON 导入：Web 用 input accept；Tauri 用通用 selectFile + 读文件 */
 
-import { isTauriRuntime } from '@/utils';
+import { isTauriRuntime, selectFile } from '@/utils';
 
 export const JSON_IMPORT_ACCEPT = '.json';
 
@@ -47,22 +47,17 @@ function pickJsonFileWeb(): Promise<File | null> {
 }
 
 async function pickJsonFileTauri(): Promise<File | null> {
-	const { invoke } = await import('@tauri-apps/api/core');
-	let filePath: string;
-	try {
-		filePath = await invoke<string>('select_english_learning_import_json_file');
-	} catch (e) {
-		const msg = e instanceof Error ? e.message : String(e ?? '');
-		if (msg.includes('canceled')) return null;
-		throw e;
-	}
+	const filePath = await selectFile({
+		accept: JSON_IMPORT_ACCEPT,
+		title: '导入 JSON',
+	});
+	if (!filePath) return null;
 	const fileName = fileNameFromPath(filePath);
 	if (!isJsonImportFileName(fileName)) return null;
+	const { invoke } = await import('@tauri-apps/api/core');
 	const content = await invoke<string>(
 		'read_english_learning_import_json_file',
-		{
-			filePath,
-		},
+		{ filePath },
 	);
 	return new File([content], fileName, {
 		type: 'application/json',

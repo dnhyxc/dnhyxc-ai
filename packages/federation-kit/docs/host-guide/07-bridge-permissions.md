@@ -160,6 +160,7 @@ export function createHostBridge(
 | `ui:toast` | `api.ui.showToast` | 宿主 Toast |
 | `ui:toast` | `api.ui.setAppFullscreen` | 应用级影院全屏（与 Toast 共用门闩）|
 | `ui:toast` | `api.ui.downloadBlob` | Web/Tauri 统一落盘 |
+| `ui:toast` | `api.ui.pickLocalFiles` | 选本地文件（返回 `{ path, name, src }[]`；取消 `null`）|
 | `nav:subtree` | `api.navigate` | 仅允许跳 `routePath` 前缀内 |
 | `http:plugin-api` | `api.http.get/post/put/delete` | 宿主 http 客户端 |
 | `modules:chat` | `api.modules.openThread` | 打开 `/chat/c/:id`（buildModules 装配）|

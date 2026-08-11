@@ -1,21 +1,9 @@
 use std::fs;
 use std::path::Path;
 
-use rfd::FileDialog;
-
 const MAX_UPLOAD_BYTES: u64 = 120 * 1024 * 1024;
 /// 本地打开阅读允许更大体积（上传仍受 MAX_UPLOAD_BYTES 约束）
 const MAX_OPEN_BYTES: u64 = 512 * 1024 * 1024;
-
-/// 桌面端：选择 epub / pdf
-#[tauri::command]
-pub fn pick_ebook_file() -> Option<String> {
-    FileDialog::new()
-        .set_title("选择电子书")
-        .add_filter("电子书", &["epub", "pdf"])
-        .pick_file()
-        .map(|path| path.to_string_lossy().to_string())
-}
 
 /// 读取电子书字节（asset URL 失败时的后备）
 /// `for_upload`: true 时按上传上限校验，false/None 时按阅读上限校验

@@ -68,6 +68,8 @@
 | [standalone-preview-polish.md](./standalone-preview-polish.md) | **独立预览环境优化**：Toaster 挂载、padding 从 layout 移至 home、UI 组件导出补齐、Input spellCheck、ScrollArea 注释 |
 | [plugin-icon-system.md](./plugin-icon-system.md) | **SVG 插件图标系统**：`PluginIcon` 组件（fetch + 缓存 + 归一化 + 内联渲染）、`pluginIconUrl` 工具集（`normalizeSvgForHostIcon`、`detectPluginIconKind`、`isThemeablePaint`）、Sidebar / PluginHostSurface 集成、CSS 动画 `pathLength=1` 单位方案（含改动前/后对比与逐行注释） |
 | [registry-icon-upload.md](./registry-icon-upload.md) | **Registry 图标上传**：Upload 组件新增 `uploadType="button"` + `openRef` + `validExtensions`、DropdownMenu scrollable、Registry 页面图标上传 UI（DropdownMenu 插件选择 + COS 上传 + `applyPluginIconUrl` 写入 + 热加载）、i18n 文案（含改动前/后对比与逐行注释） |
+| [unified-file-selection.md](./unified-file-selection.md) | **通用文件选择命令统一**：Tauri `select_files` 命令（accept + multiple + title）替代 3 个专用命令（`pick_ebook_file` / `select_knowledge_import_md_file` / `select_english_learning_import_json_file`）、前端 `select-files.ts` 模块（`pickLocalFiles` / `selectFile` / `selectFiles`）、电子书/知识库/英语学习导入迁移、`assetProtocol` 配置（含改动前/后对比与逐行注释） |
+| [plugin-pick-local-files.md](./plugin-pick-local-files.md) | **插件选本地文件能力**：federation-kit bridge 新增 `api.ui.pickLocalFiles`、`HostCapabilities.pickLocalFiles` 类型、`createHostBridge` 装配（`ui:toast` 门闩）、`attachIframeBridge` RPC case、Host 适配层（Tauri `convertFileSrc` / Web `createObjectURL`）、权限文档同步（含改动前/后对比与逐行注释） |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |
 

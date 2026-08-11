@@ -217,6 +217,8 @@
 | 主题色（强调色）怎么换 / 全站 hover/选中色不跟随 / 首帧闪回 teal  | [setting/accent-color-settings.md](./setting/accent-color-settings.md)（10 色预设 + CSS 变量覆盖 + 首屏防闪 + 原版 teal 豁免）                            |
 | 插件图标 SVG 渲染 / stroke/fill 动画不触发 / 主题色不跟随         | [app/plugin-icon-system.md](./app/plugin-icon-system.md)（PluginIcon + normalizeSvgForHostIcon + pathLength=1 动画） · [app/plugin-host-icons.md](./app/plugin-host-icons.md) |
 | Registry 上传 SVG 图标失败 / 菜单选择后无反应 / 文件选择框闪退   | [app/registry-icon-upload.md](./app/registry-icon-upload.md)（Upload button 模式 + openRef + DropdownMenu scrollable） |
+| 桌面端选文件 / 新增导入类型需写 Rust 命令 / accept 过滤器不灵活   | [app/unified-file-selection.md](./app/unified-file-selection.md)（通用 `select_files` 替代 3 个专用命令 + `select-files.ts` 模块） |
+| 插件选本地文件 / iframe untrusted 无法选文件 / `convertFileSrc` 配置 | [app/plugin-pick-local-files.md](./app/plugin-pick-local-files.md)（bridge `api.ui.pickLocalFiles` + Host 适配层 + `assetProtocol` 配置） |
 
 ---
 
