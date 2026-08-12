@@ -42,14 +42,25 @@ export function usePracticeSessionKeyboard(args: {
 			const tag = target?.tagName;
 			const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-			// 听写作答页：Shift + 空格（输入框内也响应）
-			if (phase === 'prompt' && isPracticeShiftSpacePlayShortcut(e)) {
-				if (mode === 'dictation') {
+			// 听写答题：Shift + 空格（输入框内也可触发）
+			if (
+				phase === 'prompt' &&
+				mode === 'dictation' &&
+				isPracticeShiftSpacePlayShortcut(e)
+			) {
+				e.preventDefault();
+				void playWord({ sequence: !hintOpen });
+				return;
+			}
+
+			// 拼写答题：仅开启提示后可用 Shift+空格 / 空格播放（未开提示不播，避免泄题）
+			if (phase === 'prompt' && mode === 'spelling' && hintOpen) {
+				if (isPracticeShiftSpacePlayShortcut(e)) {
 					e.preventDefault();
-					void playWord({ sequence: !hintOpen });
+					void playWord();
 					return;
 				}
-				if (mode === 'spelling') {
+				if (!inField && isPracticeSpacePlayShortcut(e)) {
 					e.preventDefault();
 					void playWord();
 					return;
@@ -98,8 +109,8 @@ export function usePracticeSessionKeyboard(args: {
 			}
 		};
 
-		window.addEventListener('keydown', onKeyDown);
-		return () => window.removeEventListener('keydown', onKeyDown);
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, [
 		canGoPrevious,
 		phase,

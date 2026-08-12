@@ -141,7 +141,7 @@ function ShortcutSection({
 }
 
 export function PracticeShortcutsMenu({
-	practiceMode,
+	practiceMode: _practiceMode,
 }: PracticeShortcutsMenuProps) {
 	const { t } = useI18n();
 
@@ -155,13 +155,11 @@ export function PracticeShortcutsMenu({
 				label: t('englishLearning.practice.shortcuts.check'),
 				keys: ['enter'],
 			},
-		];
-		if (practiceMode !== 'spelling') {
-			promptRows.push({
+			{
 				label: t('englishLearning.practice.shortcuts.play'),
 				keys: ['shiftSpace'],
-			});
-		}
+			},
+		];
 
 		return [
 			{
@@ -215,7 +213,7 @@ export function PracticeShortcutsMenu({
 				],
 			},
 		];
-	}, [practiceMode, t]);
+	}, [t]);
 
 	return (
 		<DropdownMenu>

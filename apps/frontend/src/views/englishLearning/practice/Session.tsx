@@ -253,7 +253,14 @@ export function Session({
 											: t('englishLearning.practice.hintUnavailable')
 									}
 									className="px-0! text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 shrink-0 gap-1 focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none"
-									onClick={() => setHintOpen((v) => !v)}
+									onClick={(e) => {
+										setHintOpen((v) => !v);
+										// 避免焦点留在按钮上：随后空格会当成按钮激活去切换提示
+										e.currentTarget.blur();
+									}}
+									onKeyDown={(e) => {
+										if (e.key === ' ') e.preventDefault();
+									}}
 								>
 									<Lightbulb className="size-3.5" aria-hidden />
 									<span className="max-w-24 truncate text-sm font-medium">

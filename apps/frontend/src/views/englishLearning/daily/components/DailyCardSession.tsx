@@ -224,7 +224,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 									pos={card.pos}
 									playing={playing}
 									playLabel={playLabel}
-									onPlay={() => void playWord({ force: true })}
+									onPlay={() => void playWord()}
 								/>
 							</SessionPromptPanel>
 							<div className="flex shrink-0 flex-col gap-3">

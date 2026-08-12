@@ -1,5 +1,5 @@
 import { Toast } from '@ui/index';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	isPlaybackAvailable,
 	playPreferred,
@@ -14,12 +14,18 @@ export function useDailyPlayback(args: {
 }) {
 	const { word, t } = args;
 	const [playing, setPlaying] = useState(false);
+	const playRunRef = useRef(0);
+
+	const cancelPlay = useCallback(() => {
+		playRunRef.current += 1;
+		stopAllPlayback();
+	}, []);
 
 	useEffect(() => {
 		return () => {
-			stopAllPlayback();
+			cancelPlay();
 		};
-	}, []);
+	}, [cancelPlay]);
 
 	const playWord = useCallback(
 		async (options?: PlayOptions) => {
@@ -32,19 +38,24 @@ export function useDailyPlayback(args: {
 				return;
 			}
 			if (playing && !options?.force) {
-				stopAllPlayback();
+				cancelPlay();
 				setPlaying(false);
 				return;
 			}
+
+			playRunRef.current += 1;
+			const runId = playRunRef.current;
 			stopAllPlayback();
 			setPlaying(true);
 			try {
 				await playPreferred(word);
 			} finally {
-				setPlaying(false);
+				if (playRunRef.current === runId) {
+					setPlaying(false);
+				}
 			}
 		},
-		[playing, t, word],
+		[cancelPlay, playing, t, word],
 	);
 
 	const playLabel = playing

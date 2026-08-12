@@ -18,7 +18,7 @@ export function DailyPlayIconButton({
 			onClick={onPlay}
 			aria-label={playLabel}
 			className={cn(
-				'cursor-pointer flex shrink-0 items-center justify-center rounded p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-teal-500/40',
+				'cursor-pointer flex shrink-0 items-center justify-center rounded p-1 outline-none transition-colors focus-visible:ring-0 focus-visible:shadow-none',
 				playing
 					? 'text-teal-600 dark:text-teal-400'
 					: 'text-teal-500 hover:text-teal-600 dark:hover:text-teal-400',

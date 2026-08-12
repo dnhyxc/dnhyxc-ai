@@ -28,7 +28,7 @@ export function useDailySessionKeyboard(args: {
 			if (isPracticeSpacePlayShortcut(e) && !inField) {
 				if (step === 'study' || step === 'quiz' || step === 'feedback') {
 					e.preventDefault();
-					void playWord(step === 'quiz' ? { force: true } : undefined);
+					void playWord();
 				}
 				return;
 			}
