@@ -22,13 +22,13 @@ import {
 	AssistantShell,
 	useAssistantShare,
 } from '@/components/design/Assistant';
+import { useI18n } from '@/hooks';
+import { useAssistantCopy } from '@/hooks/useAssistantCopy';
 import {
-	useAssistantCopy,
 	useAssistantMessageCount,
-	useAssistantScroll,
 	useAssistantStreamTick,
-	useI18n,
-} from '@/hooks';
+} from '@/hooks/useAssistantMessageCount';
+import { useAssistantScroll } from '@/hooks/useAssistantScroll';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';

@@ -7,10 +7,11 @@
  */
 
 import Header from '@design/Header';
+import Loading from '@design/Loading';
 import Sidebar from '@design/Sidebar';
 import { TooltipProvider } from '@ui/index';
 import { Toast } from '@ui/sonner';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import {
@@ -121,7 +122,17 @@ const Layout = () => {
 												: 'h-[calc(100%-3.25rem)] overflow-x-hidden overflow-y-auto',
 										)}
 									>
-										{needAuth && !authed ? null : <Outlet />}
+										{needAuth && !authed ? null : (
+											<Suspense
+												fallback={
+													<div className="flex h-full w-full min-h-0 items-stretch">
+														<Loading className="flex h-full w-full items-center justify-center" />
+													</div>
+												}
+											>
+												<Outlet />
+											</Suspense>
+										)}
 									</div>
 								</div>
 							</div>

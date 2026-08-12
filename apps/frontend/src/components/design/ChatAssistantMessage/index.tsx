@@ -8,6 +8,8 @@ import {
 	bindMarkdownCodeFenceActions,
 	MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
+// 与 Markdown 预览同套样式；懒路由后需在聊天路径显式引入
+import '@dnhyxc-ai/markdown-kit/styles.css';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
@@ -30,8 +32,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { getChatMarkdownHighlightTheme } from '@/constants';
-import { useMarkdownHashLinkViewportScroll } from '@/hooks';
 import { useTheme } from '@/hooks/theme';
+import { useMarkdownHashLinkViewportScroll } from '@/hooks/useMarkdownHashLinkViewportScroll';
 import { cn } from '@/lib/utils';
 import { ChatI18nT, Message, SearchOrganicItem } from '@/types/chat';
 import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';

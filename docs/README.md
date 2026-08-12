@@ -222,6 +222,7 @@
 | Web/Tauri 选文件双路径重复 / `pickFileObject` 跨端 / Rust 读文件命令删除 | [app/pick-file-object.md](./app/pick-file-object.md)（跨端 `pickFileObject` + `pickBrowserFiles` + `convertFileSrc` + `fetch` + 错误码统一） |
 | macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./app/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
 | 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
+| 主包体积大 / 首屏慢 / React.lazy 路由懒加载 / manualChunks 拆包 / mermaid 动态加载 / Monaco 组件懒加载 / Prettier 动态加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md)（`React.lazy` + `manualChunks` + `import('mermaid')` + CSS 显式引入 + `styleContents` CSS 内联 + `Suspense` fallback + Monaco 薄壳 `lazy` + `loadPrettier` + hooks/contexts barrel 瘦身） |
 
 ---
 

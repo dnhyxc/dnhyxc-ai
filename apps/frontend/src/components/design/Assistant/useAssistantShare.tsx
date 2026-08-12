@@ -1,6 +1,6 @@
 import ShareChat from '@design/Share';
 import { useCallback, useEffect, useState } from 'react';
-import { resolveSharePairFromList, useShareFlow } from '@/hooks';
+import { resolveSharePairFromList, useShareFlow } from '@/hooks/useShareFlow';
 import type { Message } from '@/types/chat';
 import type {
 	AssistantShareSessionType,

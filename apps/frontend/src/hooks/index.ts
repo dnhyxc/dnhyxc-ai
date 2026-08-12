@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { getStorage as getLocalStorage, setStorage } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './i18n';
 export * from './theme';
-export * from './useAssistantCopy';
-export * from './useAssistantMessageCount';
-export * from './useAssistantPaneBusy';
-export * from './useAssistantScroll';
-export * from './useIncrementalClassicQuoteFavoriteStatus';
-export * from './useIncrementalVocabFavoriteStatus';
 export * from './useInputsOnlyTab';
 export * from './useIsSuperAdmin';
-export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMembershipActive';
-export * from './useMermaidImagePreview';
-export * from './useShareFlow';
-export * from './useShareSelection.ts';
 export * from './useStandalonePageLocaleFromSearch';
-export * from './useStickToBottomScroll';
+
+/** ponytail: 本地读写即可；勿从 @/utils 桶导入，避免壳层误拉整包 utils */
+const getLocalStorage = (key: string) => {
+	if (typeof window !== 'undefined') {
+		return localStorage.getItem(key);
+	}
+	return '';
+};
+
+const setLocalStorage = (key: string, value: string) => {
+	if (typeof window !== 'undefined') {
+		localStorage.setItem(key, value);
+	}
+};
 
 export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	const [timeLeft, setTimeLeft] = useState(() => {
@@ -63,13 +65,13 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 
 			if (newTime <= 0) {
 				setIsRunning(false);
-				setStorage(`${storageKey}_time`, '0');
-				setStorage(`${storageKey}_state`, 'stopped');
+				setLocalStorage(`${storageKey}_time`, '0');
+				setLocalStorage(`${storageKey}_state`, 'stopped');
 				return 0;
 			}
 
-			setStorage(`${storageKey}_time`, newTime.toString());
-			setStorage(`${storageKey}_state`, 'running');
+			setLocalStorage(`${storageKey}_time`, newTime.toString());
+			setLocalStorage(`${storageKey}_state`, 'running');
 			return newTime;
 		});
 
@@ -85,11 +87,11 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 
 			if (timeLeft <= 0) {
 				setTimeLeft(initialTime);
-				setStorage(`${storageKey}_time`, initialTime.toString());
-				setStorage(`${storageKey}_state`, 'running');
+				setLocalStorage(`${storageKey}_time`, initialTime.toString());
+				setLocalStorage(`${storageKey}_state`, 'running');
 			} else {
-				setStorage(`${storageKey}_time`, timeLeft.toString());
-				setStorage(`${storageKey}_state`, 'running');
+				setLocalStorage(`${storageKey}_time`, timeLeft.toString());
+				setLocalStorage(`${storageKey}_state`, 'running');
 			}
 		}
 	};
@@ -107,14 +109,14 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 
 export const useStorageInfo = (key?: string) => {
 	const [storageInfo, setStorageInfo] = useState(() =>
-		JSON.parse(getStorage(key || 'userInfo') || '{}'),
+		JSON.parse(getLocalStorage(key || 'userInfo') || '{}'),
 	);
 
 	const eventKey = key ? `${key}Changed` : 'userInfoChanged';
 
 	useEffect(() => {
 		const handleStorageChange = () => {
-			setStorageInfo(JSON.parse(getStorage(key || 'userInfo') || '{}'));
+			setStorageInfo(JSON.parse(getLocalStorage(key || 'userInfo') || '{}'));
 		};
 
 		window.addEventListener('storage', handleStorageChange);
@@ -127,13 +129,6 @@ export const useStorageInfo = (key?: string) => {
 	}, []);
 
 	return { storageInfo, setStorageInfo };
-};
-
-const getStorage = (key: string) => {
-	if (typeof window !== 'undefined') {
-		return localStorage.getItem(key);
-	}
-	return '';
 };
 
 export const useGetVersion = () => {

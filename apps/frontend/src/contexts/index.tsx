@@ -7,7 +7,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useShareFlow } from '@/hooks';
+import { useShareFlow } from '@/hooks/useShareFlow';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 

@@ -28,7 +28,7 @@ export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
 						{t('englishLearning.daily.doneDesc')}
 					</p>
 				</div>
-				<div className="border-theme/10 border-t px-4 py-4">
+				<div className="border-theme/10 border-t px-4 py-2">
 					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'flex gap-2')}>
 						<Button
 							type="button"

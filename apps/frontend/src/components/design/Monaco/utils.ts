@@ -1,4 +1,4 @@
-import { OnMount } from '@monaco-editor/react';
+import type { OnMount } from '@monaco-editor/react';
 
 /**
  * Monaco 编辑器实例类型（类型别名，type alias）：

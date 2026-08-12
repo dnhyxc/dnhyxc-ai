@@ -8,6 +8,7 @@
 - [knowledge-preview-assistant-perf.md](../ideas/knowledge-preview-assistant-perf.md) — 规划态实现思路（架构/时序/分阶段）
 - [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) — Markdown 预览/编辑与助手 Panel 布局 co-mount
 - [knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md) — 知识库助手完整链路（会话、`documentKey`、持久化）
+- [knowledge-assistant-stream-stick.md](./knowledge-assistant-stream-stick.md) — 消息列隔离后流式贴底错帧修复（同步 stickFlush + ResizeObserver）
 - [knowledge-view.md](../../apps/frontend/specs/knowledge-view.md) — 知识编辑页规格
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

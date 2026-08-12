@@ -15,7 +15,8 @@ import {
 import MarkdownEditor from '@/components/design/Monaco';
 import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
-import { useAssistantPaneBusy, useI18n, useTheme } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
+import { useAssistantPaneBusy } from '@/hooks/useAssistantPaneBusy';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';

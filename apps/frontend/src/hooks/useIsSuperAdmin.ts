@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { USER_INFO_STORAGE_KEY } from '@/store/loggedInUserId';
-import { getStorage } from '@/utils';
 
 type UserRoleLike = { id?: number; name?: string };
 
 type UserInfoLike = {
 	id?: number;
 	roles?: UserRoleLike[] | null;
+};
+
+const readUserInfoJson = () => {
+	if (typeof window === 'undefined') return '{}';
+	return localStorage.getItem(USER_INFO_STORAGE_KEY) || '{}';
 };
 
 /** 根据 userInfo 判断是否超级管理员（与后端 userHasSuperAdminRole 对齐） */
@@ -25,12 +29,11 @@ export function checkIsSuperAdmin(
 /** 当前登录用户是否为超级管理员（随 userInfo 变更自动更新） */
 export function useIsSuperAdmin(): boolean {
 	const [userInfo, setUserInfo] = useState(() =>
-		JSON.parse(getStorage(USER_INFO_STORAGE_KEY) || '{}'),
+		JSON.parse(readUserInfoJson()),
 	);
 
 	useEffect(() => {
-		const sync = () =>
-			setUserInfo(JSON.parse(getStorage(USER_INFO_STORAGE_KEY) || '{}'));
+		const sync = () => setUserInfo(JSON.parse(readUserInfoJson()));
 		window.addEventListener('storage', sync);
 		window.addEventListener('userInfoChanged', sync);
 		return () => {

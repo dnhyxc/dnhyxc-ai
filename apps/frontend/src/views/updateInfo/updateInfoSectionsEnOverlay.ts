@@ -1546,4 +1546,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixed an issue where dragging a file directly into the desktop app window replaced the current page with the file contents. Dropping a file now only triggers the upload zone—your page stays put.',
 	},
+	's25-100': {
+		title: 'Faster first screen',
+		description:
+			'All pages now load on demand—only the home page, login page, and app shell are downloaded on first open. Large modules like the code editor, EPUB reader, PDF reader, and chart rendering are loaded only when you enter the corresponding page. The code editor is further refined so its core loads only when the editor opens, and the code formatter downloads only on first format. The home page opens noticeably faster, and secondary features load on demand as you use them.',
+	},
 };

@@ -69,7 +69,7 @@ function SetupSection({
 }
 
 function SourceIcon({ source }: { source: PracticeSource }) {
-	const className = 'text-teal-600 size-4 dark:text-teal-400';
+	const className = 'text-teal-500 size-5.5';
 	if (source === 'library') return <Library className={className} />;
 	if (source === 'pack') return <Package className={className} />;
 	if (source === 'live') return <Radio className={className} />;
@@ -355,7 +355,7 @@ export function Setup({
 					</div>
 				</div>
 
-				<div className="border-theme/10 border-t px-4 py-4">
+				<div className="border-theme/10 border-t px-4 py-2">
 					<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 						<Button
 							type="button"

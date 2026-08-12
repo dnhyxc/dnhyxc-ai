@@ -72,7 +72,7 @@ export function DictationCircleButton({
 			onClick={onClick}
 			aria-label={ariaLabel}
 			className={cn(
-				'group relative isolate flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
+				'group relative border-2 border-teal-500/15 isolate flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
 				outer,
 			)}
 		>
@@ -87,11 +87,11 @@ export function DictationCircleButton({
 			/>
 			<span
 				className={cn(
-					'relative z-10 flex items-center justify-center rounded-full border-2 group-active:scale-[0.97]',
+					'relative z-10 flex items-center justify-center rounded-full group-active:scale-[0.97]',
 					inner,
 					active
-						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 shadow-sm dark:text-teal-400'
-						: 'border-white/15 bg-linear-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/25',
+						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 shadow-sm'
+						: 'border-teal-500/15 bg-linear-to-br from-teal-500 to-teal-600 text-white shadow-md shadow-teal-500/25',
 				)}
 			>
 				{children}
@@ -226,7 +226,7 @@ export function DictationPlaySlot({
 	return (
 		<div
 			className={cn(
-				'flex shrink-0 flex-col items-center gap-1.5 overflow-visible px-2.5 py-2',
+				'flex shrink-0 flex-col items-center gap-1.5 px-2.5 py-2',
 				className,
 			)}
 		>

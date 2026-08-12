@@ -20,7 +20,9 @@ import {
 import ChatEntry from '@/components/design/ChatEntry';
 import Loading from '@/components/design/Loading';
 import { Toast } from '@/components/ui';
-import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useAssistantCopy } from '@/hooks/useAssistantCopy';
+import { useAssistantScroll } from '@/hooks/useAssistantScroll';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import ebookAssistantStore from '@/store/ebookAssistant';

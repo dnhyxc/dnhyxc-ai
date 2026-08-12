@@ -1,5 +1,6 @@
+import Loading from '@design/Loading';
 import { Toaster } from '@ui/sonner';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import {
 	createBrowserRouter,
 	type RouteObject,
@@ -106,7 +107,14 @@ const App = () => {
 		// 避免 Host 弹层样式被 Remote CSS 污染或误隔离。
 		<div className="h-full w-full bg-theme-background" data-mf-host-portal>
 			<Toaster />
-			<RouterProvider router={router} />
+			{/* Layout 外路由（login/about 等）lazy 也需 Suspense */}
+			<Suspense
+				fallback={
+					<Loading className="flex h-full items-center justify-center" />
+				}
+			>
+				<RouterProvider router={router} />
+			</Suspense>
 		</div>
 	);
 };

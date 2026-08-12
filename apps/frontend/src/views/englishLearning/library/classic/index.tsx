@@ -12,7 +12,8 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useIncrementalClassicQuoteFavoriteStatus } from '@/hooks/useIncrementalClassicQuoteFavoriteStatus';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteItem } from '@/service';
 import {

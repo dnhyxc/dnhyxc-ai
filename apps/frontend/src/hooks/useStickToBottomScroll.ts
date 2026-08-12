@@ -94,8 +94,9 @@ export function useStickToBottomScroll(
 	const suppressStickFromViewportScrollRef = useRef(false);
 	const lastViewportScrollTopRef = useRef<number | null>(null);
 	const idleFlushAppliedKeyRef = useRef<string | null>(null);
-	/** 流式 contentRevision 高频变化时合并为每帧最多一次贴底 */
+	/** 流式晚一拍布局（字体/代码高亮）补贴底；首滚须在 useLayoutEffect 同步完成，避免先绘后滚 */
 	const streamFlushRafRef = useRef(0);
+	const clearSuppressRafRef = useRef(0);
 
 	useEffect(() => {
 		if (resetKey === undefined || resetKey === null) return;
@@ -111,6 +112,10 @@ export function useStickToBottomScroll(
 				cancelAnimationFrame(streamFlushRafRef.current);
 				streamFlushRafRef.current = 0;
 			}
+			if (clearSuppressRafRef.current) {
+				cancelAnimationFrame(clearSuppressRafRef.current);
+				clearSuppressRafRef.current = 0;
+			}
 		};
 	}, []);
 
@@ -125,6 +130,20 @@ export function useStickToBottomScroll(
 		}
 		vp.scrollTop = vp.scrollHeight;
 	}, []);
+
+	/** 跟底时写 scrollTop，并短暂抑制 onScroll 误判为用户上滑 */
+	const stickFlush = useCallback(() => {
+		if (!stickToBottomRef.current || userPinnedAwayRef.current) return;
+		suppressStickFromViewportScrollRef.current = true;
+		flushScrollToBottom();
+		if (clearSuppressRafRef.current) {
+			cancelAnimationFrame(clearSuppressRafRef.current);
+		}
+		clearSuppressRafRef.current = requestAnimationFrame(() => {
+			clearSuppressRafRef.current = 0;
+			suppressStickFromViewportScrollRef.current = false;
+		});
+	}, [flushScrollToBottom]);
 
 	const enableStickToBottom = useCallback(() => {
 		stickToBottomRef.current = true;
@@ -221,26 +240,36 @@ export function useStickToBottomScroll(
 		[interruptOnPointerDownWhileStreaming, isStreaming],
 	);
 
+	// 同步贴底：须在 paint 前滚完。若推迟到 rAF，会先看到气泡撑高、「正在生成中」掉出视口，再被滚回 → 上下跳。
 	useLayoutEffect(() => {
 		if (!isStreaming) return;
-		if (!stickToBottomRef.current) return;
-		// 合并同帧多次 revision，避免每 token 双 rAF 贴底抢主线程
+		stickFlush();
+		// 晚一拍布局（代码块/字体）再补一次；合并同帧多次 revision
 		if (streamFlushRafRef.current) return;
 		streamFlushRafRef.current = requestAnimationFrame(() => {
 			streamFlushRafRef.current = 0;
-			if (!stickToBottomRef.current) return;
-			suppressStickFromViewportScrollRef.current = true;
-			flushScrollToBottom();
-			requestAnimationFrame(() => {
-				if (stickToBottomRef.current) {
-					flushScrollToBottom();
-				}
-				requestAnimationFrame(() => {
-					suppressStickFromViewportScrollRef.current = false;
-				});
-			});
+			stickFlush();
 		});
-	}, [contentRevision, isStreaming, flushScrollToBottom]);
+	}, [contentRevision, isStreaming, stickFlush]);
+
+	/**
+	 * 知识库等场景：消息列是独立 observer，content 先撑高、streamTick 晚一拍才到本 hook。
+	 * 用 ResizeObserver 在内容高度变化时立刻贴底（paint 前），对齐 ChatBot 流式跟底。
+	 */
+	useLayoutEffect(() => {
+		if (!isStreaming) return;
+		const vp = viewportRef.current;
+		if (!vp) return;
+		const target =
+			vp.querySelector<HTMLElement>('[data-stick-scroll-content]') ??
+			(vp.firstElementChild as HTMLElement | null) ??
+			vp;
+		const ro = new ResizeObserver(() => {
+			stickFlush();
+		});
+		ro.observe(target);
+		return () => ro.disconnect();
+	}, [isStreaming, stickFlush]);
 
 	useLayoutEffect(() => {
 		if (idleFlushKeyProp === undefined) return;

@@ -54,7 +54,7 @@ export function DailyIntroPanel({ starting, onStart }: DailyIntroPanelProps) {
 					) : null}
 				</div>
 
-				<div className="border-theme/10 border-t px-4 py-4">
+				<div className="border-theme/10 border-t px-4 py-2">
 					<div className={DAILY_FOOTER_PANEL_CLASS}>
 						<Button
 							type="button"

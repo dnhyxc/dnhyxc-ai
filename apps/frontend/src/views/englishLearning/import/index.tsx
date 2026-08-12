@@ -3,7 +3,7 @@
  */
 
 import { Button, Input, Toast } from '@ui/index';
-import { CloudUpload, NotebookPen } from 'lucide-react';
+import { CloudUpload, FileText, NotebookPen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DragDropAcceptResult } from '@/components/design/DragDropFileUpload';
@@ -426,26 +426,30 @@ const EnglishLearningImportPage = () => {
 			? t('englishLearning.import.hintVocab')
 			: t('englishLearning.import.hintClassic');
 
+	const exampleJson = useMemo(() => {
+		return kind === 'vocab'
+			? [
+					{
+						word: 'hello',
+						ipa: '/həˈləʊ/',
+						pos: 'n.',
+						translationZh: '你好，世界',
+						example: 'Hello, world',
+					},
+				]
+			: [
+					{
+						english:
+							'Education is not the filling of a pail, but the lighting of a fire.',
+						translationZh: '教育不是注满一桶水，而是点燃一把火。',
+						source: 'William Butler Yeats',
+						noteZh: '经典比喻，阐明教育的本质是激发热情。',
+					},
+				];
+	}, [kind]);
+
 	return (
 		<div className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden p-5.5 pt-0">
-			<div className="text-textcolor/80 mb-3 shrink-0 leading-relaxed text-sm">
-				<div className="flex items-start justify-between">
-					<div className="-mt-0.5">{hint}</div>
-					<Button
-						variant="link"
-						size="sm"
-						className="text-teal-500 hover:text-teal-400 hover:bg-teal-500/5 border border-teal-600/20"
-						onClick={() => navigate(`/english-learning/library?kind=${kind}`)}
-					>
-						{t('route.englishLearning.library.title')}
-					</Button>
-				</div>
-				<div className="max-w-3xl -mt-1">
-					{kind === 'vocab'
-						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "segmentation": "hel-lo", "translationZh": "你好", "example": "Hello, how are you?"}]`
-						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}
-				</div>
-			</div>
 			{jsonParseError ? (
 				<p className="text-destructive mb-2 shrink-0 text-sm">
 					{t('englishLearning.import.parseError')}
@@ -463,7 +467,7 @@ const EnglishLearningImportPage = () => {
 				</p>
 			) : null}
 			<div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col">
-				<div className="border-theme-border min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md border bg-theme/5">
+				<div className="min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md">
 					{previewText ? (
 						<MarkdownEditor
 							className="h-full min-h-0"
@@ -534,8 +538,8 @@ const EnglishLearningImportPage = () => {
 						/>
 					) : (
 						<DragDropFileUpload
-							className="group flex h-full min-h-0 flex-1 flex-col"
-							zoneClassName="flex h-full min-h-0 flex-1 flex-col rounded-md border border-dashed border-theme/50 hover:border-theme"
+							className="group flex h-full min-h-0 flex-1 flex-col bg-theme/5"
+							zoneClassName="flex h-full min-h-0 flex-1 flex-col rounded-md border border-dashed border-theme/10 hover:border-teal-500"
 							accept={JSON_IMPORT_ACCEPT}
 							acceptExtensionOnly
 							pickFiles={pickImportJsonFiles}
@@ -546,13 +550,40 @@ const EnglishLearningImportPage = () => {
 								if (rejected.length > 0) onDropZoneReject();
 							}}
 						>
-							<div className="mb-10 pointer-events-none flex h-full min-h-0 flex-col items-center justify-center gap-2 px-4 text-center text-sm">
-								<CloudUpload
-									className="size-18 text-theme opacity-50 group-hover:opacity-70"
-									aria-hidden
-								/>
-								<div className="max-w-2xl text-theme opacity-65 group-hover:opacity-80">
-									{t('englishLearning.import.dropReject')}
+							<div className="pointer-events-auto flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-auto px-6 py-8 text-sm">
+								<div className="max-w-2xl flex items-start justify-between w-full gap-2">
+									<CloudUpload
+										className="size-16 text-theme opacity-50 group-hover:opacity-70"
+										aria-hidden
+									/>
+									<div className="text-theme/70 text-center text-base font-medium group-hover:opacity-80">
+										{t('englishLearning.import.dropReject')}
+									</div>
+								</div>
+								<div className="mt-2 w-full max-w-2xl rounded-md border border-theme/5 bg-theme/5 p-4 pt-1">
+									<div className="mb-2 flex items-center justify-between gap-1.5 font-semibold text-textcolor/70">
+										<div className="flex items-center gap-1.5">
+											<FileText size={16} />
+											{t('englishLearning.import.formatGuide')}
+										</div>
+										<Button
+											variant="link"
+											className="text-teal-500 p-0! hover:text-teal-400 pointer-events-auto"
+											onClick={() =>
+												navigate(`/english-learning/library?kind=${kind}`)
+											}
+										>
+											{t('route.englishLearning.toLibrary')}
+										</Button>
+									</div>
+									<div className="mb-3 text-sm leading-relaxed text-textcolor/60 text-justify">
+										{hint}
+									</div>
+									<div className="text-textcolor/60 p-1 bg-theme/5 border max-h-50 w-full min-w-0 rounded-md">
+										<pre className="m-0 w-max text-xs leading-relaxed whitespace-pre">
+											{JSON.stringify(exampleJson, null, 2)}
+										</pre>
+									</div>
 								</div>
 							</div>
 						</DragDropFileUpload>

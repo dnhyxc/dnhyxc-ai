@@ -12,7 +12,8 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useIncrementalVocabFavoriteStatus } from '@/hooks/useIncrementalVocabFavoriteStatus';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyItem } from '@/service';
 import {

@@ -440,7 +440,7 @@ const System = () => {
 										'w-full',
 										'rounded-md border border-theme/15',
 										'px-3 pt-3 pb-0.5',
-										'not-first:mt-2',
+										'not-first:mt-3',
 									)}
 								>
 									<div className="text-xs font-semibold text-textcolor/70 mb-1">

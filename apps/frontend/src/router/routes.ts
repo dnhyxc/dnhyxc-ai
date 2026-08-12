@@ -1,58 +1,83 @@
 /**
  * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
  * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/update-info`、`/project-guide`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
+ *
+ * Layout / Home / Login 保持 eager；其余页面 React.lazy，避免主包打进全站视图。
  */
-import React from 'react';
+import React, { lazy } from 'react';
 import Layout from '@/layout';
-import NotFound from '@/views/404';
-import About from '@/views/about';
-import Account from '@/views/account';
-import Chat from '@/views/chat';
-import NewChat from '@/views/chat/new';
-import Session from '@/views/chat/session';
-import Coding from '@/views/coding';
-import DesktopDownloadPage from '@/views/desktopDownload';
-import Document from '@/views/document';
-import Download from '@/views/download';
-import Ebook from '@/views/ebook';
-import EbookLayout from '@/views/ebook/layout';
-import EbookRead from '@/views/ebook/read';
-import EnglishLearning from '@/views/englishLearning';
-import EnglishLearningDailyPage from '@/views/englishLearning/daily';
-import EnglishLearningDailyRecordsPage from '@/views/englishLearning/daily/records';
-import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites';
-import EnglishLearningImportPage from '@/views/englishLearning/import';
-import EnglishLearningLayout from '@/views/englishLearning/Layout';
-import EnglishLearningLibraryPage from '@/views/englishLearning/library';
-import EnglishLearningMistakesPage from '@/views/englishLearning/mistakes';
-import EnglishLearningNotesPage from '@/views/englishLearning/notes';
-import EnglishLearningPackStreamPage from '@/views/englishLearning/pack';
-import EnglishLearningPracticePage from '@/views/englishLearning/practice';
-import {
-	EnglishGrammarReferencePage,
-	EnglishMorphologyReferencePage,
-} from '@/views/englishLearning/reference';
 import Home from '@/views/home';
-import Knowledge from '@/views/knowledge';
-import LegalServicePolicy from '@/views/legal/servicePolicy';
-import LegalUserAgreement from '@/views/legal/userAgreement';
 import Login from '@/views/login';
-import Pay from '@/views/pay';
-import PluginDevGuidePage from '@/views/pluginDevGuide';
-import PluginsPage from '@/views/plugins';
-import PluginsLayout from '@/views/plugins/Layout';
-import PluginRegistryEditorPage from '@/views/plugins/registry';
-import Profile from '@/views/profile';
-import ProjectGuidePage from '@/views/projectGuide';
-import Setting from '@/views/setting';
-import AboutApp from '@/views/setting/about';
-import CloudTtsSetting from '@/views/setting/cloudTts';
-import LlmSetting from '@/views/setting/llm';
-import AppSystem from '@/views/setting/system';
-import ThemeSetting from '@/views/setting/theme';
-import Share from '@/views/share';
-import UpdateInfoPage from '@/views/updateInfo';
-import ChildWindow from '@/views/win';
+
+const NotFound = lazy(() => import('@/views/404'));
+const About = lazy(() => import('@/views/about'));
+const Account = lazy(() => import('@/views/account'));
+const Chat = lazy(() => import('@/views/chat'));
+const NewChat = lazy(() => import('@/views/chat/new'));
+const Session = lazy(() => import('@/views/chat/session'));
+const Coding = lazy(() => import('@/views/coding'));
+const DesktopDownloadPage = lazy(() => import('@/views/desktopDownload'));
+const Document = lazy(() => import('@/views/document'));
+const Download = lazy(() => import('@/views/download'));
+const Ebook = lazy(() => import('@/views/ebook'));
+const EbookLayout = lazy(() => import('@/views/ebook/layout'));
+const EbookRead = lazy(() => import('@/views/ebook/read'));
+const EnglishLearning = lazy(() => import('@/views/englishLearning'));
+const EnglishLearningDailyPage = lazy(
+	() => import('@/views/englishLearning/daily'),
+);
+const EnglishLearningDailyRecordsPage = lazy(
+	() => import('@/views/englishLearning/daily/records'),
+);
+const EnglishLearningFavoritesPage = lazy(
+	() => import('@/views/englishLearning/favorites'),
+);
+const EnglishLearningImportPage = lazy(
+	() => import('@/views/englishLearning/import'),
+);
+const EnglishLearningLayout = lazy(
+	() => import('@/views/englishLearning/Layout'),
+);
+const EnglishLearningLibraryPage = lazy(
+	() => import('@/views/englishLearning/library'),
+);
+const EnglishLearningMistakesPage = lazy(
+	() => import('@/views/englishLearning/mistakes'),
+);
+const EnglishLearningNotesPage = lazy(
+	() => import('@/views/englishLearning/notes'),
+);
+const EnglishLearningPackStreamPage = lazy(
+	() => import('@/views/englishLearning/pack'),
+);
+const EnglishLearningPracticePage = lazy(
+	() => import('@/views/englishLearning/practice'),
+);
+const EnglishGrammarReferencePage = lazy(
+	() => import('@/views/englishLearning/reference/grammar'),
+);
+const EnglishMorphologyReferencePage = lazy(
+	() => import('@/views/englishLearning/reference/morphology'),
+);
+const Knowledge = lazy(() => import('@/views/knowledge'));
+const LegalServicePolicy = lazy(() => import('@/views/legal/servicePolicy'));
+const LegalUserAgreement = lazy(() => import('@/views/legal/userAgreement'));
+const Pay = lazy(() => import('@/views/pay'));
+const PluginDevGuidePage = lazy(() => import('@/views/pluginDevGuide'));
+const PluginsPage = lazy(() => import('@/views/plugins'));
+const PluginsLayout = lazy(() => import('@/views/plugins/Layout'));
+const PluginRegistryEditorPage = lazy(() => import('@/views/plugins/registry'));
+const Profile = lazy(() => import('@/views/profile'));
+const ProjectGuidePage = lazy(() => import('@/views/projectGuide'));
+const Setting = lazy(() => import('@/views/setting'));
+const AboutApp = lazy(() => import('@/views/setting/about'));
+const CloudTtsSetting = lazy(() => import('@/views/setting/cloudTts'));
+const LlmSetting = lazy(() => import('@/views/setting/llm'));
+const AppSystem = lazy(() => import('@/views/setting/system'));
+const ThemeSetting = lazy(() => import('@/views/setting/theme'));
+const Share = lazy(() => import('@/views/share'));
+const UpdateInfoPage = lazy(() => import('@/views/updateInfo'));
+const ChildWindow = lazy(() => import('@/views/win'));
 
 export interface RouteMeta {
 	title?: string;

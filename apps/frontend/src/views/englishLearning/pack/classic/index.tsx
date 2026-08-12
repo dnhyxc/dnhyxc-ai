@@ -6,7 +6,8 @@ import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useIncrementalClassicQuoteFavoriteStatus } from '@/hooks/useIncrementalClassicQuoteFavoriteStatus';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteItem } from '@/service';
 import {

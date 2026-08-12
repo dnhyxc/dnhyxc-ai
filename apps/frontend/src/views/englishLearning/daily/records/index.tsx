@@ -5,7 +5,8 @@ import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useIncrementalVocabFavoriteStatus } from '@/hooks/useIncrementalVocabFavoriteStatus';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyItem } from '@/service';
 import {

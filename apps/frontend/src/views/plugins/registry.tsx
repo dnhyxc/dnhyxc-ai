@@ -276,9 +276,12 @@ export default function PluginRegistryEditorPage() {
 			) : null}
 
 			<div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col">
-				<div className="bg-theme/5 min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md">
+				<div className="min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md">
 					{loading ? (
-						<Loading text={t('plugins.registry.loading')} />
+						<Loading
+							className="bg-theme/5"
+							text={t('plugins.registry.loading')}
+						/>
 					) : (
 						<MarkdownEditor
 							className="h-full min-h-0"

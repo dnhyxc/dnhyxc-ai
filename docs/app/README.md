@@ -73,6 +73,7 @@
 | [pick-file-object.md](./pick-file-object.md) | **跨端 pickFileObject 统一文件选取**：新增 `pickFileObject` / `pickFileObjects` 跨端 API（Web input + Tauri `convertFileSrc` + `fetch`）、`pickBrowserFiles` / `mimeFromName` / `assertAccept` / `assertMaxBytes`、知识库/英语学习/Registry 导入从双路径简化为一行调用、删除 Rust `read_english_learning_import_json_file` 命令、错误码统一为 `accept`（含改动前/后对比与逐行注释） |
 | [macos-drag-picker-crash.md](./macos-drag-picker-crash.md) | **macOS 拖拽文件与选文件对话框冲突闪退修复**：三层修复方案——Rust `FileDialog` → `AsyncFileDialog`（不泵 runloop）+ wry 0.53.5 vendor 补丁（`collect_paths` nil unwrap 修复 tauri-apps/wry#1723）+ 前端 `pickerOpenRef` 守卫（对话框打开期间忽略拖入事件）（含改动前/后对比与逐行注释） |
 | [block-file-drop-nav.md](./block-file-drop-nav.md) | **拦截拖放文件导航**：`dragDropEnabled: false` 下 WKWebView 把拖入文件当导航顶掉 SPA；Rust `block_file_drop_navigation` 插件（`on_navigation` 拦截 `file://`）+ 前端 `main.tsx` window 级 `dragover` / `drop` `preventDefault`（双层冗余）（含改动前/后对比与逐行注释） |
+| [build-optimization.md](./build-optimization.md) | **前端打包优化**：路由 `React.lazy` 懒加载（30+ 页面按需加载）+ Vite `manualChunks` 拆分大型库（monaco/mermaid/epubjs/pdfjs/prettier）+ mermaid 动态 `import()` + CSS 显式引入 + `styleContents` 关键 CSS 内联为字符串常量 + `Suspense` + `Loading` fallback + `import type` tree-shaking + Monaco 组件级懒加载（薄壳 + `React.lazy`）+ Prettier 首次格式化才动态加载 + hooks/contexts barrel 导出瘦身（含改动前/后对比与逐行注释） |
 | [../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md) | **第三方插件接入配置**：任意 HTTPS 域、CORS 契约、加插件不发桌面版 |
 | [../ideas/mf-css-isolation.md](../ideas/mf-css-isolation.md) | **主/子样式隔离**：scoped CSS + untrusted iframe |
 

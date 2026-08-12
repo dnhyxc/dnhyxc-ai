@@ -1,4 +1,4 @@
-import mermaid from 'mermaid';
+import type mermaidApi from 'mermaid';
 import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js';
 
 /** 避免多处同时 `mermaid.run` 打乱内部状态 */
@@ -7,7 +7,19 @@ let runQueue: Promise<void> = Promise.resolve();
 /** 避免每次 run 都 `initialize` 造成主题与内部状态抖动 */
 let lastMermaidInitSignature = '';
 
-function ensureMermaidInitialized(preferDark?: boolean): void {
+let mermaidMod: typeof mermaidApi | null = null;
+
+async function loadMermaid(): Promise<typeof mermaidApi> {
+	if (mermaidMod) return mermaidMod;
+	const mod = await import('mermaid');
+	mermaidMod = mod.default;
+	return mermaidMod;
+}
+
+function ensureMermaidInitialized(
+	mermaid: typeof mermaidApi,
+	preferDark?: boolean,
+): void {
 	const signature = preferDark ? 'dark' : 'default';
 	if (lastMermaidInitSignature === signature) return;
 	lastMermaidInitSignature = signature;
@@ -28,6 +40,7 @@ export type RunMermaidInMarkdownOptions = {
 /**
  * 在已挂载的 Markdown 容器内查找 `[data-mermaid="1"]` 占位块并渲染为 SVG。
  * 由 `@dnhyxc-ai/markdown-kit/react` 导出；`mermaid` 为 tsup external，随本包 dependencies 安装供打包器解析。
+ * 首次调用才动态加载 mermaid，避免主包/路由壳打入整图库。
  */
 export async function runMermaidInMarkdownRoot(
 	root: HTMLElement | null | undefined,
@@ -41,7 +54,8 @@ export async function runMermaidInMarkdownRoot(
 		if (nodes.length === 0) return;
 
 		try {
-			ensureMermaidInitialized(options?.preferDark);
+			const mermaid = await loadMermaid();
+			ensureMermaidInitialized(mermaid, options?.preferDark);
 			await mermaid.run({
 				nodes: Array.from(nodes),
 				suppressErrors: options?.suppressErrors === true,

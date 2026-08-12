@@ -188,7 +188,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 					trailing={progressBadge}
 				/>
 
-				<div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5">
 					{step === 'study' ? (
 						<div className="flex min-h-0 flex-1 flex-col gap-3">
 							<SessionPromptPanel
@@ -272,7 +272,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 				</div>
 
 				{step === 'study' || step === 'feedback' ? (
-					<div className="border-theme/10 shrink-0 border-t px-4 py-4">
+					<div className="border-theme/10 shrink-0 border-t px-2.5 py-2">
 						<Button
 							type="button"
 							className={cn(

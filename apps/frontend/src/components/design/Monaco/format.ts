@@ -1,13 +1,5 @@
 import type { OnMount } from '@monaco-editor/react';
 import type { Plugin } from 'prettier';
-import * as babelPluginMod from 'prettier/plugins/babel';
-import * as estreePluginMod from 'prettier/plugins/estree';
-import * as htmlPluginMod from 'prettier/plugins/html';
-import * as markdownPluginMod from 'prettier/plugins/markdown';
-import * as postcssPluginMod from 'prettier/plugins/postcss';
-import * as typescriptPluginMod from 'prettier/plugins/typescript';
-import * as yamlPluginMod from 'prettier/plugins/yaml';
-import { format } from 'prettier/standalone';
 import {
 	joinMarkdownSegments,
 	splitMarkdownFencedBlocks,
@@ -19,23 +11,13 @@ const PANGU_CJK =
 	'\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FA\u30FC-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF';
 
 type MonacoApi = Parameters<OnMount>[1];
+type PrettierFormat = typeof import('prettier/standalone').format;
 
 /** ESM 下 Prettier 插件常为 default 导出 */
 function asPrettierPlugin(mod: unknown): Plugin {
 	const m = mod as { default?: Plugin };
 	return (m?.default ?? mod) as Plugin;
 }
-
-/** 浏览器端使用 standalone 的 format，不可用主包 `import prettier from 'prettier'`（依赖 Node）。 */
-const PRETTIER_PLUGINS: Plugin[] = [
-	asPrettierPlugin(babelPluginMod),
-	asPrettierPlugin(estreePluginMod),
-	asPrettierPlugin(typescriptPluginMod),
-	asPrettierPlugin(htmlPluginMod),
-	asPrettierPlugin(markdownPluginMod),
-	asPrettierPlugin(postcssPluginMod),
-	asPrettierPlugin(yamlPluginMod),
-];
 
 /** 与参考示例及仓库习惯对齐 */
 const PRETTIER_BASE_OPTIONS = {
@@ -46,6 +28,50 @@ const PRETTIER_BASE_OPTIONS = {
 	printWidth: 100,
 	endOfLine: 'lf' as const,
 };
+
+/** 首次格式化才拉 prettier（避免跟 Monaco 页静态绑进同一大 chunk） */
+let prettierBundle: Promise<{
+	format: PrettierFormat;
+	plugins: Plugin[];
+}> | null = null;
+
+function loadPrettier() {
+	if (!prettierBundle) {
+		prettierBundle = Promise.all([
+			import('prettier/standalone'),
+			import('prettier/plugins/babel'),
+			import('prettier/plugins/estree'),
+			import('prettier/plugins/typescript'),
+			import('prettier/plugins/html'),
+			import('prettier/plugins/markdown'),
+			import('prettier/plugins/postcss'),
+			import('prettier/plugins/yaml'),
+		]).then(
+			([
+				standalone,
+				babelPluginMod,
+				estreePluginMod,
+				typescriptPluginMod,
+				htmlPluginMod,
+				markdownPluginMod,
+				postcssPluginMod,
+				yamlPluginMod,
+			]) => ({
+				format: standalone.format,
+				plugins: [
+					asPrettierPlugin(babelPluginMod),
+					asPrettierPlugin(estreePluginMod),
+					asPrettierPlugin(typescriptPluginMod),
+					asPrettierPlugin(htmlPluginMod),
+					asPrettierPlugin(markdownPluginMod),
+					asPrettierPlugin(postcssPluginMod),
+					asPrettierPlugin(yamlPluginMod),
+				],
+			}),
+		);
+	}
+	return prettierBundle;
+}
 
 const documentFormatterDisposables = new Map<string, { dispose: () => void }>();
 const rangeFormatterDisposables = new Map<string, { dispose: () => void }>();
@@ -164,9 +190,10 @@ export async function safeFormatMarkdownValue(
 	value: string,
 ): Promise<string | null> {
 	try {
+		const { format, plugins } = await loadPrettier();
 		const formatted = await format(value, {
 			parser: 'markdown',
-			plugins: PRETTIER_PLUGINS,
+			plugins,
 			...PRETTIER_BASE_OPTIONS,
 			useTabs: true,
 			// 显式开启嵌入语言格式化：确保 fenced code block 内的 JS/CSS 等也走对应 parser
@@ -195,9 +222,10 @@ async function formatWithPrettierForModel(model: {
 	}
 	const text = model.getValue();
 	try {
+		const { format, plugins } = await loadPrettier();
 		const formatted = await format(text, {
 			parser,
-			plugins: PRETTIER_PLUGINS,
+			plugins,
 			...PRETTIER_BASE_OPTIONS,
 			useTabs: true,
 			embeddedLanguageFormatting: 'auto',

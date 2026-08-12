@@ -4,6 +4,7 @@ export const enUS = {
 	'common.settings': 'Settings',
 	'common.appTitle': 'Smart Chat',
 	'common.loading': 'Loading...',
+	'common.loadingEffort': 'Working hard to load...',
 	'common.loadingMore': 'Loading more...',
 	'common.noMore': 'No more',
 	'common.loadFailed': 'Load failed',
@@ -1062,6 +1063,7 @@ export const enUS = {
 	'route.englishLearning.title': 'English learning',
 	'route.englishLearning.import.title': 'Import study data',
 	'route.englishLearning.library.title': 'Library',
+	'route.englishLearning.toLibrary': 'Go to library',
 	'route.englishLearning.favorites.title': 'My favorites',
 	'route.englishLearning.notes.title': 'Study notes',
 	'route.englishLearning.mistakes.title': 'Mistake book',
@@ -1367,6 +1369,11 @@ export const enUS = {
 		'Collapse import word json example',
 	'englishLearning.import.dataExampleClassicCollapse':
 		'Collapse import classic quotes json example',
+	'englishLearning.import.formatGuide': 'Format example',
+	'englishLearning.import.topHintVocab':
+		'Drag or click to upload .json vocabulary file',
+	'englishLearning.import.topHintClassic':
+		'Drag or click to upload .json classic quotes file',
 
 	'englishLearning.library.favorites': 'Favorites',
 	'englishLearning.library.vocab.title': 'Vocabulary library',

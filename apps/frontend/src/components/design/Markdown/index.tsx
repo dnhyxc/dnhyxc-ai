@@ -9,6 +9,8 @@ import {
 	MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
+// 路由懒加载后不再靠 document 页静态副作用打进主包；预览入口自行引入
+import '@dnhyxc-ai/markdown-kit/styles.css';
 import { ScrollArea } from '@ui/index';
 import { ChevronDown, ChevronUp, Component } from 'lucide-react';
 import {
@@ -23,16 +25,16 @@ import {
 	useState,
 } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constants';
-import {
-	useMarkdownHashLinkViewportScroll,
-	useMermaidDiagramClickPreview,
-	useMermaidImagePreview,
-	useTheme,
-} from '@/hooks';
+import { useTheme } from '@/hooks';
 import {
 	ChatCodeFloatingToolbar,
 	useChatCodeFloatingToolbar,
 } from '@/hooks/useChatCodeFloatingToolbar';
+import { useMarkdownHashLinkViewportScroll } from '@/hooks/useMarkdownHashLinkViewportScroll';
+import {
+	useMermaidDiagramClickPreview,
+	useMermaidImagePreview,
+} from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import {

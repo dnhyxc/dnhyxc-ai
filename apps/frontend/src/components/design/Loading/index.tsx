@@ -27,14 +27,15 @@ const circleVariants: Variants = {
 };
 
 const Loading: FC<LoadingProps> = ({
-	text = '正在奋力加载中...',
+	text,
 	className = '',
 	size = 75,
 	animate = true,
 	children,
 }) => {
-	const textArray = text.split('');
 	const { t } = useI18n();
+	const label = text ?? t('common.loadingEffort');
+	const textArray = label.split('');
 	// 核心逻辑：优化尺寸计算，解决中心点太小的问题
 	const config = useMemo(() => {
 		const scale = size / 80;
@@ -101,7 +102,7 @@ const Loading: FC<LoadingProps> = ({
 						className="w-full h-full"
 						viewBox="0 0 100 100"
 						role="img"
-						aria-label={t('common.loading')}
+						aria-label={label}
 						preserveAspectRatio="xMidYMid meet"
 					>
 						<defs>
@@ -211,7 +212,7 @@ const Loading: FC<LoadingProps> = ({
 							</motion.span>
 						))
 					) : (
-						<span className="text-textcolor">{text}</span>
+						<span className="text-textcolor">{label}</span>
 					)}
 				</div>
 			</div>

@@ -25,7 +25,9 @@ import {
 	type SelectMessageByChatId,
 	useAssistantShare,
 } from '@/components/design/Assistant';
-import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
+import { useI18n } from '@/hooks';
+import { useAssistantCopy } from '@/hooks/useAssistantCopy';
+import { useAssistantScroll } from '@/hooks/useAssistantScroll';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import englishAgentStore from '@/store/englishAgent';
