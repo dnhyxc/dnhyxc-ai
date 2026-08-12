@@ -56,25 +56,12 @@ export function usePracticeSessionKeyboard(args: {
 				}
 			}
 
-			// 听写错题 / 完整揭示：空格（非输入框焦点）
+			// 听写 / 拼写：错题与完整揭示用空格播放（非输入框焦点；与听写一致）
 			if (
-				mode === 'dictation' &&
 				(phase === 'soft_wrong' || phase === 'revealed') &&
 				lastWrong &&
 				!inField &&
 				isPracticeSpacePlayShortcut(e)
-			) {
-				e.preventDefault();
-				void playWord();
-				return;
-			}
-
-			// 拼写错题 / 揭示：仍用 Shift + 空格
-			if (
-				mode === 'spelling' &&
-				(phase === 'soft_wrong' || phase === 'revealed') &&
-				lastWrong &&
-				isPracticeShiftSpacePlayShortcut(e)
 			) {
 				e.preventDefault();
 				void playWord();

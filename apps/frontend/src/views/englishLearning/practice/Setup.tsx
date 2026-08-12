@@ -254,14 +254,14 @@ export function Setup({
 		<div className={PRACTICE_PAGE_CONTENT_CLASS}>
 			<PracticeCard className="border-theme/10 overflow-hidden p-0 shadow-sm">
 				{sourceLocked ? (
-					<div className="border-theme/10 bg-teal-500/10 flex items-center gap-3 border-b px-4 py-3">
+					<div className="border-theme/10 bg-teal-500/10 flex items-center gap-3 border-b p-2.5">
 						<div className="bg-teal-500/15 flex size-10 shrink-0 items-center justify-center rounded-md">
 							<SourceIcon source={source} />
 						</div>
 						{sourceHeaderBody}
 					</div>
 				) : (
-					<div className="border-theme/10 bg-teal-500/6 flex items-center gap-3 border-b px-4 py-3">
+					<div className="border-theme/10 bg-teal-500/6 flex items-center gap-3 border-b p-2.5">
 						<div className="bg-teal-500/15 flex size-9 shrink-0 items-center justify-center rounded-md">
 							<SourceIcon source={source} />
 						</div>
@@ -269,7 +269,7 @@ export function Setup({
 					</div>
 				)}
 
-				<div className="flex flex-col gap-5 px-4 py-5">
+				<div className="flex flex-col gap-5 px-2.5 py-3">
 					<div className="flex flex-col gap-2">
 						<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
 							<span className="text-textcolor shrink-0 text-sm font-semibold">
@@ -355,7 +355,7 @@ export function Setup({
 					</div>
 				</div>
 
-				<div className="border-theme/10 border-t px-4 py-2">
+				<div className="border-theme/10 border-t px-2.5 py-2">
 					<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 						<Button
 							type="button"

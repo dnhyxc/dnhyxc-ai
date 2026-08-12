@@ -148,8 +148,7 @@ export function PracticeShortcutsMenu({
 	type ShortcutRowDef = { label: string; keys: PracticeShortcutKey[] };
 
 	const sections = useMemo((): { title: string; rows: ShortcutRowDef[] }[] => {
-		const playKeysWrong: PracticeShortcutKey[] =
-			practiceMode === 'spelling' ? ['shiftSpace'] : ['space'];
+		const playKeysWrong: PracticeShortcutKey[] = ['space'];
 
 		const promptRows: ShortcutRowDef[] = [
 			{

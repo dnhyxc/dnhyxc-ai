@@ -252,7 +252,7 @@ export function Session({
 											? hintButtonLabel
 											: t('englishLearning.practice.hintUnavailable')
 									}
-									className="px-0! text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 shrink-0 gap-1"
+									className="px-0! text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 shrink-0 gap-1 focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none"
 									onClick={() => setHintOpen((v) => !v)}
 								>
 									<Lightbulb className="size-3.5" aria-hidden />

@@ -24,7 +24,7 @@ export function DailyIntroPanel({ starting, onStart }: DailyIntroPanelProps) {
 	return (
 		<div className={PRACTICE_PAGE_CONTENT_CLASS}>
 			<PracticeCard className="border-theme/10 overflow-hidden p-0 shadow-sm">
-				<div className="border-theme/10 bg-teal-500/10 flex items-center gap-3 border-b px-4 py-3">
+				<div className="border-theme/10 bg-teal-500/10 flex items-center gap-3 border-b p-2.5">
 					<div className="bg-teal-500/15 flex size-10 shrink-0 items-center justify-center rounded-md">
 						<Sparkles
 							className="size-5 text-teal-600 dark:text-teal-400"
@@ -54,7 +54,7 @@ export function DailyIntroPanel({ starting, onStart }: DailyIntroPanelProps) {
 					) : null}
 				</div>
 
-				<div className="border-theme/10 border-t px-4 py-2">
+				<div className="border-theme/10 border-t px-2.5 py-2">
 					<div className={DAILY_FOOTER_PANEL_CLASS}>
 						<Button
 							type="button"
