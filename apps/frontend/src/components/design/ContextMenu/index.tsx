@@ -5,9 +5,18 @@
  */
 
 export * as ContextMenuUi from '@/components/ui/context-menu';
+export {
+	PositionedQuickMenu,
+	type PositionedQuickMenuState,
+} from './PositionedQuickMenu';
 export * from './primitives';
 export {
 	QuickContextMenu,
 	type QuickContextMenuProps,
 } from './QuickContextMenu';
 export * from './types';
+export {
+	type SelectionContextMenuCtx,
+	type SelectionContextMenuItemsFn,
+	useSelectionContextMenu,
+} from './useSelectionContextMenu';

@@ -5,6 +5,7 @@ import { Sparkles, SquareArrowOutUpRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { onListen, openExternalUrl } from '@/utils';
 import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
 import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
@@ -179,30 +180,6 @@ const Home = () => {
 													</Button>
 												);
 											})}
-											{/* <Button
-												onClick={() => goHero(-1)}
-												aria-label="上一张"
-												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/20 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
-												style={{ touchAction: "manipulation" }}
-											>
-												<ChevronLeft
-													className="h-4 w-4"
-													strokeWidth={2.2}
-													aria-hidden
-												/>
-											</Button>
-											<Button
-												onClick={() => goHero(1)}
-												aria-label="下一张"
-												className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-400/5 bg-teal-500/20 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
-												style={{ touchAction: "manipulation" }}
-											>
-												<ChevronRight
-													className="h-4 w-4"
-													strokeWidth={2.2}
-													aria-hidden
-												/>
-											</Button> */}
 										</div>
 									</div>
 
@@ -282,11 +259,12 @@ const Home = () => {
 																			key={`${s.id}-cta-${ci}`}
 																			type="button"
 																			onClick={c.onClick}
-																			className={
+																			className={cn(
+																				'flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98] ',
 																				c.primary
-																					? `relative flex h-10 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-md bg-linear-to-br px-5 text-sm font-semibold text-textcolor hover:shadow-md transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none ${hue.btn}`
-																					: 'flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-theme/5 bg-teal-500/20 px-5 text-sm font-medium text-textcolor backdrop-blur-sm transition-[border-color,background-color] hover:border-theme/10 hover:bg-teal-500/30 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none'
-																			}
+																					? `${hue.btn} relative bg-linear-to-br font-semibold text-textcolor overflow-hidden`
+																					: `${hue.btn} bg-linear-to-br font-medium text-textcolor`,
+																			)}
 																			style={{
 																				fontFamily:
 																					'"Syne", "Noto Sans SC", sans-serif',

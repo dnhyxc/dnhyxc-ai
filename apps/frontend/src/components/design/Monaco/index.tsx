@@ -20,7 +20,7 @@ export default function MarkdownEditor(props: MarkdownEditorProps) {
 			fallback={
 				// 仅 loading 时占位；加载完成后由 MonacoEditor 自己吃 height，避免双层 height 撑不满
 				<div
-					className={cn('min-h-0 min-w-0 w-full', className)}
+					className={cn('min-h-0 min-w-0 w-full bg-theme/5 ', className)}
 					style={{ height }}
 				>
 					<Loading className="flex h-full w-full items-center justify-center" />

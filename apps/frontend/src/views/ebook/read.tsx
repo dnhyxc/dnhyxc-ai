@@ -1246,6 +1246,10 @@ function EbookReadPage() {
 	/**
 	 * 侧栏交焦（单一 effect）：按当前可见面板等输入框进 DOM，再 settle 后 focus。
 	 * 问书/想法来回切换只改 target，避免两个 effect 互相 cancel。
+	 *
+	 * 问书首次开栏会 activateForBook + softResize，150ms 单次交焦易被尾随抢焦；
+	 * 先 focus 再清选区（清选区若打进 iframe 会 restore 回 textarea）。
+	 * 350ms 默认补焦以钉住焦点；仅当输入框已聚焦且用户已改过内容时跳过，避免打断输入。
 	 */
 	useEffect(() => {
 		if (!sideComposeTarget) return;
@@ -1261,28 +1265,48 @@ function EbookReadPage() {
 
 		setEpubReaderPointerSuspended(true);
 		let cancelled = false;
-		let focusTimer = 0;
+		const timers: number[] = [];
+		let initialValue: string | null = null;
 
-		const applyFocus = () => {
+		const focusOnce = () => {
 			if (cancelled) return;
+			// 先交焦再清选区：clearEpubTextSelection 会把 prev（textarea）还原回来
+			focusInput();
 			epubNavRef.current?.clearTextSelection();
 			focusInput();
-			setEpubReaderPointerSuspended(false);
 		};
 
 		const waitForPanel = () => {
 			if (cancelled) return;
-			if (!document.getElementById(inputId)) {
+			const el = document.getElementById(inputId) as HTMLTextAreaElement | null;
+			if (!el) {
 				requestAnimationFrame(waitForPanel);
 				return;
 			}
-			focusTimer = window.setTimeout(applyFocus, 150);
+			initialValue = el.value;
+			timers.push(window.setTimeout(focusOnce, 150));
+			timers.push(
+				window.setTimeout(() => {
+					if (cancelled) return;
+					const cur = document.getElementById(
+						inputId,
+					) as HTMLTextAreaElement | null;
+					const focused = cur != null && document.activeElement === cur;
+					const edited =
+						cur != null && initialValue != null && cur.value !== initialValue;
+					// 已聚焦且用户已改稿：勿抢光标；其余情况补焦（含「看似有焦、稍后被抢」）
+					if (!(focused && edited)) {
+						focusOnce();
+					}
+					setEpubReaderPointerSuspended(false);
+				}, 350),
+			);
 		};
 		requestAnimationFrame(waitForPanel);
 
 		return () => {
 			cancelled = true;
-			if (focusTimer) window.clearTimeout(focusTimer);
+			for (const id of timers) window.clearTimeout(id);
 			setEpubReaderPointerSuspended(false);
 		};
 	}, [sideComposeTarget, thoughtComposeScrollKey, assistantFocusKey]);

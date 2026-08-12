@@ -32,6 +32,7 @@ function AssistantMessageBubble({
 	onShare,
 	className,
 	t,
+	getSelectionContextMenuItems,
 }: AssistantMessageBubbleProps) {
 	const isUser = message.role === 'user';
 	const { isSharing, checkedMessages, setCheckedMessage, needShare } =
@@ -51,6 +52,7 @@ function AssistantMessageBubble({
 						message={message}
 						t={t}
 						className={messageUserContentClass(variant)}
+						getSelectionContextMenuItems={getSelectionContextMenuItems}
 					/>
 				) : (
 					<ChatAssistantMessage
@@ -58,6 +60,7 @@ function AssistantMessageBubble({
 						scrollViewportRef={scrollViewportRef}
 						t={t}
 						className={messageAssistantContentClass(variant)}
+						getSelectionContextMenuItems={getSelectionContextMenuItems}
 					/>
 				)}
 

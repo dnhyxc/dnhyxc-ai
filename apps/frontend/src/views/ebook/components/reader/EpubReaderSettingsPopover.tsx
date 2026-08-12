@@ -7,7 +7,7 @@ import {
 	ScrollArea,
 } from '@ui/index';
 import { Bolt, GalleryHorizontal, type LucideIcon, Scroll } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -32,6 +32,55 @@ export type EpubReaderSettingsPopoverProps = {
 	onOpenChange: (open: boolean) => void;
 	disabled?: boolean;
 };
+
+/**
+ * 原生 range + accent-teal-600（与改前一致的系统滑条形态）。
+ * macOS/WebKit 失焦后 accent 会卡在非激活灰：窗口回焦或重新打开时 remount 强制重绘主题色。
+ */
+function SettingsRange({
+	inputId,
+	label,
+	display,
+	min,
+	max,
+	step,
+	value,
+	onValueChange,
+	repaintKey,
+}: {
+	inputId: string;
+	label: string;
+	display: string;
+	min: number;
+	max: number;
+	step: number;
+	value: number;
+	onValueChange: (next: number) => void;
+	repaintKey: number;
+}) {
+	return (
+		<div className="flex flex-col gap-2">
+			<div className="flex items-center justify-between gap-2">
+				<span className="text-textcolor text-xs font-medium">{label}</span>
+				<span className="text-textcolor/55 tabular-nums text-xs">
+					{display}
+				</span>
+			</div>
+			<input
+				key={`${inputId}-${repaintKey}`}
+				id={inputId}
+				type="range"
+				min={min}
+				max={max}
+				step={step}
+				value={value}
+				aria-label={label}
+				className="accent-teal-600 w-full"
+				onChange={(e) => onValueChange(Number(e.target.value))}
+			/>
+		</div>
+	);
+}
 
 function BgThemeSwatches({
 	value,
@@ -176,6 +225,26 @@ export function EpubReaderSettingsPopover({
 }: EpubReaderSettingsPopoverProps) {
 	const { t } = useI18n();
 	const { theme: appTheme } = useTheme();
+	/** 原生 range accent 失焦卡灰时，递增 key remount 以恢复主题色 */
+	const [rangeRepaintKey, setRangeRepaintKey] = useState(0);
+
+	useEffect(() => {
+		const bump = () => setRangeRepaintKey((k) => k + 1);
+		const onFocus = () => bump();
+		const onVis = () => {
+			if (document.visibilityState === 'visible') bump();
+		};
+		window.addEventListener('focus', onFocus);
+		document.addEventListener('visibilitychange', onVis);
+		return () => {
+			window.removeEventListener('focus', onFocus);
+			document.removeEventListener('visibilitychange', onVis);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (open) setRangeRepaintKey((k) => k + 1);
+	}, [open]);
 
 	const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
 		event.stopPropagation();
@@ -236,52 +305,32 @@ export function EpubReaderSettingsPopover({
 							{t('ebook.read.settings')}
 						</p>
 
-						<div className="flex flex-col gap-2">
-							<div className="flex items-center justify-between gap-2">
-								<Label htmlFor="epub-font-size" className="text-xs">
-									{t('ebook.read.settings.fontSize')}
-								</Label>
-								<span className="text-textcolor/55 tabular-nums text-xs">
-									{settings.fontSize}%
-								</span>
-							</div>
-							<input
-								id="epub-font-size"
-								type="range"
-								min={80}
-								max={160}
-								step={5}
-								value={settings.fontSize}
-								className="accent-teal-600 w-full"
-								onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-							/>
-						</div>
+						<SettingsRange
+							inputId="epub-font-size"
+							label={t('ebook.read.settings.fontSize')}
+							display={`${settings.fontSize}%`}
+							min={80}
+							max={160}
+							step={5}
+							value={settings.fontSize}
+							onValueChange={(fontSize) => onChange({ fontSize })}
+							repaintKey={rangeRepaintKey}
+						/>
 
-						<div className="flex flex-col gap-2">
-							<div className="flex items-center justify-between gap-2">
-								<Label htmlFor="epub-line-height" className="text-xs">
-									{t('ebook.read.settings.lineHeight')}
-								</Label>
-								<span className="text-textcolor/55 tabular-nums text-xs">
-									{settings.lineHeight.toFixed(1)}
-								</span>
-							</div>
-							<input
-								id="epub-line-height"
-								type="range"
-								min={1.2}
-								max={2.4}
-								step={0.1}
-								value={settings.lineHeight}
-								className="accent-teal-600 w-full"
-								onChange={(e) =>
-									onChange({ lineHeight: Number(e.target.value) })
-								}
-							/>
-						</div>
+						<SettingsRange
+							inputId="epub-line-height"
+							label={t('ebook.read.settings.lineHeight')}
+							display={settings.lineHeight.toFixed(1)}
+							min={1.2}
+							max={2.4}
+							step={0.1}
+							value={settings.lineHeight}
+							onValueChange={(lineHeight) => onChange({ lineHeight })}
+							repaintKey={rangeRepaintKey}
+						/>
 
 						<div className="flex flex-col gap-3">
-							<Label className="text-xs">
+							<Label className="text-textcolor text-xs">
 								{t('ebook.read.settings.pageFlow')}
 							</Label>
 							<PageFlowToggle
@@ -291,7 +340,7 @@ export function EpubReaderSettingsPopover({
 						</div>
 
 						<div className="flex flex-col gap-3">
-							<Label className="text-xs">
+							<Label className="text-textcolor text-xs">
 								{t('ebook.read.settings.bgTheme')}
 							</Label>
 							<BgThemeSwatches
@@ -304,7 +353,7 @@ export function EpubReaderSettingsPopover({
 						</div>
 
 						<div className="flex flex-col gap-3">
-							<Label className="text-xs">
+							<Label className="text-textcolor text-xs">
 								{t('ebook.read.settings.textColor')}
 							</Label>
 							<TextColorSwatches
@@ -318,9 +367,8 @@ export function EpubReaderSettingsPopover({
 
 						<Button
 							type="button"
-							variant="secondary"
 							size="sm"
-							className="w-full mt-0.5 text-white bg-teal-600 hover:bg-teal-500"
+							className="w-full mt-0.5"
 							onClick={onReset}
 						>
 							{t('ebook.read.settings.reset')}

@@ -97,6 +97,8 @@
 | [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |
 | [../Influence-point/epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md) | **影响点**：阅读区 resize 重绘对原有功能的影响面                                                                                              |
 | [../Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md) | **影响点**：听读 utils 7→3 文件合并、路径对照与回归清单                                                                                       |
+| [epub-listen-cadence-lead.md](./epub-listen-cadence-lead.md) | **增量（本轮）**：云端整段 TTS 切句估点提前 `0.35s`（`CLOUD_CADENCE_LEAD_SEC`）、`requestAnimationFrame` 轮询进度替代稀疏 `timeupdate`、新增 `onPlaybackProgress` 句内进度回调；听书首包 kick `progress ≥ 0.8` 提前切下一句高亮（含改动前/后对比与逐行注释） |
+| [epub-settings-range-repaint.md](./epub-settings-range-repaint.md) | **增量（本轮）**：阅读设置滑条 `accent-teal-600` 在 macOS/WebKit 失焦后卡灰修复；抽取 `SettingsRange` 组件 + `rangeRepaintKey` state，监听 `window.focus` / `visibilitychange` / 面板 `open` 时递增 key remount `<input>` 恢复主题色（含改动前/后对比与逐行注释） |
 - [epub-highlight-custom-color.md](./epub-highlight-custom-color.md) — 实现说明与代码对比
 - [../Influence-point/epub-highlight-custom-color-picker.md](../Influence-point/epub-highlight-custom-color-picker.md) — **影响点**：划线自定义色 ColorPicker、`#rrggbb(aa)` 持久化与 PopBar/想法侧栏波及面                                                           |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量（已被 pin 部分取代）**：想法侧栏开合后引用 CFI scroll；通用阅读位见 [epub-viewport-pin.md](./epub-viewport-pin.md)                    |

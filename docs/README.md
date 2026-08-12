@@ -223,6 +223,13 @@
 | macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./app/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
 | 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
 | 主包体积大 / 首屏慢 / React.lazy 路由懒加载 / manualChunks 拆包 / mermaid 动态加载 / Monaco 组件懒加载 / Prettier 动态加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md)（`React.lazy` + `manualChunks` + `import('mermaid')` + CSS 显式引入 + `styleContents` CSS 内联 + `Suspense` fallback + Monaco 薄壳 `lazy` + `loadPrettier` + hooks/contexts barrel 瘦身） |
+| 英语 Agent 选中文本右键朗读 / 复制 / 选区菜单复用 | [english/selection-speak-context-menu.md](./english/selection-speak-context-menu.md)（`useSelectionContextMenu` + `PositionedQuickMenu` + 按段云端 TTS + 悬浮条） |
+| 听书切句落后听感 / 首句尾音到下句高亮滞后 / rAF 进度轮询 | [ebook/epub-listen-cadence-lead.md](./ebook/epub-listen-cadence-lead.md)（`CLOUD_CADENCE_LEAD_SEC=0.35` + `requestAnimationFrame` + `onPlaybackProgress` + kick ≥0.8 提前切句） |
+| 插件加载失败只能重试 / 想离开当前页或查接入文档 | [app/plugin-host-error-actions.md](./app/plugin-host-error-actions.md)（错误卡片新增「返回首页」「插件开发指南」按钮） |
+| 首页色块/按钮饱和度过高 / 滚动 FAB 圆形过大 / 下拉菜单内边距 | [app/ui-tint-polish.md](./app/ui-tint-polish.md)（`HUE_STYLES` 透明度 + `Button` variant + `ScrollFab` 尺寸 + `DropdownMenuContent` 内边距） |
+| EPUB 设置滑条 macOS 失焦后变灰 / accent-color 不恢复 | [ebook/epub-settings-range-repaint.md](./ebook/epub-settings-range-repaint.md)（`SettingsRange` + `rangeRepaintKey` + `focus`/`visibilitychange` remount） |
+| Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/tooltip-controlled-align.md](./app/tooltip-controlled-align.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
+| Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/monaco-loading-restore.md](./app/monaco-loading-restore.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
 
 ---
 

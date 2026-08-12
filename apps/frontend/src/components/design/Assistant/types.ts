@@ -5,6 +5,7 @@ import type {
 	SetStateAction,
 	UIEventHandler,
 } from 'react';
+import type { SelectionContextMenuItemsFn } from '@/components/design/ContextMenu';
 import type { StickToBottomScrollViewportHandlers } from '@/hooks/useStickToBottomScroll';
 import type { ChatI18nT, Message } from '@/types/chat';
 
@@ -90,6 +91,8 @@ export type AssistantFooterProps = {
 	containerClassName?: string;
 	showScrollFab?: boolean;
 	scrollFab?: ScrollFabProps;
+	/** 输入框上方悬浮层（如朗读控制条），定位相对本 Footer 内容区 */
+	floatAbove?: ReactNode;
 	children: ReactNode;
 };
 
@@ -120,6 +123,7 @@ export type AssistantMessageRowProps = {
 	onShare?: (message?: Message) => void;
 	className?: string;
 	t?: ChatI18nT;
+	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
 };
 
 export type AssistantMessageBubbleProps = {
@@ -139,6 +143,7 @@ export type AssistantMessageBubbleProps = {
 	onShare?: (message?: Message) => void;
 	className?: string;
 	t?: ChatI18nT;
+	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
 };
 
 export type AssistantSessionRow = {

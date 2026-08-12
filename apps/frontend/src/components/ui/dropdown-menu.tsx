@@ -63,7 +63,7 @@ function DropdownMenuContent({
 					<ScrollArea
 						className={cn('w-full min-h-0 border-0', scrollClassName)}
 						viewportClassName={cn(
-							'box-border p-1 px-2.5 [&>div]:min-h-0!',
+							'box-border p-2 px-2.5 [&>div]:min-h-0!',
 							viewportClassName,
 						)}
 						scrollbarClassName="w-1.5 border-l-0 p-0"

@@ -33,8 +33,6 @@ import {
 	useMarkdownBottomBarShortcuts,
 } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
-// 底部操作栏快捷键统一收敛到 useMarkdownBottomBarShortcuts（见 MarkdownBottomBar.tsx）
-// import Loading from "../Loading";
 import { registerMonacoEditorCommands } from './commands';
 import {
 	buildMonacoEditorContextMenuItems,
@@ -258,6 +256,7 @@ export interface MarkdownEditorProps {
 	 * 请与外层 `h-full min-h-0 flex-1` 及 `height="100%"` 配合使用。
 	 */
 	compactChrome?: boolean;
+	loading?: React.ReactNode | null;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -302,6 +301,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	onInsertSelectionToAssistant,
 	customBottomBarNode = null,
 	compactChrome = false,
+	loading = null,
 }) => {
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
@@ -1930,8 +1930,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									theme={glassThemeId}
 									onMount={handleEditorMount}
 									options={mergedEditorOptions}
-									// loading={<Loading text={loadingEditorText} />}
-									loading={null}
+									loading={loading ? loading : null}
 								/>
 							</div>
 						</QuickContextMenu>
@@ -1981,8 +1980,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 													theme={glassThemeId}
 													onMount={handleEditorMount}
 													options={mergedEditorOptions}
-													// loading={<Loading text={loadingEditorText} />}
-													loading={null}
+													loading={loading ? loading : null}
 												/>
 											</div>
 										</QuickContextMenu>
@@ -2037,8 +2035,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 															theme={glassThemeId}
 															onMount={handleEditorMount}
 															options={mergedEditorOptions}
-															// loading={<Loading text={loadingEditorText} />}
-															loading={null}
+															loading={loading ? loading : null}
 														/>
 													</div>
 												</QuickContextMenu>
@@ -2096,8 +2093,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												theme={glassThemeId}
 												onMount={handleDiffEditorMount}
 												options={mergedDiffEditorOptions}
-												// loading={<Loading text={loadingDiffEditorText} />}
-												loading={null}
+												loading={loading ? loading : null}
 											/>
 										</div>
 									) : viewMode === 'split' ? (

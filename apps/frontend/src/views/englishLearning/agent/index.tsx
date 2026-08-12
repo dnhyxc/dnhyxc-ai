@@ -13,6 +13,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
@@ -32,6 +33,9 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import englishAgentStore from '@/store/englishAgent';
 import type { Message } from '@/types/chat';
+import { SelectionSpeakBar } from './SelectionSpeakBar';
+import { createEnglishAgentSelectionMenu } from './selectionContextMenu';
+import { useSelectionSpeak } from './useSelectionSpeak';
 
 export type AgentPanelProps = {
 	input: string;
@@ -57,6 +61,13 @@ export const AgentPanel = observer(function AgentPanel({
 	const isLoggedIn = Boolean(userStore.userInfo?.id);
 	const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 	const { isCopyedId, onCopy } = useAssistantCopy();
+	const panelRef = useRef<HTMLDivElement>(null);
+	const selectionSpeak = useSelectionSpeak();
+
+	const getSelectionContextMenuItems = useMemo(
+		() => createEnglishAgentSelectionMenu(t, selectionSpeak.start),
+		[t, selectionSpeak.start],
+	);
 
 	useEffect(() => {
 		if (!isLoggedIn) return;
@@ -129,6 +140,11 @@ export const AgentPanel = observer(function AgentPanel({
 		await sendMessage();
 	}, [sendMessage, enableStreamStickToBottom]);
 
+	const handleNewChat = useCallback(() => {
+		selectionSpeak.stop();
+		onNewChat();
+	}, [onNewChat, selectionSpeak.stop]);
+
 	const conversationColumnActive = !isHydrating && messages.length > 0;
 
 	const assistantFooter = (
@@ -143,6 +159,19 @@ export const AgentPanel = observer(function AgentPanel({
 				toTopLabel: t('englishLearning.assistant.scrollToTop'),
 				variant: 'english',
 			}}
+			floatAbove={
+				selectionSpeak.visible ? (
+					<SelectionSpeakBar
+						boundsRef={panelRef}
+						status={selectionSpeak.status}
+						rate={selectionSpeak.rate}
+						preview={selectionSpeak.preview}
+						onTogglePlay={selectionSpeak.togglePlay}
+						onStop={selectionSpeak.stop}
+						onRateChange={selectionSpeak.setRate}
+					/>
+				) : null
+			}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
 				<AssistantShareBar
@@ -182,7 +211,7 @@ export const AgentPanel = observer(function AgentPanel({
 							setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
 							enableStreamStickToBottom={enableStreamStickToBottom}
 							flushScrollToBottom={flushScrollToBottom}
-							onNewConversation={onNewChat}
+							onNewConversation={handleNewChat}
 						/>
 					}
 				/>
@@ -201,6 +230,7 @@ export const AgentPanel = observer(function AgentPanel({
 
 	return (
 		<div
+			ref={panelRef}
 			className={cn(
 				'relative flex h-full w-full flex-col overflow-hidden bg-theme-background',
 			)}
@@ -253,6 +283,7 @@ export const AgentPanel = observer(function AgentPanel({
 						}
 						variant="english"
 						t={t}
+						getSelectionContextMenuItems={getSelectionContextMenuItems}
 					/>
 				))}
 				afterScroll={toolStatusBlock}

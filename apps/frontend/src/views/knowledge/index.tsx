@@ -261,6 +261,11 @@ const Knowledge = observer(() => {
 	const lastAssistantInsertRef = useRef<{ text: string; at: number } | null>(
 		null,
 	);
+	/**
+	 * 助手面板关闭时 `KnowledgeAssistant` 未挂载，`assistantRef.appendInput` 无效。
+	 * 先开面板，待挂载后再把这里的文本写入输入框。
+	 */
+	const pendingAfterOpenInsertRef = useRef<string | null>(null);
 
 	const scheduleAssistantInputFocus = useCallback(() => {
 		window.setTimeout(() => assistantRef.current?.focusInputAtEnd(), 0);
@@ -356,32 +361,45 @@ const Knowledge = observer(() => {
 	 * 3. 若没有待插入内容则直接返回。
 	 * 4. 若上一条插入内容与当前相同，且两次操作间隔小于 160ms，则不做任何处理（防抖以避免短时间内重复插入）。
 	 * 5. 否则，记录本次插入内容和时间。
-	 * 6. 按当前助手模式写入 AI 输入框或 RAG 输入框；若已有内容则用两行换行追加，否则直接写入。
-	 * 7. 同步打开助手面板并在内容写入后聚焦（右键菜单由 Monaco 拦截 onCloseAutoFocus 防止焦点回 Monaco）。
+	 * 6. 助手已打开：写入对应模式输入框并聚焦；未打开：暂存后开面板，挂载后再写入（见下方 effect）。
 	 */
 	const flushAssistantInsertFromEditor = useCallback(() => {
-		// 重置动画帧调用的 id，防止残留
 		assistantInsertFlushRafRef.current = 0;
 		const next = pendingAssistantInsertRef.current;
-		// 清空待插入内容，防止被多次消费
 		pendingAssistantInsertRef.current = null;
-		if (!next) return; // 没有新内容则返回
+		if (!next) return;
 
 		const now = performance.now();
 		const last = lastAssistantInsertRef.current;
-		// 防抖逻辑：短时间内重复内容不插入
 		if (last && last.text === next && now - last.at < 160) {
 			return;
 		}
-		// 记录本次插入内容和时间
 		lastAssistantInsertRef.current = { text: next, at: now };
 
-		assistantRef.current?.appendInput(next, knowledgeAssistantModeRef.current);
+		// 未挂载时 appendInput 会丢；对齐 ebook：先开栏，内容等挂载后再写
+		if (!markdownAssistantOpenRef.current) {
+			const prev = pendingAfterOpenInsertRef.current?.trim();
+			pendingAfterOpenInsertRef.current = prev ? `${prev}\n\n${next}` : next;
+			setMarkdownAssistantOpen(true);
+			return;
+		}
 
-		// 对齐 ebook openAssistant：同步打开面板；内容写入后再聚焦（右键路径由 Monaco 拦截 onCloseAutoFocus）
-		setMarkdownAssistantOpen(true);
+		assistantRef.current?.appendInput(next, knowledgeAssistantModeRef.current);
 		scheduleAssistantInputFocus();
 	}, [scheduleAssistantInputFocus]);
+
+	// 助手从关闭→打开后：消费 pending，写入并聚焦（须在子组件 documentKey 清空 effect 之后）
+	useEffect(() => {
+		if (!markdownAssistantOpen) return;
+		const pending = pendingAfterOpenInsertRef.current;
+		if (!pending) return;
+		pendingAfterOpenInsertRef.current = null;
+		assistantRef.current?.appendInput(
+			pending,
+			knowledgeAssistantModeRef.current,
+		);
+		scheduleAssistantInputFocus();
+	}, [markdownAssistantOpen, scheduleAssistantInputFocus]);
 
 	// 将编辑器选区写入助手输入框
 	const onInsertSelectionToAssistant = useCallback(
@@ -391,7 +409,7 @@ const Knowledge = observer(() => {
 			 *
 			 * 重要：开启助手会触发 Monaco 视图切换（edit→split）并导致 Editor 重挂载。
 			 * 若此时父级 markdown 尚未从 Editor 同步完成，会短暂表现为“编辑器内容被清空”，并触发助手输入框的清空逻辑。
-			 * 因此这里先强制从 Editor 同步最新正文，再写入输入框，最后再打开助手面板。
+			 * 因此这里先强制从 Editor 同步最新正文，再延迟写入（未开栏时由 pendingAfterOpen 在挂载后写入）。
 			 */
 			getMarkdownFromEditorRef.current?.();
 			const next = (text ?? '').trim();

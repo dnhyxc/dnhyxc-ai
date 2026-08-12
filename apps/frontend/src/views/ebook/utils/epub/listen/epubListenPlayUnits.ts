@@ -145,10 +145,19 @@ export async function playListenUnitsFromCursor(
 				}
 			});
 
+			/** 首包尾声提前切到下一句，避免等 kick 整段 ended 才改预览 */
+			let kickAdvanced = false;
 			await playCurrent(kickRaw, {
 				speak: { rate: getRate() },
 				cloudSingleUtterance: true,
 				onPlaybackStart: prefetchAfterKickStart,
+				onPlaybackProgress: (event) => {
+					if (!isActive() || kickAdvanced) return;
+					if (event.progress < 0.8) return;
+					if (startSi + 1 >= unit.siEnd) return;
+					kickAdvanced = true;
+					onSentence(startSi + 1, {});
+				},
 			});
 			// 本机无 onPlaybackStart 时仍兜底预取，保证后续等待不被拉长
 			prefetchAfterKickStart();
@@ -171,7 +180,7 @@ export async function playListenUnitsFromCursor(
 			}
 
 			const restStartSi = si;
-			onSentence(restStartSi, {});
+			if (!kickAdvanced) onSentence(restStartSi, {});
 
 			const prefetchAfterRestStart = oncePrefetch(() => {
 				if (pi + 1 < units.length) {

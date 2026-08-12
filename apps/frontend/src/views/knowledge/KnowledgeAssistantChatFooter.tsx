@@ -254,7 +254,12 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 		[appendInputBlock, assistantMode, setInputProp, setRagInputProp],
 	);
 
+	// 仅换篇清空；首挂载草稿本为空，勿清（避免冲掉「开栏后写入」的复制选区）
+	const prevDocumentKeyRef = useRef<string | null>(null);
 	useEffect(() => {
+		const prev = prevDocumentKeyRef.current;
+		prevDocumentKeyRef.current = documentKey;
+		if (prev === null || prev === documentKey) return;
 		aiDraftRef.current = '';
 		ragDraftRef.current = '';
 		entryRef.current?.clear();
@@ -286,6 +291,10 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 		if (knowledgeStore.markdownNonempty) return;
 		const id = window.setTimeout(() => {
 			if (!knowledgeStore.markdownNonempty) {
+				// 开栏瞬间 Monaco 重挂载可能短暂空正文；有草稿（含复制选区）则保留
+				const cur =
+					entryRef.current?.getValue()?.trim() || aiDraftRef.current.trim();
+				if (cur) return;
 				aiDraftRef.current = '';
 				if (!isRagMode) entryRef.current?.clear();
 				setInputProp?.('');

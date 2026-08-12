@@ -4,6 +4,10 @@
 
 | 文档 | 范围 |
 |------|------|
+| [epub-listen-cadence-lead.md](./epub-listen-cadence-lead.md) | **云端切句提前 + kick 尾声提前**：对听书/听当前句高亮时序与选区朗读预览的影响 |
+| [english-agent-selection-speak.md](./english-agent-selection-speak.md) | **英语 Agent 选区右键朗读/复制 + 通用 `PositionedQuickMenu`/`useSelectionContextMenu` 抽取**：对 EPUB 右键菜单薄壳化、Markdown/知识库助手未启用菜单、听书 TTS 链路复用的影响 |
+| [plugin-host-error-actions.md](./plugin-host-error-actions.md) | **插件宿主卡片错误态新增「返回首页」「插件开发指南」按钮**：对 toolbar 变体、加载态、错误边界、全屏态、路由导航的影响 |
+| [ui-tint-polish.md](./ui-tint-polish.md) | **首页色相透明度 + 全局 `Button` default/outline variant + `ScrollFab` 尺寸 + `DropdownMenuContent` 内边距**：对 30+ 文件 Button 消费方、三端 ScrollFab、主题色切换豁免的影响 |
 | [epub-listen-bg-vs-annotations.md](./epub-listen-bg-vs-annotations.md) | 听当前/听书 **播放背景色** 对用户划线、想法虚线的影响点 |
 | [epub-listen-resize-relayout.md](./epub-listen-resize-relayout.md) | 阅读区 **resize 重绘**（`repaintActive` / ResizeObserver / `EpubPane` 接线）对原有功能的影响点 |
 | [epub-listen-utils-consolidation.md](./epub-listen-utils-consolidation.md) | 听读 **utils 7→3 文件合并**：路径对照、API 不变项、文档滞后、回归清单 |

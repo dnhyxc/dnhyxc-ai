@@ -5,6 +5,10 @@
  */
 
 import {
+	type SelectionContextMenuItemsFn,
+	useSelectionContextMenu,
+} from '@design/ContextMenu';
+import {
 	bindMarkdownCodeFenceActions,
 	MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
@@ -148,6 +152,11 @@ interface AssistantMessageProps {
 	 */
 	scrollViewportRef?: React.RefObject<HTMLElement | null>;
 	className?: string;
+	/**
+	 * 选中消息正文后右键菜单；不传则关闭（默认）。
+	 * 菜单能力由使用方传入（如英语 Agent 的朗读/复制）。
+	 */
+	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
 }
 
 function ChatAssistantMessageInner({
@@ -160,10 +169,16 @@ function ChatAssistantMessageInner({
 	t,
 	scrollViewportRef,
 	className,
+	getSelectionContextMenuItems,
 }: AssistantMessageProps) {
 	const { theme: appTheme } = useTheme();
 	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
 	const shellRef = useRef<HTMLDivElement>(null);
+	const {
+		onContextMenuCapture: onSelectionContextMenuCapture,
+		onPointerDownCapture: onSelectionPointerDownCapture,
+		menu: selectionContextMenu,
+	} = useSelectionContextMenu(getSelectionContextMenuItems);
 	const bodyMarkdownRef = useRef<HTMLDivElement>(null);
 	const previewBubbleRef = useRef<HTMLDivElement>(null);
 	/** 与当前预览绑定的角标节点；同 position 多出处时需区分，否则会沿用旧 rect 导致气泡跑偏 */
@@ -486,6 +501,8 @@ function ChatAssistantMessageInner({
 			ref={shellRef} // IO 观察目标：整条气泡（思考区+正文+操作区），进视口判定与此一致
 			className="w-full h-auto"
 			data-chat-assistant-shell
+			onContextMenuCapture={onSelectionContextMenuCapture}
+			onPointerDownCapture={onSelectionPointerDownCapture}
 		>
 			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
 				<div
@@ -728,6 +745,7 @@ function ChatAssistantMessageInner({
 					</div>,
 					document.body,
 				)}
+			{selectionContextMenu}
 		</div>
 	);
 }
@@ -759,7 +777,10 @@ function areChatAssistantMessageMemoPropsEqual(
 		prev.scrollViewportRef === next.scrollViewportRef &&
 		prev.onToggleThinkContent === next.onToggleThinkContent &&
 		prev.onContinue === next.onContinue &&
-		prev.onContinueAnswering === next.onContinueAnswering
+		prev.onContinueAnswering === next.onContinueAnswering &&
+		prev.getSelectionContextMenuItems === next.getSelectionContextMenuItems &&
+		prev.className === next.className &&
+		prev.t === next.t
 	);
 }
 

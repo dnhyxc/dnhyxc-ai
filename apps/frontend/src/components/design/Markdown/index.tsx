@@ -1,3 +1,7 @@
+import {
+	type SelectionContextMenuItemsFn,
+	useSelectionContextMenu,
+} from '@design/ContextMenu';
 import Loading from '@design/Loading';
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
@@ -92,6 +96,11 @@ interface ParserMarkdownPreviewPaneProps {
 	 * 源正文已有内容但 `markdown` 尚未就绪（deferred/latch 追平帧）时展示加载态，避免误显示「预览为空」。
 	 */
 	pendingSourceMarkdown?: string;
+	/**
+	 * 选中预览正文后右键菜单；不传则关闭（默认）。
+	 * 菜单项由使用方根据选中文本自行决定（朗读/复制等），组件不写死能力。
+	 */
+	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
 }
 
 /**
@@ -109,8 +118,14 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	withScrollArea = true,
 	enableCodeFloatingToolbar = true,
 	pendingSourceMarkdown,
+	getSelectionContextMenuItems,
 }: ParserMarkdownPreviewPaneProps) {
 	const markdownRef = useRef<HTMLDivElement>(null);
+	const {
+		onContextMenuCapture: onSelectionContextMenuCapture,
+		onPointerDownCapture: onSelectionPointerDownCapture,
+		menu: selectionContextMenu,
+	} = useSelectionContextMenu(getSelectionContextMenuItems);
 	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
 	const previewHtmlRootRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
@@ -437,6 +452,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	return (
 		<div
 			ref={markdownRef}
+			onContextMenuCapture={onSelectionContextMenuCapture}
+			onPointerDownCapture={onSelectionPointerDownCapture}
 			className={cn(
 				'relative h-full min-h-0 min-w-0 max-w-full w-full contain-[inline-size] select-text',
 				embedInParentScroll ? 'overflow-visible' : 'overflow-hidden',
@@ -512,6 +529,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				</Tooltip>
 			) : null}
 			{mermaidImagePreviewModal}
+			{selectionContextMenu}
 		</div>
 	);
 });

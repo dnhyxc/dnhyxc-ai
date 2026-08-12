@@ -8,6 +8,7 @@ export function AssistantFooter({
 	containerClassName,
 	showScrollFab = false,
 	scrollFab,
+	floatAbove,
 	children,
 }: AssistantFooterProps) {
 	return (
@@ -18,6 +19,7 @@ export function AssistantFooter({
 					containerClassName,
 				)}
 			>
+				{floatAbove}
 				{showScrollFab && scrollFab ? <ScrollFab {...scrollFab} /> : null}
 				{children}
 			</div>

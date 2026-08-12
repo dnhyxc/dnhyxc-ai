@@ -1551,4 +1551,29 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'All pages now load on demand—only the home page, login page, and app shell are downloaded on first open. Large modules like the code editor, EPUB reader, PDF reader, and chart rendering are loaded only when you enter the corresponding page. The code editor is further refined so its core loads only when the editor opens, and the code formatter downloads only on first format. The home page opens noticeably faster, and secondary features load on demand as you use them.',
 	},
+	's25-101': {
+		title: 'English Agent selection right-click read aloud & copy',
+		description:
+			'In the English-learning Agent chat, selecting a passage of a message and right-clicking opens a custom menu to read the selected text aloud or copy it; with no text selected, the system default menu is used. Read-aloud reuses the same segmented cloud TTS as the book reader—first sentence plays fast with per-sentence preview—while a floating control bar above the input lets you play/pause, stop, change speed, and drag it anywhere. Markdown preview and the EPUB selection menu share the same menu component.',
+	},
+	's25-102': {
+		title: 'Cloud TTS sentence highlighting feels more in sync',
+		description:
+			'Per-sentence highlighting for cloud whole-paragraph TTS now switches about 0.35s ahead of media time, easing the lag where the next sentence is being read but the highlight is still on the previous one. When the first sentence of book listening nears its end, the next sentence highlight also switches early, shortening the preview gap between the end of the first sentence and the start of the next segment. Playback progress is polled at a higher frequency for smoother in-sentence progress feedback.',
+	},
+	's25-103': {
+		title: 'Plugin load failure: return home or open dev guide',
+		description:
+			'When a plugin page fails to load, the error message now offers Return home and Plugin development guide buttons alongside the existing Reload—three buttons centered with icons. If a plugin stays unavailable, you can jump back to the home page or open the onboarding docs in a new window without editing the address bar.',
+	},
+	's25-104': {
+		title: 'UI tint softened & button/scroll button tweaks',
+		description:
+			'Home color blocks and global accent buttons are uniformly desaturated (with alpha) so they look softer in both light and dark themes—no more visual oversaturation. The scroll-to-top/bottom button changes from an oversized circle to a more compact rounded rectangle, and the floating read-aloud bar above the English Agent input is narrowed to match. Dropdown menu content padding is slightly increased for easier clicking.',
+	},
+	's25-105': {
+		title: 'EPUB settings slider macOS blur color fix',
+		description:
+			'Fixed an issue on macOS where the font-size and line-height sliders in the EPUB reader settings panel turned gray after the window lost focus and did not recover. The slider color now automatically restores to the theme accent color when the window regains focus or the settings panel is reopened.',
+	},
 };

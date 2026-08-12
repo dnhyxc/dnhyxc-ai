@@ -312,7 +312,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-8': {
 		title: '13.8 English-learning Agent (multi-session)',
 		description:
-			'Agent chat supports multiple sessions with a paginated history drawer; “New chat” clears the view and creates the server session on first send. Scroll-to-bottom / scroll-to-top near the input; scrolling up during streaming stops auto-follow and your position is kept after streaming ends. Quick intents affect only the current turn, not stored transcript. Saving to the knowledge base may navigate you there to continue editing.',
+			'Agent chat supports multiple sessions with a paginated history drawer; “New chat” clears the view and creates the server session on first send. Scroll-to-bottom / scroll-to-top near the input; scrolling up during streaming stops auto-follow and your position is kept after streaming ends. Quick intents affect only the current turn, not stored transcript. Saving to the knowledge base may navigate you there to continue editing. Selecting text in an Agent message and right-clicking offers Read aloud or Copy; read-aloud reuses the book-reader segmented cloud TTS, with a floating control bar above the input for play/pause, stop, speed, and dragging to any position; with no text selected, the system default menu is used.',
 	},
 	'pg-s13-9': {
 		title: '13.9 List and left-rail UX details',

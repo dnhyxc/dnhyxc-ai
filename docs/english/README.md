@@ -107,6 +107,7 @@
 | [english-tts-stop-cleanup.md](./english-tts-stop-cleanup.md) | **增量**：`stopAllPlayback` 彻底释放音频元素与 MediaSession（修复 Touch Bar/控制中心残留进度条）、路由壳子页切换自动停播、经典句朗读统一 `cloudSingleUtterance` |
 | [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) | **增量**：本机 `cancel()` 后 50ms settle，修复首句无声（听当前/听书本机路径） |
 | [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
+| [selection-speak-context-menu.md](./selection-speak-context-menu.md) | **增量（本轮）**：英语 Agent 消息正文「选中文本 → 右键 → 朗读/复制」；抽取通用 `useSelectionContextMenu` hook + `PositionedQuickMenu` 组件（供 `ChatAssistantMessage` / `Markdown` 预览 / EPUB 右键复用）；朗读复用听书同款按段云端 TTS，悬浮条支持拖动/倍速/软暂停（含改动前/后对比与逐行注释） |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)
 - 完整列表：`ls docs/english/*.md`
 

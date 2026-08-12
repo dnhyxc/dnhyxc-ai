@@ -474,6 +474,12 @@ export type TtsCadenceChunkEvent = {
 	sentencePlainEnd: number;
 };
 
+/** 云端整段播放：按 audio 进度映射到当前句内 0~1（与句高亮同一套估算） */
+export type TtsPlaybackProgress = {
+	sentenceIndex: number;
+	progress: number;
+};
+
 /** 听书逐句：上一句播放期间预取的云端 MP3（plain 为实际请求的 chunk 文本） */
 export type TtsSentencePrefetch = {
 	plain: string;
@@ -487,6 +493,11 @@ export type PlayPreferredOptions = {
 	speak?: SpeakOptions;
 	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
+	/**
+	 * 云端单段 Audio 播放进度（currentTime/duration → 句内 progress）。
+	 * 本机 Web Speech 无可靠字级进度时不回调。
+	 */
+	onPlaybackProgress?: (event: TtsPlaybackProgress) => void;
 	/** 听书/听当前：由上一轮发起的云端预取（缩短等待） */
 	prefetchedCloud?: Promise<TtsSentencePrefetch> | null;
 	/**
@@ -510,6 +521,7 @@ export type PlayPreferredOptions = {
 type CadencePlaybackHooks = Pick<
 	PlayPreferredOptions,
 	| 'onCadenceChunk'
+	| 'onPlaybackProgress'
 	| 'prefetchedCloud'
 	| 'onPlaybackStart'
 	| 'onAwaitingPlayback'
@@ -897,6 +909,8 @@ let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
 /** stopPlaybackMediaOnly 时打断 waitCloudAudioEnd，避免 onended 被清掉后一直挂到超时 */
 let abortCloudAudioWait: (() => void) | null = null;
+/** 句高亮 rAF 轮询；stop 时取消，避免卸 src 后仍回调 */
+let abortCloudCadenceRaf: (() => void) | null = null;
 /** 点击同步解锁 Tauri/WKWebView 云端 Audio（须在 fetch 合成之前调用） */
 let cloudAudioUnlock: HTMLAudioElement | null = null;
 const SILENT_WAV_DATA_URI =
@@ -1202,6 +1216,8 @@ function stopPlaybackMediaOnly(): void {
 	}
 	abortCloudAudioWait?.();
 	abortCloudAudioWait = null;
+	abortCloudCadenceRaf?.();
+	abortCloudCadenceRaf = null;
 	detachCloudAudioPauseBridge?.();
 	detachCloudAudioPauseBridge = null;
 	if (cloudAudio) {
@@ -1733,7 +1749,10 @@ async function playCloudTtsCadenceSegments(
 	}
 }
 
-/** 整段一次合成；按 currentTime 比例估算当前句并回调 onCadenceChunk */
+/** 整段一次合成；按 currentTime 比例估算当前句并回调 onCadenceChunk。
+ * ponytail: TTS 非匀速 + timeupdate 稀疏，纯比例切句常落后听感；媒体时间略提前。 */
+const CLOUD_CADENCE_LEAD_SEC = 0.35;
+
 async function playCloudTtsSingleUtterance(
 	plain: string,
 	generation: number,
@@ -1777,18 +1796,27 @@ async function playCloudTtsSingleUtterance(
 		generation,
 		rate,
 		(currentTime, duration) => {
-			if (!onCadence || sentences.length === 0) return;
+			if (sentences.length === 0) return;
 			if (!(duration > 0) || !Number.isFinite(duration)) return;
-			const ratio = Math.min(1, Math.max(0, currentTime / duration));
+			const leadTime = Math.min(duration, currentTime + CLOUD_CADENCE_LEAD_SEC);
+			const ratio = Math.min(1, Math.max(0, leadTime / duration));
 			const offset = Math.min(
 				Math.max(0, plain.length - 1),
 				Math.floor(ratio * plain.length),
 			);
 			const si = sentenceIndexAtOffset(sentences, offset);
-			if (si === lastSi) return;
-			if (lastSi >= 0) emitSentence(lastSi, 'end');
-			emitSentence(si, 'start');
-			lastSi = si;
+			if (onCadence && si !== lastSi) {
+				if (lastSi >= 0) emitSentence(lastSi, 'end');
+				emitSentence(si, 'start');
+				lastSi = si;
+			}
+			const span = sentences[si];
+			if (!span || !opts?.onPlaybackProgress) return;
+			const len = Math.max(1, span.end - span.start);
+			opts.onPlaybackProgress({
+				sentenceIndex: si,
+				progress: Math.min(1, Math.max(0, (offset - span.start) / len)),
+			});
 		},
 		opts?.onPlaybackStart,
 	);
@@ -1857,6 +1885,14 @@ async function playCloudTtsPackedSingleUtterances(
 			onCadenceChunk: parentOnCadence
 				? (event) => {
 						parentOnCadence({
+							...event,
+							sentenceIndex: baseSi + event.sentenceIndex,
+						});
+					}
+				: undefined,
+			onPlaybackProgress: opts?.onPlaybackProgress
+				? (event) => {
+						opts.onPlaybackProgress!({
 							...event,
 							sentenceIndex: baseSi + event.sentenceIndex,
 						});
@@ -1954,10 +1990,51 @@ function playCloudMp3Blob(
 	audio.muted = false;
 	audio.volume = 1;
 	audio.src = url;
+	abortCloudCadenceRaf?.();
+	abortCloudCadenceRaf = null;
 	if (onTimeUpdate) {
-		audio.ontimeupdate = () => {
+		let rafId = 0;
+		const stopRaf = () => {
+			if (rafId) cancelAnimationFrame(rafId);
+			rafId = 0;
+		};
+		const emit = () => {
 			if (!isPlaybackGenerationActive(generation)) return;
 			onTimeUpdate(audio.currentTime, audio.duration);
+		};
+		const pump = () => {
+			rafId = 0;
+			emit();
+			if (
+				isPlaybackGenerationActive(generation) &&
+				!audio.paused &&
+				!audio.ended
+			) {
+				rafId = requestAnimationFrame(pump);
+			}
+		};
+		const onPlaying = () => {
+			stopRaf();
+			rafId = requestAnimationFrame(pump);
+		};
+		const onPauseOrEnd = () => {
+			stopRaf();
+			emit();
+		};
+		abortCloudCadenceRaf = () => {
+			stopRaf();
+			audio.removeEventListener('playing', onPlaying);
+			audio.removeEventListener('pause', onPauseOrEnd);
+			audio.removeEventListener('ended', onPauseOrEnd);
+			abortCloudCadenceRaf = null;
+		};
+		audio.addEventListener('playing', onPlaying);
+		audio.addEventListener('pause', onPauseOrEnd);
+		audio.addEventListener('ended', onPauseOrEnd);
+		// 兜底：部分环境 playing 事件稀疏
+		audio.ontimeupdate = () => {
+			if (!isPlaybackGenerationActive(generation)) return;
+			emit();
 		};
 	}
 
@@ -2166,6 +2243,7 @@ export async function playPreferred(
 
 	const cadenceHooks: CadencePlaybackHooks = {
 		onCadenceChunk: options?.onCadenceChunk,
+		onPlaybackProgress: options?.onPlaybackProgress,
 		prefetchedCloud: options?.prefetchedCloud,
 		onPlaybackStart: options?.onPlaybackStart,
 		onAwaitingPlayback: options?.onAwaitingPlayback,
@@ -2187,6 +2265,7 @@ export async function playPreferred(
 	// 云端优先：失败时 MiniMax/讯飞 → Edge → 本机 Web Speech
 	const cloudPlayOpts = {
 		onCadenceChunk: options?.onCadenceChunk,
+		onPlaybackProgress: options?.onPlaybackProgress,
 		prefetchedCloud: options?.prefetchedCloud,
 		onPlaybackStart: options?.onPlaybackStart,
 		onAwaitingPlayback: options?.onAwaitingPlayback,

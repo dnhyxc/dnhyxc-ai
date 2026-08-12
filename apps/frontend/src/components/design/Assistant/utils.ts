@@ -52,14 +52,14 @@ export function messageLabelClass(
 ): string {
 	if (variant === 'english') {
 		return cn(
-			'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-auto rounded-md p-4 text-textcolor',
+			'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-text rounded-md p-4 text-textcolor',
 			isUser
 				? 'w-fit max-w-[min(100%,36rem)] border border-teal-500/5 bg-teal-500/8 px-4 pt-2 pb-2.5'
 				: 'w-full border border-theme/5 bg-theme-secondary/60 py-3',
 		);
 	}
 	return cn(
-		'message-md-wrap relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
+		'message-md-wrap relative flex min-w-0 max-w-full rounded-md p-3 select-text text-textcolor mb-5',
 		isUser
 			? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/5 text-end pt-2 pb-2.5 px-3'
 			: 'flex-1 bg-theme/5 border border-theme/5',

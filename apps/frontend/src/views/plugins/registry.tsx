@@ -277,152 +277,146 @@ export default function PluginRegistryEditorPage() {
 
 			<div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col">
 				<div className="min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md">
-					{loading ? (
-						<Loading
-							className="bg-theme/5"
-							text={t('plugins.registry.loading')}
-						/>
-					) : (
-						<MarkdownEditor
-							className="h-full min-h-0"
-							value={text}
-							readOnly={saving || !!uploadingPluginId}
-							onChange={setText}
-							language="json"
-							theme={monacoTheme}
-							height="100%"
-							documentIdentity={`plugins-registry-editor-${docEpoch}`}
-							getMarkdownFromEditorRef={getEditorTextRef}
-							placeholder=""
-							enableMarkdownBottomBar={false}
-							showTabBar={false}
-							stickyScrollEnabled={false}
-							clipboardAdapter={monacoClipboardAdapter}
-							t={t}
-							title={
-								<div className="flex flex-1 items-center justify-between gap-2 pl-1.5">
-									<div className="flex min-w-0 items-center gap-1.5">
-										<RegistryFieldsHelp dirty={textDiff} />
-										<span className="text-textcolor truncate base font-medium">
-											{PLUGIN_REGISTRY_FILENAME}
-										</span>
-									</div>
-									<div className="flex shrink-0 items-center gap-2 pr-1 sm:gap-3">
-										{pluginList.length !== 0 ? (
-											<DropdownMenu>
-												<DropdownMenuTrigger
-													asChild
-													disabled={busy || pluginList.length === 0}
+					<MarkdownEditor
+						className="h-full min-h-0"
+						value={text}
+						readOnly={saving || !!uploadingPluginId}
+						onChange={setText}
+						language="json"
+						theme={monacoTheme}
+						height="100%"
+						documentIdentity={`plugins-registry-editor-${docEpoch}`}
+						getMarkdownFromEditorRef={getEditorTextRef}
+						placeholder=""
+						enableMarkdownBottomBar={false}
+						showTabBar={false}
+						stickyScrollEnabled={false}
+						loading={<Loading />}
+						clipboardAdapter={monacoClipboardAdapter}
+						t={t}
+						title={
+							<div className="flex flex-1 items-center justify-between gap-2 pl-1.5">
+								<div className="flex min-w-0 items-center gap-1.5">
+									<RegistryFieldsHelp dirty={textDiff} />
+									<span className="text-textcolor truncate base font-medium">
+										{PLUGIN_REGISTRY_FILENAME}
+									</span>
+								</div>
+								<div className="flex shrink-0 items-center gap-2 pr-1 sm:gap-3">
+									{pluginList.length !== 0 ? (
+										<DropdownMenu>
+											<DropdownMenuTrigger
+												asChild
+												disabled={busy || pluginList.length === 0}
+											>
+												<Button
+													type="button"
+													variant="link"
+													size="sm"
+													disabled={busy}
+													aria-busy={!!uploadingPluginId}
+													title={
+														uploadingPluginId
+															? t('plugins.registry.iconUploading')
+															: undefined
+													}
+													className={titleBarBtn}
 												>
-													<Button
-														type="button"
-														variant="link"
-														size="sm"
-														disabled={busy}
-														aria-busy={!!uploadingPluginId}
-														title={
-															uploadingPluginId
-																? t('plugins.registry.iconUploading')
-																: undefined
-														}
-														className={titleBarBtn}
+													<span className={titleIconSlot}>
+														{uploadingPluginId ? (
+															<Spinner
+																className="size-4 text-textcolor"
+																aria-hidden
+															/>
+														) : (
+															<ImageUp className="size-4" aria-hidden />
+														)}
+													</span>
+													{t('plugins.registry.iconUploadLabel')}
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent
+												align="end"
+												className="min-w-50"
+												viewportClassName="max-h-80"
+											>
+												{pluginList.map((data) => (
+													<DropdownMenuItem
+														key={data.id}
+														className="gap-3 py-1 pr-0"
+														onClick={(e) => {
+															e.stopPropagation();
+															onPickPluginIcon(data.id);
+														}}
 													>
-														<span className={titleIconSlot}>
-															{uploadingPluginId ? (
-																<Spinner
-																	className="size-4 text-textcolor"
-																	aria-hidden
-																/>
-															) : (
-																<ImageUp className="size-4" aria-hidden />
-															)}
+														<span className="min-w-0 flex-1 truncate">
+															{data.title}
 														</span>
-														{t('plugins.registry.iconUploadLabel')}
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent
-													align="end"
-													className="min-w-50"
-													viewportClassName="max-h-80"
-												>
-													{pluginList.map((data) => (
-														<DropdownMenuItem
-															key={data.id}
-															className="gap-3 py-1 pr-0"
-															onClick={(e) => {
+														<div
+															className="shrink-0 size-7 flex items-center justify-center"
+															onPointerDown={(e) => {
+																e.preventDefault();
 																e.stopPropagation();
-																onPickPluginIcon(data.id);
 															}}
 														>
-															<span className="min-w-0 flex-1 truncate">
-																{data.title}
-															</span>
-															<div
-																className="shrink-0 size-7 flex items-center justify-center"
-																onPointerDown={(e) => {
-																	e.preventDefault();
-																	e.stopPropagation();
-																}}
-															>
-																<PluginIcon
-																	name={data.icon}
-																	className="size-4 text-textcolor"
-																/>
-															</div>
-														</DropdownMenuItem>
-													))}
-												</DropdownMenuContent>
-											</DropdownMenu>
-										) : null}
+															<PluginIcon
+																name={data.icon}
+																className="size-4 text-textcolor"
+															/>
+														</div>
+													</DropdownMenuItem>
+												))}
+											</DropdownMenuContent>
+										</DropdownMenu>
+									) : null}
 
-										<Button
-											type="button"
-											variant="link"
-											size="sm"
-											disabled={busy || jsonParseError || !text.trim()}
-											aria-busy={saving}
-											title={saving ? t('plugins.registry.saving') : undefined}
-											className={titleBarBtn}
-											onClick={() => void onSave()}
-										>
-											<span className={titleIconSlot}>
-												{saving ? (
-													<Spinner
-														className="size-4 text-textcolor"
-														aria-hidden
-													/>
-												) : (
-													<Save className="size-4" aria-hidden />
-												)}
-											</span>
-											{t('plugins.registry.save')}
-										</Button>
-										<Button
-											type="button"
-											variant="link"
-											size="sm"
-											disabled={busy}
-											aria-busy={loading}
-											className={titleBarBtn}
-											onClick={() => void load()}
-										>
-											<span className={titleIconSlot}>
-												{loading ? (
-													<Spinner
-														className="size-4 text-textcolor"
-														aria-hidden
-													/>
-												) : (
-													<ListRestart className="size-4" aria-hidden />
-												)}
-											</span>
-											{t('plugins.registry.reload')}
-										</Button>
-									</div>
+									<Button
+										type="button"
+										variant="link"
+										size="sm"
+										disabled={busy || jsonParseError || !text.trim()}
+										aria-busy={saving}
+										title={saving ? t('plugins.registry.saving') : undefined}
+										className={titleBarBtn}
+										onClick={() => void onSave()}
+									>
+										<span className={titleIconSlot}>
+											{saving ? (
+												<Spinner
+													className="size-4 text-textcolor"
+													aria-hidden
+												/>
+											) : (
+												<Save className="size-4" aria-hidden />
+											)}
+										</span>
+										{t('plugins.registry.save')}
+									</Button>
+									<Button
+										type="button"
+										variant="link"
+										size="sm"
+										disabled={busy}
+										aria-busy={loading}
+										className={titleBarBtn}
+										onClick={() => void load()}
+									>
+										<span className={titleIconSlot}>
+											{loading ? (
+												<Spinner
+													className="size-4 text-textcolor"
+													aria-hidden
+												/>
+											) : (
+												<ListRestart className="size-4" aria-hidden />
+											)}
+										</span>
+										{t('plugins.registry.reload')}
+									</Button>
 								</div>
-							}
-						/>
-					)}
+							</div>
+						}
+					/>
 				</div>
 			</div>
 		</div>

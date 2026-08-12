@@ -34,32 +34,32 @@ export const HUE_STYLES: Record<
 > = {
 	teal: {
 		rail: 'bg-teal-400',
-		icon: 'from-teal-500 to-teal-300 shadow-teal-500/25',
-		btn: 'from-teal-400 to-teal-500 hover:shadow-teal-500/30',
+		icon: 'from-teal-500/90 to-teal-300/90 shadow-teal-500/25',
+		btn: 'from-teal-400/80 to-teal-500/80 hover:shadow-teal-500/30',
 		glow: 'from-teal-600/15 via-cyan-500/8',
 	},
 	emerald: {
 		rail: 'bg-emerald-400',
-		icon: 'from-emerald-400 to-[#14b8a6] shadow-emerald-500/25',
-		btn: 'from-emerald-400 to-[#14b8a6] hover:shadow-emerald-500/30',
+		icon: 'from-emerald-400/90 to-teal-200/90 shadow-emerald-500/25',
+		btn: 'from-emerald-400/80 to-teal-200/80 hover:shadow-emerald-500/30',
 		glow: 'from-emerald-500/15 via-teal-500/8',
 	},
 	amber: {
 		rail: 'bg-amber-400',
-		icon: 'from-amber-400 to-orange-500 shadow-amber-500/20',
-		btn: 'from-amber-400 to-orange-500 hover:shadow-amber-500/30',
+		icon: 'from-amber-400/90 to-orange-500/90 shadow-amber-500/20',
+		btn: 'from-amber-400/80 to-orange-500/80 hover:shadow-amber-500/30',
 		glow: 'from-amber-500/15 via-orange-500/8',
 	},
 	rose: {
 		rail: 'bg-rose-400',
-		icon: 'from-rose-400 to-amber-600 shadow-rose-500/20',
-		btn: 'from-rose-400 to-amber-600 hover:shadow-rose-500/30',
+		icon: 'from-rose-400/90 to-amber-600/90 shadow-rose-500/20',
+		btn: 'from-rose-400/80 to-amber-600/80 hover:shadow-rose-500/30',
 		glow: 'from-rose-500/15 via-amber-500/8',
 	},
 	violet: {
 		rail: 'bg-violet-400',
-		icon: 'from-violet-400 to-purple-600 shadow-violet-500/25',
-		btn: 'from-violet-400 to-purple-600 hover:shadow-violet-500/30',
+		icon: 'from-violet-400/90 to-purple-600/90 shadow-violet-500/25',
+		btn: 'from-violet-400/80 to-purple-600/80 hover:shadow-violet-500/30',
 		glow: 'from-violet-500/15 via-purple-500/8',
 	},
 };
