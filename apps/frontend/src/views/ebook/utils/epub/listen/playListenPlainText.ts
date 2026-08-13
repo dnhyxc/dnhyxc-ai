@@ -11,7 +11,18 @@ export async function playListenPlainText(
 		isActive?: () => boolean;
 		getRate?: () => number;
 		onAwaitingCurrentTts?: (waiting: boolean) => void;
-		onSentence?: (si: number, info: { forceCenter?: boolean }) => void;
+		onSentence?: (
+			si: number,
+			info: { forceCenter?: boolean; early?: boolean },
+		) => void;
+		onAudioTime?: (info: {
+			text: string;
+			baseSi: number;
+			currentTime: number;
+			duration: number;
+			/** 与听书同一套中英权重切句（相对本段 text） */
+			sentenceIndex?: number;
+		}) => void;
 	},
 ): Promise<boolean> {
 	const plain = stripMarkdownForTts(rawText).trim();
@@ -30,5 +41,6 @@ export async function playListenPlainText(
 		isActive: options?.isActive ?? (() => true),
 		onSentence: options?.onSentence ?? (() => {}),
 		onAwaitingCurrentTts: options?.onAwaitingCurrentTts,
+		onAudioTime: options?.onAudioTime,
 	});
 }

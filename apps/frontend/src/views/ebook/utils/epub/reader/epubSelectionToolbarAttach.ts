@@ -96,7 +96,7 @@ function readSelectionText(win: Window): string {
 	return (win.getSelection()?.toString() ?? '').trim();
 }
 
-/** 清除 rendition 各 iframe 及顶层的文字选区 */
+/** 清除 rendition 各 iframe 内的文字选区（正文只在 iframe，勿动顶层选区） */
 export function clearEpubTextSelection(rend: Rendition): void {
 	// removeAllRanges 常把焦点打进 iframe；若原先在父页面（侧栏/按钮），清完还回去
 	const prev = document.activeElement;
@@ -120,11 +120,8 @@ export function clearEpubTextSelection(rend: Rendition): void {
 			// iframe 已卸载时忽略
 		}
 	}
-	try {
-		window.getSelection()?.removeAllRanges();
-	} catch {
-		// ignore
-	}
+	// ponytail: 不清 window.getSelection——侧栏问书拖选会因 ScrollArea 自动滚动触发
+	// attachEpubSelectionPopBar 的 window/document scroll 监听，误清顶层选区导致拖选断裂。
 
 	if (!restore || document.activeElement === prev) return;
 	for (const contents of list) {

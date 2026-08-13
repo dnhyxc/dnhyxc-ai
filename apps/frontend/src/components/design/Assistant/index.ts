@@ -1,3 +1,10 @@
+export {
+	createSelectionSpeakMenu,
+	SelectionSpeakBar,
+	type SelectionSpeakStatus,
+	useAssistantSelectionSpeak,
+	useSelectionSpeak,
+} from '../SelectionSpeak';
 export { AssistantEntryToolbar } from './EntryToolbar';
 export { AssistantFooter } from './Footer';
 export { AssistantHistoryDrawer } from './HistoryDrawer';

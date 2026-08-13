@@ -225,19 +225,37 @@ function EbookReadPage() {
 	const chapterListenRef = useRef(chapterListen);
 	chapterListenRef.current = chapterListen;
 
+	/** 问书选区朗读 stop；与听书互斥（只在本页接线，不改公共选区朗读） */
+	const assistantSpeakStopRef = useRef<(() => void) | null>(null);
+	const stopAssistantSelectionSpeak = useCallback(() => {
+		assistantSpeakStopRef.current?.();
+	}, []);
+	const stopChapterListenForSpeak = useCallback(() => {
+		chapterListenRef.current.stop();
+	}, []);
+	const toggleChapterListenExclusive = useCallback(() => {
+		// 开听书前先停问书朗读；关听书无需动问书
+		if (chapterListenRef.current.status === 'idle') {
+			stopAssistantSelectionSpeak();
+		}
+		chapterListenRef.current.toggleChapterListen();
+	}, [stopAssistantSelectionSpeak]);
+
 	const { toggleListen, listenLabel } = useEbookQuoteListen(
 		t,
 		() => epubNavRef.current?.getRendition() ?? null,
 		() => epubNavRef.current?.syncReadingAnnotations(),
 		() => epubSpineIndexRef.current ?? epubSpineIndex,
 		{
-			startFromCfi: (cfi, mode, anchorRange, selectionPlain) =>
+			startFromCfi: (cfi, mode, anchorRange, selectionPlain) => {
+				stopAssistantSelectionSpeak();
 				chapterListenRef.current.startFromCfi(
 					cfi,
 					mode,
 					anchorRange,
 					selectionPlain,
-				),
+				);
+			},
 		},
 	);
 
@@ -1602,6 +1620,7 @@ function EbookReadPage() {
 				setEpubSpineIndex(spineIndex);
 			}
 			if (wasListening) {
+				assistantSpeakStopRef.current?.();
 				chapterListenRef.current.restartFromChapterStart();
 			}
 		})();
@@ -2168,6 +2187,8 @@ function EbookReadPage() {
 					bookTitle={book.title}
 					input={assistantInput}
 					onInputChange={setAssistantInput}
+					onBeforeSelectionSpeak={stopChapterListenForSpeak}
+					selectionSpeakStopRef={assistantSpeakStopRef}
 				/>
 			);
 		}
@@ -2227,6 +2248,7 @@ function EbookReadPage() {
 		book,
 		assistantOpen,
 		assistantInput,
+		stopChapterListenForSpeak,
 		closeThoughtDialog,
 		closeThoughtList,
 		deleteThought,
@@ -2611,7 +2633,7 @@ function EbookReadPage() {
 								: t('ebook.read.listenBook')
 						}
 						disabled={!epubNavReady}
-						onClick={chapterListen.toggleChapterListen}
+						onClick={toggleChapterListenExclusive}
 					>
 						<Headphones className="size-4" />
 					</Button>
@@ -2937,6 +2959,8 @@ function EbookReadPage() {
 									bookTitle={book.title}
 									input={assistantInput}
 									onInputChange={setAssistantInput}
+									onBeforeSelectionSpeak={stopChapterListenForSpeak}
+									selectionSpeakStopRef={assistantSpeakStopRef}
 								/>
 							) : null
 						}

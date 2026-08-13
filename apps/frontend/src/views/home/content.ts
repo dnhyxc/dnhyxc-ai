@@ -34,13 +34,13 @@ export const HUE_STYLES: Record<
 > = {
 	teal: {
 		rail: 'bg-teal-400',
-		icon: 'from-teal-500/90 to-teal-300/90 shadow-teal-500/25',
-		btn: 'from-teal-400/80 to-teal-500/80 hover:shadow-teal-500/30',
+		icon: 'from-teal-500/95 to-teal-400/95 shadow-teal-500/25',
+		btn: 'from-teal-400/95 to-teal-500/95 hover:shadow-teal-500/30',
 		glow: 'from-teal-600/15 via-cyan-500/8',
 	},
 	emerald: {
 		rail: 'bg-emerald-400',
-		icon: 'from-emerald-400/90 to-teal-200/90 shadow-emerald-500/25',
+		icon: 'from-emerald-400/90 to-teal-200/80 shadow-emerald-500/25',
 		btn: 'from-emerald-400/80 to-teal-200/80 hover:shadow-emerald-500/30',
 		glow: 'from-emerald-500/15 via-teal-500/8',
 	},

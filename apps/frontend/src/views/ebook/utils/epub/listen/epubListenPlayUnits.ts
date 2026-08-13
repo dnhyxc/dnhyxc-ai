@@ -24,7 +24,10 @@ export type PlayListenUnitsArgs = {
 	/** 每次起播时取当前倍速（勿在段循环外快照，否则中途调速会丢） */
 	getRate: () => number;
 	isActive: () => boolean;
-	onSentence: (si: number, info: { forceCenter?: boolean }) => void;
+	onSentence: (
+		si: number,
+		info: { forceCenter?: boolean; early?: boolean },
+	) => void;
 	onUnitIdle?: () => void;
 	scrollCenterOnFirst?: boolean;
 	/**
@@ -32,6 +35,17 @@ export type PlayListenUnitsArgs = {
 	 * 仅阻塞播放的请求；prefetchCloudTts 不触发。
 	 */
 	onAwaitingCurrentTts?: (waiting: boolean) => void;
+	/**
+	 * 当前这段音频的真实进度（选区朗读预览用；听书勿接）
+	 * sentenceIndex：与 speech 云端 cadence 同一套权重映射（相对本段 text）
+	 */
+	onAudioTime?: (info: {
+		text: string;
+		baseSi: number;
+		currentTime: number;
+		duration: number;
+		sentenceIndex?: number;
+	}) => void;
 };
 
 function sentenceRaw(
@@ -71,6 +85,7 @@ export async function playListenUnitsFromCursor(
 		onUnitIdle,
 		scrollCenterOnFirst,
 		onAwaitingCurrentTts,
+		onAudioTime,
 	} = args;
 	const loopStartSi = args.startSi;
 
@@ -150,13 +165,28 @@ export async function playListenUnitsFromCursor(
 			await playCurrent(kickRaw, {
 				speak: { rate: getRate() },
 				cloudSingleUtterance: true,
-				onPlaybackStart: prefetchAfterKickStart,
+				onPlaybackStart: () => {
+					prefetchAfterKickStart();
+					onAudioTime?.({
+						text: kickRaw,
+						baseSi: startSi,
+						currentTime: 0,
+						duration: 0,
+					});
+				},
 				onPlaybackProgress: (event) => {
+					onAudioTime?.({
+						text: kickRaw,
+						baseSi: startSi,
+						currentTime: event.currentTime,
+						duration: event.duration,
+						sentenceIndex: event.sentenceIndex,
+					});
 					if (!isActive() || kickAdvanced) return;
 					if (event.progress < 0.8) return;
 					if (startSi + 1 >= unit.siEnd) return;
 					kickAdvanced = true;
-					onSentence(startSi + 1, {});
+					onSentence(startSi + 1, { early: true });
 				},
 			});
 			// 本机无 onPlaybackStart 时仍兜底预取，保证后续等待不被拉长
@@ -192,7 +222,24 @@ export async function playListenUnitsFromCursor(
 				speak: { rate: getRate() },
 				prefetchedCloud: prefetchedByText.get(restRaw) ?? null,
 				cloudSingleUtterance: true,
-				onPlaybackStart: prefetchAfterRestStart,
+				onPlaybackStart: () => {
+					prefetchAfterRestStart();
+					onAudioTime?.({
+						text: restRaw,
+						baseSi: restStartSi,
+						currentTime: 0,
+						duration: 0,
+					});
+				},
+				onPlaybackProgress: (event) => {
+					onAudioTime?.({
+						text: restRaw,
+						baseSi: restStartSi,
+						currentTime: event.currentTime,
+						duration: event.duration,
+						sentenceIndex: event.sentenceIndex,
+					});
+				},
 				onCadenceChunk: (event) => {
 					if (event.phase !== 'start') return;
 					if (!isActive()) return;
@@ -233,7 +280,24 @@ export async function playListenUnitsFromCursor(
 			speak: { rate: getRate() },
 			prefetchedCloud: prefetchedByText.get(spokenRaw) ?? null,
 			cloudSingleUtterance: true,
-			onPlaybackStart: prefetchAfterUnitStart,
+			onPlaybackStart: () => {
+				prefetchAfterUnitStart();
+				onAudioTime?.({
+					text: spokenRaw,
+					baseSi: startSi,
+					currentTime: 0,
+					duration: 0,
+				});
+			},
+			onPlaybackProgress: (event) => {
+				onAudioTime?.({
+					text: spokenRaw,
+					baseSi: startSi,
+					currentTime: event.currentTime,
+					duration: event.duration,
+					sentenceIndex: event.sentenceIndex,
+				});
+			},
 			onCadenceChunk: (event) => {
 				if (event.phase !== 'start') return;
 				if (!isActive()) return;

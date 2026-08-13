@@ -1,96 +1,146 @@
-# 英语 Agent 选区右键菜单 + 选区朗读
+# 助手选区右键朗读与复制 — 完整实现
 
-> **文档角色**：为英语 Agent 消息正文新增「选中文本 → 右键弹出菜单 → 朗读/复制」能力；抽取通用 `useSelectionContextMenu` hook + `PositionedQuickMenu` 组件供 `ChatAssistantMessage` / `Markdown` 预览 / EPUB 右键菜单复用；朗读复用听书同款按段云端 TTS 链路（`playListenPlainText`），悬浮条支持拖动、倍速、软暂停。
-> **延伸阅读**：[epub-listen-cadence-lead.md](../ebook/epub-listen-cadence-lead.md)（朗读切句时序优化，为本篇朗读预览服务）；[epub-assistant-context-menu.md](../ebook/epub-assistant-context-menu.md)（EPUB 选区菜单底座）；[english-tts-playback.md](./english-tts-playback.md)（云端 TTS 播放链路）
+> **现行实现（菜单 + 悬浮条 + 状态机）** 以 [../chat/assistant-selection-speak-guide.md](../chat/assistant-selection-speak-guide.md) 为准。本文为英语域增量/历史稿；文中若仍出现 `panelRef` / `boundsRef` 传参，视为过时 API。
+
+## 延伸阅读
+- [../chat/assistant-selection-speak-guide.md](../chat/assistant-selection-speak-guide.md)（现行主文档）
+- [../chat/selection-speak-common.md](../chat/selection-speak-common.md)（重构史）
+- epub-listen-cadence-lead.md（朗读切句时序优化）
+- epub-listen-implementation.md（听书播放引擎完整实现）
+- epub-assistant-context-menu.md（EPUB 选区菜单底座）
 
 ## 1. 背景与目标
 
-**问题**：英语 Agent 消息正文此前只支持系统默认右键菜单，无法对选中段落直接朗读；用户想在 Agent 回复中「听一段」必须切到其它入口。
+**问题**：助手消息正文此前只支持系统默认右键菜单，无法对选中段落直接朗读；用户想在助手回复中「听一段」必须切到其它入口。
 
 **目标**：
-1. 选中消息正文后右键，弹出自定义菜单（朗读 / 复制）；未选中文本时不拦截系统菜单。
-2. 朗读复用听书同款按段云端 TTS（`cloudSingleUtterance`）链路，首句快出声、逐句预览。
+1. 选中助手消息正文后右键，弹出自定义菜单（朗读 / 复制）；未选中文本时不拦截系统菜单。
+2. 朗读复用听书同款按段云端 TTS（`cloudSingleUtterance`）链路，首句快出声、逐句预览，句间停顿不抢跑。
 3. 朗读期间在输入框上方显示悬浮控制条：播放/暂停、停止、倍速、当前句预览；悬浮条可拖动。
-4. 抽取通用「锚定坐标的声明式菜单」与「选区右键 hook」，供 `ChatAssistantMessage` / `Markdown` 预览 / EPUB 右键菜单复用，消除 `EpubReaderContextMenu` 内的重复实现。
+4. 抽取通用「锚定坐标的声明式菜单」（`PositionedQuickMenu`）与「选区右键 hook」（`useSelectionContextMenu`），供 `ChatAssistantMessage` / `Markdown` 预览 / EPUB 右键菜单复用。
+5. 选区朗读相关代码统一收敛到 `components/design/SelectionSpeak/` 目录，由 `useAssistantSelectionSpeak` 编排，供英语 Agent 与 EPUB 助手共用。
 
-## 2. 改动范围
+## 2. 架构总览（调用链 + 文件清单）
 
-| 路径 | 变更类型 | 说明 |
-|------|----------|------|
-| `apps/frontend/src/components/design/ContextMenu/PositionedQuickMenu.tsx` | 新增 | 锚定鼠标坐标的声明式菜单（从 `EpubReaderContextMenu` 抽取） |
-| `apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx` | 新增 | 选区右键 hook：pointerdown 快照 + contextmenu 捕获阶段拦截 |
-| `apps/frontend/src/components/design/ContextMenu/index.tsx` | 修改 | barrel 导出新增 `PositionedQuickMenu` / `useSelectionContextMenu` |
-| `apps/frontend/src/views/ebook/components/reader/EpubReaderContextMenu.tsx` | 修改 | 删除内部 `MenuEntries` / `anchorStyle`，改用 `PositionedQuickMenu` |
-| `apps/frontend/src/components/design/Assistant/types.ts` | 修改 | 新增 `floatAbove` / `getSelectionContextMenuItems` 字段 |
-| `apps/frontend/src/components/design/Assistant/Footer.tsx` | 修改 | 渲染 `floatAbove` 悬浮层 |
-| `apps/frontend/src/components/design/Assistant/utils.ts` | 修改 | `select-auto` → `select-text`，确保消息正文可选中 |
-| `apps/frontend/src/components/design/Assistant/MessageRow.tsx` | 修改 | 透传 `getSelectionContextMenuItems` 到消息气泡 |
-| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 修改 | 集成 `useSelectionContextMenu` + 新增 `getSelectionContextMenuItems` prop |
-| `apps/frontend/src/components/design/Markdown/index.tsx` | 修改 | 预览组件集成 `useSelectionContextMenu` + 新增 prop |
-| `apps/frontend/src/views/englishLearning/agent/selectionContextMenu.ts` | 新增 | 英语 Agent 选区菜单项工厂（朗读 + 复制） |
-| `apps/frontend/src/views/englishLearning/agent/useSelectionSpeak.ts` | 新增 | 选区朗读会话 hook（状态机 + 倍速 + 软暂停） |
-| `apps/frontend/src/views/englishLearning/agent/SelectionSpeakBar.tsx` | 新增 | 朗读悬浮条（拖动 + 倍速菜单 + 句预览） |
-| `apps/frontend/src/views/englishLearning/agent/index.tsx` | 修改 | Agent 面板装配选区菜单 + 悬浮条；新会话时停止朗读 |
-| `apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts` | 新增 | 无 EPUB 高亮的听当前同款播法入口，供选区朗读复用 |
-| `apps/frontend/src/i18n/locales/zh-CN.ts` | 修改 | 新增 `englishLearning.selection.*` 5 个 key |
-| `apps/frontend/src/i18n/locales/en-US.ts` | 修改 | 同上英文 |
+### 调用链
 
-## 3. 实现思路
+```
+agent/index.tsx
+  └─ useAssistantSelectionSpeak(panelRef)
+       ├─ useSelectionSpeak() → playListenPlainText → playListenUnitsFromCursor
+       ├─ createSelectionSpeakMenu(t, speak.start) → SelectionContextMenuItemsFn
+       └─ <SelectionSpeakBar /> → floatAbove → AssistantFooter
 
-| # | 要点 | 说明 |
-|---|------|------|
-| 1 | 选区右键可靠性（macOS） | `pointerdown(button=2)` 先快照选区（系统右键常会改写/点词选中）；`contextmenu` 用**捕获阶段**并尽早 `preventDefault`，优先用快照文本，避免系统改写后误判无选区 |
-| 2 | 声明式锚定菜单 | `PositionedQuickMenu` 用一个 1×1 `pointer-events:none` 的 fixed `<span>` 作 `DropdownMenuTrigger`，把 Radix Dropdown 锚到鼠标坐标；解决 iframe / 选区右键无法用 Trigger 包裹的问题 |
-| 3 | 通用 hook 设计 | `useSelectionContextMenu(getItems?)`：未传 `getItems` 时返回 `undefined`/`null`（默认关闭，零开销）；传入时返回 `onContextMenuCapture` / `onPointerDownCapture` / `menu` 三件套，使用方挂到容器即可 |
-| 4 | 菜单能力由使用方决定 | hook 只负责「选中文本 + 弹菜单」，菜单项（朗读/复制等）由 `getItems(selectedText, ctx)` 回调返回；`ChatAssistantMessage` / `Markdown` 均新增同名 prop 透传 |
-| 5 | 朗读复用听书链路 | `playListenPlainText` 入口 = `stripMarkdownForTts` + `buildSentenceOffsetSpans` + `buildParagraphUnits` + `playListenUnitsFromCursor`；选区朗读与听书共享同一套按段云端 TTS、预取、软暂停 |
-| 6 | 朗读会话状态机 | `useSelectionSpeak` 维护 `idle/loading/playing/paused`；`seqRef` 世代号防止旧播放回调污染新会话；`pausedRef` 软暂停标志传给 `isActive` |
-| 7 | 悬浮条拖动 | 默认挂在 Footer 内 `absolute bottom-full`；拖动后切 `fixed` 并用 ref 直接改 DOM（避免每帧 setState 重渲染含 ScrollArea/菜单的整条）；`ResizeObserver` 在面板尺寸变化时重新 clamp |
-| 8 | 新会话停止朗读 | `handleNewChat` 包裹 `onNewChat`，先 `selectionSpeak.stop()` 再开新会话，避免朗读残留 |
-| 9 | 消息正文可选 | `messageLabelClass` 把 `select-auto` 改为 `select-text`，确保用户能拖选消息正文 |
+AssistantMessageRow → ChatAssistantMessage
+  └─ useSelectionContextMenu(getSelectionContextMenuItems)
+       ├─ onContextMenuCapture / onPointerDownCapture → shell div
+       └─ <PositionedQuickMenu />
+```
 
-## 4. 关键代码对比与注释
+### 文件清单
 
-### 4.1 `useSelectionContextMenu` — 选区右键 hook（纯新增）
+| # | 模块 | 路径 | 行数 |
+|---|------|------|------|
+| 1 | 选区右键 hook | `apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx` | 139 |
+| 2 | 锚定坐标菜单 | `apps/frontend/src/components/design/ContextMenu/PositionedQuickMenu.tsx` | 106 |
+| 3 | 菜单项工厂 | `apps/frontend/src/components/design/SelectionSpeak/createSelectionSpeakMenu.ts` | 46 |
+| 4 | 选区朗读会话 hook | `apps/frontend/src/components/design/SelectionSpeak/useSelectionSpeak.ts` | 282 |
+| 5 | 朗读悬浮条 | `apps/frontend/src/components/design/SelectionSpeak/SelectionSpeakBar.tsx` | 340 |
+| 6 | 编排 hook | `apps/frontend/src/components/design/SelectionSpeak/useAssistantSelectionSpeak.tsx` | 53 |
+| 7 | 纯文本播放入口 | `apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts` | 41 |
 
-**对比范围**：`useSelectionContextMenu.tsx` 整个文件。纯新增（见 `code-before-after.md` §4 例外），仅贴新增实现。
+## 3. 核心实现代码
 
-**新增** · `apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx`（当前，约 L31–L58）
+### 3.1 `useSelectionContextMenu` — 选区右键 hook
+
+来源：`apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx`（当前源码，约 L1–L139）
 
 ```typescript
-// 读取 root 内的当前选区，返回文本与克隆后的 Range（contextmenu 时原生选区可能已被系统改写）
+// 从 react 引入鼠标事件、指针事件、ReactNode 类型与 useCallback/useRef/useState
+import {
+	// React 鼠标事件类型（用于 contextmenu 捕获）
+	type MouseEvent as ReactMouseEvent,
+	// React 子节点类型（menu 返回值）
+	type ReactNode,
+	// React 指针事件类型（用于 pointerdown 捕获）
+	type PointerEvent as ReactPointerEvent,
+	// 缓存回调，依赖不变时引用稳定
+	useCallback,
+	// 跨渲染保存可变值（选区快照、世代号等）
+	useRef,
+	// 菜单 open/坐标/项状态
+	useState,
+} from 'react';
+// 引入锚定坐标菜单组件与其状态类型
+import {
+	// 声明式锚定菜单组件
+	PositionedQuickMenu,
+	// 菜单状态类型（open + x + y）
+	type PositionedQuickMenuState,
+} from './PositionedQuickMenu';
+// 引入菜单项类型（item/sub/separator 三类）
+import type { QuickContextMenuEntry } from './types';
+
+// 选区上下文：携带右键按下前的选区 Range 快照
+export type SelectionContextMenuCtx = {
+	/** 右键按下前的选区快照（contextmenu 时原生选区可能已被系统改写） */
+	// 选区 Range 克隆，可能为 null
+	range: Range | null;
+};
+
+/** 由使用方根据选中文本返回菜单项；返回 null/空则不弹出自定义菜单 */
+// 菜单项工厂函数类型：入参为选中文本与上下文，出参为菜单项数组或 null
+export type SelectionContextMenuItemsFn = (
+	// 用户选中的文本
+	selectedText: string,
+	// 选区上下文（含 Range 快照）
+	ctx: SelectionContextMenuCtx,
+) => readonly QuickContextMenuEntry[] | null | undefined;
+
+// 选区快照内部类型：文本 + 克隆 Range
+type SelSnap = {
+	// 选区纯文本
+	text: string;
+	// 选区 Range 克隆
+	range: Range | null;
+};
+
+// 读取 root 容器内的当前选区，返回文本与克隆 Range
 function readSelectionIn(root: HTMLElement): SelSnap {
-	// 取 window 选区
+	// 取 window 选区对象
 	const sel = window.getSelection();
-	// 无选区 / 折叠 / 无 range → 返回空
+	// 无选区 / 选区折叠 / 无 range → 返回空快照
 	if (!sel || sel.isCollapsed || sel.rangeCount < 1) {
+		// 返回空文本与 null range
 		return { text: '', range: null };
 	}
-	// 取第一个 range
+	// 取第一个 range（用户通常只产生一个连续选区）
 	const range = sel.getRangeAt(0);
-	// range 的公共祖先节点
+	// range 的公共祖先节点（可能是文本节点或元素）
 	const ancestor = range.commonAncestorContainer;
 	// 判断选区是否落在 root 内：自身相等 / root 包含祖先 / range 与 root 相交
 	const inRoot =
-		// root 即祖先
+		// root 即公共祖先
 		root === ancestor ||
-		// root 包含祖先节点
+		// root 包含公共祖先节点
 		root.contains(ancestor) ||
-		// 兜底：用 intersectsNode 判断相交（try/catch 防止跨 shadow DOM 抛错）
+		// 兜底：用 intersectsNode 判断相交
 		(() => {
 			try {
+				// intersectsNode 可能跨 shadow DOM 抛异常
 				return range.intersectsNode(root);
 			} catch {
+				// 抛异常则视为不相交
 				return false;
 			}
 		})();
-	// 选区不在 root 内 → 返回空
+	// 选区不在 root 内 → 返回空快照
 	if (!inRoot) return { text: '', range: null };
 	// 取选区纯文本并 trim
 	const text = sel.toString().trim();
-	// 文本为空 → 返回空
+	// 文本为空 → 返回空快照
 	if (!text) return { text: '', range: null };
-	// 克隆 range 供后续定位使用
+	// 准备克隆 range 供后续定位
 	let cloned: Range | null = null;
 	try {
 		// cloneRange 可能抛异常（跨 shadow DOM）
@@ -102,21 +152,28 @@ function readSelectionIn(root: HTMLElement): SelSnap {
 	// 返回文本与克隆 range
 	return { text, range: cloned };
 }
-```
 
-**新增** · `apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx`（当前，约 L71–L141）
+// 菜单状态类型：继承坐标状态 + 菜单项
+type MenuState = PositionedQuickMenuState & {
+	// 当前菜单项数组
+	items: readonly QuickContextMenuEntry[];
+};
 
-```typescript
-// 选区右键 hook：选中文本后右键才弹菜单；getItems 未传则无行为（默认关闭）
+/**
+ * 选中文本后右键才弹出菜单；`getItems` 未传则无行为（默认关闭）。
+ *
+ * 可靠性（尤其 macOS）：
+ * - pointerdown(button=2) 先快照选区（系统右键常会改写/点词选中）
+ * - contextmenu 用捕获阶段，并尽早 preventDefault
+ */
+// 选区右键 hook：入参为可选菜单项工厂，返回三件套
 export function useSelectionContextMenu(
 	// 菜单项工厂，由使用方传入；未传则 hook 不启用
 	getItems?: SelectionContextMenuItemsFn,
-	// 返回三件套：捕获阶段事件处理器 + 菜单 ReactNode
+	// 返回 contextmenu/pointerdown 捕获处理器 + 菜单 ReactNode
 ): {
 	// contextmenu 捕获阶段处理器（挂到容器 onContextMenuCapture）
-	onContextMenuCapture:
-		| ((e: ReactMouseEvent<HTMLElement>) => void)
-		| undefined;
+	onContextMenuCapture: ((e: ReactMouseEvent<HTMLElement>) => void) | undefined;
 	// pointerdown 捕获阶段处理器（挂到容器 onPointerDownCapture）
 	onPointerDownCapture:
 		| ((e: ReactPointerEvent<HTMLElement>) => void)
@@ -124,13 +181,15 @@ export function useSelectionContextMenu(
 	// 菜单 ReactNode，渲染到容器内
 	menu: ReactNode;
 } {
-	// 菜单状态：坐标 + open + items
+	// 菜单状态：坐标 + open + items；null 表示不渲染
 	const [menu, setMenu] = useState<MenuState | null>(null);
-	// 右键按下瞬间的选区快照；contextmenu 时优先用它
+	/** 右键按下瞬间的选区；contextmenu 时优先用它 */
+	// 选区快照 ref（pointerdown 写入，contextmenu 读取后清空）
 	const snapRef = useRef<SelSnap | null>(null);
 
 	// pointerdown 捕获：button=2（右键）时快照选区
 	const onPointerDownCapture = useCallback(
+		// 指针事件
 		(e: ReactPointerEvent<HTMLElement>) => {
 			// 未传 getItems → 不启用
 			if (!getItems) return;
@@ -145,6 +204,7 @@ export function useSelectionContextMenu(
 
 	// contextmenu 捕获：决定是否弹自定义菜单
 	const onContextMenuCapture = useCallback(
+		// 鼠标事件
 		(e: ReactMouseEvent<HTMLElement>) => {
 			// 未传 getItems → 不启用
 			if (!getItems) return;
@@ -168,7 +228,7 @@ export function useSelectionContextMenu(
 			// 无菜单项 → 不弹
 			if (!items?.length) return;
 
-			// 已确认要弹自定义菜单：拦住系统菜单（须在捕获阶段尽早调用）
+			// 已确认要弹自定义菜单：必须拦住系统菜单（须在捕获阶段尽早调用）
 			e.preventDefault();
 			// 停止冒泡，避免上层重复处理
 			e.stopPropagation();
@@ -218,15 +278,59 @@ export function useSelectionContextMenu(
 }
 ```
 
----
+### 3.2 `PositionedQuickMenu` — 锚定坐标菜单
 
-### 4.2 `PositionedQuickMenu` — 锚定坐标的声明式菜单（纯新增，自 `EpubReaderContextMenu` 抽取）
-
-**对比范围**：`PositionedQuickMenu.tsx` 整个文件。纯新增；同逻辑原存在于 `EpubReaderContextMenu.tsx` 内（4.3 节展示其删除前后对比）。
-
-**新增** · `apps/frontend/src/components/design/ContextMenu/PositionedQuickMenu.tsx`（当前，约 L28–L106）
+来源：`apps/frontend/src/components/design/ContextMenu/PositionedQuickMenu.tsx`（当前源码，约 L1–L106）
 
 ```typescript
+// 从 react 引入 useMemo（缓存锚点样式对象）
+import { useMemo } from 'react';
+// 引入 Radix Dropdown 原语集合
+import {
+	// 菜单容器
+	DropdownMenu,
+	// 菜单内容区
+	DropdownMenuContent,
+	// 普通可点击项
+	DropdownMenuItem,
+	// 分隔线
+	DropdownMenuSeparator,
+	// 快捷键文本
+	DropdownMenuShortcut,
+	// 子菜单容器
+	DropdownMenuSub,
+	// 子菜单内容区
+	DropdownMenuSubContent,
+	// 子菜单触发器
+	DropdownMenuSubTrigger,
+	// 菜单触发器
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+// 引入菜单项类型（item/sub/separator）
+import type { QuickContextMenuEntry } from './types';
+
+// 菜单状态类型：open + 鼠标坐标
+export type PositionedQuickMenuState = {
+	// 是否打开
+	open: boolean;
+	// 鼠标 x 坐标
+	x: number;
+	// 鼠标 y 坐标
+	y: number;
+};
+
+// 组件 Props
+type Props = {
+	// 菜单状态（null 表示不渲染）
+	state: PositionedQuickMenuState | null;
+	// 菜单项数组
+	items: readonly QuickContextMenuEntry[];
+	// 开关回调
+	onOpenChange: (open: boolean) => void;
+	// 内容区 className（默认 min-w-44）
+	contentClassName?: string;
+};
+
 // 菜单项递归渲染：separator / sub / item 三类
 function MenuEntries({
 	// 菜单项数组
@@ -245,14 +349,14 @@ function MenuEntries({
 		// 子菜单
 		if (entry.type === 'sub') {
 			return (
-				// DropdownMenuSub 容器
+				// DropdownMenuSub 容器，key 用 id
 				<DropdownMenuSub key={entry.id}>
-					{/* 子菜单触发器 */}
+					{/* 子菜单触发器，支持禁用与缩进 */}
 					<DropdownMenuSubTrigger disabled={entry.disabled} inset={entry.inset}>
 						{/* 子菜单标题 */}
 						{entry.label}
 					</DropdownMenuSubTrigger>
-					{/* 子菜单内容 */}
+					{/* 子菜单内容区 */}
 					<DropdownMenuSubContent>
 						{/* 递归渲染子菜单项 */}
 						<MenuEntries entries={entry.items} />
@@ -285,7 +389,10 @@ function MenuEntries({
 	});
 }
 
-// 锚定在鼠标坐标的声明式菜单（iframe / 选区右键等无法用 Trigger 包裹时用）
+/**
+ * 锚定在鼠标坐标的声明式菜单（iframe / 选区右键等无法用 Trigger 包裹时用）。
+ */
+// 锚定坐标菜单组件
 export function PositionedQuickMenu({
 	// 菜单状态（null 表示不渲染）
 	state,
@@ -293,7 +400,7 @@ export function PositionedQuickMenu({
 	items,
 	// 开关回调
 	onOpenChange,
-	// 内容区 className（默认 min-w-44）
+	// 内容区 className，默认 min-w-44
 	contentClassName = 'min-w-44',
 }: Props) {
 	// 锚点样式：fixed 1×1 无指针事件，定位到鼠标坐标
@@ -304,9 +411,9 @@ export function PositionedQuickMenu({
 				? ({
 						// 固定定位
 						position: 'fixed',
-						// 鼠标 x
+						// 鼠标 x 坐标
 						left: state.x,
-						// 鼠标 y
+						// 鼠标 y 坐标
 						top: state.y,
 						// 1px 宽
 						width: 1,
@@ -331,7 +438,7 @@ export function PositionedQuickMenu({
 			<DropdownMenuTrigger asChild>
 				<span aria-hidden style={anchorStyle} />
 			</DropdownMenuTrigger>
-			{/* 菜单内容 */}
+			{/* 菜单内容区 */}
 			<DropdownMenuContent
 				// 内容 className
 				className={contentClassName}
@@ -348,465 +455,28 @@ export function PositionedQuickMenu({
 }
 ```
 
----
+### 3.3 `createSelectionSpeakMenu` — 菜单项工厂
 
-### 4.3 `EpubReaderContextMenu` — 改用 `PositionedQuickMenu`（重构）
-
-**对比范围**：`EpubReaderContextMenu.tsx` 整个文件。删除内部 `MenuEntries` 与 `anchorStyle`，改用 4.2 抽取的 `PositionedQuickMenu`。
-
-**改动前** · `apps/frontend/src/views/ebook/components/reader/EpubReaderContextMenu.tsx`（基线 `HEAD`，约 L1–L88）
-
-```typescript
-// 旧版：直接 import Radix Dropdown 原语与 QuickContextMenuEntry 类型
-import type { QuickContextMenuEntry } from '@design/ContextMenu';
-import { useMemo } from 'react';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuShortcut,
-	DropdownMenuSub,
-	DropdownMenuSubContent,
-	DropdownMenuSubTrigger,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
-// 旧版：菜单状态类型自建（open/x/y + hasSelection）
-export type EpubReaderContextMenuState = {
-	open: boolean;
-	x: number;
-	y: number;
-	hasSelection: boolean;
-};
-// ...（旧版 MenuEntries 函数：约 40 行，与 4.2 新抽取的 MenuEntries 完全一致）
-// ...（旧版 anchorStyle useMemo：与 4.2 完全一致）
-// ...（旧版 EpubReaderContextMenu 函数体：直接拼 DropdownMenu + Trigger span + Content + MenuEntries）
-```
-
-**改动后** · `apps/frontend/src/views/ebook/components/reader/EpubReaderContextMenu.tsx`（当前，约 L1–L25）
-
-```typescript
-// 新版：从 @design/ContextMenu 复用 PositionedQuickMenu 与类型
-import {
-	// 声明式锚定菜单组件
-	PositionedQuickMenu,
-	// 菜单状态类型（open/x/y）
-	type PositionedQuickMenuState,
-	// 菜单项类型
-	type QuickContextMenuEntry,
-} from '@design/ContextMenu';
-
-// 新版：菜单状态复用 PositionedQuickMenuState，扩展 hasSelection
-export type EpubReaderContextMenuState = PositionedQuickMenuState & {
-	// 是否有选区（EPUB 用来决定菜单项集合）
-	hasSelection: boolean;
-};
-
-// 新版：Props 不变
-type Props = {
-	state: EpubReaderContextMenuState | null;
-	items: readonly QuickContextMenuEntry[];
-	onOpenChange: (open: boolean) => void;
-};
-
-// 新版：函数体仅一行——委托给 PositionedQuickMenu
-export function EpubReaderContextMenu({ state, items, onOpenChange }: Props) {
-	return (
-		// 直接渲染 PositionedQuickMenu，透传 state/items/onOpenChange
-		<PositionedQuickMenu
-			state={state}
-			items={items}
-			onOpenChange={onOpenChange}
-		/>
-	);
-}
-```
-
-**变更摘要**：删除 `EpubReaderContextMenu` 内约 70 行重复的 `MenuEntries` / `anchorStyle` / `DropdownMenu` 拼装逻辑，改为复用 `PositionedQuickMenu`；`EpubReaderContextMenuState` 改为 `PositionedQuickMenuState & { hasSelection }` 复用基础类型。
-
----
-
-### 4.4 `ContextMenu/index.tsx` — barrel 导出新增
-
-**对比范围**：`ContextMenu/index.tsx` 整个文件。
-
-**改动前** · `apps/frontend/src/components/design/ContextMenu/index.tsx`（基线 `HEAD`，约 L5–L14）
-
-```typescript
-// 旧版：仅导出 ContextMenuUi / primitives / QuickContextMenu / types
-export * as ContextMenuUi from '@/components/ui/context-menu';
-export * from './primitives';
-export {
-	QuickContextMenu,
-	type QuickContextMenuProps,
-} from './QuickContextMenu';
-export * from './types';
-```
-
-**改动后** · `apps/frontend/src/components/design/ContextMenu/index.tsx`（当前，约 L5–L22）
-
-```typescript
-// 新版：新增 PositionedQuickMenu 与 useSelectionContextMenu 导出
-export * as ContextMenuUi from '@/components/ui/context-menu';
-// 新增：PositionedQuickMenu 组件 + 状态类型
-export {
-	PositionedQuickMenu,
-	type PositionedQuickMenuState,
-} from './PositionedQuickMenu';
-export * from './primitives';
-export {
-	QuickContextMenu,
-	type QuickContextMenuProps,
-} from './QuickContextMenu';
-export * from './types';
-// 新增：useSelectionContextMenu hook + 类型
-export {
-	useSelectionContextMenu,
-	type SelectionContextMenuCtx,
-	type SelectionContextMenuItemsFn,
-} from './useSelectionContextMenu';
-```
-
-**变更摘要**：barrel 新增 `PositionedQuickMenu`、`useSelectionContextMenu` 及配套类型导出，供 `ChatAssistantMessage` / `Markdown` / `EpubReaderContextMenu` 消费。
-
----
-
-### 4.5 `ChatAssistantMessage` — 集成选区右键菜单
-
-**对比范围**：`ChatAssistantMessage/index.tsx` 的 props 定义、组件内 hook 调用、容器事件绑定、菜单渲染、memo 相等函数。
-
-**改动前** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（基线 `HEAD`，约 L148–L162）
-
-```typescript
-// 旧版：props 无选区菜单字段
-interface AssistantMessageProps {
-	// ...（其它字段未改动）
-	scrollViewportRef?: React.RefObject<HTMLElement | null>;
-	className?: string;
-}
-
-function ChatAssistantMessageInner({
-	// ...（其它字段未改动）
-	scrollViewportRef,
-	className,
-}: AssistantMessageProps) {
-	const { theme: appTheme } = useTheme();
-	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标
-	const shellRef = useRef<HTMLDivElement>(null);
-	// 旧版：无选区右键 hook
-	const bodyMarkdownRef = useRef<HTMLDivElement>(null);
-```
-
-**改动后** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（当前，约 L4–L9、L152–L177）
-
-```typescript
-// 新增 import：选区菜单 hook + 类型
-import {
-	// 选区菜单项工厂类型
-	type SelectionContextMenuItemsFn,
-	// 选区菜单 hook
-	useSelectionContextMenu,
-} from '@design/ContextMenu';
-// ...（其它 import 未改动）
-
-// 新版：props 新增 getSelectionContextMenuItems
-interface AssistantMessageProps {
-	// ...（其它字段未改动）
-	scrollViewportRef?: React.RefObject<HTMLElement | null>;
-	className?: string;
-	// 新增：选中消息正文后右键菜单；不传则关闭（默认）
-	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
-}
-
-function ChatAssistantMessageInner({
-	// ...（其它字段未改动）
-	scrollViewportRef,
-	className,
-	// 新增：解构选区菜单工厂
-	getSelectionContextMenuItems,
-}: AssistantMessageProps) {
-	const { theme: appTheme } = useTheme();
-	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
-	const shellRef = useRef<HTMLDivElement>(null);
-	// 新增：选区右键 hook 三件套
-	const {
-		// contextmenu 捕获处理器
-		onContextMenuCapture: onSelectionContextMenuCapture,
-		// pointerdown 捕获处理器
-		onPointerDownCapture: onSelectionPointerDownCapture,
-		// 菜单 ReactNode
-		menu: selectionContextMenu,
-	} = useSelectionContextMenu(getSelectionContextMenuItems);
-	const bodyMarkdownRef = useRef<HTMLDivElement>(null);
-```
-
-**改动前** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（基线 `HEAD`，约 L486–L490）
-
-```typescript
-// 旧版：shell div 无选区事件绑定
-				ref={shellRef}
-				className="w-full h-auto"
-				data-chat-assistant-shell
-			>
-```
-
-**改动后** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（当前，约 L501–L505）
-
-```typescript
-// 新版：shell div 绑定选区捕获事件
-				ref={shellRef}
-				className="w-full h-auto"
-				data-chat-assistant-shell
-				// 新增：contextmenu 捕获，决定是否弹自定义菜单
-				onContextMenuCapture={onSelectionContextMenuCapture}
-				// 新增：pointerdown 捕获，右键按下时快照选区
-				onPointerDownCapture={onSelectionPointerDownCapture}
-			>
-```
-
-**改动前** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（基线 `HEAD`，约 L759–L766）
-
-```typescript
-// 旧版：memo 相等函数未比较选区菜单字段
-		prev.onContinue === next.onContinue &&
-		prev.onContinueAnswering === next.onContinueAnswering
-	);
-}
-```
-
-**改动后** · `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（当前，约 L777–L784）
-
-```typescript
-// 新版：memo 相等函数新增 4 项比较
-		prev.onContinue === next.onContinue &&
-		prev.onContinueAnswering === next.onContinueAnswering &&
-		// 新增：选区菜单工厂引用相等
-		prev.getSelectionContextMenuItems === next.getSelectionContextMenuItems &&
-		// 新增：className 相等
-		prev.className === next.className &&
-		// 新增：t 相等
-		prev.t === next.t
-	);
-}
-```
-
-**变更摘要**：`ChatAssistantMessage` 新增 `getSelectionContextMenuItems` prop，内部用 `useSelectionContextMenu` 产出三件套挂到 shell div，并在末尾渲染 `{selectionContextMenu}`；memo 相等函数补齐 4 项比较。`Markdown` 预览组件（`ParserMarkdownPreviewPane`）同构集成，逻辑一致，此处不重复贴代码（见源码 `apps/frontend/src/components/design/Markdown/index.tsx` L96–L131、L452–L531）。
-
----
-
-### 4.6 `Assistant/types.ts` — 新增 `floatAbove` 与 `getSelectionContextMenuItems` 字段
-
-**对比范围**：`Assistant/types.ts` 中 `AssistantFooterProps` 与 `AssistantMessageRowProps` / `AssistantMessageBubbleProps`。
-
-**改动前** · `apps/frontend/src/components/design/Assistant/types.ts`（基线 `HEAD`，约 L88–L94）
-
-```typescript
-export type AssistantFooterProps = {
-	containerClassName?: string;
-	showScrollFab?: boolean;
-	scrollFab?: ScrollFabProps;
-	// 旧版：无 floatAbove
-	children: ReactNode;
-};
-```
-
-**改动后** · `apps/frontend/src/components/design/Assistant/types.ts`（当前，约 L6–L8、L91–L96）
-
-```typescript
-// 新增 import：选区菜单工厂类型
-import type { SelectionContextMenuItemsFn } from '@/components/design/ContextMenu';
-// ...（其它 import 未改动）
-
-export type AssistantFooterProps = {
-	containerClassName?: string;
-	showScrollFab?: boolean;
-	scrollFab?: ScrollFabProps;
-	// 新增：输入框上方悬浮层（如朗读控制条），定位相对本 Footer 内容区
-	floatAbove?: ReactNode;
-	children: ReactNode;
-};
-```
-
-**改动前** · `apps/frontend/src/components/design/Assistant/types.ts`（基线 `HEAD`，约 L118–L141）
-
-```typescript
-export type AssistantMessageRowProps = {
-	// ...（其它字段未改动）
-	className?: string;
-	t?: ChatI18nT;
-	// 旧版：无 getSelectionContextMenuItems
-};
-
-export type AssistantMessageBubbleProps = {
-	// ...（其它字段未改动）
-	className?: string;
-	t?: ChatI18nT;
-	// 旧版：无 getSelectionContextMenuItems
-};
-```
-
-**改动后** · `apps/frontend/src/components/design/Assistant/types.ts`（当前，约 L123–L146）
-
-```typescript
-export type AssistantMessageRowProps = {
-	// ...（其它字段未改动）
-	className?: string;
-	t?: ChatI18nT;
-	// 新增：选区右键菜单工厂
-	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
-};
-
-export type AssistantMessageBubbleProps = {
-	// ...（其它字段未改动）
-	className?: string;
-	t?: ChatI18nT;
-	// 新增：选区右键菜单工厂（透传给 ChatAssistantMessage）
-	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
-};
-```
-
-**变更摘要**：`AssistantFooterProps` 新增 `floatAbove` 槽位；`AssistantMessageRowProps` / `AssistantMessageBubbleProps` 新增 `getSelectionContextMenuItems` 透传字段。
-
----
-
-### 4.7 `Assistant/Footer.tsx` — 渲染 `floatAbove`
-
-**对比范围**：`Footer.tsx` 整个组件。
-
-**改动前** · `apps/frontend/src/components/design/Assistant/Footer.tsx`（基线 `HEAD`，约 L6–L26）
-
-```typescript
-export function AssistantFooter({
-	embedded: _embedded = false,
-	containerClassName,
-	showScrollFab = false,
-	scrollFab,
-	// 旧版：无 floatAbove
-	children,
-}: AssistantFooterProps) {
-	return (
-		<div className="min-w-0 w-full shrink-0">
-			<div
-				className={cn(
-					'relative mx-auto min-w-0 w-full max-w-3xl pl-4 pr-4',
-					containerClassName,
-				)}
-			>
-				// 旧版：无 floatAbove 渲染
-				{showScrollFab && scrollFab ? <ScrollFab {...scrollFab} /> : null}
-				{children}
-			</div>
-		</div>
-	);
-}
-```
-
-**改动后** · `apps/frontend/src/components/design/Assistant/Footer.tsx`（当前，约 L6–L27）
-
-```typescript
-export function AssistantFooter({
-	embedded: _embedded = false,
-	containerClassName,
-	showScrollFab = false,
-	scrollFab,
-	// 新增：悬浮层（如朗读控制条）
-	floatAbove,
-	children,
-}: AssistantFooterProps) {
-	return (
-		<div className="min-w-0 w-full shrink-0">
-			<div
-				className={cn(
-					'relative mx-auto min-w-0 w-full max-w-3xl pl-4 pr-4',
-					containerClassName,
-				)}
-			>
-				// 新增：渲染悬浮层（位于 ScrollFab 与 children 之上）
-				{floatAbove}
-				{showScrollFab && scrollFab ? <ScrollFab {...scrollFab} /> : null}
-				{children}
-			</div>
-		</div>
-	);
-}
-```
-
-**变更摘要**：`AssistantFooter` 新增 `floatAbove` prop 并在内容区顶部渲染，供选区朗读悬浮条挂载。
-
----
-
-### 4.8 `Assistant/utils.ts` — `select-auto` → `select-text`
-
-**对比范围**：`messageLabelClass` 函数。
-
-**改动前** · `apps/frontend/src/components/design/Assistant/utils.ts`（基线 `HEAD`，约 L55–L66）
-
-```typescript
-export function messageLabelClass(
-	// ...（参数未改动）
-): string {
-	if (variant === 'english') {
-		return cn(
-			// 旧版：select-auto，系统决定是否可选
-			'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-auto rounded-md p-4 text-textcolor',
-			// ...（分支未改动）
-		);
-	}
-	return cn(
-		// 旧版：select-auto
-		'message-md-wrap relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
-		// ...（分支未改动）
-	);
-}
-```
-
-**改动后** · `apps/frontend/src/components/design/Assistant/utils.ts`（当前，约 L55–L66）
-
-```typescript
-export function messageLabelClass(
-	// ...（参数未改动）
-): string {
-	if (variant === 'english') {
-		return cn(
-			// 新版：select-text，强制允许用户选中文本（选区右键菜单前提）
-			'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-text rounded-md p-4 text-textcolor',
-			// ...（分支未改动）
-		);
-	}
-	return cn(
-		// 新版：select-text
-		'message-md-wrap relative flex min-w-0 max-w-full rounded-md p-3 select-text text-textcolor mb-5',
-		// ...（分支未改动）
-	);
-}
-```
-
-**变更摘要**：消息气泡容器从 `select-auto`（交由系统默认）改为 `select-text`（显式允许选中），确保选区右键菜单可获取选中文本。
-
----
-
-### 4.9 `selectionContextMenu.ts` — 英语 Agent 选区菜单项工厂（纯新增）
-
-**对比范围**：`selectionContextMenu.ts` 整个文件。纯新增。
-
-**新增** · `apps/frontend/src/views/englishLearning/agent/selectionContextMenu.ts`（当前，约 L1–L45）
+来源：`apps/frontend/src/components/design/SelectionSpeak/createSelectionSpeakMenu.ts`（当前源码，约 L1–L46）
 
 ```typescript
 // import：选区菜单工厂类型
 import type { SelectionContextMenuItemsFn } from '@design/ContextMenu';
-// import：Toast 提示
+// import：Toast 提示组件
 import { Toast } from '@ui/index';
 // import：剪贴板复制工具
 import { copyToClipboard } from '@/utils/clipboard';
 // import：播放可用性检查
 import { isPlaybackAvailable } from '@/utils/speech';
 
-// t 函数类型别名
+// i18n t 函数类型别名
 type TFn = (key: string, params?: Record<string, unknown>) => string;
 
-// 英语 Agent 消息选区右键：朗读（由外部会话启动）+ 复制
-export function createEnglishAgentSelectionMenu(
+/**
+ * 助手消息选区右键：朗读内容 + 复制内容。
+ */
+// 菜单项工厂创建函数：入参为 t 函数与朗读启动回调
+export function createSelectionSpeakMenu(
 	// i18n t 函数
 	t: TFn,
 	// 朗读启动回调（由 useSelectionSpeak.start 提供）
@@ -814,7 +484,7 @@ export function createEnglishAgentSelectionMenu(
 	// 返回 SelectionContextMenuItemsFn
 ): SelectionContextMenuItemsFn {
 	// 返回菜单项工厂闭包
-	return (selectedText, _ctx) => {
+	return (selectedText) => {
 		// 去首尾空白
 		const text = selectedText.trim();
 		// 空文本 → 不弹菜单
@@ -828,7 +498,7 @@ export function createEnglishAgentSelectionMenu(
 				// id
 				id: 'speak',
 				// 标签（i18n）
-				label: t('englishLearning.selection.speak'),
+				label: t('assistant.selection.speak'),
 				// 选中回调
 				onSelect: () => {
 					// 播放不可用 → 警告提示
@@ -837,7 +507,7 @@ export function createEnglishAgentSelectionMenu(
 							// 警告类型
 							type: 'warning',
 							// 标题（i18n）
-							title: t('englishLearning.tts.unsupported'),
+							title: t('assistant.tts.unsupported'),
 						});
 						// 中止
 						return;
@@ -852,7 +522,7 @@ export function createEnglishAgentSelectionMenu(
 				// id
 				id: 'copy',
 				// 标签（i18n）
-				label: t('englishLearning.selection.copy'),
+				label: t('assistant.selection.copy'),
 				// 选中回调
 				onSelect: () => {
 					// 复制到剪贴板（void 忽略 Promise）
@@ -864,331 +534,1146 @@ export function createEnglishAgentSelectionMenu(
 }
 ```
 
----
+### 3.4 `useSelectionSpeak` — 选区朗读会话
 
-### 4.10 `useSelectionSpeak` — 选区朗读会话 hook（纯新增）
-
-**对比范围**：`useSelectionSpeak.tsx` 的 `start` 函数（核心启动逻辑）。其余 `stop` / `pause` / `resume` / `setRate` 见源码。
-
-**新增** · `apps/frontend/src/views/englishLearning/agent/useSelectionSpeak.ts`（当前，约 L64–L124）
+来源：`apps/frontend/src/components/design/SelectionSpeak/useSelectionSpeak.ts`（当前源码，约 L1–L282）
 
 ```typescript
-// 启动选区朗读：听当前同款按段 TTS
-const start = useCallback(
+// 从 react 引入 useCallback/useEffect/useRef/useState
+import { useCallback, useEffect, useRef, useState } from 'react';
+// 从 speech 工具引入播放控制函数集
+import {
+	// 应用当前倍速到正在播放的音频
+	applyActivePlaybackRate,
+	// 按句切分，返回 offset spans
+	buildSentenceOffsetSpans,
+	// 播放可用性检查
+	isPlaybackAvailable,
+	// 软暂停（不杀 loopGen）
+	pausePlaybackSoft,
+	// 软续播（从 currentTime 继续）
+	resumePlaybackSoft,
+	// 停止所有播放
+	stopAllPlayback,
+	// 剥 Markdown 得纯文本
+	stripMarkdownForTts,
+} from '@/utils/speech';
+// 引入选区朗读复用的听书播放入口
+import { playListenPlainText } from '@/views/ebook/utils/epub/listen/playListenPlainText';
+
+// 朗读状态枚举：空闲/加载中/播放中/已暂停
+export type SelectionSpeakStatus = 'idle' | 'loading' | 'playing' | 'paused';
+
+// 倍速下限
+const RATE_MIN = 0.5;
+// 倍速上限
+const RATE_MAX = 3;
+/** 与 speech.ts CLOUD_CADENCE_LEAD_SEC 一致：无真实进度时抵消听书估句提前量 */
+// 句切换延迟补偿秒数
+const CADENCE_LEAD_SEC = 0.35;
+
+// 将倍速限制在 [RATE_MIN, RATE_MAX] 并保留一位小数
+function clampRate(rate: number): number {
+	return Math.min(RATE_MAX, Math.max(RATE_MIN, Number(rate.toFixed(1))));
+}
+
+// 预览文本处理：合并空白为单空格并 trim
+function previewOf(text: string): string {
+	return text.replace(/\s+/g, ' ').trim();
+}
+
+/** 句内说话权重：汉字约 3× 字母 */
+// 单字符说话权重：用于按字符比例分配句时长
+function charWeight(ch: string): number {
+	// 空白权重极低
+	if (/\s/u.test(ch)) return 0.1;
+	// 汉字权重 1
+	if (/\p{Script=Han}/u.test(ch)) return 1;
+	// 字母权重 0.34
+	if (/[A-Za-z]/.test(ch)) return 0.34;
+	// 数字权重 0.4
+	if (/[0-9]/.test(ch)) return 0.4;
+	// 其余字符权重 0.18
+	return 0.18;
+}
+
+// 计算一句话的说话权重总和
+function sentenceSpeakWeight(
+	// 全文纯文本
+	text: string,
+	// 句子 span（起止偏移）
+	span: { start: number; end: number },
+): number {
+	// 累加权重
+	let w = 0;
+	// 遍历句内每个字符
+	for (const ch of text.slice(span.start, span.end)) w += charWeight(ch);
+	// 至少 0.05，避免除零
+	return Math.max(w, 0.05);
+}
+
+/**
+ * 根因：整段 MP3 的 currentTime 含句间停顿，按字符比例映射会在停顿里提前跳到下一句。
+ * 做法：把时间轴拆成「各句说话段 + 句间停顿」；停顿期间仍显示上一句。
+ */
+// 根据音频当前时间计算应显示第几句
+function sentenceAtAudioTime(
+	// 全文纯文本
+	text: string,
+	// 音频当前时间
+	currentTime: number,
+	// 音频总时长
+	duration: number,
+): number {
+	// 重新切句（与播放端一致）
+	const spans = buildSentenceOffsetSpans(text);
+	// 只有一句 → 永远第 0 句
+	if (spans.length <= 1) return 0;
+	// 无有效时长 → 返回第 0 句
+	if (!(duration > 0) || !Number.isFinite(duration)) return 0;
+
+	// 各句说话权重数组
+	const weights = spans.map((span) => sentenceSpeakWeight(text, span));
+	// 权重总和
+	const speakTotal = weights.reduce((a, b) => a + b, 0);
+	// 句间停顿约占时长 4%/缝，上限 28%（TTS 句间常有静音）
+	const pauseFrac = Math.min(0.28, 0.04 * (spans.length - 1));
+	// 说话段占比
+	const speakFrac = 1 - pauseFrac;
+	// 当前时间占比 [0,1]
+	const ratio = Math.min(1, Math.max(0, currentTime / duration));
+
+	// 时间轴游标
+	let cursor = 0;
+	// 遍历每一句
+	for (let i = 0; i < spans.length; i += 1) {
+		// 本句说话段结束点
+		const speakEnd = cursor + speakFrac * (weights[i]! / speakTotal);
+		// 在本句说话段内或最后一句 → 返回 i
+		if (ratio < speakEnd || i === spans.length - 1) return i;
+		// 游标推进到说话段结束
+		cursor = speakEnd;
+		// 非最后一句：加上句间停顿
+		if (i < spans.length - 1) {
+			// 每个停顿均分 pauseFrac
+			cursor += pauseFrac / (spans.length - 1);
+			// 停顿里仍算上一句
+			if (ratio < cursor) return i;
+		}
+	}
+	// 兜底：最后一句
+	return spans.length - 1;
+}
+
+/**
+ * 选区朗读：TTS 仍走听书按段链路；预览只跟真实音频进度，句间停顿不抢跑。
+ */
+// 选区朗读会话 hook
+export function useSelectionSpeak() {
+	// 朗读状态
+	const [status, setStatus] = useState<SelectionSpeakStatus>('idle');
+	// 当前倍速
+	const [rate, setRateState] = useState(1);
+	// 当前句预览文本
+	const [preview, setPreview] = useState('');
+
+	// 世代号：每次 start/stop 递增，作废旧异步回调
+	const seqRef = useRef(0);
+	// 软暂停标志
+	const pausedRef = useRef(false);
+	// 当前倍速 ref（供 isActive/getRate 闭包读取最新值）
+	const rateRef = useRef(1);
 	// 原始文本（可能含 Markdown）
-	(rawText: string) => {
-		// 去首尾空白
-		const text = rawText.trim();
-		// 空文本 → 不启动
-		if (!text) return false;
-		// 播放不可用 → 不启动
-		if (!isPlaybackAvailable()) return false;
+	const textRef = useRef('');
+	// 纯文本（剥 Markdown 后）
+	const plainRef = useRef('');
+	// 句子 spans
+	const sentencesRef = useRef<Array<{ start: number; end: number }>>([]);
+	// 状态 ref（供异步回调读取最新状态）
+	const statusRef = useRef<SelectionSpeakStatus>('idle');
+	// 已显示的句索引（避免重复 setState）
+	const shownSiRef = useRef(0);
+	/** 已拿到 duration>0 的真实进度；之后忽略带 lead 的 onSentence */
+	// 真实音频时钟标志
+	const audioClockRef = useRef(false);
+	// 是否正在等待当前句 TTS
+	const waitingRef = useRef(false);
+	// 延迟切句定时器
+	const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-		// 剥 Markdown 得纯文本
-		const plain = stripMarkdownForTts(text);
-		// 纯文本为空 → 不启动
-		if (!plain) return false;
-		// 按句切分（返回 offset spans）
-		const sentences = buildSentenceOffsetSpans(plain);
+	// 同步 status 到 ref（每次渲染更新）
+	statusRef.current = status;
 
-		// 世代号自增，作废所有旧回调
-		const seq = ++seqRef.current;
+	// 应用第 si 句到预览（去重）
+	const applySentence = useCallback((si: number) => {
+		// 取该句 span
+		const span = sentencesRef.current[si];
+		// span 不存在 → 跳过
+		if (!span) return;
+		// 与已显示句相同 → 跳过（避免重复 setState）
+		if (si === shownSiRef.current) return;
+		// 更新已显示句索引
+		shownSiRef.current = si;
+		// 切取该句纯文本并处理空白后设置预览
+		setPreview(previewOf(plainRef.current.slice(span.start, span.end)));
+	}, []);
+
+	// 清除延迟切句定时器
+	const clearDelay = useCallback(() => {
+		// 无定时器 → 跳过
+		if (delayTimerRef.current == null) return;
+		// 清除定时器
+		clearTimeout(delayTimerRef.current);
+		// 置空引用
+		delayTimerRef.current = null;
+	}, []);
+
+	// 停止朗读：作废世代号 + 清理状态 + 停止播放
+	const stop = useCallback(() => {
+		// 递增世代号，作废所有旧回调
+		seqRef.current += 1;
 		// 重置暂停标志
 		pausedRef.current = false;
-		// 记录原始文本
-		textRef.current = text;
-		// 记录纯文本
-		plainRef.current = plain;
-		// 记录句子 spans
-		sentencesRef.current = sentences;
-		// 停止旧播放
+		// 重置音频时钟标志
+		audioClockRef.current = false;
+		// 重置等待标志
+		waitingRef.current = false;
+		// 重置已显示句索引
+		shownSiRef.current = 0;
+		// 清除延迟定时器
+		clearDelay();
+		// 清空原始文本
+		textRef.current = '';
+		// 清空纯文本
+		plainRef.current = '';
+		// 清空句子 spans
+		sentencesRef.current = [];
+		// 停止所有播放
 		stopAllPlayback();
-		// 预览首句
-		applySentence(0);
-		// 进入 loading 态
-		setStatus('loading');
+		// 状态回 idle
+		setStatus('idle');
+		// 清空预览
+		setPreview('');
+	}, [clearDelay]);
 
-		// 异步启动播放
-		void (async () => {
-			try {
-				// 调用听当前同款播法入口
-				const ok = await playListenPlainText(plain, {
-					// isActive：同世代且未暂停
-					isActive: () => seq === seqRef.current && !pausedRef.current,
-					// getRate：当前倍速
-					getRate: () => rateRef.current,
-					// 等待当前句 TTS 时回调
-					onAwaitingCurrentTts: (waiting) => {
-						// 旧世代或已暂停 → 忽略
-						if (seq !== seqRef.current || pausedRef.current) return;
-						// waiting=true → loading；否则 playing
-						setStatus(waiting ? 'loading' : 'playing');
-					},
-					// 句切换回调
-					onSentence: (si) => {
-						// 旧世代 → 忽略
-						if (seq !== seqRef.current) return;
-						// 更新预览
-						applySentence(si);
-					},
-				});
-				// 旧世代 → 忽略后续
-				if (seq !== seqRef.current) return;
-				// 正常结束且未暂停 → 回 idle
-				if (ok && !pausedRef.current) {
-					// 状态回 idle
+	// 卸载时停止朗读
+	useEffect(() => () => stop(), [stop]);
+
+	// 启动选区朗读：听书同款按段 TTS
+	const start = useCallback(
+		// 原始文本（可能含 Markdown）
+		(rawText: string) => {
+			// 去首尾空白
+			const text = rawText.trim();
+			// 空文本 → 不启动
+			if (!text) return false;
+			// 播放不可用 → 不启动
+			if (!isPlaybackAvailable()) return false;
+
+			// 剥 Markdown 得纯文本
+			const plain = stripMarkdownForTts(text);
+			// 纯文本为空 → 不启动
+			if (!plain) return false;
+			// 按句切分（返回 offset spans）
+			const sentences = buildSentenceOffsetSpans(plain);
+
+			// 世代号自增，作废所有旧回调
+			const seq = ++seqRef.current;
+			// 重置暂停标志
+			pausedRef.current = false;
+			// 重置音频时钟标志
+			audioClockRef.current = false;
+			// 重置等待标志
+			waitingRef.current = false;
+			// 已显示句置为 -1（确保首句 applySentence 生效）
+			shownSiRef.current = -1;
+			// 清除延迟定时器
+			clearDelay();
+			// 记录原始文本
+			textRef.current = text;
+			// 记录纯文本
+			plainRef.current = plain;
+			// 记录句子 spans
+			sentencesRef.current = sentences;
+			// 停止旧播放
+			stopAllPlayback();
+			// 预览首句
+			applySentence(0);
+			// 进入 loading 态
+			setStatus('loading');
+
+			// 异步启动播放
+			void (async () => {
+				try {
+					// 调用听书同款播法入口
+					const ok = await playListenPlainText(plain, {
+						// isActive：同世代且未暂停
+						isActive: () => seq === seqRef.current && !pausedRef.current,
+						// getRate：当前倍速
+						getRate: () => rateRef.current,
+						// 等待当前句 TTS 时回调
+						onAwaitingCurrentTts: (waiting) => {
+							// 旧世代或已暂停 → 忽略
+							if (seq !== seqRef.current || pausedRef.current) return;
+							// 更新等待标志
+							waitingRef.current = waiting;
+							// waiting=true → 清除音频时钟与延迟
+							if (waiting) {
+								audioClockRef.current = false;
+								clearDelay();
+							}
+							// waiting → loading；否则 playing
+							setStatus(waiting ? 'loading' : 'playing');
+						},
+						// 真实音频进度回调
+						onAudioTime: ({ text: clip, baseSi, currentTime, duration }) => {
+							// 旧世代 → 忽略
+							if (seq !== seqRef.current) return;
+							// 出声瞬间尚无 duration：只钉到本段首句，不锁死 audioClock
+							if (!(duration > 0) || !Number.isFinite(duration)) {
+								applySentence(baseSi);
+								return;
+							}
+							// 标记已拿到真实进度
+							audioClockRef.current = true;
+							// 清除延迟切句定时器
+							clearDelay();
+							// 按音频进度计算当前句并应用
+							applySentence(
+								baseSi + sentenceAtAudioTime(clip, currentTime, duration),
+							);
+						},
+						// 句切换回调（TTS 估句）
+						onSentence: (si, info) => {
+							// 旧世代 → 忽略
+							if (seq !== seqRef.current) return;
+							// 首包 80% 提前切句：下一句音频还没出
+							if (info.early) return;
+							// 已有真实进度则完全交给 onAudioTime
+							if (audioClockRef.current || waitingRef.current) return;
+							// 本机等无 progress：抵消 cadence 的 0.35s lead
+							clearDelay();
+							// 延迟 = CADENCE_LEAD_SEC / 当前倍速 * 1000ms
+							const delayMs =
+								(CADENCE_LEAD_SEC / Math.max(RATE_MIN, rateRef.current)) *
+								1000;
+							// 设置延迟切句定时器
+							delayTimerRef.current = setTimeout(() => {
+								// 清空定时器引用
+								delayTimerRef.current = null;
+								// 旧世代 → 忽略
+								if (seq !== seqRef.current) return;
+								// 已有真实进度 → 不切
+								if (audioClockRef.current) return;
+								// 延迟后切句
+								applySentence(si);
+							}, delayMs);
+						},
+					});
+					// 旧世代 → 忽略后续
+					if (seq !== seqRef.current) return;
+					// 正常结束且未暂停 → 回 idle
+					if (ok && !pausedRef.current) {
+						// 状态回 idle
+						setStatus('idle');
+						// 清空预览
+						setPreview('');
+						// 清空原始文本
+						textRef.current = '';
+						// 清空纯文本
+						plainRef.current = '';
+						// 清空句子
+						sentencesRef.current = [];
+						// 失败且非暂停态 → 回 idle
+					} else if (!ok && statusRef.current !== 'paused') {
+						// 状态回 idle
+						setStatus('idle');
+						// 清空预览
+						setPreview('');
+						// 清空原始文本
+						textRef.current = '';
+						// 清空纯文本
+						plainRef.current = '';
+						// 清空句子
+						sentencesRef.current = [];
+					}
+				} catch {
+					// 旧世代 → 忽略
+					if (seq !== seqRef.current) return;
+					// 异常 → 回 idle
 					setStatus('idle');
 					// 清空预览
 					setPreview('');
-					// 清空文本
-					textRef.current = '';
-					// 清空纯文本
-					plainRef.current = '';
-					// 清空句子
-					sentencesRef.current = [];
-					// 失败且非暂停态 → 回 idle
-				} else if (!ok && statusRef.current !== 'paused') {
-					// 状态回 idle
-					setStatus('idle');
-					// 清空预览
-					setPreview('');
-					// 清空文本
+					// 清空原始文本
 					textRef.current = '';
 					// 清空纯文本
 					plainRef.current = '';
 					// 清空句子
 					sentencesRef.current = [];
 				}
-			} catch {
-				// 旧世代 → 忽略
-				if (seq !== seqRef.current) return;
-				// 异常 → 回 idle
-				setStatus('idle');
-				// 清空预览
-				setPreview('');
-				// 清空文本
-				textRef.current = '';
-				// 清空纯文本
-				plainRef.current = '';
-				// 清空句子
-				sentencesRef.current = [];
-			}
-		})();
+			})();
 
-		// 启动成功
-		return true;
-	},
-	// 依赖 applySentence
-	[applySentence],
-);
-```
+			// 启动成功
+			return true;
+		},
+		// 依赖 applySentence 与 clearDelay
+		[applySentence, clearDelay],
+	);
 
----
+	// 软暂停：playing/loading → paused
+	const pause = useCallback(() => {
+		// 当前状态
+		const s = statusRef.current;
+		// 非 playing/loading → 不处理
+		if (s !== 'playing' && s !== 'loading') return;
+		// 设置暂停标志
+		pausedRef.current = true;
+		// 清除延迟切句定时器
+		clearDelay();
+		// 软暂停（不杀 loopGen）
+		pausePlaybackSoft();
+		// 进入 paused 态
+		setStatus('paused');
+	}, [clearDelay]);
 
-### 4.11 `SelectionSpeakBar` — 悬浮条拖动核心（纯新增摘录）
-
-**对比范围**：`SelectionSpeakBar.tsx` 的 `onHandlePointerDown`（首次拖动切 fixed 并钉住起点）。其余拖动 move/up、ResizeObserver、渲染见源码。
-
-**新增** · `apps/frontend/src/views/englishLearning/agent/SelectionSpeakBar.tsx`（当前，约 L143–L187）
-
-```typescript
-// 拖动手柄 pointerdown：首次拖切换 absolute → fixed 并钉住起点
-const onHandlePointerDown = useCallback(
-	(e: ReactPointerEvent<HTMLButtonElement>) => {
-		// 非左键不处理
-		if (e.button !== 0) return;
-		// 取面板边界 rect
-		const box = boundsRef.current?.getBoundingClientRect();
-		// 取 bar 元素
-		const bar = barRef.current;
-		// 取 bar rect
-		const barRect = bar?.getBoundingClientRect();
-		// 边界或 bar 不存在 → 中止
-		if (!box || !bar || !barRect) return;
-		// 阻止默认（避免选中文本）
-		e.preventDefault();
-		// 捕获指针
-		e.currentTarget.setPointerCapture(e.pointerId);
-		// 计算起始 fixed 坐标（首次拖时 bar 还在 absolute，用 barRect 算 clamp）
-		const current =
-			// 已有 fixed 坐标则用之
-			fixedPosRef.current ??
-			// 否则用 barRect clamp 到 box
-			clampFixed(
-				// bar 左
-				barRect.left,
-				// bar 顶
-				barRect.top,
-				// bar 宽
-				barRect.width,
-				// bar 高
-				barRect.height,
-				// 边界
-				box,
-			);
-		// 首次拖：切到 fixed 并钉住起点（一次 setState）
-		if (fixedPosRef.current == null) {
-			// 写入 ref（拖动中以 ref 为准）
-			fixedPosRef.current = current;
-			// 移除 absolute 定位类
-			bar.classList.remove(
-				// absolute
-				'absolute',
-				// bottom-full
-				'bottom-full',
-				// left-1/2
-				'left-1/2',
-				// mb-[9px]
-				'mb-[9px]',
-				// -translate-x-1/2
-				'-translate-x-1/2',
-			);
-			// 加 fixed 类
-			bar.classList.add('fixed');
-			// 直接写 style（避免等 setState）
-			applyFixedStyle(current);
-			// setState 同步（供渲染层）
-			setFixedPos(current);
+	// 软续播：paused → playing
+	const resume = useCallback(() => {
+		// 非 paused → 不处理
+		if (statusRef.current !== 'paused') return;
+		// 清除暂停标志
+		pausedRef.current = false;
+		// 尝试软续播
+		if (resumePlaybackSoft()) {
+			// 续播成功 → playing
+			setStatus('playing');
+			return;
 		}
-		// 记录拖动上下文
-		dragRef.current = {
-			// 指针 id
-			pointerId: e.pointerId,
-			// 起始 x
-			startX: e.clientX,
-			// 起始 y
-			startY: e.clientY,
-			// 起点 left
-			originLeft: current.left,
-			// 起点 top
-			originTop: current.top,
-			// bar 宽
-			barW: barRect.width,
-			// bar 高
-			barH: barRect.height,
-			// 边界 rect
-			box,
-		};
-	},
-	// 依赖 boundsRef 与 applyFixedStyle
-	[boundsRef, applyFixedStyle],
-);
+		// 续播失败（loopGen 已失效）→ 取原始文本重新启动
+		const text = textRef.current;
+		// 无文本 → 回 idle
+		if (!text) {
+			setStatus('idle');
+			return;
+		}
+		// 重新启动播放
+		start(text);
+	}, [start]);
+
+	// 播放/暂停切换
+	const togglePlay = useCallback(() => {
+		// 当前状态
+		const s = statusRef.current;
+		// playing/loading → 暂停
+		if (s === 'playing' || s === 'loading') {
+			pause();
+			return;
+		}
+		// paused → 续播
+		if (s === 'paused') resume();
+	}, [pause, resume]);
+
+	// 设置倍速
+	const setRate = useCallback((next: number) => {
+		// 限制范围
+		const clamped = clampRate(next);
+		// 更新 ref
+		rateRef.current = clamped;
+		// 应用到正在播放的音频
+		applyActivePlaybackRate(clamped);
+		// 更新 state
+		setRateState(clamped);
+	}, []);
+
+	// 返回会话 API
+	return {
+		// 朗读状态
+		status,
+		// 当前倍速
+		rate,
+		// 当前句预览
+		preview,
+		// 是否可见（非 idle）
+		visible: status !== 'idle',
+		// 启动朗读
+		start,
+		// 停止朗读
+		stop,
+		// 播放/暂停切换
+		togglePlay,
+		// 设置倍速
+		setRate,
+	};
+}
 ```
 
----
+### 3.5 `SelectionSpeakBar` — 朗读悬浮条
 
-### 4.12 `englishLearning/agent/index.tsx` — Agent 面板装配
-
-**对比范围**：`AgentPanel` 组件的 hook 调用、`handleNewChat`、`assistantFooter` 的 `floatAbove`、消息渲染透传。
-
-**改动前** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（基线 `HEAD`，约 L61–L66）
+来源：`apps/frontend/src/components/design/SelectionSpeak/SelectionSpeakBar.tsx`（当前源码，约 L1–L340）
 
 ```typescript
-const { isCopyedId, onCopy } = useAssistantCopy();
-// 旧版：无选区朗读 hook、无 panelRef
-```
-
-**改动后** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（当前，约 L13–L17、L64–L71）
-
-```typescript
-// 新增 import：useRef
+// import：Tooltip 组件
+import Tooltip from '@design/Tooltip';
+// import：Dropdown 原语
+import {
+	// 菜单容器
+	DropdownMenu,
+	// 菜单内容区
+	DropdownMenuContent,
+	// 普通可点击项
+	DropdownMenuItem,
+	// 菜单触发器
+	DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
+// import：Button/ScrollArea/Spinner 组件
+import { Button, ScrollArea, Spinner } from '@ui/index';
+// import：图标
+import { GripVertical, Pause, Play, Square } from 'lucide-react';
+// import：React 类型与 hooks
+import {
+	// 指针事件类型
+	type PointerEvent as ReactPointerEvent,
+	// RefObject 类型
+	type RefObject,
+	// 缓存回调
+	useCallback,
+	// 副作用
+	useEffect,
+	// 跨渲染保存可变值
 	useRef,
-// ...（其它 import 未改动）
-// 新增 import：SelectionSpeakBar / selectionContextMenu / useSelectionSpeak
+	// 状态
+	useState,
+} from 'react';
+// import：i18n hook
+import { useI18n } from '@/hooks';
+// import：className 合并工具
+import { cn } from '@/lib/utils';
+// import：朗读状态类型
+import type { SelectionSpeakStatus } from './useSelectionSpeak';
+
+
+// 倍速预设档位
+const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3] as const;
+// 边缘留白像素
+const EDGE_PAD = 12;
+
+// fixed 坐标类型
+type Pos = { left: number; top: number };
+
+// 组件 Props
+type Props = {
+	/** 拖动边界（Agent 面板） */
+	// 拖动边界 ref
+	boundsRef: RefObject<HTMLElement | null>;
+	// 朗读状态
+	status: SelectionSpeakStatus;
+	// 当前倍速
+	rate: number;
+	// 当前句预览
+	preview: string;
+	// 播放/暂停切换回调
+	onTogglePlay: () => void;
+	// 停止回调
+	onStop: () => void;
+	// 倍速变更回调
+	onRateChange: (rate: number) => void;
+};
+
+// 格式化倍速显示文本
+function formatRate(rate: number): string {
+	return `${rate.toFixed(1)} X`;
+}
+
+/** 固定槽位展示完整当前句；水平可滚、隐藏滚动条 */
+// 预览组件：展示当前句文本
+function SpeakPreview({ text }: { text: string }) {
+	// 文本为空时显示占位
+	const display = text.trim() || '......';
+
+	return (
+		// ScrollArea：水平可滚，隐藏滚动条
+		<ScrollArea
+			// key 用 display，文本变化时重置滚动位置
+			key={display}
+			// 仅水平滚动条
+			scrollbars="horizontal"
+			// 样式
+			className="text-textcolor/80 ml-2 mr-2 h-8 min-w-0 flex-1 text-sm pb-0.5"
+			// 隐藏滚动条
+			scrollbarClassName="pointer-events-none h-0 border-0 opacity-0"
+			// 视口样式：flex 行布局
+			viewportClassName="flex items-center [&>div]:flex-row! [&>div]:items-center! [&>div]:flex-nowrap!"
+			// 阻止 pointerdown 冒泡（避免触发拖动）
+			onPointerDown={(e) => e.stopPropagation()}
+			// 竖向滚轮转横向
+			onWheel={(e) => {
+				// 竖向滚轮转成横向，方便在窄槽里浏览长句
+				const viewport = e.currentTarget;
+				// 横向滚动优先时不转换
+				if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+				// 无横向滚动空间时不处理
+				if (viewport.scrollWidth <= viewport.clientWidth + 2) return;
+				// 阻止默认竖向滚动
+				e.preventDefault();
+				// 竖向增量转横向
+				viewport.scrollLeft += e.deltaY;
+			}}
+		>
+			{/* 当前句文本，不换行 */}
+			<span className="inline-block whitespace-nowrap">{display}</span>
+		</ScrollArea>
+	);
+}
+
+/** fixed 坐标：限制在 bounds 视口矩形内 */
+// 将 fixed 坐标 clamp 到边界矩形内
+function clampFixed(
+	// 期望 left
+	left: number,
+	// 期望 top
+	top: number,
+	// bar 宽
+	barW: number,
+	// bar 高
+	barH: number,
+	// 边界矩形
+	box: DOMRect,
+): Pos {
+	// left 上限：右边缘减 bar 宽减边距
+	const maxLeft = Math.max(box.left + EDGE_PAD, box.right - barW - EDGE_PAD);
+	// top 上限：下边缘减 bar 高减边距
+	const maxTop = Math.max(box.top + EDGE_PAD, box.bottom - barH - EDGE_PAD);
+	return {
+		// left clamp 到 [左边缘+边距, maxLeft]
+		left: Math.min(maxLeft, Math.max(box.left + EDGE_PAD, left)),
+		// top clamp 到 [上边缘+边距, maxTop]
+		top: Math.min(maxTop, Math.max(box.top + EDGE_PAD, top)),
+	};
+}
+
+/**
+ * 选区朗读悬浮条。
+ * 默认：挂在 Footer 内，用 bottom-full + mb-3 贴在输入框上方居中（与图示间距一致）。
+ * 拖动后改为 fixed，并限制在 boundsRef 内。
+ * 拖动中直接改 DOM，避免每帧 setState 重渲染整条（含 ScrollArea/菜单）。
+ */
+// 悬浮条组件
+export function SelectionSpeakBar({
+	// 拖动边界 ref
+	boundsRef,
+	// 朗读状态
+	status,
+	// 当前倍速
+	rate,
+	// 当前句预览
+	preview,
+	// 播放/暂停切换
+	onTogglePlay,
+	// 停止
+	onStop,
+	// 倍速变更
+	onRateChange,
+}: Props) {
+	// i18n t 函数
+	const { t } = useI18n();
+	// bar 根元素 ref
+	const barRef = useRef<HTMLDivElement>(null);
+	/** null = 未拖过，走 Footer 锚点默认位 */
+	// fixed 坐标状态（null 表示未拖动，走默认 absolute 定位）
+	const [fixedPos, setFixedPos] = useState<Pos | null>(null);
+	// fixed 坐标 ref（拖动中以 ref 为准，避免 setState 延迟）
+	const fixedPosRef = useRef<Pos | null>(null);
+	// 同步 ref
+	fixedPosRef.current = fixedPos;
+
+	// 拖动上下文 ref
+	const dragRef = useRef<{
+		// 指针 id
+		pointerId: number;
+		// 起始 x
+		startX: number;
+		// 起始 y
+		startY: number;
+		// 起点 left
+		originLeft: number;
+		// 起点 top
+		originTop: number;
+		// bar 宽
+		barW: number;
+		// bar 高
+		barH: number;
+		// 边界 rect
+		box: DOMRect;
+	} | null>(null);
+
+	// 直接写 style.left/top（拖动中不 setState）
+	const applyFixedStyle = useCallback((pos: Pos) => {
+		// 取 bar 元素
+		const el = barRef.current;
+		// 不存在 → 跳过
+		if (!el) return;
+		// 写 left
+		el.style.left = `${pos.left}px`;
+		// 写 top
+		el.style.top = `${pos.top}px`;
+	}, []);
+
+	// 是否已切 fixed
+	const isFixed = fixedPos != null;
+
+	// ResizeObserver：面板尺寸变化时重新 clamp
+	useEffect(() => {
+		// 取边界元素
+		const boxEl = boundsRef.current;
+		// 无边界或未切 fixed → 不处理
+		if (!boxEl || !isFixed) return;
+		// 创建 ResizeObserver
+		const ro = new ResizeObserver(() => {
+			// 重新取边界 rect
+			const box = boundsRef.current?.getBoundingClientRect();
+			// 取 bar rect
+			const bar = barRef.current?.getBoundingClientRect();
+			// 取上次 fixed 坐标
+			const prev = fixedPosRef.current;
+			// 任一缺失 → 跳过
+			if (!box || !bar || !prev) return;
+			// 重新 clamp
+			const next = clampFixed(prev.left, prev.top, bar.width, bar.height, box);
+			// 更新 ref
+			fixedPosRef.current = next;
+			// 直接写 style
+			applyFixedStyle(next);
+			// 同步 state
+			setFixedPos(next);
+		});
+		// 观察边界元素
+		ro.observe(boxEl);
+		// 卸载时断开
+		return () => ro.disconnect();
+	}, [boundsRef, isFixed, applyFixedStyle]);
+
+	// 拖动手柄 pointerdown
+	const onHandlePointerDown = useCallback(
+		(e: ReactPointerEvent<HTMLButtonElement>) => {
+			// 非左键不处理
+			if (e.button !== 0) return;
+			// 取面板边界 rect
+			const box = boundsRef.current?.getBoundingClientRect();
+			// 取 bar 元素
+			const bar = barRef.current;
+			// 取 bar rect
+			const barRect = bar?.getBoundingClientRect();
+			// 边界或 bar 不存在 → 中止
+			if (!box || !bar || !barRect) return;
+			// 阻止默认（避免选中文本）
+			e.preventDefault();
+			// 捕获指针
+			e.currentTarget.setPointerCapture(e.pointerId);
+			// 计算起始 fixed 坐标（首次拖时 bar 还在 absolute，用 barRect 算 clamp）
+			const current =
+				// 已有 fixed 坐标则用之
+				fixedPosRef.current ??
+				// 否则用 barRect clamp 到 box
+				clampFixed(
+					// bar 左
+					barRect.left,
+					// bar 顶
+					barRect.top,
+					// bar 宽
+					barRect.width,
+					// bar 高
+					barRect.height,
+					// 边界
+					box,
+				);
+			// 首次拖：切到 fixed 并钉住起点（一次 setState）
+			if (fixedPosRef.current == null) {
+				// 写入 ref（拖动中以 ref 为准）
+				fixedPosRef.current = current;
+				// 移除 absolute 定位类
+				bar.classList.remove(
+					// absolute
+					'absolute',
+					// bottom-full
+					'bottom-full',
+					// left-1/2
+					'left-1/2',
+					// mb-[9px]
+					'mb-[9px]',
+					// -translate-x-1/2
+					'-translate-x-1/2',
+				);
+				// 加 fixed 类
+				bar.classList.add('fixed');
+				// 直接写 style（避免等 setState）
+				applyFixedStyle(current);
+				// setState 同步（供渲染层）
+				setFixedPos(current);
+			}
+			// 记录拖动上下文
+			dragRef.current = {
+				// 指针 id
+				pointerId: e.pointerId,
+				// 起始 x
+				startX: e.clientX,
+				// 起始 y
+				startY: e.clientY,
+				// 起点 left
+				originLeft: current.left,
+				// 起点 top
+				originTop: current.top,
+				// bar 宽
+				barW: barRect.width,
+				// bar 高
+				barH: barRect.height,
+				// 边界 rect
+				box,
+			};
+		},
+		// 依赖 boundsRef 与 applyFixedStyle
+		[boundsRef, applyFixedStyle],
+	);
+
+	// 拖动手柄 pointermove
+	const onHandlePointerMove = useCallback(
+		(e: ReactPointerEvent<HTMLButtonElement>) => {
+			// 取拖动上下文
+			const drag = dragRef.current;
+			// 无上下文或指针 id 不匹配 → 跳过
+			if (!drag || drag.pointerId !== e.pointerId) return;
+			// 计算新坐标（起点 + 偏移量，再 clamp）
+			const next = clampFixed(
+				// left = 起点 + dx
+				drag.originLeft + (e.clientX - drag.startX),
+				// top = 起点 + dy
+				drag.originTop + (e.clientY - drag.startY),
+				// bar 宽
+				drag.barW,
+				// bar 高
+				drag.barH,
+				// 边界
+				drag.box,
+			);
+			// 更新 ref
+			fixedPosRef.current = next;
+			// 直接写 style（不 setState）
+			applyFixedStyle(next);
+		},
+		// 依赖 applyFixedStyle
+		[applyFixedStyle],
+	);
+
+	// 拖动手柄 pointerup
+	const onHandlePointerUp = useCallback(
+		(e: ReactPointerEvent<HTMLButtonElement>) => {
+			// 取拖动上下文
+			const drag = dragRef.current;
+			// 无上下文或指针 id 不匹配 → 跳过
+			if (!drag || drag.pointerId !== e.pointerId) return;
+			// 清空拖动上下文
+			dragRef.current = null;
+			// 取最终 fixed 坐标
+			const pos = fixedPosRef.current;
+			// 同步到 state
+			if (pos) setFixedPos(pos);
+			// 释放指针捕获
+			try {
+				e.currentTarget.releasePointerCapture(e.pointerId);
+			} catch {
+				// ignore
+			}
+		},
+		// 无依赖
+		[],
+	);
+
+	// 是否 loading（等待 TTS）
+	const loading = status === 'loading';
+	// 是否 playing（含 loading）
+	const playing = status === 'playing' || status === 'loading';
+
+	return (
+		// bar 根元素
+		<div
+			// ref
+			ref={barRef}
+			// className：宽度 + 层级 + flex + 圆角边框 + 毛玻璃
+			className={cn(
+				// 最大宽度
+				'w-[min(100%-1.5rem,22rem)]',
+				// 层级 + 布局 + 边框 + 背景 + 阴影 + 毛玻璃
+				'z-40 flex items-center gap-1 rounded-md border border-theme/10 bg-theme-background/5 px-1.5 py-1 shadow-md backdrop-blur-sm',
+				// 未拖动 → absolute 贴 Footer 上方居中；已拖动 → fixed
+				fixedPos == null
+					? 'absolute bottom-full left-1/2 mb-[9px] -translate-x-1/2'
+					: 'fixed',
+			)}
+			// style：fixed 时写入坐标
+			style={
+				fixedPos
+					? {
+							// 拖动中以 ref 为准，避免父级因 preview/status 重渲染把位置打回旧 state
+							left: (fixedPosRef.current ?? fixedPos).left,
+							top: (fixedPosRef.current ?? fixedPos).top,
+						}
+					: undefined
+			}
+			// 无障碍角色
+			role="group"
+			// 无障碍标签
+			aria-label={t('assistant.selection.speakBar')}
+		>
+			{/* 拖动手柄按钮 */}
+			<button
+				// 按钮类型
+				type="button"
+				// 样式：grab 光标
+				className="text-textcolor/45 hover:text-textcolor/70 flex h-8 w-6 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+				// 无障碍标签
+				aria-label={t('assistant.selection.dragBar')}
+				// pointerdown：开始拖动
+				onPointerDown={onHandlePointerDown}
+				// pointermove：拖动中
+				onPointerMove={onHandlePointerMove}
+				// pointerup：结束拖动
+				onPointerUp={onHandlePointerUp}
+				// pointercancel：同 pointerup
+				onPointerCancel={onHandlePointerUp}
+			>
+				{/* 拖动图标 */}
+				<GripVertical className="size-4" aria-hidden />
+			</button>
+
+			{/* 停止按钮 */}
+			<Tooltip content={t('assistant.selection.stopSpeak')}>
+				<Button
+					// 按钮类型
+					type="button"
+					// 幽灵变体
+					variant="ghost"
+					// 小图标尺寸
+					size="icon-sm"
+					// 样式
+					className="w-7 h-7 text-teal-500 shrink-0"
+					// 无障碍标签
+					aria-label={t('assistant.selection.stopSpeak')}
+					// 点击停止
+					onClick={onStop}
+				>
+					{/* 停止图标 */}
+					<Square className="size-4 fill-current" aria-hidden />
+				</Button>
+			</Tooltip>
+
+			{/* 播放/暂停按钮 */}
+			<Tooltip
+				// 提示文本随状态切换
+				content={
+					playing
+						? t('ebook.read.listenBook.pause')
+						: t('ebook.read.listenBook.resume')
+				}
+			>
+				<Button
+					// 按钮类型
+					type="button"
+					// 幽灵变体
+					variant="ghost"
+					// 小图标尺寸
+					size="icon-sm"
+					// 样式
+					className="w-7 h-7 text-teal-500 shrink-0"
+					// 无障碍标签
+					aria-label={
+						playing
+							? t('ebook.read.listenBook.pause')
+							: t('ebook.read.listenBook.resume')
+					}
+					// 点击切换播放/暂停
+					onClick={onTogglePlay}
+				>
+					{/* loading → Spinner */}
+					{loading ? (
+						<Spinner className="size-4 text-teal-500" aria-hidden />
+					) : playing ? (
+						// playing → 暂停图标
+						<Pause className="size-4" aria-hidden />
+					) : (
+						// paused → 播放图标
+						<Play className="size-4" aria-hidden />
+					)}
+				</Button>
+			</Tooltip>
+
+			{/* 倍速菜单 */}
+			<DropdownMenu modal={false}>
+				{/* 触发器：显示当前倍速 */}
+				<DropdownMenuTrigger asChild>
+					<Button
+						// 按钮类型
+						type="button"
+						// link 变体
+						variant="link"
+						// 小图标尺寸
+						size="icon-sm"
+						// 样式
+						className={cn(
+							'text-teal-500/80 hover:bg-teal-500/10',
+							'h-6 px-1.5! text-base w-fit! shrink-0 rounded-sm font-medium tabular-nums',
+						)}
+						// 无障碍标签
+						aria-label={t('ebook.read.listenBook.speed')}
+						// 阻止 pointerdown 冒泡（避免触发拖动）
+						onPointerDown={(e) => e.stopPropagation()}
+					>
+						{/* 当前倍速文本 */}
+						{formatRate(rate)}
+					</Button>
+				</DropdownMenuTrigger>
+				{/* 倍速选项 */}
+				<DropdownMenuContent
+					// 向上弹出
+					side="top"
+					// 居中对齐
+					align="center"
+					// 样式
+					className="z-50 min-w-18"
+				>
+					{/* 遍历预设档位 */}
+					{RATE_PRESETS.map((preset) => (
+						<DropdownMenuItem
+							// key
+							key={preset}
+							// 样式：居中 + 当前档高亮
+							className={cn(
+								'tabular-nums flex items-center justify-center',
+								preset === rate && 'bg-theme/10 text-teal-500',
+							)}
+							// 选中 → 设置倍速
+							onSelect={() => onRateChange(preset)}
+						>
+							{/* 档位文本 */}
+							{formatRate(preset)}
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{/* 当前句预览 */}
+			<SpeakPreview text={preview} />
+		</div>
+	);
+}
+```
+
+### 3.6 `useAssistantSelectionSpeak` — 编排 hook
+
+来源：`apps/frontend/src/components/design/SelectionSpeak/useAssistantSelectionSpeak.tsx`（当前源码，约 L1–L53）
+
+```typescript
+// 从 react 引入 RefObject 类型与 useMemo
+import { type RefObject, useMemo } from 'react';
+// import：i18n hook
+import { useI18n } from '@/hooks';
+// import：菜单项工厂
+import { createSelectionSpeakMenu } from './createSelectionSpeakMenu';
+// import：悬浮条组件
 import { SelectionSpeakBar } from './SelectionSpeakBar';
-import { createEnglishAgentSelectionMenu } from './selectionContextMenu';
+// import：选区朗读会话 hook
 import { useSelectionSpeak } from './useSelectionSpeak';
-// ...（组件体内）
-const { isCopyedId, onCopy } = useAssistantCopy();
-// 新增：面板 ref（悬浮条拖动边界）
-const panelRef = useRef<HTMLDivElement>(null);
-// 新增：选区朗读会话
-const selectionSpeak = useSelectionSpeak();
 
-// 新增：选区菜单工厂（memo 化，依赖 t 与 start）
-const getSelectionContextMenuItems = useMemo(
-	// 工厂闭包
-	() => createEnglishAgentSelectionMenu(t, selectionSpeak.start),
-	// 依赖 t 与 start
-	[t, selectionSpeak.start],
-);
-```
+/**
+ * 助手选区朗读会话：菜单项工厂 + Footer 悬浮条 + stop。
+ * 挂到 AssistantMessageRow.getSelectionContextMenuItems / AssistantFooter.floatAbove。
+ */
+// 编排 hook：入参为拖动边界 ref
+export function useAssistantSelectionSpeak(
+	// 面板边界 ref（悬浮条拖动范围）
+	boundsRef: RefObject<HTMLElement | null>,
+) {
+	// i18n t 函数
+	const { t } = useI18n();
+	// 选区朗读会话
+	const speak = useSelectionSpeak();
 
-**改动前** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（基线 `HEAD`，约 L129–L133）
+	// 菜单项工厂（memo 化，依赖 t 与 start）
+	const getSelectionContextMenuItems = useMemo(
+		// 创建菜单项工厂闭包
+		() => createSelectionSpeakMenu(t, speak.start),
+		// 依赖 t 与 start
+		[t, speak.start],
+	);
 
-```typescript
-// 旧版：直接 onNewChat
-const handleSendMessage = useCallback(async () => {
-	await sendMessage();
-}, [sendMessage, enableStreamStickToBottom]);
-```
-
-**改动后** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（当前，约 L142–L146）
-
-```typescript
-// 新增：新会话时先停止朗读
-const handleNewChat = useCallback(() => {
-	// 停止选区朗读
-	selectionSpeak.stop();
-	// 再开新会话
-	onNewChat();
-}, [onNewChat, selectionSpeak.stop]);
-```
-
-**改动前** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（基线 `HEAD`，约 L143–L148）
-
-```typescript
-const assistantFooter = (
-	<AssistantFooter
-		// ...（其它 props 未改动）
-	}}
-	>
-		// ...（children 未改动）
-```
-
-**改动后** · `apps/frontend/src/views/englishLearning/agent/index.tsx`（当前，约 L162–L175）
-
-```typescript
-const assistantFooter = (
-	<AssistantFooter
-		// ...（其它 props 未改动）
-		// 新增：悬浮朗读条（仅 visible 时渲染）
-		floatAbove={
-			selectionSpeak.visible ? (
+	// 悬浮条 JSX（memo 化，visible 时才渲染）
+	const floatAbove = useMemo(
+		() =>
+			speak.visible ? (
 				<SelectionSpeakBar
 					// 拖动边界
-					boundsRef={panelRef}
-					// 状态
-					status={selectionSpeak.status}
+					boundsRef={boundsRef}
+					// 朗读状态
+					status={speak.status}
 					// 倍速
-					rate={selectionSpeak.rate}
+					rate={speak.rate}
 					// 预览
-					preview={selectionSpeak.preview}
+					preview={speak.preview}
 					// 播放/暂停
-					onTogglePlay={selectionSpeak.togglePlay}
+					onTogglePlay={speak.togglePlay}
 					// 停止
-					onStop={selectionSpeak.stop}
+					onStop={speak.stop}
 					// 倍速变更
-					onRateChange={selectionSpeak.setRate}
+					onRateChange={speak.setRate}
 				/>
-			) : null
-		}
-	>
-		// ...（children 未改动）
+			) : null,
+		// 依赖列表
+		[
+			// 边界 ref
+			boundsRef,
+			// 是否可见
+			speak.visible,
+			// 状态
+			speak.status,
+			// 倍速
+			speak.rate,
+			// 预览
+			speak.preview,
+			// 播放/暂停
+			speak.togglePlay,
+			// 停止
+			speak.stop,
+			// 倍速变更
+			speak.setRate,
+		],
+	);
+
+	// 返回编排结果
+	return {
+		// 菜单项工厂
+		getSelectionContextMenuItems,
+		// 悬浮条 JSX
+		floatAbove,
+		// 停止
+		stop: speak.stop,
+		// 是否可见
+		visible: speak.visible,
+	};
+}
 ```
 
-**变更摘要**：`AgentPanel` 装配 `useSelectionSpeak` + 选区菜单工厂；`handleNewChat` 包裹 `onNewChat` 先停朗读；`AssistantFooter` 透传 `floatAbove` 渲染悬浮条；消息渲染透传 `getSelectionContextMenuItems`；面板根 `div` 加 `ref={panelRef}` 作拖动边界。
+### 3.7 `playListenPlainText` — 纯文本播放入口
 
----
-
-### 4.13 `playListenPlainText.ts` — 选区朗读复用听书链路入口（纯新增）
-
-**对比范围**：`playListenPlainText.ts` 整个文件。纯新增。
-
-**新增** · `apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts`（当前，约 L11–L37）
+来源：`apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts`（当前源码，约 L1–L41）
 
 ```typescript
-// 无 EPUB 高亮的听当前同款播法：首句快出声，其后按段整包 TTS
+/**
+ * 无 EPUB 高亮的听当前同款播法：首句快出声，其后按段整包 TTS（cloudSingleUtterance）。
+ */
+// 从 speech 工具引入分句与剥 Markdown
+import { buildSentenceOffsetSpans, stripMarkdownForTts } from '@/utils/speech';
+// 从听书段落工具引入按段打包
+import { buildParagraphUnits } from './epubListenParagraphs';
+// 从听书播放游标引入播放入口
+import { playListenUnitsFromCursor } from './epubListenPlayUnits';
+
+// 纯文本播放入口：入参为原始文本与播放选项
 export async function playListenPlainText(
 	// 原始文本（可能含 Markdown）
 	rawText: string,
@@ -1200,12 +1685,23 @@ export async function playListenPlainText(
 		getRate?: () => number;
 		// 等待当前句 TTS 回调
 		onAwaitingCurrentTts?: (waiting: boolean) => void;
-		// 句切换回调
-		onSentence?: (si: number, info: { forceCenter?: boolean }) => void;
+		// 句切换回调（含 forceCenter / early 标志）
+		onSentence?: (si: number, info: { forceCenter?: boolean; early?: boolean }) => void;
+		// 真实音频进度回调
+		onAudioTime?: (info: {
+			// 本段文本
+			text: string;
+			// 本段首句索引
+			baseSi: number;
+			// 当前播放时间
+			currentTime: number;
+			// 总时长
+			duration: number;
+		}) => void;
 	},
 	// 返回是否正常播放完成
 ): Promise<boolean> {
-	// 剥 Markdown 得纯文本
+	// 剥 Markdown 得纯文本并 trim
 	const plain = stripMarkdownForTts(rawText).trim();
 	// 空文本 → 失败
 	if (!plain) return false;
@@ -1236,67 +1732,54 @@ export async function playListenPlainText(
 		onSentence: options?.onSentence ?? (() => {}),
 		// 等待回调
 		onAwaitingCurrentTts: options?.onAwaitingCurrentTts,
+		// 音频进度回调
+		onAudioTime: options?.onAudioTime,
 	});
 }
 ```
 
-**变更摘要**：新增 `playListenPlainText` 入口，将「剥 Markdown → 分句 → 分段 → `playListenUnitsFromCursor`」封装为一步，供选区朗读复用听书链路；`useSelectionSpeak` 通过 `onAwaitingCurrentTts` / `onSentence` 回调驱动状态机与预览。
+## 4. 关键设计决策
 
-## 5. 兼容性与影响
+| # | 决策 | 说明 |
+|---|------|------|
+| 1 | pointerdown 快照选区 | macOS 右键时系统会先改写选区，`pointerdown(button=2)` 先快照，`contextmenu` 时优先用快照文本 |
+| 2 | contextmenu 捕获阶段拦截 | 尽早 `preventDefault` 防止系统菜单弹出；未选中文本或菜单项为空时放行系统菜单 |
+| 3 | 世代控制（seqRef） | 每次 `start`/`stop` 递增 `seq`，异步回调通过 `seq === seqRef.current` 判断是否仍有效，防止旧播放回调污染新会话 |
+| 4 | 双进度源策略 | `onAudioTime`（真实音频进度）优先于 `onSentence`（TTS 估句）；`audioClockRef` 标记已拿到真实进度后忽略带 lead 的 `onSentence` |
+| 5 | 句间停顿模型 | `sentenceAtAudioTime` 按字符权重 + 停顿比例映射当前句，避免停顿期间按字符比例抢跑到下一句 |
+| 6 | CADENCE_LEAD_SEC 延迟补偿 | 无真实进度时延迟 `0.35s / rate` 切句，抵消听书估句提前量（与 `speech.ts` 的 `CLOUD_CADENCE_LEAD_SEC` 一致） |
+| 7 | 悬浮条拖动 | 默认 `absolute` 贴 Footer 上方居中；拖动后切 `fixed` + `clampFixed` 限制在 `boundsRef` 内；拖动中直接改 DOM 避免 `setState` 重渲染整条 |
+| 8 | 软暂停/续播 | `pausePlaybackSoft`/`resumePlaybackSoft` 不杀 `loopGen`，续播从 `currentTime` 继续；续播失败时取原始文本重新 `start` |
 
-| 项目 | 说明 |
-|------|------|
-| 未传 `getSelectionContextMenuItems` | `useSelectionContextMenu` 返回 `undefined`/`null`，零开销，行为与改动前完全一致 |
-| 系统右键菜单 | 选中文本且 `getItems` 返回非空时才 `preventDefault`；未选中或返回空时放行系统菜单 |
-| EPUB 右键菜单 | `EpubReaderContextMenu` 改用 `PositionedQuickMenu`，外部 API（`state`/`items`/`onOpenChange`）不变 |
-| `ChatAssistantMessage` / `Markdown` | 新增 prop 可选，不传则不启用选区菜单 |
-| 朗读与听书 | 共享 `playListenUnitsFromCursor`；切句时序优化见 [epub-listen-cadence-lead.md](../ebook/epub-listen-cadence-lead.md) |
-| 新会话 | `handleNewChat` 先 `stop()` 朗读，避免残留 |
-| 消息正文可选 | `select-auto` → `select-text`，不影响其它样式 |
+## 5. 集成点
 
-## 6. 风险与回归清单
+| 集成方 | 路径 | 关键行 |
+|--------|------|--------|
+| 英语 Agent | `apps/frontend/src/views/englishLearning/agent/index.tsx` | L29 import；L62–63 `useAssistantSelectionSpeak(panelRef)`；L155 `floatAbove`；L267–269 `getSelectionContextMenuItems` |
+| EPUB 助手 | `apps/frontend/src/views/ebook/components/reader/EbookAssistant.tsx` | L23 import；L63 `useAssistantSelectionSpeak(panelRef)` |
+| ChatAssistantMessage | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | L177–181 `useSelectionContextMenu`；L504–505 `onContextMenuCapture`/`onPointerDownCapture` 挂到 shell div |
+| Markdown 预览 | `apps/frontend/src/components/design/Markdown/index.tsx` | L124–128 `useSelectionContextMenu` |
 
-| 风险 | 排查 |
-|------|------|
-| macOS 右键选区被系统改写 | pointerdown 快照 + contextmenu 捕获阶段双保险；测试：拖选一段 → 右键 → 菜单弹出且文本正确 |
-| 菜单未弹出 | `getItems` 返回空时不弹；确认选中文本非空、`isPlaybackAvailable()` 未拦截（复制项不依赖播放） |
-| 朗读残留 | 切会话 / 切路由时确认 `stop()` 被调用；`useEffect` 卸载清理 |
-| 悬浮条拖出面板 | `clampFixed` 限制在 `boundsRef` 内；`ResizeObserver` 面板缩放时重新 clamp |
-| 悬浮条拖动闪烁 | 拖动中直接改 DOM（ref），不每帧 setState；确认 `fixedPosRef` 与 `fixedPos` 同步 |
-| EPUB 右键菜单回归 | 复用 `PositionedQuickMenu` 后行为一致；测试 EPUB 选区右键弹菜单 |
-
-建议回归：
-1. 英语 Agent 消息：拖选一段 → 右键 → 菜单含「朗读内容」「复制内容」
-2. 点「朗读内容」→ 悬浮条出现 → 首句出声 → 句预览跟随切换
-3. 悬浮条拖动 → 切 fixed → 限制在面板内 → 松手位置保持
-4. 倍速菜单 → 切换 0.75/1.5/2 → 朗读倍速变化
-5. 暂停 / 续播 / 停止 → 状态正确
-6. 朗读中点「新会话」→ 朗读停止
-7. 未选中文本右键 → 弹系统菜单（非自定义）
-8. EPUB 阅读器选区右键 → 菜单正常（复用 PositionedQuickMenu）
-
-## 7. 相关源码路径
+## 6. 相关源码路径表
 
 | 说明 | 路径 |
 |------|------|
 | 选区右键 hook | `apps/frontend/src/components/design/ContextMenu/useSelectionContextMenu.tsx` |
 | 声明式锚定菜单 | `apps/frontend/src/components/design/ContextMenu/PositionedQuickMenu.tsx` |
-| ContextMenu barrel | `apps/frontend/src/components/design/ContextMenu/index.tsx` |
-| EPUB 右键菜单（复用） | `apps/frontend/src/views/ebook/components/reader/EpubReaderContextMenu.tsx` |
-| 助手 Footer | `apps/frontend/src/components/design/Assistant/Footer.tsx` |
-| 助手类型 | `apps/frontend/src/components/design/Assistant/types.ts` |
-| 助手 utils | `apps/frontend/src/components/design/Assistant/utils.ts` |
-| 助手 MessageRow | `apps/frontend/src/components/design/Assistant/MessageRow.tsx` |
+| 菜单项类型 | `apps/frontend/src/components/design/ContextMenu/types.ts` |
+| 选区菜单工厂 | `apps/frontend/src/components/design/SelectionSpeak/createSelectionSpeakMenu.ts` |
+| 选区朗读会话 hook | `apps/frontend/src/components/design/SelectionSpeak/useSelectionSpeak.ts` |
+| 朗读悬浮条 | `apps/frontend/src/components/design/SelectionSpeak/SelectionSpeakBar.tsx` |
+| 编排 hook | `apps/frontend/src/components/design/SelectionSpeak/useAssistantSelectionSpeak.tsx` |
+| 纯文本播放入口 | `apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts` |
+| 听书播放游标 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenPlayUnits.ts` |
+| 段落打包 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenParagraphs.ts` |
+| 语音工具 | `apps/frontend/src/utils/speech.ts` |
+| 英语 Agent 装配 | `apps/frontend/src/views/englishLearning/agent/index.tsx` |
+| EPUB 助手装配 | `apps/frontend/src/views/ebook/components/reader/EbookAssistant.tsx` |
 | ChatAssistantMessage | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` |
 | Markdown 预览 | `apps/frontend/src/components/design/Markdown/index.tsx` |
-| 选区菜单工厂 | `apps/frontend/src/views/englishLearning/agent/selectionContextMenu.ts` |
-| 选区朗读 hook | `apps/frontend/src/views/englishLearning/agent/useSelectionSpeak.ts` |
-| 朗读悬浮条 | `apps/frontend/src/views/englishLearning/agent/SelectionSpeakBar.tsx` |
-| Agent 面板装配 | `apps/frontend/src/views/englishLearning/agent/index.tsx` |
-| 听书链路入口 | `apps/frontend/src/views/ebook/utils/epub/listen/playListenPlainText.ts` |
-| 中文 i18n | `apps/frontend/src/i18n/locales/zh-CN.ts` |
-| 英文 i18n | `apps/frontend/src/i18n/locales/en-US.ts` |
 
 ---
 
-（若与仓库最新源码不一致，以源码为准）
+若与仓库最新源码不一致，以源码为准。

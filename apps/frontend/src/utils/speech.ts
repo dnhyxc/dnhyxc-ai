@@ -478,6 +478,8 @@ export type TtsCadenceChunkEvent = {
 export type TtsPlaybackProgress = {
 	sentenceIndex: number;
 	progress: number;
+	currentTime: number;
+	duration: number;
 };
 
 /** 听书逐句：上一句播放期间预取的云端 MP3（plain 为实际请求的 chunk 文本） */
@@ -907,6 +909,11 @@ function emitCadenceChunk(
 
 let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
+/**
+ * 当前期望倍速。loading 期间尚无（或未挂好）audio 时，applyActivePlaybackRate 只写入这里；
+ * 出声前 startCloudAudioPlayback 再读，避免起播快照了旧 rate。
+ */
+let desiredPlaybackRate = 1;
 /** stopPlaybackMediaOnly 时打断 waitCloudAudioEnd，避免 onended 被清掉后一直挂到超时 */
 let abortCloudAudioWait: (() => void) | null = null;
 /** 句高亮 rAF 轮询；stop 时取消，避免卸 src 后仍回调 */
@@ -1363,10 +1370,15 @@ function bindCloudAudioPauseBridge(
 	};
 }
 
-/** 听书等场景切换倍速：云端 MP3 即时生效；本机 Web Speech 仅影响下一句 */
+/** 听书等场景切换倍速：写入期望值；云端 MP3 已挂载则即时生效；本机 Web Speech 仅影响下一句 */
 export function applyActivePlaybackRate(rate: number): void {
 	const clamped = clampPlaybackRate(rate);
+	desiredPlaybackRate = clamped;
 	if (cloudAudio) cloudAudio.playbackRate = clamped;
+}
+
+function seedDesiredPlaybackRate(rate?: number): void {
+	desiredPlaybackRate = clampPlaybackRate(rate);
 }
 
 async function readResponseBodyAsArrayBuffer(
@@ -1643,6 +1655,9 @@ async function playCloudTtsCadenceSegments(
 	generation: number,
 	opts?: CloudTtsPlaybackOptions,
 ): Promise<void> {
+	// 在 TTS HTTP 等待前写入期望倍速；等待期间 UI 调速走 applyActivePlaybackRate
+	seedDesiredPlaybackRate(opts?.rate);
+
 	let playbackStartNotified = false;
 	const notifyPlaybackStart = () => {
 		if (playbackStartNotified) return;
@@ -1672,9 +1687,6 @@ async function playCloudTtsCadenceSegments(
 	// 如果无可用块，直接返回
 	if (chunks.length === 0) return;
 
-	// 获取播放速率，兜底为 1
-	const rate = clampPlaybackRate(opts?.rate);
-
 	// 若文本仅有一个块，且不超过单次云 TTS 最大长度，直接整段播（省去分段机制）
 	if (
 		chunks.length === 1 &&
@@ -1689,11 +1701,11 @@ async function playCloudTtsCadenceSegments(
 		);
 		// 检查播放世代是否仍有效，用户可能已终止
 		if (!isPlaybackGenerationActive(generation)) return;
-		// 播放 MP3（Blob）
+		// 播放 MP3（Blob）；倍速出声前读 desiredPlaybackRate
 		await playCloudTtsReady(
 			ready,
 			generation,
-			rate,
+			undefined,
 			undefined,
 			notifyPlaybackStart,
 		);
@@ -1718,7 +1730,7 @@ async function playCloudTtsCadenceSegments(
 		if (i > 0) {
 			// 为每一段（首段除外）播放前等待上段定义的停顿时长，单位 ms，速率控制
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
-			await pauseMs(Math.max(0, Math.round(prevPause / rate)));
+			await pauseMs(Math.max(0, Math.round(prevPause / desiredPlaybackRate)));
 			// 校验暂停期间世代是否仍然有效
 			if (!isPlaybackGenerationActive(generation)) return;
 			// 下一段 TTS 可能仍在飞：恢复等待态
@@ -1738,7 +1750,7 @@ async function playCloudTtsCadenceSegments(
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
 		// 播放当前段 MP3
-		await playCloudTtsReady(ready, generation, rate, undefined, () => {
+		await playCloudTtsReady(ready, generation, undefined, undefined, () => {
 			opts?.onAwaitingPlayback?.(false);
 			if (i === 0) notifyPlaybackStart();
 		});
@@ -1749,17 +1761,68 @@ async function playCloudTtsCadenceSegments(
 	}
 }
 
-/** 整段一次合成；按 currentTime 比例估算当前句并回调 onCadenceChunk。
- * ponytail: TTS 非匀速 + timeupdate 稀疏，纯比例切句常落后听感；媒体时间略提前。 */
+/** 整段一次合成；按 currentTime × 朗读耗时权重估算当前句并回调 onCadenceChunk。
+ * ponytail: TTS 非匀速 + timeupdate 稀疏，纯比例切句常落后听感；媒体时间略提前。
+ * 中英混排时拉丁字母远密于 CJK 音节，按字数比例会令高亮超前——改用权重。 */
 const CLOUD_CADENCE_LEAD_SEC = 0.35;
+
+/** 单字相对朗读耗时：CJK≈1 音节；拉丁≈3 字母/音节。 */
+function ttsCharSpeechWeight(ch: string): number {
+	if (
+		/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(
+			ch,
+		)
+	) {
+		return 1;
+	}
+	if (/[A-Za-z]/.test(ch)) return 1 / 3;
+	if (/\d/.test(ch)) return 0.5;
+	if (/\s/.test(ch)) return 0.15;
+	return 0.4;
+}
+
+function buildTtsWeightPrefix(plain: string): Float64Array {
+	const prefix = new Float64Array(plain.length + 1);
+	for (let i = 0; i < plain.length; i += 1) {
+		prefix[i + 1] = prefix[i]! + ttsCharSpeechWeight(plain[i]!);
+	}
+	return prefix;
+}
+
+/** ratio∈[0,1] → 字符下标（供 sentenceIndexAtOffset） */
+function charOffsetAtSpeechRatio(prefix: Float64Array, ratio: number): number {
+	const n = prefix.length - 1;
+	if (n <= 0) return 0;
+	const total = prefix[n]!;
+	const r = Math.min(1, Math.max(0, ratio));
+	if (!(total > 0)) return Math.min(n - 1, Math.floor(r * n));
+	const aim = r * total;
+	let lo = 0;
+	let hi = n;
+	while (lo < hi) {
+		const mid = (lo + hi + 1) >> 1;
+		if (prefix[mid]! <= aim) lo = mid;
+		else hi = mid - 1;
+	}
+	return Math.min(n - 1, lo);
+}
+
+// ponytail: 自检——中英混排 40% 进度不得已越过中文句（纯字数映射会）
+// {
+// 	const sample = '你好世界。Hello world.';
+// 	const en = sample.indexOf('H');
+// 	if (charOffsetAtSpeechRatio(buildTtsWeightPrefix(sample), 0.4) >= en) {
+// 		throw new Error('[speech] bilingual cadence weight');
+// 	}
+// }
 
 async function playCloudTtsSingleUtterance(
 	plain: string,
 	generation: number,
 	opts?: CloudTtsPlaybackOptions,
 ): Promise<void> {
-	const rate = clampPlaybackRate(opts?.rate);
 	const sentences = buildSentenceOffsetSpans(plain);
+	const weightPrefix = buildTtsWeightPrefix(plain);
 	const onCadence = opts?.onCadenceChunk;
 
 	const emitSentence = (
@@ -1794,16 +1857,13 @@ async function playCloudTtsSingleUtterance(
 	await playCloudTtsReady(
 		ready,
 		generation,
-		rate,
+		undefined,
 		(currentTime, duration) => {
 			if (sentences.length === 0) return;
 			if (!(duration > 0) || !Number.isFinite(duration)) return;
 			const leadTime = Math.min(duration, currentTime + CLOUD_CADENCE_LEAD_SEC);
 			const ratio = Math.min(1, Math.max(0, leadTime / duration));
-			const offset = Math.min(
-				Math.max(0, plain.length - 1),
-				Math.floor(ratio * plain.length),
-			);
+			const offset = charOffsetAtSpeechRatio(weightPrefix, ratio);
 			const si = sentenceIndexAtOffset(sentences, offset);
 			if (onCadence && si !== lastSi) {
 				if (lastSi >= 0) emitSentence(lastSi, 'end');
@@ -1812,10 +1872,19 @@ async function playCloudTtsSingleUtterance(
 			}
 			const span = sentences[si];
 			if (!span || !opts?.onPlaybackProgress) return;
-			const len = Math.max(1, span.end - span.start);
+			const spanW = Math.max(
+				1e-6,
+				weightPrefix[span.end]! - weightPrefix[span.start]!,
+			);
+			const atW = Math.max(
+				0,
+				ratio * weightPrefix[plain.length]! - weightPrefix[span.start]!,
+			);
 			opts.onPlaybackProgress({
 				sentenceIndex: si,
-				progress: Math.min(1, Math.max(0, (offset - span.start) / len)),
+				progress: Math.min(1, Math.max(0, atW / spanW)),
+				currentTime,
+				duration,
 			});
 		},
 		opts?.onPlaybackStart,
@@ -1934,13 +2003,14 @@ function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
 async function startCloudAudioPlayback(
 	audio: HTMLAudioElement,
 	generation: number,
-	rate?: number,
+	_rate?: number,
 	onPlaybackStart?: () => void,
 ): Promise<void> {
 	await waitCloudAudioCanPlay(audio);
 	if (!isPlaybackGenerationActive(generation)) return;
 	// 必须在 src 就绪后设 playbackRate：改 src / load 会把倍速打回 1
-	audio.playbackRate = clampPlaybackRate(rate);
+	// 读 desiredPlaybackRate：loading 期间调速已写入，勿用起播快照
+	audio.playbackRate = desiredPlaybackRate;
 
 	const playOnce = async () => {
 		// 软暂停中（含合成返回时 UI 已暂停）：等续播再 play，保留已挂好的 src
@@ -1967,7 +2037,7 @@ async function startCloudAudioPlayback(
 		audio.load();
 		await waitCloudAudioCanPlay(audio);
 		if (!isPlaybackGenerationActive(generation)) return;
-		audio.playbackRate = clampPlaybackRate(rate);
+		audio.playbackRate = desiredPlaybackRate;
 		await playOnce();
 	}
 }
@@ -2307,9 +2377,10 @@ export async function playPreferred(
 		}
 		await prepareLocalSpeechAfterCloud(generation);
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 须带上 awaiting/start 钩子，否则听书/划词条会一直停在 loading
 		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
-			onCadenceChunk: options?.onCadenceChunk,
+			...cadenceHooks,
 		});
 	}
 }

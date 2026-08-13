@@ -20,6 +20,7 @@
 | [wechat-miniprogram-epub-reader.md](./wechat-miniprogram-epub-reader.md) | **微信小程序 EPUB 电子书阅读器**（规划）：书架/EPUB 阅读/听书/想法/划线五大模块、web-view+epub.js 渲染方案、M1–M6 分阶段落地、与 Web 端数据互通 |
 | [miniprogram-epub-parse-logic.md](./miniprogram-epub-parse-logic.md) | **小程序 EPUB 解析逻辑**（部分已落地）：后端 `parseEpubBuffer` 懒解析、COS 键兼容、章节 API、`mp-html` 消费与 409 轮询；M1–M2 已上线 → **归档** [miniprogram-epub-server-parse.md](../ebook/miniprogram-epub-server-parse.md) |
 | [epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md) | **Web/桌面听书·听当前按段 TTS + 逐句高亮**（核心已落地）：规划脉络 → **归档** [ebook/epub-listen-paragraph-tts.md](../ebook/epub-listen-paragraph-tts.md) |
+| [epub-listen-core-logic.md](./epub-listen-core-logic.md) | **EPUB 听书核心实现逻辑梳理**（已上线）：架构/流程/时序/状态机 + **§14 相关实现完整源码**（PlayUnits/Paragraphs/Chapter/Hook/底栏/Overlay 等全文 + `speech.ts` 听书节选） |
 | [epub-listen-playback-optimize.md](./epub-listen-playback-optimize.md) | **听书播放优化**（主项已落地）：loading / 分句选中色 / 进度取整见 ebook 专题；总索引 [ebook/epub-listen-playback-fixes-2026-07.md](../ebook/epub-listen-playback-fixes-2026-07.md) |
 | [learning-notes-rich-editor.md](./learning-notes-rich-editor.md) | **学习笔记富文本编辑器**（核心已上线）：Tiptap 3.x 封装、自定义 Title 节点、工具栏+气泡菜单、左右分栏布局、M1–M5 分阶段落地 → **归档** [english/learning-notes-rich-editor.md](../english/learning-notes-rich-editor.md) |
 | [learning-notes-editor-preview-jank.md](./learning-notes-editor-preview-jank.md) | **学习笔记编辑/预览卡顿**（已上线）：根因拆解、S1–S8（卸 TipTap、列表隔离、长文窗口化编辑/预览、延迟挂载等）、否决虚拟列表/iframe、带注释代码与原理 |

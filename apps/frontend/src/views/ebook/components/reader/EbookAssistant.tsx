@@ -19,6 +19,7 @@ import {
 } from '@/components/design/Assistant';
 import ChatEntry from '@/components/design/ChatEntry';
 import Loading from '@/components/design/Loading';
+import { useAssistantSelectionSpeak } from '@/components/design/SelectionSpeak';
 import { Toast } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { useAssistantCopy } from '@/hooks/useAssistantCopy';
@@ -38,6 +39,10 @@ export type EbookAssistantProps = {
 	bookTitle: string;
 	input?: string;
 	onInputChange?: (value: string) => void;
+	/** 选区朗读开播前（听书页用来先停章节听书） */
+	onBeforeSelectionSpeak?: () => void;
+	/** 向外暴露 stop，供听书开播前停问书朗读 */
+	selectionSpeakStopRef?: RefObject<(() => void) | null>;
 };
 
 const selectEbookMessageByChatId: SelectMessageByChatId = (chatId) =>
@@ -48,6 +53,8 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 	bookTitle,
 	input: inputProp,
 	onInputChange,
+	onBeforeSelectionSpeak,
+	selectionSpeakStopRef,
 }: EbookAssistantProps) {
 	const { userStore, knowledgeStore } = useStore();
 	const navigate = useNavigate();
@@ -57,6 +64,18 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 	const setInput = onInputChange ?? setInternalInput;
 	const { isCopyedId, onCopy } = useAssistantCopy();
 	const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+	const selectionSpeak = useAssistantSelectionSpeak({
+		onBeforeStart: onBeforeSelectionSpeak,
+		initialWidth: 344,
+	});
+
+	useEffect(() => {
+		if (!selectionSpeakStopRef) return;
+		selectionSpeakStopRef.current = selectionSpeak.stop;
+		return () => {
+			selectionSpeakStopRef.current = null;
+		};
+	}, [selectionSpeak.stop, selectionSpeakStopRef]);
 
 	const isLoggedIn = Boolean(userStore.userInfo?.id);
 	const aiMessages = ebookAssistantStore.messages;
@@ -126,6 +145,11 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 		void ebookAssistantStore.activateForBook(bookId);
 	}, [bookId]);
 
+	// 换书 / 切会话时停掉选区朗读，避免串台
+	useEffect(() => {
+		selectionSpeak.stop();
+	}, [bookId, ebookAssistantStore.activeSessionId, selectionSpeak.stop]);
+
 	useEffect(() => {
 		if (!isHistoryDrawerOpen) return;
 		void ebookAssistantStore.refreshSessionListForCurrentBook();
@@ -185,6 +209,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 				toTopLabel: t('knowledge.assistant.scrollToTop'),
 				variant: 'english',
 			}}
+			floatAbove={selectionSpeak.floatAbove}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
 				<AssistantShareBar
@@ -231,59 +256,66 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 	const historyLoading = ebookAssistantStore.isHistoryLoading;
 
 	return (
-		<AssistantShell
-			t={t}
-			isLoading={false}
-			hasMessages={aiMessages.length > 0}
-			emptyState={
-				<div className="relative flex min-h-0 w-full flex-1 flex-col pt-4">
-					{historyLoading ? (
-						<div
-							className={cn(
-								'absolute inset-0 z-10 flex items-center justify-center text-sm text-textcolor',
-								epubReaderSurfaceOverlayClass,
-							)}
-						>
-							<Loading text={t('knowledge.assistant.loadingConversation')} />
-						</div>
-					) : null}
-					<div className="text-textcolor/70 flex justify-center items-start text-sm">
-						<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
-							<div className="flex w-full justify-between rounded-md border border-theme/10 p-2">
-								<Sparkles
-									size={18}
-									className="mr-2 mt-0.5 shrink-0 text-teal-500"
-								/>
-								<div className="flex-1 leading-relaxed">
-									{t('ebook.read.assistant.intro', { title: bookTitle })}
+		<div className="relative flex h-full min-h-0 w-full flex-col">
+			<AssistantShell
+				t={t}
+				isLoading={false}
+				hasMessages={aiMessages.length > 0}
+				emptyState={
+					<div className="relative flex min-h-0 w-full flex-1 flex-col pt-4">
+						{historyLoading ? (
+							<div
+								className={cn(
+									'absolute inset-0 z-10 flex items-center justify-center text-sm text-textcolor',
+									epubReaderSurfaceOverlayClass,
+								)}
+							>
+								<Loading text={t('knowledge.assistant.loadingConversation')} />
+							</div>
+						) : null}
+						<div className="text-textcolor/70 flex justify-center items-start text-sm">
+							<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
+								<div className="flex w-full justify-between rounded-md border border-theme/10 p-2">
+									<Sparkles
+										size={18}
+										className="mr-2 mt-0.5 shrink-0 text-teal-500"
+									/>
+									<div className="flex-1 leading-relaxed">
+										{t('ebook.read.assistant.intro', { title: bookTitle })}
+									</div>
 								</div>
 							</div>
 						</div>
 					</div>
-				</div>
-			}
-			viewportRef={scrollViewportRef}
-			scrollAreaHandlers={scrollAreaHandlers}
-			messageList={aiMessages.map((message, index) => (
-				<AssistantMessageRow
-					key={message.chatId}
-					selectMessageByChatId={selectEbookMessageByChatId}
-					t={t}
-					chatId={message.chatId}
-					index={index}
-					messagesLength={aiMessages.length}
-					isCopyedId={isCopyedId}
-					onCopy={onCopy}
-					isLoading={ebookAssistantStore.isSending}
-					onSaveToKnowledge={onSaveToKnowledge}
-					allowAiShare={allowAiShare}
-					shareSelection={shareSelection}
-					onShare={onShare}
-					scrollViewportRef={scrollViewportRef as RefObject<HTMLElement | null>}
-				/>
-			))}
-			footer={assistantFooter}
-		/>
+				}
+				viewportRef={scrollViewportRef}
+				scrollAreaHandlers={scrollAreaHandlers}
+				messageList={aiMessages.map((message, index) => (
+					<AssistantMessageRow
+						key={message.chatId}
+						selectMessageByChatId={selectEbookMessageByChatId}
+						t={t}
+						chatId={message.chatId}
+						index={index}
+						messagesLength={aiMessages.length}
+						isCopyedId={isCopyedId}
+						onCopy={onCopy}
+						isLoading={ebookAssistantStore.isSending}
+						onSaveToKnowledge={onSaveToKnowledge}
+						allowAiShare={allowAiShare}
+						shareSelection={shareSelection}
+						onShare={onShare}
+						scrollViewportRef={
+							scrollViewportRef as RefObject<HTMLElement | null>
+						}
+						getSelectionContextMenuItems={
+							selectionSpeak.getSelectionContextMenuItems
+						}
+					/>
+				))}
+				footer={assistantFooter}
+			/>
+		</div>
 	);
 });
 

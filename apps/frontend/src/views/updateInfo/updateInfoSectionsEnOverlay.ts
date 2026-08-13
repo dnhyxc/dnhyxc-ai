@@ -1576,4 +1576,25 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixed an issue on macOS where the font-size and line-height sliders in the EPUB reader settings panel turned gray after the window lost focus and did not recover. The slider color now automatically restores to the theme accent color when the window regains focus or the settings panel is reopened.',
 	},
+	's25-106': {
+		title:
+			'Selection-speak universalization: English Agent & e-book share one component',
+		description:
+			'The selection-speak capability has been extracted from the English Agent into a standalone reusable component. Both the English Agent and the e-book MOKE assistant now share the same floating control bar and right-click menu: select any text and right-click to read aloud or copy. During playback a draggable, resizable floating bar appears (play/pause, stop, 0.5×–3× speed); it automatically switches to a vertical layout when taller for easier one-hand use.',
+	},
+	's25-107': {
+		title: 'More accurate highlighting for mixed Chinese-English TTS playback',
+		description:
+			'Selection-speak and chapter-listen progress now combine real audio clock time with character-type weighting (CJK ≈ 1 syllable, Latin ≈ 1/3 syllable, digits 0.5, whitespace 0.15), so sentence highlighting no longer jumps over Chinese paragraphs or lags behind English paragraphs in mixed-text passages. Speed changes made while TTS is loading now take effect immediately once the audio is ready—no need to replay.',
+	},
+	's25-108': {
+		title: 'Listen & selection-speak are now mutually exclusive',
+		description:
+			'Within the e-book reader page, chapter listen and selection-speak in the assistant panel are now strictly mutually exclusive. Starting chapter listen automatically stops any ongoing selection-speak; choosing "read aloud" on selected text in the assistant panel first stops the current chapter listen before starting the new朗读. Switching books or chat sessions also automatically stops any active read-aloud so two audio streams never play at once.',
+	},
+	's25-109': {
+		title: 'E-book player bar icons and spacing polished',
+		description:
+			'The play / pause / stop icons on the bottom e-book player bar have been unified to a square line style to match the rest of the product control buttons. The speed button is slightly narrower and the progress label gains a left margin, giving the bar a more compact look.',
+	},
 };

@@ -1,10 +1,5 @@
 import type { QuickContextMenuEntry } from '@design/ContextMenu';
-import type { MutableRefObject } from 'react';
-import { isMacLike } from '@/components/design/Monaco/utils';
-
-function shortcutHintCtrlOrCmd(key: string): string {
-	return isMacLike() ? `⌘+${key}` : `Ctrl+${key}`;
-}
+import type { RefObject } from 'react';
 
 export type EpubReaderContextActions = {
 	copy: () => void;
@@ -22,7 +17,7 @@ type BuildEpubContextMenuItemsInput = {
 	hasSelection: boolean;
 	/** 分页翻页时才展示上一页/下一页 */
 	showPageNav?: boolean;
-	actionsRef: MutableRefObject<EpubReaderContextActions | null>;
+	actionsRef: RefObject<EpubReaderContextActions | null>;
 	t: (key: string, params?: Record<string, unknown>) => string;
 };
 
@@ -40,7 +35,6 @@ export function buildEpubContextMenuItems({
 			type: 'item',
 			id: 'copy',
 			label: t('ebook.read.contextMenu.copy'),
-			shortcut: shortcutHintCtrlOrCmd('C'),
 			onSelect: () => actionsRef.current?.copy(),
 		});
 		items.push({

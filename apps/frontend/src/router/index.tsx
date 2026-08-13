@@ -24,7 +24,7 @@ const App = () => {
 	const [pluginsReady, setPluginsReady] = useState(false);
 
 	useEffect(() => {
-		if (import.meta.env.PROD && isTauriRuntime()) {
+		if (isTauriRuntime()) {
 			document.addEventListener('contextmenu', (e) => {
 				e.preventDefault();
 			});

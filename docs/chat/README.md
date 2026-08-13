@@ -20,3 +20,5 @@
 | [chat-update.md](./chat-update.md) | Chat 重构与性能相关记录 |
 | [chat-memory-oom.md](./chat-memory-oom.md) | **对话堆 OOM**：流式 Registry、附件缓存与解析上限、上下文 60 条 |
 | [streaming-code-block-scroll.md](./streaming-code-block-scroll.md) | **流式代码块横滚**：拆段渲染、`StreamingCodeFenceBlock` 冻结 DOM |
+| [assistant-selection-speak-guide.md](./assistant-selection-speak-guide.md) | **现行主文档**：助手选区「右键菜单 + 悬浮条 + 状态机」整条链路（F1–F14；英语 Agent / 电子书问书） |
+| [selection-speak-common.md](./selection-speak-common.md) | **历史 / 重构对照**：`SelectionSpeak` 组件化与跨域复用过程；现行实现见 [assistant-selection-speak-guide.md](./assistant-selection-speak-guide.md) |

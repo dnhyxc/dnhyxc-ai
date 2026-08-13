@@ -226,7 +226,6 @@ const Home = () => {
 																>
 																	<Icon
 																		className="h-6 w-6 text-textcolor"
-																		strokeWidth={2}
 																		aria-hidden
 																	/>
 																</div>
@@ -260,7 +259,7 @@ const Home = () => {
 																			type="button"
 																			onClick={c.onClick}
 																			className={cn(
-																				'flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98] ',
+																				'flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98]',
 																				c.primary
 																					? `${hue.btn} relative bg-linear-to-br font-semibold text-textcolor overflow-hidden`
 																					: `${hue.btn} bg-linear-to-br font-medium text-textcolor`,

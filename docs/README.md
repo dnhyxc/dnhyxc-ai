@@ -45,6 +45,10 @@
 | 知识库助手总览                                                    | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                                                                 |
 | 对话硅基接入                                                      | [llm/siliconflow-chat-unification.md](./llm/siliconflow-chat-unification.md)                                                                             |
 | 聊天附件预览失败                                                  | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                                                             |
+| 助手消息选区朗读 / 右键菜单无反应 / 与听书同时出声                | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) |
+| 助手拖选移出窗口后整页上移 / 底边黑缝 / 上下留白不一致              | [app/selection-drag-shell-scroll-guide.md](./app/selection-drag-shell-scroll-guide.md)                                                                     |
+| 选区朗读控制条无法拖动缩放 / 高亮漂移 / 中英混排朗读不准          | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) · [chat/selection-speak-common.md](./chat/selection-speak-common.md)（历史对照） · [ebook/tts-audio-progress-sync.md](./ebook/tts-audio-progress-sync.md)         |
+| 电子书听书与选区朗读同时出声 / 互斥异常                           | [ebook/listen-exclusive-control.md](./ebook/listen-exclusive-control.md)                                                                             |
 | 生产 `/images/` 400                                               | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md)                                                    |
 | 本地上传落盘 / UPLOAD_ROOT                                        | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md)                                                                                             |
 | 插件 registry 跨域 / Vite proxy 不生效 / `/remotes` 404             | [ops/remotes-registry-static.md](./ops/remotes-registry-static.md)                                                                                       |

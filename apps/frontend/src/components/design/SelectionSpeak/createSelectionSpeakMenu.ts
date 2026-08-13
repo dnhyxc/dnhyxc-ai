@@ -6,13 +6,13 @@ import { isPlaybackAvailable } from '@/utils/speech';
 type TFn = (key: string, params?: Record<string, unknown>) => string;
 
 /**
- * 英语 Agent 消息选区右键：朗读（由外部会话启动）+ 复制。
+ * 助手消息选区右键：朗读内容 + 复制内容。
  */
-export function createEnglishAgentSelectionMenu(
+export function createSelectionSpeakMenu(
 	t: TFn,
 	onSpeak: (text: string) => boolean,
 ): SelectionContextMenuItemsFn {
-	return (selectedText, _ctx) => {
+	return (selectedText) => {
 		const text = selectedText.trim();
 		if (!text) return null;
 
@@ -20,12 +20,12 @@ export function createEnglishAgentSelectionMenu(
 			{
 				type: 'item',
 				id: 'speak',
-				label: t('englishLearning.selection.speak'),
+				label: t('assistant.selection.speak'),
 				onSelect: () => {
 					if (!isPlaybackAvailable()) {
 						Toast({
 							type: 'warning',
-							title: t('englishLearning.tts.unsupported'),
+							title: t('assistant.tts.unsupported'),
 						});
 						return;
 					}
@@ -35,7 +35,7 @@ export function createEnglishAgentSelectionMenu(
 			{
 				type: 'item',
 				id: 'copy',
-				label: t('englishLearning.selection.copy'),
+				label: t('assistant.selection.copy'),
 				onSelect: () => {
 					void copyToClipboard(text);
 				},

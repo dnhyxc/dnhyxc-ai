@@ -23,7 +23,8 @@ body {
 	height: 100%;
 	width: 100%;
 	overscroll-behavior: none;
-	overflow: hidden;
+	/* 文档层禁止滚动；即便 WKWebView 仍改 scrollTop，#root 为 fixed 也不跟着走 */
+	overflow: clip;
 	/* 禁止页面选中文本（避免误选）；编辑器/输入框区域会单独放开 */
 	-webkit-user-select: none;
 	user-select: none;
@@ -398,9 +399,10 @@ body {
 }
 
 #root {
-	height: 100%;
-	min-height: 100%;
-	width: 100%;
+	/* 钉在视口：拖选移出窗口时 document 被改 scrollTop 也不会带动整页 UI */
+	position: fixed;
+	inset: 0;
+	overflow: clip;
 	background-color: var(--background);
 	/* 氛围渐变（atmosphere gradient）：由各主题 --theme-bg-atmosphere 提供，避免单调平涂 */
 	background-image: var(--theme-bg-atmosphere);

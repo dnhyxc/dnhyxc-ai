@@ -14,9 +14,9 @@ import {
 	ChevronUp,
 	ListOrdered,
 	LocateFixed,
-	Pause,
-	Play,
-	Square,
+	SquarePause,
+	SquarePlay,
+	SquareStop,
 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -705,9 +705,9 @@ export function EpubListenPlayerBar({
 					{loading ? (
 						<Spinner className="size-4 text-teal-500" aria-hidden />
 					) : playing ? (
-						<Pause className="size-4" aria-hidden />
+						<SquarePause className="size-4" aria-hidden />
 					) : (
-						<Play className="size-4" aria-hidden />
+						<SquarePlay className="size-4" aria-hidden />
 					)}
 				</Button>
 			</Tooltip>
@@ -721,11 +721,11 @@ export function EpubListenPlayerBar({
 					aria-label={t('ebook.read.listenBook.stop')}
 					onClick={onStop}
 				>
-					<Square className="size-3.5 fill-current" aria-hidden />
+					<SquareStop className="size-4" aria-hidden />
 				</Button>
 			</Tooltip>
 
-			<span className="text-textcolor/70 min-w-0 flex-1 truncate text-xs">
+			<span className="text-textcolor/70 min-w-0 flex-1 truncate text-xs ml-2">
 				{progressLabel}
 			</span>
 
@@ -816,8 +816,8 @@ export function EpubListenPlayerBar({
 							variant="ghost"
 							size="sm"
 							className={cn(
-								'text-textcolor/80 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
-								'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
+								'ml-2 text-textcolor/80 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
+								'h-6 w-11 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
 							)}
 							aria-label={t('ebook.read.listenBook.speed')}
 							title={t('ebook.read.listenBook.speed')}
