@@ -38,8 +38,11 @@ export {
 export {
 	APP_FULLSCREEN_EVENT,
 	getAppFullscreen,
+	installAppFullscreenExitSync,
 	setAppFullscreen,
 	subscribeAppFullscreen,
+	TAURI_WILL_EXIT_FULLSCREEN_EVENT,
+	TAURI_WINDOW_FULLSCREEN_EVENT,
 } from './capabilities/appFullscreen';
 export {
 	createEbookModulesApi,

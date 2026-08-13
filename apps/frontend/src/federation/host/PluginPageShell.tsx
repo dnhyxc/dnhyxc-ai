@@ -6,6 +6,7 @@
  * Chromium 会让子树 backdrop-filter 采不到更深的 video（本地独立跑正常、MF 嵌入失效）。
  */
 import { type ReactNode, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { cn } from '@/lib/utils';
 import {
 	getAppFullscreen,
@@ -20,7 +21,13 @@ export function PluginPageShell({
 	className?: string;
 }) {
 	const [theater, setTheater] = useState(getAppFullscreen);
-	useEffect(() => subscribeAppFullscreen(setTheater), []);
+	useEffect(
+		() =>
+			subscribeAppFullscreen((next) => {
+				flushSync(() => setTheater(next));
+			}),
+		[],
+	);
 
 	return (
 		<div

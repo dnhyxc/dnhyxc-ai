@@ -87,6 +87,7 @@
 | 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [app/video-player-chrome-cinema-theme.md](./app/video-player-chrome-cinema-theme.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |
 | 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
+| macOS 绿钮/菜单退出全屏时侧栏晚一步消失 / 缩窗动画与影院态不同步     | [app/tauri-fullscreen-sync.md](./app/tauri-fullscreen-sync.md)（`fullscreen_watch.rs` + `NSWindowWillExitFullScreenNotification` + `host://will-exit-fullscreen` + `flushSync` + `ignoreNativeUntil` 防抖） |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |
 | macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [app/tauri-window-zoom-unveil.md](./app/tauri-window-zoom-unveil.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/tauri-window-zoom-unveil.md](./ideas/tauri-window-zoom-unveil.md)（规划思路） |
 | 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [app/tauri-system-menu-shortcuts.md](./app/tauri-system-menu-shortcuts.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/tauri-system-menu-shortcuts.md](./ideas/tauri-system-menu-shortcuts.md)（规划思路） |

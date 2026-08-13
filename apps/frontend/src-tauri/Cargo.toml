@@ -39,6 +39,9 @@ objc2-foundation = { version = "0.3", features = [
   "NSGeometry",
   "NSArray",
   "NSString",
+  "NSNotification",
+  "NSOperation",
+  "block2",
   "objc2-core-foundation",
 ] }
 objc2-app-kit = { version = "0.3", features = [
@@ -55,6 +58,7 @@ objc2-app-kit = { version = "0.3", features = [
   "NSFontDescriptor",
   "objc2-core-foundation",
 ] }
+block2 = "0.6"
 dispatch2 = "0.3"
 rfd = "0.17.2"
 reqwest = { version = "0.13.1", features = ["json", "stream"] }

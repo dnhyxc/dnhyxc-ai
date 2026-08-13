@@ -173,7 +173,12 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
 			}
 			"fullscreen" => {
 				let next = !win.is_fullscreen().unwrap_or(false);
+				// 与 Esc 同序：先通知前端收影院，再缩窗
+				if !next {
+					let _ = win.emit("host://will-exit-fullscreen", ());
+				}
 				let _ = win.set_fullscreen(next);
+				crate::system::event::emit_window_fullscreen_state(&win);
 			}
 			"quit" => {
 				let _ = app_handle.exit(0);

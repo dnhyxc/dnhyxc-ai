@@ -62,6 +62,8 @@ pub fn run() {
             // 设置窗口事件处理器
             setup_window_events(main_window.clone(), app.handle().clone());
             #[cfg(target_os = "macos")]
+            system::fullscreen_watch::install(&main_window);
+            #[cfg(target_os = "macos")]
             system::zoom::install(&main_window);
             Ok(())
         })

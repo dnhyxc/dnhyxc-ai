@@ -12,11 +12,12 @@ import Sidebar from '@design/Sidebar';
 import { TooltipProvider } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import {
 	getAppFullscreen,
-	setAppFullscreen,
+	installAppFullscreenExitSync,
 	subscribeAppFullscreen,
 } from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
@@ -67,19 +68,16 @@ const Layout = () => {
 		locale,
 	]);
 
-	useEffect(() => subscribeAppFullscreen(setTheater), []);
+	useEffect(
+		() =>
+			subscribeAppFullscreen((next) => {
+				flushSync(() => setTheater(next));
+			}),
+		[],
+	);
 
-	// Web：系统 Esc 退出 document 全屏时同步关掉影院态
-	useEffect(() => {
-		const onFs = () => {
-			if (document.fullscreenElement) return;
-			if (!getAppFullscreen()) return;
-			if (isTauriRuntime()) return;
-			void setAppFullscreen(false);
-		};
-		document.addEventListener('fullscreenchange', onFs);
-		return () => document.removeEventListener('fullscreenchange', onFs);
-	}, []);
+	// Tauri 原生 host://window-fullscreen / Web document：系统退出全屏时立刻收起影院
+	useEffect(() => installAppFullscreenExitSync(), []);
 
 	return (
 		<ChatCoreProvider>

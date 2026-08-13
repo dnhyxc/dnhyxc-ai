@@ -1,6 +1,8 @@
 pub mod dock;
 pub mod event;
 #[cfg(target_os = "macos")]
+pub mod fullscreen_watch;
+#[cfg(target_os = "macos")]
 pub mod zoom;
 pub mod menu;
 pub mod shortcut;
