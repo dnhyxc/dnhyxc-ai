@@ -515,7 +515,8 @@ export type PlayPreferredOptions = {
 	onPlaybackStart?: () => void;
 	/**
 	 * 当前正要播放的音频仍在等待（合成/下载/canplay）时为 true，出声后为 false。
-	 * 多包/多段时会在每一段等待前再次 true；prefetch 未完成也会 true。
+	 * 语义：仅「尚未出声且在等当前段就绪」；下一段预取、本机分句停顿不应点亮。
+	 * 多包云端时，上一包结束后、下一包 HTTP/canplay 完成前会再次 true。
 	 */
 	onAwaitingPlayback?: (waiting: boolean) => void;
 };
@@ -2225,10 +2226,11 @@ async function speakTextWithGeneration(
 	// 多段朗读语速稍慢，单段使用标准语速
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
 	let playbackStartNotified = false;
-	const notifyPlaybackStart = () => {
+	/** 出声前清掉 waiting；onPlaybackStart 只通知一次 */
+	const clearAwaitingAndNotifyStart = () => {
+		options?.onAwaitingPlayback?.(false);
 		if (playbackStartNotified) return;
 		playbackStartNotified = true;
-		options?.onAwaitingPlayback?.(false);
 		options?.onPlaybackStart?.();
 	};
 	// 分段顺次朗读
@@ -2243,11 +2245,11 @@ async function speakTextWithGeneration(
 			await pauseMs(prevPause);
 			// 停顿期间世代提前变化（用户已停止）须退出
 			if (!isPlaybackGenerationActive(generation)) return;
-			options?.onAwaitingPlayback?.(true);
+			// ponytail: 本机分段只有 pause，无 HTTP；勿 onAwaiting(true)，否则 loading 卡到整段播完
 		}
 		// 分段播放前事件钩子，可外部监听
 		emitCadenceChunk(options, plain, chunks, i, 'start');
-		if (i === 0) notifyPlaybackStart();
+		clearAwaitingAndNotifyStart();
 		// 朗读当前 chunk，单段时用标准语速，多段时降为 chunkRate
 		await speakOneUtterance(chunk.text, generation, {
 			rate: options?.rate ?? chunkRate,
