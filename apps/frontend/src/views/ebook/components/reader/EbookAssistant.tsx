@@ -311,6 +311,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 						getSelectionContextMenuItems={
 							selectionSpeak.getSelectionContextMenuItems
 						}
+						onSpeakContent={selectionSpeak.start}
 					/>
 				))}
 				footer={assistantFooter}

@@ -72,6 +72,8 @@ export function useAssistantSelectionSpeak(
 	);
 
 	return {
+		/** 朗读任意文本（选区菜单 / 消息操作条整条朗读共用） */
+		start,
 		getSelectionContextMenuItems,
 		floatAbove,
 		stop: speak.stop,

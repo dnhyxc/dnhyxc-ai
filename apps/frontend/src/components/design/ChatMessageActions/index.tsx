@@ -1,4 +1,4 @@
-import { Checkbox } from '@ui/index';
+import { Checkbox, Toast } from '@ui/index';
 import {
 	CheckCircle,
 	ChevronLeft,
@@ -8,9 +8,11 @@ import {
 	PencilLine,
 	RotateCw,
 	Share2,
+	Volume2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatI18nT, Message } from '@/types/chat';
+import { isPlaybackAvailable } from '@/utils/speech';
 
 /**
  * 消息操作组件的 Props 接口定义
@@ -43,6 +45,11 @@ interface MessageActionsProps {
 	deleteCheckedMessage?: (message: Message) => void;
 	/** 将助手回复写入知识库草稿（由 ChatBot 注入后跳转知识页） */
 	onSaveToKnowledge?: (message: Message) => void;
+	/**
+	 * 朗读整条助手消息正文（与选区朗读同一套 TTS / 悬浮条）。
+	 * 不传则不展示；仅 `role !== 'user'` 时渲染，且位于分享按钮之后。
+	 */
+	onSpeakContent?: (content: string) => void;
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: ChatI18nT;
 }
@@ -74,6 +81,7 @@ export const MessageActions = ({
 	checkedMessages,
 	setCheckedMessage,
 	onSaveToKnowledge,
+	onSpeakContent,
 	needShare = true,
 	needSave = true,
 	t,
@@ -100,6 +108,19 @@ export const MessageActions = ({
 
 	const onCheckedMessage = (message: Message) => {
 		setCheckedMessage?.(message);
+	};
+
+	const onSpeak = () => {
+		const text = (message.content ?? '').trim();
+		if (!text || !onSpeakContent) return;
+		if (!isPlaybackAvailable()) {
+			Toast({
+				type: 'warning',
+				title: t?.('assistant.tts.unsupported') ?? '朗读不可用',
+			});
+			return;
+		}
+		onSpeakContent(text);
 	};
 
 	return (
@@ -242,6 +263,19 @@ export const MessageActions = ({
 								title={t?.('chat.messageActions.shareAnswer') ?? '分享此回答'}
 							>
 								<Share2 size={16} onClick={() => onCheckShare(message)} />
+							</div>
+						)}
+
+					{/* 朗读整条 AI 消息 — 传入 onSpeakContent 才显示，放在分享之后 */}
+					{onSpeakContent &&
+						message.role !== 'user' &&
+						!isLoading &&
+						!isSharing && (
+							<div
+								className="cursor-pointer hover:text-textcolor"
+								title={t?.('assistant.selection.speak') ?? '朗读内容'}
+							>
+								<Volume2 size={18} onClick={onSpeak} />
 							</div>
 						)}
 				</div>

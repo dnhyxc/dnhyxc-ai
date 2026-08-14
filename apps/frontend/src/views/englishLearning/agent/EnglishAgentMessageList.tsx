@@ -23,6 +23,7 @@ type EnglishAgentMessageListProps = {
 	isLoading: boolean;
 	t: (key: string, params?: Record<string, unknown>) => string;
 	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
+	onSpeakContent?: (content: string) => void;
 };
 
 /** 单独订阅 messages：流式 chunk 只重渲染消息列，不带动 ChatEntry / 左侧栏 */
@@ -38,6 +39,7 @@ export const EnglishAgentMessageList = memo(
 		isLoading,
 		t,
 		getSelectionContextMenuItems,
+		onSpeakContent,
 	}: EnglishAgentMessageListProps) {
 		const messages = englishAgentStore.messages;
 
@@ -59,6 +61,7 @@ export const EnglishAgentMessageList = memo(
 				variant="english"
 				t={t}
 				getSelectionContextMenuItems={getSelectionContextMenuItems}
+				onSpeakContent={onSpeakContent}
 			/>
 		));
 	}),

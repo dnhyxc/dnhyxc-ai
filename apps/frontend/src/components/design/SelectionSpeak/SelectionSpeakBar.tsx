@@ -187,7 +187,7 @@ export function SelectionSpeakBar({
 	onTogglePlay,
 	onStop,
 	onRateChange,
-	width = 'w-[min(100%-1.5rem,22rem)]',
+	width = 'w-[min(100%-1.5rem,21rem)]',
 	initialWidth,
 	initialHeight,
 }: Props) {

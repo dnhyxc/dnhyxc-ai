@@ -41,7 +41,7 @@ const ChatControls = ({
 		(!isLatestBranch && messagesLength > 0);
 
 	return (
-		<div className="absolute right-[max(calc((100%-48rem)/2),0rem)] bottom-3 mx-auto">
+		<div className="absolute right-[max(calc((100%-48rem)/2),0rem)] bottom-3.5 mx-auto">
 			<div className="flex justify-end">
 				{/* 分支切换按钮组 */}
 				{showBranchButtons && (
@@ -86,7 +86,7 @@ const ChatControls = ({
 				{hasScrollbar && (
 					<button
 						type="button"
-						className="w-8.5 h-8.5 bg-theme/5 hover:bg-theme/15 text-textcolor/70 flex justify-center items-center cursor-pointer border border-theme/5 backdrop-blur-[2px] rounded-full ml-2 z-99"
+						className="h-5 w-8 bg-theme/5 flex justify-center items-center cursor-pointer border border-theme/10 rounded-sm text-textcolor/65 backdrop-blur-sm hover:bg-theme/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40"
 						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
 						aria-label={
 							isAtBottom

@@ -124,6 +124,8 @@ export type AssistantMessageRowProps = {
 	className?: string;
 	t?: ChatI18nT;
 	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
+	/** 传入则消息操作条显示「朗读内容」，读整条 message.content */
+	onSpeakContent?: (content: string) => void;
 };
 
 export type AssistantMessageBubbleProps = {
@@ -144,6 +146,7 @@ export type AssistantMessageBubbleProps = {
 	className?: string;
 	t?: ChatI18nT;
 	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
+	onSpeakContent?: (content: string) => void;
 };
 
 export type AssistantSessionRow = {

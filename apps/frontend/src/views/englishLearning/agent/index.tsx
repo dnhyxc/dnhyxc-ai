@@ -87,6 +87,7 @@ function EnglishAgentScrollShell({
 	shareChatNode,
 	floatAbove,
 	selectionSpeakGetItems,
+	onSpeakContent,
 	isCopyedId,
 	onCopy,
 	onSaveToKnowledge,
@@ -103,6 +104,7 @@ function EnglishAgentScrollShell({
 	selectionSpeakGetItems: ReturnType<
 		typeof useAssistantSelectionSpeak
 	>['getSelectionContextMenuItems'];
+	onSpeakContent?: (content: string) => void;
 	isCopyedId: string | undefined;
 	onCopy: (content: string, chatId: string) => void;
 	onSaveToKnowledge: (message: Message) => void;
@@ -203,6 +205,7 @@ function EnglishAgentScrollShell({
 						isLoading={isSending}
 						t={t}
 						getSelectionContextMenuItems={selectionSpeakGetItems}
+						onSpeakContent={onSpeakContent}
 					/>
 				}
 				afterScroll={toolStatusBlock}
@@ -389,6 +392,7 @@ export const AgentPanel = observer(function AgentPanel({
 			shareChatNode={shareChatNode}
 			floatAbove={selectionSpeak.floatAbove}
 			selectionSpeakGetItems={selectionSpeak.getSelectionContextMenuItems}
+			onSpeakContent={selectionSpeak.start}
 			isCopyedId={isCopyedId}
 			onCopy={onCopy}
 			onSaveToKnowledge={onSaveToKnowledge}
