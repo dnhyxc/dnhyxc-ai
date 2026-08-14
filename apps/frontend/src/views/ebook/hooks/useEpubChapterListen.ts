@@ -4,13 +4,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	applyActivePlaybackRate,
 	buildSentenceOffsetSpans,
+	detachPlaybackMediaHandlers,
 	isPlaybackAvailable,
 	pausePlaybackSoft,
 	primePlaybackForUserGesture,
 	registerPlaybackMediaHandlers,
 	resumePlaybackSoft,
+	setPlaybackMediaSessionState,
 	stopAllPlayback,
 	stripMarkdownForTts,
+	suppressPlaybackMediaChromeForLoading,
 	warmupSpeechVoices,
 } from '@/utils/speech';
 import {
@@ -380,7 +383,16 @@ export function useEpubChapterListen(
 					},
 					onAwaitingCurrentTts: (waiting) => {
 						if (!isGenActive(gen) || pausedRef.current) return;
-						syncState({ status: waiting ? 'loading' : 'playing' });
+						if (waiting) {
+							// 同步卸键+丢 <audio>：中途仅 detach 时 macOS 常残留 Touch Bar
+							suppressPlaybackMediaChromeForLoading();
+							syncState({ status: 'loading' });
+							return;
+						}
+						// 仅离开 loading；勿被迟到的 false 盖掉 paused
+						if (stateRef.current.status === 'loading') {
+							syncState({ status: 'playing' });
+						}
 					},
 				});
 			} catch (err) {
@@ -941,8 +953,8 @@ export function useEpubChapterListen(
 	}, [runListenLoop, syncState]);
 
 	const pause = useCallback(() => {
-		const status = stateRef.current.status;
-		if (status !== 'playing' && status !== 'loading') return;
+		// loading（声音未就绪）不允许暂停；与 Touch Bar 卸键策略一致
+		if (stateRef.current.status !== 'playing') return;
 		pausedRef.current = true;
 		// 软暂停：不杀 loopGen / 不 abort TTS wait，续播从 currentTime 继续
 		pausePlaybackSoft();
@@ -1028,8 +1040,9 @@ export function useEpubChapterListen(
 
 	const togglePlay = useCallback(() => {
 		const status = stateRef.current.status;
-		// loading = 当前句 TTS 等待中，允许点暂停取消等待
-		if (status === 'playing' || status === 'loading') {
+		// loading：声音未就绪，禁止播控（条上 disabled + 此处兜底）
+		if (status === 'loading') return;
+		if (status === 'playing') {
 			pause();
 			return;
 		}
@@ -1043,14 +1056,25 @@ export function useEpubChapterListen(
 		state.status === 'playing' ||
 		state.status === 'paused';
 
+	/** 声音未就绪前不挂 Touch Bar；仅 playing / paused 接线 */
+	const mediaReady = state.status === 'playing' || state.status === 'paused';
+
 	useEffect(() => {
-		if (!isActive) return;
+		if (!mediaReady) {
+			detachPlaybackMediaHandlers();
+			return;
+		}
 		registerPlaybackMediaHandlers({
 			play: () => resumeRef.current(),
 			pause: () => pauseRef.current(),
 		});
-		return () => registerPlaybackMediaHandlers(null);
-	}, [isActive]);
+		return () => detachPlaybackMediaHandlers();
+	}, [mediaReady]);
+
+	useEffect(() => {
+		if (state.status === 'playing') setPlaybackMediaSessionState('playing');
+		else if (state.status === 'paused') setPlaybackMediaSessionState('paused');
+	}, [state.status]);
 
 	/** 当前分句播头 CFI：底栏上下章定位目录用（勿用阅读 relocated CFI，会滞后） */
 	const getPlayheadCfi = useCallback((): string | undefined => {

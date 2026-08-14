@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	applyActivePlaybackRate,
 	buildSentenceOffsetSpans,
+	detachPlaybackMediaHandlers,
 	isPlaybackAvailable,
 	pausePlaybackSoft,
 	registerPlaybackMediaHandlers,
 	resumePlaybackSoft,
+	setPlaybackMediaSessionState,
 	stopAllPlayback,
 	stripMarkdownForTts,
+	suppressPlaybackMediaChromeForLoading,
 } from '@/utils/speech';
 import { playListenPlainText } from '@/views/ebook/utils/epub/listen/playListenPlainText';
 
@@ -33,7 +36,7 @@ function previewOf(text: string): string {
 
 /**
  * 选区朗读：TTS 仍走听书按段链路；预览跟听书同一套 cadence 句下标（含中英权重）。
- * 对外暴露 status / rate / preview 与 start、stop、togglePlay、setRate。
+ * loading（声音未就绪）：不挂 Touch Bar；playing / paused 再接线。
  */
 export function useSelectionSpeak() {
 	const [status, setStatus] = useState<SelectionSpeakStatus>('idle');
@@ -132,6 +135,7 @@ export function useSelectionSpeak() {
 			sentencesRef.current = sentences;
 			// 先停掉可能残留的全局播放，再展示首句并进入 loading
 			stopAllPlayback();
+			suppressPlaybackMediaChromeForLoading();
 			applySentence(0);
 			setStatus('loading');
 
@@ -148,8 +152,13 @@ export function useSelectionSpeak() {
 							if (waiting) {
 								audioClockRef.current = false;
 								clearDelay();
+								// 同步卸键+丢 <audio>：中途仅 detach 时 macOS 常残留 Touch Bar
+								suppressPlaybackMediaChromeForLoading();
+								setStatus('loading');
+								return;
 							}
-							setStatus(waiting ? 'loading' : 'playing');
+							// 仅离开 loading；勿在 paused 时被迟到的 false 打成 playing
+							if (statusRef.current === 'loading') setStatus('playing');
 						},
 						// 真实音频时钟：优先用 speech 与听书同一套 cadence 句下标（中英权重）
 						onAudioTime: ({ baseSi, duration, sentenceIndex }) => {
@@ -220,10 +229,9 @@ export function useSelectionSpeak() {
 		[applySentence, clearDelay],
 	);
 
-	/** 软暂停：仅 playing/loading 可进；清估句定时器并 pausePlaybackSoft */
+	/** 软暂停：仅已出声的 playing 可进（loading 时无 Touch Bar / 条上播控禁用） */
 	const pause = useCallback(() => {
-		const s = statusRef.current;
-		if (s !== 'playing' && s !== 'loading') return;
+		if (statusRef.current !== 'playing') return;
 		pausedRef.current = true;
 		clearDelay();
 		pausePlaybackSoft();
@@ -254,10 +262,11 @@ export function useSelectionSpeak() {
 	const resumeRef = useRef(resume);
 	resumeRef.current = resume;
 
-	/** 播放中/加载中 → 暂停；已暂停 → 恢复；idle 无操作 */
+	/** 仅 playing ↔ paused；loading 禁止播控 */
 	const togglePlay = useCallback(() => {
 		const s = statusRef.current;
-		if (s === 'playing' || s === 'loading') {
+		if (s === 'loading') return;
+		if (s === 'playing') {
 			pause();
 			return;
 		}
@@ -272,18 +281,25 @@ export function useSelectionSpeak() {
 		setRateState(clamped);
 	}, []);
 
-	const isActive =
-		status === 'loading' || status === 'playing' || status === 'paused';
+	/** 声音未就绪前不挂 Touch Bar；仅 playing / paused 接线 */
+	const mediaReady = status === 'playing' || status === 'paused';
 
-	// 对齐听书：系统 Touch Bar / 控制中心 play·pause 接到悬浮条 status
 	useEffect(() => {
-		if (!isActive) return;
+		if (!mediaReady) {
+			detachPlaybackMediaHandlers();
+			return;
+		}
 		registerPlaybackMediaHandlers({
 			play: () => resumeRef.current(),
 			pause: () => pauseRef.current(),
 		});
-		return () => registerPlaybackMediaHandlers(null);
-	}, [isActive]);
+		return () => detachPlaybackMediaHandlers();
+	}, [mediaReady]);
+
+	useEffect(() => {
+		if (status === 'playing') setPlaybackMediaSessionState('playing');
+		else if (status === 'paused') setPlaybackMediaSessionState('paused');
+	}, [status]);
 
 	return {
 		status,

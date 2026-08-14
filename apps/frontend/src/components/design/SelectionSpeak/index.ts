@@ -2,6 +2,7 @@ export { createSelectionSpeakMenu } from './createSelectionSpeakMenu';
 export {
 	SelectionSpeakBar,
 	type SelectionSpeakBarSizeProps,
+	type SelectionSpeakResizeHandles,
 } from './SelectionSpeakBar';
 export {
 	type AssistantSelectionSpeakOptions,

@@ -1,5 +1,7 @@
 # 选区朗读 Media Session 接入
 
+> **延伸阅读**：[ebook/epub-listen-touchbar-loading.md](../ebook/epub-listen-touchbar-loading.md)（loading 期隐藏/锁定 Touch Bar，与听书共用 `speech.ts` 锁与 suppress）。
+
 ## 1. 背景与目标
 
 ### 1.1 用户可见问题

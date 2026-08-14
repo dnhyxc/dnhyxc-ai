@@ -940,6 +940,11 @@ type PlaybackMediaHandlers = {
 	pause: () => void;
 };
 let englishPlaybackMediaHandlers: PlaybackMediaHandlers | null = null;
+/**
+ * loading（等出声）为 true：忽略系统 pause/play。
+ * 否则连点 Touch Bar 易经 pause 桥静默 soft-pause，条上状态错乱。
+ */
+let systemMediaControlsLocked = false;
 
 function withSuppressedAudioPauseEvent(run: () => void): void {
 	suppressAudioPauseEvent = true;
@@ -964,6 +969,15 @@ function waitWhileSoftPaused(_generation: number): Promise<void> {
 	return new Promise((resolve) => {
 		softResumeWaiters.push(resolve);
 	});
+}
+
+function notifyAwaitingPlayback(
+	cb: ((waiting: boolean) => void) | undefined,
+	waiting: boolean,
+): void {
+	// 先于 hook：loading 期立刻锁系统键，避免连点抢在 suppress 之前
+	if (waiting) systemMediaControlsLocked = true;
+	cb?.(waiting);
 }
 
 /** 退出听书后清掉 macOS 菜单栏 / 控制中心 Now Playing（含进度条） */
@@ -1017,7 +1031,7 @@ function clearPlaybackMediaSession(opts?: {
 
 /**
  * 丢掉云端 <audio> 引用：仅 pause/清 src 时，Chromium/macOS 仍可能按旧元素外推进度条（无声）。
- * 句间换轨不要调用；仅听书会话结束时调用。
+ * 句间换轨的 stopPlaybackMediaOnly 勿调；会话结束、或 loading 压 Touch Bar 时再调。
  */
 function releaseCloudAudioEl(): void {
 	detachCloudAudioPauseBridge?.();
@@ -1074,12 +1088,13 @@ function setPlaybackMediaState(state: MediaSessionPlaybackState): void {
 	}
 }
 
-/** 听书/听当前/选区朗读：把系统媒体键接到 pause/resume；传 null 卸载 */
+/** 听书/听当前/选区朗读：把系统媒体键接到 pause/resume；传 null 硬拆会话 */
 export function registerPlaybackMediaHandlers(
 	handlers: PlaybackMediaHandlers | null,
 ): void {
 	if (!handlers) {
 		englishPlaybackMediaHandlers = null;
+		systemMediaControlsLocked = false;
 		// 先作废异步 play，再拆掉元素，避免无声进度条继续走
 		playbackGeneration += 1;
 		abortCloudAudioWait?.();
@@ -1102,15 +1117,77 @@ export function registerPlaybackMediaHandlers(
 		});
 		return;
 	}
-	englishPlaybackMediaHandlers = handlers;
+	// 已出声/可暂停：允许系统键；包装一层防止 loading 锁期间误入
+	systemMediaControlsLocked = false;
+	englishPlaybackMediaHandlers = {
+		play: () => {
+			if (systemMediaControlsLocked) return;
+			handlers.play();
+		},
+		pause: () => {
+			if (systemMediaControlsLocked) return;
+			handlers.pause();
+		},
+	};
 	if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
 	try {
-		navigator.mediaSession.setActionHandler('play', () => handlers.play());
-		navigator.mediaSession.setActionHandler('pause', () => handlers.pause());
-		navigator.mediaSession.setActionHandler('stop', () => handlers.pause());
+		navigator.mediaSession.setActionHandler('play', () =>
+			englishPlaybackMediaHandlers?.play(),
+		);
+		navigator.mediaSession.setActionHandler('pause', () =>
+			englishPlaybackMediaHandlers?.pause(),
+		);
+		navigator.mediaSession.setActionHandler('stop', () =>
+			englishPlaybackMediaHandlers?.pause(),
+		);
 	} catch {
 		// 旧环境不支持 setActionHandler
 	}
+}
+
+/**
+ * 仅卸 Media Session 键与展示，不递增世代、不杀 TTS、不丢 <audio>。
+ * effect cleanup 用这个（避免 remount 误杀正在播的介质）。
+ */
+export function detachPlaybackMediaHandlers(): void {
+	englishPlaybackMediaHandlers = null;
+	clearPlaybackMediaSession({ clearHandlers: true });
+	// macOS：句间换轨后偶发需下一帧再清才收起 Touch Bar
+	requestAnimationFrame(() => {
+		if (englishPlaybackMediaHandlers) return;
+		clearPlaybackMediaSession({ clearHandlers: true });
+	});
+}
+
+/**
+ * 声音未就绪（loading / 句间等 TTS）：卸键并丢掉 <audio>。
+ * 中途仅 detach 时 macOS 常残留上一句的 Touch Bar；初始 stopAll 会 release 所以不明显。
+ */
+export function suppressPlaybackMediaChromeForLoading(): void {
+	systemMediaControlsLocked = true;
+	englishPlaybackMediaHandlers = null;
+	// 清掉 loading 期误入的静默 soft-pause，避免出声后卡住
+	clearSoftPauseState();
+	releaseCloudAudioEl();
+	silenceCloudAudioUnlock();
+	clearPlaybackMediaSession({ clearHandlers: true });
+	requestAnimationFrame(() => {
+		if (englishPlaybackMediaHandlers) return;
+		clearPlaybackMediaSession({ clearHandlers: true });
+	});
+}
+
+/** 已接线时同步系统 playing / paused */
+export function setPlaybackMediaSessionState(
+	state: 'playing' | 'paused',
+): void {
+	setPlaybackMediaState(state);
+}
+
+/** 无播控会话时清掉系统 Now Playing（挂 src 后浏览器可能又拉起 Touch Bar） */
+function suppressOrphanMediaSessionChrome(): void {
+	if (englishPlaybackMediaHandlers) return;
+	clearPlaybackMediaSession({ clearHandlers: true });
 }
 
 /**
@@ -1253,7 +1330,15 @@ function stopPlaybackMediaOnly(): void {
 }
 
 function ensureCloudAudioEl(): HTMLAudioElement {
-	if (!cloudAudio) cloudAudio = new Audio();
+	if (!cloudAudio) {
+		cloudAudio = new Audio();
+		// 尽量少走远端播控 UI；macOS Touch Bar 仍可能由 Media Session / 元素拉起
+		try {
+			cloudAudio.disableRemotePlayback = true;
+		} catch {
+			// ignore
+		}
+	}
 	return cloudAudio;
 }
 
@@ -1295,6 +1380,7 @@ export function stopAllPlayback(): void {
  * 续播走 resumePlaybackSoft，从 currentTime 继续。
  */
 export function pausePlaybackSoft(): void {
+	if (systemMediaControlsLocked) return;
 	playbackSoftPaused = true;
 	if (isSpeechSupported()) {
 		try {
@@ -1313,6 +1399,7 @@ export function pausePlaybackSoft(): void {
 
 /** @returns 是否已从暂停的 Audio / speechSynthesis 续上（含合成已就绪待播） */
 export function resumePlaybackSoft(): boolean {
+	if (systemMediaControlsLocked) return false;
 	const audio = cloudAudio;
 	const hasSrc = Boolean(audio?.currentSrc || audio?.getAttribute('src'));
 	const canResumeAudio = !!(audio && hasSrc && !audio.ended);
@@ -1356,6 +1443,13 @@ function bindCloudAudioPauseBridge(
 	detachCloudAudioPauseBridge?.();
 	const onPause = () => {
 		if (suppressAudioPauseEvent) return;
+		if (systemMediaControlsLocked) {
+			// loading 刚 play、尚未接线：顶掉 Touch Bar 误暂停，避免条显示播放却无声
+			if (!audio.ended && audio.paused) {
+				void audio.play().catch(() => {});
+			}
+			return;
+		}
 		if (!isPlaybackGenerationActive(generation)) return;
 		if (audio.ended) return;
 		if (englishPlaybackMediaHandlers) {
@@ -1363,7 +1457,7 @@ function bindCloudAudioPauseBridge(
 			englishPlaybackMediaHandlers.pause();
 			return;
 		}
-		pausePlaybackSoft();
+		// ponytail: 无 UI 接线时勿静默 soft-pause——loading 期 Touch Bar 会把介质卡住而条状态错乱
 	};
 	audio.addEventListener('pause', onPause);
 	detachCloudAudioPauseBridge = () => {
@@ -1729,13 +1823,12 @@ async function playCloudTtsCadenceSegments(
 		if (!isPlaybackGenerationActive(generation)) return;
 
 		if (i > 0) {
+			notifyAwaitingPlayback(opts?.onAwaitingPlayback, true);
 			// 为每一段（首段除外）播放前等待上段定义的停顿时长，单位 ms，速率控制
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
 			await pauseMs(Math.max(0, Math.round(prevPause / desiredPlaybackRate)));
 			// 校验暂停期间世代是否仍然有效
 			if (!isPlaybackGenerationActive(generation)) return;
-			// 下一段 TTS 可能仍在飞：恢复等待态
-			opts?.onAwaitingPlayback?.(true);
 		}
 
 		// 发出“本块开始”事件（供 UI/外部响应）
@@ -1752,7 +1845,7 @@ async function playCloudTtsCadenceSegments(
 
 		// 播放当前段 MP3
 		await playCloudTtsReady(ready, generation, undefined, undefined, () => {
-			opts?.onAwaitingPlayback?.(false);
+			notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
 			if (i === 0) notifyPlaybackStart();
 		});
 		// 校验播放后世代有效性
@@ -1941,7 +2034,7 @@ async function playCloudTtsPackedSingleUtterances(
 	for (let i = 0; i < packs.length; i += 1) {
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 第二包起再次进入等待：首包出声后 loading 已清，后续 HTTP 需重新点亮
-		if (i > 0) opts?.onAwaitingPlayback?.(true);
+		if (i > 0) notifyAwaitingPlayback(opts?.onAwaitingPlayback, true);
 		const pack = packs[i]!;
 		const baseSi = sentenceIndexAtOffset(sentences, pack.start);
 		await playCloudTtsSingleUtterance(pack.text, generation, {
@@ -1949,7 +2042,7 @@ async function playCloudTtsPackedSingleUtterances(
 			// 仅首包可吃预取
 			prefetchedCloud: i === 0 ? opts?.prefetchedCloud : null,
 			onPlaybackStart: () => {
-				opts?.onAwaitingPlayback?.(false);
+				notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
 				if (i === 0) opts?.onPlaybackStart?.();
 			},
 			onCadenceChunk: parentOnCadence
@@ -2007,39 +2100,53 @@ async function startCloudAudioPlayback(
 	_rate?: number,
 	onPlaybackStart?: () => void,
 ): Promise<void> {
-	await waitCloudAudioCanPlay(audio);
-	if (!isPlaybackGenerationActive(generation)) return;
-	// 必须在 src 就绪后设 playbackRate：改 src / load 会把倍速打回 1
-	// 读 desiredPlaybackRate：loading 期间调速已写入，勿用起播快照
-	audio.playbackRate = desiredPlaybackRate;
-
-	const playOnce = async () => {
-		// 软暂停中（含合成返回时 UI 已暂停）：等续播再 play，保留已挂好的 src
-		await waitWhileSoftPaused(generation);
-		if (!isPlaybackGenerationActive(generation)) return false;
-		if (playbackSoftPaused) return false;
-		await audio.play();
-		if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) {
-			withSuppressedAudioPauseEvent(() => {
-				audio.pause();
-			});
-			return false;
-		}
-		setPlaybackMediaState('playing');
-		onPlaybackStart?.();
-		return true;
+	// 挂 src→play 窗口内浏览器常又亮 Touch Bar；无 handlers 时轮询压住
+	const suppressIv =
+		englishPlaybackMediaHandlers == null
+			? window.setInterval(() => suppressOrphanMediaSessionChrome(), 80)
+			: 0;
+	const stopSuppress = () => {
+		if (suppressIv) window.clearInterval(suppressIv);
 	};
-
 	try {
-		await playOnce();
-	} catch (err) {
-		if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) return;
-		if (!isTauriRuntime()) throw err;
-		audio.load();
 		await waitCloudAudioCanPlay(audio);
 		if (!isPlaybackGenerationActive(generation)) return;
+		suppressOrphanMediaSessionChrome();
+		// 必须在 src 就绪后设 playbackRate：改 src / load 会把倍速打回 1
+		// 读 desiredPlaybackRate：loading 期间调速已写入，勿用起播快照
 		audio.playbackRate = desiredPlaybackRate;
-		await playOnce();
+
+		const playOnce = async () => {
+			// 软暂停中（含合成返回时 UI 已暂停）：等续播再 play，保留已挂好的 src
+			await waitWhileSoftPaused(generation);
+			if (!isPlaybackGenerationActive(generation)) return false;
+			if (playbackSoftPaused) return false;
+			await audio.play();
+			if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) {
+				withSuppressedAudioPauseEvent(() => {
+					audio.pause();
+				});
+				return false;
+			}
+			stopSuppress();
+			setPlaybackMediaState('playing');
+			onPlaybackStart?.();
+			return true;
+		};
+
+		try {
+			await playOnce();
+		} catch (err) {
+			if (!isPlaybackGenerationActive(generation) || playbackSoftPaused) return;
+			if (!isTauriRuntime()) throw err;
+			audio.load();
+			await waitCloudAudioCanPlay(audio);
+			if (!isPlaybackGenerationActive(generation)) return;
+			audio.playbackRate = desiredPlaybackRate;
+			await playOnce();
+		}
+	} finally {
+		stopSuppress();
 	}
 }
 
@@ -2061,6 +2168,9 @@ function playCloudMp3Blob(
 	audio.muted = false;
 	audio.volume = 1;
 	audio.src = url;
+	// 挂 src 后 Chromium/macOS 可能立刻拉起 Touch Bar；loading 期已 detach 则再清一次
+	suppressOrphanMediaSessionChrome();
+	requestAnimationFrame(() => suppressOrphanMediaSessionChrome());
 	abortCloudCadenceRaf?.();
 	abortCloudCadenceRaf = null;
 	if (onTimeUpdate) {
@@ -2228,7 +2338,7 @@ async function speakTextWithGeneration(
 	let playbackStartNotified = false;
 	/** 出声前清掉 waiting；onPlaybackStart 只通知一次 */
 	const clearAwaitingAndNotifyStart = () => {
-		options?.onAwaitingPlayback?.(false);
+		notifyAwaitingPlayback(options?.onAwaitingPlayback, false);
 		if (playbackStartNotified) return;
 		playbackStartNotified = true;
 		options?.onPlaybackStart?.();

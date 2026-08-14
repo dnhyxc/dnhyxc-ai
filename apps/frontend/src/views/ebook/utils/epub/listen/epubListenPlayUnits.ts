@@ -121,9 +121,12 @@ export async function playListenUnitsFromCursor(
 					notifyStart?.();
 				},
 			});
-		} finally {
+		} catch (err) {
+			// 未出声失败：清掉 waiting，避免条卡在 loading
 			onAwaitingCurrentTts?.(false);
+			throw err;
 		}
+		// 勿在 finally 里 false：段结束后强制 playing 会让 Touch Bar 在句间空隙复活，连点易错乱
 	};
 
 	let si = Math.max(0, Math.min(args.startSi, sentences.length - 1));

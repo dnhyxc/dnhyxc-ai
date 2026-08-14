@@ -46,6 +46,19 @@ export type SelectionSpeakBarSizeProps = {
 	initialWidth?: number;
 	/** 初始高度（px） */
 	initialHeight?: number;
+	/**
+	 * 四角拖拽缩放开关；未传或某角省略视为开启。
+	 * 例：`{ nw: false }` 只关左上，其余仍开。
+	 */
+	resizeHandles?: SelectionSpeakResizeHandles;
+};
+
+/** 四角缩放把手：nw 左上 / ne 右上 / sw 左下 / se 右下 */
+export type SelectionSpeakResizeHandles = {
+	nw?: boolean;
+	ne?: boolean;
+	sw?: boolean;
+	se?: boolean;
 };
 
 type Props = {
@@ -58,6 +71,17 @@ type Props = {
 	/** 未传 initialWidth/Height 时的默认宽度 class */
 	width?: string;
 } & SelectionSpeakBarSizeProps;
+
+function resolveResizeHandles(
+	handles?: SelectionSpeakResizeHandles,
+): Required<SelectionSpeakResizeHandles> {
+	return {
+		nw: handles?.nw !== false,
+		ne: handles?.ne !== false,
+		sw: handles?.sw !== false,
+		se: handles?.se !== false,
+	};
+}
 
 function resolveBoundsEl(): HTMLElement {
 	return (
@@ -107,7 +131,7 @@ function SpeakPreview({ text, stacked }: { text: string; stacked: boolean }) {
 		<ScrollArea
 			key={display}
 			scrollbars="horizontal"
-			className="text-textcolor/80 ml-2 mr-2 h-8 min-w-0 flex-1 text-sm pb-0.5"
+			className="text-textcolor/80 px-2 box-border h-8 min-w-0 flex-1 text-sm pb-0.5"
 			scrollbarClassName="pointer-events-none h-0 border-0 opacity-0"
 			viewportClassName="flex items-center [&>div]:flex-row! [&>div]:items-center! [&>div]:flex-nowrap!"
 			onPointerDown={(e) => e.stopPropagation()}
@@ -155,7 +179,7 @@ function clampSize(
 	};
 }
 
-/** 右上角缩放：底边固定，向上增高 */
+/** 右上角缩放：左边与底边固定，向右上拉大 */
 function clampSizeNe(
 	w: number,
 	h: number,
@@ -172,13 +196,47 @@ function clampSizeNe(
 	return { size, top: bottom - size.h };
 }
 
-type ResizeCorner = 'se' | 'ne';
+/** 左上角缩放：右边与底边固定，向左上拉大 */
+function clampSizeNw(
+	w: number,
+	h: number,
+	box: DOMRect,
+	right: number,
+	bottom: number,
+): { size: Size; left: number; top: number } {
+	const maxW = Math.max(MIN_W, right - (box.left + EDGE_PAD));
+	const maxH = Math.max(MIN_H, bottom - (box.top + EDGE_PAD));
+	const size = {
+		w: Math.min(maxW, Math.max(MIN_W, w)),
+		h: Math.min(maxH, Math.max(MIN_H, h)),
+	};
+	return { size, left: right - size.w, top: bottom - size.h };
+}
+
+/** 左下角缩放：右边与顶边固定，向左下拉大 */
+function clampSizeSw(
+	w: number,
+	h: number,
+	box: DOMRect,
+	right: number,
+	top: number,
+): { size: Size; left: number } {
+	const maxW = Math.max(MIN_W, right - (box.left + EDGE_PAD));
+	const maxH = Math.max(MIN_H, box.bottom - EDGE_PAD - top);
+	const size = {
+		w: Math.min(maxW, Math.max(MIN_W, w)),
+		h: Math.min(maxH, Math.max(MIN_H, h)),
+	};
+	return { size, left: right - size.w };
+}
+
+type ResizeCorner = 'se' | 'ne' | 'sw' | 'nw';
 
 /**
  * 选区朗读悬浮条。
  * 默认：挂在 Footer 内，用 bottom-full + mb-3 贴在输入框上方居中。
  * 拖动后改为 fixed，并限制在 Layout（[data-app-layout]）内。
- * 右下角可拖改宽高。
+ * 四角可拖改宽高（由 resizeHandles 控制，默认全开）。
  */
 export function SelectionSpeakBar({
 	status,
@@ -190,8 +248,10 @@ export function SelectionSpeakBar({
 	width = 'w-[min(100%-1.5rem,21rem)]',
 	initialWidth,
 	initialHeight,
+	resizeHandles,
 }: Props) {
 	const { t } = useI18n();
+	const handles = resolveResizeHandles(resizeHandles);
 	const barRef = useRef<HTMLDivElement>(null);
 	/** null = 未拖过，走 Footer 锚点默认位 */
 	const [fixedPos, setFixedPos] = useState<Pos | null>(null);
@@ -229,6 +289,7 @@ export function SelectionSpeakBar({
 		left: number;
 		top: number;
 		bottom: number;
+		right: number;
 		box: DOMRect;
 	} | null>(null);
 
@@ -459,6 +520,7 @@ export function SelectionSpeakBar({
 				left: pos.left,
 				top: pos.top,
 				bottom: pos.top + originH,
+				right: pos.left + originW,
 				box,
 			};
 		},
@@ -473,6 +535,19 @@ export function SelectionSpeakBar({
 			const dy = e.clientY - resize.startY;
 			const prevH = sizeRef.current?.h ?? 0;
 
+			const commit = (next: Size, pos?: Pos) => {
+				sizeRef.current = next;
+				applySizeStyle(next);
+				if (pos) {
+					fixedPosRef.current = pos;
+					applyFixedStyle(pos);
+				}
+				if (prevH >= STACK_H !== next.h >= STACK_H) {
+					setSize(next);
+					if (pos) setFixedPos(pos);
+				}
+			};
+
 			if (resize.corner === 'ne') {
 				const { size: next, top } = clampSizeNe(
 					resize.originW + dx,
@@ -481,18 +556,39 @@ export function SelectionSpeakBar({
 					resize.left,
 					resize.bottom,
 				);
-				sizeRef.current = next;
-				applySizeStyle(next);
-				const pos = { left: resize.left, top };
-				fixedPosRef.current = pos;
-				applyFixedStyle(pos);
-				if (prevH >= STACK_H !== next.h >= STACK_H) {
-					setSize(next);
-					setFixedPos(pos);
-				}
+				commit(next, { left: resize.left, top });
 				return;
 			}
 
+			if (resize.corner === 'nw') {
+				const {
+					size: next,
+					left,
+					top,
+				} = clampSizeNw(
+					resize.originW - dx,
+					resize.originH - dy,
+					resize.box,
+					resize.right,
+					resize.bottom,
+				);
+				commit(next, { left, top });
+				return;
+			}
+
+			if (resize.corner === 'sw') {
+				const { size: next, left } = clampSizeSw(
+					resize.originW - dx,
+					resize.originH + dy,
+					resize.box,
+					resize.right,
+					resize.top,
+				);
+				commit(next, { left, top: resize.top });
+				return;
+			}
+
+			// se：左上固定
 			const next = clampSize(
 				resize.originW + dx,
 				resize.originH + dy,
@@ -500,9 +596,7 @@ export function SelectionSpeakBar({
 				resize.left,
 				resize.top,
 			);
-			sizeRef.current = next;
-			applySizeStyle(next);
-			if (prevH >= STACK_H !== next.h >= STACK_H) setSize(next);
+			commit(next);
 		},
 		[applySizeStyle, applyFixedStyle],
 	);
@@ -526,7 +620,7 @@ export function SelectionSpeakBar({
 	);
 
 	const loading = status === 'loading';
-	const playing = status === 'playing' || status === 'loading';
+	const playing = status === 'playing';
 	const stacked = (size?.h ?? 0) >= STACK_H;
 	const sized = size != null;
 	const showReset = isDockedAway;
@@ -534,13 +628,13 @@ export function SelectionSpeakBar({
 	const controls = (
 		<div
 			className={cn(
-				'flex shrink-0 items-center gap-1',
+				'flex shrink-0 items-center gap-0.5',
 				stacked && 'w-full justify-center px-1.5',
 			)}
 		>
 			<button
 				type="button"
-				className="text-textcolor/55 hover:text-textcolor/80 flex h-8 w-6 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+				className="text-textcolor/45 hover:text-teal-500 flex h-8 w-6 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
 				aria-label={t('assistant.selection.dragBar')}
 				onPointerDown={onHandlePointerDown}
 				onPointerMove={onHandlePointerMove}
@@ -556,7 +650,7 @@ export function SelectionSpeakBar({
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/55 hover:text-textcolor/80 w-7 h-7 shrink-0"
+						className="text-textcolor/45 hover:text-teal-500 w-7 h-7 shrink-0"
 						aria-label={t('assistant.selection.resetBar')}
 						onPointerDown={(e) => e.stopPropagation()}
 						onClick={resetToDefault}
@@ -568,9 +662,11 @@ export function SelectionSpeakBar({
 
 			<Tooltip
 				content={
-					playing
-						? t('ebook.read.listenBook.pause')
-						: t('ebook.read.listenBook.resume')
+					loading
+						? t('ebook.read.listenBook.loading')
+						: playing
+							? t('ebook.read.listenBook.pause')
+							: t('ebook.read.listenBook.resume')
 				}
 			>
 				<Button
@@ -578,10 +674,14 @@ export function SelectionSpeakBar({
 					variant="ghost"
 					size="icon-sm"
 					className="w-7 h-7 text-teal-500 shrink-0"
+					disabled={loading}
+					aria-busy={loading}
 					aria-label={
-						playing
-							? t('ebook.read.listenBook.pause')
-							: t('ebook.read.listenBook.resume')
+						loading
+							? t('ebook.read.listenBook.loading')
+							: playing
+								? t('ebook.read.listenBook.pause')
+								: t('ebook.read.listenBook.resume')
 					}
 					onClick={onTogglePlay}
 				>
@@ -614,6 +714,7 @@ export function SelectionSpeakBar({
 						type="button"
 						variant="link"
 						size="icon-sm"
+						disabled={loading}
 						className={cn(
 							'text-teal-500/80 hover:bg-teal-500/10',
 							'h-6 px-1.5! text-base w-fit! shrink-0 rounded-sm font-medium tabular-nums',
@@ -653,13 +754,11 @@ export function SelectionSpeakBar({
 			ref={barRef}
 			className={cn(
 				!sized && width,
-				'relative z-9999 flex gap-1 rounded-md border border-theme/10 bg-theme-background/5 py-1 shadow-md backdrop-blur-sm',
+				'relative z-99 px-2 flex gap-0.5 rounded-md border border-theme/10 bg-theme-background/5 py-1 shadow-md backdrop-blur-sm',
 				isFixedVisual
 					? 'fixed'
 					: 'absolute bottom-full left-1/2 mb-[9px] -translate-x-1/2',
-				stacked
-					? 'flex-col items-stretch px-0'
-					: 'flex-row items-center px-1.5',
+				stacked ? 'flex-col items-stretch px-0' : 'flex-row items-center px-3',
 			)}
 			style={{
 				...(isFixedVisual && fixedPosRef.current
@@ -690,36 +789,74 @@ export function SelectionSpeakBar({
 				</>
 			)}
 
-			<button
-				type="button"
-				className="text-textcolor/40 hover:text-textcolor/60 absolute top-0 right-0 z-10 h-4 w-4 cursor-ne-resize touch-none"
-				aria-label={t('assistant.selection.resizeBar')}
-				onPointerDown={onResizePointerDown('ne')}
-				onPointerMove={onResizePointerMove}
-				onPointerUp={onResizePointerUp}
-				onPointerCancel={onResizePointerUp}
-			>
-				<span
-					className="border-textcolor/15 absolute top-1 right-1 box-border block h-2.5 w-2.5 cursor-pointer rounded-tr-sm border-t-2 border-r-2"
-					aria-hidden
-				/>
-			</button>
+			{handles.nw ? (
+				<button
+					type="button"
+					className="cursor-crosshair group text-textcolor/40 hover:text-textcolor/60 absolute top-0 left-0 z-10 h-4 w-4 touch-none"
+					aria-label={t('assistant.selection.resizeBar')}
+					onPointerDown={onResizePointerDown('nw')}
+					onPointerMove={onResizePointerMove}
+					onPointerUp={onResizePointerUp}
+					onPointerCancel={onResizePointerUp}
+				>
+					<span
+						className="border-textcolor/6 group-hover:border-teal-500 absolute top-1 left-1 box-border block h-2 w-2 rounded-tl-[4px] border-t-2 border-l-2"
+						aria-hidden
+					/>
+				</button>
+			) : null}
 
-			<button
-				type="button"
-				className="text-textcolor/40 hover:text-textcolor/60 absolute right-0 bottom-0 z-10 h-4 w-4 cursor-se-resize touch-none"
-				aria-label={t('assistant.selection.resizeBar')}
-				onPointerDown={onResizePointerDown('se')}
-				onPointerMove={onResizePointerMove}
-				onPointerUp={onResizePointerUp}
-				onPointerCancel={onResizePointerUp}
-			>
-				{/* 略小于条的 rounded-md，避免角弧显得偏大 */}
-				<span
-					className="border-textcolor/15 absolute right-1 bottom-1 box-border block h-2.5 w-2.5 cursor-pointer rounded-br-sm border-r-2 border-b-2"
-					aria-hidden
-				/>
-			</button>
+			{handles.ne ? (
+				<button
+					type="button"
+					className="cursor-crosshair group text-textcolor/40 hover:text-textcolor/60 absolute top-0 right-0 z-10 h-4 w-4 touch-none"
+					aria-label={t('assistant.selection.resizeBar')}
+					onPointerDown={onResizePointerDown('ne')}
+					onPointerMove={onResizePointerMove}
+					onPointerUp={onResizePointerUp}
+					onPointerCancel={onResizePointerUp}
+				>
+					<span
+						className="border-textcolor/6 group-hover:border-teal-500 absolute top-1 right-1 box-border block h-2 w-2 rounded-tr-[4px] border-t-2 border-r-2"
+						aria-hidden
+					/>
+				</button>
+			) : null}
+
+			{handles.sw ? (
+				<button
+					type="button"
+					className="cursor-crosshair group text-textcolor/40 hover:text-textcolor/60 absolute bottom-0 left-0 z-10 h-4 w-4 touch-none"
+					aria-label={t('assistant.selection.resizeBar')}
+					onPointerDown={onResizePointerDown('sw')}
+					onPointerMove={onResizePointerMove}
+					onPointerUp={onResizePointerUp}
+					onPointerCancel={onResizePointerUp}
+				>
+					<span
+						className="border-textcolor/6 group-hover:border-teal-500 absolute bottom-1 left-1 box-border block h-2 w-2 rounded-bl-[4px] border-b-2 border-l-2"
+						aria-hidden
+					/>
+				</button>
+			) : null}
+
+			{handles.se ? (
+				<button
+					type="button"
+					className="cursor-crosshair group absolute right-0 bottom-0 z-10 h-4 w-4 touch-none"
+					aria-label={t('assistant.selection.resizeBar')}
+					onPointerDown={onResizePointerDown('se')}
+					onPointerMove={onResizePointerMove}
+					onPointerUp={onResizePointerUp}
+					onPointerCancel={onResizePointerUp}
+				>
+					{/* 略小于条的 rounded-md，避免角弧显得偏大 */}
+					<span
+						className="border-textcolor/6 group-hover:border-teal-500 absolute right-1 bottom-1 box-border block h-2 w-2 rounded-br-[4px] border-r-2 border-b-2"
+						aria-hidden
+					/>
+				</button>
+			) : null}
 		</div>
 	);
 }

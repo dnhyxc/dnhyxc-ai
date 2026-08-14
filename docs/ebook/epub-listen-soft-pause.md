@@ -1,7 +1,7 @@
 # EPUB 听书：软暂停与系统媒体同步
 
 > **文档角色**：听书 / 听当前底栏暂停后从 **currentTime** 续播；与系统 Now Playing / 媒体键双向同步；退出会话时尽力拆除 Media Session。  
-> **延伸阅读**：[epub-listen-audio-end-ui.md](./epub-listen-audio-end-ui.md)（ended 与 UI）、[epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)（底栏切章）、[epub-chapter-listen.md](./epub-chapter-listen.md)（状态机基线）、[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)（本轮索引）。
+> **延伸阅读**：[epub-listen-touchbar-loading.md](./epub-listen-touchbar-loading.md)（loading 期隐藏/锁定 Touch Bar）、[epub-listen-audio-end-ui.md](./epub-listen-audio-end-ui.md)（ended 与 UI）、[epub-listen-bar-chapter-nav.md](./epub-listen-bar-chapter-nav.md)（底栏切章）、[epub-chapter-listen.md](./epub-chapter-listen.md)（状态机基线）、[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)（本轮索引）。
 
 ## 1. 背景与目标
 

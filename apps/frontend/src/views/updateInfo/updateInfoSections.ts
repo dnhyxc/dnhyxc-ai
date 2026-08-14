@@ -387,6 +387,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'在助手消息中选中文字后朗读时，macOS Touch Bar / 控制中心的播放/暂停键现在可以直接控制选区朗读的播放与暂停，与听书的媒体键行为保持一致。',
 			},
+			{
+				id: 's4-16',
+				title: '助手消息操作条新增「朗读内容」按钮',
+				dateLabel: '2026-08-14',
+				description:
+					'英语学习 Agent 与电子书 MOKE 助手的助手消息操作条新增朗读按钮，点击即可朗读整条消息正文，无需先框选文字。朗读复用选区朗读同款 TTS 管线与悬浮控制条，支持播放/暂停、停止与倍速调节。',
+			},
 		],
 	},
 	{
@@ -2388,6 +2395,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				dateLabel: '2026-08-14',
 				description:
 					'MOKE 电子书助手在流式输出过程中，消息内容的增量更新改为帧级合并与就地变更，不再每 token 触发整页 observer 重渲染——长对话也能保持流畅的输入与滚动体验。',
+			},
+			{
+				id: 's25-112',
+				title: '听书/朗读 loading 时系统媒体键与播放条对齐',
+				dateLabel: '2026-08-14',
+				description:
+					'等待语音合成出声时，macOS Touch Bar 不再展示可操作播放控件；出声后才可暂停/继续。修复加载等待期间连点系统播放键导致听书底栏或选区朗读条状态错乱的问题。',
 			},
 		],
 	},

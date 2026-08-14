@@ -30,6 +30,7 @@ export function useAssistantSelectionSpeak(
 	onBeforeStartRef.current = normalized.onBeforeStart;
 	const initialWidth = normalized.initialWidth;
 	const initialHeight = normalized.initialHeight;
+	const resizeHandles = normalized.resizeHandles;
 
 	const start = useCallback(
 		(text: string) => {
@@ -56,6 +57,7 @@ export function useAssistantSelectionSpeak(
 					onRateChange={speak.setRate}
 					initialWidth={initialWidth}
 					initialHeight={initialHeight}
+					resizeHandles={resizeHandles}
 				/>
 			) : null,
 		[
@@ -68,6 +70,7 @@ export function useAssistantSelectionSpeak(
 			speak.setRate,
 			initialWidth,
 			initialHeight,
+			resizeHandles,
 		],
 	);
 

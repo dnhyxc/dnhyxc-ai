@@ -24,3 +24,4 @@
 | [selection-speak-common.md](./selection-speak-common.md) | **历史 / 重构对照**：`SelectionSpeak` 组件化与跨域复用过程；现行实现见 [assistant-selection-speak-guide.md](./assistant-selection-speak-guide.md) |
 | [streaming-selection-preserve.md](./streaming-selection-preserve.md) | **流式选区保持**：`domTextSelection` 文本偏移快照/恢复、`StreamingCodeFenceBlock` 与 `StableMarkdownChunk` 选区保护、稳定 key 策略 |
 | [selection-speak-media-session.md](./selection-speak-media-session.md) | **选区朗读 Media Session**：系统 Touch Bar / 控制中心 play·pause 接入选区朗读（`registerPlaybackMediaHandlers` + `pauseRef`/`resumeRef` 闭包新鲜度） |
+| [message-actions-speak-content.md](./message-actions-speak-content.md) | **消息操作条朗读整条内容**：`ChatMessageActions` 新增 Volume2 按钮、`onSpeakContent` prop、`useAssistantSelectionSpeak.start` 暴露，英语 Agent / 电子书 MOKE 助手接入 |

@@ -86,11 +86,11 @@ const Sidebar = observer(() => {
 			data-tauri-drag-region
 			className="w-20 h-full flex flex-col items-center py-7 px-2"
 		>
-			<div className="h-full flex flex-col justify-between w-full">
-				<div className="flex flex-col items-center overflow-hidden">
+			<div className="flex h-full min-h-0 w-full flex-col justify-between">
+				<div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden">
 					<div
 						data-tauri-drag-region
-						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
+						className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-all duration-200 ease-in-out hover:text-theme/70"
 						onClick={() => onJump('/')}
 					>
 						<Image
@@ -100,8 +100,12 @@ const Sidebar = observer(() => {
 							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>
-					<div className="my-7.5 w-full flex-1 h-10 flex flex-col items-center justify-center overflow-auto">
-						<ScrollArea scrollbarClassName="hidden">
+					<div className="my-7.5 flex min-h-0 w-full flex-1 flex-col items-center">
+						<ScrollArea
+							className="h-full w-full"
+							viewportClassName="[&>div]:items-center!"
+							scrollbarClassName="hidden absolute right-0 w-1 border-0 py-0"
+						>
 							{processedMenus.map((item) => {
 								const active = isMenuActive(item.path, pathname);
 								return (
@@ -134,7 +138,7 @@ const Sidebar = observer(() => {
 						</ScrollArea>
 					</div>
 				</div>
-				<div className="w-full flex justify-center items-center">
+				<div className="flex w-full shrink-0 items-center justify-center">
 					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>

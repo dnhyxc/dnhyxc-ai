@@ -50,6 +50,7 @@
 | 选区朗读控制条无法拖动缩放 / 高亮漂移 / 中英混排朗读不准          | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) · [chat/selection-speak-common.md](./chat/selection-speak-common.md)（历史对照） · [ebook/tts-audio-progress-sync.md](./ebook/tts-audio-progress-sync.md)         |
 | 流式对话中选区文字丢失 / 拖选后选区自动消失 | [chat/streaming-selection-preserve.md](./chat/streaming-selection-preserve.md) |
 | 选区朗读无法用系统媒体键（Touch Bar/控制中心）控制 | [chat/selection-speak-media-session.md](./chat/selection-speak-media-session.md) |
+| 听书/朗读 loading 时 Touch Bar 仍可点 / 连点导致条状态错乱 | [ebook/epub-listen-touchbar-loading.md](./ebook/epub-listen-touchbar-loading.md) |
 | 电子书听书与选区朗读同时出声 / 互斥异常                           | [ebook/listen-exclusive-control.md](./ebook/listen-exclusive-control.md)                                                                             |
 | 生产 `/images/` 400                                               | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md)                                                    |
 | 本地上传落盘 / UPLOAD_ROOT                                        | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md)                                                                                             |

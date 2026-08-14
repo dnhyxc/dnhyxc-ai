@@ -2,7 +2,7 @@
 
 > **文档角色**：增量修复——底部播放钮 **只要在等当前要播的音频** 就保持 Spinner，不再仅首次起播可见。  
 > **姊妹文档**：[epub-listen-play-loading.md](./epub-listen-play-loading.md)（首版 `onAwaitingCurrentTts`）、[epub-listen-paragraph-tts.md](./epub-listen-paragraph-tts.md)、[epub-listen-prefetch-after-start.md](./epub-listen-prefetch-after-start.md)。  
-> **延伸阅读**：[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)。
+> **延伸阅读**：[epub-listen-touchbar-loading.md](./epub-listen-touchbar-loading.md)（loading 期隐藏/锁定 Touch Bar）、[epub-listen-playback-fixes-2026-07.md](./epub-listen-playback-fixes-2026-07.md)。
 
 ## 1. 背景与目标
 

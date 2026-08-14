@@ -285,6 +285,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When using the select-and-speak feature on assistant messages, macOS Touch Bar / Control Center play-pause buttons now control selection speak playback, matching the audiobook behavior.',
 	},
+	's4-16': {
+		title: 'New "Speak Content" Button on Assistant Message Actions',
+		description:
+			'A new read-aloud button appears in the message actions bar for assistant messages in the English Learning Agent and Ebook MOKE assistant — tap it to speak the entire message without first selecting text. Reuses the same TTS pipeline and floating control bar as selection speak, with play/pause, stop, and speed controls.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
@@ -1627,5 +1632,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Smoother Ebook Assistant Streaming',
 		description:
 			'The MOKE ebook assistant now batches streaming message updates per frame with in-place property changes, instead of triggering full observer re-renders per token — keeping input and scrolling smooth during long conversations.',
+	},
+	's25-112': {
+		title:
+			'System Media Keys Align with Player Bar During Listen/Speak Loading',
+		description:
+			'While waiting for speech synthesis to start, the macOS Touch Bar no longer shows operable playback controls; pause/resume become available only after audio begins. Fixes desynced listen bar or selection-speak bar state caused by repeatedly tapping system media keys during the loading wait.',
 	},
 };

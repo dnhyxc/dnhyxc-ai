@@ -692,6 +692,7 @@ export function EpubListenPlayerBar({
 					variant="ghost"
 					size="icon-sm"
 					className="text-teal-500 shrink-0"
+					disabled={loading}
 					aria-busy={loading}
 					aria-label={
 						loading
