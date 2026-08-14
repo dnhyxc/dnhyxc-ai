@@ -48,6 +48,8 @@
 | 助手消息选区朗读 / 右键菜单无反应 / 与听书同时出声                | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) |
 | 助手拖选移出窗口后整页上移 / 底边黑缝 / 上下留白不一致              | [app/selection-drag-shell-scroll-guide.md](./app/selection-drag-shell-scroll-guide.md)                                                                     |
 | 选区朗读控制条无法拖动缩放 / 高亮漂移 / 中英混排朗读不准          | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) · [chat/selection-speak-common.md](./chat/selection-speak-common.md)（历史对照） · [ebook/tts-audio-progress-sync.md](./ebook/tts-audio-progress-sync.md)         |
+| 流式对话中选区文字丢失 / 拖选后选区自动消失 | [chat/streaming-selection-preserve.md](./chat/streaming-selection-preserve.md) |
+| 选区朗读无法用系统媒体键（Touch Bar/控制中心）控制 | [chat/selection-speak-media-session.md](./chat/selection-speak-media-session.md) |
 | 电子书听书与选区朗读同时出声 / 互斥异常                           | [ebook/listen-exclusive-control.md](./ebook/listen-exclusive-control.md)                                                                             |
 | 生产 `/images/` 400                                               | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md)                                                    |
 | 本地上传落盘 / UPLOAD_ROOT                                        | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md)                                                                                             |
@@ -229,10 +231,13 @@
 | 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
 | 主包体积大 / 首屏慢 / React.lazy 路由懒加载 / manualChunks 拆包 / mermaid 动态加载 / Monaco 组件懒加载 / Prettier 动态加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md)（`React.lazy` + `manualChunks` + `import('mermaid')` + CSS 显式引入 + `styleContents` CSS 内联 + `Suspense` fallback + Monaco 薄壳 `lazy` + `loadPrettier` + hooks/contexts barrel 瘦身） |
 | 英语 Agent 选中文本右键朗读 / 复制 / 选区菜单复用 | [english/selection-speak-context-menu.md](./english/selection-speak-context-menu.md)（`useSelectionContextMenu` + `PositionedQuickMenu` + 按段云端 TTS + 悬浮条） |
+| 英语学习 Agent 流式输出输入框卡顿 / 视觉抖动 | [english/english-agent-stream-perf-isolation.md](./english/english-agent-stream-perf-isolation.md) |
 | 听书切句落后听感 / 首句尾音到下句高亮滞后 / rAF 进度轮询 | [ebook/epub-listen-cadence-lead.md](./ebook/epub-listen-cadence-lead.md)（`CLOUD_CADENCE_LEAD_SEC=0.35` + `requestAnimationFrame` + `onPlaybackProgress` + kick ≥0.8 提前切句） |
 | 插件加载失败只能重试 / 想离开当前页或查接入文档 | [app/plugin-host-error-actions.md](./app/plugin-host-error-actions.md)（错误卡片新增「返回首页」「插件开发指南」按钮） |
 | 首页色块/按钮饱和度过高 / 滚动 FAB 圆形过大 / 下拉菜单内边距 | [app/ui-tint-polish.md](./app/ui-tint-polish.md)（`HUE_STYLES` 透明度 + `Button` variant + `ScrollFab` 尺寸 + `DropdownMenuContent` 内边距） |
 | EPUB 设置滑条 macOS 失焦后变灰 / accent-color 不恢复 | [ebook/epub-settings-range-repaint.md](./ebook/epub-settings-range-repaint.md)（`SettingsRange` + `rangeRepaintKey` + `focus`/`visibilitychange` remount） |
+| EPUB 阅读区选区被问书侧栏滚动误清 | [ebook/epub-selection-scroll-target-filter.md](./ebook/epub-selection-scroll-target-filter.md) |
+| 电子书助手流式输出卡顿 | [ebook/ebook-assistant-stream-patch-scheduler.md](./ebook/ebook-assistant-stream-patch-scheduler.md) |
 | Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/tooltip-controlled-align.md](./app/tooltip-controlled-align.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
 | Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/monaco-loading-restore.md](./app/monaco-loading-restore.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
 

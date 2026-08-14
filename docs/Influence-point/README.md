@@ -40,5 +40,8 @@
 | [epub-thought-viewport-mark.md](./epub-thought-viewport-mark.md) | **想法按章拉取 + 视口 mark**：`spineHints`、双轨 reclaim、sync 拆分、对划线/听书/大册私有书的影响 |
 | [epub-thought-loader-full-fetch-removal.md](./epub-thought-loader-full-fetch-removal.md) | **移除误触发全量 list**：`book?.fmt` 未就绪竞态、PDF 无想法、进书仅 `spineHints` |
 | [tts-edge-unify-stream-endpoint.md](./tts-edge-unify-stream-endpoint.md) | **Edge TTS 统一 `SPEECH_EDGE_TTS_STREAM`**：取消 Tauri/Web endpoint 分流对云端朗读的影响 |
+| [chat-stream-selection-preserve.md](./chat-stream-selection-preserve.md) | **流式气泡选区保持**：命令式 HTML + 文本偏移恢复；对横滚冻结、贴底、引用、性能与复制的影响 |
+| [english-agent-stream-input-perf.md](./english-agent-stream-input-perf.md) | **英语 Agent 流式输入性能**：MessageList/Signals 与 ChatEntry 解耦、`createStreamingMobxPatchScheduler` 就地写 content |
+| [epub-ask-stream-selection-clear.md](./epub-ask-stream-selection-clear.md) | **MK 问书流式误清 EPUB 选区**：`onScroll` 仅阅读区清选；问书 store rAF 合并 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

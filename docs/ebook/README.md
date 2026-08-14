@@ -101,6 +101,8 @@
 | [epub-settings-range-repaint.md](./epub-settings-range-repaint.md)                                             | **增量（本轮）**：阅读设置滑条 `accent-teal-600` 在 macOS/WebKit 失焦后卡灰修复；抽取 `SettingsRange` 组件 + `rangeRepaintKey` state，监听 `window.focus` / `visibilitychange` / 面板 `open` 时递增 key remount `<input>` 恢复主题色（含改动前/后对比与逐行注释） |
 | [tts-audio-progress-sync.md](./tts-audio-progress-sync.md)                                                   | **增量（本轮）**：TTS 音频进度同步与中英权重算法——`onAudioTime` 真实音频时钟、CJK/拉丁/数字/空白字符权重映射、`Float64Array` 前缀和 + 二分定位、`desiredPlaybackRate` 倍速期望值机制 |
 | [listen-exclusive-control.md](./listen-exclusive-control.md)                                                 | **增量（本轮）**：电子书听书与选区朗读双向互斥控制——`useRef + useCallback` 状态暴露模式、`onBeforeSelectionSpeak` 钩子、`clearEpubTextSelection` 顶层选区清理修复、听书播放器方形图标统一 |
+| [epub-selection-scroll-target-filter.md](./epub-selection-scroll-target-filter.md) | **增量**：`isEpubReaderScrollTarget` 过滤阅读区滚动——仅 EPUB 阅读区滚动才关 PopBar / 清选区，问书 ScrollArea 贴底滚动勿误伤 |
+| [ebook-assistant-stream-patch-scheduler.md](./ebook-assistant-stream-patch-scheduler.md) | **增量**：电子书助手流式 `createStreamingMobxPatchScheduler` rAF 合并 + 原地属性变更，减少每 token 整页 observer 重渲染 |
 
 - [epub-highlight-custom-color.md](./epub-highlight-custom-color.md) — 实现说明与代码对比
 - [../Influence-point/epub-highlight-custom-color-picker.md](../Influence-point/epub-highlight-custom-color-picker.md) — **影响点**：划线自定义色 ColorPicker、`#rrggbb(aa)` 持久化与 PopBar/想法侧栏波及面 |

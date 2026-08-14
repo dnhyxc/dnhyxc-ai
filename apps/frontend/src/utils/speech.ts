@@ -1074,7 +1074,7 @@ function setPlaybackMediaState(state: MediaSessionPlaybackState): void {
 	}
 }
 
-/** 听书/听当前：把系统媒体键接到 pause/resume；传 null 卸载 */
+/** 听书/听当前/选区朗读：把系统媒体键接到 pause/resume；传 null 卸载 */
 export function registerPlaybackMediaHandlers(
 	handlers: PlaybackMediaHandlers | null,
 ): void {

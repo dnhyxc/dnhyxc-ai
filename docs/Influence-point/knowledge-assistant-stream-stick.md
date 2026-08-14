@@ -5,6 +5,8 @@
 - [knowledge-preview-assistant-pane-perf.md](./knowledge-preview-assistant-pane-perf.md) — 预览+助手同开性能（消息列独立 observer / `useAssistantStreamTick` 隔离）
 - [use-stick-to-bottom-scroll.md](../react/use-stick-to-bottom-scroll.md) — `useStickToBottomScroll` 实现归档（含历史 rAF 合并动机）
 - [knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md) — 知识库助手会话 / SSE / `documentKey` 完整链路
+- [english-agent-stream-input-perf.md](./english-agent-stream-input-perf.md) — 英语 Agent 对齐 MessageList 隔离 + store rAF
+- [epub-ask-stream-selection-clear.md](./epub-ask-stream-selection-clear.md) — 问书贴底 scroll 与 EPUB 选区隔离
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
 

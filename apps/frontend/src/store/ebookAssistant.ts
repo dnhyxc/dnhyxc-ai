@@ -17,6 +17,7 @@ import {
 import { EBOOK_ASSISTANT_SSE } from '@/service/api';
 import type { Message } from '@/types/chat';
 import { AGENT_SSE_USER_ABORT_MARKER, streamAgentSse } from '@/utils/agentSse';
+import { createStreamingMobxPatchScheduler } from '@/utils/scheduleStreamingMobxPatch';
 
 function readToken(): string {
 	if (typeof window === 'undefined') return '';
@@ -545,14 +546,21 @@ export class EbookAssistantStore {
 			});
 		});
 
-		const patchAssistant = (delta: string) => {
-			if (delta) accumulated += delta;
+		const flushAssistantPatch = () => {
 			runInAction(() => {
 				const idx = st.messages.findIndex((m) => m.chatId === assistantRowId);
 				if (idx < 0) return;
 				const prev = st.messages[idx] as Message;
-				st.messages[idx] = { ...prev, content: accumulated };
+				if (prev.content === accumulated) return;
+				prev.content = accumulated;
 			});
+		};
+		const assistantPatchScheduler =
+			createStreamingMobxPatchScheduler(flushAssistantPatch);
+
+		const patchAssistant = (delta: string) => {
+			if (delta) accumulated += delta;
+			assistantPatchScheduler.schedule();
 		};
 
 		runInAction(() => {
@@ -594,6 +602,7 @@ export class EbookAssistantStore {
 					},
 					onDelta: (d) => patchAssistant(d),
 					onComplete: (err) => {
+						assistantPatchScheduler.flush();
 						runInAction(() => {
 							st.isSending = false;
 							const idx = st.messages.findIndex(
@@ -621,6 +630,7 @@ export class EbookAssistantStore {
 						void this.refreshSessionListForCurrentBook();
 					},
 					onError: () => {
+						assistantPatchScheduler.flush();
 						runInAction(() => {
 							st.isSending = false;
 							const idx = st.messages.findIndex(
@@ -646,6 +656,7 @@ export class EbookAssistantStore {
 				st.abortStream = abort;
 			});
 		} catch {
+			assistantPatchScheduler.flush();
 			runInAction(() => {
 				st.isSending = false;
 				const idx = st.messages.findIndex((m) => m.chatId === assistantRowId);

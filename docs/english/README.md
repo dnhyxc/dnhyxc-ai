@@ -109,6 +109,7 @@
 | [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
 | [selection-speak-context-menu.md](./selection-speak-context-menu.md) | **增量（本轮）**：英语 Agent 消息正文「选中文本 → 右键 → 朗读/复制」；抽取通用 `useSelectionContextMenu` hook + `PositionedQuickMenu` 组件（供 `ChatAssistantMessage` / `Markdown` 预览 / EPUB 右键复用）；朗读复用听书同款按段云端 TTS，悬浮条支持拖动/倍速/软暂停（含改动前/后对比与逐行注释） |
 | [tts-awaiting-callback-refine.md](./tts-awaiting-callback-refine.md) | **增量**：`onAwaitingPlayback` 语义修正——仅「尚未出声且在等当前段就绪」点亮，本机分段停顿/预取不点亮；`clearAwaitingAndNotifyStart` 重构消除时序错位；修复本机 Web Speech 多段朗读 loading 卡死（含改动前/后对比与逐行注释） |
+| [english-agent-stream-perf-isolation.md](./english-agent-stream-perf-isolation.md) | **增量**：英语学习 Agent 流式渲染隔离——`useEnglishAgentSignals` 精细化订阅、`EnglishAgentMessageList` 独立 observer、`EnglishAgentScrollShell` 组件拆分 + Store 层 rAF Patch 调度 |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)
 - 完整列表：`ls docs/english/*.md`
 

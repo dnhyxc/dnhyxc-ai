@@ -275,6 +275,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes fenced code blocks in assistant messages that could not be scrolled sideways reliably while the reply was still streaming—including after the closing fence when the model kept writing prose below. Copy, download, and the code toolbar behave as before.',
 	},
+	's4-14': {
+		title: 'Text Selection Preserved During Streaming',
+		description:
+			'When selecting text in AI assistant messages during streaming output (chat, knowledge assistant, English learning Agent), your selection is now preserved as new tokens arrive — you can continue highlighting or copying while the model generates.',
+	},
+	's4-15': {
+		title: 'Selection Speak Now Supports System Media Keys',
+		description:
+			'When using the select-and-speak feature on assistant messages, macOS Touch Bar / Control Center play-pause buttons now control selection speak playback, matching the audiobook behavior.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
@@ -1056,6 +1066,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When reading aloud a classic quote or word in English Learning, switching to another sub-page or leaving English Learning now stops playback immediately—no more audio bleeding across pages. Tapping another entry to trigger a stop no longer leaves a silent progress bar lingering in system media controls (Touch Bar / Control Center / Bluetooth headset popup). Classic-quote and word cloud TTS also switched to single-utterance synthesis for a faster first packet.',
 	},
+	's24-62': {
+		title: 'Smoother English Learning Agent Streaming',
+		description:
+			'During streaming responses in the English learning Agent, message token updates no longer trigger full-page re-renders of the input area, share bar, and session toolbar — typing, intent selection, and session switching remain responsive even during long conversations.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:
@@ -1601,5 +1616,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'E-book player bar icons and spacing polished',
 		description:
 			'The play / pause / stop icons on the bottom e-book player bar have been unified to a square line style to match the rest of the product control buttons. The speed button is slightly narrower and the progress label gains a left margin, giving the bar a more compact look.',
+	},
+	's25-110': {
+		title:
+			'EPUB Reading Selection No Longer Accidentally Cleared by Sidebar Scroll',
+		description:
+			'When text is selected in the EPUB reader and the MOKE assistant sidebar is open, scrolling inside the sidebar no longer clears the reading selection — only scrolling within the EPUB reader itself dismisses the selection toolbar.',
+	},
+	's25-111': {
+		title: 'Smoother Ebook Assistant Streaming',
+		description:
+			'The MOKE ebook assistant now batches streaming message updates per frame with in-place property changes, instead of triggering full observer re-renders per token — keeping input and scrolling smooth during long conversations.',
 	},
 };

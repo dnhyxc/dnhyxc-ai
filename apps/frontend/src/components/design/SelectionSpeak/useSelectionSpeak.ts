@@ -4,6 +4,7 @@ import {
 	buildSentenceOffsetSpans,
 	isPlaybackAvailable,
 	pausePlaybackSoft,
+	registerPlaybackMediaHandlers,
 	resumePlaybackSoft,
 	stopAllPlayback,
 	stripMarkdownForTts,
@@ -94,6 +95,8 @@ export function useSelectionSpeak() {
 		plainRef.current = '';
 		sentencesRef.current = [];
 		stopAllPlayback();
+		// 与听书一致：同步卸 Media Session，避免 macOS Touch Bar / 控制中心残留
+		registerPlaybackMediaHandlers(null);
 		setStatus('idle');
 		setPreview('');
 	}, [clearDelay]);
@@ -246,6 +249,11 @@ export function useSelectionSpeak() {
 		start(text);
 	}, [start]);
 
+	const pauseRef = useRef(pause);
+	pauseRef.current = pause;
+	const resumeRef = useRef(resume);
+	resumeRef.current = resume;
+
 	/** 播放中/加载中 → 暂停；已暂停 → 恢复；idle 无操作 */
 	const togglePlay = useCallback(() => {
 		const s = statusRef.current;
@@ -263,6 +271,19 @@ export function useSelectionSpeak() {
 		applyActivePlaybackRate(clamped);
 		setRateState(clamped);
 	}, []);
+
+	const isActive =
+		status === 'loading' || status === 'playing' || status === 'paused';
+
+	// 对齐听书：系统 Touch Bar / 控制中心 play·pause 接到悬浮条 status
+	useEffect(() => {
+		if (!isActive) return;
+		registerPlaybackMediaHandlers({
+			play: () => resumeRef.current(),
+			pause: () => pauseRef.current(),
+		});
+		return () => registerPlaybackMediaHandlers(null);
+	}, [isActive]);
 
 	return {
 		status,

@@ -8,6 +8,10 @@ import {
 	type MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
 import { memo, useLayoutEffect, useRef } from 'react';
+import {
+	restoreTextOffsetsInRoot,
+	snapshotTextOffsetsInRoot,
+} from '@/utils/domTextSelection';
 import { patchIncompleteNonMermaidFence } from '@/utils/splitMarkdownFences';
 
 export type StreamingCodeFenceBlockProps = {
@@ -59,9 +63,11 @@ function StreamingCodeFenceBlockInner({
 			const scrollLeft =
 				root.querySelector<HTMLElement>('.chat-md-code-block pre')
 					?.scrollLeft ?? 0;
+			const snap = snapshotTextOffsetsInRoot(root);
 			root.innerHTML = parser.render(renderCompleteFenceMarkdown(lang, body));
 			const pre = root.querySelector<HTMLElement>('.chat-md-code-block pre');
 			if (pre) pre.scrollLeft = scrollLeft;
+			if (snap) restoreTextOffsetsInRoot(root, snap);
 			frozenRef.current = true;
 			langRef.current = lang;
 			return;
@@ -72,7 +78,9 @@ function StreamingCodeFenceBlockInner({
 			const patched = patchIncompleteNonMermaidFence(
 				renderOpenFenceMarkdown(lang, body),
 			);
+			const snap = snapshotTextOffsetsInRoot(root);
 			root.innerHTML = parser.render(patched);
+			if (snap) restoreTextOffsetsInRoot(root, snap);
 			return;
 		}
 
@@ -82,12 +90,15 @@ function StreamingCodeFenceBlockInner({
 			const patched = patchIncompleteNonMermaidFence(
 				renderOpenFenceMarkdown(lang, body),
 			);
+			const snap = snapshotTextOffsetsInRoot(root);
 			root.innerHTML = parser.render(patched);
+			if (snap) restoreTextOffsetsInRoot(root, snap);
 			return;
 		}
 
 		const scrollLeft = pre.scrollLeft;
 		const scrollTop = pre.scrollTop;
+		const snap = snapshotTextOffsetsInRoot(root);
 		const patched = patchIncompleteNonMermaidFence(
 			renderOpenFenceMarkdown(lang, body),
 		);
@@ -100,6 +111,7 @@ function StreamingCodeFenceBlockInner({
 		}
 		pre.scrollLeft = scrollLeft;
 		pre.scrollTop = scrollTop;
+		if (snap) restoreTextOffsetsInRoot(root, snap);
 	}, [body, complete, lang, parser]);
 
 	return (

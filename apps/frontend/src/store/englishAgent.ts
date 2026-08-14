@@ -16,6 +16,7 @@ import {
 import EnglishPackStore from '@/store/englishPack';
 import type { Message, SearchOrganicItem } from '@/types/chat';
 import { AGENT_SSE_USER_ABORT_MARKER, streamAgentSse } from '@/utils/agentSse';
+import { createStreamingMobxPatchScheduler } from '@/utils/scheduleStreamingMobxPatch';
 
 function readToken(): string {
 	if (typeof window === 'undefined') return '';
@@ -529,17 +530,22 @@ export class EnglishAgentStore {
 
 		let accumulated = '';
 
-		const patchAssistant = (delta: string) => {
-			if (delta) accumulated += delta;
+		/** 就地改 content：不替换数组元素，避免整表 MessageList 随 token 重渲染 */
+		const flushAssistantPatch = () => {
 			runInAction(() => {
 				const idx = st.messages.findIndex((m) => m.chatId === assistantRowId);
 				if (idx < 0) return;
 				const prev = st.messages[idx] as Message;
-				st.messages[idx] = {
-					...prev,
-					content: accumulated,
-				};
+				if (prev.content === accumulated) return;
+				prev.content = accumulated;
 			});
+		};
+		const assistantPatchScheduler =
+			createStreamingMobxPatchScheduler(flushAssistantPatch);
+
+		const patchAssistant = (delta: string) => {
+			if (delta) accumulated += delta;
+			assistantPatchScheduler.schedule();
 		};
 
 		const patchAssistantOrganic = (organic: SearchOrganicItem[]) => {
@@ -606,6 +612,7 @@ export class EnglishAgentStore {
 						});
 					},
 					onComplete: (err) => {
+						assistantPatchScheduler.flush();
 						runInAction(() => {
 							st.isSending = false;
 							const idx = st.messages.findIndex(
@@ -634,6 +641,7 @@ export class EnglishAgentStore {
 						void this.refreshSessionList();
 					},
 					onError: () => {
+						assistantPatchScheduler.flush();
 						runInAction(() => {
 							st.isSending = false;
 							const idx = st.messages.findIndex(
@@ -660,6 +668,7 @@ export class EnglishAgentStore {
 				st.abortStream = abort;
 			});
 		} catch {
+			assistantPatchScheduler.flush();
 			runInAction(() => {
 				st.isSending = false;
 				const idx = st.messages.findIndex((m) => m.chatId === assistantRowId);

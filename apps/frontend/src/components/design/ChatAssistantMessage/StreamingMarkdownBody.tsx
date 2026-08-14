@@ -4,16 +4,20 @@
  *
  * 流式阶段：
  * - 代码围栏 → StreamingCodeFenceBlock（稳定 fenceKey，闭合后冻结 DOM）
- * - 正文段 → StableMarkdownChunk memo，仅尾段增长
+ * - 正文段 → StableMarkdownChunk：命令式写 HTML，更新前快照选区偏移并恢复（不冻结流式、无全局 selectionchange）
  */
 
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
 import type { MarkdownParser } from '@dnhyxc-ai/markdown-kit';
-import { memo, type RefObject, useMemo } from 'react';
+import { memo, type RefObject, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import { ChatI18nT } from '@/types/chat';
+import {
+	restoreTextOffsetsInRoot,
+	snapshotTextOffsetsInRoot,
+} from '@/utils/domTextSelection';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
@@ -42,11 +46,16 @@ type StableMarkdownChunkProps = {
 	renderedMarkdownHtmlPostProcess?: (html: string) => string;
 };
 
+/**
+ * 流式正文段：自管 innerHTML。
+ * React 的 dangerouslySetInnerHTML 会在 commit 时先毁掉选区；此处先 snapshot 再写入。
+ */
 function StableMarkdownChunkInner({
 	text,
 	parser,
 	renderedMarkdownHtmlPostProcess,
 }: StableMarkdownChunkProps) {
+	const rootRef = useRef<HTMLDivElement>(null);
 	const html = useMemo(() => {
 		let out = parser.render(text);
 		if (renderedMarkdownHtmlPostProcess) {
@@ -55,7 +64,16 @@ function StableMarkdownChunkInner({
 		return out;
 	}, [text, parser, renderedMarkdownHtmlPostProcess]);
 
-	return <div dangerouslySetInnerHTML={{ __html: html }} />;
+	useLayoutEffect(() => {
+		const root = rootRef.current;
+		if (!root) return;
+		if (root.innerHTML === html) return;
+		const snap = snapshotTextOffsetsInRoot(root);
+		root.innerHTML = html;
+		if (snap) restoreTextOffsetsInRoot(root, snap);
+	}, [html]);
+
+	return <div ref={rootRef} />;
 }
 
 const StableMarkdownChunk = memo(
@@ -169,10 +187,12 @@ function StreamingMarkdownBodyInner({
 				}
 				if (part.type === 'markdown') {
 					if (isStreaming) {
+						// 用下标作稳定 key：内容 hash 会随流式变化导致 remount，选区无法恢复
+						const stableKey = `md-stream-${i}`;
 						return (
 							<StableMarkdownChunk
-								key={part.partKey}
-								partKey={part.partKey}
+								key={stableKey}
+								partKey={stableKey}
 								text={part.text}
 								parser={parser}
 								renderedMarkdownHtmlPostProcess={

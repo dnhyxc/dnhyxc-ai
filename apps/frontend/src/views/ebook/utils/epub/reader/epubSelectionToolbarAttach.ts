@@ -134,6 +134,49 @@ export function clearEpubTextSelection(rend: Rendition): void {
 	prev.focus({ preventScroll: true });
 }
 
+/**
+ * 是否阅读区自身滚动（连续滚容器 / iframe 文档）。
+ * 问书侧栏流式贴底也会触发 document capture scroll，须排除以免清掉 EPUB 选区。
+ */
+function isEpubReaderScrollTarget(
+	rend: Rendition,
+	target: EventTarget | null,
+): boolean {
+	if (target == null) return false;
+	const container = getEpubScrollContainer(rend);
+	if (
+		container &&
+		(target === container ||
+			(target instanceof Node && container.contains(target)))
+	) {
+		return true;
+	}
+	const raw = rend.getContents();
+	const list: EpubIframeContents[] = Array.isArray(raw)
+		? (raw as EpubIframeContents[])
+		: raw
+			? [raw as EpubIframeContents]
+			: [];
+	for (const contents of list) {
+		try {
+			const doc = contents.document;
+			if (
+				target === contents.window ||
+				target === doc ||
+				target === doc.documentElement ||
+				target === doc.body ||
+				target === doc.scrollingElement
+			) {
+				return true;
+			}
+			if (target instanceof Node && doc.contains(target)) return true;
+		} catch {
+			// iframe 已卸载
+		}
+	}
+	return false;
+}
+
 function toIframeViewportOffset(win: Window): { x: number; y: number } {
 	const iframe = win.frameElement as HTMLIFrameElement | null;
 	const iframeRect = iframe?.getBoundingClientRect();
@@ -308,7 +351,9 @@ export function attachEpubSelectionPopBar(
 
 	const shouldSuppressEmit = () => Date.now() < suppressEmitUntil;
 
-	const onScroll = () => {
+	const onScroll = (e: Event) => {
+		// 仅阅读区滚动才关 PopBar / 清选区；问书 ScrollArea 贴底滚动勿误伤 EPUB 选区
+		if (!isEpubReaderScrollTarget(rend, e.target)) return;
 		suppressEmitUntil = Date.now() + 350;
 		if (shouldSuppressDismiss()) return;
 		clearPendingEmit();
