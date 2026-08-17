@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
 import type { Locale } from '@/i18n';
+import { withStandaloneLangSearch } from '@/utils/public-doc-url';
 import type { LegalSection } from './legalDocuments';
 
 type LegalDocPageProps = {
@@ -29,7 +30,8 @@ export function LegalDocPage({
 
 	const onToggleLanguage = useCallback(() => {
 		const base = pathname.replace(/\/$/, '');
-		navigate(`${base}/?lang=${locale === 'en-US' ? 'zh-CN' : 'en-US'}`);
+		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
+		navigate(`${base}/?${withStandaloneLangSearch(next)}`);
 	}, [locale, navigate, pathname]);
 
 	return (

@@ -1,3 +1,8 @@
+import {
+	appendShareThemeQuery,
+	readThemeBootstrapSync,
+	type ThemeName,
+} from '@/hooks/theme';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES } from '@/i18n';
 
@@ -21,10 +26,26 @@ export function withAppLangInSearch(
 }
 
 /**
- * 当前站点下的页面绝对 URL：有 `window` 时拼 `origin + path`，否则仅返回 `path`（SSR）。
- * 传入 `locale` 时经 `withAppLangInSearch` 追加 `?lang=`，与分享页 search 传参一致。
+ * 独立页切换语言：只改 `lang`，保留 `theme` 等现有 search。
  */
-export function getSitePageAbsoluteUrl(path: string, locale?: Locale): string {
+export function withStandaloneLangSearch(nextLocale: Locale): string {
+	const p = new URLSearchParams(
+		typeof window !== 'undefined' ? window.location.search : '',
+	);
+	p.set('lang', nextLocale);
+	return p.toString();
+}
+
+/**
+ * 当前站点下的页面绝对 URL：有 `window` 时拼 `origin + path`，否则仅返回 `path`（SSR）。
+ * 传入 `locale` 时追加 `?lang=`；主题默认取本地 bootstrap（与壳内一致），也可显式传入。
+ * 外链打开的独立页（产品指南 / 插件开发手册等）靠 `?theme=` 对齐桌面端主题。
+ */
+export function getSitePageAbsoluteUrl(
+	path: string,
+	locale?: Locale,
+	themeName?: ThemeName | null,
+): string {
 	const base =
 		typeof window === 'undefined'
 			? path
@@ -33,5 +54,7 @@ export function getSitePageAbsoluteUrl(path: string, locale?: Locale): string {
 						? import.meta.env.VITE_DEV_WEB_DOMAIN
 						: import.meta.env.VITE_PROD_WEB_DOMAIN
 				}${path}`;
-	return locale ? withAppLangInSearch(base, locale) : base;
+	const url = locale ? withAppLangInSearch(base, locale) : base;
+	const theme = themeName === undefined ? readThemeBootstrapSync() : themeName;
+	return theme ? appendShareThemeQuery(url, theme) : url;
 }

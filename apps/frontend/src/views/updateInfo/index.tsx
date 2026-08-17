@@ -3,6 +3,7 @@ import { Languages } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
+import { withStandaloneLangSearch } from '@/utils/public-doc-url';
 import {
 	getUpdateInfoIntro,
 	getUpdateInfoSections,
@@ -20,7 +21,8 @@ const UpdateInfoPage = () => {
 	const intro = useMemo(() => getUpdateInfoIntro(locale), [locale]);
 
 	const onToggleLanguage = useCallback(() => {
-		navigate(`/update-info/?lang=${locale === 'en-US' ? 'zh-CN' : 'en-US'}`);
+		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
+		navigate(`/update-info/?${withStandaloneLangSearch(next)}`);
 	}, [locale, navigate]);
 
 	return (

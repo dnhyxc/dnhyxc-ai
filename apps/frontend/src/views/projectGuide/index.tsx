@@ -3,6 +3,7 @@ import { Languages } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
+import { withStandaloneLangSearch } from '@/utils/public-doc-url';
 import { getProjectGuideSections } from './projectGuideSections';
 
 /**
@@ -16,7 +17,8 @@ const ProjectGuidePage = () => {
 	const sections = useMemo(() => getProjectGuideSections(locale), [locale]);
 
 	const onToggleLanguage = useCallback(() => {
-		navigate(`/project-guide/?lang=${locale === 'en-US' ? 'zh-CN' : 'en-US'}`);
+		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
+		navigate(`/project-guide/?${withStandaloneLangSearch(next)}`);
 	}, [locale, navigate]);
 
 	return (

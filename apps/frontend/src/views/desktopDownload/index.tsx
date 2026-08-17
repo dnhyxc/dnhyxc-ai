@@ -24,6 +24,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
+import { withStandaloneLangSearch } from '@/utils/public-doc-url';
 import { DOWNLOAD_DESKTOP_PATH } from './paths';
 import {
 	getBundledDesktopRelease,
@@ -72,7 +73,8 @@ const DesktopDownloadPage = () => {
 
 	const onToggleLanguage = useCallback(() => {
 		const base = DOWNLOAD_DESKTOP_PATH.replace(/\/$/, '');
-		navigate(`${base}/?lang=${locale === 'en-US' ? 'zh-CN' : 'en-US'}`);
+		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
+		navigate(`${base}/?${withStandaloneLangSearch(next)}`);
 	}, [locale, navigate]);
 
 	const pubFormatted = useMemo(

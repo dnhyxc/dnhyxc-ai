@@ -231,8 +231,8 @@ function readAccentBootstrapSync(): AccentId | null {
 	}
 }
 
-/** 与 index.html 首屏逻辑一致，供 useState 初值与 body class 对齐 */
-function readThemeBootstrapSync(): ThemeName | null {
+/** 与 index.html 首屏逻辑一致，供 useState 初值、外链拼 theme、body class 对齐 */
+export function readThemeBootstrapSync(): ThemeName | null {
 	if (typeof window === 'undefined') {
 		return null;
 	}

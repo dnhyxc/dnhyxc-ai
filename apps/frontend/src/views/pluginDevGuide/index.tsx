@@ -4,6 +4,7 @@ import { Languages, Puzzle } from 'lucide-react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
+import { withStandaloneLangSearch } from '@/utils/public-doc-url';
 import type { PluginGuideCode } from './pluginDevGuideSections';
 import {
 	getPluginGuideIntro,
@@ -53,7 +54,7 @@ const PluginDevGuidePage = memo(function PluginDevGuidePage() {
 	const onToggleLanguage = useCallback(() => {
 		const next = locale === 'en-US' ? 'zh-CN' : 'en-US';
 		setForceCopyKey((k) => k + 1);
-		navigate(`/plugin-dev-guide/?lang=${next}`);
+		navigate(`/plugin-dev-guide/?${withStandaloneLangSearch(next)}`);
 	}, [locale, navigate]);
 
 	return (
