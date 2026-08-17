@@ -1,6 +1,6 @@
 # Influence-point 文档骨架
 
-落盘路径：`docs/Influence-point/<文件名>.md`
+落盘路径：`docs/Influence-point/<简体中文短名>.md`（建议 4～12 字，语义明确；禁止英文 kebab-case 与泛名；与 SKILL §5 一致）
 
 ---
 

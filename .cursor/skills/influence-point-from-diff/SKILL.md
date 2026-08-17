@@ -3,7 +3,7 @@ name: influence-point-from-diff
 description: >-
   基于当前改动（git diff、@ 文件或会话内已落地变更）分析对既有功能需求的影响面，
   产出影响点矩阵、风险与回归清单，写入 docs/Influence-point/。
-  文件名简短语义明确；默认只写文档不改业务源码。
+  文件名用简体中文且简短语义明确；默认只写文档不改业务源码。
   适用于「影响点分析/影响面/Influence-point/改动会不会影响原有功能/回归范围/波及哪些模块」等。
 ---
 
@@ -16,7 +16,7 @@ description: >-
 1. **是否影响原有功能需求** — 逐项对照既有能力，给出 **是 / 否 / 有条件变化** 及理由。
 2. **影响点具体有哪些** — 模块 × 场景矩阵、潜在风险、未改动项、回归清单。
 
-**落盘**：`docs/Influence-point/<文件名>.md`（见 § 文件名规则）。**默认不改业务源码**。
+**落盘**：`docs/Influence-point/<中文文件名>.md`（见 § 文件名规则）。**默认不改业务源码**。
 
 ## 与相近 Skill 的边界
 
@@ -103,16 +103,18 @@ description: >-
 
 **目录**：`docs/Influence-point/`
 
-**文件名规则**（kebab-case，**3～5 个语义段**，总长建议 ≤ 40 字符）：
+**文件名规则**（**简体中文**，**简短**且**语义明确**）：
 
-- 格式：`<域>-<能力/对象>-<动作或主题>.md`
-- **域前缀**：与产品能力一致，如 `epub-`、`chat-`、`cos-`
-- **动作词**：`extraction`（抽取）、`consolidation`（合并）、`relayout`（重排）、`vs-annotations`（层间隔离）等
-- **禁止**：`analysis`、`report`、`doc`、`change`、`update` 等空泛词；禁止日期戳；禁止一句英文句子
+- 格式：`docs/Influence-point/<中文短名>.md`
+- **简短**：建议 **4～12 个汉字**（含必要专有词时仍宜一眼读完）；避免「……影响点分析 / 改动报告 / 最终版」等堆后缀。
+- **语义明确**：读者只看文件名即可判断**域 + 能力/对象**（可用「对象 + 主题」结构，如 `划线听书播放条.md`、`标记层抽取.md`）。
+- **禁止**英文 kebab-case（如 `epub-quote-listen-player-bar.md`）；**禁止**泛名：`分析.md`、`影响.md`、`改动.md`、`报告.md`、`临时.md`；**禁止**日期戳与多主题串名。
+- 确需保留的技术专有词可嵌在中文名中（如 `EPUB听书层隔离.md`）。
+- 历史英文专题可不强制改名；**新建**一律中文。
 
-**好例**：`epub-quote-listen-player-bar.md`、`epub-mark-shared-extraction.md`
+**好例**：`划线听书播放条.md`、`标记共享抽取.md`
 
-**差例**：`change-analysis-2026.md`、`epub-listen-refactor-impact-report.md`
+**差例**：`change-analysis-2026.md`、`听书重构影响点分析报告.md`、`epub-listen-refactor-impact-report.md`
 
 **标题**（H1）：`# <产品能力> — 影响点分析`（可略长于文件名）
 
@@ -128,7 +130,7 @@ description: >-
 - [ ] 每个「是/有条件变化」结论有**调用链或源码证据**（路径或符号名）
 - [ ] §3 矩阵行数 ≥ 改动触达的独立场景数
 - [ ] §6 回归项可手工执行、无实现细节依赖
-- [ ] 文件名通过 §5 规则；README 已登记
+- [ ] 文件名为**简体中文**、简短且语义明确（§5，非英文 kebab-case）；README 已登记
 - [ ] 未修改白名单外源码
 
 ## 输出模板
@@ -139,7 +141,7 @@ description: >-
 
 与 `implementation-doc-from-diff` §7 同标准：可独立命名、独立验收、路径集合几乎不相交的改动 → **各一篇** Influence-point 文；README 各登记一行。
 
-可选：极短 `changelog-YYYY-MM.md` 只列链接，**不得**重复粘贴各篇矩阵。
+可选：极短 `变更索引-YYYY-MM.md` 只列链接，**不得**重复粘贴各篇矩阵。
 
 ## 示例触发语
 

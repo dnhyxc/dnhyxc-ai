@@ -28,7 +28,7 @@
 
 **跨域改动（一轮含多个独立功能）**：
 
-- **每个独立功能各写一篇**专题，分别落在各自功能域（例如 `docs/chat/assistant-share-bar.md` + `docs/ebook/local-path-dedup.md`）。
+- **每个独立功能各写一篇**专题，分别落在各自功能域（例如 `docs/chat/助手分享条.md` + `docs/ebook/本地路径去重.md`）。
 - 文首「延伸阅读」互链；`docs/README.md` 或各域 `README.md` 可增一行索引。
 - **禁止**为「省事」只选一个主域，把其它域的实现细节与代码块全部塞进同一篇 Markdown。
 - **同一功能**的前端 + 后端仍写在**一篇**专题内（按 ### 分模块），**不要**按 `backend/` vs `frontend/` 拆成两篇技术栈文档（且禁止恢复 `docs/backend/`、`docs/frontend/` 目录）。
@@ -51,6 +51,14 @@
 | `auth/`（若与 `app/` 路由守卫拆不开则仍用 `app/`） | `user-authentication-module/` |
 
 新目录名建议 **2～8 个字符**；创建后必须在 `docs/README.md`「功能域目录」表增一行。
+
+---
+
+## 2.1 专题文件名（中文，与目录名分工）
+
+- **目录名**：短英文（上表）。
+- **专题 `.md` 文件名**：**简体中文**、简短、语义明确（细则见 SKILL §4）；示例 `docs/chat/助手分享条.md`。
+- **禁止**用英文 kebab-case 作专题文件名（历史英文专题可不强制改名；**新建**一律中文）。
 
 ---
 
@@ -86,7 +94,7 @@ packages/markdown-kit/              → tools/
 ## 5. 自检（落盘前）
 
 - [ ] 若一轮含多个独立功能，是否已**各写一篇**（未全部堆在同一文件）？
-- [ ] 专题路径是否为 `docs/<功能域>/<简短文件名>.md`？
+- [ ] 专题路径是否为 `docs/<功能域>/<简短中文文件名>.md`（非英文 kebab-case）？
 - [ ] `<功能域>` 是否在 `docs/README.md` 已登记？
 - [ ] 是否误用 `docs/backend/`、`docs/frontend/` 或 `docs/` 根目录堆专题？
 - [ ] 跨域内容是否指定了主文档 + 它处摘要链接（见 `docs-maintenance.md` §2）？

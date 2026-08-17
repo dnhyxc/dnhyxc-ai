@@ -21,9 +21,9 @@
 ## 3. 去重与主从分工
 
 - **一功能一文件**：一轮改动若含多个独立功能实现，**各写各的**专题文；**禁止**把多项实现堆进同一 `*.md`。可选在域 `README.md` 增「本轮变更索引」表（仅链接 + 一句话），索引文**不得**重复各专题的代码块。
-- **同一主题只保留一份「实现细节 + 代码摘录」**：例如 COS 展示代理以 `cos/cos-dev-http-proxy.md` 为主，`app/route-auth.md` §12、`app/tauri-macos-ats-http.md` 只保留摘要 + 链接。完整功能域表见 `docs/README.md`。
+- **同一主题只保留一份「实现细节 + 代码摘录」**：例如 COS 展示代理以某篇中文专题为主文档，相关域其它文只保留摘要 + 链接。完整功能域表见 `docs/README.md`。
 - **用户向 vs 开发者向**：`project-guide.md` / `project-update-info.md` 不写路径；实现路径写在专题文与 `docs/README.md`。
-- **文件名**：简短 kebab-case，与 SKILL §4 一致；勿用 `notes.md`、`update.md`。
+- **文件名**：简体中文、简短且语义明确，与 SKILL §4 一致；勿用英文 kebab-case，勿用 `说明.md`、`更新.md`、`notes.md`。
 
 ## 4. 整理自检清单
 

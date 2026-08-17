@@ -9,7 +9,7 @@
 **Agent 动作**：
 
 1. 调研 `ebook` 进度 API、COS、阅读页 state
-2. 落盘 `docs/ideas/epub-bookmark-cloud-sync.md`
+2. 落盘 `docs/ideas/章节书签云同步.md`
 3. 含：架构图（阅读页 / API / DB / COS）、用户添加书签流程图、保存时序图；**每张图下** 附 **图内方法说明** 表（如 `saveBookmark`、`syncToCloud` 各一句功能）
 4. 更新 `docs/ideas/README.md` 索引
 
@@ -22,7 +22,7 @@
 **Agent 动作**：
 
 1. 调研 `chat/`、`knowledge/` 引用与附件模式
-2. `docs/ideas/chat-knowledge-quote.md`
+2. `docs/ideas/知识库段落引用.md`
 3. §10 决策表：inline 引用 vs 附件卡片
 
 ## 示例 3 — 不应使用本 Skill

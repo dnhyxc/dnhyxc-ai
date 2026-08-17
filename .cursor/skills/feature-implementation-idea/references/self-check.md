@@ -2,7 +2,7 @@
 
 ## 路径与索引
 
-- [ ] 文件落在 `docs/ideas/<kebab-case>.md`，非 `docs/<功能域>/` 正式专题
+- [ ] 文件落在 `docs/ideas/<简短中文文件名>.md`（非英文 kebab-case），非 `docs/<功能域>/` 正式专题
 - [ ] `docs/ideas/README.md` 已登记一行
 - [ ] `docs/README.md` 已含 ideas 入口（若首次创建目录）
 - [ ] 一需求一文件；多需求已拆篇并互链

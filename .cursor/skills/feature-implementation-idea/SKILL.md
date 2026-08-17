@@ -2,7 +2,8 @@
 name: feature-implementation-idea
 description: >-
   根据用户指定的功能需求，通读仓库可复用实现后，在 docs/ideas/ 生成「实现思路」设计文档：
-  含架构图、核心流程图、时序图、模块职责、分阶段落地步骤与验收清单，让读者一眼看懂怎么做。
+  含架构图、核心流程图、时序图、模块职责、分阶段落地步骤与验收清单，让读者一眼看懂怎么做；
+  文件名用简体中文且简短语义明确。
   适用于「写实现思路/功能怎么做/架构设计/需求方案/docs/ideas/implementation idea/设计文档」等，
   且目标为规划态文档（默认不改业务源码）。
 ---
@@ -24,7 +25,7 @@ description: >-
 
 | Skill | 输入 | 输出 | 何时用 |
 |-------|------|------|--------|
-| **本 Skill** | 用户 **功能需求**（规划） | `docs/ideas/<名>.md` | 还没写代码、要先定方案 |
+| **本 Skill** | 用户 **功能需求**（规划） | `docs/ideas/<中文文件名>.md` | 还没写代码、要先定方案 |
 | `implementation-doc-from-diff` | git diff / 已落地改动 | `docs/<功能域>/` | 改完后归档实现说明 |
 | `spec-from-implementation` | 已有模块路径 | `spec/*.md` 等 | 从代码反推验收 SPEC |
 | `ebook-feature-dev-guide` | EPUB 功能名 + 现有实现 | `docs/ebook/developer/` | 电子书 **已实现** 的开发者手册 |
@@ -33,8 +34,11 @@ description: >-
 
 ## 硬约束
 
-1. **落盘路径**
-   - 单篇：`docs/ideas/<文件名>.md`（kebab-case，贴题，如 `epub-offline-cache.md`）。
+1. **落盘路径与文件名**
+   - 单篇：`docs/ideas/<中文文件名>.md`。
+   - **文件名用中文（必做）**：简体中文短语 + `.md`；**简短**（建议 4～12 个汉字）、**语义明确**（一眼看出单项功能，如 `电子书离线缓存.md`、`对话语音输入.md`）。
+   - **禁止**英文 kebab-case（如 `epub-offline-cache.md`）；**禁止**泛名：`说明.md`、`方案.md`、`思路.md`、`临时.md`；**禁止**多主题串名。
+   - 确需保留的技术专有词可嵌在中文名中（如 `EPUB章节书签同步.md`）。
    - 目录不存在则创建 `docs/ideas/README.md` 并更新 [`docs/README.md`](../../../docs/README.md)「文档类型」或功能域表。
    - **一需求一文件**；一次多个独立需求 → 多篇 + 文首互链。
 
@@ -78,7 +82,7 @@ description: >-
 | 范围 | 前端 / 后端 / 全栈；是否含迁移、i18n、会员 |
 | 非目标 | 明确不做什么（YAGNI） |
 | 约束 | 性能、兼容、Ponytail、现有交互互斥 |
-| 文件名 | 默认 kebab-case 自拟，用户可指定 |
+| 文件名 | 默认自拟**简体中文**短名（见硬约束 §1），用户可指定 |
 
 用户已 @ 文件或粘贴 PRD 片段 → 以之为准。
 
@@ -114,7 +118,7 @@ description: >-
 ### 5) 落盘
 
 - 骨架：[`references/doc-outline.md`](references/doc-outline.md)。
-- 路径：`docs/ideas/<文件名>.md`。
+- 路径：`docs/ideas/<中文文件名>.md`（规则见硬约束 §1）。
 - 更新 `docs/ideas/README.md` 索引行。
 - 若与 `docs/<功能域>/` 已有专题相关：文首 **延伸阅读** 互链，避免重复维护实现细节。
 
@@ -139,8 +143,8 @@ description: >-
 
 | 用户说 | 动作 |
 |--------|------|
-| 「电子书离线缓存的实现思路，写 docs/ideas」 | 调研 ebook 阅读/COS → 出三图 + 分阶段步骤 → `docs/ideas/epub-offline-cache.md` |
-| 「聊天里加语音输入怎么做」 | 调研 chat + TTS/上传 → 架构 + 时序 → `docs/ideas/chat-voice-input.md` |
+| 「电子书离线缓存的实现思路，写 docs/ideas」 | 调研 ebook 阅读/COS → 出三图 + 分阶段步骤 → `docs/ideas/电子书离线缓存.md` |
+| 「聊天里加语音输入怎么做」 | 调研 chat + TTS/上传 → 架构 + 时序 → `docs/ideas/对话语音输入.md` |
 
 ## 参考文件
 
