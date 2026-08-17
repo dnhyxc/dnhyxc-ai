@@ -102,9 +102,9 @@ const App = () => {
 	return (
 		// data-mf-host-portal：标记 Host 应用根，供 MF 对 ReactDOM.createPortal 的劫持识别。
 		// 插件 Portal 桥接会把挂到 body/documentElement 的内容重定向进 [data-mf-portal-scope]，
-		// 以便落入 Remote 的 @scope([data-mf-style-realm])；若目标落在本属性子树内则跳过重定向，
-		// 保证 Host 自身 UI（如 <Toaster /> / sonner）仍挂在 Host 侧，不被收进插件样式域，
-		// 避免 Host 弹层样式被 Remote CSS 污染或误隔离。
+		// 以便落入 Remote 的 @scope([data-mf-style-realm])；若目标落在本属性子树内则跳过重定向。
+		// <Toaster /> 自身会 portal 到 body（避开 #root fixed 层叠被 Dialog 挡住），
+		// federation-kit 对 data-sonner-toaster / .toaster 已做 Host 保护，不会被收进插件域。
 		<div className="h-full w-full bg-theme-background" data-mf-host-portal>
 			<Toaster />
 			{/* Layout 外路由（login/about 等）lazy 也需 Suspense */}
