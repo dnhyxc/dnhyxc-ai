@@ -6,7 +6,7 @@
 - [EPUB阅读器设置滚动.md](./EPUB阅读器设置滚动.md) — 连续滚动阅读与 `continuous` manager
 - [EPUB听书播放器栏.md](./EPUB听书播放器栏.md) — 播放条切句 / 倍速
 - [连续滚动听书逐 iframe 节间衔接 — 影响点分析](../impact/EPUB滚动听书章节前进影响.md) — 回归矩阵与风险
-- [连续滚动多 iframe 听书续播 — 实现思路](../ideas/EPUB滚动多iframe听书.md) — 解题套路与 §8 逐点改动清单
+- [连续滚动多 iframe 听书续播 — 实现思路](../ideas/epub/EPUB滚动多iframe听书.md) — 解题套路与 §8 逐点改动清单
 
 ## 1. 背景与目标
 

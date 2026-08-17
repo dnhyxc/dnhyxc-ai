@@ -4,7 +4,7 @@
 
 **增量专题**：当前正要播放的云端/本机 TTS **尚未出声** 时，底部播放条播放钮显示 **Spinner**（`status: 'loading'`）；**预取** 不触发 loading。
 
-**姊妹文档**：[EPUB听书段落朗读.md](./EPUB听书段落朗读.md)、[EPUB听书启动后预取.md](./EPUB听书启动后预取.md)、[EPUB听书播放器栏.md](./EPUB听书播放器栏.md)。
+**姊妹文档**：[EPUB听书段落朗读.md](../ideas/epub/EPUB听书段落朗读.md)、[EPUB听书启动后预取.md](./EPUB听书启动后预取.md)、[EPUB听书播放器栏.md](./EPUB听书播放器栏.md)。
 
 **延伸阅读**：[EPUB听书等待加载.md](./EPUB听书等待加载.md)（**2026-07-17 修复**：连播/多包等待时 loading 被 `onSentence` 盖掉）、[EPUB听书触控栏加载.md](./EPUB听书触控栏加载.md)（loading 期隐藏/锁定 Touch Bar）、[EPUB听书播放修复2026-07.md](./EPUB听书播放修复2026-07.md)。
 

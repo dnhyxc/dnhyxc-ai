@@ -4,7 +4,7 @@
 
 - [EPUB章节听书.md](../ebook/EPUB章节听书.md) — 听书 MVP 总览（改前以 `waitForNextSection` 统一节间推进）
 - [EPUB滚动听书章节前进影响.md](../ebook/EPUB滚动听书章节前进影响.md) — 实现思路与改动前后代码对比
-- [EPUB滚动多iframe听书.md](../ideas/EPUB滚动多iframe听书.md) — 多 iframe 续播解题套路与逐点改动清单
+- [EPUB滚动多iframe听书.md](../ideas/epub/EPUB滚动多iframe听书.md) — 多 iframe 续播解题套路与逐点改动清单
 - [EPUB阅读器设置滚动.md](../ebook/EPUB阅读器设置滚动.md) — 连续滚动阅读与 `continuous` manager
 - [EPUB听书播放器栏.md](../ebook/EPUB听书播放器栏.md) — 播放条切句 / 倍速 / 分句菜单
 - [EPUB引用听书播放器栏影响.md](./EPUB引用听书播放器栏影响.md) — 听当前与听书互斥、播放条共用

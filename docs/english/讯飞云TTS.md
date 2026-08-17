@@ -1,7 +1,7 @@
 # 讯飞在线云端朗读（playbackSource=xfyun）
 
 > **文档角色（主文档）**：有效会员在 **语音设置** 增加第三种朗读来源 **讯飞云端**；Nest 经 `ws` 连讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `speech` 选路。  
-> **规划态思路（架构/时序/分阶段）**：[`docs/ideas/讯飞云TTS.md`](../ideas/讯飞云TTS.md)  
+> **规划态思路（架构/时序/分阶段）**：[`docs/ideas/讯飞云TTS.md`](../ideas/tts/讯飞云TTS.md)  
 > **延伸阅读**：[`TTS播放源.md`](./TTS播放源.md)（选路字段）、[`云端TTS设置.md`](./云端TTS设置.md)（设置页结构）、[`MiniMax云端TTS.md`](./MiniMax云端TTS.md)（MiniMax 路径）、[`TTS端到端指南.md`](./TTS端到端指南.md)（全景）、[`云端TTS用户凭据回退影响.md`](../impact/云端TTS用户凭据回退影响.md)（用户凭证与失败降级影响面）。
 
 若与仓库最新源码不一致，**以源码为准**。

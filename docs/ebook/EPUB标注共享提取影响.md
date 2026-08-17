@@ -4,7 +4,7 @@
 
 - [developer/EPUB标注分层共享.md](./developer/EPUB标注分层共享.md) — 三层 mark 共用符号表（维护时以 shared + geometry 为权威）
 - [../impact/EPUB标注共享提取影响.md](../impact/EPUB标注共享提取影响.md) — 影响点与回归清单
-- [../ideas/EPUB标注分层.md](../ideas/EPUB标注分层.md) — 三层架构规划
+- [../ideas/EPUB标注分层.md](../ideas/epub/EPUB标注分层.md) — 三层架构规划
 
 ---
 

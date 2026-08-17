@@ -1695,7 +1695,7 @@ title={saving ? '保存中…' : editingId ? '更新笔记 ⌘S' : '保存笔记
 | 后端模块注册 | `apps/backend/src/app.module.ts` |
 | 学习笔记后端模块 | `apps/backend/src/services/learning-notes/learning-notes.module.ts` |
 
-延伸阅读：[学习笔记远程.md](./学习笔记远程.md)（MF Remote 接入）、[学习笔记富文本编辑.md](./学习笔记富文本编辑.md)（富文本编辑器）。
+延伸阅读：[学习笔记远程.md](./学习笔记远程.md)（MF Remote 接入）、[学习笔记富文本编辑.md](../ideas/notes/学习笔记富文本编辑.md)（富文本编辑器）。
 
 ---
 

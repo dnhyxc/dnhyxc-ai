@@ -1,6 +1,6 @@
 # 小程序 EPUB 服务端章节解析（BullMQ 异步队列）
 
-**文档角色**：本轮「服务端解析 EPUB → 章节目录 + 正文 HTML API」的**实现归档**（改动前后对比 + 逐行注释）。规划态思路见 [ideas/小程序EPUB解析逻辑.md](../ideas/小程序EPUB解析逻辑.md)；影响面见 [impact/EPUB小程序服务端解析影响.md](../impact/EPUB小程序服务端解析影响.md)。COS 键规则与历史兼容见 [电子书COS对象键解析.md](./电子书COS对象键解析.md)。
+**文档角色**：本轮「服务端解析 EPUB → 章节目录 + 正文 HTML API」的**实现归档**（改动前后对比 + 逐行注释）。规划态思路见 [ideas/小程序EPUB解析逻辑.md](../ideas/miniprogram/小程序EPUB解析逻辑.md)；影响面见 [impact/EPUB小程序服务端解析影响.md](../impact/EPUB小程序服务端解析影响.md)。COS 键规则与历史兼容见 [电子书COS对象键解析.md](./电子书COS对象键解析.md)。
 
 ## 1. 背景与目标
 

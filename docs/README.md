@@ -62,10 +62,10 @@
 | 生产 `/images/` 400                                               | [chat/对话上传生产访问.md](./chat/对话上传生产访问.md) + [ops/Nginx配置.md](./ops/Nginx配置.md)                                                    |
 | 本地上传落盘 / UPLOAD_ROOT                                        | [ops/上传存储路径.md](./ops/上传存储路径.md)                                                                                             |
 | 插件 registry 跨域 / Vite proxy 不生效 / `/remotes` 404             | [ops/远程注册静态.md](./ops/远程注册静态.md)                                                                                       |
-| Remote `mf-manifest.json` CORS（9002 / `tauri://localhost`）        | [ops/远程注册静态.md](./ops/远程注册静态.md) §7 + [ideas/第三方联邦插件接入.md](./ideas/第三方联邦插件接入.md) |
-| 第三方任意域名插件怎么接 / 加插件不发桌面版                         | [ideas/第三方联邦插件接入.md](./ideas/第三方联邦插件接入.md)（§14 接入者 / §15 基座）                                          |
+| Remote `mf-manifest.json` CORS（9002 / `tauri://localhost`）        | [ops/远程注册静态.md](./ops/远程注册静态.md) §7 + [ideas/第三方联邦插件接入.md](./ideas/plugins/第三方联邦插件接入.md) |
+| 第三方任意域名插件怎么接 / 加插件不发桌面版                         | [ideas/第三方联邦插件接入.md](./ideas/plugins/第三方联邦插件接入.md)（§14 接入者 / §15 基座）                                          |
 | 桌面插件 RUNTIME-003 / Origin tauri://localhost                     | 对方 CORS 漏配；见上 + [apps/remote-plugins/README.md](./plugins/插件开发指南.md)                                                   |
-| 插件样式污染主站 / 子应用 Button 无样式                             | [style/样式隔离实现.md](./style/样式隔离实现.md)（实现手册）、[style/样式隔离模块化.md](./style/样式隔离模块化.md)（模块化与 PluginHostPage 接入）、[ideas/模块联邦CSS隔离.md](./ideas/模块联邦CSS隔离.md)（思路）                                                                                                 |
+| 插件样式污染主站 / 子应用 Button 无样式                             | [style/样式隔离实现.md](./style/样式隔离实现.md)（实现手册）、[style/样式隔离模块化.md](./style/样式隔离模块化.md)（模块化与 PluginHostPage 接入）、[ideas/模块联邦CSS隔离.md](./ideas/plugins/模块联邦CSS隔离.md)（思路）                                                                                                 |
 | 同一 Remote 多插件切换后样式丢失 / Drawer Portal 组件无样式 / sonner Toaster 顶开布局 | [style/样式隔离领域门户.md](./style/样式隔离领域门户.md)（Realm 键 + createPortal 收编 + sonner 保护 + HMR 重包） |
 | Vue Teleport / CSS-in-JS 样式泄漏 / `@font-face` 失效 / keyframes 撞名 | [style/样式隔离乾坤加固.md](./style/样式隔离乾坤加固.md)（transpile / CSSOM / body Portal / captureStack） |
 | 样式隔离源码是怎么分 `protocol / css / sandbox / portal` 四层的 / Host 主题 token 剥离 | [style/样式隔离分层重构.md](./style/样式隔离分层重构.md)（巨石拆分 + `themeStrip` 新增职责 + barrel / smoke 迁位） |
@@ -99,8 +99,8 @@
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [plugins/插件影院全屏.md](./plugins/插件影院全屏.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
 | macOS 绿钮/菜单退出全屏时侧栏晚一步消失 / 缩窗动画与影院态不同步     | [tauri/Tauri全屏同步.md](./tauri/Tauri全屏同步.md)（`fullscreen_watch.rs` + `NSWindowWillExitFullScreenNotification` + `host://will-exit-fullscreen` + `flushSync` + `ignoreNativeUntil` 防抖） |
 | 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/Tauri WebView右键菜单禁用.md](./tauri/Tauri WebView右键菜单禁用.md)                                                                  |
-| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [tauri/Tauri窗口缩放揭示.md](./tauri/Tauri窗口缩放揭示.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/Tauri窗口缩放揭示.md](./ideas/Tauri窗口缩放揭示.md)（规划思路） |
-| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [tauri/Tauri系统菜单快捷键.md](./tauri/Tauri系统菜单快捷键.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/Tauri系统菜单快捷键.md](./ideas/Tauri系统菜单快捷键.md)（规划思路） |
+| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [tauri/Tauri窗口缩放揭示.md](./tauri/Tauri窗口缩放揭示.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/Tauri窗口缩放揭示.md](./ideas/tauri/Tauri窗口缩放揭示.md)（规划思路） |
+| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [tauri/Tauri系统菜单快捷键.md](./tauri/Tauri系统菜单快捷键.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/Tauri系统菜单快捷键.md](./ideas/tauri/Tauri系统菜单快捷键.md)（规划思路） |
 | 关于子窗加载慢 / 关于窗口主题与主窗不一致                          | [tauri/关于窗口轻量化.md](./tauri/关于窗口轻量化.md)（main.tsx 按 pathname 分流 + about.tsx 极简入口 + readWindowChromeThemeSync 同步读主题） |
 | 菜单/侧边栏登出不一致 / 多窗口主题不同步 / 401 后状态残留          | [auth/登出统一主题同步.md](./auth/登出统一主题同步.md)（performLogout 集中清态 + 动态 import 规避循环依赖 + setThemeToAllWindows 广播） |
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/电子书插件想法列表.md](./ebook/电子书插件想法列表.md)                                                                                    |
@@ -110,11 +110,11 @@
 | 学习笔记富文本编辑器（Tiptap 升级 / HTML 存储）                     | [english/学习笔记富文本编辑.md](./english/学习笔记富文本编辑.md)                                                                          |
 | 学习笔记未保存橙点 / 保存图标脏标记                                 | [english/学习笔记脏保存.md](./english/学习笔记脏保存.md)                                                                            |
 | 学习笔记导出 Word / 长文性能优化（TitleNode / opt-in 扩展 / 乐观预览） | [english/学习笔记导出性能.md](./english/学习笔记导出性能.md)                                                                          |
-| 学习笔记编辑/预览卡顿（长文窗口化 / 列表隔离）                       | [ideas/学习笔记编辑器预览卡顿.md](./ideas/学习笔记编辑器预览卡顿.md)                                                              |
-| 学习笔记 DOCX 插图导出 + 长文编辑打磨（sharp / 落点 / 空段）         | [ideas/学习笔记导出与编辑打磨.md](./ideas/学习笔记导出与编辑打磨.md)                                                    |
+| 学习笔记编辑/预览卡顿（长文窗口化 / 列表隔离）                       | [ideas/学习笔记编辑器预览卡顿.md](./ideas/notes/学习笔记编辑器预览卡顿.md)                                                              |
+| 学习笔记 DOCX 插图导出 + 长文编辑打磨（sharp / 落点 / 空段）         | [ideas/学习笔记导出与编辑打磨.md](./ideas/notes/学习笔记导出与编辑打磨.md)                                                    |
 | 学习笔记 Cmd+↑ 跳到文末 / 缺少首尾导航快捷键                        | [english/富文本编辑器边缘导航.md](./english/富文本编辑器边缘导航.md)                                                                              |
 | 学习笔记保存失败后光标不在标题 / 标题为空保存无引导                 | [english/学习笔记保存聚焦标题.md](./english/学习笔记保存聚焦标题.md)                                                                |
-| Tauri 桌面端 TipTap 复制粘贴失效                                    | [english/Tauri剪贴板富文本.md](./english/Tauri剪贴板富文本.md)（早期纯文本版）· [ideas/Tauri剪贴板富文本粘贴.md](./ideas/Tauri剪贴板富文本粘贴.md)（完整图文方案：HTML/截图/多图）· [english/Tauri剪贴板图片文件.md](./english/Tauri剪贴板图片文件.md)（位图/文件列表多图读取专题） |
+| Tauri 桌面端 TipTap 复制粘贴失效                                    | [english/Tauri剪贴板富文本.md](./english/Tauri剪贴板富文本.md)（早期纯文本版）· [ideas/Tauri剪贴板富文本粘贴.md](./ideas/tauri/Tauri剪贴板富文本粘贴.md)（完整图文方案：HTML/截图/多图）· [english/Tauri剪贴板图片文件.md](./english/Tauri剪贴板图片文件.md)（位图/文件列表多图读取专题） |
 | 学习笔记列表分页 / 滚动加载更多                                     | [english/学习笔记MobX存储.md](./english/学习笔记MobX存储.md)                                                                            |
 | 学习笔记列表看不到他人公开笔记 / 想切换公开状态 / 列表网格徽章与刷新按钮 | [english/学习笔记公开列表.md](./english/学习笔记公开列表.md)                                                                        |
 | `createLlm` / 400                                                 | [llm/创建LLM.md](./llm/创建LLM.md)                                                                                                                 |
@@ -129,7 +129,7 @@
 | 云端保存知识库报「请求体过大」/ PayloadTooLarge                   | [knowledge/知识保存正文限制.md](./knowledge/知识保存正文限制.md)                                                                       |
 | 知识库长文编辑卡顿（标题/正文/助手输入）                          | [knowledge/知识编辑器长文本性能.md](./knowledge/知识编辑器长文本性能.md)                                                             |
 | 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/知识预览助手性能.md](./knowledge/知识预览助手性能.md) · [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) |
-| 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) · [ideas/知识库滚动卡顿修复.md](./ideas/知识库滚动卡顿修复.md) |
+| 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) · [ideas/知识库滚动卡顿修复.md](./ideas/knowledge/知识库滚动卡顿修复.md) |
 | 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/知识预览代码工具条滚动.md](./knowledge/知识预览代码工具条滚动.md) · [impact/知识预览代码工具条滚动.md](./impact/知识预览代码工具条滚动.md) |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/对话内存溢出.md](./chat/对话内存溢出.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/流式代码块滚动.md](./chat/流式代码块滚动.md)                                                                             |
@@ -153,7 +153,7 @@
 | 换号后仍看到上一账号的草稿或助手对话                              | [auth/用户切换状态重置.md](./auth/用户切换状态重置.md)                                                                                       |
 | 登录成功瞬间又回到登录页 / cloud-tts 401                          | [auth/登录云端TTS预取401.md](./auth/登录云端TTS预取401.md)                                                                             |
 | Tauri 桌面频繁 Toast「网络异常，请检查网络后重试」                | [tauri/Tauri HTTP全方法重试.md](./tauri/Tauri HTTP全方法重试.md)                                                                              |
-| 小程序 EPUB 章节 409 / Processor 无日志 / **已解析换章仍 ~1s** | [ebook/小程序EPUB服务端解析.md](./ebook/小程序EPUB服务端解析.md) §3.1、§4.7、[ideas/小程序EPUB解析逻辑.md](./ideas/小程序EPUB解析逻辑.md) |
+| 小程序 EPUB 章节 409 / Processor 无日志 / **已解析换章仍 ~1s** | [ebook/小程序EPUB服务端解析.md](./ebook/小程序EPUB服务端解析.md) §3.1、§4.7、[ideas/小程序EPUB解析逻辑.md](./ideas/miniprogram/小程序EPUB解析逻辑.md) |
 | 强制刷新后 EPUB/PDF 续读位置丢失 / 听书时 progress 请求过频          | [ebook/电子书进度远程防抖影响.md](./ebook/电子书进度远程防抖影响.md)                                                                     |
 | 阅读页顶栏显示「智能对话」而非书架                                | [ebook/电子书阅读书架.md](./ebook/电子书阅读书架.md) §3.4、[auth/路由认证.md](./auth/路由认证.md)                                              |
 | PDF 目录跳转报 canvas 并发渲染错误                                | [ebook/书架阅读打磨.md](./ebook/书架阅读打磨.md) §3.6                                                                                      |
@@ -195,7 +195,7 @@
 | EPUB 边听边读 / 顶栏听书 / 播放条 / 分句跳转 / 倍速                 | [ebook/EPUB章节听书.md](./ebook/EPUB章节听书.md) · [ebook/EPUB听书播放器栏.md](./ebook/EPUB听书播放器栏.md) · [ebook/EPUB滚动听书章节前进影响.md](./ebook/EPUB滚动听书章节前进影响.md) |
 | EPUB 听读分句段首省略号/破折号/开引号错位或空句                     | [ebook/EPUB听书句首标点影响.md](./ebook/EPUB听书句首标点影响.md) · [impact/EPUB听书句首标点影响.md](./impact/EPUB听书句首标点影响.md) |
 | EPUB 听书/听当前云端连播句间停顿过长                               | [ebook/EPUB听书云端预取影响.md](./ebook/EPUB听书云端预取影响.md) · [impact/EPUB听书云端预取影响.md](./impact/EPUB听书云端预取影响.md) |
-| EPUB 听书/听当前按段合成仍逐句高亮 / 首句慢                       | [ebook/EPUB听书段落朗读.md](./ebook/EPUB听书段落朗读.md) · [ideas/EPUB听书段落朗读.md](./ideas/EPUB听书段落朗读.md) |
+| EPUB 听书/听当前按段合成仍逐句高亮 / 首句慢                       | [ebook/EPUB听书段落朗读.md](./ebook/EPUB听书段落朗读.md) · [ideas/EPUB听书段落朗读.md](./ideas/epub/EPUB听书段落朗读.md) |
 | EPUB 听书中点目录切章不自动续听 / go trim 抛错                     | [ebook/EPUB听书目录章节重启.md](./ebook/EPUB听书目录章节重启.md)                                                               |
 | 听书目录切章起播落在上一节末句或文件第 0 句                        | [ebook/EPUB听书目录锚点启动.md](./ebook/EPUB听书目录锚点启动.md)                                                                     |
 | EPUB 听书首句出声慢 / 首包与预取抢带宽                             | [ebook/EPUB听书启动后预取.md](./ebook/EPUB听书启动后预取.md)                                                                 |
@@ -204,7 +204,7 @@
 | EPUB 听书倍速落库 /「设置为本书籍」仍影响其它书                     | [ebook/EPUB听书速率持久化.md](./ebook/EPUB听书速率持久化.md)                                                                               |
 | EPUB 听书 loading 时倍速 pop 被关掉 / 右侧按钮灰掉                 | [ebook/EPUB听书栏加载控件.md](./ebook/EPUB听书栏加载控件.md)                                                               |
 | EPUB 听书云端已停但播放条仍「播放中」                              | [ebook/EPUB听书音频结束UI.md](./ebook/EPUB听书音频结束UI.md)                                                                               |
-| EPUB 听书播放本轮修复总览（含切章 / 软暂停 / loading / 选中色）    | [ebook/EPUB听书播放修复2026-07.md](./ebook/EPUB听书播放修复2026-07.md) · [ideas/EPUB听书播放优化.md](./ideas/EPUB听书播放优化.md) |
+| EPUB 听书播放本轮修复总览（含切章 / 软暂停 / loading / 选中色）    | [ebook/EPUB听书播放修复2026-07.md](./ebook/EPUB听书播放修复2026-07.md) · [ideas/EPUB听书播放优化.md](./ideas/epub/EPUB听书播放优化.md) |
 | EPUB 听书连播时播放钮 loading 只在首启出现                          | [ebook/EPUB听书等待加载.md](./ebook/EPUB听书等待加载.md) · [ebook/EPUB听书播放加载.md](./ebook/EPUB听书播放加载.md) |
 | 书架已读进度出现很长小数                                          | [ebook/电子书书架进度百分比.md](./ebook/电子书书架进度百分比.md)                                                                               |
 | EPUB 听书底栏切章 / 暂停续播与系统媒体同步                        | [ebook/EPUB听书栏章节导航.md](./ebook/EPUB听书栏章节导航.md) · [ebook/EPUB听书栏播放头目录.md](./ebook/EPUB听书栏播放头目录.md) · [ebook/EPUB听书软暂停.md](./ebook/EPUB听书软暂停.md) |

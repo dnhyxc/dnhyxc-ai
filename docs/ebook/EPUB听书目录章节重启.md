@@ -2,7 +2,7 @@
 
 > **文档角色**：听书播放中点击 **书籍目录** 切章时自动续听并保留倍速；修复 `go()` / `trimContinuousViews` 同步抛错导致听书不重开。  
 > **起播句更新（2026-07-16）**：同 HTML 多目录锚点时，不再固定文件「第 0 句」，改为按目标 CFI `mode: 'after'` 起播——见 [EPUB听书目录锚点启动.md](./EPUB听书目录锚点启动.md)。本文仍描述 **重开链路与 trim 容错**。  
-> **延伸阅读**：[EPUB听书目录锚点启动.md](./EPUB听书目录锚点启动.md)（锚点起播）、[EPUB目录CFI导航.md](./EPUB目录CFI导航.md)（目录 CFI 跳转）、[EPUB章节听书.md](./EPUB章节听书.md)（听书 MVP）、[EPUB听书栏章节导航.md](./EPUB听书栏章节导航.md)（底栏切章）、[../ideas/EPUB目录章节顶部对齐.md](../ideas/EPUB目录章节顶部对齐.md)（章首对齐规划）。
+> **延伸阅读**：[EPUB听书目录锚点启动.md](./EPUB听书目录锚点启动.md)（锚点起播）、[EPUB目录CFI导航.md](./EPUB目录CFI导航.md)（目录 CFI 跳转）、[EPUB章节听书.md](./EPUB章节听书.md)（听书 MVP）、[EPUB听书栏章节导航.md](./EPUB听书栏章节导航.md)（底栏切章）、[../ideas/EPUB目录章节顶部对齐.md](../ideas/epub/EPUB目录章节顶部对齐.md)（章首对齐规划）。
 
 ## 1. 背景与目标
 

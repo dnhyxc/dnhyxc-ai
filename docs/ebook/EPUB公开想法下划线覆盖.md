@@ -6,7 +6,7 @@
 
 ## 延伸阅读
 
-- [ideas/EPUB公开想法下划线修复.md](../ideas/EPUB公开想法下划线修复.md) — 规划态排查时间线与架构图
+- [ideas/EPUB公开想法下划线修复.md](../ideas/epub/EPUB公开想法下划线修复.md) — 规划态排查时间线与架构图
 - [EPUB想法部分重叠.md](./EPUB想法部分重叠.md) — 私有书单用户部分重叠去重（旧 `thoughtBlockers` 链）
 - [EPUB想法用户划线重叠.md](./EPUB想法用户划线重叠.md) — 想法虚线与用户划线叠加
 - [developer/EPUB标注分层共享.md](./developer/EPUB标注分层共享.md) — sync 编排总览

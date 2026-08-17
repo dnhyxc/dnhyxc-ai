@@ -9,7 +9,7 @@
 - [EPUB 听书播放条：分句菜单与倍速增强](EPUB听书播放器栏.md) — 分句跳转、倍速 3×、TTS `playbackRate`
 - [连续滚动听书逐 iframe 节间衔接 — 影响点分析](../impact/EPUB滚动听书章节前进影响.md) — `runScrollSectionLoop` / 分页分叉回归范围
 - [连续滚动听书逐 iframe 节间衔接](./EPUB滚动听书章节前进影响.md) — 实现思路与改动前后代码对比
-- [连续滚动多 iframe 听书续播 — 实现思路](../ideas/EPUB滚动多iframe听书.md) — 问题根因、逐点改动、类似场景通用套路
+- [连续滚动多 iframe 听书续播 — 实现思路](../ideas/epub/EPUB滚动多iframe听书.md) — 问题根因、逐点改动、类似场景通用套路
 
 ## 1. 背景与目标
 

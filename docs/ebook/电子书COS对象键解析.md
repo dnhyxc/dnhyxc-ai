@@ -2,7 +2,7 @@
 
 > **文档角色**：说明 `UploadService` 中 `objectExists`、`resolveCosObjectKey`、`uploadEbookAssetBuffer` 及 `buildCosObjectKey(ebooks)` 为何增加、如何工作、影响哪些链路。  
 > **源码**：`apps/backend/src/services/upload/upload.service.ts`（约 L49–L239）  
-> **延伸阅读**：[电子书COS流式IO.md](./电子书COS流式IO.md)、[电子书会员上传.md](./电子书会员上传.md)、[../ideas/小程序EPUB解析逻辑.md](../ideas/小程序EPUB解析逻辑.md)、[../impact/EPUB小程序服务端解析影响.md](../impact/EPUB小程序服务端解析影响.md)
+> **延伸阅读**：[电子书COS流式IO.md](./电子书COS流式IO.md)、[电子书会员上传.md](./电子书会员上传.md)、[../ideas/小程序EPUB解析逻辑.md](../ideas/miniprogram/小程序EPUB解析逻辑.md)、[../impact/EPUB小程序服务端解析影响.md](../impact/EPUB小程序服务端解析影响.md)
 
 若与仓库最新源码不一致，**以源码为准**。
 

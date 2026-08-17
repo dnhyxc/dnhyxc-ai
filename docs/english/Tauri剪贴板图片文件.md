@@ -2,7 +2,7 @@
 
 > 延伸阅读：
 > - [docs/english/Tauri剪贴板富文本.md](./Tauri剪贴板富文本.md) —— 早期「纯文本 / HTML flavor」剪贴板接管方案（基线）。
-> - [docs/ideas/Tauri剪贴板富文本粘贴.md](../ideas/Tauri剪贴板富文本粘贴.md) —— 完整图文混合粘贴方案思路与四级降级设计。
+> - [docs/ideas/Tauri剪贴板富文本粘贴.md](../ideas/tauri/Tauri剪贴板富文本粘贴.md) —— 完整图文混合粘贴方案思路与四级降级设计。
 
 ## 1. 背景与目标
 

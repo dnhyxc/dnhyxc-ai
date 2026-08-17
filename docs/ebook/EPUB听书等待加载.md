@@ -1,7 +1,7 @@
 # 听书等待播放时持续 loading
 
 > **文档角色**：增量修复——底部播放钮 **只要在等当前要播的音频** 就保持 Spinner，不再仅首次起播可见。  
-> **姊妹文档**：[EPUB听书播放加载.md](./EPUB听书播放加载.md)（首版 `onAwaitingCurrentTts`）、[EPUB听书段落朗读.md](./EPUB听书段落朗读.md)、[EPUB听书启动后预取.md](./EPUB听书启动后预取.md)。  
+> **姊妹文档**：[EPUB听书播放加载.md](./EPUB听书播放加载.md)（首版 `onAwaitingCurrentTts`）、[EPUB听书段落朗读.md](../ideas/epub/EPUB听书段落朗读.md)、[EPUB听书启动后预取.md](./EPUB听书启动后预取.md)。  
 > **延伸阅读**：[EPUB听书触控栏加载.md](./EPUB听书触控栏加载.md)（loading 期隐藏/锁定 Touch Bar）、[EPUB听书播放修复2026-07.md](./EPUB听书播放修复2026-07.md)。
 
 ## 1. 背景与目标

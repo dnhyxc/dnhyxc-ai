@@ -10,4 +10,4 @@
 | [EPUB想法添加下划线开发.md](./EPUB想法添加下划线开发.md) | 读书想法：添加 + 琥珀虚线 + 侧栏 + 点击聚合 |
 | [EPUB用户划线开发.md](./EPUB用户划线开发.md) | 用户彩色划线：高亮 / 下划线 / 波浪线 + 重叠合并 + PopBar |
 
-**交叉阅读**：想法与用户划线在 `syncEpubReadingAnnotations` 中共存；**三层共用几何与流程图**见 [EPUB标注分层共享.md](./EPUB标注分层共享.md)。EPUB 听读播放背景对用户/想法的影响见 [impact/EPUB听书背景与注释影响.md](../../impact/EPUB听书背景与注释影响.md)。听读 utils **7→3 合并**见 [impact/EPUB听书工具整合影响.md](../../impact/EPUB听书工具整合影响.md)。**连续滚动多 iframe 听书**见 [EPUB听书开发.md §4](./EPUB听书开发.md#44-播放循环分页-vs-连续滚动) 与 [ideas/EPUB滚动多iframe听书.md](../../ideas/EPUB滚动多iframe听书.md)。
+**交叉阅读**：想法与用户划线在 `syncEpubReadingAnnotations` 中共存；**三层共用几何与流程图**见 [EPUB标注分层共享.md](./EPUB标注分层共享.md)。EPUB 听读播放背景对用户/想法的影响见 [impact/EPUB听书背景与注释影响.md](../../impact/EPUB听书背景与注释影响.md)。听读 utils **7→3 合并**见 [impact/EPUB听书工具整合影响.md](../../impact/EPUB听书工具整合影响.md)。**连续滚动多 iframe 听书**见 [EPUB听书开发.md §4](./EPUB听书开发.md#44-播放循环分页-vs-连续滚动) 与 [ideas/EPUB滚动多iframe听书.md](../../ideas/epub/EPUB滚动多iframe听书.md)。

@@ -4,7 +4,7 @@
 
 - [EPUB听书背景与注释影响.md](./EPUB听书背景与注释影响.md) — 三层 mark（用户 / 想法 / 听书）职责隔离
 - [EPUB标注分层共享.md](../ebook/developer/EPUB标注分层共享.md) — 共用符号与 patch 热路径（若已存在）
-- [../ideas/EPUB标注分层.md](../ideas/EPUB标注分层.md) — 三层架构总览
+- [../ideas/EPUB标注分层.md](../ideas/epub/EPUB标注分层.md) — 三层架构总览
 
 ## 1. 分析目的
 

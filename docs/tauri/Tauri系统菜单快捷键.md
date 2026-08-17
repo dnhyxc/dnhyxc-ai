@@ -1,6 +1,6 @@
 # 系统菜单 + 全局/页面快捷键体系（store 单一真相源）
 
-> 归档态实现说明。规划态思路见 [../ideas/Tauri系统菜单快捷键.md](../ideas/Tauri系统菜单快捷键.md)；窗口「缩放」分支动画见 [./Tauri窗口缩放揭示.md](../tauri/Tauri窗口缩放揭示.md)。
+> 归档态实现说明。规划态思路见 [../ideas/Tauri系统菜单快捷键.md](../ideas/tauri/Tauri系统菜单快捷键.md)；窗口「缩放」分支动画见 [./Tauri窗口缩放揭示.md](../tauri/Tauri窗口缩放揭示.md)。
 
 ## 1. 背景与目标
 

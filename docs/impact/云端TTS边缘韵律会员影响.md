@@ -9,7 +9,7 @@
 - [EPUB听书云端预取影响.md](./EPUB听书云端预取影响.md) — 句间云端预取（仍走 `shouldUseCloudTts`）
 - [云端TTS设置.md](../english/云端TTS设置.md) — 设置页结构（**滞后**：仍写「三选一 / 会员才云端」）
 - [TTS播放源.md](../english/TTS播放源.md) — 朗读介质 Switch（**滞后**：未含 `edge`）
-- [讯飞云TTS.md](../ideas/讯飞云TTS.md) — 讯飞选路设计稿（**滞后**：`playbackSource` 仍为三值）
+- [讯飞云TTS.md](../ideas/tts/讯飞云TTS.md) — 讯飞选路设计稿（**滞后**：`playbackSource` 仍为三值）
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
 

@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [docs/ideas/EPUB听书段落朗读.md](../ideas/EPUB听书段落朗读.md) — 规划稿：问题、方案总览、M1–M4 阶段与风险
+- [docs/ideas/EPUB听书段落朗读.md](../ideas/epub/EPUB听书段落朗读.md) — 规划稿：问题、方案总览、M1–M4 阶段与风险
 - [EPUB听书云端预取影响.md](./EPUB听书云端预取影响.md) — 句间/段间云端预取基线（`prefetchCloudTts`）
 - [developer/EPUB听书开发.md](./developer/EPUB听书开发.md) — 听当前 + 听书开发者总手册
 

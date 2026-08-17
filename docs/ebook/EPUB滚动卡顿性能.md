@@ -7,7 +7,7 @@
 
 - [EPUB注释同步性能.md](./EPUB注释同步性能.md) — patch 读 rect 快路径、sync 作用域缓存、想法 DOM restack（本轮 **叠加** 在其上）
 - [EPUB公开想法下划线覆盖.md](./EPUB公开想法下划线覆盖.md) — 公开书叠层 rank + CFI 投影扣减（投影缓存服务于该 patch）
-- [ideas/EPUB滚动卡顿性能.md](../ideas/EPUB滚动卡顿性能.md) — 规划态架构图与调试手册
+- [ideas/EPUB滚动卡顿性能.md](../ideas/epub/EPUB滚动卡顿性能.md) — 规划态架构图与调试手册
 
 ---
 

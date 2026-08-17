@@ -1,6 +1,6 @@
 # macOS 窗口缩放零露白（目标尺寸预布局 + 揭开动画）
 
-> 归档态实现说明。规划态思路见 [../ideas/Tauri窗口缩放揭示.md](../ideas/Tauri窗口缩放揭示.md)。
+> 归档态实现说明。规划态思路见 [../ideas/Tauri窗口缩放揭示.md](../ideas/tauri/Tauri窗口缩放揭示.md)。
 
 ## 1. 背景与目标
 

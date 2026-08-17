@@ -8,7 +8,7 @@
 |------|------|
 | [学习笔记远程.md](./学习笔记远程.md) | **学习笔记 MF Remote**：`/english-learning/notes`、`remotePlugins/LearningNotes`（:9008）、`injectRoute: false` |
 | [学习笔记脏保存.md](./学习笔记脏保存.md) | **学习笔记未保存橙点**：编辑有 diff 时保存图标显示脏标记 |
-| [学习笔记富文本编辑.md](./学习笔记富文本编辑.md) | **学习笔记富文本编辑器**：升级 Tiptap 至 3.28.0、支持格式化文本、高亮、列表等功能 |
+| [学习笔记富文本编辑.md](../ideas/notes/学习笔记富文本编辑.md) | **学习笔记富文本编辑器**：升级 Tiptap 至 3.28.0、支持格式化文本、高亮、列表等功能 |
 | [学习笔记导出性能.md](./学习笔记导出性能.md) | **学习笔记导出 Word 与长文性能优化**：DOCX 导出全链路（后端→HostBridge→插件）、TitleNode 选区修复、RichEditor opt-in 扩展、openPreview 乐观预览、Toolbar ResizeObserver deps 修复 |
 | [学习笔记DOCX构建.md](./学习笔记DOCX构建.md) | **DOCX Builder 端到端实现手册**：后端 `learning-note-docx.builder.ts` 全 28 个符号（HTML→DOCX 转换、sharp 懒加载转 JPEG、foreign/webp 兼容、本机 uploads 读盘、ImageBudget 图片预算、表格/列表/代码块转换、`buildLearningNoteDocxBuffer` 主入口） |
 | [学习笔记大编辑器.md](./学习笔记大编辑器.md) | **长文笔记编辑器（LargeNoteEditor）**：切块窗口化挂载、`LargeNoteDoc` 模型、`flushWindow` 写回、`originForScroll` 滞回换窗、入场贴底、`NotesListPanel` 列表隔离 |
@@ -20,12 +20,12 @@
 | [富文本编辑器性能调优.md](./富文本编辑器性能调优.md) | **RichEditor 性能优化**：JSON 懒序列化、回调 ref 化、CharacterCount 按需挂载、toolbarExtra useMemo |
 | [富文本编辑器边缘导航.md](./富文本编辑器边缘导航.md) | **Cmd/Ctrl+↑↓ 文档首尾导航**：新增 `DocEdgeNav` 扩展与 `scrollEditorViewport` 辅助函数、`TitleNode.appendTransaction` 选区纠正从 `Selection.atEnd` 改为 `TextSelection.near`（含改动前/后对比与逐行注释） |
 | [Tauri剪贴板富文本.md](./Tauri剪贴板富文本.md) | **Tauri 剪贴板支持 TipTap**：桌面端 WebView 系统级 Cmd/Ctrl+C/V/X 快捷键接管 TipTap 富文本正文 |
-| [Tauri剪贴板图片文件.md](./Tauri剪贴板图片文件.md) | **Tauri 剪贴板图片与文件列表读取**：Rust `arboard` 位图→PNG→base64、文件列表逐个读图→data URL、`clipboard.ts` 四 flavor 并行读取与降级插入、`getTipTapEditor`/`insertHtmlViaEditor`/`insertClipSegments` 全链路（含改动前/后对比与逐行注释）；与 [../ideas/Tauri剪贴板富文本粘贴.md](../ideas/Tauri剪贴板富文本粘贴.md) 互为专题/总文档 |
+| [Tauri剪贴板图片文件.md](./Tauri剪贴板图片文件.md) | **Tauri 剪贴板图片与文件列表读取**：Rust `arboard` 位图→PNG→base64、文件列表逐个读图→data URL、`clipboard.ts` 四 flavor 并行读取与降级插入、`getTipTapEditor`/`insertHtmlViaEditor`/`insertClipSegments` 全链路（含改动前/后对比与逐行注释）；与 [../ideas/Tauri剪贴板富文本粘贴.md](../ideas/tauri/Tauri剪贴板富文本粘贴.md) 互为专题/总文档 |
 | [学习笔记CRUD.md](./学习笔记CRUD.md) | **学习笔记 CRUD 与 API 集成**：列表左/编辑器右布局重构、`createNotesApi` 工厂、`Confirm` 删除确认、HostBridge 扩展 `put/delete` 全链路 |
 | [学习笔记公开列表.md](./学习笔记公开列表.md) | **学习笔记公开可见与列表卡片重构**：`isPublic` 字段与索引、`PUT /visibility/:id`、`authorMap`/`toListItem`、列表网格与公开徽章、刷新状态机、富文本 hover 描边动画（含改动前/后对比与逐行注释） |
 | [学习笔记保存聚焦标题.md](./学习笔记保存聚焦标题.md) | **保存时标题为空自动聚焦标题**：`focusTitle` 回调滚动到顶并聚焦标题输入框、`onSave` 两路径提取 title 变量、保存失败+dirty+空标题时 `focusTitle()`（含改动前/后对比与逐行注释） |
 | [学习笔记MobX存储.md](./学习笔记MobX存储.md) | **学习笔记 MobX 状态管理与分页**：useState 重构为 MobX store、列表分页加载、滚动到底部加载更多 |
-| [../ideas/第三方联邦插件接入.md](../ideas/第三方联邦插件接入.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |
+| [../ideas/第三方联邦插件接入.md](../ideas/plugins/第三方联邦插件接入.md) | **第三方/自建 Remote 接入契约**（registry + 对方 CORS，不改 capabilities） |
 | [英语学习实现概述.md](./英语学习实现概述.md) | 产品能力总览 |
 | [英语学习后端实现.md](./英语学习后端实现.md) | 后端模块总览 |
 | [英语学习主Agent联网搜索转LLM.md](./英语学习主Agent联网搜索转LLM.md) | 主 Agent 与联网 |
@@ -101,7 +101,7 @@
 | [云端TTS边缘语音.md](./云端TTS边缘语音.md) | **Edge 云端朗读**、分模式 prosody、非会员本机+Edge 选路（前后端实现） |
 | [TTS桌面端云端播放影响.md](./TTS桌面端云端播放影响.md) | **Tauri 云端 MP3 播放修复**：Audio prime、`canplay` 后 play、Edge 非流式 endpoint（**endpoint 分流已被 [EdgeTTS统一流式.md](./EdgeTTS统一流式.md) 取代**） |
 | [EdgeTTS统一流式.md](./EdgeTTS统一流式.md) | **增量（本轮）**：Edge TTS 统一 `SPEECH_EDGE_TTS_STREAM`，取消 Tauri/Web endpoint 分流 |
-| [讯飞云TTS.md](./讯飞云TTS.md) | **讯飞在线云端朗读**：WS 合成、设置页音量/音高、Node 18 `ws` |
+| [讯飞云TTS.md](../ideas/tts/讯飞云TTS.md) | **讯飞在线云端朗读**：WS 合成、设置页音量/音高、Node 18 `ws` |
 | [云端TTS用户凭据.md](./云端TTS用户凭据.md) | **用户凭证与失败降级**：MiniMax/讯飞 Key 入库、Toast、xfyunVoiceId 独立 |
 | [英语TTS播放.md](./英语TTS播放.md) | 播放世代、异步丢弃 |
 | [英语TTS停止清理.md](./英语TTS停止清理.md) | **增量**：`stopAllPlayback` 彻底释放音频元素与 MediaSession（修复 Touch Bar/控制中心残留进度条）、路由壳子页切换自动停播、经典句朗读统一 `cloudSingleUtterance` |

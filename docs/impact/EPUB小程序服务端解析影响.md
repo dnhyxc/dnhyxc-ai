@@ -2,10 +2,10 @@
 
 ## 延伸阅读
 
-- [小程序EPUB解析逻辑.md](../ideas/小程序EPUB解析逻辑.md) — 解析编排、API 与小程序消费链路（规划/已落地说明）
+- [小程序EPUB解析逻辑.md](../ideas/miniprogram/小程序EPUB解析逻辑.md) — 解析编排、API 与小程序消费链路（规划/已落地说明）
 - [小程序EPUB服务端解析.md](../ebook/小程序EPUB服务端解析.md) — **实现归档**：BullMQ、`startParseTask`/`waitForParse` 改动前后对比与逐行注释
 - [电子书COS对象键解析.md](../ebook/电子书COS对象键解析.md) — `resolveCosObjectKey` / `uploadEbookAssetBuffer` 动机与调用点
-- [电子书阅读进度保存.md](../ideas/电子书阅读进度保存.md) — Web 端 CFI / percent 进度保存（未改调用方）
+- [电子书阅读进度保存.md](../ideas/ebook/电子书阅读进度保存.md) — Web 端 CFI / percent 进度保存（未改调用方）
 - [电子书进度远程防抖影响.md](./电子书进度远程防抖影响.md) — Web 进度 PUT 防抖与 keepalive
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
