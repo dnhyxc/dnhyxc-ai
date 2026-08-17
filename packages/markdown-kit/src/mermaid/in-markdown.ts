@@ -9,10 +9,36 @@ let lastMermaidInitSignature = '';
 
 let mermaidMod: typeof mermaidApi | null = null;
 
+/** Vite / MF 可能把 default 再包一层；只认带 initialize+run 的实例 */
+function resolveMermaidApi(mod: unknown): typeof mermaidApi {
+	const candidates: unknown[] = [];
+	let cur: unknown = mod;
+	for (let i = 0; i < 3 && cur != null; i++) {
+		candidates.push(cur);
+		if (typeof cur !== 'object' || !('default' in cur)) break;
+		cur = (cur as { default: unknown }).default;
+	}
+	for (const c of candidates) {
+		try {
+			if (
+				c &&
+				typeof c === 'object' &&
+				typeof (c as typeof mermaidApi).initialize === 'function' &&
+				typeof (c as typeof mermaidApi).run === 'function'
+			) {
+				return c as typeof mermaidApi;
+			}
+		} catch {
+			// vitest mock Proxy：访问未声明的 named export 会抛错，跳过该候选
+		}
+	}
+	throw new Error('[mermaid-in-markdown] unexpected mermaid module shape');
+}
+
 async function loadMermaid(): Promise<typeof mermaidApi> {
 	if (mermaidMod) return mermaidMod;
 	const mod = await import('mermaid');
-	mermaidMod = mod.default;
+	mermaidMod = resolveMermaidApi(mod);
 	return mermaidMod;
 }
 

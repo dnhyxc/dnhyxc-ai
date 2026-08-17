@@ -230,7 +230,7 @@
 | Web/Tauri 选文件双路径重复 / `pickFileObject` 跨端 / Rust 读文件命令删除 | [app/pick-file-object.md](./app/pick-file-object.md)（跨端 `pickFileObject` + `pickBrowserFiles` + `convertFileSrc` + `fetch` + 错误码统一） |
 | macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./app/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
 | 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
-| 主包体积大 / 首屏慢 / React.lazy 路由懒加载 / manualChunks 拆包 / mermaid 动态加载 / Monaco 组件懒加载 / Prettier 动态加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md)（`React.lazy` + `manualChunks` + `import('mermaid')` + CSS 显式引入 + `styleContents` CSS 内联 + `Suspense` fallback + Monaco 薄壳 `lazy` + `loadPrettier` + hooks/contexts barrel 瘦身） |
+| 主包体积大 / 首屏慢 / React.lazy / mermaid 动态加载（含形态修复见 §4.6.1）/ Monaco·Prettier 懒加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md) |
 | 英语 Agent 选中文本右键朗读 / 复制 / 选区菜单复用 | [english/selection-speak-context-menu.md](./english/selection-speak-context-menu.md)（`useSelectionContextMenu` + `PositionedQuickMenu` + 按段云端 TTS + 悬浮条） |
 | 英语学习 Agent 流式输出输入框卡顿 / 视觉抖动 | [english/english-agent-stream-perf-isolation.md](./english/english-agent-stream-perf-isolation.md) |
 | 听书切句落后听感 / 首句尾音到下句高亮滞后 / rAF 进度轮询 | [ebook/epub-listen-cadence-lead.md](./ebook/epub-listen-cadence-lead.md)（`CLOUD_CADENCE_LEAD_SEC=0.35` + `requestAnimationFrame` + `onPlaybackProgress` + kick ≥0.8 提前切句） |

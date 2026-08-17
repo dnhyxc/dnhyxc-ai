@@ -444,32 +444,85 @@ export async function runMermaidInMarkdownRoot(
 }
 ```
 
-**改动后** · `packages/markdown-kit/src/mermaid/in-markdown.ts`（当前，约 L1–L72）
+**改动后（动态加载初版）** · 约 `ee1f580a`
 
 ```typescript
-// 新版：import type 仅引入类型，不引入运行时
 import type mermaidApi from 'mermaid';
-import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js';
-
-// ...（runQueue / lastMermaidInitSignature 未改动）
-
-// 新增：mermaid 模块缓存
+// ...
 let mermaidMod: typeof mermaidApi | null = null;
 
-// 新增：首次调用才动态 import('mermaid')，避免主包打入整图库
 async function loadMermaid(): Promise<typeof mermaidApi> {
-	// 已缓存 → 直接返回
 	if (mermaidMod) return mermaidMod;
-	// 动态 import
 	const mod = await import('mermaid');
-	// 缓存 default 导出
+	mermaidMod = mod.default; // 初版：直接取 default
+	return mermaidMod;
+}
+```
+
+**变更摘要（初版）**：`import mermaid from 'mermaid'`（静态）→ `import type` + `loadMermaid()` 动态加载。mermaid 不再打入主包，首次有图表的 Markdown 才加载。
+
+#### 4.6.1 回归修复：动态 `import` 后模块形态不一致导致图全部不渲染（2026-08-17）
+
+**现象**：聊天 / 知识库预览等路径下，Markdown 中所有 ` ```mermaid ` 围栏无法出图（或只剩源码/空白）；控制台可能出现 `[mermaid-in-markdown]` 警告。此前静态 `import mermaid` 时正常。
+
+**根因**：
+
+1. Vite / Module Federation 对 `import('mermaid')` 的产物形态不一：有时 `mod.default` 即 API，有时再包一层 `{ default: api }`。初版 `mermaidMod = mod.default` 在后一种形态下得到**非 API 对象**（或 `undefined`），随后 `initialize` / `run` 失败被 `catch` 吞掉，表现为「全部不渲染」。
+2. **依赖契约**：`import('mermaid')` 写在 `@dnhyxc-ai/markdown-kit` 包内，`mermaid` 已是本包 `dependencies`。解析应从 **markdown-kit 的依赖树**走，**不应**要求消费方（如 `apps/frontend`）再单独安装 `mermaid`。若因 pnpm/Vite 偶发从应用根解析失败，应修 Vite 解析配置，而不是把 `mermaid` 提升为业务依赖。
+
+**改动前（有 bug 的加载）** · `loadMermaid` 仅 `mod.default`
+
+```typescript
+async function loadMermaid(): Promise<typeof mermaidApi> {
+	if (mermaidMod) return mermaidMod;
+	const mod = await import('mermaid');
 	mermaidMod = mod.default;
 	return mermaidMod;
 }
+```
 
-// 新版：ensureMermaidInitialized 接收 mermaid 参数（不再依赖顶层）
+**改动后（当前）** · `packages/markdown-kit/src/mermaid/in-markdown.ts`
+
+```typescript
+import type mermaidApi from 'mermaid';
+import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js';
+
+let mermaidMod: typeof mermaidApi | null = null;
+
+/** Vite / MF 可能把 default 再包一层；只认带 initialize+run 的实例 */
+function resolveMermaidApi(mod: unknown): typeof mermaidApi {
+	const candidates: unknown[] = [];
+	let cur: unknown = mod;
+	for (let i = 0; i < 3 && cur != null; i++) {
+		candidates.push(cur);
+		if (typeof cur !== 'object' || !('default' in cur)) break;
+		cur = (cur as { default: unknown }).default;
+	}
+	for (const c of candidates) {
+		try {
+			if (
+				c &&
+				typeof c === 'object' &&
+				typeof (c as typeof mermaidApi).initialize === 'function' &&
+				typeof (c as typeof mermaidApi).run === 'function'
+			) {
+				return c as typeof mermaidApi;
+			}
+		} catch {
+			// vitest mock Proxy：访问未声明的 named export 会抛错，跳过该候选
+		}
+	}
+	throw new Error('[mermaid-in-markdown] unexpected mermaid module shape');
+}
+
+async function loadMermaid(): Promise<typeof mermaidApi> {
+	if (mermaidMod) return mermaidMod;
+	const mod = await import('mermaid');
+	mermaidMod = resolveMermaidApi(mod);
+	return mermaidMod;
+}
+
 function ensureMermaidInitialized(
-	// 新增 mermaid 参数
 	mermaid: typeof mermaidApi,
 	preferDark?: boolean,
 ): void {
@@ -483,40 +536,33 @@ function ensureMermaidInitialized(
 	});
 }
 
-// ...（RunMermaidInMarkdownOptions 类型未改动；doc comment 新增动态加载说明）
-
-// 新版：runMermaidInMarkdownRoot 先 loadMermaid 再调用
 export async function runMermaidInMarkdownRoot(
 	root: HTMLElement | null | undefined,
 	options?: RunMermaidInMarkdownOptions,
 ): Promise<void> {
 	if (!root) return;
-
 	const task = async (): Promise<void> => {
 		const nodes = queryMermaidMarkdownEntryNodes(root);
 		if (nodes.length === 0) return;
-
 		try {
-			// 新版：先动态加载 mermaid 模块
 			const mermaid = await loadMermaid();
-			// 新版：传入 mermaid 参数
 			ensureMermaidInitialized(mermaid, options?.preferDark);
-			// 新版：使用加载后的 mermaid.run
 			await mermaid.run({
 				nodes: Array.from(nodes),
 				suppressErrors: options?.suppressErrors === true,
 			});
 		} catch (err) {
-			// ...（catch 未改动）
+			if (typeof console !== 'undefined' && console.warn) {
+				console.warn('[mermaid-in-markdown]', err);
+			}
 		}
 	};
-
 	runQueue = runQueue.then(task).catch(() => {});
 	await runQueue;
 }
 ```
 
-**变更摘要**：`import mermaid from 'mermaid'`（静态）→ `import type mermaidApi from 'mermaid'`（仅类型）+ `loadMermaid()` 动态加载。`ensureMermaidInitialized` 新增 `mermaid` 参数。`runMermaidInMarkdownRoot` 调用前先 `await loadMermaid()`。mermaid 库不再打入主包或 markdown-kit 运行时，首次有 mermaid 图表的 Markdown 渲染时才加载。
+**修复摘要**：`loadMermaid` 经 `resolveMermaidApi` 解包多层 `default`，并用 `initialize` + `run` 校验真实 API；形态不对时抛错并打 `[mermaid-in-markdown]`，避免静默空图。消费方仍只依赖 `@dnhyxc-ai/markdown-kit`，**不要**为解析动态 import 再装一份 `mermaid`。
 
 ---
 
@@ -1057,6 +1103,7 @@ const readUserInfoJson = () => {
 | `Suspense` fallback | 路由 chunk 加载期间显示 `Loading` 组件（圆形动画 + i18n 文案） |
 | `Layout` / `Home` / `Login` | 保持 eager，首屏无额外延迟 |
 | mermaid 首次渲染 | 首次遇到 mermaid 图表时多一次 `import('mermaid')` 加载（约 200–500KB gzipped）；后续渲染走缓存 |
+| mermaid 动态加载形态 | `loadMermaid` 须经 `resolveMermaidApi` 解包；勿在消费方重复安装 `mermaid`（见 §4.6.1） |
 | CSS | `markdown-kit/styles.css` 从主包移到各使用组件的 chunk；聊天和 Markdown 预览路径各自引入 |
 | `reference` barrel | 旧版 `{ Grammar, Morphology } from '@/views/.../reference'` 拆为两个独立 lazy import，避免 barrel 把两个页面打到同一 chunk |
 | Tauri 桌面端 | 桌面端通过 `tauri://localhost` 加载本地资源，chunk 下载为本地文件读取，延迟极低 |
@@ -1069,6 +1116,7 @@ const readUserInfoJson = () => {
 | 路由 chunk 404 | 检查 `vite build` 产物是否完整部署；CDN 缓存是否过期 |
 | Suspense 白屏 | `Loading` fallback 是否正确渲染；检查 `Loading` 组件 i18n key 是否存在 |
 | mermaid 首次加载延迟 | 首次遇到 mermaid 图表时有短暂空白；检查 `loadMermaid` 缓存是否生效（第二次渲染无延迟） |
+| mermaid 全部不出图 | 控制台搜 `[mermaid-in-markdown]`；确认 `resolveMermaidApi` 能拿到带 `initialize`/`run` 的实例；**不要**为修解析去业务项目再装 `mermaid`（依赖在 markdown-kit） |
 | CSS 缺失 | 检查聊天和 Markdown 预览路径是否正确渲染样式；`import '@dnhyxc-ai/markdown-kit/styles.css'` 是否被 Vite 处理 |
 | `reference` barrel 拆分 | 检查 `/english-learning/reference/grammar` 和 `/english-learning/reference/morphology` 路由是否正常 |
 | Tauri 本地文件加载 | 桌面端 chunk 文件路径是否正确（`tauri://localhost/assets/xxx.js`） |
@@ -1078,7 +1126,7 @@ const readUserInfoJson = () => {
 1. **首屏加载**：访问 `/` → 首页快速渲染，无白屏
 2. **路由跳转**：点击侧栏各入口 → 显示 Loading → 页面渲染
 3. **聊天 Markdown**：发送含代码块的消息 → 代码高亮正确，CSS 正常
-4. **mermaid 图表**：发送含 mermaid 代码块的消息 → 首次有短暂空白 → SVG 渲染正确；第二次无延迟
+4. **mermaid 图表**：发送含 mermaid 代码块的消息 → 首次有短暂空白 → SVG 渲染正确；第二次无延迟；若全部空白，按 §7「mermaid 全部不出图」排查
 5. **Monaco 编辑器**：打开代码编辑页 → 编辑器正常加载
 6. **EPUB 阅读**：打开电子书 → epubjs chunk 加载 → 阅读器正常渲染
 7. **PDF 阅读**：打开 PDF → pdfjs chunk 加载 → PDF 正常渲染
