@@ -1,6 +1,6 @@
 # 小程序 EPUB 服务端章节解析（BullMQ 异步队列）
 
-**文档角色**：本轮「服务端解析 EPUB → 章节目录 + 正文 HTML API」的**实现归档**（改动前后对比 + 逐行注释）。规划态思路见 [ideas/miniprogram-epub-parse-logic.md](../ideas/miniprogram-epub-parse-logic.md)；影响面见 [Influence-point/epub-miniprogram-server-parse.md](../Influence-point/epub-miniprogram-server-parse.md)。COS 键规则与历史兼容见 [ebook-cos-object-key-resolve.md](./ebook-cos-object-key-resolve.md)。
+**文档角色**：本轮「服务端解析 EPUB → 章节目录 + 正文 HTML API」的**实现归档**（改动前后对比 + 逐行注释）。规划态思路见 [ideas/miniprogram-epub-parse-logic.md](../ideas/miniprogram-epub-parse-logic.md)；影响面见 [impact/epub-miniprogram-server-parse.md](../impact/epub-miniprogram-server-parse.md)。COS 键规则与历史兼容见 [ebook-cos-object-key-resolve.md](./ebook-cos-object-key-resolve.md)。
 
 ## 1. 背景与目标
 

@@ -2,7 +2,7 @@
 
 **文档角色**：在 EPUB 阅读器滚动监听链路中增加「阅读区目标过滤」——只有真正来自 EPUB 阅读区的滚动事件才会触发 PopBar 收起与选区清除，避免问书侧栏流式贴底等非阅读区滚动误伤 EPUB 正文选区。
 
-**延伸阅读**：[EPUB 选区：滚动时收起 PopBar 并清除选中样式](./epub-selection-scroll-clear.md)、[MK 问书流式误清 EPUB 选区（影响点）](../Influence-point/epub-ask-stream-selection-clear.md)
+**延伸阅读**：[EPUB 选区：滚动时收起 PopBar 并清除选中样式](./epub-selection-scroll-clear.md)、[MK 问书流式误清 EPUB 选区（影响点）](../impact/epub-ask-stream-selection-clear.md)
 
 ---
 

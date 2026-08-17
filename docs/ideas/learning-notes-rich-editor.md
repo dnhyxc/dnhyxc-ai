@@ -906,9 +906,9 @@ type HostBridgeProps = {
 ## 16. 延伸阅读
 
 - [学习笔记富文本编辑器（实现归档）](../english/learning-notes-rich-editor.md) — 已落地实现的详细代码对照与逐行注释
-- [动态插件系统核心实现](../app/dynamic-plugin-system.md) — Module Federation 插件系统架构
-- [主子项目样式隔离实现手册](../app/style-isolation-implementation.md) — CSS @scope + DOM 劫持双层隔离机制
-- [插件开发手册](../app/plugin-development-guide.md) — 子项目开发规范与 HostBridge API
+- [动态插件系统核心实现](../plugins/dynamic-plugin-system.md) — Module Federation 插件系统架构
+- [主子项目样式隔离实现手册](../style/style-isolation-implementation.md) — CSS @scope + DOM 劫持双层隔离机制
+- [插件开发手册](../plugins/plugin-development-guide.md) — 子项目开发规范与 HostBridge API
 - [第三方 MF 插件接入配置](./third-party-mf-plugin-onboarding.md) — 远程插件跨域接入契约
 
 ---

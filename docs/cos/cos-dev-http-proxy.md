@@ -4,8 +4,8 @@
 > **机制**：持久化存完整 COS HTTPS URL；DEV / Web 生产展示为 `/ext-cos/{key}`；**仅** `/ext-cos/`，不兼容 `/ext-img/`。  
 > **延伸阅读**  
 > - COS 上传、ACL、聊天附件：[../cos/cos-object-storage.md](../cos/cos-object-storage.md)  
-> - macOS ATS 概念：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)  
-> - 路由鉴权 mixed content 摘要：[route-auth.md](./route-auth.md) §12  
+> - macOS ATS 概念：[tauri-macos-ats-http.md](../tauri/tauri-macos-ats-http.md)  
+> - 路由鉴权 mixed content 摘要：[route-auth.md](../auth/route-auth.md) §12  
 > - 生产 Nginx：`location /ext-cos/` → [../ops/nginx.md](../ops/nginx.md)  
 > - 文档总索引：[../README.md](../README.md)
 

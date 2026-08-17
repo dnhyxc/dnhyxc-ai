@@ -2,7 +2,7 @@
 
 > **状态**：已落地（**Host 运行时 @scope 隔离** + untrusted iframe；含 realm / Portal·Teleport / qiankun 式 transpile·CSSOM）  
 > **日期**：2026-07-22（Host 侧接管；子应用恢复正常 Tailwind；2026-08 第三轮加固）  
-> **关联**：[`mf-plugin-host.md`](../app/mf-plugin-host.md)、[`style-isolation-implementation.md`](../app/style-isolation-implementation.md)、[`style-isolation-tech-overview.md`](../app/style-isolation-tech-overview.md)、[`style-isolation-qiankun-harden.md`](../app/style-isolation-qiankun-harden.md)、**实现指南详解** [`mf-implementation-guide.md` §2.10.2](../../apps/frontend/src/plugins/docs/mf-implementation-guide.md)、[`styleIsolation.ts`](../../apps/frontend/src/plugins/host/styleIsolation.ts)
+> **关联**：[`mf-plugin-host.md`](../plugins/mf-plugin-host.md)、[`style-isolation-implementation.md`](../style/style-isolation-implementation.md)、[`style-isolation-tech-overview.md`](../style/style-isolation-tech-overview.md)、[`style-isolation-qiankun-harden.md`](../style/style-isolation-qiankun-harden.md)、**实现指南详解** [`mf-implementation-guide.md` §2.10.2](../../apps/frontend/src/plugins/docs/mf-implementation-guide.md)、[`styleIsolation.ts`](../../apps/frontend/src/plugins/host/styleIsolation.ts)
 
 ---
 

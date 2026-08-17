@@ -6,7 +6,7 @@
 
 ## 延伸阅读
 
-- Host 运行时：[../app/mf-plugin-host.md](../app/mf-plugin-host.md)
+- Host 运行时：[../plugins/mf-plugin-host.md](../plugins/mf-plugin-host.md)
 - Registry 静态分发：[../ops/remotes-registry-static.md](../ops/remotes-registry-static.md)
 - Nginx 片段：[../ops/nginx.md](../ops/nginx.md)
 - 自建学习笔记 Remote：[../english/learning-notes-remote.md](../english/learning-notes-remote.md)
@@ -284,7 +284,7 @@ type ThirdPartyPluginRow = {
 };
 ```
 
-**样式**：Host 侧自动 `@scope` 隔离，`partner` / `first-party` 无需手动 scoped（子项目零侵入），详见 [style-isolation-implementation.md](../app/style-isolation-implementation.md)。无法保证样式安全 → `trust: untrusted` + `iframeUrl`。
+**样式**：Host 侧自动 `@scope` 隔离，`partner` / `first-party` 无需手动 scoped（子项目零侵入），详见 [style-isolation-implementation.md](../style/style-isolation-implementation.md)。无法保证样式安全 → `trust: untrusted` + `iframeUrl`。
 
 ### 8.3 Host Origin 常量（契约）
 

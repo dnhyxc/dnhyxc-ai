@@ -3,7 +3,7 @@
 > **按 id 取消收藏、Hook 内 `Map<key,id>`、`onPartial(refs)`**：见 [`english-learning-favorites-by-id.md`](./english-learning-favorites-by-id.md)。  
 > 本文聚焦 **星标高亮滞后**（列表已渲染，已收藏词条的星仍空心，需等数秒才批量亮起）。  
 > 网络重试、资源库分页等见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（含线上偶发 `error sending request` 说明）；  
-> 重试失败后 Toast 脱敏与 i18n 见 [`http-network-error-toast.md`](./http-network-error-toast.md)；单词 500 上限与增量 Hook 初版见 [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md)。
+> 重试失败后 Toast 脱敏与 i18n 见 [`http-network-error-toast.md`](../app/http-network-error-toast.md)；单词 500 上限与增量 Hook 初版见 [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md)。
 
 ## 1. 背景与目标
 

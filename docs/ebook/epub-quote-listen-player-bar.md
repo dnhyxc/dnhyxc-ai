@@ -4,7 +4,7 @@
 
 - [epub-quote-listen.md](./epub-quote-listen.md) — 听当前三入口（改前无播放条）
 - [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 听书播放条 UI（分句/倍速）
-- [../Influence-point/epub-quote-listen-player-bar.md](../Influence-point/epub-quote-listen-player-bar.md) — 影响点与回归清单
+- [../impact/epub-quote-listen-player-bar.md](../impact/epub-quote-listen-player-bar.md) — 影响点与回归清单
 
 ---
 
@@ -421,7 +421,7 @@ export function getEpubListenSentenceSpokenRaw(index: number): string | null {
 | 阅读页接线 | `apps/frontend/src/views/ebook/read.tsx` |
 | Session / 句表 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
 | 播放条 UI | `apps/frontend/src/views/ebook/components/EpubListenPlayerBar.tsx` |
-| 影响点 | `docs/Influence-point/epub-quote-listen-player-bar.md` |
+| 影响点 | `docs/impact/epub-quote-listen-player-bar.md` |
 
 ---
 

@@ -1,6 +1,6 @@
 # HttpClient 网络错误 Toast：友好文案与同步 i18n
 
-> 在 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（Tauri GET 重试、`retryAsync`）之上，本轮解决 **重试仍失败时 Toast 直接展示 Tauri 原始英文报错**、以及 **HttpClient 内硬编码中文兜底** 的问题。
+> 在 [`english-learning-list-network-retry.md`](../english/english-learning-list-network-retry.md)（Tauri GET 重试、`retryAsync`）之上，本轮解决 **重试仍失败时 Toast 直接展示 Tauri 原始英文报错**、以及 **HttpClient 内硬编码中文兜底** 的问题。
 
 ## 1. 背景与目标
 
@@ -23,7 +23,7 @@ error sending request for url (https://...)
 | i18n | 提供 **无 React 上下文** 的 `translateSync`，供 `fetch.ts` 等模块使用 |
 | 文案 | 新增 `common.networkErrorTryAgain`、`common.requestFailed` |
 
-**与重试的关系**：重试逻辑不变；仅在 **最终失败** 弹出 Toast 时改写展示文案。`silent: true` 的请求仍不弹 Toast。Tauri 默认重试范围扩展见 [tauri-http-all-method-retry.md](./tauri-http-all-method-retry.md)。
+**与重试的关系**：重试逻辑不变；仅在 **最终失败** 弹出 Toast 时改写展示文案。`silent: true` 的请求仍不弹 Toast。Tauri 默认重试范围扩展见 [tauri-http-all-method-retry.md](../tauri/tauri-http-all-method-retry.md)。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -275,8 +275,8 @@ if (!finalConfig.silent) {
 
 | 说明 | 路径 |
 |------|------|
-| 重试与列表韧性 | [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md) |
-| 星标渐进查询 | [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md) |
+| 重试与列表韧性 | [`english-learning-list-network-retry.md`](../english/english-learning-list-network-retry.md) |
+| 星标渐进查询 | [`favorite-star-incremental-ui.md`](../english/favorite-star-incremental-ui.md) |
 | HttpClient | `apps/frontend/src/utils/fetch.ts` |
 | 重试/脱敏工具 | `apps/frontend/src/utils/retryAsync.ts` |
 | 同步 i18n | `apps/frontend/src/i18n/index.ts` |

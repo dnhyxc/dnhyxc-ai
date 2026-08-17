@@ -3,7 +3,7 @@
 ## 延伸阅读
 
 - [developer/epub-user-highlight-dev.md](./developer/epub-user-highlight-dev.md) — 用户划线主手册（五色基线）
-- [../Influence-point/epub-highlight-custom-color-picker.md](../Influence-point/epub-highlight-custom-color-picker.md) — 影响面矩阵与回归清单
+- [../impact/epub-highlight-custom-color-picker.md](../impact/epub-highlight-custom-color-picker.md) — 影响面矩阵与回归清单
 - [epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md) — PopBar 防闪烁与 sync 增量
 
 ## 1. 背景与目标

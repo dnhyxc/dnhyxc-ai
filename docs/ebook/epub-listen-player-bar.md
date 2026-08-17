@@ -9,7 +9,7 @@
 - [epub-listen-player-bar-ruler-ui.md](epub-listen-player-bar-ruler-ui.md) — **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」
 
 **文档角色**：本轮 **听书底部播放条** 增量（分句跳转菜单、倍速 0.75×～3×、TTS 倍速贯通、跳转居中滚动）。  
-> **影响面（分句虚拟列表 / 刻度倍速 UI）**：[epub-listen-player-bar-ui.md](../Influence-point/epub-listen-player-bar-ui.md)
+> **影响面（分句虚拟列表 / 刻度倍速 UI）**：[epub-listen-player-bar-ui.md](../impact/epub-listen-player-bar-ui.md)
 
 ## 1. 背景与目标
 

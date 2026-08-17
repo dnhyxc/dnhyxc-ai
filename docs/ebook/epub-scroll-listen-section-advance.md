@@ -5,7 +5,7 @@
 - [epub-chapter-listen.md](./epub-chapter-listen.md) — 听书 MVP 总览（改前单一 `waitForNextSection` 环）
 - [epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md) — 连续滚动阅读与 `continuous` manager
 - [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 播放条切句 / 倍速
-- [连续滚动听书逐 iframe 节间衔接 — 影响点分析](../Influence-point/epub-scroll-listen-section-advance.md) — 回归矩阵与风险
+- [连续滚动听书逐 iframe 节间衔接 — 影响点分析](../impact/epub-scroll-listen-section-advance.md) — 回归矩阵与风险
 - [连续滚动多 iframe 听书续播 — 实现思路](../ideas/epub-scroll-multi-iframe-listen.md) — 解题套路与 §8 逐点改动清单
 
 ## 1. 背景与目标
@@ -594,7 +594,7 @@ export async function advanceScrollListenSection(
 | 滚动节间 advance | `apps/frontend/src/views/ebook/utils/epubScrollListenAdvance.ts` |
 | 正文抽取 | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` |
 | 滚动容器 | `apps/frontend/src/views/ebook/utils/epubScrolledNav.ts` |
-| 影响点分析 | `docs/Influence-point/epub-scroll-listen-section-advance.md` |
+| 影响点分析 | `docs/impact/epub-scroll-listen-section-advance.md` |
 
 ---
 

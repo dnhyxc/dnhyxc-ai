@@ -4,7 +4,7 @@
 > **朗读介质 Switch**：[`tts-playback-source.md`](./tts-playback-source.md)  
 > **存储与账号同步**：[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)  
 > 后端 MiniMax 流式合成、硅基回退与 LRU 见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
-> **用户凭证与失败降级影响面**：[`cloud-tts-user-credentials-fallback.md`](../Influence-point/cloud-tts-user-credentials-fallback.md)  
+> **用户凭证与失败降级影响面**：[`cloud-tts-user-credentials-fallback.md`](../impact/cloud-tts-user-credentials-fallback.md)  
 > **用户凭证实现说明**：[`cloud-tts-user-credentials.md`](./cloud-tts-user-credentials.md)  
 > 中文系统音色与语言增强联动见 [`minimax-chinese-voices.md`](./minimax-chinese-voices.md)。  
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。

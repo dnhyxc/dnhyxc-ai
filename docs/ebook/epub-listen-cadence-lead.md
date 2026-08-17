@@ -1,7 +1,7 @@
 # 听书切句提前 + rAF 进度轮询 + 句内进度回调
 
 > **文档角色**：云端整段 TTS 切句估点提前 `0.35s`、`HTMLAudioElement` 用 `requestAnimationFrame` 轮询进度替代稀疏 `timeupdate`、新增 `onPlaybackProgress` 句内进度回调；听书首包（kick）尾声 `progress ≥ 0.8` 时提前切下一句高亮，缩短「上一句念完到下一段出声」间的预览滞后。
-> **延伸阅读**：[epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)（云端预取与 `playListenUnitsFromCursor`）；[epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)（分句算法）；[../Influence-point/epub-listen-cadence-lead.md](../Influence-point/epub-listen-cadence-lead.md)（本改动对听书/听当前的影响点分析）；[../english/selection-speak-context-menu.md](../english/selection-speak-context-menu.md)（选区朗读为动机方）
+> **延伸阅读**：[epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)（云端预取与 `playListenUnitsFromCursor`）；[epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)（分句算法）；[../impact/epub-listen-cadence-lead.md](../impact/epub-listen-cadence-lead.md)（本改动对听书/听当前的影响点分析）；[../english/selection-speak-context-menu.md](../english/selection-speak-context-menu.md)（选区朗读为动机方）
 
 ## 1. 背景与目标
 
@@ -424,7 +424,7 @@ function stopPlaybackMediaOnly(): void {
 | 倍速 | lead 按媒体时间秒，不随 `playbackRate` 再乘；2× 时墙钟提前量减半 |
 | 预取 / 世代 / `isActive` | 未改控制流；`stop` 时 `abortCloudCadenceRaf` 清理 rAF |
 | `onPlaybackProgress` 可选 | 未传时 `playCloudTtsSingleUtterance` 内 `!opts?.onPlaybackProgress` 短路，零开销 |
-| 影响点详见 | [../Influence-point/epub-listen-cadence-lead.md](../Influence-point/epub-listen-cadence-lead.md) |
+| 影响点详见 | [../impact/epub-listen-cadence-lead.md](../impact/epub-listen-cadence-lead.md) |
 
 ## 6. 风险与回归清单
 
@@ -451,7 +451,7 @@ function stopPlaybackMediaOnly(): void {
 |------|------|
 | TTS 播放核心 | `apps/frontend/src/utils/speech.ts` |
 | 听书播放游标 | `apps/frontend/src/views/ebook/utils/epub/listen/epubListenPlayUnits.ts` |
-| 影响点分析 | `docs/Influence-point/epub-listen-cadence-lead.md` |
+| 影响点分析 | `docs/impact/epub-listen-cadence-lead.md` |
 
 ---
 

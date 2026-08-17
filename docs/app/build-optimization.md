@@ -1,7 +1,7 @@
 # 前端打包优化：路由懒加载 + manualChunks + mermaid 动态加载 + CSS 内联 + Monaco 组件懒加载 + Prettier 动态加载 + barrel 瘦身
 
 > **文档角色**：将全站 30+ 页面从 eager import 改为 `React.lazy`，配合 Vite `manualChunks` 拆分大型库、mermaid 改为动态加载、高频 CSS 内联为字符串常量、Monaco 编辑器组件级懒加载、Prettier 首次格式化才动态加载、hooks/contexts barrel 导出瘦身，减小主包体积
-> **延伸阅读**：[macos-drag-picker-crash.md](./macos-drag-picker-crash.md)（拖拽闪退修复）；[unified-file-selection.md](./unified-file-selection.md)（通用文件选择）
+> **延伸阅读**：[macos-drag-picker-crash.md](../tauri/macos-drag-picker-crash.md)（拖拽闪退修复）；[unified-file-selection.md](../app/unified-file-selection.md)（通用文件选择）
 
 ## 1. 背景与目标
 

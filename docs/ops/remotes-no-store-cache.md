@@ -1,7 +1,7 @@
 # remotes 静态资源禁止缓存
 
 > **文档角色（本轮主文档）**：`/remotes`（含 `plugins-registry.json`）由短缓存改为 `no-store`。  
-> **延伸阅读**：[remotes-registry-static.md](./remotes-registry-static.md)（分发总览，缓存策略以本文为准）；[../app/plugin-entry-cache-bust.md](../app/plugin-entry-cache-bust.md)。
+> **延伸阅读**：[remotes-registry-static.md](./remotes-registry-static.md)（分发总览，缓存策略以本文为准）；[../plugins/plugin-entry-cache-bust.md](../plugins/plugin-entry-cache-bust.md)。
 
 ## 1. 背景与目标
 
@@ -80,7 +80,7 @@ res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
 ## 5. 兼容性与影响
 
 - Nginx 若对 `/remotes/` 另设 `expires`，生产应改为不缓存或与后端一致，否则仍可能吃旧清单。
-- Host 侧 force 拉 registry 仍会加 `?t=`（清单防缓存）。**MF entry bust** 已与 `registry.updatedAt` 解耦，改为 Remote `mf-manifest` 内容指纹，见 [plugin-entry-cache-bust.md](../app/plugin-entry-cache-bust.md)。
+- Host 侧 force 拉 registry 仍会加 `?t=`（清单防缓存）。**MF entry bust** 已与 `registry.updatedAt` 解耦，改为 Remote `mf-manifest` 内容指纹，见 [plugin-entry-cache-bust.md](../plugins/plugin-entry-cache-bust.md)。
 
 ## 6. 相关源码路径
 

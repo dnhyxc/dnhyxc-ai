@@ -4,7 +4,7 @@
 
 - 桌面本地优先 + COS 备份主链路：[ebook-cos-local-shelf.md](./ebook-cos-local-shelf.md)
 - 同一本地路径去重上传：[ebook-local-path-dedup.md](./ebook-local-path-dedup.md)
-- 会员状态纯函数（避免 Store 循环依赖）：[../app/membership-store-circular-deps.md](../app/membership-store-circular-deps.md)
+- 会员状态纯函数（避免 Store 循环依赖）：[../auth/membership-store-circular-deps.md](../auth/membership-store-circular-deps.md)
 
 ---
 

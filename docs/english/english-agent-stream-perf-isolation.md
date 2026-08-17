@@ -959,8 +959,8 @@ export function createStreamingMobxPatchScheduler(
 
 ### 交叉引用
 
-- [影响点分析：英语学习 Agent 流式输入性能](./Influence-point/english-agent-stream-input-perf.md)
-- [相关优化：流式代码块滚动](./chat/streaming-code-block-scroll.md)
+- [影响点分析：英语学习 Agent 流式输入性能](../impact/english-agent-stream-input-perf.md)
+- [相关优化：流式代码块滚动](../chat/streaming-code-block-scroll.md)
 - [同源实现：知识库 Signal Hooks](./hooks/useAssistantMessageCount.ts)
 - [相关工具：createStreamingMobxPatchScheduler](./utils/scheduleStreamingMobxPatch.ts)
 

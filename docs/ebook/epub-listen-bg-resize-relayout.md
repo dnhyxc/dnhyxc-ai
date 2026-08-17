@@ -2,8 +2,8 @@
 
 ## 延伸阅读
 
-- [epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) — 播放背景与用户划线 / 想法虚线的隔离
-- [epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md) — 本次改动的**影响面矩阵**与回归清单
+- [epub-listen-bg-vs-annotations.md](../impact/epub-listen-bg-vs-annotations.md) — 播放背景与用户划线 / 想法虚线的隔离
+- [epub-listen-resize-relayout.md](../impact/epub-listen-resize-relayout.md) — 本次改动的**影响面矩阵**与回归清单
 - [epub-split-soft-resize.md](./epub-split-soft-resize.md) — 分栏 soft resize 与批注 patch 主路径
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册
 
@@ -356,7 +356,7 @@ export function relayoutListenMarkHighlight(rend: Rendition): void {
 | 听读播放中 resize | **正向修复** — 背景对齐当前句 |
 | 性能 | 听读活跃期多 2 个 ResizeObserver + 偶发双帧 repaint；同帧 `schedulePatch` 合并 |
 
-详细影响矩阵见 [epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md)。
+详细影响矩阵见 [epub-listen-resize-relayout.md](../impact/epub-listen-resize-relayout.md)。
 
 ---
 
@@ -379,7 +379,7 @@ export function relayoutListenMarkHighlight(rend: Rendition): void {
 | 播放背景模块 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` |
 | EPUB 容器 resize | `apps/frontend/src/views/ebook/components/EpubPane.tsx` |
 | soft resize | `apps/frontend/src/views/ebook/utils/epubSoftResize.ts` |
-| 影响面分析 | `docs/Influence-point/epub-listen-resize-relayout.md` |
+| 影响面分析 | `docs/impact/epub-listen-resize-relayout.md` |
 
 ---
 

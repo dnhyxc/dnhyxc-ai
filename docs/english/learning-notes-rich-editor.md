@@ -1,6 +1,6 @@
 # 学习笔记富文本编辑器与分栏布局
 
-> **延伸阅读（后续增量）**：[learning-notes-dirty-save.md](./learning-notes-dirty-save.md)（保存图标未保存橙点）；[../app/remote-plugin-hmr.md](../app/remote-plugin-hmr.md)（勿在入口同文件导出空 `activate`；tiptap `optimizeDeps.include`）。
+> **延伸阅读（后续增量）**：[learning-notes-dirty-save.md](./learning-notes-dirty-save.md)（保存图标未保存橙点）；[../plugins/remote-plugin-hmr.md](../plugins/remote-plugin-hmr.md)（勿在入口同文件导出空 `activate`；tiptap `optimizeDeps.include`）。
 
 ## 1. 背景与目标
 

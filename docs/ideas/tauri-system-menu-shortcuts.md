@@ -1485,6 +1485,6 @@ macOS 在 `set_menu` 后会**异步注入** `AutoFill / Start Dictation / Emoji 
 
 **相关文档**：
 
-- 窗口缩放零露白（菜单「缩放窗口」接入点）：[ideas/tauri-window-zoom-unveil.md](./tauri-window-zoom-unveil.md)
+- 窗口缩放零露白（菜单「缩放窗口」接入点）：[ideas/tauri-window-zoom-unveil.md](../tauri/tauri-window-zoom-unveil.md)
 - 剪贴板快捷键（C/V/X/A 全局接管）：[ideas/tauri-clipboard-rich-paste.md](./tauri-clipboard-rich-paste.md)
 - 关闭行为与托盘：[app/](../app/) 目录

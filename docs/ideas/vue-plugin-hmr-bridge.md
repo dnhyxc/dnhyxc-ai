@@ -366,7 +366,7 @@ sequenceDiagram
 
 | 文档 | 说明 |
 |------|------|
-| [plugin-vue-bridge.md](../app/plugin-vue-bridge.md) | 实现归档文档（改动前后对比 + 逐行注释） |
+| [plugin-vue-bridge.md](../plugins/plugin-vue-bridge.md) | 实现归档文档（改动前后对比 + 逐行注释） |
 | [mf-implementation-guide.md](../../apps/frontend/src/plugins/docs/mf-implementation-guide.md) | MF 实现细节总览 |
 | [plugin-development-guide.md](../../apps/frontend/src/plugins/docs/plugin-development-guide.md) | 插件开发者手册 |
 | [third-party-mf-plugin-onboarding.md](./third-party-mf-plugin-onboarding.md) | 第三方 MF 插件接入配置 |

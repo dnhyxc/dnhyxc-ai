@@ -3,7 +3,7 @@
 ## 延伸阅读
 
 - [ebook-reader-shelf.md](./ebook-reader-shelf.md) — 书架与阅读页全链路（进度同步背景）
-- [../Influence-point/ebook-progress-remote-debounce.md](../Influence-point/ebook-progress-remote-debounce.md) — 影响点矩阵与回归清单
+- [../impact/ebook-progress-remote-debounce.md](../impact/ebook-progress-remote-debounce.md) — 影响点矩阵与回归清单
 - [epub-chapter-listen.md](./epub-chapter-listen.md) — 听书 `relocated` 高频触发进度的场景
 
 ## 1. 背景与目标
@@ -337,7 +337,7 @@ function progNeedsRemoteSync(next: Prog, lastSynced?: Prog): boolean {
 | keepalive PUT | `apps/frontend/src/service/index.ts` |
 | Store 防抖 | `apps/frontend/src/store/ebook.ts` |
 | 阅读页 flush | `apps/frontend/src/views/ebook/read.tsx` |
-| 影响点 | `docs/Influence-point/ebook-progress-remote-debounce.md` |
+| 影响点 | `docs/impact/ebook-progress-remote-debounce.md` |
 
 ---
 

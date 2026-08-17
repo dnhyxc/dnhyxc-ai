@@ -2,7 +2,7 @@
 
 > **文档角色**：说明 `UploadService` 中 `objectExists`、`resolveCosObjectKey`、`uploadEbookAssetBuffer` 及 `buildCosObjectKey(ebooks)` 为何增加、如何工作、影响哪些链路。  
 > **源码**：`apps/backend/src/services/upload/upload.service.ts`（约 L49–L239）  
-> **延伸阅读**：[ebook-cos-stream-io.md](./ebook-cos-stream-io.md)、[ebook-membership-upload.md](./ebook-membership-upload.md)、[../ideas/miniprogram-epub-parse-logic.md](../ideas/miniprogram-epub-parse-logic.md)、[../Influence-point/epub-miniprogram-server-parse.md](../Influence-point/epub-miniprogram-server-parse.md)
+> **延伸阅读**：[ebook-cos-stream-io.md](./ebook-cos-stream-io.md)、[ebook-membership-upload.md](./ebook-membership-upload.md)、[../ideas/miniprogram-epub-parse-logic.md](../ideas/miniprogram-epub-parse-logic.md)、[../impact/epub-miniprogram-server-parse.md](../impact/epub-miniprogram-server-parse.md)
 
 若与仓库最新源码不一致，**以源码为准**。
 

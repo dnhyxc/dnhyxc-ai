@@ -1,7 +1,7 @@
 # 生产环境 trust proxy 与 rate-limit
 
 > **文档角色**：Nginx 反向代理后 Express **信任 X-Forwarded-For**，修复 `express-rate-limit` 抛错并正确按客户端 IP 限流。  
-> **延伸阅读**：[ops/nginx.md](./nginx.md)（部署与反代）、[app/route-auth.md](../app/route-auth.md)（路由与 HTTPS）。
+> **延伸阅读**：[ops/nginx.md](./nginx.md)（部署与反代）、[app/route-auth.md](../auth/route-auth.md)（路由与 HTTPS）。
 
 若与仓库最新源码不一致，**以源码为准**。
 

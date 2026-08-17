@@ -1,7 +1,7 @@
 # 拦截拖放文件导航：阻止 WKWebView 顶掉 SPA
 
 > **文档角色**：`dragDropEnabled: false` 下 WKWebView 会把拖入的文件当导航打开（顶掉 SPA），通过 Rust 导航拦截 + 前端 `preventDefault` 双层修复
-> **延伸阅读**：[macos-drag-picker-crash.md](./macos-drag-picker-crash.md)（拖拽闪退修复）；[unified-file-selection.md](./unified-file-selection.md)（通用文件选择）
+> **延伸阅读**：[macos-drag-picker-crash.md](../tauri/macos-drag-picker-crash.md)（拖拽闪退修复）；[unified-file-selection.md](../app/unified-file-selection.md)（通用文件选择）
 
 ## 1. 背景与目标
 

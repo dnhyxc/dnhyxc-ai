@@ -36,7 +36,7 @@
 
 **说明**：报错文案来自 **Tauri HTTP 插件**在「请求未得到 HTTP 响应」时的原生层，不一定是后端 5xx。浏览器 H5 直连同源 API 时默认 **不重试**（见 §4.4）；桌面端对 **GET/HEAD** 默认多 2 次重试，收藏列表、资源库分页、收藏 `/status` 分批等见下文各节。
 
-**用户可见改进**：失败时优先 `silent: true` + 业务层 i18n Toast，避免直接展示 `error sending request for url (...)`；详见 [`http-network-error-toast.md`](./http-network-error-toast.md)。
+**用户可见改进**：失败时优先 `silent: true` + 业务层 i18n Toast，避免直接展示 `error sending request for url (...)`；详见 [`http-network-error-toast.md`](../app/http-network-error-toast.md)。
 
 ### 1.3 要解决的具体问题（改前 → 改后）
 
@@ -51,7 +51,7 @@
 | P6 | 经典句包曾用内联 `useEffect` 全量 `fetchEnglishClassicQuoteFavoriteStatus` | 与资源库逻辑重复、难维护 | 抽出 **`useIncrementalClassicQuoteFavoriteStatus`**，与单词 Hook 对称 |
 | P7 | 列表失败时 Toast 重复（HttpClient 默认 + 面板自定义） | 未传 `silent` | 列表类 API 透传 **`silent: true`**，由 Hook / 面板统一 i18n Toast |
 | P8 | 收藏 Tab 切走后，进行中的列表请求仍 `setState` | 无取消世代 | **`active === false` 时 `loadGenRef++`**，丢弃过期响应 |
-| P9 | 重试失败后 Toast 展示 `error sending request for url (...)` 或硬编码「请求接口异常」 | HttpClient 未脱敏 Tauri 原文、Toast 未走 i18n | **`shouldMaskAsUserFacingNetworkError` + `translateSync`**（详见 [`http-network-error-toast.md`](./http-network-error-toast.md)） |
+| P9 | 重试失败后 Toast 展示 `error sending request for url (...)` 或硬编码「请求接口异常」 | HttpClient 未脱敏 Tauri 原文、Toast 未走 i18n | **`shouldMaskAsUserFacingNetworkError` + `translateSync`**（详见 [`http-network-error-toast.md`](../app/http-network-error-toast.md)） |
 
 **刻意不重试的场景**：`add/remove` 收藏等 **非幂等 POST** 仍只请求 1 次（避免重复副作用）；仅 **`/status` 查询** 在 service 层用 `retryAsync` 包裹。
 
@@ -696,9 +696,9 @@ useEffect(() => {
 ## 11. 相关文档
 
 - [`english-tts-playback.md`](./english-tts-playback.md) — 朗读播放世代、`preferLocal` 单词本机优先（与 HTTP 列表错误正交）
-- [`http-network-error-toast.md`](./http-network-error-toast.md) — 网络错误 Toast 友好化与 `translateSync`
+- [`http-network-error-toast.md`](../app/http-network-error-toast.md) — 网络错误 Toast 友好化与 `translateSync`
 - [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md) — 星标慢半拍、`onPartialKeys`、有限并发与乐观点击
 - [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md) — 单词收藏状态增量查询与 500 上限（本轮在其上扩展 HTTP 50 小批与重试）
 - [`library-words-list-cache.md`](./library-words-list-cache.md) — 资源库词条列表会话内缓存与滚动恢复
 - [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md) — 资源库 UX 与删除
-- [`tauri-macos-ats-http.md`](./tauri-macos-ats-http.md) — Tauri / HTTP 相关背景（若存在网络策略问题可交叉查阅）
+- [`tauri-macos-ats-http.md`](../tauri/tauri-macos-ats-http.md) — Tauri / HTTP 相关背景（若存在网络策略问题可交叉查阅）

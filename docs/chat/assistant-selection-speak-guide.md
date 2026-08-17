@@ -2413,7 +2413,7 @@ getSelectionContextMenuItems={
 - EPUB 正文选区 PopBar / 高亮工具条
 - 章节听书主循环、进度条、章节切换（见 [ideas/epub-listen-core-logic.md](../ideas/epub-listen-core-logic.md)、[ebook/listen-exclusive-control.md](../ebook/listen-exclusive-control.md)）
 - 主站 `/chat` 路由默认助手（未接 SelectionSpeak）
-- 拖选导致整页滚动（见 [app/selection-drag-shell-scroll-guide.md](../app/selection-drag-shell-scroll-guide.md)）
+- 拖选导致整页滚动（见 [app/selection-drag-shell-scroll-guide.md](../ui/selection-drag-shell-scroll-guide.md)）
 - 重构过程与改前/改后对照（见 [selection-speak-common.md](./selection-speak-common.md)）
 
 ---

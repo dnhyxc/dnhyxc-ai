@@ -1,7 +1,7 @@
 # EPUB 听书播放条：刻度倍速与分句虚拟列表
 
 > **文档角色**：本轮 `EpubListenPlayerBar` UI 升级的实现说明（刻度尺倍速 + 分句虚拟列表 +「滚到当前句」）。  
-> **延伸阅读**：[epub-listen-player-bar.md](./epub-listen-player-bar.md)（首版分句菜单与倍速）、[ebook-list-scroll-cycle.md](./ebook-list-scroll-cycle.md)（**后续**：分句/目录三态滚动按钮，替代仅「手动滚后才显示滚到当前句」）、[../Influence-point/epub-listen-player-bar-ui.md](../Influence-point/epub-listen-player-bar-ui.md)（影响面）、[ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)（同轮书架改动，独立专题）。
+> **延伸阅读**：[epub-listen-player-bar.md](./epub-listen-player-bar.md)（首版分句菜单与倍速）、[ebook-list-scroll-cycle.md](./ebook-list-scroll-cycle.md)（**后续**：分句/目录三态滚动按钮，替代仅「手动滚后才显示滚到当前句」）、[../impact/epub-listen-player-bar-ui.md](../impact/epub-listen-player-bar-ui.md)（影响面）、[ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)（同轮书架改动，独立专题）。
 
 ## 1. 背景与目标
 

@@ -403,7 +403,7 @@ EPUB 读书想法不是「在 React 里画一条线」这么简单，实际约�
 
 **为何想法用 `underline`、用户线用 `highlight`？**
 
-- `annotations.remove(cfi, type)` 按 **type** 删除。共用 `highlight` 时，删用户线会误删想法 mark，或播放层清 highlight 时误伤（见 [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md)）。
+- `annotations.remove(cfi, type)` 按 **type** 删除。共用 `highlight` 时，删用户线会误删想法 mark，或播放层清 highlight 时误伤（见 [epub-listen-user-highlight-reconcile.md](../epub-listen-user-highlight-reconcile.md)）。
 - 槽位分离后，purge 用户线与 purge 想法线互不干扰。
 
 ### 2.3 想法添加：逐步推理
@@ -578,8 +578,8 @@ markClicked(thoughtIds) 或 findThoughtsAtClickPoint(clientX,Y)
 
 ### 2.6 侧栏与引用锚点（与添加联动）
 
-- `thoughtQuoteAnchorCfiRef`：打开撰写/列表时记录 **primary CFI**，分栏 resize 或开合后 `scrollEpubCfiIntoView` 把左侧引用段滚回视口（[epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)）。
-- `thoughtListPanelOpen` 要求 `allThoughts.length > 0`：删光列表后不再占分栏（[epub-read-split-panel.md](./epub-read-split-panel.md)）。
+- `thoughtQuoteAnchorCfiRef`：打开撰写/列表时记录 **primary CFI**，分栏 resize 或开合后 `scrollEpubCfiIntoView` 把左侧引用段滚回视口（[epub-thought-quote-viewport.md](../epub-thought-quote-viewport.md)）。
+- `thoughtListPanelOpen` 要求 `allThoughts.length > 0`：删光列表后不再占分栏（[epub-read-split-panel.md](../epub-read-split-panel.md)）。
 
 ### 2.7 若从零实现：推荐排期
 
@@ -1832,7 +1832,7 @@ sequenceDiagram
 | 虚线变矩形框 | epub.js stroke 继承到 rect | `ensureThoughtUnderlineStyles` + patch rect |
 | 保存后无线 | thoughts 未传入 EpubPane / sync 未跑 | 检查 `useEffect([thoughts])` |
 | 重叠双线 | 未走 patch blocker | 确认 `runEpubReadingAnnotationPatch` 在 apply 之后 |
-| 听 current 误删划线 | 播放层 remove highlight | 播放用独立 class，见 [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) |
+| 听 current 误删划线 | 播放层 remove highlight | 播放用独立 class，见 [epub-listen-user-highlight-reconcile.md](../epub-listen-user-highlight-reconcile.md) |
 | PDF 无想法 | 无 EPUB CFI | 产品范围仅 EPUB |
 
 ---
@@ -2022,7 +2022,7 @@ async listThoughts(userId: number, bookId: string): Promise<EbookThoughtDto[]> {
 
 - `EbookReadSplitLayout`：`sidePanelOpen` + `sidePanel: ReactNode`，左阅读右面板。
 - `sidePanelOpen = assistantOpen || thoughtDialogOpen || thoughtListPanelOpen`。
-- `thoughtListPanelOpen = thoughtListOpen && cluster != null && allThoughts.length > 0`（删光最后一条须收栏，见 [epub-read-split-panel.md](./epub-read-split-panel.md)）。
+- `thoughtListPanelOpen = thoughtListOpen && cluster != null && allThoughts.length > 0`（删光最后一条须收栏，见 [epub-read-split-panel.md](../epub-read-split-panel.md)）。
 
 ### 15.2 sidePanel 渲染优先级
 

@@ -1,7 +1,7 @@
 # 插件 Registry 静态分发（/remotes）与跨域策略
 
 > **文档角色（主文档）**：本轮「插件注册表落在 `uploads/remotes`、经静态路径与 Vite/Nginx 同源代理对外、Web 避免 CORS」的实现说明。  
-> **延伸阅读**：[../app/mf-plugin-host.md](../app/mf-plugin-host.md)（Host 动态加载）；[../english/learning-notes-remote.md](../english/learning-notes-remote.md)（学习笔记 Remote）；[upload-storage-paths.md](./upload-storage-paths.md)；[nginx.md](./nginx.md)；**第三方任意域名接入**：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)。
+> **延伸阅读**：[../plugins/mf-plugin-host.md](../plugins/mf-plugin-host.md)（Host 动态加载）；[../english/learning-notes-remote.md](../english/learning-notes-remote.md)（学习笔记 Remote）；[upload-storage-paths.md](./upload-storage-paths.md)；[nginx.md](./nginx.md)；**第三方任意域名接入**：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)。
 
 ---
 
@@ -47,7 +47,7 @@ Module Federation Host（`:9002`）启动时需拉取插件清单（registry）�
 | `apps/frontend/src/vite-env.d.ts`                               | registry / entry origins 环境变量类型                |
 | `apps/frontend/.env`                                            | 可选 override 注释说明                               |
 
-**非本篇**：Host `PluginManager` / MF Runtime → [../app/mf-plugin-host.md](../app/mf-plugin-host.md)。
+**非本篇**：Host `PluginManager` / MF Runtime → [../plugins/mf-plugin-host.md](../plugins/mf-plugin-host.md)。
 
 ---
 

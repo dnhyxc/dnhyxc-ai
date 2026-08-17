@@ -2,7 +2,7 @@
 
 > **文档角色**：针对「知识库长文 + 多代码块预览滚动持续卡顿」的专项实现说明（改动前后成对对比 + 每行源码逐行中文注释）。
 > **日期**：2026-07-28
-> **延伸阅读**：[knowledge-preview-scroll-jank.md](./knowledge-preview-scroll-jank.md)（上一轮 FAB / 岛屿 memo / enabled / 贴底 rAF）、[../ideas/knowledge-scroll-jank-fix-steps.md](../ideas/knowledge-scroll-jank-fix-steps.md)（步骤手册，含本轮 **S7**）、[../Influence-point/knowledge-preview-code-toolbar-scroll.md](../Influence-point/knowledge-preview-code-toolbar-scroll.md)（影响面）、[knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md)（预览+助手争用）。
+> **延伸阅读**：[knowledge-preview-scroll-jank.md](./knowledge-preview-scroll-jank.md)（上一轮 FAB / 岛屿 memo / enabled / 贴底 rAF）、[../ideas/knowledge-scroll-jank-fix-steps.md](../ideas/knowledge-scroll-jank-fix-steps.md)（步骤手册，含本轮 **S7**）、[../impact/knowledge-preview-code-toolbar-scroll.md](../impact/knowledge-preview-code-toolbar-scroll.md)（影响面）、[knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md)（预览+助手争用）。
 
 ---
 
@@ -960,7 +960,7 @@ JSDoc 末行追加：`滚动热路径不 refresh 块列表；正文变化（layo
 | 本专题 | `docs/knowledge/knowledge-preview-code-toolbar-scroll.md` |
 | 上一轮滚动层归档 | `docs/knowledge/knowledge-preview-scroll-jank.md` |
 | 步骤手册（含 S7） | `docs/ideas/knowledge-scroll-jank-fix-steps.md` |
-| 影响点 | `docs/Influence-point/knowledge-preview-code-toolbar-scroll.md` |
+| 影响点 | `docs/impact/knowledge-preview-code-toolbar-scroll.md` |
 | 二分纯函数 | `apps/frontend/src/utils/chatCodeFencePinSearch.ts` |
 | 布局实现 | `apps/frontend/src/utils/chatCodeToolbar.ts` |
 | Hook | `apps/frontend/src/hooks/useChatCodeFloatingToolbar.tsx` |

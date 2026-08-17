@@ -1,7 +1,7 @@
 # Markdown 预览/编辑与助手 Panel 布局及滚动对齐
 
 > **文档角色**：本轮 Monaco 知识库编辑器在「预览 / 编辑 / 分屏 / Diff / 文档助手」组合下的布局与滚动行为实现说明。  
-> **延伸阅读**：[markdown-preview-edit-scroll-restore.md](./markdown-preview-edit-scroll-restore.md)（preview↔edit 双向滚动恢复现行实现）、[markdown-split-scroll-sync.md](./markdown-split-scroll-sync.md)（分屏左右跟随滚动算法）、[markdown-bottom-bar.md](./markdown-bottom-bar.md)（底部栏入口）、[../Influence-point/monaco-markdown-view-panel.md](../Influence-point/monaco-markdown-view-panel.md)（对既有功能的影响面与回归清单）。
+> **延伸阅读**：[markdown-preview-edit-scroll-restore.md](./markdown-preview-edit-scroll-restore.md)（preview↔edit 双向滚动恢复现行实现）、[markdown-split-scroll-sync.md](./markdown-split-scroll-sync.md)（分屏左右跟随滚动算法）、[markdown-bottom-bar.md](./markdown-bottom-bar.md)（底部栏入口）、[../impact/monaco-markdown-view-panel.md](../impact/monaco-markdown-view-panel.md)（对既有功能的影响面与回归清单）。
 
 > **说明**：§3/§4 中「切换时滚动对齐」的早期叙述已被 [markdown-preview-edit-scroll-restore.md](./markdown-preview-edit-scroll-restore.md) 覆盖并修正（edit 清空预览正文、助手同开卸载 Monaco 等根因）；阅读滚动恢复请以该专文为准，本文仍保留布局与右栏可见性说明。
 

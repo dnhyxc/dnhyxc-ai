@@ -1,7 +1,7 @@
 # 电子书书架与阅读页实现说明
 
 > **文档角色**：本域**主文档**，覆盖本轮「书架 + 阅读」从前端到后端的完整改动。  
-> **延伸阅读**：上传落盘 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；顶栏路由匹配横切能力见 [app/route-auth.md](../app/route-auth.md)（公开路径策略）。书架卡片、PDF 目录与阅读交互增强见 [shelf-reader-polish.md](./shelf-reader-polish.md)。
+> **延伸阅读**：上传落盘 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；顶栏路由匹配横切能力见 [app/route-auth.md](../auth/route-auth.md)（公开路径策略）。书架卡片、PDF 目录与阅读交互增强见 [shelf-reader-polish.md](./shelf-reader-polish.md)。
 
 ## 1. 背景与目标
 

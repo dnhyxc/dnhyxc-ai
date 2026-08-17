@@ -8,7 +8,7 @@
 
 - [ebook-progress-remote-debounce.md](../ebook/ebook-progress-remote-debounce.md) — 远端 8s 防抖 + keepalive flush 实现归档
 - [ebook-reader-shelf.md](../ebook/ebook-reader-shelf.md) — 书架与阅读页全链路
-- [../Influence-point/ebook-progress-remote-debounce.md](../Influence-point/ebook-progress-remote-debounce.md) — 影响面与回归清单
+- [../impact/ebook-progress-remote-debounce.md](../impact/ebook-progress-remote-debounce.md) — 影响面与回归清单
 - [epub-chapter-listen.md](../ebook/epub-chapter-listen.md) — 听书 `relocated` 高频触发进度的场景
 
 ---

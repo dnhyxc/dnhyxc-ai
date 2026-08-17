@@ -1,6 +1,6 @@
 # EPUB 读书想法：右侧分栏面板
 
-> **已归档**：UI 状态机与关键代码已并入 **[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md) §15**。请勿在此维护细节。
+> **已归档**：UI 状态机与关键代码已并入 **[epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) §15**。请勿在此维护细节。
 
 | 原章节 | 主文档对应 |
 |--------|------------|

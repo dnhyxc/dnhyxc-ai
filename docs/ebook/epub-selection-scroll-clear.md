@@ -2,7 +2,7 @@
 
 **文档角色**：页面滚动后若 PopBar 已隐藏，原生选区高亮常仍残留；滚动（及 relocated）时一并 `removeAllRanges`。
 
-**延伸阅读**：[epub-listen-popbar-dismiss.md](./epub-listen-popbar-dismiss.md)、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[MK 问书流式误清 EPUB 选区（影响点）](../Influence-point/epub-ask-stream-selection-clear.md)
+**延伸阅读**：[epub-listen-popbar-dismiss.md](./epub-listen-popbar-dismiss.md)、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[MK 问书流式误清 EPUB 选区（影响点）](../impact/epub-ask-stream-selection-clear.md)
 
 ---
 

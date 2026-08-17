@@ -477,7 +477,7 @@ export default function IdeasListApp({ api }: HostBridgeProps) {
 ---
 
 **延伸阅读**：
-- [dynamic-plugin-system.md](../app/dynamic-plugin-system.md)：主项目动态插件系统核心实现
-- [mf-implementation-guide.md](../app/mf-implementation-guide.md)：MF 实现过程完整文档
+- [dynamic-plugin-system.md](../plugins/dynamic-plugin-system.md)：主项目动态插件系统核心实现
+- [mf-implementation-guide.md](../plugins/mf-implementation-guide.md)：MF 实现过程完整文档
 
 （若与仓库最新源码不一致，以源码为准。）

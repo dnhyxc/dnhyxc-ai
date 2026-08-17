@@ -4,7 +4,7 @@
 
 **增量专题**：在 [epub-split-soft-resize.md](./epub-split-soft-resize.md) 已用 `softResizeEpubRendition` 处理 **分栏拖拽** 的基础上，修复 **应用窗口放大或全屏** 后已加载 EPUB 章节 **正文贴左、右侧大片空白**、需刷新才恢复的问题。
 
-**姊妹文档**：[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)、[../Influence-point/epub-window-resize-relayout.md](../Influence-point/epub-window-resize-relayout.md)（窗口 resize 影响面）、[../Influence-point/epub-listen-follow-fab-layout.md](../Influence-point/epub-listen-follow-fab-layout.md)（布局离屏 FAB 影响面）。
+**姊妹文档**：[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)、[../impact/epub-window-resize-relayout.md](../impact/epub-window-resize-relayout.md)（窗口 resize 影响面）、[../impact/epub-listen-follow-fab-layout.md](../impact/epub-listen-follow-fab-layout.md)（布局离屏 FAB 影响面）。
 
 ---
 

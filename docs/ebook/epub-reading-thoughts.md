@@ -1,6 +1,6 @@
 # EPUB 读书想法（服务端存储 + 虚线下划线）
 
-> **已归档**：正文已并入 **[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md)**。请勿在此维护实现细节。
+> **已归档**：正文已并入 **[epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md)**。请勿在此维护实现细节。
 
 | 原章节 | 主文档对应 |
 |--------|------------|

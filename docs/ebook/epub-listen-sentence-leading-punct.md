@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [epub-listen-sentence-leading-punct.md](../Influence-point/epub-listen-sentence-leading-punct.md) — 本次改动的**影响面矩阵**与回归清单
+- [epub-listen-sentence-leading-punct.md](../impact/epub-listen-sentence-leading-punct.md) — 本次改动的**影响面矩阵**与回归清单
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册（`buildSentenceOffsetSpans` 调用链）
 - [epub-listen-player-bar.md](./epub-listen-player-bar.md) — 听书分句列表与播放条
 - [epub-quote-listen.md](./epub-quote-listen.md) — 听当前入口与按句 TTS
@@ -754,7 +754,7 @@ export function buildSentenceOffsetSpans(
 | 英语学习 cadence | **有条件变化** — 长文含中文段首标点时段落边界可能变 |
 | 用户划线 / 想法 | **无影响** — 无调用链 |
 
-详细影响面矩阵见 [Influence-point 姊妹稿](../Influence-point/epub-listen-sentence-leading-punct.md)。
+详细影响面矩阵见 [Influence-point 姊妹稿](../impact/epub-listen-sentence-leading-punct.md)。
 
 ### 建议回归
 

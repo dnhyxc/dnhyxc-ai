@@ -1,7 +1,7 @@
 # 后端 `createLlm` 统一工厂
 
 > **文档角色**：硅基流动 + LangChain `ChatOpenAI` 的**唯一创建入口**说明。  
-> **延伸阅读**：[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（业务为何统一硅基、Assistant SSE 等）、[english-learning-gen-robustness.md](./english-learning-gen-robustness.md)（单词包凑条与 JSON 重试）、[llm-runtime-settings.md](./llm-runtime-settings.md)（设置页实例级覆盖 env）、[ocr-create-llm-glm.md](./ocr-create-llm-glm.md)（图片 OCR preset `ocr`）。
+> **延伸阅读**：[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（业务为何统一硅基、Assistant SSE 等）、[english-learning-gen-robustness.md](../english/english-learning-gen-robustness.md)（单词包凑条与 JSON 重试）、[llm-runtime-settings.md](./llm-runtime-settings.md)（设置页实例级覆盖 env）、[ocr-create-llm-glm.md](./ocr-create-llm-glm.md)（图片 OCR preset `ocr`）。
 
 ## 1. 背景与目标
 
@@ -207,7 +207,7 @@ SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-5.1
 |----------|------|
 | 硅基 URL + `deepseek-chat` 模型名 | 配置 `SILICONFLOW_MODEL_NAME`，勿仅依赖 `DEEPSEEK_MODEL_NAME` |
 | 仍使用旧 env 键 `CHAT_SILICONFLOW_MODEL_NAME` 而代码读 `SILICONFLOW_MODEL_NAME` | 改名或双写直至迁移完成 |
-| JSON 模式 + 极大 `maxTokens` 与超长 system | 见 [english-learning-gen-robustness.md](./english-learning-gen-robustness.md) |
+| JSON 模式 + 极大 `maxTokens` 与超长 system | 见 [english-learning-gen-robustness.md](../english/english-learning-gen-robustness.md) |
 
 日志特征：主 Agent 检索与子模型 JSON **几乎同时** 400，且重试无效。
 

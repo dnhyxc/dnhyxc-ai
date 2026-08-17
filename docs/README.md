@@ -16,7 +16,14 @@
 | [`cos/`](./cos/)             | 腾讯云 COS 上传与 `/ext-cos/` 展示      | [cos/README.md](./cos/README.md)                                                                                                         |
 | [`llm/`](./llm/)             | 大模型接入（硅基、`createLlm`、设置页） | [llm/README.md](./llm/README.md)                                                                                                         |
 | [`ops/`](./ops/)             | 部署、Nginx、本地上传目录               | [ops/README.md](./ops/README.md)                                                                                                         |
-| [`app/`](./app/)             | 前端壳层：路由鉴权、Tauri、i18n         | [app/README.md](./app/README.md)                                                                                                         |
+| [`app/`](./app/)             | 前端壳层（构建、网络、文件选择）        | [app/README.md](./app/README.md)                                                                                                         |
+| [`plugins/`](./plugins/)    | 插件/微前端系统（MF、插件开发）        | [plugins/mf-implementation-guide.md](./plugins/mf-implementation-guide.md)                                                               |
+| [`tauri/`](./tauri/)         | Tauri 桌面特性（窗口、菜单、全屏）      | [tauri/tauri-window-zoom-unveil.md](./tauri/tauri-window-zoom-unveil.md)                                                                 |
+| [`auth/`](./auth/)           | 认证登录（路由守卫、SecretInput）      | [auth/route-auth.md](./auth/route-auth.md)                                                                                               |
+| [`style/`](./style/)         | 样式隔离（@scope、Portal、qiankun）    | [style/style-isolation-implementation.md](./style/style-isolation-implementation.md)                                                     |
+| [`video/`](./video/)         | 视频播放器（组件化、影院态、画中画）    | [video/video-player-plugin.md](./video/video-player-plugin.md)                                                                           |
+| [`i18n/`](./i18n/)           | 国际化（中英文界面）                    | [i18n/i18n-zh-en-implementation-guide.md](./i18n/i18n-zh-en-implementation-guide.md)                                                       |
+| [`ui/`](./ui/)               | 通用 UI/UX（组件、交互、编辑器）        | [ui/ui-tint-polish.md](./ui/ui-tint-polish.md)                                                                                           |
 | [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器                | [monaco/README.md](./monaco/README.md)                                                                                                    |
 | [`mermaid/`](./mermaid/)     | Mermaid 围栏与预览                      | [mermaid/markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md)                                                           |
 | [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit`               | [tools/index.md](./tools/index.md)                                                                                                       |
@@ -26,7 +33,7 @@
 | [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
 | [`ideas/`](./ideas/)         | **规划态**功能实现思路（架构/流程图）   | [ideas/README.md](./ideas/README.md)                                                                                                     |
-| [`Influence-point/`](./Influence-point/) | 跨功能改动影响面分析              | [Influence-point/README.md](./Influence-point/README.md)                                                                                 |
+| [`impact/`](./impact/)       | 跨功能改动影响面分析                    | [impact/README.md](./impact/README.md)                                                                                                   |
 
 ---
 
@@ -39,14 +46,14 @@
 | COS 能预览但下载失败                                              | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.7                                                                                            |
 | 分享页无用户附件                                                  | [chat/share.md](./chat/share.md) §五 + [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.9                                                     |
 | 知识分享「更新时间」差 8h（如凌晨变 18 点）                       | [chat/share-knowledge-timezone.md](./chat/share-knowledge-timezone.md)                                                                                   |
-| Web HTTPS mixed content                                           | 同上 + [app/route-auth.md](./app/route-auth.md) §12 + [ops/nginx.md](./ops/nginx.md)                                                                     |
-| Tauri macOS ATS                                                   | [app/tauri-macos-ats-http.md](./app/tauri-macos-ats-http.md)                                                                                             |
+| Web HTTPS mixed content                                           | 同上 + [auth/route-auth.md](./auth/route-auth.md) §12 + [ops/nginx.md](./ops/nginx.md)                                                                     |
+| Tauri macOS ATS                                                   | [tauri/tauri-macos-ats-http.md](./tauri/tauri-macos-ats-http.md)                                                                                             |
 | 知识库助手 Mermaid 流式                                           | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)                                               |
 | 知识库助手总览                                                    | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                                                                 |
 | 对话硅基接入                                                      | [llm/siliconflow-chat-unification.md](./llm/siliconflow-chat-unification.md)                                                                             |
 | 聊天附件预览失败                                                  | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                                                             |
 | 助手消息选区朗读 / 右键菜单无反应 / 与听书同时出声                | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) |
-| 助手拖选移出窗口后整页上移 / 底边黑缝 / 上下留白不一致              | [app/selection-drag-shell-scroll-guide.md](./app/selection-drag-shell-scroll-guide.md)                                                                     |
+| 助手拖选移出窗口后整页上移 / 底边黑缝 / 上下留白不一致              | [ui/selection-drag-shell-scroll-guide.md](./ui/selection-drag-shell-scroll-guide.md)                                                                     |
 | 选区朗读控制条无法拖动缩放 / 高亮漂移 / 中英混排朗读不准          | [chat/assistant-selection-speak-guide.md](./chat/assistant-selection-speak-guide.md) · [chat/selection-speak-common.md](./chat/selection-speak-common.md)（历史对照） · [ebook/tts-audio-progress-sync.md](./ebook/tts-audio-progress-sync.md)         |
 | 流式对话中选区文字丢失 / 拖选后选区自动消失 | [chat/streaming-selection-preserve.md](./chat/streaming-selection-preserve.md) |
 | 选区朗读无法用系统媒体键（Touch Bar/控制中心）控制 | [chat/selection-speak-media-session.md](./chat/selection-speak-media-session.md) |
@@ -58,44 +65,44 @@
 | Remote `mf-manifest.json` CORS（9002 / `tauri://localhost`）        | [ops/remotes-registry-static.md](./ops/remotes-registry-static.md) §7 + [ideas/third-party-mf-plugin-onboarding.md](./ideas/third-party-mf-plugin-onboarding.md) |
 | 第三方任意域名插件怎么接 / 加插件不发桌面版                         | [ideas/third-party-mf-plugin-onboarding.md](./ideas/third-party-mf-plugin-onboarding.md)（§14 接入者 / §15 基座）                                          |
 | 桌面插件 RUNTIME-003 / Origin tauri://localhost                     | 对方 CORS 漏配；见上 + [apps/remote-plugins/README.md](../apps/remote-plugins/README.md)                                                   |
-| 插件样式污染主站 / 子应用 Button 无样式                             | [app/style-isolation-implementation.md](./app/style-isolation-implementation.md)（实现手册）、[app/style-isolation-modularization.md](./app/style-isolation-modularization.md)（模块化与 PluginHostPage 接入）、[ideas/mf-css-isolation.md](./ideas/mf-css-isolation.md)（思路）                                                                                                 |
-| 同一 Remote 多插件切换后样式丢失 / Drawer Portal 组件无样式 / sonner Toaster 顶开布局 | [app/style-isolation-realm-portal.md](./app/style-isolation-realm-portal.md)（Realm 键 + createPortal 收编 + sonner 保护 + HMR 重包） |
-| Vue Teleport / CSS-in-JS 样式泄漏 / `@font-face` 失效 / keyframes 撞名 | [app/style-isolation-qiankun-harden.md](./app/style-isolation-qiankun-harden.md)（transpile / CSSOM / body Portal / captureStack） |
-| 样式隔离源码是怎么分 `protocol / css / sandbox / portal` 四层的 / Host 主题 token 剥离 | [app/style-isolation-layered-refactor.md](./app/style-isolation-layered-refactor.md)（巨石拆分 + `themeStrip` 新增职责 + barrel / smoke 迁位） |
-| 插件 Core 模块怎么分层 / runtime / bridge / types / mf 各自职责 | [app/plugins-core-refactor.md](./app/plugins-core-refactor.md)（扁平单文件 → 分层目录 + barrel 对外接口稳定） |
-| Vue Remote 加载报错 / React 插件中混跑 Vue 组件 / framework 识别失败 | [app/plugin-vue-bridge.md](./app/plugin-vue-bridge.md)（createVueHostBridge / normalizePluginModule / registry framework） |
-| 动态插件加载失败闪烁 / virtual:mf 解析失败                          | [app/mf-plugin-host.md](./app/mf-plugin-host.md)                                                                                                         |
-| 桌面发新版插件仍是旧版 / remoteEntry 被缓存                         | [app/plugin-entry-cache-bust.md](./app/plugin-entry-cache-bust.md)（`version@manifestHash`）+ [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md) |
-| 线上 `/plugins` `useLocation` 无 Router context                     | [app/mf-shared-react-router.md](./app/mf-shared-react-router.md)                                                                                          |
-| 保存 registry 报 hostApi 不兼容 / 误改 hostApiRange                   | [app/plugin-registry-hostapi.md](./app/plugin-registry-hostapi.md)                                                                                        |
-| 改 remote-plugins 内容页面刷两次 / Importing a module script failed | [app/remote-plugin-hmr.md](./app/remote-plugin-hmr.md)                                                                                                    |
-| 插件生命周期钩子同文件挂载 + Fast Refresh 兼容（App.activate / default 静态属性） | [app/plugin-lifecycle-colocation.md](./app/plugin-lifecycle-colocation.md)                                                                               |
-| MF 插件语言同步（Host → Remote locale 推送 / i18n 完整接入）         | [app/mf-plugin-locale-sync.md](./app/mf-plugin-locale-sync.md)                                                                                            |
-| MF 动态插件系统完整实现（Vite / PluginManager / 路由注入）          | [app/dynamic-plugin-system.md](./app/dynamic-plugin-system.md)（含改动前/后对比与逐行注释）                                                              |
-| 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [app/plugin-development-guide.md](./app/plugin-development-guide.md)                                                                                      |
-| 主项目接入插件方式（自动路由 / 手动挂载 / iframe 隔离）             | [app/host-plugin-integration-guide.md](./app/host-plugin-integration-guide.md)                                                                            |
-| 插件图标 SVG URL 动态加载与内联（侧栏 / Host Surface）              | [app/plugin-host-icons.md](./app/plugin-host-icons.md)                                                                                                    |
-| 插件上架/下架（setEnabled / 持久化 / Switch / Registry 编辑页）     | [app/plugin-shelf-toggle.md](./app/plugin-shelf-toggle.md)                                                                                                |
-| 插件开关偏好换号不同步 / Web 与桌面不一致 / 默认全关 / 偏好写回 catalog 污染全局 | [app/plugin-enabled-prefs-persistence.md](./app/plugin-enabled-prefs-persistence.md)                                                                       |
-| 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [app/switch-dynamic-id-fix.md](./app/switch-dynamic-id-fix.md)                                                                                            |
-| 插件中心卡片白边 / 远程插件污染 border-border                       | [app/plugin-card-border-theme.md](./app/plugin-card-border-theme.md)                                                                                      |
-| 视频播放器插件 / 影院态全屏（藏侧栏 + Tauri 窗口/Web document 全屏） | [app/video-player-plugin.md](./app/video-player-plugin.md)、[app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)                                                                                   |
-| 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [app/video-player-component-refactor.md](./app/video-player-component-refactor.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
-| 视频播放器进度条 hover 无缩略图 / 画中画 Safari 不可用 / 长视频刻度卡 | [app/video-player-feature-enhancement.md](./app/video-player-feature-enhancement.md)（缩略图预览 + 多平台画中画 + 刻度上限）                                                                 |
-| 视频播放器拖拽松手右抖 / 循环单条不重播 / 控制条毛玻璃慢一拍 / xgplayer 背景不跟随主题 | [app/video-player-drag-scrub.md](./app/video-player-drag-scrub.md)（拖拽重写 + scrubHoldUntil 抑制 + 画布固定 160×90 + visible 显隐） |
-| 微前端插件目录 `plugins/` 被整包抽走、业务 import 全失效           | [app/federation-kit-migration.md](./app/federation-kit-migration.md)（`@dnhyxc-ai/federation-kit` + `src/federation` 薄适配 + `PluginHostSurface` 通用模版 + `mf.start()` 迁移） |
-| sonner Toast 点击失效 / 关闭按钮按不动                             | [app/sonner-pointer-events-fix.md](./app/sonner-pointer-events-fix.md)（Toast 根 + `<Sonner>` className + style 三处 `pointer-events: auto` 加固） |
-| 富文本编辑器标题与正文分离 / Tab 缩进失效 / Cmd+↑↓ 无响应 / 空段落删不掉 | [app/rich-editor-feature.md](./app/rich-editor-feature.md)（TitleNode + TabIndent + DocEdgeNav + EmptyParagraphDelete 自定义扩展） |
+| 插件样式污染主站 / 子应用 Button 无样式                             | [style/style-isolation-implementation.md](./style/style-isolation-implementation.md)（实现手册）、[style/style-isolation-modularization.md](./style/style-isolation-modularization.md)（模块化与 PluginHostPage 接入）、[ideas/mf-css-isolation.md](./ideas/mf-css-isolation.md)（思路）                                                                                                 |
+| 同一 Remote 多插件切换后样式丢失 / Drawer Portal 组件无样式 / sonner Toaster 顶开布局 | [style/style-isolation-realm-portal.md](./style/style-isolation-realm-portal.md)（Realm 键 + createPortal 收编 + sonner 保护 + HMR 重包） |
+| Vue Teleport / CSS-in-JS 样式泄漏 / `@font-face` 失效 / keyframes 撞名 | [style/style-isolation-qiankun-harden.md](./style/style-isolation-qiankun-harden.md)（transpile / CSSOM / body Portal / captureStack） |
+| 样式隔离源码是怎么分 `protocol / css / sandbox / portal` 四层的 / Host 主题 token 剥离 | [style/style-isolation-layered-refactor.md](./style/style-isolation-layered-refactor.md)（巨石拆分 + `themeStrip` 新增职责 + barrel / smoke 迁位） |
+| 插件 Core 模块怎么分层 / runtime / bridge / types / mf 各自职责 | [plugins/plugins-core-refactor.md](./plugins/plugins-core-refactor.md)（扁平单文件 → 分层目录 + barrel 对外接口稳定） |
+| Vue Remote 加载报错 / React 插件中混跑 Vue 组件 / framework 识别失败 | [plugins/plugin-vue-bridge.md](./plugins/plugin-vue-bridge.md)（createVueHostBridge / normalizePluginModule / registry framework） |
+| 动态插件加载失败闪烁 / virtual:mf 解析失败                          | [plugins/mf-plugin-host.md](./plugins/mf-plugin-host.md)                                                                                                         |
+| 桌面发新版插件仍是旧版 / remoteEntry 被缓存                         | [plugins/plugin-entry-cache-bust.md](./plugins/plugin-entry-cache-bust.md)（`version@manifestHash`）+ [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md) |
+| 线上 `/plugins` `useLocation` 无 Router context                     | [plugins/mf-shared-react-router.md](./plugins/mf-shared-react-router.md)                                                                                          |
+| 保存 registry 报 hostApi 不兼容 / 误改 hostApiRange                   | [plugins/plugin-registry-hostapi.md](./plugins/plugin-registry-hostapi.md)                                                                                        |
+| 改 remote-plugins 内容页面刷两次 / Importing a module script failed | [plugins/remote-plugin-hmr.md](./plugins/remote-plugin-hmr.md)                                                                                                    |
+| 插件生命周期钩子同文件挂载 + Fast Refresh 兼容（App.activate / default 静态属性） | [app/plugin-lifecycle-colocation.md](./plugins/plugin-lifecycle-colocation.md)                                                                               |
+| MF 插件语言同步（Host → Remote locale 推送 / i18n 完整接入）         | [plugins/mf-plugin-locale-sync.md](./plugins/mf-plugin-locale-sync.md)                                                                                            |
+| MF 动态插件系统完整实现（Vite / PluginManager / 路由注入）          | [plugins/dynamic-plugin-system.md](./plugins/dynamic-plugin-system.md)（含改动前/后对比与逐行注释）                                                              |
+| 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [plugins/plugin-development-guide.md](./plugins/plugin-development-guide.md)                                                                                      |
+| 主项目接入插件方式（自动路由 / 手动挂载 / iframe 隔离）             | [plugins/host-plugin-integration-guide.md](./plugins/host-plugin-integration-guide.md)                                                                            |
+| 插件图标 SVG URL 动态加载与内联（侧栏 / Host Surface）              | [plugins/plugin-host-icons.md](./plugins/plugin-host-icons.md)                                                                                                    |
+| 插件上架/下架（setEnabled / 持久化 / Switch / Registry 编辑页）     | [plugins/plugin-shelf-toggle.md](./plugins/plugin-shelf-toggle.md)                                                                                                |
+| 插件开关偏好换号不同步 / Web 与桌面不一致 / 默认全关 / 偏好写回 catalog 污染全局 | [plugins/plugin-enabled-prefs-persistence.md](./plugins/plugin-enabled-prefs-persistence.md)                                                                       |
+| 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [plugins/switch-dynamic-id-fix.md](./plugins/switch-dynamic-id-fix.md)                                                                                            |
+| 插件中心卡片白边 / 远程插件污染 border-border                       | [plugins/plugin-card-border-theme.md](./plugins/plugin-card-border-theme.md)                                                                                      |
+| 视频播放器插件 / 影院态全屏（藏侧栏 + Tauri 窗口/Web document 全屏） | [video/video-player-plugin.md](./video/video-player-plugin.md)、[plugins/plugin-cinema-fullscreen.md](./plugins/plugin-cinema-fullscreen.md)                                                                                   |
+| 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [video/video-player-component-refactor.md](./video/video-player-component-refactor.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
+| 视频播放器进度条 hover 无缩略图 / 画中画 Safari 不可用 / 长视频刻度卡 | [video/video-player-feature-enhancement.md](./video/video-player-feature-enhancement.md)（缩略图预览 + 多平台画中画 + 刻度上限）                                                                 |
+| 视频播放器拖拽松手右抖 / 循环单条不重播 / 控制条毛玻璃慢一拍 / xgplayer 背景不跟随主题 | [video/video-player-drag-scrub.md](./video/video-player-drag-scrub.md)（拖拽重写 + scrubHoldUntil 抑制 + 画布固定 160×90 + visible 显隐） |
+| 微前端插件目录 `plugins/` 被整包抽走、业务 import 全失效           | [plugins/federation-kit-migration.md](./plugins/federation-kit-migration.md)（`@dnhyxc-ai/federation-kit` + `src/federation` 薄适配 + `PluginHostSurface` 通用模版 + `mf.start()` 迁移） |
+| sonner Toast 点击失效 / 关闭按钮按不动                             | [style/sonner-pointer-events-fix.md](./style/sonner-pointer-events-fix.md)（Toast 根 + `<Sonner>` className + style 三处 `pointer-events: auto` 加固） |
+| 富文本编辑器标题与正文分离 / Tab 缩进失效 / Cmd+↑↓ 无响应 / 空段落删不掉 | [ui/rich-editor-feature.md](./ui/rich-editor-feature.md)（TitleNode + TabIndent + DocEdgeNav + EmptyParagraphDelete 自定义扩展） |
 | 学习笔记列表不分页 / 无法导出 DOCX / 公开状态切换失败 / 保存无 Toast | [app/learning-notes-implementation.md](./app/learning-notes-implementation.md)（MobX Store + HostHttp 注入 + 累积分页 + 双端 downloadBlob） |
-| 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [app/video-player-chrome-cinema-theme.md](./app/video-player-chrome-cinema-theme.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |
-| 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
-| 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [app/plugin-cinema-fullscreen.md](./app/plugin-cinema-fullscreen.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
-| macOS 绿钮/菜单退出全屏时侧栏晚一步消失 / 缩窗动画与影院态不同步     | [app/tauri-fullscreen-sync.md](./app/tauri-fullscreen-sync.md)（`fullscreen_watch.rs` + `NSWindowWillExitFullScreenNotification` + `host://will-exit-fullscreen` + `flushSync` + `ignoreNativeUntil` 防抖） |
-| 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./app/tauri-webview-context-menu-disable.md)                                                                  |
-| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [app/tauri-window-zoom-unveil.md](./app/tauri-window-zoom-unveil.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/tauri-window-zoom-unveil.md](./ideas/tauri-window-zoom-unveil.md)（规划思路） |
-| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [app/tauri-system-menu-shortcuts.md](./app/tauri-system-menu-shortcuts.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/tauri-system-menu-shortcuts.md](./ideas/tauri-system-menu-shortcuts.md)（规划思路） |
-| 关于子窗加载慢 / 关于窗口主题与主窗不一致                          | [app/about-window-lightweight.md](./app/about-window-lightweight.md)（main.tsx 按 pathname 分流 + about.tsx 极简入口 + readWindowChromeThemeSync 同步读主题） |
-| 菜单/侧边栏登出不一致 / 多窗口主题不同步 / 401 后状态残留          | [app/logout-unify-theme-sync.md](./app/logout-unify-theme-sync.md)（performLogout 集中清态 + 动态 import 规避循环依赖 + setThemeToAllWindows 广播） |
+| 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [video/video-player-chrome-cinema-theme.md](./video/video-player-chrome-cinema-theme.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |
+| 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [plugins/plugin-cinema-fullscreen.md](./plugins/plugin-cinema-fullscreen.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
+| 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [plugins/plugin-cinema-fullscreen.md](./plugins/plugin-cinema-fullscreen.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
+| macOS 绿钮/菜单退出全屏时侧栏晚一步消失 / 缩窗动画与影院态不同步     | [tauri/tauri-fullscreen-sync.md](./tauri/tauri-fullscreen-sync.md)（`fullscreen_watch.rs` + `NSWindowWillExitFullScreenNotification` + `host://will-exit-fullscreen` + `flushSync` + `ignoreNativeUntil` 防抖） |
+| 桌面端 WebView 右键仍弹系统菜单 / 想禁用右键菜单                    | [app/tauri-webview-context-menu-disable.md](./tauri/tauri-webview-context-menu-disable.md)                                                                  |
+| macOS 双击标题栏放大窗口露白 / 壳先大页后跟 / 缩放不同步           | [tauri/tauri-window-zoom-unveil.md](./tauri/tauri-window-zoom-unveil.md)（实现：swizzle zoom: + 目标尺寸预布局 + 揭开动画）· [ideas/tauri-window-zoom-unveil.md](./ideas/tauri-window-zoom-unveil.md)（规划思路） |
+| 系统菜单加速键改键后不更新 / 全局热键抢占系统 / 页面快捷键冲突     | [tauri/tauri-system-menu-shortcuts.md](./tauri/tauri-system-menu-shortcuts.md)（实现：store 单一真相源 + IconMenuItem set_accelerator + 失焦反注册 + 写法归一化冲突检测）· [ideas/tauri-system-menu-shortcuts.md](./ideas/tauri-system-menu-shortcuts.md)（规划思路） |
+| 关于子窗加载慢 / 关于窗口主题与主窗不一致                          | [tauri/about-window-lightweight.md](./tauri/about-window-lightweight.md)（main.tsx 按 pathname 分流 + about.tsx 极简入口 + readWindowChromeThemeSync 同步读主题） |
+| 菜单/侧边栏登出不一致 / 多窗口主题不同步 / 401 后状态残留          | [auth/logout-unify-theme-sync.md](./auth/logout-unify-theme-sync.md)（performLogout 集中清态 + 动态 import 规避循环依赖 + setThemeToAllWindows 广播） |
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/ebook-plugin-ideas-list.md](./ebook/ebook-plugin-ideas-list.md)                                                                                    |
 | 后端 Remote 静态资源服务（serveRemote / uploads/remotes）           | [ops/remote-static-resources.md](./ops/remote-static-resources.md)                                                                                        |
 | remotes registry 仍被缓存 / 桌面吃旧清单                            | [ops/remotes-no-store-cache.md](./ops/remotes-no-store-cache.md)                                                                                           |
@@ -123,7 +130,7 @@
 | 知识库长文编辑卡顿（标题/正文/助手输入）                          | [knowledge/knowledge-editor-long-text-perf.md](./knowledge/knowledge-editor-long-text-perf.md)                                                             |
 | 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/knowledge-preview-assistant-perf.md](./knowledge/knowledge-preview-assistant-perf.md) · [knowledge/knowledge-preview-scroll-jank.md](./knowledge/knowledge-preview-scroll-jank.md) |
 | 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/knowledge-preview-scroll-jank.md](./knowledge/knowledge-preview-scroll-jank.md) · [ideas/knowledge-scroll-jank-fix-steps.md](./ideas/knowledge-scroll-jank-fix-steps.md) |
-| 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/knowledge-preview-code-toolbar-scroll.md](./knowledge/knowledge-preview-code-toolbar-scroll.md) · [Influence-point/knowledge-preview-code-toolbar-scroll.md](./Influence-point/knowledge-preview-code-toolbar-scroll.md) |
+| 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/knowledge-preview-code-toolbar-scroll.md](./knowledge/knowledge-preview-code-toolbar-scroll.md) · [impact/knowledge-preview-code-toolbar-scroll.md](./impact/knowledge-preview-code-toolbar-scroll.md) |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md)                                                                                         |
@@ -143,19 +150,19 @@
 | Edge 云端不可用 / 非会员选路 / 分模式语速被覆盖               | [english/cloud-tts-edge-voice.md](./english/cloud-tts-edge-voice.md) §5                                                                                  |
 | TTS 从点喇叭到出声（前后端全链路）                                | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md)                                                                                     |
 | 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7                                                                             |
-| 换号后仍看到上一账号的草稿或助手对话                              | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
-| 登录成功瞬间又回到登录页 / cloud-tts 401                          | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md)                                                                             |
-| Tauri 桌面频繁 Toast「网络异常，请检查网络后重试」                | [app/tauri-http-all-method-retry.md](./app/tauri-http-all-method-retry.md)                                                                              |
+| 换号后仍看到上一账号的草稿或助手对话                              | [auth/user-switch-state-reset.md](./auth/user-switch-state-reset.md)                                                                                       |
+| 登录成功瞬间又回到登录页 / cloud-tts 401                          | [auth/login-cloud-tts-prefetch-401.md](./auth/login-cloud-tts-prefetch-401.md)                                                                             |
+| Tauri 桌面频繁 Toast「网络异常，请检查网络后重试」                | [tauri/tauri-http-all-method-retry.md](./tauri/tauri-http-all-method-retry.md)                                                                              |
 | 小程序 EPUB 章节 409 / Processor 无日志 / **已解析换章仍 ~1s** | [ebook/miniprogram-epub-server-parse.md](./ebook/miniprogram-epub-server-parse.md) §3.1、§4.7、[ideas/miniprogram-epub-parse-logic.md](./ideas/miniprogram-epub-parse-logic.md) |
 | 强制刷新后 EPUB/PDF 续读位置丢失 / 听书时 progress 请求过频          | [ebook/ebook-progress-remote-debounce.md](./ebook/ebook-progress-remote-debounce.md)                                                                     |
-| 阅读页顶栏显示「智能对话」而非书架                                | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md)                                              |
+| 阅读页顶栏显示「智能对话」而非书架                                | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[auth/route-auth.md](./auth/route-auth.md)                                              |
 | PDF 目录跳转报 canvas 并发渲染错误                                | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6                                                                                      |
 | EPUB 连续滚动无法自动进入下一章                                   | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2                                                                      |
 | 桌面大文件上传中无法阅读 / 超 120MB 打不开                        | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2                                                                             |
 | 非会员 Web 无法导入 / 会员才云端备份                              | [ebook/ebook-membership-upload.md](./ebook/ebook-membership-upload.md)                                                                                   |
 | 重复选同一路径仍上传                                              | [ebook/ebook-local-path-dedup.md](./ebook/ebook-local-path-dedup.md)                                                                                     |
-| 刷新报 `getStorage` 未初始化                                      | [app/membership-store-circular-deps.md](./app/membership-store-circular-deps.md)                                                                         |
-| 换号后书架仍是上一账号                                            | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
+| 刷新报 `getStorage` 未初始化                                      | [auth/membership-store-circular-deps.md](./auth/membership-store-circular-deps.md)                                                                         |
+| 换号后书架仍是上一账号                                            | [auth/user-switch-state-reset.md](./auth/user-switch-state-reset.md)                                                                                       |
 | 阅读背景色不生效                                                  | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4                                                                                  |
 | PDF 页面太小 / 猛滚连跳多页                                       | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3                                                                             |
 | EPUB 右键无菜单 / 助手与知识库样式不一致                          | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md)         |
@@ -186,8 +193,8 @@
 | EPUB 滚动后选区高亮残留                                           | [ebook/epub-selection-scroll-clear.md](./ebook/epub-selection-scroll-clear.md)                                                                           |
 | EPUB 听书朗读整行星号分隔线                                       | [ebook/epub-tts-separator-filter.md](./ebook/epub-tts-separator-filter.md)                                                                               |
 | EPUB 边听边读 / 顶栏听书 / 播放条 / 分句跳转 / 倍速                 | [ebook/epub-chapter-listen.md](./ebook/epub-chapter-listen.md) · [ebook/epub-listen-player-bar.md](./ebook/epub-listen-player-bar.md) · [ebook/epub-scroll-listen-section-advance.md](./ebook/epub-scroll-listen-section-advance.md) |
-| EPUB 听读分句段首省略号/破折号/开引号错位或空句                     | [ebook/epub-listen-sentence-leading-punct.md](./ebook/epub-listen-sentence-leading-punct.md) · [Influence-point/epub-listen-sentence-leading-punct.md](./Influence-point/epub-listen-sentence-leading-punct.md) |
-| EPUB 听书/听当前云端连播句间停顿过长                               | [ebook/epub-listen-cloud-prefetch.md](./ebook/epub-listen-cloud-prefetch.md) · [Influence-point/epub-listen-cloud-prefetch.md](./Influence-point/epub-listen-cloud-prefetch.md) |
+| EPUB 听读分句段首省略号/破折号/开引号错位或空句                     | [ebook/epub-listen-sentence-leading-punct.md](./ebook/epub-listen-sentence-leading-punct.md) · [impact/epub-listen-sentence-leading-punct.md](./impact/epub-listen-sentence-leading-punct.md) |
+| EPUB 听书/听当前云端连播句间停顿过长                               | [ebook/epub-listen-cloud-prefetch.md](./ebook/epub-listen-cloud-prefetch.md) · [impact/epub-listen-cloud-prefetch.md](./impact/epub-listen-cloud-prefetch.md) |
 | EPUB 听书/听当前按段合成仍逐句高亮 / 首句慢                       | [ebook/epub-listen-paragraph-tts.md](./ebook/epub-listen-paragraph-tts.md) · [ideas/epub-listen-paragraph-tts.md](./ideas/epub-listen-paragraph-tts.md) |
 | EPUB 听书中点目录切章不自动续听 / go trim 抛错                     | [ebook/epub-listen-toc-chapter-restart.md](./ebook/epub-listen-toc-chapter-restart.md)                                                               |
 | 听书目录切章起播落在上一节末句或文件第 0 句                        | [ebook/epub-listen-toc-anchor-start.md](./ebook/epub-listen-toc-anchor-start.md)                                                                     |
@@ -202,8 +209,8 @@
 | 书架已读进度出现很长小数                                          | [ebook/ebook-shelf-progress-pct.md](./ebook/ebook-shelf-progress-pct.md)                                                                               |
 | EPUB 听书底栏切章 / 暂停续播与系统媒体同步                        | [ebook/epub-listen-bar-chapter-nav.md](./ebook/epub-listen-bar-chapter-nav.md) · [ebook/epub-listen-bar-playhead-toc.md](./ebook/epub-listen-bar-playhead-toc.md) · [ebook/epub-listen-soft-pause.md](./ebook/epub-listen-soft-pause.md) |
 | 听书底栏上下章切到错误邻节（同 spine 多节）                        | [ebook/epub-listen-bar-playhead-toc.md](./ebook/epub-listen-bar-playhead-toc.md)                                                                     |
-| 本机听书/听当前第一句无声、第二句正常                               | [english/tts-local-cancel-settle.md](./english/tts-local-cancel-settle.md) · [Influence-point/tts-local-cancel-settle.md](./Influence-point/tts-local-cancel-settle.md) |
-| EPUB 听读播放背景在分栏/侧栏 resize 后错位或消失                    | [ebook/epub-listen-bg-resize-relayout.md](./ebook/epub-listen-bg-resize-relayout.md) · [Influence-point/epub-listen-resize-relayout.md](./Influence-point/epub-listen-resize-relayout.md) |
+| 本机听书/听当前第一句无声、第二句正常                               | [english/tts-local-cancel-settle.md](./english/tts-local-cancel-settle.md) · [impact/tts-local-cancel-settle.md](./impact/tts-local-cancel-settle.md) |
+| EPUB 听读播放背景在分栏/侧栏 resize 后错位或消失                    | [ebook/epub-listen-bg-resize-relayout.md](./ebook/epub-listen-bg-resize-relayout.md) · [impact/epub-listen-resize-relayout.md](./impact/epub-listen-resize-relayout.md) |
 | 听当前无逐句淡黄底 / Safari 无背景                                | [ebook/epub-listen-sentence-bg.md](./ebook/epub-listen-sentence-bg.md)                                                                                   |
 | 听当前跨段多句同时高亮 / 换句背景不消                               | [ebook/epub-listen-host-overlay.md](./ebook/epub-listen-host-overlay.md)                                                                                 |
 | 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
@@ -223,24 +230,24 @@
 | 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md) · [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) |
 | 预览切编辑丢位置 / 助手开时编辑切预览总在文首                     | [monaco/markdown-preview-edit-scroll-restore.md](./monaco/markdown-preview-edit-scroll-restore.md)                                                       |
 | 主题色（强调色）怎么换 / 全站 hover/选中色不跟随 / 首帧闪回 teal  | [setting/accent-color-settings.md](./setting/accent-color-settings.md)（10 色预设 + CSS 变量覆盖 + 首屏防闪 + 原版 teal 豁免）                            |
-| 插件图标 SVG 渲染 / stroke/fill 动画不触发 / 主题色不跟随         | [app/plugin-icon-system.md](./app/plugin-icon-system.md)（PluginIcon + normalizeSvgForHostIcon + pathLength=1 动画） · [app/plugin-host-icons.md](./app/plugin-host-icons.md) |
-| Registry 上传 SVG 图标失败 / 菜单选择后无反应 / 文件选择框闪退   | [app/registry-icon-upload.md](./app/registry-icon-upload.md)（Upload button 模式 + openRef + DropdownMenu scrollable） |
+| 插件图标 SVG 渲染 / stroke/fill 动画不触发 / 主题色不跟随         | [app/plugin-icon-system.md](./plugins/plugin-icon-system.md)（PluginIcon + normalizeSvgForHostIcon + pathLength=1 动画） · [plugins/plugin-host-icons.md](./plugins/plugin-host-icons.md) |
+| Registry 上传 SVG 图标失败 / 菜单选择后无反应 / 文件选择框闪退   | [app/registry-icon-upload.md](./plugins/registry-icon-upload.md)（Upload button 模式 + openRef + DropdownMenu scrollable） |
 | 桌面端选文件 / 新增导入类型需写 Rust 命令 / accept 过滤器不灵活   | [app/unified-file-selection.md](./app/unified-file-selection.md)（通用 `select_files` 替代 3 个专用命令 + `select-files.ts` 模块） |
-| 插件选本地文件 / iframe untrusted 无法选文件 / `convertFileSrc` 配置 | [app/plugin-pick-local-files.md](./app/plugin-pick-local-files.md)（bridge `api.ui.pickLocalFiles` + Host 适配层 + `assetProtocol` 配置） |
+| 插件选本地文件 / iframe untrusted 无法选文件 / `convertFileSrc` 配置 | [app/plugin-pick-local-files.md](./plugins/plugin-pick-local-files.md)（bridge `api.ui.pickLocalFiles` + Host 适配层 + `assetProtocol` 配置） |
 | Web/Tauri 选文件双路径重复 / `pickFileObject` 跨端 / Rust 读文件命令删除 | [app/pick-file-object.md](./app/pick-file-object.md)（跨端 `pickFileObject` + `pickBrowserFiles` + `convertFileSrc` + `fetch` + 错误码统一） |
-| macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./app/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
+| macOS 拖文件闪退 / 对话框打开时拖入 SIGABRT / wry nil pasteboard panic | [app/macos-drag-picker-crash.md](./tauri/macos-drag-picker-crash.md)（`AsyncFileDialog` + wry vendor 补丁 #1723 + `pickerOpenRef` 前端守卫） |
 | 拖文件顶掉 SPA / WKWebView 导航到 file:// / dragDropEnabled false 副作用 | [app/block-file-drop-nav.md](./app/block-file-drop-nav.md)（Rust `on_navigation` 拦截 `file://` + 前端 window 级 `preventDefault`） |
 | 主包体积大 / 首屏慢 / React.lazy / mermaid 动态加载（含形态修复见 §4.6.1）/ Monaco·Prettier 懒加载 / barrel 瘦身 | [app/build-optimization.md](./app/build-optimization.md) |
 | 英语 Agent 选中文本右键朗读 / 复制 / 选区菜单复用 | [english/selection-speak-context-menu.md](./english/selection-speak-context-menu.md)（`useSelectionContextMenu` + `PositionedQuickMenu` + 按段云端 TTS + 悬浮条） |
 | 英语学习 Agent 流式输出输入框卡顿 / 视觉抖动 | [english/english-agent-stream-perf-isolation.md](./english/english-agent-stream-perf-isolation.md) |
 | 听书切句落后听感 / 首句尾音到下句高亮滞后 / rAF 进度轮询 | [ebook/epub-listen-cadence-lead.md](./ebook/epub-listen-cadence-lead.md)（`CLOUD_CADENCE_LEAD_SEC=0.35` + `requestAnimationFrame` + `onPlaybackProgress` + kick ≥0.8 提前切句） |
-| 插件加载失败只能重试 / 想离开当前页或查接入文档 | [app/plugin-host-error-actions.md](./app/plugin-host-error-actions.md)（错误卡片新增「返回首页」「插件开发指南」按钮） |
-| 首页色块/按钮饱和度过高 / 滚动 FAB 圆形过大 / 下拉菜单内边距 | [app/ui-tint-polish.md](./app/ui-tint-polish.md)（`HUE_STYLES` 透明度 + `Button` variant + `ScrollFab` 尺寸 + `DropdownMenuContent` 内边距） |
+| 插件加载失败只能重试 / 想离开当前页或查接入文档 | [app/plugin-host-error-actions.md](./plugins/plugin-host-error-actions.md)（错误卡片新增「返回首页」「插件开发指南」按钮） |
+| 首页色块/按钮饱和度过高 / 滚动 FAB 圆形过大 / 下拉菜单内边距 | [ui/ui-tint-polish.md](./ui/ui-tint-polish.md)（`HUE_STYLES` 透明度 + `Button` variant + `ScrollFab` 尺寸 + `DropdownMenuContent` 内边距） |
 | EPUB 设置滑条 macOS 失焦后变灰 / accent-color 不恢复 | [ebook/epub-settings-range-repaint.md](./ebook/epub-settings-range-repaint.md)（`SettingsRange` + `rangeRepaintKey` + `focus`/`visibilitychange` remount） |
 | EPUB 阅读区选区被问书侧栏滚动误清 | [ebook/epub-selection-scroll-target-filter.md](./ebook/epub-selection-scroll-target-filter.md) |
 | 电子书助手流式输出卡顿 | [ebook/ebook-assistant-stream-patch-scheduler.md](./ebook/ebook-assistant-stream-patch-scheduler.md) |
-| Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/tooltip-controlled-align.md](./app/tooltip-controlled-align.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
-| Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/monaco-loading-restore.md](./app/monaco-loading-restore.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
+| Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/tooltip-controlled-align.md](./ui/tooltip-controlled-align.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
+| Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/monaco-loading-restore.md](./ui/monaco-loading-restore.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
 
 ---
 

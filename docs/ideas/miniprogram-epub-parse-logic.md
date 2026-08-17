@@ -6,10 +6,10 @@
 
 - [ebook-cos-object-key-resolve.md](../ebook/ebook-cos-object-key-resolve.md) — COS 键兼容、`resolveCosObjectKey`、章节图片 `uploadEbookAssetBuffer`
 - [miniprogram-epub-server-parse.md](../ebook/miniprogram-epub-server-parse.md) — **实现归档**（改动前后对比 + BullMQ/`waitForParse` 逐行注释）
-- [epub-miniprogram-server-parse.md](../Influence-point/epub-miniprogram-server-parse.md) — 本次改动对 Web epub.js、进度、下载、部署的回归影响面
+- [epub-miniprogram-server-parse.md](../impact/epub-miniprogram-server-parse.md) — 本次改动对 Web epub.js、进度、下载、部署的回归影响面
 - [wechat-miniprogram-epub-reader.md](./wechat-miniprogram-epub-reader.md) — 微信小程序阅读器整体方案（含 web-view 备选）
 - [ebook-reading-progress-save.md](./ebook-reading-progress-save.md) — 阅读进度保存（Web CFI；小程序用 `chapterIndex + scrollPercent`）
-- [auth-wechat-mini-program-bind.md](../Influence-point/auth-wechat-mini-program-bind.md) — 微信登录与账号关联
+- [auth-wechat-mini-program-bind.md](../impact/auth-wechat-mini-program-bind.md) — 微信登录与账号关联
 
 ---
 

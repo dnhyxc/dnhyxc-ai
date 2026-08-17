@@ -1,7 +1,7 @@
 # 书架：空分类 Tab 隐藏与书名 Tooltip
 
 > **文档角色**：书架分类 Tab 空态过滤、`resetActiveCategoryIfEmpty` 与卡片书名 Tooltip 增强的实现说明。  
-> **延伸阅读**：[ebook-shelf-category.md](./ebook-shelf-category.md)（分类主文档）、[epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)（同轮听书播放条 UI，独立专题）、[../Influence-point/ebook-shelf-empty-tab-reset.md](../Influence-point/ebook-shelf-empty-tab-reset.md)（影响面）。
+> **延伸阅读**：[ebook-shelf-category.md](./ebook-shelf-category.md)（分类主文档）、[epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)（同轮听书播放条 UI，独立专题）、[../impact/ebook-shelf-empty-tab-reset.md](../impact/ebook-shelf-empty-tab-reset.md)（影响面）。
 
 ## 1. 背景与目标
 

@@ -1,6 +1,6 @@
 # EPUB 想法划线（虚线下划线）：完整实现说明（逐步拆解版）
 
-> **已归档**：面向开发者的端到端内容已并入 **[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md)**。本文保留产品向「一句话理解」索引；逐行注释代码以主文档 §3–§8 与源码为准。
+> **已归档**：面向开发者的端到端内容已并入 **[epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md)**。本文保留产品向「一句话理解」索引；逐行注释代码以主文档 §3–§8 与源码为准。
 
 | 原章节 | 主文档对应 |
 |--------|------------|

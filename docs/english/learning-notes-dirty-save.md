@@ -1,7 +1,7 @@
 # 学习笔记：未保存脏标记（保存图标橙点）
 
 > **文档角色（本轮主文档）**：编辑笔记有变更时，工具栏保存图标右上角显示橙点。  
-> **延伸阅读**：[learning-notes-rich-editor.md](./learning-notes-rich-editor.md)；[learning-notes-remote.md](./learning-notes-remote.md)；Host 侧同类交互见 [../app/plugin-registry-hostapi.md](../app/plugin-registry-hostapi.md)。
+> **延伸阅读**：[learning-notes-rich-editor.md](./learning-notes-rich-editor.md)；[learning-notes-remote.md](./learning-notes-remote.md)；Host 侧同类交互见 [../plugins/plugin-registry-hostapi.md](../plugins/plugin-registry-hostapi.md)。
 
 ## 1. 背景与目标
 

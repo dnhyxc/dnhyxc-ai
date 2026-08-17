@@ -1,6 +1,6 @@
 # 学习笔记实现
 
-> **延伸阅读**：[rich-editor-feature.md](./rich-editor-feature.md)（富文本编辑器功能实现）、[video-player-component-refactor.md](./video-player-component-refactor.md)（视频播放器组件化重构）
+> **延伸阅读**：[rich-editor-feature.md](../ui/rich-editor-feature.md)（富文本编辑器功能实现）、[video-player-component-refactor.md](../video/video-player-component-refactor.md)（视频播放器组件化重构）
 
 ## 1. 背景与目标
 

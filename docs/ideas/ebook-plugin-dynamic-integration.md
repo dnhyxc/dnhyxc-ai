@@ -6,7 +6,7 @@
 
 ## 延伸阅读
 
-- 通用插件系统手册：[docs/app/host-plugin-integration-guide.md](../app/host-plugin-integration-guide.md)
+- 通用插件系统手册：[docs/app/host-plugin-integration-guide.md](../plugins/host-plugin-integration-guide.md)
 - 第三方 MF 插件接入（CORS / capabilities / registry 上架）：[docs/ideas/third-party-mf-plugin-onboarding.md](./third-party-mf-plugin-onboarding.md)
 - MF 主子样式互不影响：[docs/ideas/mf-css-isolation.md](./mf-css-isolation.md)
 - 插件开发模板手册：[apps/remote-plugins/plugin-info.md](../../apps/remote-plugins/plugin-info.md)

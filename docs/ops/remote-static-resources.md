@@ -189,7 +189,7 @@ export class UploadPublicController {
 ---
 
 **延伸阅读**：
-- [dynamic-plugin-system.md](../app/dynamic-plugin-system.md)：主项目动态插件系统核心实现
+- [dynamic-plugin-system.md](../plugins/dynamic-plugin-system.md)：主项目动态插件系统核心实现
 - [nginx.md](./nginx.md)：Nginx 配置（含 /remotes 代理）
 
 （若与仓库最新源码不一致，以源码为准。）

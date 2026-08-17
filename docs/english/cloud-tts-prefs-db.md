@@ -204,7 +204,7 @@ export function resetUserState(): void {
 
 偏好入库后在 `setUserInfo` 内预拉取；若登录表单**先** `setUserInfo` **后**写 token，legacy 迁移 **PUT** 会在无 Authorization 时 401，触发全局 `notifyUnauthorized` 清空刚建立的会话。
 
-**修复摘要**（详见 [`../app/login-cloud-tts-prefetch-401.md`](../app/login-cloud-tts-prefetch-401.md)）：
+**修复摘要**（详见 [`../auth/login-cloud-tts-prefetch-401.md`](../auth/login-cloud-tts-prefetch-401.md)）：
 
 - 登录页：先 `setStorage('token')` + `http.setAuthToken`，再 `setUserInfo`
 - 仅会员在 `setUserInfo` 后 prefetch

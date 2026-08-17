@@ -1,7 +1,7 @@
 # 跨端 pickFileObject 统一文件选取：消除 Web/Tauri 双路径
 
 > **文档角色**：新增 `pickFileObject` / `pickFileObjects` 跨端 API，统一 Web input 与 Tauri 系统对话框两条路径，删除业务侧重复的 Web input 代码与 Rust 读取命令
-> **延伸阅读**：[unified-file-selection.md](./unified-file-selection.md)（通用 `select_files` 命令）；[plugin-pick-local-files.md](./plugin-pick-local-files.md)（插件 bridge 选文件）
+> **延伸阅读**：[unified-file-selection.md](../app/unified-file-selection.md)（通用 `select_files` 命令）；[plugin-pick-local-files.md](../plugins/plugin-pick-local-files.md)（插件 bridge 选文件）
 
 ## 1. 背景与目标
 

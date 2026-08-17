@@ -7,7 +7,7 @@
 ## 延伸阅读
 
 - [mf-style-isolation-implementation.md](./mf-style-isolation-implementation.md)
-- [docs/app/style-isolation-layered-refactor.md](../app/style-isolation-layered-refactor.md)
+- [docs/app/style-isolation-layered-refactor.md](../style/style-isolation-layered-refactor.md)
 - [apps/frontend/src/plugins/docs/mf-implementation-guide.md](../../apps/frontend/src/plugins/docs/mf-implementation-guide.md)
 
 ---

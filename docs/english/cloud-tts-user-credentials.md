@@ -5,7 +5,7 @@
 - [cloud-tts-settings.md](./cloud-tts-settings.md) — 设置页结构与偏好同步（部分字段描述待补）
 - [xfyun-cloud-tts.md](./xfyun-cloud-tts.md) — 讯飞 WS 合成与参数映射
 - [cloud-tts-prefs-db.md](./cloud-tts-prefs-db.md) — 偏好表 API
-- [cloud-tts-user-credentials-fallback.md](../Influence-point/cloud-tts-user-credentials-fallback.md) — **影响面与回归清单**
+- [cloud-tts-user-credentials-fallback.md](../impact/cloud-tts-user-credentials-fallback.md) — **影响面与回归清单**
 
 ---
 
@@ -456,7 +456,7 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 | 设置页 UI | `apps/frontend/src/views/setting/cloudTts/index.tsx` |
 | 后端凭证读取 | `apps/backend/src/services/speech-transcription/minimax-tts-prefs.service.ts` |
 | 讯飞合成 | `apps/backend/src/services/speech-transcription/xfyun-tts.service.ts` |
-| 影响面文档 | `docs/Influence-point/cloud-tts-user-credentials-fallback.md` |
+| 影响面文档 | `docs/impact/cloud-tts-user-credentials-fallback.md` |
 
 ---
 

@@ -10,7 +10,7 @@
 - [epub-public-thought-live-sync.md](./epub-public-thought-live-sync.md) — 公开书想法 `/sync` 增量与双轨触发
 - [epub-thought-viewport-perf.md](./epub-thought-viewport-perf.md) — 按章拉取与视口动态挂载
 - [epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md) — 公开书叠层投影 + 滚动 patch 性能
-- [../Influence-point/ebook-public-share.md](../Influence-point/ebook-public-share.md) — **影响点**：公开书对私有书架/阅读的范围
+- [../impact/ebook-public-share.md](../impact/ebook-public-share.md) — **影响点**：公开书对私有书架/阅读的范围
 
 ---
 

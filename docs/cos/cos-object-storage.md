@@ -3,10 +3,10 @@
 > **文档角色（主文档）**：七牛直传迁移为腾讯云 COS；**头像、下载页、智能对话聊天附件**均走后端 `putObject`；文档页等仍可用本地上传。  
 > **延伸阅读**  
 > - 本地上传目录：[../ops/upload-storage-paths.md](../ops/upload-storage-paths.md)  
-> - 开发态同源代理 `/ext-cos/`：[cos-dev-http-proxy.md](./cos-dev-http-proxy.md)  
+> - 开发态同源代理 `/ext-cos/`：[cos-dev-http-proxy.md](../cos/cos-dev-http-proxy.md)  
 > - 生产 Nginx `/ext-cos/`：[../ops/nginx.md](../ops/nginx.md)  
 > - 历史本地上传附件排查：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)  
-> - 分享页附件透出：[../chat/share.md](./share.md) §五
+> - 分享页附件透出：[../chat/share.md](../chat/share.md) §五
 
 若与仓库最新源码不一致，以源码为准。
 
@@ -452,4 +452,4 @@ VITE_COS_PROXY_PREFIX=/ext-cos/
 
 - [../ops/upload-storage-paths.md](../ops/upload-storage-paths.md) — 非 COS 的本地上传
 - [../chat/share.md](../chat/share.md) — 分享顺序与附件 §五
-- [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) — `/ext-cos/` 与 mixed content
+- [cos-dev-http-proxy.md](../cos/cos-dev-http-proxy.md) — `/ext-cos/` 与 mixed content

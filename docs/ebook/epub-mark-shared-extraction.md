@@ -3,7 +3,7 @@
 ## 延伸阅读
 
 - [developer/epub-mark-layers-shared.md](./developer/epub-mark-layers-shared.md) — 三层 mark 共用符号表（维护时以 shared + geometry 为权威）
-- [../Influence-point/epub-mark-shared-extraction.md](../Influence-point/epub-mark-shared-extraction.md) — 影响点与回归清单
+- [../impact/epub-mark-shared-extraction.md](../impact/epub-mark-shared-extraction.md) — 影响点与回归清单
 - [../ideas/epub-mark-layers.md](../ideas/epub-mark-layers.md) — 三层架构规划
 
 ---
@@ -415,7 +415,7 @@ export function setSvgAttrIfChanged(
 | 用户可感知行为 | **无**（纯重构） |
 | TypeScript | `apps/frontend` `tsc --noEmit` **通过** |
 
-详细影响矩阵见 [Influence-point 专题](../Influence-point/epub-mark-shared-extraction.md)。
+详细影响矩阵见 [Influence-point 专题](../impact/epub-mark-shared-extraction.md)。
 
 ---
 
@@ -442,7 +442,7 @@ export function setSvgAttrIfChanged(
 | 想法虚线 | `apps/frontend/src/views/ebook/utils/epubThoughtAnnotations.ts` |
 | 想法 cluster / spine re-export | `apps/frontend/src/views/ebook/utils/epubThoughtCluster.ts` |
 | 听书播放背景 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` |
-| 影响点分析 | `docs/Influence-point/epub-mark-shared-extraction.md` |
+| 影响点分析 | `docs/impact/epub-mark-shared-extraction.md` |
 
 ---
 

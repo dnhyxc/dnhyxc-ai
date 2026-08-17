@@ -1,7 +1,7 @@
 # 流式 Markdown 选区保持
 
 > **文档角色（主文档）**：说明助手消息在 **SSE 流式输出** 期间，用户在 Markdown 正文或代码块内拖选文本时，选区被销毁的问题根因、选区快照/恢复方案与回归边界。
-> **延伸阅读**：[streaming-code-block-scroll.md](./streaming-code-block-scroll.md)（流式代码块横向滚动修复）、[../Influence-point/chat-stream-selection-preserve.md](../Influence-point/chat-stream-selection-preserve.md)（影响点分析）。
+> **延伸阅读**：[streaming-code-block-scroll.md](./streaming-code-block-scroll.md)（流式代码块横向滚动修复）、[../impact/chat-stream-selection-preserve.md](../impact/chat-stream-selection-preserve.md)（影响点分析）。
 
 ---
 
@@ -731,7 +731,7 @@ if (part.type === 'markdown') {
 | 流式正文入口 / StableMarkdownChunk | `apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx` |
 | 流式拆段算法 | `apps/frontend/src/utils/splitMarkdownFences.ts` |
 | 贴底滚动 hook | `apps/frontend/src/hooks/useStickToBottomScroll.ts` |
-| 影响点分析（延伸阅读） | `docs/Influence-point/chat-stream-selection-preserve.md` |
+| 影响点分析（延伸阅读） | `docs/impact/chat-stream-selection-preserve.md` |
 | 代码块横滚修复（延伸阅读） | `docs/chat/streaming-code-block-scroll.md` |
 
 若与仓库最新源码不一致，以源码为准。

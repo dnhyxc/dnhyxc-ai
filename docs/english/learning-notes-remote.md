@@ -2,7 +2,7 @@
 
 > **文档角色（主文档）**：将「学习笔记」作为 Module Federation Remote 嵌入英语学习业务路由，而非顶层动态注入。  
 > **实现位置（已迁）**：`apps/remote-plugins`（federation `remotePlugins`，expose `./LearningNotes`，端口 **9008**）。原 `apps/remote-learning-notes`（:9007）已删除。  
-> **延伸阅读**：[../app/mf-plugin-host.md](../app/mf-plugin-host.md)；[../app/plugin-entry-cache-bust.md](../app/plugin-entry-cache-bust.md)；[../app/remote-plugin-hmr.md](../app/remote-plugin-hmr.md)；[learning-notes-dirty-save.md](./learning-notes-dirty-save.md)；[../ops/remotes-registry-static.md](../ops/remotes-registry-static.md)；[../../apps/remote-plugins/README.md](../../apps/remote-plugins/README.md)；第三方通用接入：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)。
+> **延伸阅读**：[../plugins/mf-plugin-host.md](../plugins/mf-plugin-host.md)；[../plugins/plugin-entry-cache-bust.md](../plugins/plugin-entry-cache-bust.md)；[../plugins/remote-plugin-hmr.md](../plugins/remote-plugin-hmr.md)；[learning-notes-dirty-save.md](./learning-notes-dirty-save.md)；[../ops/remotes-registry-static.md](../ops/remotes-registry-static.md)；[../../apps/remote-plugins/README.md](../../apps/remote-plugins/README.md)；第三方通用接入：[../ideas/third-party-mf-plugin-onboarding.md](../ideas/third-party-mf-plugin-onboarding.md)。
 
 ---
 

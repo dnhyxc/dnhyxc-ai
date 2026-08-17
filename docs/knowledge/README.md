@@ -57,7 +57,7 @@
 | [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) | **长文编辑性能**：纯 edit 停喂隐藏预览、Store 派生 boolean、助手输入内化 |
 | [knowledge-preview-assistant-perf.md](./knowledge-preview-assistant-perf.md) | **预览+助手同开**：SSE rAF 合并、消息列隔离、busy latch、预览加载态 |
 | [knowledge-preview-scroll-jank.md](./knowledge-preview-scroll-jank.md) | **长预览滚动卡顿**：FAB 去重、岛屿 HTML memo、toolbar enabled、流式贴底 rAF 合并；步骤手册见 [../ideas/knowledge-scroll-jank-fix-steps.md](../ideas/knowledge-scroll-jank-fix-steps.md) |
-| [knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md) | **长文多代码块预览滚动**：吸顶栏块列表缓存、二分定位、O(1) 清 pinned；影响点见 [../Influence-point/knowledge-preview-code-toolbar-scroll.md](../Influence-point/knowledge-preview-code-toolbar-scroll.md) |
+| [knowledge-preview-code-toolbar-scroll.md](./knowledge-preview-code-toolbar-scroll.md) | **长文多代码块预览滚动**：吸顶栏块列表缓存、二分定位、O(1) 清 pinned；影响点见 [../impact/knowledge-preview-code-toolbar-scroll.md](../impact/knowledge-preview-code-toolbar-scroll.md) |
 | [shortcuts.md](./shortcuts.md) |
 | [unauthenticated-local-only.md](./unauthenticated-local-only.md) |
 

@@ -1,7 +1,7 @@
 # 通用文件选择命令统一：Tauri select_files 与前端 select-files 模块
 
 > **文档角色**：将分散的 Tauri 文件选择命令统一为通用 `select_files`，前端新增 `select-files.ts` 模块，迁移全部业务调用方
-> **延伸阅读**：[plugin-pick-local-files.md](./plugin-pick-local-files.md)（插件 bridge 选文件能力）
+> **延伸阅读**：[plugin-pick-local-files.md](../plugins/plugin-pick-local-files.md)（插件 bridge 选文件能力）
 
 ## 1. 背景与目标
 
@@ -812,7 +812,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png"] }
 ```
 
-**变更摘要**：新增 `assetProtocol` 配置和 `protocol-asset` feature，使 `convertFileSrc(path)` 能将本地文件路径转为可被 WebView 加载的 `asset://` (macOS) / `https://asset.localhost/` (Windows) URL。这是插件 `pickLocalFiles` 能力的基础设施（见 [plugin-pick-local-files.md](./plugin-pick-local-files.md)）。
+**变更摘要**：新增 `assetProtocol` 配置和 `protocol-asset` feature，使 `convertFileSrc(path)` 能将本地文件路径转为可被 WebView 加载的 `asset://` (macOS) / `https://asset.localhost/` (Windows) URL。这是插件 `pickLocalFiles` 能力的基础设施（见 [plugin-pick-local-files.md](../plugins/plugin-pick-local-files.md)）。
 
 ## 5. 兼容性与影响
 

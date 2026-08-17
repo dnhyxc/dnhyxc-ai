@@ -7,7 +7,7 @@
 ## 延伸阅读
 
 - [epub-scroll-listen-section-advance.md](../ebook/epub-scroll-listen-section-advance.md) — 改动前后代码对比与注释
-- [epub-scroll-listen-section-advance.md](../Influence-point/epub-scroll-listen-section-advance.md) — 影响面与回归清单
+- [epub-scroll-listen-section-advance.md](../impact/epub-scroll-listen-section-advance.md) — 影响面与回归清单
 - [epub-reader-settings-scroll.md](../ebook/epub-reader-settings-scroll.md) — 连续滚动阅读与 `continuous` manager
 - [epub-chapter-listen.md](../ebook/epub-chapter-listen.md) — 听书 MVP 总览
 
@@ -593,7 +593,7 @@ function extractListenSectionForDocument(
 | Advance | `apps/frontend/src/views/ebook/utils/epubScrollListenAdvance.ts` |
 | 抽取 | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` |
 | 滚动容器 | `apps/frontend/src/views/ebook/utils/epubScrolledNav.ts`（只读依赖） |
-| 文档 | `docs/ebook/epub-scroll-listen-section-advance.md`、`docs/Influence-point/epub-scroll-listen-section-advance.md` |
+| 文档 | `docs/ebook/epub-scroll-listen-section-advance.md`、`docs/impact/epub-scroll-listen-section-advance.md` |
 
 ---
 

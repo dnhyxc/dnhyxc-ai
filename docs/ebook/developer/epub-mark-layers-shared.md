@@ -4,7 +4,7 @@
 
 说明 **用户彩色划线**、**想法琥珀虚线**、**听读播放背景** 三类视觉层共用的底层方法：每个符号的**具体作用**、**所在文件**、**谁在什么时机调用**。
 
-**延伸阅读**：[epub-user-highlight-dev.md](./epub-user-highlight-dev.md)、[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md)、[epub-listen-dev.md](./epub-listen-dev.md)、[Influence-point 播放背景 vs 划线](../../Influence-point/epub-listen-bg-vs-annotations.md)。
+**延伸阅读**：[epub-user-highlight-dev.md](./epub-user-highlight-dev.md)、[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md)、[epub-listen-dev.md](./epub-listen-dev.md)、[Influence-point 播放背景 vs 划线](../../impact/epub-listen-bg-vs-annotations.md)。
 
 ---
 
@@ -227,7 +227,7 @@ flowchart TD
   AF -->|是| SCROLL --> SN
 ```
 
-**与用户/想法的本质区别**：播放层 **不调用** `syncEpubReadingAnnotations`，**不写入** `annotations.highlight/underline`；清除 selector 独立，见 [Influence-point](../../Influence-point/epub-listen-bg-vs-annotations.md)。
+**与用户/想法的本质区别**：播放层 **不调用** `syncEpubReadingAnnotations`，**不写入** `annotations.highlight/underline`；清除 selector 独立，见 [Influence-point](../../impact/epub-listen-bg-vs-annotations.md)。
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [knowledge-editor-long-text-perf.md](../Influence-point/knowledge-editor-long-text-perf.md) — 影响面矩阵与回归清单
+- [knowledge-editor-long-text-perf.md](../impact/knowledge-editor-long-text-perf.md) — 影响面矩阵与回归清单
 - [monaco-markdown-view-panel.md](../monaco/markdown-view-panel.md) — 预览/编辑/助手 Panel 布局
 - [knowledge-assistant-complete.md](./knowledge-assistant-complete.md) — 文档助手总览
 
@@ -474,7 +474,7 @@ title={<KnowledgeTitleField t={t} />}
 | 草稿 Store | `apps/frontend/src/store/knowledge.ts` |
 | 文档助手 | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` |
 | 知识编辑页 | `apps/frontend/src/views/knowledge/index.tsx` |
-| 影响面 | `docs/Influence-point/knowledge-editor-long-text-perf.md` |
+| 影响面 | `docs/impact/knowledge-editor-long-text-perf.md` |
 
 ---
 

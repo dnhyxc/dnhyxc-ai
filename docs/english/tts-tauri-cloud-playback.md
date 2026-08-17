@@ -1,6 +1,6 @@
 # Tauri 云端 MP3 播放修复 — 实现说明
 
-**文档角色**：修复线上 Tauri 桌面「云端朗读 UI 显示播放中但无声、暂停再播才恢复」及 Edge 读 body 挂起。影响面见 [../Influence-point/tts-tauri-cloud-playback.md](../Influence-point/tts-tauri-cloud-playback.md)。Edge 接入与 prosody 见 [cloud-tts-edge-voice.md](./cloud-tts-edge-voice.md)；HttpClient 网络重试（TTS POST 少误报）见 [../app/tauri-http-all-method-retry.md](../app/tauri-http-all-method-retry.md)。
+**文档角色**：修复线上 Tauri 桌面「云端朗读 UI 显示播放中但无声、暂停再播才恢复」及 Edge 读 body 挂起。影响面见 [../impact/tts-tauri-cloud-playback.md](../impact/tts-tauri-cloud-playback.md)。Edge 接入与 prosody 见 [cloud-tts-edge-voice.md](./cloud-tts-edge-voice.md)；HttpClient 网络重试（TTS POST 少误报）见 [../tauri/tauri-http-all-method-retry.md](../tauri/tauri-http-all-method-retry.md)。
 
 ## 1. 背景与目标
 
@@ -418,7 +418,7 @@ export function primePlaybackForUserGesture(): void {
 |------|------|
 | 朗读主模块 | `apps/frontend/src/utils/speech.ts` |
 | API 常量 | `apps/frontend/src/service/api.ts` |
-| 影响面 | `docs/Influence-point/tts-tauri-cloud-playback.md` |
+| 影响面 | `docs/impact/tts-tauri-cloud-playback.md` |
 | Edge 全功能 | `docs/english/cloud-tts-edge-voice.md` |
 
 ---

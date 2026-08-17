@@ -6,11 +6,11 @@
 
 ## 延伸阅读
 
-- [style-isolation-tech-overview.md](../app/style-isolation-tech-overview.md)（技术速览）
-- [style-isolation-implementation.md](../app/style-isolation-implementation.md)（初始实现记录）
-- [style-isolation-qiankun-harden.md](../app/style-isolation-qiankun-harden.md)（第三轮加固：transpile/CSSOM/Portal）
+- [style-isolation-tech-overview.md](../style/style-isolation-tech-overview.md)（技术速览）
+- [style-isolation-implementation.md](../style/style-isolation-implementation.md)（初始实现记录）
+- [style-isolation-qiankun-harden.md](../style/style-isolation-qiankun-harden.md)（第三轮加固：transpile/CSSOM/Portal）
 - [mf-css-isolation.md](./mf-css-isolation.md)（规划态初始思路）
-- [mf-implementation-guide.md](../app/mf-implementation-guide.md)（MF 实现总览）
+- [mf-implementation-guide.md](../plugins/mf-implementation-guide.md)（MF 实现总览）
 
 ---
 
@@ -1320,7 +1320,7 @@ useLayoutEffect(() => {
 
 **参考文件**：
 
-- [style-isolation-tech-overview.md](../app/style-isolation-tech-overview.md)（技术速览）
-- [style-isolation-qiankun-harden.md](../app/style-isolation-qiankun-harden.md)（第三轮加固）
+- [style-isolation-tech-overview.md](../style/style-isolation-tech-overview.md)（技术速览）
+- [style-isolation-qiankun-harden.md](../style/style-isolation-qiankun-harden.md)（第三轮加固）
 - [mf-css-isolation.md](./mf-css-isolation.md)（规划态初始思路）
-- [mf-implementation-guide.md](../app/mf-implementation-guide.md)（MF 实现总览）
+- [mf-implementation-guide.md](../plugins/mf-implementation-guide.md)（MF 实现总览）

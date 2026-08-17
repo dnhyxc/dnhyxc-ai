@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [tts-local-cancel-settle.md](../Influence-point/tts-local-cancel-settle.md) — **影响面矩阵**与回归清单
+- [tts-local-cancel-settle.md](../impact/tts-local-cancel-settle.md) — **影响面矩阵**与回归清单
 - [english-tts-playback.md](./english-tts-playback.md) — 播放世代与 `beginPlaybackSession`
 - [epub-quote-listen-player-bar.md](../ebook/epub-quote-listen-player-bar.md) — 听当前按句 `playPreferred` 循环
 - [tts-playback-source.md](./tts-playback-source.md) — 本机 / MiniMax / 讯飞选路
@@ -233,7 +233,7 @@ async function speakTextWithGeneration(
 | EPUB 听书 / 听当前 | 本机来源逐句受益；云端来源不变 |
 | 对外 API | 无签名变更 |
 
-详见 [Influence-point 姊妹稿](../Influence-point/tts-local-cancel-settle.md)。
+详见 [Influence-point 姊妹稿](../impact/tts-local-cancel-settle.md)。
 
 ### 建议回归
 

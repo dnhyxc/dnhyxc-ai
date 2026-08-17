@@ -2,7 +2,7 @@
 
 > **文档角色**：后端对话类能力**为何/如何**统一硅基流动 + `ChatOpenAI` 的产品与技术总览。  
 > **实现细节（创建 LLM 的唯一入口）**：见 **[create-llm.md](./create-llm.md)**（`createLlm` + `preset`）。  
-> **延伸阅读**：[knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md)、[knowledge-qdrant-rag.md](./knowledge-qdrant-rag.md)、[knowledge-siliconflow-embedding-rerank.md](./knowledge-siliconflow-embedding-rerank.md)。
+> **延伸阅读**：[knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md)、[knowledge-qdrant-rag.md](../knowledge/knowledge-qdrant-rag.md)、[knowledge-siliconflow-embedding-rerank.md](../knowledge/knowledge-siliconflow-embedding-rerank.md)。
 
 ## 1. 背景与目标
 

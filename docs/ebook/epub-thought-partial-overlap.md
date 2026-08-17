@@ -1,6 +1,6 @@
 # EPUB 想法虚线：部分重叠选区去重
 
-> **已归档**：根因、patch 两阶段与关键代码已并入 **[epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md) §17**。请勿在此维护细节。
+> **已归档**：根因、patch 两阶段与关键代码已并入 **[epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) §17**。请勿在此维护细节。
 
 | 原章节 | 主文档对应 |
 |--------|------------|

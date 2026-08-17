@@ -4,7 +4,7 @@
 
 - [cloud-tts-edge-voice.md](./cloud-tts-edge-voice.md) — Edge 选路、prosody、设置页
 - [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) — **历史**：曾将 Tauri+Edge 分流至非流式 `/edge/speech`；**当前源码已统一 stream**（见本篇 §4）
-- [../Influence-point/tts-edge-unify-stream-endpoint.md](../Influence-point/tts-edge-unify-stream-endpoint.md) — 影响点与 Tauri 回归清单
+- [../impact/tts-edge-unify-stream-endpoint.md](../impact/tts-edge-unify-stream-endpoint.md) — 影响点与 Tauri 回归清单
 
 ## 1. 背景与目标
 
@@ -117,7 +117,7 @@ async *streamSpeech(dto: EdgeTtsDto, userId?: number): AsyncGenerator<Buffer> {
 | 客户端选路 | `apps/frontend/src/utils/speech.ts` → `startCloudTts` |
 | API 常量 | `apps/frontend/src/service/api.ts` |
 | 后端合成 | `apps/backend/src/services/speech-transcription/edge-tts.service.ts` |
-| 影响点 | `docs/Influence-point/tts-edge-unify-stream-endpoint.md` |
+| 影响点 | `docs/impact/tts-edge-unify-stream-endpoint.md` |
 
 ---
 

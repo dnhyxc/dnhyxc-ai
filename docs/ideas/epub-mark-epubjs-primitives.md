@@ -8,7 +8,7 @@
 
 - [epub-mark-layers.md](./epub-mark-layers.md) — 三层架构、sync 编排、分阶段验收（偏「做什么」）
 - [developer/epub-mark-layers-shared.md](../ebook/developer/epub-mark-layers-shared.md) — 符号级维护定位表
-- [Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) — 播放层 vs 划线层隔离
+- [impact/epub-listen-bg-vs-annotations.md](../impact/epub-listen-bg-vs-annotations.md) — 播放层 vs 划线层隔离
 
 ---
 

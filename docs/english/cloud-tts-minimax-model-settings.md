@@ -2,7 +2,7 @@
 
 ## 延伸阅读
 
-- [../Influence-point/cloud-tts-minimax-model-settings.md](../Influence-point/cloud-tts-minimax-model-settings.md) — 回归矩阵与破坏性变更说明
+- [../impact/cloud-tts-minimax-model-settings.md](../impact/cloud-tts-minimax-model-settings.md) — 回归矩阵与破坏性变更说明
 - [cloud-tts-settings.md](./cloud-tts-settings.md) — 设置页整体结构（本文仅增量 model 相关）
 - [minimax-cloud-tts.md](./minimax-cloud-tts.md) — T2A 全链路（§ 中 8 项 model 描述可能滞后）
 

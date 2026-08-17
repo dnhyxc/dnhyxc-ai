@@ -3,7 +3,7 @@
 > **延伸阅读**  
 > - **按收藏 id 取消 / 批量 remove-batch / status 返回 `{ favorited: [{ wordKey, id }] }`**：[`english-learning-favorites-by-id.md`](./english-learning-favorites-by-id.md)（**以该文为准**更新 remove 与 status 响应）  
 > - 星标「慢半拍」、`onPartial` 渐进点亮、有限并发：[`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md)  
-> - 网络错误 Toast 友好化：[`http-network-error-toast.md`](./http-network-error-toast.md)  
+> - 网络错误 Toast 友好化：[`http-network-error-toast.md`](../app/http-network-error-toast.md)  
 > - 资源库列表会话缓存与滚动恢复：[`library-words-list-cache.md`](./library-words-list-cache.md)  
 > - 网络重试 / HTTP 50 小批 / 资源库分页 Hook：[`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（含 §1.4 线上 vs 本地）
 > - 单词朗读 `preferLocal` / 播放世代：[`english-tts-playback.md`](./english-tts-playback.md)  

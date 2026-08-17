@@ -139,6 +139,6 @@ const { main: mainLlm, summary: summaryLlm } = this.buildModels({
 | 说明 | 路径 |
 |------|------|
 | `createLlm` 工厂与 preset 表 | [create-llm.md](./create-llm.md) |
-| Agent 工具与联网进上下文 | [english-learning-master-agent-web-search-to-llm.md](./english-learning-master-agent-web-search-to-llm.md) |
+| Agent 工具与联网进上下文 | [english-learning-master-agent-web-search-to-llm.md](../english/english-learning-master-agent-web-search-to-llm.md) |
 | 实现 | `apps/backend/src/services/agent/agent.service.ts` |
 | 工厂 | `apps/backend/src/utils/create-llm.ts` |

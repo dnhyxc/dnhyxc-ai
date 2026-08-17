@@ -12,7 +12,7 @@
 
 **用户可感知变化**：无（纯内部路径重组）。因此**不**更新 `project-guide.md` / `project-update-info.md`。
 
-**延伸阅读**：[epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)（mark 层纯抽取）、[../Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md)（听读 utils 7→3 合并，逻辑未因本轮归档而再次拆分）。
+**延伸阅读**：[epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)（mark 层纯抽取）、[../impact/epub-listen-utils-consolidation.md](../impact/epub-listen-utils-consolidation.md)（听读 utils 7→3 合并，逻辑未因本轮归档而再次拆分）。
 
 ---
 

@@ -439,7 +439,7 @@ if (appliedRef.get(cfi) === nextSig && isThoughtUnderlineMarkPresent(rend, cfi))
 | 前端主改 | `apps/frontend/src/views/ebook/utils/epub/mark/epubThoughtAnnotations.ts` |
 | 前端次改 | `apps/frontend/src/views/ebook/utils/epub/mark/epubUserHighlights.ts` |
 | 实现后归档（可选） | `docs/ebook/epub-public-thought-underline-overlay.md`（`implementation-doc-from-diff`） |
-| 影响面（可选） | `docs/Influence-point/epub-public-thought-underline.md` |
+| 影响面（可选） | `docs/impact/epub-public-thought-underline.md` |
 
 ---
 

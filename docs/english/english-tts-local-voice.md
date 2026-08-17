@@ -1,7 +1,7 @@
 # 英语学习：本机 TTS 音色设置与默认 Karen
 
 > **文档角色**：本机 Web Speech 音色、按账号分键、**语音设置页**上方区块 UI。  
-> **延伸阅读**：[`english-tts-playback.md`](./english-tts-playback.md)（播放世代与会员云端策略）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端朗读偏好入库，与本机音色分离）、[`../app/user-switch-state-reset.md`](../app/user-switch-state-reset.md)（换号清内存态；本机音色键**不**清）。
+> **延伸阅读**：[`english-tts-playback.md`](./english-tts-playback.md)（播放世代与会员云端策略）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端朗读偏好入库，与本机音色分离）、[`../auth/user-switch-state-reset.md`](../auth/user-switch-state-reset.md)（换号清内存态；本机音色键**不**清）。
 
 若与仓库最新源码不一致，**以源码为准**。
 

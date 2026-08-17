@@ -4,7 +4,7 @@
 
 - [EPUB 听书：首包出声后再预取](epub-listen-prefetch-after-start.md) — `onPlaybackStart` 错开首包与预取 HTTP（本篇句间预取的后续优化）
 - [EPUB 听书：跨章 trim 后 FAB CFI 重挂载](epub-listen-follow-cfi-remount.md) — FAB 回位与滚动（与本篇带宽优化正交）
-- [epub-listen-cloud-prefetch.md](../Influence-point/epub-listen-cloud-prefetch.md) — **影响面矩阵**与回归清单
+- [epub-listen-cloud-prefetch.md](../impact/epub-listen-cloud-prefetch.md) — **影响面矩阵**与回归清单
 - [developer/epub-listen-dev.md](./developer/epub-listen-dev.md) — 听当前 + 听书总手册
 - [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) — 句界算法（与本篇正交，可同轮发布）
 
@@ -667,7 +667,7 @@ const playFromCursor = useCallback(
 | 云端连播 | 句间等待缩短；停止后未播预取可能仍完成并写 LRU |
 | 超长句（>120 字） | 仅首 chunk 可句间预取；后续 chunk 仍句内预取 |
 
-详见 [Influence-point 姊妹稿](../Influence-point/epub-listen-cloud-prefetch.md)。
+详见 [Influence-point 姊妹稿](../impact/epub-listen-cloud-prefetch.md)。
 
 ---
 

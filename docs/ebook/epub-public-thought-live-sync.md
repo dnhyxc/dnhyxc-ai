@@ -9,7 +9,7 @@
 - [epub-thought-viewport-perf.md](./epub-thought-viewport-perf.md) — 按章拉取 + 视口挂载（与 sync 后 `ephemeralPin` 配合）
 - [epub-public-thought-underline-overlay.md](./epub-public-thought-underline-overlay.md) — 多人虚线叠层几何
 - [../ideas/ebook-public-thought-live-sync.md](../ideas/ebook-public-thought-live-sync.md) — 规划态架构图与时序
-- [../Influence-point/epub-public-thought-live-sync.md](../Influence-point/epub-public-thought-live-sync.md) — **影响点**：`/sync` 对私有书与列表交互
+- [../impact/epub-public-thought-live-sync.md](../impact/epub-public-thought-live-sync.md) — **影响点**：`/sync` 对私有书与列表交互
 
 ---
 

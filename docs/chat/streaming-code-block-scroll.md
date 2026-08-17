@@ -1,7 +1,7 @@
 # 流式输出时代码块横向滚动修复
 
 > **文档角色（主文档）**：说明助手消息在 **SSE 流式输出** 期间，Markdown **围栏代码块**（` ```lang `）无法稳定左右滚动的问题根因、拆段渲染方案与回归边界。  
-> **延伸阅读**：[web-search.md](./web-search.md)（联网引用与 `StreamingMarkdownBody`）、[knowledge/knowledge-assistant-mermaid-streaming.md](../knowledge/knowledge-assistant-mermaid-streaming.md)（Mermaid 流式岛）、[../react/use-stick-to-bottom-scroll.md](../react/use-stick-to-bottom-scroll.md)（贴底滚动）、[../mermaid/markdown-zoom-and-preview.md](../mermaid/markdown-zoom-and-preview.md)（Mermaid 拆岛总览）、[../Influence-point/chat-stream-selection-preserve.md](../Influence-point/chat-stream-selection-preserve.md)（流式选区保持影响面）。
+> **延伸阅读**：[web-search.md](./web-search.md)（联网引用与 `StreamingMarkdownBody`）、[knowledge/knowledge-assistant-mermaid-streaming.md](../knowledge/knowledge-assistant-mermaid-streaming.md)（Mermaid 流式岛）、[../react/use-stick-to-bottom-scroll.md](../react/use-stick-to-bottom-scroll.md)（贴底滚动）、[../mermaid/markdown-zoom-and-preview.md](../mermaid/markdown-zoom-and-preview.md)（Mermaid 拆岛总览）、[../impact/chat-stream-selection-preserve.md](../impact/chat-stream-selection-preserve.md)（流式选区保持影响面）。
 
 ---
 
