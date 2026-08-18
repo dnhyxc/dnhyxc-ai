@@ -230,10 +230,12 @@ const Home = () => {
 																	/>
 																</div>
 																<div
-																	className="mt-1 bg-linear-to-r from-teal-500 via-cyan-500 to-amber-300 bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-tight tracking-tight line-clamp-1 sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]"
+																	className="mt-1 bg-linear-to-r from-teal-500 via-cyan-500 to-amber-300 bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-13.5 tracking-tight sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]"
 																	style={{
 																		fontFamily:
-																			'"Syne", "Noto Sans SC", sans-serif',
+																			locale === 'zh-CN'
+																				? '"Syne", "Noto Sans SC", sans-serif'
+																				: '',
 																	}}
 																>
 																	{s.titleMain}
@@ -245,7 +247,7 @@ const Home = () => {
 
 															{/* Row 2：描述 —— flex-1 占满中部空间，2 行截断 */}
 															<div className="flex min-h-0 flex-1 items-center py-1.5">
-																<p className="min-w-0 text-pretty text-xl font-medium leading-7 text-textcolor/60 line-clamp-2">
+																<p className="min-w-0 text-pretty text-xl font-medium leading-7 text-textcolor/60">
 																	{s.subtitle}
 																</p>
 															</div>

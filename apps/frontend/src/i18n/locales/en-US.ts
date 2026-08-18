@@ -787,26 +787,26 @@ export const enUS = {
 	'home.hero.welcome': 'Welcome',
 	'home.hero.product': 'Smart Assistant',
 	'home.hero.subtitle':
-		'A desktop AI workspace that unifies chat, a Markdown knowledge library, and English learning. Stream conversations, organize notes, practice vocabulary and classic quotes—from dialogue to lasting notes, all in one app.',
+		'A unified AI workspace for chat, Markdown notes, and English learning. Turn conversations into lasting knowledge—all in one app.',
 	'home.hero.quickStart': 'Get started',
 	'home.hero.learnMore': 'Learn more',
 	'home.hero.downloadDesktop': 'Download desktop app',
 	'home.hero.knowledge.title': 'Knowledge',
 	'home.hero.knowledge.subtitle': 'Markdown Notes',
 	'home.hero.knowledge.desc':
-		'A WYSIWYG Markdown editor with file import, dual-pane preview, draft auto-save and trash recovery — capture every spark of inspiration, organize knowledge, and build your personal wiki with structured notes.',
+		'WYSIWYG Markdown editor with import, dual-preview, auto-save, and trash recovery. Capture inspiration, organize knowledge, and build your personal wiki.',
 	'home.hero.ebook.title': 'Bookshelf',
 	'home.hero.ebook.subtitle': 'E-book Reader',
 	'home.hero.ebook.desc':
-		'Import EPUB books with table-of-content navigation, full-text search, reading progress and bookmarks for an immersive reading experience. Every book is within reach, always ready on your digital bookshelf.',
+		'Import EPUBs with TOC navigation, full-text search, progress tracking, and bookmarks—all on your digital bookshelf for immersive reading.',
 	'home.hero.english.title': 'English Learning',
 	'home.hero.english.subtitle': 'Vocabulary & Quotes',
 	'home.hero.english.desc':
-		'Daily words, classic quote practice, mistake book and favorites — build vocabulary and language intuition from multiple angles. Scientific spaced repetition keeps your learning efficient, rhythmic, and rewarding.',
+		'Daily words, quotes, mistakes, and favorites—build vocabulary from every angle. Spaced repetition keeps learning efficient and rewarding.',
 	'home.hero.plugins.title': 'Plugins',
 	'home.hero.plugins.subtitle': 'Extensible',
 	'home.hero.plugins.desc':
-		'Install community plugins to extend capabilities, or follow the dev guide to build your own and flexibly integrate into your workflow. Let your tools grow with your needs in an open, customizable ecosystem.',
+		'Install community plugins or build your own with the dev guide. Customize your workflow in an open ecosystem.',
 	'home.features.enter': 'Enter',
 	'home.sections.showcase': 'Highlights',
 	'home.sections.steps': 'Quick start',
@@ -814,7 +814,7 @@ export const enUS = {
 	'home.features.chat.title': 'Chat',
 	'home.features.chat.subtitle': 'Natural language',
 	'home.features.chat.desc':
-		'Talk naturally with an AI assistant for answers, writing ideas, and learning support.',
+		'Chat naturally with AI for answers, ideas, and learning support.',
 	'home.features.coding.title': 'Code assistant',
 	'home.features.coding.subtitle': 'Developer support',
 	'home.features.coding.desc':
@@ -822,7 +822,7 @@ export const enUS = {
 	'home.features.document.title': 'Document tools',
 	'home.features.document.subtitle': 'Smart analysis',
 	'home.features.document.desc':
-		'Parse, summarize, and extract content from Image, PDF, Word, Excel, and more.',
+		'Parse, summarize, and extract from images, PDFs, Word, Excel, and more.',
 	'home.showcase.plugin.title': 'Plugin System',
 	'home.showcase.plugin.desc': 'Extensible architecture',
 	'home.showcase.fast.title': 'Fast',
