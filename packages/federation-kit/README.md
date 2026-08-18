@@ -54,14 +54,21 @@ await mf.start();
 
 详细实现思路、原理与逐行注释代码见：
 
-- [`docs/README.md`](./docs/README.md) — 索引  
-- [`docs/01-architecture-overview.md`](./docs/01-architecture-overview.md) — 架构总览（先读）  
-- [`docs/07-api-method-reference.md`](./docs/07-api-method-reference.md) — **方法字典**（ensurePlugin / runLoad / resolvePluginBust 等）  
-- [`docs/02-runtime-mf-bridge.md`](./docs/02-runtime-mf-bridge.md) — 运行时 / MF / Bridge  
-- [`docs/03-style-isolation.md`](./docs/03-style-isolation.md) — 样式隔离  
-- [`docs/04-react-host-view.md`](./docs/04-react-host-view.md) — React 挂载  
-- [`docs/05-host-adapter-frontend.md`](./docs/05-host-adapter-frontend.md) — 本仓 `@/federation` 适配层  
-- [`docs/06-replication-playbook.md`](./docs/06-replication-playbook.md) — 跨项目复刻手册
+**实现指南（implements-guide）**：
+- [`implements-guide/README.md`](./docs/implements-guide/README.md) — 索引
+- [`implements-guide/架构概览.md`](./docs/implements-guide/架构概览.md) — 架构总览（先读）
+- [`implements-guide/API方法参考.md`](./docs/implements-guide/API方法参考.md) — **方法字典**（ensurePlugin / runLoad / resolvePluginBust 等）
+- [`implements-guide/运行时与桥接.md`](./docs/implements-guide/运行时与桥接.md) — 运行时 / MF / Bridge
+- [`implements-guide/样式隔离实现.md`](./docs/implements-guide/样式隔离实现.md) — 样式隔离
+- [`implements-guide/React宿主视图.md`](./docs/implements-guide/React宿主视图.md) — React 挂载
+- [`implements-guide/宿主适配层.md`](./docs/implements-guide/宿主适配层.md) — 本仓 `@/federation` 适配层
+- [`implements-guide/复刻方案.md`](./docs/implements-guide/复刻方案.md) — 跨项目复刻手册
+
+**宿主接入指南（host-guide）**：
+- [`host-guide/README.md`](./docs/host-guide/README.md) — 主项目接入手册
+
+**插件开发指南（plugin-guide）**：
+- [`plugin-guide/README.md`](./docs/plugin-guide/README.md) — 子项目/插件开指南
 
 ## Exports
 

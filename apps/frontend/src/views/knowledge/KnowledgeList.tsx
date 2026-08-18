@@ -3,9 +3,16 @@ import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Switch, Toast } from '@ui/index';
-import { Code2, Globe, Trash2 } from 'lucide-react';
+import {
+	ChevronRight,
+	Code2,
+	Folder,
+	FolderOpen,
+	Globe,
+	Trash2,
+} from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { deleteKnowledge } from '@/service';
@@ -21,6 +28,13 @@ import {
 	invokeResolveKnowledgeMarkdownTarget,
 } from '@/utils/knowledge-save';
 import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
+import {
+	buildLocalMdTree,
+	flattenVisibleLocalMdTree,
+	type LocalMdTreeDir,
+	type LocalMdTreeFile,
+	normalizeFsPath,
+} from './knowledge-local-tree';
 
 /** 从绝对路径取所在目录（兼容 `/` 与 `\`） */
 function dirnameFs(filePath: string): string {
@@ -61,6 +75,26 @@ interface KnowledgeListRowProps {
 		e: React.MouseEvent,
 		item: KnowledgeListItem,
 	) => void;
+	/** 本地树缩进层级（0 起） */
+	depth?: number;
+}
+
+interface KnowledgeFolderRowProps {
+	node: LocalMdTreeDir;
+	depth: number;
+	expanded: boolean;
+	onToggle: (path: string) => void;
+}
+
+function localFileToListItem(node: LocalMdTreeFile): KnowledgeListItem {
+	return {
+		id: `${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(node.path)}`,
+		title: node.title,
+		author: null,
+		authorId: null,
+		updatedAt: node.updatedAt,
+		localAbsolutePath: node.path,
+	};
 }
 
 const KnowledgeListRow = (props: KnowledgeListRowProps) => {
@@ -73,6 +107,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		onVisibilityClick,
 		showOpenInExternalEditor = false,
 		onOpenInExternalEditorClick,
+		depth = 0,
 	} = props;
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
@@ -109,6 +144,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		<div
 			onClick={() => void onActivate(item)}
 			onKeyDown={onKeyDown}
+			style={depth > 0 ? { paddingLeft: 15 + depth * 12 } : undefined}
 			className={cn(
 				'group relative w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md transition-colors',
 				selected ? 'bg-theme/10' : 'hover:bg-theme/10',
@@ -228,6 +264,52 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 	);
 };
 
+const KnowledgeFolderRow = (props: KnowledgeFolderRowProps) => {
+	const { node, depth, expanded, onToggle } = props;
+	const onKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			onToggle(node.path);
+		}
+	};
+
+	return (
+		<div
+			role="button"
+			tabIndex={0}
+			aria-expanded={expanded}
+			onClick={() => onToggle(node.path)}
+			onKeyDown={onKeyDown}
+			style={depth > 0 ? { paddingLeft: 8 + depth * 12 } : undefined}
+			className="group relative w-full cursor-pointer overflow-hidden flex items-center gap-1.5 p-2 rounded-md transition-colors hover:bg-theme/10"
+		>
+			<ChevronRight
+				size={14}
+				aria-hidden
+				className={cn(
+					'shrink-0 text-textcolor/50 transition-transform',
+					expanded && 'rotate-90',
+				)}
+			/>
+			{expanded ? (
+				<FolderOpen
+					size={15}
+					className="shrink-0 text-teal-500/90"
+					aria-hidden
+				/>
+			) : (
+				<Folder size={15} className="shrink-0 text-teal-500/90" aria-hidden />
+			)}
+			<span className="min-w-0 truncate font-medium">{node.name}</span>
+			{node.children.length > 0 ? (
+				<span className="shrink-0 text-xs text-textcolor/40">
+					{node.children.length}
+				</span>
+			) : null}
+		</div>
+	);
+};
+
 const KnowledgeList: React.FC<IProps> = observer(
 	({
 		open,
@@ -256,11 +338,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 			isPublic: boolean;
 		} | null>(null);
 
-		/** false：云端列表；true：递归扫描本地文件夹中的 .md */
+		/** false：云端列表；true：本地文件夹树（仅展开含 .md 的目录） */
 		const [useLocalFolder, setUseLocalFolder] = useState(!allowCloudList);
 		const [localFolderPath, setLocalFolderPath] = useState(TAURI_KNOWLEDGE_DIR);
 		const [localList, setLocalList] = useState<KnowledgeListItem[]>([]);
 		const [localLoading, setLocalLoading] = useState(false);
+		const [expandedDirs, setExpandedDirs] = useState(
+			() => new Set([normalizeFsPath(TAURI_KNOWLEDGE_DIR)]),
+		);
 
 		const loadLocalMarkdownList = useCallback(async () => {
 			if (!isTauriRuntime()) return;
@@ -291,6 +376,38 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, [localFolderPath, t]);
 
+		const localTree = useMemo(() => {
+			const root = localFolderPath.trim() || TAURI_KNOWLEDGE_DIR;
+			return buildLocalMdTree(
+				root,
+				localList
+					.filter((i) => !!i.localAbsolutePath)
+					.map((i) => ({
+						path: i.localAbsolutePath!,
+						title:
+							i.title?.trim() ||
+							i.localAbsolutePath!.split(/[/\\]/).pop() ||
+							'',
+						updatedAt: i.updatedAt?.toString() ?? '',
+					})),
+			);
+		}, [localFolderPath, localList]);
+
+		const visibleLocalRows = useMemo(
+			() => flattenVisibleLocalMdTree(localTree, expandedDirs),
+			[localTree, expandedDirs],
+		);
+
+		const toggleLocalDir = useCallback((path: string) => {
+			const key = normalizeFsPath(path);
+			setExpandedDirs((prev) => {
+				const next = new Set(prev);
+				if (next.has(key)) next.delete(key);
+				else next.add(key);
+				return next;
+			});
+		}, []);
+
 		// 未登录：固定使用本地文件夹模式，避免请求云端列表
 		useEffect(() => {
 			if (!allowCloudList) {
@@ -313,7 +430,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 			try {
 				const { invoke } = await import('@tauri-apps/api/core');
 				const dir = await invoke<string>('select_directory');
+				const normalized = normalizeFsPath(dir);
 				setLocalFolderPath(dir);
+				setExpandedDirs(new Set([normalized]));
 			} catch (e) {
 				const msg = formatTauriInvokeError(e);
 				if (msg === t('knowledge.list.dirNotSelected')) return;
@@ -843,25 +962,51 @@ const KnowledgeList: React.FC<IProps> = observer(
 										<Loading text={t('common.loading')} />
 									</div>
 								) : null}
-								{displayList.map((knowledge) => (
-									<KnowledgeListRow
-										key={knowledge.id}
-										item={knowledge}
-										selected={
-											editingKnowledgeId != null &&
-											editingKnowledgeId === knowledge.id
-										}
-										onActivate={handleRowClick}
-										onTrashClick={onTrashClick}
-										onVisibilityClick={
-											useLocalFolder ? undefined : onVisibilityClick
-										}
-										showOpenInExternalEditor={
-											useLocalFolder && isTauriRuntime()
-										}
-										onOpenInExternalEditorClick={onOpenInExternalEditorClick}
-									/>
-								))}
+								{useLocalFolder
+									? visibleLocalRows.map(({ node, depth }) => {
+											if (node.type === 'dir') {
+												return (
+													<KnowledgeFolderRow
+														key={`dir:${node.path}`}
+														node={node}
+														depth={depth}
+														expanded={expandedDirs.has(node.path)}
+														onToggle={toggleLocalDir}
+													/>
+												);
+											}
+											const item = localFileToListItem(node);
+											return (
+												<KnowledgeListRow
+													key={node.path}
+													item={item}
+													depth={depth}
+													selected={
+														editingKnowledgeId != null &&
+														editingKnowledgeId === item.id
+													}
+													onActivate={handleRowClick}
+													onTrashClick={onTrashClick}
+													showOpenInExternalEditor={isTauriRuntime()}
+													onOpenInExternalEditorClick={
+														onOpenInExternalEditorClick
+													}
+												/>
+											);
+										})
+									: displayList.map((knowledge) => (
+											<KnowledgeListRow
+												key={knowledge.id}
+												item={knowledge}
+												selected={
+													editingKnowledgeId != null &&
+													editingKnowledgeId === knowledge.id
+												}
+												onActivate={handleRowClick}
+												onTrashClick={onTrashClick}
+												onVisibilityClick={onVisibilityClick}
+											/>
+										))}
 								{showLoadMoreHint ? (
 									<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
 										<Spinner

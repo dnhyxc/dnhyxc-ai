@@ -844,6 +844,8 @@ export const enUS = {
 	'home.steps.pluginDev.desc': 'Build custom plugins for the platform',
 	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
 	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai web',
+	'home.quicklinks.dnhyxc-ai-admin.title': 'dnhyxc-ai-admin',
+	'home.quicklinks.dnhyxc-ai-admin.desc': 'dnhyxc-ai Backend Management System',
 	'home.quicklinks.blog.title': 'My blog',
 	'home.quicklinks.blog.desc': 'My blog website',
 	'home.quicklinks.github.title': 'GitHub',

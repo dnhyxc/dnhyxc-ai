@@ -458,6 +458,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Switching between Markdown preview and edit in the knowledge base keeps your reading position when possible (including with the doc assistant open). Previously edit→preview was more reliable; preview→edit, or edit→preview with the assistant open, often jumped back to the top.',
 	},
+	's6-29': {
+		title: 'Local knowledge base folder tree browsing',
+		description:
+			'Local knowledge base browsing is upgraded to an expandable folder tree: after selecting a local folder, the app automatically scans for Markdown files and builds a hierarchical tree structure that can be expanded/collapsed. Empty folders are filtered out, showing only paths with .md files. Folder rows support click-to-expand/collapse and keyboard Enter/Space operations; file rows are indented by level and can be edited in-app or opened in an external editor.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

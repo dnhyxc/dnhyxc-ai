@@ -1,7 +1,7 @@
 # 方法级 API 详解（federation-kit）
 
 > **一句话**：把微前端链路里**每一个关键方法**说清楚——做什么、为了什么、参数/返回、谁调谁、副作用、失败时怎样。  
-> **入口**：读完 [01 总览](./01-architecture-overview.md) 后，用本文当「字典」查具体函数。  
+> **入口**：读完 [01 总览](./架构概览.md) 后，用本文当「字典」查具体函数。  
 > **关联源码**：`packages/federation-kit/src/**`、`apps/frontend/src/federation/**`。  
 > **非目标**：不重复粘贴整文件逐行附录（见 02–05）；本文专注**方法语义**。
 
@@ -157,7 +157,7 @@ resolvePluginBust
 | **副作用** | 下载并执行 Remote 脚本；注入 CSS（须在捕获窗内）；缺钩子时 `console.info`。 |
 | **失败** | 无 `default` → `plugin ${id}: expose ./X missing default export`；网络/MF 错误向上抛（由 `runLoad` 收成 `failed`）。 |
 
-> 生命周期解析细节见 [08-lifecycle-hooks.md](./08-lifecycle-hooks.md)。
+> 生命周期解析细节见 [生命周期钩子.md](./生命周期钩子.md)。
 
 ---
 
@@ -170,7 +170,7 @@ resolvePluginBust
 | **缺钩子** | `console.info('[federation-kit] plugin "…": 未导出 activate/deactivate …')`，**不抛错**。 |
 | **Vue** | 先 `pickPluginLifecycle`，再 `createVueHostBridge`（桥组件不携带钩子，钩子摊到 `PluginModule` 顶层）。 |
 | **导出** | 均从 `@dnhyxc-ai/federation-kit` 公开导出。 |
-| **详解** | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md)（含完整带注释源码）。 |
+| **详解** | [生命周期钩子.md](./生命周期钩子.md)（含完整带注释源码）。 |
 
 ---
 
@@ -306,7 +306,7 @@ resolvePluginBust
 | **步骤** | 1. 写入 `status:'loading'` + 临时 bridge<br>2. `verifyPlugin(meta)`<br>3. 若 `trust==='untrusted'`：标 activated（空 default），**不**走 MF<br>4. `registerRemote(meta, bust)`<br>5. `beginPluginStyleCapture`<br>6. `try { loadRemoteApp } finally { endCapture }`（内部 `pickPluginLifecycle`；缺钩子 `console.info`）<br>7. `createHostBridge` + `await mod.activate?.(bridge.api)`（渲染前）<br>8. 写入 `status:'activated'` |
 | **失败** | catch 后 `status:'failed'` + `console.error`，**不 rethrow**（由 `ensurePlugin` 再检查并抛）。`activate` 抛错同样进此路径。 |
 | **为何 finally 关捕获窗** | 无论加载成败都要拆 head 劫持，防止泄漏到后续 Host 样式注入。 |
-| **生命周期专章** | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md) |
+| **生命周期专章** | [生命周期钩子.md](./生命周期钩子.md) |
 
 ---
 
@@ -598,12 +598,12 @@ resolvePluginBust
 | 需求 | 文档 |
 |------|------|
 | 方法干什么（本文） | **07（本文）** |
-| 架构与旅程 | [01](./01-architecture-overview.md) |
-| 运行时全文+逐行注释 | [02](./02-runtime-mf-bridge.md) |
-| 样式隔离全文 | [03](./03-style-isolation.md) |
-| React 组件 | [04](./04-react-host-view.md) |
-| 本仓接线 | [05](./05-host-adapter-frontend.md) |
-| 换项目怎么搭 | [06](./06-replication-playbook.md) |
+| 架构与旅程 | [01](./架构概览.md) |
+| 运行时全文+逐行注释 | [02](./运行时与桥接.md) |
+| 样式隔离全文 | [03](./样式隔离实现.md) |
+| React 组件 | [04](./React宿主视图.md) |
+| 本仓接线 | [05](./宿主适配层.md) |
+| 换项目怎么搭 | [06](./复刻方案.md) |
 
 ---
 

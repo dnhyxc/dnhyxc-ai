@@ -4,7 +4,7 @@
 > **入口**：业务页渲染 `<FederationPlugin name="…" />`，或本仓经 `@/federation` 的 `PluginHostPage` 间接调用。  
 > **关联文件**：`packages/federation-kit/src/react/*`  
 > **文档目标**：读懂 React 挂载层；按复刻手册可在其他 React 宿主落地等价视图。  
-> **非目标**：不写 `createFederation` 启动细节、registry 拉取、样式隔离内部实现（见同目录其他篇）；不写本仓 design 包装（见 `05-host-adapter-frontend.md`）。
+> **非目标**：不写 `createFederation` 启动细节、registry 拉取、样式隔离内部实现（见同目录其他篇）；不写本仓 design 包装（见 `宿主适配层.md`）。
 
 ---
 
@@ -1128,4 +1128,4 @@ export {
 
 ### 7.3 文档范围外的相邻能力
 
-`createFederation`、registry、enabled 存储、style-isolation 内部、本仓 `PluginHostPage` / `PluginHostSurface` 见其他文档（含 `05-host-adapter-frontend.md`）。
+`createFederation`、registry、enabled 存储、style-isolation 内部、本仓 `PluginHostPage` / `PluginHostSurface` 见其他文档（含 `宿主适配层.md`）。

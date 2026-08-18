@@ -472,3 +472,175 @@ export class AssistantSession {
   createdAt: Date;
 }
 ```
+
+---
+
+## 5.10 本地知识库文件夹浏览
+
+### 5.10.1 功能概述
+
+桌面端（Tauri）知识库支持**本地文件夹模式**，用户可选择本地目录作为知识库数据源。本地 `.md` 文件以**可展开目录树**形式展示，仅展示含 `.md` 文件的目录路径，实现类文件管理器的层级浏览体验。
+
+### 5.10.2 目录树数据结构
+
+```typescript
+// knowledge-local-tree.ts
+
+// 树节点类型
+type LocalMdTreeDir = {
+  type: 'dir';
+  name: string;
+  path: string;
+  children: LocalMdTreeNode[];
+};
+
+type LocalMdTreeFile = {
+  type: 'file';
+  name: string;
+  path: string;
+  title: string;
+  updatedAt: string;
+};
+
+type LocalMdTreeNode = LocalMdTreeDir | LocalMdTreeFile;
+
+// 路径归一化
+function normalizeFsPath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+// 树构建算法：O(n) 时间复杂度
+function buildLocalMdTree(
+  rootDir: string,
+  entries: LocalMdTreeEntry[],
+): LocalMdTreeDir {
+  const rootPath = normalizeFsPath(rootDir);
+  const root: LocalMdTreeDir = {
+    type: 'dir',
+    name: basenameFs(rootPath) || rootPath,
+    path: rootPath,
+    children: [],
+  };
+  const prefix = `${rootPath}/`;
+
+  for (const e of entries) {
+    const filePath = normalizeFsPath(e.path);
+    if (!filePath.startsWith(prefix)) continue;
+    const parts = filePath.slice(prefix.length).split('/').filter(Boolean);
+    if (parts.length === 0) continue;
+
+    // 逐层创建中间目录节点
+    let parent = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const name = parts[i]!;
+      const childPath = `${parent.path}/${name}`;
+      let child = parent.children.find(
+        (c): c is LocalMdTreeDir => c.type === 'dir' && c.path === childPath,
+      );
+      if (!child) {
+        child = { type: 'dir', name, path: childPath, children: [] };
+        parent.children.push(child);
+      }
+      parent = child;
+    }
+
+    // 最后一段为文件名
+    const fileName = parts[parts.length - 1]!;
+    parent.children.push({
+      type: 'file',
+      name: fileName,
+      path: filePath,
+      title: e.title,
+      updatedAt: e.updatedAt,
+    });
+  }
+
+  sortDir(root);
+  return root;
+}
+
+// 按展开状态拍平为可见行
+function flattenVisibleLocalMdTree(
+  root: LocalMdTreeDir,
+  expanded: ReadonlySet<string>,
+): Array<{ node: LocalMdTreeNode; depth: number }> {
+  const out: Array<{ node: LocalMdTreeNode; depth: number }> = [];
+  const walk = (node: LocalMdTreeNode, depth: number) => {
+    out.push({ node, depth });
+    if (node.type === 'dir' && expanded.has(node.path)) {
+      for (const c of node.children) walk(c, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+```
+
+### 5.10.3 组件架构
+
+| 组件/模块 | 职责 |
+|-----------|------|
+| `KnowledgeList` | 主容器，管理展开状态、树构建、列表渲染分支 |
+| `KnowledgeFolderRow` | 目录行组件，支持展开/收起交互、缩进、子节点计数 |
+| `KnowledgeListRow` | 文件行组件，扩展 `depth` 属性支持层级缩进 |
+| `knowledge-local-tree.ts` | 独立工具模块：树构建、排序、拍平 |
+
+### 5.10.4 状态管理
+
+```typescript
+// KnowledgeList 中的本地树相关状态
+const [expandedDirs, setExpandedDirs] = useState(
+  () => new Set([normalizeFsPath(TAURI_KNOWLEDGE_DIR)]),
+);
+
+// 派生：目录树结构（useMemo）
+const localTree = useMemo(() => buildLocalMdTree(root, entries), [localList]);
+
+// 派生：可见行列表（useMemo）
+const visibleLocalRows = useMemo(
+  () => flattenVisibleLocalMdTree(localTree, expandedDirs),
+  [localTree, expandedDirs],
+);
+
+// 展开/收起回调
+const toggleLocalDir = useCallback((path: string) => {
+  const key = normalizeFsPath(path);
+  setExpandedDirs((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+}, []);
+```
+
+### 5.10.5 渲染流程
+
+```
+用户选择文件夹 → Tauri invoke('select_directory')
+    │
+    ├─ invokeListKnowledgeMarkdownFiles(dirPath)
+    │   └─ 返回扁平 .md 文件列表
+    │
+    ├─ buildLocalMdTree(root, entries)
+    │   └─ 构建嵌套目录树
+    │
+    ├─ flattenVisibleLocalMdTree(tree, expandedDirs)
+    │   └─ 按展开集合拍平为可见行
+    │
+    └─ 条件渲染
+        ├─ useLocalFolder=true → visibleLocalRows.map()
+        │   ├─ node.type==='dir' → <KnowledgeFolderRow />
+        │   └─ node.type==='file' → <KnowledgeListRow depth={n} />
+        └─ useLocalFolder=false → displayList.map()
+            └─ <KnowledgeListRow />（原有逻辑）
+```
+
+### 5.10.6 关键特性
+
+- **空目录过滤**：仅展示含 `.md` 的目录路径，无文件的中间目录自动省略
+- **中文排序**：同级节点使用 `localeCompare(name, 'zh')` 支持中文本地化排序
+- **路径兼容**：`normalizeFsPath` 统一处理 Windows 反斜杠路径
+- **键盘可达**：目录行支持 Enter/Space 键展开，`tabIndex={0}` 可聚焦
+- **选择新文件夹**：自动重置展开状态，仅展开新根目录
+- **云端模式不受影响**：仅当 `useLocalFolder=true` 时启用树渲染

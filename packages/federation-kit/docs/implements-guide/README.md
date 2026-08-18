@@ -8,15 +8,15 @@
 
 | 顺序 | 文档 | 内容 | 约略篇幅 |
 |------|------|------|----------|
-| 1 | [01-architecture-overview.md](./01-architecture-overview.md) | **先读**：一句话模型、分层、总功能点索引、端到端旅程、问题总表、文档地图 | 总览 |
-| 2 | [07-api-method-reference.md](./07-api-method-reference.md) | **方法字典**：`resolvePluginBust` / `ensurePlugin` / `loadPlugin` / `runLoad` / `createPluginRuntime` 等——作用、目的、签名、调用链、副作用、失败 | 方法详解 |
-| 3 | [02-runtime-mf-bridge.md](./02-runtime-mf-bridge.md) | `createFederation` / `PluginManager` / MF 加载 / 校验 / 偏好 / 路由侧栏注入 / Bridge / iframe / EventBus | 核心运行时 |
-| 4 | [03-style-isolation.md](./03-style-isolation.md) | realm、`claimUnmarked`、head/CSSOM、认领/reclaim、Portal、z-index vs Toast、双入口 `globalThis` | 样式隔离 |
-| 5 | [04-react-host-view.md](./04-react-host-view.md) | `FederationPlugin` / `PluginHostView` / slots / untrusted iframe / hooks | React 挂载 |
-| 6 | [05-host-adapter-frontend.md](./05-host-adapter-frontend.md) | 本仓 `@/federation` 适配层（Toast/COS/偏好/ebook/全屏/design slots） | Host 接线 |
-| 7 | [06-replication-playbook.md](./06-replication-playbook.md) | **跨项目复刻**：前置条件、建造顺序、MVP、验收清单、常见失误 | 可落地手册 |
-| 8 | [08-lifecycle-hooks.md](./08-lifecycle-hooks.md) | **生命周期变更**：`pickPluginLifecycle`、缺钩子 `console.info`、`runLoad`/`unload`、React/Vue 导出（逐行注释） | 生命周期 |
-| 9 | [09-plugin-host-icons.md](./09-plugin-host-icons.md) | **动态插件图标**：registry SVG URL → `PluginIcon` fetch/消毒/内联；侧栏与 Surface 接线；上传写回；画线 CSS（逐行注释） | Host 适配层 |
+| 1 | [架构概览.md](./架构概览.md) | **先读**：一句话模型、分层、总功能点索引、端到端旅程、问题总表、文档地图 | 总览 |
+| 2 | [API方法参考.md](./API方法参考.md) | **方法字典**：`resolvePluginBust` / `ensurePlugin` / `loadPlugin` / `runLoad` / `createPluginRuntime` 等——作用、目的、签名、调用链、副作用、失败 | 方法详解 |
+| 3 | [运行时与桥接.md](./运行时与桥接.md) | `createFederation` / `PluginManager` / MF 加载 / 校验 / 偏好 / 路由侧栏注入 / Bridge / iframe / EventBus | 核心运行时 |
+| 4 | [样式隔离实现.md](./样式隔离实现.md) | realm、`claimUnmarked`、head/CSSOM、认领/reclaim、Portal、z-index vs Toast、双入口 `globalThis` | 样式隔离 |
+| 5 | [React宿主视图.md](./React宿主视图.md) | `FederationPlugin` / `PluginHostView` / slots / untrusted iframe / hooks | React 挂载 |
+| 6 | [宿主适配层.md](./宿主适配层.md) | 本仓 `@/federation` 适配层（Toast/COS/偏好/ebook/全屏/design slots） | Host 接线 |
+| 7 | [复刻方案.md](./复刻方案.md) | **跨项目复刻**：前置条件、建造顺序、MVP、验收清单、常见失误 | 可落地手册 |
+| 8 | [生命周期钩子.md](./生命周期钩子.md) | **生命周期变更**：`pickPluginLifecycle`、缺钩子 `console.info`、`runLoad`/`unload`、React/Vue 导出（逐行注释） | 生命周期 |
+| 9 | [插件图标.md](./插件图标.md) | **动态插件图标**：registry SVG URL → `PluginIcon` fetch/消毒/内联；侧栏与 Surface 接线；上传写回；画线 CSS（逐行注释） | Host 适配层 |
 
 ## 三层心智模型（30 秒）
 
@@ -53,6 +53,6 @@
 
 ## 维护约定
 
-1. 改 kit 行为时：优先更新本目录对应分册，并在 [01](./01-architecture-overview.md) 的功能点索引补一行。  
+1. 改 kit 行为时：优先更新本目录对应分册，并在 [01](./架构概览.md) 的功能点索引补一行。  
 2. 代码块规范：可执行代码行上方必须有中文意图注释（见 feature-impl-guide）。  
 3. 禁止在文档中粘贴密钥、真实 `.env`、生产 COS 凭证。

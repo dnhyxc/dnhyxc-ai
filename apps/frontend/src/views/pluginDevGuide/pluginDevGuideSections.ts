@@ -762,7 +762,7 @@ const introZh =
 	'参考实现（仓外 micro-apps）：\n' +
 	'• React 多页：remote-react-shadcn（端口 9010，内存 NavigationProvider）\n' +
 	'• Vue 多页：remote-vue-shadcn（端口 9009，vue-router：预览 WebHistory / 嵌入 MemoryHistory）\n' +
-	'• 契约文档：packages/federation-kit/docs/plugin-guide（尤其 06 多页 React、09 多页 Vue）\n' +
+	'• 契约文档：packages/federation-kit/docs/plugin-guide（尤其 自动路由接入、Vue插件开发）\n' +
 	'• Host 适配层：apps/frontend/src/federation（再导出 @dnhyxc-ai/federation-kit）\n\n' +
 	'更新日期：' +
 	TODAY;
@@ -915,7 +915,7 @@ const sectionsZh: PluginGuideSection[] = [
 					'• 叶子页用 useNavigation().navigate("/detail")\n' +
 					'• 若 expose 叶子页：Context 默认 navigate 为空函数 → 点击无反应\n' +
 					'• activate 必须挂在壳 App，挂 InfoPage 无效\n' +
-					'详见 packages/federation-kit/docs/plugin-guide/06-connect-auto-route.md §5',
+					'详见 packages/federation-kit/docs/plugin-guide/自动路由接入.md §5',
 			),
 			item(
 				'react-nav-ctx',
@@ -981,7 +981,7 @@ const sectionsZh: PluginGuideSection[] = [
 					'• 独立预览：createWebHistory；Host 嵌入：createMemoryHistory（否则 push("/detail") 会改掉主站 URL）\n' +
 					'• 预览与嵌入共用同一 routes 表\n' +
 					'• activate 参数是 api，不是整个 bridge\n' +
-					'详见 packages/federation-kit/docs/plugin-guide/09-vue-plugin.md §5',
+					'详见 packages/federation-kit/docs/plugin-guide/Vue插件开发.md §5',
 			),
 			item(
 				'vue-router',
@@ -1254,7 +1254,7 @@ const introEn =
 	'References (micro-apps outside this monorepo):\n' +
 	'• React multi-page: remote-react-shadcn (port 9010, in-memory NavigationProvider)\n' +
 	'• Vue multi-page: remote-vue-shadcn (port 9009, vue-router WebHistory preview / MemoryHistory embed)\n' +
-	'• Contracts: packages/federation-kit/docs/plugin-guide (ch.06 React multi-page, ch.09 Vue multi-page)\n' +
+	'• Contracts: packages/federation-kit/docs/plugin-guide (自动路由接入、Vue插件开发)\n' +
 	'• Host adapter: apps/frontend/src/federation (re-exports @dnhyxc-ai/federation-kit)\n\n' +
 	'Updated: ' +
 	TODAY;

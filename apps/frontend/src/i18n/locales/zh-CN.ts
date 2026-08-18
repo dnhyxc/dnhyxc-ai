@@ -776,6 +776,8 @@ export const zhCN = {
 	'home.steps.pluginDev.desc': '为平台开发专属插件',
 	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
 	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai 网页版',
+	'home.quicklinks.dnhyxc-ai-admin.title': 'dnhyxc-ai-admin',
+	'home.quicklinks.dnhyxc-ai-admin.desc': 'dnhyxc-ai 后台管理',
 	'home.quicklinks.blog.title': '我的博客',
 	'home.quicklinks.blog.desc': '我的博客网站',
 	'home.quicklinks.github.title': 'GitHub',

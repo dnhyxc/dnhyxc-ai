@@ -140,6 +140,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'For long articles (e.g. tens of thousands of characters) with the doc assistant open, typing in edit-only mode for title, body, and assistant questions should feel noticeably smoother. Preview and split preview still render the full document after switching; save, auto-save, and assistant send behavior are unchanged.',
 	},
+	'pg-s5-8': {
+		title: '5.8 Local folder tree browsing',
+		description:
+			'When using local knowledge base mode on desktop, after selecting a folder the app automatically scans for Markdown files and displays them as an expandable folder tree.\n\n• Folder structure: hierarchy is built from the actual file paths; empty folders are automatically filtered, showing only paths with .md files\n• Expand/collapse: click a folder row or press Enter/Space to expand or collapse subfolders; the selected root folder is expanded by default\n• File operations: click a file row to edit in-app; use the right-click or action button to open in an external editor or delete the file\n• Hierarchy indentation: files are indented by their folder level for easy identification\n• Cloud mode unaffected: only local folder mode uses the tree view; the cloud knowledge base still uses the list view',
+	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',
 		description:

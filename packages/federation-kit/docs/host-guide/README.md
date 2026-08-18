@@ -14,18 +14,18 @@
 
 | 顺序 | 文件 | 内容 | 篇幅 |
 |------|------|------|------|
-| 1 | [01-concepts.md](./01-concepts.md) | **先读**：微前端要解决的问题、kit 三层架构、三种接入模式、一张数据流图 | 概念 |
-| 2 | [02-preparation.md](./02-preparation.md) | 前置准备：装依赖、Vite federation 配置、路径别名、环境变量、registry 托管位置 | 实操 |
-| 3 | [03-registry.md](./03-registry.md) | `plugins-registry.json` **全字段详解**（每个字段的作用与取值），这是「动态接入」的源头 | 配置 |
-| 4 | [04-create-federation.md](./04-create-federation.md) | `createFederation()` 门面**全部配置项**逐项讲解 + 返回值 `mf` 对象每个方法 | 核心 |
-| 5 | [05-start-router-injection.md](./05-start-router-injection.md) | `mf.start()`、动态路由注入、防刷新闪 404、侧栏菜单注入 | 核心 |
-| 6 | [06-mount-modes.md](./06-mount-modes.md) | 三种挂载模式：自动路由 / 业务内嵌 / iframe；`FederationPlugin`、`PluginHostPage`、`PluginHostSurface`（含 **动态 SVG 图标**）、slots、hooks | 核心 |
-| 7 | [07-bridge-permissions.md](./07-bridge-permissions.md) | HostBridge API：子应用能拿到什么；permissions 权限表；capabilities 能力注入；iframe RPC 扩展 | 能力 |
-| 8 | [08-enabled-registry-impl.md](./08-enabled-registry-impl.md) | 上架偏好 `enabledStore` + registry 拉取/缓存/保存的实现 | 数据 |
-| 9 | [09-security-isolation.md](./09-security-isolation.md) | 安全校验（origin / hostApiRange / integrity / trust）、缓存破坏、样式隔离、untrusted iframe | 安全 |
-| 10 | [10-complete-example.md](./10-complete-example.md) | 端到端完整示例：从零搭建一个 Host，并把本仓真实接入代码逐文件贴出 | 综合 |
+| 1 | [核心概念.md](./宿主概念.md) | **先读**：微前端要解决的问题、kit 三层架构、三种接入模式、一张数据流图 | 概念 |
+| 2 | [准备工作.md](./准备工作.md) | 前置准备：装依赖、Vite federation 配置、路径别名、环境变量、registry 托管位置 | 实操 |
+| 3 | [注册中心.md](./注册中心.md) | `plugins-registry.json` **全字段详解**（每个字段的作用与取值），这是「动态接入」的源头 | 配置 |
+| 4 | [创建联邦.md](./创建联邦.md) | `createFederation()` 门面**全部配置项**逐项讲解 + 返回值 `mf` 对象每个方法 | 核心 |
+| 5 | [路由注入.md](./路由注入.md) | `mf.start()`、动态路由注入、防刷新闪 404、侧栏菜单注入 | 核心 |
+| 6 | [挂载模式.md](./挂载模式.md) | 三种挂载模式：自动路由 / 业务内嵌 / iframe；`FederationPlugin`、`PluginHostPage`、`PluginHostSurface`（含 **动态 SVG 图标**）、slots、hooks | 核心 |
+| 7 | [桥接权限.md](./桥接权限.md) | HostBridge API：子应用能拿到什么；permissions 权限表；capabilities 能力注入；iframe RPC 扩展 | 能力 |
+| 8 | [上架偏好实现.md](./上架偏好实现.md) | 上架偏好 `enabledStore` + registry 拉取/缓存/保存的实现 | 数据 |
+| 9 | [安全隔离.md](./安全隔离.md) | 安全校验（origin / hostApiRange / integrity / trust）、缓存破坏、样式隔离、untrusted iframe | 安全 |
+| 10 | [完整示例.md](./完整示例.md) | 端到端完整示例：从零搭建一个 Host，并把本仓真实接入代码逐文件贴出 | 综合 |
 
-> 时间紧只需看：README 速览 → [02](./02-preparation.md) → [04](./04-create-federation.md) 的第 1 节与第 3 节 → [05](./05-start-router-injection.md) → [06](./06-mount-modes.md) 的「自动路由」一节，即可跑通 MVP。
+> 时间紧只需看：README 速览 → [02](./准备工作.md) → [04](./创建联邦.md) 的第 1 节与第 3 节 → [05](./路由注入.md) → [06](./挂载模式.md) 的「自动路由」一节，即可跑通 MVP。
 
 ---
 

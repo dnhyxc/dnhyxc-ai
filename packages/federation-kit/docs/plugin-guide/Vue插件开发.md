@@ -163,7 +163,7 @@ const toast = () => {
 </script>
 ```
 
-> **生命周期**：`activate` 在 `mount` **之前**由 Host 调用，参数是 `bridge.api`（不是整个 bridge）。Vue 无 React Fast Refresh 约束，named export 与挂在 `default` 上均可。缺钩子时 Host 会 `console.info`（见 [04](./04-expose-contract.md) / [implements-guide/08](../implements-guide/08-lifecycle-hooks.md)）。
+> **生命周期**：`activate` 在 `mount` **之前**由 Host 调用，参数是 `bridge.api`（不是整个 bridge）。Vue 无 React Fast Refresh 约束，named export 与挂在 `default` 上均可。缺钩子时 Host 会 `console.info`（见 [04](./暴露契约.md) / [implements-guide/08](../implements-guide/生命周期钩子.md)）。
 
 ---
 
@@ -171,7 +171,7 @@ const toast = () => {
 
 Host **只注入一条** `routePath`。列表 → 详情这类二级页由子应用自己用 **vue-router** 解决。参考仓外 `remote-vue-shadcn`。
 
-与 React 第 [06 §5](./06-connect-auto-route.md) 对照：
+与 React 第 [06 §5](./自动路由接入.md) 对照：
 
 |           | React（06）                   | Vue（本章）                                                                             |
 | --------- | ----------------------------- | --------------------------------------------------------------------------------------- |
@@ -558,7 +558,7 @@ await pluginManager.ensurePlugin("vueStyleIsolationLab", { force: true });
 | expose 导出          | `default` React 组件                                                               | `mount(el, bridge)` 或 `{ mount }`                              |
 | 根 props             | `props` 直接收 `HostBridgeProps`                                                   | 根组件收 `props.bridge`                                         |
 | bridge 热更新        | React 每次重传新 props                                                             | 用 `reactive(bridge)` 同一个对象                                |
-| 内部多页             | `NavigationProvider` 或自建 `BrowserRouter`（[06 §5](./06-connect-auto-route.md)） | **vue-router**：预览 WebHistory / 嵌入 MemoryHistory（本章 §5） |
+| 内部多页             | `NavigationProvider` 或自建 `BrowserRouter`（[06 §5](./自动路由接入.md)） | **vue-router**：预览 WebHistory / 嵌入 MemoryHistory（本章 §5） |
 | shared vue           | —                                                                                  | Host **不** shared vue；Remote 自带 vue                         |
 | Host 是否装 Vue      | —                                                                                  | 不装                                                            |
 
