@@ -158,3 +158,16 @@ export function flattenVisibleLocalMdTree(
 	walk(root, 0);
 	return out;
 }
+
+/** 收集树上所有目录 path（含根）；搜索时用来一次性展开匹配结果的祖先 */
+export function collectLocalMdDirPaths(root: LocalMdTreeDir): string[] {
+	const out: string[] = [];
+	const walk = (dir: LocalMdTreeDir) => {
+		out.push(dir.path);
+		for (const c of dir.children) {
+			if (c.type === 'dir') walk(c);
+		}
+	};
+	walk(root);
+	return out;
+}

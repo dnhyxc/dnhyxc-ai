@@ -3,12 +3,14 @@ import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Switch, Toast } from '@ui/index';
+import { Input } from '@ui/input';
 import {
 	ChevronRight,
 	Code2,
 	Folder,
 	FolderOpen,
 	Globe,
+	Search,
 	Trash2,
 } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -30,6 +32,7 @@ import {
 import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
 import {
 	buildLocalMdTree,
+	collectLocalMdDirPaths,
 	flattenVisibleLocalMdTree,
 	type LocalMdTreeDir,
 	type LocalMdTreeFile,
@@ -353,6 +356,15 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const [expandedDirs, setExpandedDirs] = useState(
 			() => new Set([normalizeFsPath(TAURI_KNOWLEDGE_DIR)]),
 		);
+		/** 文档名称搜索：输入框内容；回车后写入 appliedQuery 才真正过滤 / 请求 */
+		const [titleQuery, setTitleQuery] = useState(
+			() => knowledgeStore.titleKeyword,
+		);
+		const [appliedQuery, setAppliedQuery] = useState(
+			() => knowledgeStore.titleKeyword,
+		);
+		const titleQueryNorm = appliedQuery.trim().toLowerCase();
+		const searching = titleQueryNorm.length > 0;
 
 		const loadLocalMarkdownList = useCallback(async () => {
 			if (!isTauriRuntime()) return;
@@ -385,25 +397,36 @@ const KnowledgeList: React.FC<IProps> = observer(
 
 		const localTree = useMemo(() => {
 			const root = localFolderPath.trim() || TAURI_KNOWLEDGE_DIR;
-			return buildLocalMdTree(
-				root,
-				localList
-					.filter((i) => !!i.localAbsolutePath)
-					.map((i) => ({
-						path: i.localAbsolutePath!,
-						title:
-							i.title?.trim() ||
-							i.localAbsolutePath!.split(/[/\\]/).pop() ||
-							'',
-						updatedAt: i.updatedAt?.toString() ?? '',
-					})),
-			);
-		}, [localFolderPath, localList]);
+			const entries = localList
+				.filter((i) => !!i.localAbsolutePath)
+				.map((i) => ({
+					path: i.localAbsolutePath!,
+					title:
+						i.title?.trim() || i.localAbsolutePath!.split(/[/\\]/).pop() || '',
+					updatedAt: i.updatedAt?.toString() ?? '',
+				}))
+				.filter((e) =>
+					searching ? e.title.toLowerCase().includes(titleQueryNorm) : true,
+				);
+			return buildLocalMdTree(root, entries);
+		}, [localFolderPath, localList, searching, titleQueryNorm]);
 
 		const visibleLocalRows = useMemo(
 			() => flattenVisibleLocalMdTree(localTree, expandedDirs),
 			[localTree, expandedDirs],
 		);
+
+		const localFileCount = useMemo(() => {
+			let n = 0;
+			const walk = (dir: LocalMdTreeDir) => {
+				for (const c of dir.children) {
+					if (c.type === 'file') n += 1;
+					else walk(c);
+				}
+			};
+			walk(localTree);
+			return n;
+		}, [localTree]);
 
 		const toggleLocalDir = useCallback((path: string) => {
 			const key = normalizeFsPath(path);
@@ -415,6 +438,41 @@ const KnowledgeList: React.FC<IProps> = observer(
 			});
 		}, []);
 
+		const submitTitleSearch = useCallback(() => {
+			setAppliedQuery(titleQuery);
+			if (useLocalFolder) {
+				const q = titleQuery.trim().toLowerCase();
+				if (!q) return;
+				// 回车搜索时先展开匹配树，之后折叠由 expandedDirs 控制
+				const root = localFolderPath.trim() || TAURI_KNOWLEDGE_DIR;
+				const entries = localList
+					.filter((i) => !!i.localAbsolutePath)
+					.map((i) => ({
+						path: i.localAbsolutePath!,
+						title:
+							i.title?.trim() ||
+							i.localAbsolutePath!.split(/[/\\]/).pop() ||
+							'',
+						updatedAt: i.updatedAt?.toString() ?? '',
+					}))
+					.filter((e) => e.title.toLowerCase().includes(q));
+				setExpandedDirs(
+					new Set(collectLocalMdDirPaths(buildLocalMdTree(root, entries))),
+				);
+				return;
+			}
+			if (allowCloudList) {
+				void knowledgeStore.refreshList(titleQuery);
+			}
+		}, [
+			titleQuery,
+			useLocalFolder,
+			localFolderPath,
+			localList,
+			allowCloudList,
+			knowledgeStore,
+		]);
+
 		// 未登录：固定使用本地文件夹模式，避免请求云端列表
 		useEffect(() => {
 			if (!allowCloudList) {
@@ -422,10 +480,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, [allowCloudList]);
 
+		// 云端列表：打开 / 切回数据库时拉当前已提交的关键词（输入中未回车的不搜）
 		useEffect(() => {
-			if (!open) return;
-			if (useLocalFolder || !allowCloudList) return;
-			void knowledgeStore.refreshList();
+			if (!open || useLocalFolder || !allowCloudList) return;
+			void knowledgeStore.refreshList(appliedQuery);
 		}, [open, useLocalFolder, allowCloudList, knowledgeStore]);
 
 		useEffect(() => {
@@ -762,7 +820,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const { loading, loadingMore, list, hasMore } = knowledgeStore;
 		const displayList = useLocalFolder ? localList : list;
 		const displayLoading = useLocalFolder ? localLoading : loading;
-		const showInitialPlaceholder = displayLoading && displayList.length === 0;
+		const showInitialPlaceholder =
+			displayLoading &&
+			(useLocalFolder ? localList.length === 0 : displayList.length === 0);
 		const showLoadMoreHint = !useLocalFolder && loadingMore;
 		const showNoMoreHint =
 			!useLocalFolder &&
@@ -771,9 +831,18 @@ const KnowledgeList: React.FC<IProps> = observer(
 			list.length > 0 &&
 			!hasMore;
 		const showEmptyHint =
-			!displayLoading &&
-			displayList.length === 0 &&
-			(!useLocalFolder ? !loadingMore : true);
+			!displayLoading && !showInitialPlaceholder
+				? useLocalFolder
+					? localList.length === 0 || (searching && localFileCount === 0)
+					: list.length === 0 && !loadingMore
+				: false;
+		const emptyHintText = useLocalFolder
+			? localList.length === 0
+				? t('knowledge.list.empty.local')
+				: t('knowledge.list.empty.search')
+			: searching
+				? t('knowledge.list.empty.search')
+				: t('knowledge.list.empty.cloud');
 
 		const deleteRecordTitle =
 			selectKnowledge?.title?.trim() || t('knowledge.common.untitled');
@@ -956,6 +1025,26 @@ const KnowledgeList: React.FC<IProps> = observer(
 										? t('knowledge.list.localOpsOnly')
 										: t('knowledge.list.localAndDbSync')}
 							</div>
+							<div className="relative mt-1.5 mb-1">
+								<Search
+									className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-textcolor/40"
+									aria-hidden
+								/>
+								<Input
+									type="search"
+									size={18}
+									value={titleQuery}
+									onChange={(e) => setTitleQuery(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key !== 'Enter') return;
+										e.preventDefault();
+										submitTitleSearch();
+									}}
+									placeholder={t('knowledge.list.searchPlaceholder')}
+									aria-label={t('knowledge.list.searchPlaceholder')}
+									className="h-9 pl-8"
+								/>
+							</div>
 						</div>
 						<ScrollArea
 							className="flex min-h-0 flex-1 flex-col pr-1.5 box-border"
@@ -970,37 +1059,39 @@ const KnowledgeList: React.FC<IProps> = observer(
 									</div>
 								) : null}
 								{useLocalFolder
-									? visibleLocalRows.map(({ node, depth }) => {
-											if (node.type === 'dir') {
+									? !showEmptyHint
+										? visibleLocalRows.map(({ node, depth }) => {
+												if (node.type === 'dir') {
+													return (
+														<KnowledgeFolderRow
+															key={`dir:${node.path}`}
+															node={node}
+															depth={depth}
+															expanded={expandedDirs.has(node.path)}
+															onToggle={toggleLocalDir}
+														/>
+													);
+												}
+												const item = localFileToListItem(node);
 												return (
-													<KnowledgeFolderRow
-														key={`dir:${node.path}`}
-														node={node}
+													<KnowledgeListRow
+														key={node.path}
+														item={item}
 														depth={depth}
-														expanded={expandedDirs.has(node.path)}
-														onToggle={toggleLocalDir}
+														selected={
+															editingKnowledgeId != null &&
+															editingKnowledgeId === item.id
+														}
+														onActivate={handleRowClick}
+														onTrashClick={onTrashClick}
+														showOpenInExternalEditor={isTauriRuntime()}
+														onOpenInExternalEditorClick={
+															onOpenInExternalEditorClick
+														}
 													/>
 												);
-											}
-											const item = localFileToListItem(node);
-											return (
-												<KnowledgeListRow
-													key={node.path}
-													item={item}
-													depth={depth}
-													selected={
-														editingKnowledgeId != null &&
-														editingKnowledgeId === item.id
-													}
-													onActivate={handleRowClick}
-													onTrashClick={onTrashClick}
-													showOpenInExternalEditor={isTauriRuntime()}
-													onOpenInExternalEditorClick={
-														onOpenInExternalEditorClick
-													}
-												/>
-											);
-										})
+											})
+										: null
 									: displayList.map((knowledge) => (
 											<KnowledgeListRow
 												key={knowledge.id}
@@ -1030,9 +1121,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 								) : null}
 								{showEmptyHint ? (
 									<div className="text-sm text-textcolor/60 py-8 text-center">
-										{useLocalFolder
-											? t('knowledge.list.empty.local')
-											: t('knowledge.list.empty.cloud')}
+										{emptyHintText}
 									</div>
 								) : null}
 							</div>

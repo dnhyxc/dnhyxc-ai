@@ -463,6 +463,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Local knowledge base browsing is upgraded to an expandable folder tree: after selecting a local folder, the app automatically scans for Markdown files and builds a hierarchical tree structure that can be expanded/collapsed. Empty folders are filtered out, showing only paths with .md files. Folder rows support click-to-expand/collapse and keyboard Enter/Space operations; file rows are indented by level and can be edited in-app or opened in an external editor.',
 	},
+	's6-30': {
+		title: 'Title search for knowledge list & trash',
+		description:
+			'A search box is added at the top of both the knowledge base list drawer and the trash drawer: type a document name keyword and press Enter to filter. In cloud mode the backend performs a case-insensitive title LIKE query; in local folder mode filtering is done in the frontend, and all folders containing matching files are automatically expanded. The trash drawer also supports title filtering. When no matches are found, a specific "No matching documents" hint is shown instead of the generic empty state.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

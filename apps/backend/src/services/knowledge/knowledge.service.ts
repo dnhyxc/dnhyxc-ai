@@ -4,7 +4,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Like, Repository } from 'typeorm';
+import { In, Raw, Repository } from 'typeorm';
 import { AssistantSession } from '../assistant/assistant-session.entity';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
@@ -178,7 +178,9 @@ export class KnowledgeService {
 			.skip(skip);
 
 		if (title) {
-			qb.andWhere('k.title LIKE :title', { title: `%${title}%` });
+			qb.andWhere('LOWER(k.title) LIKE :title', {
+				title: `%${title.toLowerCase()}%`,
+			});
 		}
 
 		const [rows, total] = await qb.getManyAndCount();
@@ -224,7 +226,11 @@ export class KnowledgeService {
 		const authorId = query.authorId;
 
 		const where: Record<string, unknown> = {};
-		if (title) where.title = Like(`%${title}%`);
+		if (title) {
+			where.title = Raw((alias) => `LOWER(${alias}) LIKE :title`, {
+				title: `%${title.toLowerCase()}%`,
+			});
+		}
 		if (authorId != null) where.authorId = authorId;
 
 		const [list, total] = await this.knowledgeTrashRepository.findAndCount({

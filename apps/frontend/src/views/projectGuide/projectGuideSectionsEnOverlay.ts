@@ -145,6 +145,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'When using local knowledge base mode on desktop, after selecting a folder the app automatically scans for Markdown files and displays them as an expandable folder tree.\n\n• Folder structure: hierarchy is built from the actual file paths; empty folders are automatically filtered, showing only paths with .md files\n• Expand/collapse: click a folder row or press Enter/Space to expand or collapse subfolders; the selected root folder is expanded by default\n• File operations: click a file row to edit in-app; use the right-click or action button to open in an external editor or delete the file\n• Hierarchy indentation: files are indented by their folder level for easy identification\n• Cloud mode unaffected: only local folder mode uses the tree view; the cloud knowledge base still uses the list view',
 	},
+	'pg-s5-9': {
+		title: '5.9 Title search (list and trash)',
+		description:
+			'When your knowledge base or trash has many entries, use the top search box in either drawer to quickly find documents by title.\n\n• Trigger: type a title keyword (e.g. "Weekly", "API") and press Enter to submit; no request fires while typing, so the list does not refresh on every keystroke\n• Cloud mode: the backend runs a paged fuzzy title query and remains compatible with scroll-to-load-more\n• Local folder mode: filtering happens in the frontend; after matching files are found, all parent folders containing matches are auto-expanded so you do not need to open directories by hand\n• Trash support: the trash drawer also supports title filtering; when no matches are found, a specific "No matching documents" hint is shown\n• Case insensitive: matching ignores letter case so "Report" and "report" give the same results\n• Clear search: delete all text and press Enter once more (or leave only whitespace) to restore the full list',
+	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',
 		description:

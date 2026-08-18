@@ -854,6 +854,8 @@ export const zhCN = {
 	'knowledge.list.localAndDbSync': '该列表的数据操作支持本地与数据库同步',
 	'knowledge.list.empty.local': '该文件夹下暂无 .md 文件',
 	'knowledge.list.empty.cloud': '暂无知识库条目',
+	'knowledge.list.searchPlaceholder': '根据文档名称搜索',
+	'knowledge.list.empty.search': '未找到匹配的文档',
 
 	'knowledge.assistant.prompts.polish.title': '润色文档',
 	'knowledge.assistant.prompts.polish.desc': '精修字句，提升质感',
@@ -919,6 +921,8 @@ export const zhCN = {
 	'knowledge.trash.batchDelete': '批量删除',
 	'knowledge.trash.loadingDetail': '正在加载...',
 	'knowledge.trash.empty': '回收站暂无内容',
+	'knowledge.trash.searchPlaceholder': '搜索文档名称',
+	'knowledge.trash.empty.search': '未找到匹配的文档',
 
 	'share.header.chatTitle': '分享对话内容',
 	'share.header.knowledgeTitle': '分享文章内容',

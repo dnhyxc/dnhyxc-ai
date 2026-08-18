@@ -131,6 +131,8 @@
 | 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/知识预览助手性能.md](./knowledge/知识预览助手性能.md) · [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) |
 | 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) · [ideas/知识库滚动卡顿修复.md](./ideas/knowledge/知识库滚动卡顿修复.md) |
 | 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/知识预览代码工具条滚动.md](./knowledge/知识预览代码工具条滚动.md) · [impact/知识预览代码工具条滚动.md](./impact/知识预览代码工具条滚动.md) |
+| 本地知识库文件夹目录树浏览（可展开层级/键盘可达）                 | [knowledge/知识库文件夹树.md](./knowledge/知识库文件夹树.md)                                                                               |
+| 知识库列表与回收站：按文档标题搜索（Enter 提交、不区分大小写）    | [knowledge/知识库列表搜索标题.md](./knowledge/知识库列表搜索标题.md)                                                                     |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/对话内存溢出.md](./chat/对话内存溢出.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/流式代码块滚动.md](./chat/流式代码块滚动.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/代理信任与限流.md](./ops/代理信任与限流.md)                                                                                         |

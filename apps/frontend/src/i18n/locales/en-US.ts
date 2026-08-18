@@ -928,6 +928,8 @@ export const enUS = {
 		'Operations can sync between local and database.',
 	'knowledge.list.empty.local': 'No .md files in this folder',
 	'knowledge.list.empty.cloud': 'No knowledge items yet',
+	'knowledge.list.searchPlaceholder': 'Search by document title',
+	'knowledge.list.empty.search': 'No matching documents',
 
 	'knowledge.assistant.prompts.polish.title': 'Polish document',
 	'knowledge.assistant.prompts.polish.desc': 'Refine wording and improve tone',
@@ -1000,6 +1002,8 @@ export const enUS = {
 	'knowledge.trash.batchDelete': 'Batch delete',
 	'knowledge.trash.loadingDetail': 'Loading…',
 	'knowledge.trash.empty': 'Trash is empty',
+	'knowledge.trash.searchPlaceholder': 'Search by document name',
+	'knowledge.trash.empty.search': 'No matching documents',
 
 	// 分享文案
 	'share.header.chatTitle': 'Shared conversation',
