@@ -40,11 +40,7 @@ import {
 	KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
 	loadKnowledgeShortcutChords,
 } from '@/utils/knowledge-shortcuts';
-import {
-	EDITOR_HEIGHT,
-	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
-	TAURI_KNOWLEDGE_DIR,
-} from './constants';
+import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeAssistant, {
 	type KnowledgeAssistantHandle,
 	type KnowledgeAssistantMode,
@@ -161,12 +157,10 @@ const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
 
 	return (
 		<MarkdownEditor
-			className="h-full min-w-0 max-w-full w-full"
 			stickyScrollEnabled={false}
 			stickyScrollScrollWithEditor={false}
 			diffBaselineSource="persisted"
 			diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
-			height={EDITOR_HEIGHT}
 			theme={monacoTheme}
 			language={monacoLanguage}
 			shortcutSource={shortcutSource}

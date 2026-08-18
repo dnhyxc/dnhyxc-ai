@@ -118,7 +118,7 @@ const Sidebar = observer(() => {
 											'lucide-stroke-draw-hover group mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
 											active
 												? 'bg-teal-500/15 text-teal-500'
-												: 'text-textcolor bg-theme/10 hover:bg-teal-500/15 hover:text-teal-300',
+												: 'text-theme bg-theme/10 hover:bg-teal-500/15 hover:text-teal-300',
 										)}
 										onClick={item.onClick}
 									>
@@ -145,7 +145,7 @@ const Sidebar = observer(() => {
 								<div
 									className={cn(
 										'lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-[color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
-										'bg-theme/10 text-textcolor hover:bg-teal-500/15 hover:text-teal-300',
+										'bg-theme/10 text-theme hover:bg-teal-500/15 hover:text-teal-300',
 									)}
 								>
 									<ShieldUser className="size-6.5 shrink-0 overflow-visible" />
@@ -172,28 +172,28 @@ const Sidebar = observer(() => {
 									</div>
 								</DropdownMenuLabel>
 								<DropdownMenuItem
-									className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									className="text-theme focus:text-theme flex justify-between items-center cursor-pointer group"
 									onClick={() => onJump('/profile')}
 								>
-									<CircleUserRound className="text-textcolor group-hover:text-teal-300" />
+									<CircleUserRound className="text-theme group-hover:text-teal-300" />
 									<span className="group-hover:text-teal-300">
 										{t('nav.profile')}
 									</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem
-									className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									className="text-theme focus:text-theme flex justify-between items-center cursor-pointer group"
 									onClick={() => onJump('/login')}
 								>
-									<ArrowLeftRight className="text-textcolor group-hover:text-teal-300" />
+									<ArrowLeftRight className="text-theme group-hover:text-teal-300" />
 									<span className="group-hover:text-teal-300">
 										{t('nav.switchAccount')}
 									</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem
-									className="min-w-20 text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+									className="min-w-20 text-theme focus:text-theme flex justify-between items-center cursor-pointer group"
 									onClick={onLogout}
 								>
-									<LogOut className="text-textcolor group-hover:text-teal-300" />
+									<LogOut className="text-theme group-hover:text-teal-300" />
 									<span className="group-hover:text-teal-300">
 										{t('auth.logout')}
 									</span>
@@ -204,7 +204,7 @@ const Sidebar = observer(() => {
 						<div
 							role="button"
 							tabIndex={0}
-							className="lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-white/5 text-theme-white transition-[color,background-color] duration-200 ease-out hover:bg-theme-white/10 hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+							className="lucide-stroke-draw-hover group flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-white/5 text-theme transition-[color,background-color] duration-200 ease-out hover:bg-theme-white/10 hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={() => onJump('/login')}
 						>
 							<CircleUserRound className="size-6 shrink-0 overflow-visible" />

@@ -62,6 +62,9 @@ const Home = () => {
 	);
 
 	const [heroIndex, setHeroIndex] = useState(0);
+	/** 1 前进 / -1 后退；环绕时不能靠 index 大小判断进出场方向 */
+	const [heroDir, setHeroDir] = useState(1);
+	const heroPrevRef = useRef(0);
 	const heroTimerRef = useRef<number | null>(null);
 	const heroHoverRef = useRef<boolean>(false);
 	const HERO_AUTOPLAY_MS = 5200;
@@ -75,7 +78,10 @@ const Home = () => {
 	};
 
 	const goHero = (delta: number) => {
+		const dir = delta >= 0 ? 1 : -1;
+		setHeroDir(dir);
 		setHeroIndex((prev) => {
+			heroPrevRef.current = prev;
 			const total = HERO_SLIDES.length;
 			return (((prev + delta) % total) + total) % total;
 		});
@@ -85,13 +91,21 @@ const Home = () => {
 	const CHEVRONS = useMemo(() => createChevrons(goHero), [goHero]);
 
 	const setHero = (idx: number) => {
+		if (idx === heroIndex) {
+			resetHeroTimer();
+			return;
+		}
+		heroPrevRef.current = heroIndex;
+		setHeroDir(idx > heroIndex ? 1 : -1);
 		setHeroIndex(idx);
 		resetHeroTimer();
 	};
 
 	const tick = () => {
 		if (!heroHoverRef.current) {
+			setHeroDir(1);
 			setHeroIndex((prev) => {
+				heroPrevRef.current = prev;
 				const total = HERO_SLIDES.length;
 				return (((prev + 1) % total) + total) % total;
 			});
@@ -109,7 +123,6 @@ const Home = () => {
 				window.clearTimeout(heroTimerRef.current);
 			}
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [HERO_SLIDES.length]);
 
 	return (
@@ -197,7 +210,12 @@ const Home = () => {
 											{HERO_SLIDES.map((s, i) => {
 												const Icon = s.icon;
 												const isActive = i === heroIndex;
-												const direction = heroIndex > i ? -1 : 1;
+												// 前进：旧片向左退、新片自右侧入；环绕末→首同向
+												const x = isActive
+													? 0
+													: i === heroPrevRef.current
+														? -44 * heroDir
+														: 44 * heroDir;
 												const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
 												return (
 													<motion.div
@@ -205,7 +223,7 @@ const Home = () => {
 														initial={false}
 														animate={{
 															opacity: isActive ? 1 : 0,
-															x: isActive ? 0 : 44 * direction,
+															x,
 														}}
 														transition={{
 															duration: 0.5,
@@ -225,7 +243,7 @@ const Home = () => {
 																	className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-linear-to-br ${hue.icon}`}
 																>
 																	<Icon
-																		className="h-6 w-6 text-textcolor"
+																		className="h-6 w-6 text-white"
 																		aria-hidden
 																	/>
 																</div>
@@ -247,7 +265,7 @@ const Home = () => {
 
 															{/* Row 2：描述 —— flex-1 占满中部空间，2 行截断 */}
 															<div className="flex min-h-0 flex-1 items-center py-1.5">
-																<p className="min-w-0 text-pretty text-xl font-medium leading-7 text-textcolor/60">
+																<p className="min-w-0 text-pretty text-lg font-medium leading-7 text-textcolor/60">
 																	{s.subtitle}
 																</p>
 															</div>
@@ -263,8 +281,8 @@ const Home = () => {
 																			className={cn(
 																				'flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98]',
 																				c.primary
-																					? `${hue.btn} relative bg-linear-to-br font-semibold text-textcolor overflow-hidden`
-																					: `${hue.btn} bg-linear-to-br font-medium text-textcolor`,
+																					? `${hue.btn} relative bg-linear-to-br font-semibold text-white overflow-hidden`
+																					: `${hue.btn} bg-linear-to-br font-medium text-white`,
 																			)}
 																			style={{
 																				fontFamily:
@@ -358,7 +376,7 @@ const Home = () => {
 											className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} group-hover:shadow-md ${feature.glow} sm:h-14 sm:w-14`}
 										>
 											<feature.icon
-												className="h-6 w-6 text-textcolor"
+												className="h-6 w-6 text-white"
 												strokeWidth={2}
 											/>
 										</div>
@@ -415,7 +433,7 @@ const Home = () => {
 										<div
 											className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg group-hover:shadow-xl`}
 										>
-											<feature.icon className="h-6 w-6 text-textcolor" />
+											<feature.icon className="h-6 w-6 text-white" />
 										</div>
 										<h4 className="mb-1 font-semibold text-textcolor transition-colors">
 											{feature.title}
@@ -471,7 +489,7 @@ const Home = () => {
 										<div
 											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
 										>
-											<span className="text-2xl font-bold text-textcolor">
+											<span className="text-2xl font-bold text-white">
 												{item.step}
 											</span>
 										</div>
@@ -485,7 +503,7 @@ const Home = () => {
 											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
 											whileHover={{ x: 4 }}
 										>
-											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/40 group-hover:text-teal-500" />
+											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
 										</motion.div>
 									</motion.div>
 								))}
@@ -521,7 +539,7 @@ const Home = () => {
 										<div
 											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
 										>
-											<span className="text-2xl font-bold text-textcolor">
+											<span className="text-2xl font-bold text-white">
 												{item.index}
 											</span>
 										</div>
@@ -535,7 +553,7 @@ const Home = () => {
 											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
 											whileHover={{ x: 4 }}
 										>
-											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/40 group-hover:text-teal-500" />
+											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
 										</motion.div>
 									</motion.div>
 								))}

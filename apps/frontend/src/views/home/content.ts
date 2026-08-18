@@ -40,8 +40,8 @@ export const HUE_STYLES: Record<
 	},
 	emerald: {
 		rail: 'bg-emerald-400',
-		icon: 'from-emerald-400/90 to-teal-200/80 shadow-emerald-500/25',
-		btn: 'from-emerald-400/80 to-teal-200/80 hover:shadow-emerald-500/30',
+		icon: 'from-emerald-400/90 to-green-500/80 shadow-emerald-500/25',
+		btn: 'from-emerald-400/80 to-green-500/80 hover:shadow-emerald-500/30',
 		glow: 'from-emerald-500/15 via-teal-500/8',
 	},
 	amber: {

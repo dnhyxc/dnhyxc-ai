@@ -8,8 +8,6 @@ export const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/knowledge';
 /** 本地文件夹打开的条目 id 前缀（与云端 UUID 区分，不写库） */
 export const KNOWLEDGE_LOCAL_MD_ID_PREFIX = '__local_md__:';
 
-export const EDITOR_HEIGHT = 'calc(100vh - 172px)';
-
 /** 知识库助手首页快捷卡片类型（与构建发给模型的正文对应） */
 export type KnowledgeAssistantPromptKind =
 	| 'polish'

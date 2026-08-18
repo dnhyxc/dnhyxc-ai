@@ -538,8 +538,8 @@ const EnglishLearningImportPage = () => {
 						/>
 					) : (
 						<DragDropFileUpload
-							className="group flex h-full min-h-0 flex-1 flex-col bg-theme/5"
-							zoneClassName="flex h-full min-h-0 flex-1 flex-col rounded-md border border-dashed border-theme/10 hover:border-teal-500"
+							className="group flex h-full min-h-0 flex-1 flex-col bg-theme-background"
+							zoneClassName="flex h-full min-h-0 flex-1 flex-col rounded-md border border-dashed border-theme/20 hover:border-teal-500"
 							accept={JSON_IMPORT_ACCEPT}
 							acceptExtensionOnly
 							pickFiles={pickImportJsonFiles}

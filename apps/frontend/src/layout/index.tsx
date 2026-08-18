@@ -119,8 +119,8 @@ const Layout = () => {
 										{needAuth && !authed ? null : (
 											<Suspense
 												fallback={
-													<div className="flex h-full w-full min-h-0 items-stretch">
-														<Loading className="flex h-full w-full items-center justify-center" />
+													<div className="flex h-full w-full min-h-0 items-stretch p-5.5 pt-0">
+														<Loading className="bg-theme-background flex h-full w-full items-center justify-center" />
 													</div>
 												}
 											>

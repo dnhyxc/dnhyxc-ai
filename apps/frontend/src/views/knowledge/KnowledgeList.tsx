@@ -197,28 +197,35 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 						</Tooltip>
 					) : null}
 					{showVisibility ? (
-						<button
-							type="button"
-							title={
+						<Tooltip
+							side="left"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={
 								item.isPublic
 									? t('knowledge.list.makePrivate')
 									: t('knowledge.list.makePublic')
 							}
-							aria-label={
-								item.isPublic
-									? t('knowledge.list.makePrivate')
-									: t('knowledge.list.makePublic')
-							}
-							className={cn(
-								'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
-								item.isPublic
-									? 'text-teal-500 hover:bg-teal-500/10'
-									: 'text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10',
-							)}
-							onClick={(e) => onVisibilityClick?.(e, item)}
 						>
-							<Globe size={15} />
-						</button>
+							<button
+								type="button"
+								aria-label={
+									item.isPublic
+										? t('knowledge.list.makePrivate')
+										: t('knowledge.list.makePublic')
+								}
+								className={cn(
+									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
+									item.isPublic
+										? 'text-teal-500 hover:bg-teal-500/10'
+										: 'text-textcolor/80 hover:text-teal-500 hover:bg-teal-500/10',
+								)}
+								onClick={(e) => onVisibilityClick?.(e, item)}
+							>
+								<Globe size={15} />
+							</button>
+						</Tooltip>
 					) : null}
 					{showTrash ? (
 						<button

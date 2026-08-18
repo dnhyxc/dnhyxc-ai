@@ -266,7 +266,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	placeholder: placeholderProp,
 	t,
 	className,
-	height = '300px',
+	height = '100%',
 	readOnly = false,
 	theme = 'vs',
 	language = 'markdown',
@@ -1846,6 +1846,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		resetMarkdownBottomBarPosition: resetBottomBarPosition,
 	});
 
+	console.log(compactChrome, 'compactChrome', height);
+
 	const editorPixelHeight = compactChrome ? '100%' : height;
 
 	return (
@@ -1859,7 +1861,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		>
 			<div
 				className={cn(
-					'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme/5',
+					'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme-background',
 					compactChrome && 'min-h-0 flex-1',
 				)}
 			>
@@ -1903,10 +1905,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 				<div
 					className={cn(
-						'box-border min-h-0 min-w-0 max-w-full overflow-hidden',
+						'box-border h-full min-h-0 min-w-0 max-w-full overflow-hidden',
 						compactChrome && 'flex min-h-0 flex-1 flex-col',
 					)}
-					style={compactChrome ? undefined : { height }}
 				>
 					{/* 非 Markdown：保持单栏编辑器渲染 */}
 					{!isMarkdown ? (

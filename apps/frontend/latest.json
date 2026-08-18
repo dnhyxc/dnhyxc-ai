@@ -1,10 +1,10 @@
 {
-	"version": "1.0.136",
+	"version": "1.0.137",
 	"notes": "https://dnhyxc.cn:9002/update-info",
-	"pub_date": "2026-08-18T05:09:34.462Z",
+	"pub_date": "2026-08-18T11:35:32.919Z",
 	"platforms": {
 		"darwin-aarch64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZnlvb2pqTTQ3c2YxVmMwc1ZxaHFPWTErdGNVZG51VmRuWCtkVnJrcTM0cWJuR3pRZmhoU1Q5K1YyQVVEb0psaTNWNzRTbEVpM29sd3RCUEpYVjdtdHpHNW8rOVlQU3drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MDI5NzcyCWZpbGU6ZG5oeXhjLWFpLmFwcC50YXIuZ3oKbjk4S0hpcWNIczNRTGhLQnFPY3ZXdndiYWZvSWFZQjBhc2JUb01ST2Zyd3d0SXBBSHVFd3F2TEtmeTNRUDBiSzBTRGJtOWxIS3YvQmlON0R2ckhpQ1E9PQo=",
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZnlvb2pqTTQ3c1VOeTJwSitMKy9MQzgxSU5yL3NsejFBM1VyYWdzcGEyNVZVUFEzeG9wS3pmdWxFVFhPRWF5akp2dUpEZ0RhSG5kcDg5NXNlbzhCeS9TZ1oycDd1SkFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MDUyOTMyCWZpbGU6ZG5oeXhjLWFpLmFwcC50YXIuZ3oKd3hONnA2OEx4RkY5Nm13NHQxazBGdDlXNTU0Sy9CLzRPWWc4OVo3QlBzb1pkWnVlQkFNRXgxZEFVMmZqbWVHV05YOUJCNEN6ZFR4RWh2YmoxNU9MRGc9PQo=",
 			"url": "https://github.com/dnhyxc/dnhyxc-ai-app/releases/download/latest/dnhyxc-ai.app.tar.gz"
 		}
 	}
