@@ -11,16 +11,35 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react';
-import { observer } from 'mobx-react';
 import { useCallback, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import ebookStore from '@/store/ebook';
 import { getRequestErrorMessage } from '@/utils/fetch';
 
-export type EbookCategoryManageDialogProps = {
+export type CategoryManageItem = {
+	id: string;
+	name: string;
+	count: number;
+};
+
+export type CategoryManageLabels = {
+	title: string;
+	add: string;
+	rename: string;
+	delete: string;
+	deleteConfirm: string;
+	duplicateName: string;
+};
+
+export type CategoryManageDialogProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	items: CategoryManageItem[];
+	labels: CategoryManageLabels;
+	onCreate: (name: string) => Promise<void>;
+	onRename: (id: string, name: string) => Promise<void>;
+	onDelete: (id: string) => Promise<void>;
+	onMove: (id: string, direction: 'up' | 'down') => Promise<void>;
 };
 
 function iconActionClass(destructive = false): string {
@@ -74,10 +93,17 @@ function SortControl({
 	);
 }
 
-function EbookCategoryManageDialog({
+/** 分类管理弹窗：新建 / 重命名 / 删除 / 排序；业务侧只注入 items 与 CRUD */
+export default function CategoryManageDialog({
 	open,
 	onOpenChange,
-}: EbookCategoryManageDialogProps) {
+	items,
+	labels,
+	onCreate,
+	onRename,
+	onDelete,
+	onMove,
+}: CategoryManageDialogProps) {
 	const { t } = useI18n();
 	const [newName, setNewName] = useState('');
 	const [adding, setAdding] = useState(false);
@@ -110,13 +136,12 @@ function EbookCategoryManageDialog({
 		setEditDraft('');
 	}, []);
 
-	const showCategoryNameError = (e: unknown) => {
+	const showNameError = (e: unknown) => {
 		const message = getRequestErrorMessage(e);
-		const duplicateTitle = t('ebook.shelf.category.duplicateName');
 		Toast({
 			type: 'error',
-			title: duplicateTitle,
-			message: message !== duplicateTitle ? message : undefined,
+			title: labels.duplicateName,
+			message: message !== labels.duplicateName ? message : undefined,
 		});
 	};
 
@@ -126,17 +151,15 @@ function EbookCategoryManageDialog({
 		setAdding(true);
 		let added = false;
 		try {
-			await ebookStore.createCategory(name);
+			await onCreate(name);
 			setNewName('');
 			added = true;
 			scrollListToBottom();
 		} catch (e) {
-			showCategoryNameError(e);
+			showNameError(e);
 		} finally {
 			setAdding(false);
-			if (added) {
-				focusAddInput();
-			}
+			if (added) focusAddInput();
 		}
 	};
 
@@ -145,10 +168,10 @@ function EbookCategoryManageDialog({
 		if (!name || savingId) return;
 		setSavingId(id);
 		try {
-			await ebookStore.renameCategory(id, name);
+			await onRename(id, name);
 			resetEdit();
 		} catch (e) {
-			showCategoryNameError(e);
+			showNameError(e);
 		} finally {
 			setSavingId(null);
 		}
@@ -158,7 +181,7 @@ function EbookCategoryManageDialog({
 		if (!deleteId || busy) return;
 		setBusy(true);
 		try {
-			await ebookStore.deleteCategory(deleteId);
+			await onDelete(deleteId);
 			setDeleteId(null);
 		} catch (e) {
 			Toast({
@@ -171,8 +194,6 @@ function EbookCategoryManageDialog({
 		}
 	};
 
-	const manageTitle = t('ebook.shelf.category.manage');
-
 	return (
 		<>
 			<Confirm
@@ -180,8 +201,8 @@ function EbookCategoryManageDialog({
 				onOpenChange={(next) => {
 					if (!next) setDeleteId(null);
 				}}
-				title={t('ebook.shelf.category.delete')}
-				description={t('ebook.shelf.category.deleteConfirm')}
+				title={labels.delete}
+				description={labels.deleteConfirm}
 				confirmText={t('common.delete')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
@@ -191,14 +212,14 @@ function EbookCategoryManageDialog({
 			<Model
 				open={open}
 				onOpenChange={onOpenChange}
-				title={manageTitle}
-				description={manageTitle}
+				title={labels.title}
+				description={labels.title}
 				width="35rem"
 				footer={null}
 				header={
 					<div className="pr-8">
 						<h2 className="h-8 flex items-center text-textcolor text-lg leading-snug font-semibold">
-							{manageTitle}
+							{labels.title}
 						</h2>
 					</div>
 				}
@@ -210,12 +231,12 @@ function EbookCategoryManageDialog({
 						viewportClassName="min-w-0 max-w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
 					>
 						<div className="flex min-w-0 flex-col gap-2 px-4.5 pb-2">
-							{ebookStore.categories.length === 0 ? (
+							{items.length === 0 ? (
 								<p className="text-textcolor/50 py-8 text-center text-sm">
-									{t('ebook.shelf.category.add')}
+									{labels.add}
 								</p>
 							) : (
-								ebookStore.categories.map((cat, index) => {
+								items.map((cat, index) => {
 									const isEditing = editingId === cat.id;
 									const isSaving = savingId === cat.id;
 									return (
@@ -230,14 +251,10 @@ function EbookCategoryManageDialog({
 										>
 											<SortControl
 												canMoveUp={index > 0}
-												canMoveDown={index < ebookStore.categories.length - 1}
+												canMoveDown={index < items.length - 1}
 												disabled={busy || isEditing}
-												onMoveUp={() =>
-													void ebookStore.moveCategory(cat.id, 'up')
-												}
-												onMoveDown={() =>
-													void ebookStore.moveCategory(cat.id, 'down')
-												}
+												onMoveUp={() => void onMove(cat.id, 'up')}
+												onMoveDown={() => void onMove(cat.id, 'down')}
 											/>
 
 											{isEditing ? (
@@ -268,7 +285,7 @@ function EbookCategoryManageDialog({
 														{cat.name}
 													</span>
 													<span className="bg-theme/10 inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-xs leading-none text-textcolor/55 tabular-nums">
-														{cat.bookCount}
+														{cat.count}
 													</span>
 												</div>
 											)}
@@ -307,7 +324,7 @@ function EbookCategoryManageDialog({
 														<button
 															type="button"
 															className={iconActionClass()}
-															aria-label={t('ebook.shelf.category.rename')}
+															aria-label={labels.rename}
 															onClick={() => {
 																setEditingId(cat.id);
 																setEditDraft(cat.name);
@@ -318,7 +335,7 @@ function EbookCategoryManageDialog({
 														<button
 															type="button"
 															className={iconActionClass(true)}
-															aria-label={t('ebook.shelf.category.delete')}
+															aria-label={labels.delete}
 															onClick={() => setDeleteId(cat.id)}
 														>
 															<Trash2 className="size-4" aria-hidden />
@@ -340,7 +357,7 @@ function EbookCategoryManageDialog({
 								value={newName}
 								maxLength={20}
 								autoFocus
-								placeholder={t('ebook.shelf.category.add')}
+								placeholder={labels.add}
 								className="h-8 min-w-0 flex-1 truncate border-0 bg-transparent px-1 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0"
 								disabled={adding}
 								showCount
@@ -363,7 +380,7 @@ function EbookCategoryManageDialog({
 								) : (
 									<Plus className="size-3.5" aria-hidden />
 								)}
-								{t('ebook.shelf.category.add')}
+								{labels.add}
 							</Button>
 						</div>
 					</div>
@@ -372,5 +389,3 @@ function EbookCategoryManageDialog({
 		</>
 	);
 }
-
-export default observer(EbookCategoryManageDialog);

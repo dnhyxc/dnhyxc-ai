@@ -119,6 +119,9 @@ export const KNOWLEDGE_DETAIL = '/knowledge/detail';
 export const KNOWLEDGE_UPDATE = '/knowledge/update';
 export const KNOWLEDGE_VISIBILITY = '/knowledge/visibility';
 export const KNOWLEDGE_DELETE = '/knowledge/delete';
+export const KNOWLEDGE_CATEGORIES_SUMMARY = '/knowledge/categories/summary';
+export const KNOWLEDGE_CATEGORIES = '/knowledge/categories';
+export const KNOWLEDGE_ITEM_CATEGORY = '/knowledge/item';
 // 知识库回收站
 export const KNOWLEDGE_TRASH_LIST = '/knowledge/trash/list';
 export const KNOWLEDGE_TRASH_DETAIL = '/knowledge/trash/detail';

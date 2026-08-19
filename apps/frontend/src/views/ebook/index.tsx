@@ -1,3 +1,4 @@
+import CategoryManageDialog from '@design/CategoryManageDialog';
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
@@ -13,7 +14,6 @@ import ebookStore, { EBOOK_UPLOAD_MEMBERSHIP_REQUIRED } from '@/store/ebook';
 import { isTauriRuntime } from '@/utils/runtime';
 import { EbookPageShell } from './components/layout/EbookPageShell';
 import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
-import EbookCategoryManageDialog from './components/shelf/EbookCategoryManageDialog';
 import { EbookShelfBookCard } from './components/shelf/EbookShelfBookCard';
 import EbookShelfCategoryRail from './components/shelf/EbookShelfCategoryRail';
 import { EbookShelfUploadBanner } from './components/shelf/EbookShelfUploadBanner';
@@ -213,9 +213,28 @@ function EbookShelfPage() {
 
 	return (
 		<>
-			<EbookCategoryManageDialog
+			<CategoryManageDialog
 				open={categoryManageOpen}
 				onOpenChange={setCategoryManageOpen}
+				items={ebookStore.categories.map((c) => ({
+					id: c.id,
+					name: c.name,
+					count: c.bookCount,
+				}))}
+				labels={{
+					title: t('ebook.shelf.category.manage'),
+					add: t('ebook.shelf.category.add'),
+					rename: t('ebook.shelf.category.rename'),
+					delete: t('ebook.shelf.category.delete'),
+					deleteConfirm: t('ebook.shelf.category.deleteConfirm'),
+					duplicateName: t('ebook.shelf.category.duplicateName'),
+				}}
+				onCreate={async (name) => {
+					await ebookStore.createCategory(name);
+				}}
+				onRename={(id, name) => ebookStore.renameCategory(id, name)}
+				onDelete={(id) => ebookStore.deleteCategory(id)}
+				onMove={(id, direction) => ebookStore.moveCategory(id, direction)}
 			/>
 			<Confirm
 				open={deleteBookId != null}

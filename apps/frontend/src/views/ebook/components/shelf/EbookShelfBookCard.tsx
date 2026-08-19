@@ -263,7 +263,10 @@ export function EbookShelfBookCard({
 		);
 	};
 
-	const showMoveCategory = Boolean(onMoveCategory && categories.length > 0);
+	// 仅本人书架可改分类（含自己公开的）；公开书架 / 他人公开书不可移动
+	const showMoveCategory = Boolean(
+		canManage && !book.owner && onMoveCategory && categories.length > 0,
+	);
 
 	const moveCategoryMenu = showMoveCategory ? (
 		<Popover open={categoryMenuOpen} onOpenChange={setCategoryMenuOpen}>
@@ -272,6 +275,8 @@ export function EbookShelfBookCard({
 				sideOffset={4}
 				delayDuration={200}
 				shadow
+				disableHoverableContent
+				disabled={categoryMenuOpen || categoryBusy}
 				content={t('ebook.shelf.category.move')}
 			>
 				<PopoverTrigger asChild>
@@ -296,6 +301,7 @@ export function EbookShelfBookCard({
 				side="bottom"
 				sideOffset={6}
 				className="w-48 overflow-hidden p-0"
+				onCloseAutoFocus={(e) => e.preventDefault()}
 			>
 				<p className="border-theme/10 text-textcolor border-b px-3 py-3.5 text-xs font-medium">
 					{t('ebook.shelf.category.move')}

@@ -30,6 +30,10 @@ export class Knowledge {
 	@Column({ name: 'is_public', type: 'boolean', default: false })
 	isPublic!: boolean;
 
+	/** 用户自定义分类；删除分类时由服务端置空（未分类） */
+	@Column({ name: 'category_id', type: 'varchar', length: 255, nullable: true })
+	categoryId: string | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

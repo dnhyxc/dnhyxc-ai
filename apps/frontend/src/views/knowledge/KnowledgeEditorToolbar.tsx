@@ -63,7 +63,7 @@ const KnowledgeEditorToolbar = (props: {
 	return (
 		<div className="flex items-center pr-3 gap-3">
 			<Tooltip
-				side="bottom"
+				side="top"
 				content={shortcutHintImport ?? t('knowledge.shortcuts.import')}
 			>
 				<Button
@@ -80,7 +80,7 @@ const KnowledgeEditorToolbar = (props: {
 				</Button>
 			</Tooltip>
 			<Tooltip
-				side="bottom"
+				side="top"
 				content={shortcutHintSave ?? t('knowledge.shortcuts.save')}
 			>
 				<Button
@@ -97,7 +97,7 @@ const KnowledgeEditorToolbar = (props: {
 				</Button>
 			</Tooltip>
 			<Tooltip
-				side="bottom"
+				side="top"
 				content={shortcutHintClear ?? t('knowledge.shortcuts.clear')}
 			>
 				<Button
@@ -113,7 +113,7 @@ const KnowledgeEditorToolbar = (props: {
 			</Tooltip>
 			{isCloudLoggedIn && (
 				<Tooltip
-					side="bottom"
+					side="top"
 					content={shortcutHintShare ?? t('knowledge.shortcuts.share')}
 				>
 					<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
@@ -125,7 +125,7 @@ const KnowledgeEditorToolbar = (props: {
 				</Tooltip>
 			)}
 			<Tooltip
-				side="bottom"
+				side="top"
 				content={
 					shortcutHintOpenLibrary ?? t('knowledge.shortcuts.openLibrary')
 				}
@@ -139,7 +139,7 @@ const KnowledgeEditorToolbar = (props: {
 			</Tooltip>
 			{isCloudLoggedIn ? (
 				<Tooltip
-					side="bottom"
+					side="top"
 					content={shortcutHintOpenTrash ?? t('knowledge.shortcuts.openTrash')}
 				>
 					<Button variant="link" className={linkBtn} onClick={onOpenTrash}>

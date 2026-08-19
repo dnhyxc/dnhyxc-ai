@@ -1846,8 +1846,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		resetMarkdownBottomBarPosition: resetBottomBarPosition,
 	});
 
-	console.log(compactChrome, 'compactChrome', height);
-
 	const editorPixelHeight = compactChrome ? '100%' : height;
 
 	return (
@@ -1875,7 +1873,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						<div className="flex min-w-0 shrink-0 items-center justify-end">
 							{showTabBar && markdownBottomBarEnabled ? (
 								<Tooltip
-									side="bottom"
+									side="top"
 									content={markdownBottomBarShortcutHint ?? 'Meta + Shift + B'}
 								>
 									<Button

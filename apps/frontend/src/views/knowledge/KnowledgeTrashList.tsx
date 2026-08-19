@@ -2,7 +2,6 @@ import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import { Button, Checkbox, ScrollArea, Spinner, Toast } from '@ui/index';
-import { Input } from '@ui/input';
 import { Search, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,6 +15,7 @@ import {
 import useStore from '@/store';
 import type { KnowledgeTrashListItem } from '@/types';
 import { formatDate } from '@/utils';
+import KnowledgeSearchInput from './KnowledgeSearchInput';
 
 interface Props {
 	open: boolean;
@@ -123,9 +123,6 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 		const [confirmOpen, setConfirmOpen] = useState(false);
 		const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
 		const [pendingDeleteLabel, setPendingDeleteLabel] = useState('');
-		const [titleQuery, setTitleQuery] = useState(
-			() => knowledgeStore.trashTitleKeyword,
-		);
 		const [appliedQuery, setAppliedQuery] = useState(
 			() => knowledgeStore.trashTitleKeyword,
 		);
@@ -141,10 +138,13 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 			void knowledgeStore.refreshTrashList(appliedQuery);
 		}, [open, knowledgeStore]);
 
-		const submitTitleSearch = useCallback(() => {
-			setAppliedQuery(titleQuery);
-			void knowledgeStore.refreshTrashList(titleQuery);
-		}, [titleQuery, knowledgeStore]);
+		const submitTitleSearch = useCallback(
+			(q: string) => {
+				setAppliedQuery(q);
+				void knowledgeStore.refreshTrashList(q);
+			},
+			[knowledgeStore],
+		);
 
 		const { trashList, trashLoading, trashLoadingMore, trashHasMore } =
 			knowledgeStore;
@@ -356,26 +356,19 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					onOpenChange={onOpenChange}
 				>
 					<div className="flex h-full min-h-0 flex-col">
-						<div className="relative mb-2 pt-2 pl-2.5 pr-4">
+						<div className="relative mb-2 pt-2 pl-2 pr-3.5">
 							<Search
-								className="pointer-events-none absolute left-5 top-6.5 size-4 -translate-y-1/2 text-textcolor/40"
+								className="pointer-events-none absolute left-5 top-6.5 size-4 -translate-y-1/2 opacity-50"
 								aria-hidden
 							/>
-							<Input
-								type="search"
-								value={titleQuery}
-								onChange={(e) => setTitleQuery(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key !== 'Enter') return;
-									e.preventDefault();
-									submitTitleSearch();
-								}}
+							<KnowledgeSearchInput
+								committedQuery={appliedQuery}
+								onCommit={submitTitleSearch}
 								placeholder={t('knowledge.trash.searchPlaceholder')}
-								aria-label={t('knowledge.trash.searchPlaceholder')}
-								className="h-9 pl-8"
+								className="h-9 pl-8 border border-theme/15! shadow-none bg-transparent pr-2 text-textcolor placeholder:text-sm placeholder:text-textcolor/60 focus-visible:ring-1 focus-visible:ring-theme/20"
 							/>
 						</div>
-						<div className="flex items-center justify-between gap-2 pl-0.5 pr-4">
+						<div className="flex items-center justify-between gap-2 pr-3.5">
 							<div className="flex items-center gap-2 text-sm text-textcolor/70">
 								<div
 									role="button"

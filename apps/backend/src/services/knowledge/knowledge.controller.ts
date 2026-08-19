@@ -17,11 +17,16 @@ import {
 import type { Request } from 'express';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
+import { AssignKnowledgeCategoryDto } from './dto/assign-knowledge-category.dto';
+import { CreateKnowledgeCategoryDto } from './dto/create-knowledge-category.dto';
 import { DeleteKnowledgeTrashBatchDto } from './dto/delete-knowledge-trash-batch.dto';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
+import { QueryKnowledgeCategoriesSummaryDto } from './dto/query-knowledge-categories-summary.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
+import { ReorderKnowledgeCategoriesDto } from './dto/reorder-knowledge-categories.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { UpdateKnowledgeCategoryDto } from './dto/update-knowledge-category.dto';
 import { UpdateKnowledgeVisibilityDto } from './dto/update-knowledge-visibility.dto';
 import { KnowledgeService } from './knowledge.service';
 
@@ -68,6 +73,62 @@ export class KnowledgeController {
 		@Body() dto: UpdateKnowledgeVisibilityDto,
 	) {
 		return this.knowledgeService.setVisibility(this.userId(req), id, dto);
+	}
+
+	@Get('categories/summary')
+	async categoriesSummary(
+		@Req() req: AuthedRequest,
+		@Query() query: QueryKnowledgeCategoriesSummaryDto,
+	) {
+		return this.knowledgeService.getCategoriesSummary(this.userId(req), query);
+	}
+
+	@Post('categories')
+	async createCategory(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateKnowledgeCategoryDto,
+	) {
+		return this.knowledgeService.createCategory(this.userId(req), dto);
+	}
+
+	@Put('categories/reorder')
+	async reorderCategories(
+		@Req() req: AuthedRequest,
+		@Body() dto: ReorderKnowledgeCategoriesDto,
+	) {
+		await this.knowledgeService.reorderCategories(this.userId(req), dto);
+		return { ok: true };
+	}
+
+	@Put('categories/:id')
+	async updateCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateKnowledgeCategoryDto,
+	) {
+		return this.knowledgeService.updateCategory(this.userId(req), id, dto);
+	}
+
+	@Delete('categories/:id')
+	async removeCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.knowledgeService.removeCategory(this.userId(req), id);
+		return { id };
+	}
+
+	@Put('item/:id/category')
+	async assignItemCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: AssignKnowledgeCategoryDto,
+	) {
+		return this.knowledgeService.assignItemCategory(
+			this.userId(req),
+			id,
+			dto.categoryId ?? null,
+		);
 	}
 
 	@Delete('delete/:id')

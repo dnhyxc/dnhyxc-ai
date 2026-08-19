@@ -856,6 +856,17 @@ export const zhCN = {
 	'knowledge.list.empty.cloud': '暂无知识库条目',
 	'knowledge.list.searchPlaceholder': '根据文档名称搜索',
 	'knowledge.list.empty.search': '未找到匹配的文档',
+	'knowledge.list.category.manage': '管理分类',
+	'knowledge.list.category.add': '添加分类',
+	'knowledge.list.category.rename': '重命名',
+	'knowledge.list.category.delete': '删除分类',
+	'knowledge.list.category.deleteConfirm':
+		'删除后，该分类中的文档将移至「未分类」。',
+	'knowledge.list.category.move': '移动到分类',
+	'knowledge.list.category.all': '全部',
+	'knowledge.list.category.uncategorized': '未分类',
+	'knowledge.list.category.empty': '此分类暂无文档。',
+	'knowledge.list.category.duplicateName': '分类名称已存在',
 
 	'knowledge.assistant.prompts.polish.title': '润色文档',
 	'knowledge.assistant.prompts.polish.desc': '精修字句，提升质感',

@@ -1,15 +1,26 @@
+import CategoryManageDialog from '@design/CategoryManageDialog';
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
-import { Button, ScrollArea, Spinner, Switch, Toast } from '@ui/index';
-import { Input } from '@ui/input';
+import {
+	Button,
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+	ScrollArea,
+	Spinner,
+	Switch,
+	Toast,
+} from '@ui/index';
 import {
 	ChevronRight,
+	CircuitBoard,
 	Code2,
 	Folder,
 	FolderOpen,
 	Globe,
+	LayoutList,
 	Search,
 	Trash2,
 } from 'lucide-react';
@@ -19,8 +30,14 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { deleteKnowledge } from '@/service';
 import useStore from '@/store';
-import type { KnowledgeListItem, KnowledgeRecord } from '@/types';
+import type {
+	KnowledgeCategory,
+	KnowledgeCategoryKey,
+	KnowledgeListItem,
+	KnowledgeRecord,
+} from '@/types';
 import { formatDate, isTauriRuntime } from '@/utils';
+import { getRequestErrorMessage } from '@/utils/fetch';
 import {
 	formatTauriInvokeError,
 	invokeDeleteKnowledgeMarkdown,
@@ -30,6 +47,7 @@ import {
 	invokeResolveKnowledgeMarkdownTarget,
 } from '@/utils/knowledge-save';
 import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
+import KnowledgeSearchInput from './KnowledgeSearchInput';
 import {
 	buildLocalMdTree,
 	collectLocalMdDirPaths,
@@ -80,6 +98,11 @@ interface KnowledgeListRowProps {
 	) => void;
 	/** 本地树缩进层级（0 起） */
 	depth?: number;
+	categories?: KnowledgeCategory[];
+	onMoveCategory?: (
+		id: string,
+		categoryId: string | null,
+	) => void | Promise<void>;
 }
 
 interface KnowledgeFolderRowProps {
@@ -100,6 +123,126 @@ function localFileToListItem(node: LocalMdTreeFile): KnowledgeListItem {
 	};
 }
 
+function categoryMenuItemClass(active?: boolean): string {
+	return cn(
+		'flex min-w-0 w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
+		'hover:bg-theme/5 focus-visible:bg-theme/5 focus-visible:outline-none',
+		active && 'pointer-events-none opacity-50',
+	);
+}
+
+function KnowledgeCategoryAssign({
+	item,
+	categories,
+	onMoveCategory,
+}: {
+	item: KnowledgeListItem;
+	categories: KnowledgeCategory[];
+	onMoveCategory: (
+		id: string,
+		categoryId: string | null,
+	) => void | Promise<void>;
+}) {
+	const { t } = useI18n();
+	const [open, setOpen] = useState(false);
+	const [busy, setBusy] = useState(false);
+
+	const assign = (categoryId: string | null) => {
+		if (busy) return;
+		setOpen(false);
+		setBusy(true);
+		void Promise.resolve(onMoveCategory(item.id, categoryId)).finally(() =>
+			setBusy(false),
+		);
+	};
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<Tooltip
+				side="top"
+				sideOffset={6}
+				delayDuration={200}
+				shadow
+				disableHoverableContent
+				disabled={open || busy}
+				content={t('knowledge.list.category.move')}
+			>
+				<PopoverTrigger asChild>
+					<button
+						type="button"
+						aria-label={t('knowledge.list.category.move')}
+						aria-expanded={open}
+						disabled={busy}
+						className={cn(
+							'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+							'hover:text-teal-500 hover:bg-teal-500/10',
+						)}
+						onClick={(e) => e.stopPropagation()}
+					>
+						{busy ? (
+							<Spinner className="size-3.5" aria-hidden />
+						) : (
+							<LayoutList size={15} />
+						)}
+					</button>
+				</PopoverTrigger>
+			</Tooltip>
+			<PopoverContent
+				align="end"
+				side="bottom"
+				sideOffset={6}
+				className="w-48 overflow-hidden p-0"
+				onClick={(e) => e.stopPropagation()}
+				onCloseAutoFocus={(e) => e.preventDefault()}
+			>
+				<p className="border-theme/10 text-textcolor border-b px-3 py-3.5 text-xs font-medium">
+					{t('knowledge.list.category.move')}
+				</p>
+				<ScrollArea className="max-h-56 w-full">
+					<div className="flex min-w-0 flex-col gap-0.5 p-1 pb-2">
+						{categories.map((cat) => {
+							const selected = item.categoryId === cat.id;
+							return (
+								<button
+									key={cat.id}
+									type="button"
+									className={categoryMenuItemClass(selected)}
+									disabled={selected}
+									onClick={() => assign(cat.id)}
+								>
+									<span className="min-w-0 truncate">{cat.name}</span>
+								</button>
+							);
+						})}
+						<div className="bg-theme/10 my-1 h-px" aria-hidden />
+						<button
+							type="button"
+							className={categoryMenuItemClass(item.categoryId == null)}
+							disabled={item.categoryId == null}
+							onClick={() => assign(null)}
+						>
+							<span className="min-w-0 truncate">
+								{t('knowledge.list.category.uncategorized')}
+							</span>
+						</button>
+					</div>
+				</ScrollArea>
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+function isActiveCategoryKey(
+	active: KnowledgeCategoryKey,
+	key: KnowledgeCategoryKey,
+): boolean {
+	if (active.kind !== key.kind) return false;
+	if (active.kind === 'category' && key.kind === 'category') {
+		return active.categoryId === key.categoryId;
+	}
+	return true;
+}
+
 const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 	const { t } = useI18n();
 	const {
@@ -111,6 +254,8 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		showOpenInExternalEditor = false,
 		onOpenInExternalEditorClick,
 		depth = 0,
+		categories = [],
+		onMoveCategory,
 	} = props;
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
@@ -128,20 +273,35 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 	const showVisibility =
 		owned && !item.localAbsolutePath && !!onVisibilityClick;
 	const showTrash = owned;
+	// 仅本人文档可改分类（含自己公开的）；他人公开不可移动
+	const showCategory =
+		item.isOwned === true &&
+		!item.localAbsolutePath &&
+		!!onMoveCategory &&
+		categories.length > 0;
 	const actionCount =
-		(showOpenEditor ? 1 : 0) + (showVisibility ? 1 : 0) + (showTrash ? 1 : 0);
+		(showOpenEditor ? 1 : 0) +
+		(showVisibility ? 1 : 0) +
+		(showCategory ? 1 : 0) +
+		(showTrash ? 1 : 0);
 	const hoverPr =
-		actionCount >= 3
-			? 'group-hover:pr-22'
-			: actionCount === 2
-				? 'group-hover:pr-14'
-				: actionCount === 1
-					? 'group-hover:pr-8'
-					: '';
+		actionCount >= 4
+			? 'group-hover:pr-30'
+			: actionCount >= 3
+				? 'group-hover:pr-22'
+				: actionCount === 2
+					? 'group-hover:pr-14'
+					: actionCount === 1
+						? 'group-hover:pr-8'
+						: '';
 	const author = item.author?.trim() || '';
 	const updatedLabel = t('knowledge.list.updatedAt', {
 		time: formatDate(item.updatedAt?.toString() ?? ''),
 	});
+	const categoryName =
+		item.categoryId != null
+			? categories.find((c) => c.id === item.categoryId)?.name
+			: undefined;
 
 	return (
 		<div
@@ -169,6 +329,14 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 						{t('knowledge.list.publicBadge')}
 					</span>
 				) : null}
+				{categoryName ? (
+					<span
+						className="bg-teal-200/15 text-teal-200 shrink-0 rounded px-1.5 py-1 text-xs font-medium leading-none"
+						title={categoryName}
+					>
+						{categoryName}
+					</span>
+				) : null}
 				<span className="min-w-0 truncate font-medium">
 					{item.title?.trim() || t('knowledge.common.untitled')}
 				</span>
@@ -177,7 +345,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 				<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
 					{showOpenEditor ? (
 						<Tooltip
-							side="left"
+							side="top"
 							sideOffset={6}
 							delayDuration={200}
 							shadow
@@ -201,7 +369,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 					) : null}
 					{showVisibility ? (
 						<Tooltip
-							side="left"
+							side="top"
 							sideOffset={6}
 							delayDuration={200}
 							shadow
@@ -230,6 +398,13 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 							</button>
 						</Tooltip>
 					) : null}
+					{showCategory && onMoveCategory ? (
+						<KnowledgeCategoryAssign
+							item={item}
+							categories={categories}
+							onMoveCategory={onMoveCategory}
+						/>
+					) : null}
 					{showTrash ? (
 						<button
 							type="button"
@@ -253,7 +428,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 				{author ? (
 					<>
 						<Tooltip
-							side="bottom"
+							side="top"
 							sideOffset={6}
 							delayDuration={200}
 							shadow
@@ -297,7 +472,7 @@ const KnowledgeFolderRow = (props: KnowledgeFolderRowProps) => {
 				size={14}
 				aria-hidden
 				className={cn(
-					'shrink-0 text-textcolor/50 transition-transform',
+					'-ml-0.5 shrink-0 text-textcolor/50 transition-transform',
 					expanded && 'rotate-90',
 				)}
 			/>
@@ -356,13 +531,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const [expandedDirs, setExpandedDirs] = useState(
 			() => new Set([normalizeFsPath(TAURI_KNOWLEDGE_DIR)]),
 		);
-		/** 文档名称搜索：输入框内容；回车后写入 appliedQuery 才真正过滤 / 请求 */
-		const [titleQuery, setTitleQuery] = useState(
-			() => knowledgeStore.titleKeyword,
-		);
+		/** 已提交的搜索词（回车 / 清除才更新；草稿在 KnowledgeSearchInput 内） */
 		const [appliedQuery, setAppliedQuery] = useState(
 			() => knowledgeStore.titleKeyword,
 		);
+		const [categoryManageOpen, setCategoryManageOpen] = useState(false);
 		const titleQueryNorm = appliedQuery.trim().toLowerCase();
 		const searching = titleQueryNorm.length > 0;
 
@@ -438,40 +611,42 @@ const KnowledgeList: React.FC<IProps> = observer(
 			});
 		}, []);
 
-		const submitTitleSearch = useCallback(() => {
-			setAppliedQuery(titleQuery);
-			if (useLocalFolder) {
-				const q = titleQuery.trim().toLowerCase();
-				if (!q) return;
-				// 回车搜索时先展开匹配树，之后折叠由 expandedDirs 控制
-				const root = localFolderPath.trim() || TAURI_KNOWLEDGE_DIR;
-				const entries = localList
-					.filter((i) => !!i.localAbsolutePath)
-					.map((i) => ({
-						path: i.localAbsolutePath!,
-						title:
-							i.title?.trim() ||
-							i.localAbsolutePath!.split(/[/\\]/).pop() ||
-							'',
-						updatedAt: i.updatedAt?.toString() ?? '',
-					}))
-					.filter((e) => e.title.toLowerCase().includes(q));
-				setExpandedDirs(
-					new Set(collectLocalMdDirPaths(buildLocalMdTree(root, entries))),
-				);
-				return;
-			}
-			if (allowCloudList) {
-				void knowledgeStore.refreshList(titleQuery);
-			}
-		}, [
-			titleQuery,
-			useLocalFolder,
-			localFolderPath,
-			localList,
-			allowCloudList,
-			knowledgeStore,
-		]);
+		const submitTitleSearch = useCallback(
+			(q: string) => {
+				setAppliedQuery(q);
+				if (useLocalFolder) {
+					const norm = q.trim().toLowerCase();
+					if (!norm) return;
+					// 回车搜索时先展开匹配树，之后折叠由 expandedDirs 控制
+					const root = localFolderPath.trim() || TAURI_KNOWLEDGE_DIR;
+					const entries = localList
+						.filter((i) => !!i.localAbsolutePath)
+						.map((i) => ({
+							path: i.localAbsolutePath!,
+							title:
+								i.title?.trim() ||
+								i.localAbsolutePath!.split(/[/\\]/).pop() ||
+								'',
+							updatedAt: i.updatedAt?.toString() ?? '',
+						}))
+						.filter((e) => e.title.toLowerCase().includes(norm));
+					setExpandedDirs(
+						new Set(collectLocalMdDirPaths(buildLocalMdTree(root, entries))),
+					);
+					return;
+				}
+				if (allowCloudList) {
+					void knowledgeStore.refreshList(q);
+				}
+			},
+			[
+				useLocalFolder,
+				localFolderPath,
+				localList,
+				allowCloudList,
+				knowledgeStore,
+			],
+		);
 
 		// 未登录：固定使用本地文件夹模式，避免请求云端列表
 		useEffect(() => {
@@ -484,6 +659,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 		useEffect(() => {
 			if (!open || useLocalFolder || !allowCloudList) return;
 			void knowledgeStore.refreshList(appliedQuery);
+			void knowledgeStore.fetchCategories();
 		}, [open, useLocalFolder, allowCloudList, knowledgeStore]);
 
 		useEffect(() => {
@@ -788,6 +964,21 @@ const KnowledgeList: React.FC<IProps> = observer(
 			setPendingVisibility(null);
 		}, [knowledgeStore, pendingVisibility, t]);
 
+		const onMoveCategory = useCallback(
+			async (id: string, categoryId: string | null) => {
+				try {
+					await knowledgeStore.assignItemCategory(id, categoryId);
+				} catch (e) {
+					Toast({
+						type: 'error',
+						title: t('common.loadFailed'),
+						message: getRequestErrorMessage(e),
+					});
+				}
+			},
+			[knowledgeStore, t],
+		);
+
 		/** 本地列表：在 Cursor / Trae 中打开（由 Rust detect_markdown_editor，优先 Cursor） */
 		const onOpenInExternalEditorClick = useCallback(
 			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
@@ -842,7 +1033,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 				: t('knowledge.list.empty.search')
 			: searching
 				? t('knowledge.list.empty.search')
-				: t('knowledge.list.empty.cloud');
+				: knowledgeStore.activeCategoryKey.kind !== 'all'
+					? t('knowledge.list.category.empty')
+					: t('knowledge.list.empty.cloud');
 
 		const deleteRecordTitle =
 			selectKnowledge?.title?.trim() || t('knowledge.common.untitled');
@@ -870,6 +1063,34 @@ const KnowledgeList: React.FC<IProps> = observer(
 					closeOnConfirm={false}
 					onConfirm={onConfirmVisibility}
 				/>
+
+				{!useLocalFolder && allowCloudList ? (
+					<CategoryManageDialog
+						open={categoryManageOpen}
+						onOpenChange={setCategoryManageOpen}
+						items={knowledgeStore.categories.map((c) => ({
+							id: c.id,
+							name: c.name,
+							count: c.itemCount,
+						}))}
+						labels={{
+							title: t('knowledge.list.category.manage'),
+							add: t('knowledge.list.category.add'),
+							rename: t('knowledge.list.category.rename'),
+							delete: t('knowledge.list.category.delete'),
+							deleteConfirm: t('knowledge.list.category.deleteConfirm'),
+							duplicateName: t('knowledge.list.category.duplicateName'),
+						}}
+						onCreate={async (name) => {
+							await knowledgeStore.createCategory(name);
+						}}
+						onRename={(id, name) => knowledgeStore.renameCategory(id, name)}
+						onDelete={(id) => knowledgeStore.deleteCategory(id)}
+						onMove={(id, direction) =>
+							knowledgeStore.moveCategory(id, direction)
+						}
+					/>
+				) : null}
 
 				<Confirm
 					open={deleteRecordOnlyOpen}
@@ -953,7 +1174,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					onOpenChange={onOpenChange}
 				>
 					<div className="flex h-full min-h-0 flex-col">
-						<div className="flex shrink-0 flex-col gap-0.5 pr-4 pl-2.5 pb-0.5">
+						<div className="flex shrink-0 flex-col gap-0.5 pr-3.5 pl-2 pb-0.5">
 							<div className="flex flex-wrap items-center justify-between gap-2">
 								<span className="text-sm text-textcolor/80">
 									{t('knowledge.list.dataSource')}
@@ -1027,24 +1248,118 @@ const KnowledgeList: React.FC<IProps> = observer(
 							</div>
 							<div className="relative mt-1.5 mb-1">
 								<Search
-									className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-textcolor/40"
+									className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 opacity-50"
 									aria-hidden
 								/>
-								<Input
-									type="search"
-									size={18}
-									value={titleQuery}
-									onChange={(e) => setTitleQuery(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key !== 'Enter') return;
-										e.preventDefault();
-										submitTitleSearch();
-									}}
+								<KnowledgeSearchInput
+									committedQuery={appliedQuery}
+									onCommit={submitTitleSearch}
 									placeholder={t('knowledge.list.searchPlaceholder')}
-									aria-label={t('knowledge.list.searchPlaceholder')}
-									className="h-9 pl-8"
+									className="h-9 pl-8 border border-theme/15! shadow-none bg-transparent pr-2 text-textcolor placeholder:text-sm placeholder:text-textcolor/60 focus-visible:ring-1 focus-visible:ring-theme/20"
 								/>
 							</div>
+							{!useLocalFolder && allowCloudList ? (
+								<div className="mt-1 mb-0.5 flex min-w-0 items-center">
+									<Button
+										type="button"
+										variant="link"
+										size="sm"
+										className="h-8 shrink-0 gap-1 pl-0!"
+										onClick={() => setCategoryManageOpen(true)}
+									>
+										<CircuitBoard className="size-3.5" aria-hidden />
+										{t('knowledge.list.category.manage')}
+									</Button>
+									<div
+										className={cn(
+											'flex h-8 min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overscroll-x-contain',
+											'[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+										)}
+										role="tablist"
+										aria-label={t('knowledge.list.category.all')}
+									>
+										{(
+											[
+												{
+													key: { kind: 'all' } as KnowledgeCategoryKey,
+													label: t('knowledge.list.category.all'),
+													count: knowledgeStore.totalItemCount,
+												},
+												...knowledgeStore.categories
+													.filter((c) => c.itemCount > 0)
+													.map((c) => ({
+														key: {
+															kind: 'category' as const,
+															categoryId: c.id,
+														},
+														label: c.name,
+														count: c.itemCount,
+													})),
+												...(knowledgeStore.uncategorizedCount > 0
+													? [
+															{
+																key: {
+																	kind: 'uncategorized' as const,
+																},
+																label: t(
+																	'knowledge.list.category.uncategorized',
+																),
+																count: knowledgeStore.uncategorizedCount,
+															},
+														]
+													: []),
+											] as Array<{
+												key: KnowledgeCategoryKey;
+												label: string;
+												count: number;
+											}>
+										).map((chip) => {
+											const active = isActiveCategoryKey(
+												knowledgeStore.activeCategoryKey,
+												chip.key,
+											);
+											const tabId =
+												chip.key.kind === 'category'
+													? `knowledge-cat-${chip.key.categoryId}`
+													: `knowledge-cat-${chip.key.kind}`;
+											return (
+												<Button
+													key={tabId}
+													id={tabId}
+													type="button"
+													role="tab"
+													aria-selected={active}
+													variant="ghost"
+													size="sm"
+													className={cn(
+														'h-8 shrink-0 gap-1 px-2 font-medium hover:bg-transparent dark:hover:bg-transparent',
+														active
+															? 'text-textcolor hover:text-textcolor'
+															: 'text-textcolor/60 hover:text-textcolor',
+													)}
+													onClick={() =>
+														knowledgeStore.setActiveCategoryKey(chip.key)
+													}
+												>
+													<span className="max-w-24 truncate">
+														{chip.label}
+													</span>
+													<span
+														className={cn(
+															'inline-flex min-w-4.5 items-center justify-center rounded-full px-1.5 py-px text-xs leading-none tabular-nums',
+															active
+																? 'bg-teal-600 font-medium text-white'
+																: 'bg-theme/10 text-textcolor/55',
+														)}
+													>
+														{chip.count}
+													</span>
+												</Button>
+											);
+										})}
+									</div>
+								</div>
+							) : null}
 						</div>
 						<ScrollArea
 							className="flex min-h-0 flex-1 flex-col pr-1.5 box-border"
@@ -1103,6 +1418,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 												onActivate={handleRowClick}
 												onTrashClick={onTrashClick}
 												onVisibilityClick={onVisibilityClick}
+												categories={knowledgeStore.categories}
+												onMoveCategory={onMoveCategory}
 											/>
 										))}
 								{showLoadMoreHint ? (

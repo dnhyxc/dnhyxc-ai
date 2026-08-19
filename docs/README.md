@@ -133,6 +133,8 @@
 | 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/知识预览代码工具条滚动.md](./knowledge/知识预览代码工具条滚动.md) · [impact/知识预览代码工具条滚动.md](./impact/知识预览代码工具条滚动.md) |
 | 本地知识库文件夹目录树浏览（可展开层级/键盘可达）                 | [knowledge/知识库文件夹树.md](./knowledge/知识库文件夹树.md)                                                                               |
 | 知识库列表与回收站：按文档标题搜索（Enter 提交、不区分大小写）    | [knowledge/知识库列表搜索标题.md](./knowledge/知识库列表搜索标题.md)                                                                     |
+| 知识库自定义分类（新建/重命名/删除/排序/归档/Tab 筛选/默认分类播种） | [knowledge/知识库分类管理.md](./knowledge/知识库分类管理.md)                                                                                     |
+| 知识库/电子书列表公开优先排序 + 电子书非本人书不可改分类           | [knowledge/公开优先排序.md](./knowledge/公开优先排序.md)                                                                                       |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/对话内存溢出.md](./chat/对话内存溢出.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/流式代码块滚动.md](./chat/流式代码块滚动.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/代理信任与限流.md](./ops/代理信任与限流.md)                                                                                         |
@@ -249,6 +251,7 @@
 | EPUB 阅读区选区被问书侧栏滚动误清 | [ebook/EPUB选区滚动目标过滤.md](./ebook/EPUB选区滚动目标过滤.md) |
 | 电子书助手流式输出卡顿 | [ebook/电子书助手流式补丁调度.md](./ebook/电子书助手流式补丁调度.md) |
 | Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/提示受控对齐.md](./ui/提示受控对齐.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
+| Tooltip 阴影偏色 / 默认无阴影 / 箭头遮内容 / 工具栏与底部栏 Tooltip 朝下遮挡 / 分类菜单与 Tooltip 抢焦点 | [app/Tooltip方向与阴影修复.md](./app/Tooltip方向与阴影修复.md)（`shadow` 默认 `true` + 投影改 teal-500 + drop-shadow 改 theme-background + Arrow `z-50→z-30` + 工具栏/底部栏 `side="top"` + 分类菜单 `disableHoverableContent`/`disabled` + `onCloseAutoFocus` 阻止回跳） |
 | Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/Monaco加载恢复.md](./ui/Monaco加载恢复.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
 
 ---

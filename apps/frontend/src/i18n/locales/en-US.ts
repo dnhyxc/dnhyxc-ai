@@ -930,6 +930,17 @@ export const enUS = {
 	'knowledge.list.empty.cloud': 'No knowledge items yet',
 	'knowledge.list.searchPlaceholder': 'Search by document title',
 	'knowledge.list.empty.search': 'No matching documents',
+	'knowledge.list.category.manage': 'Manage categories',
+	'knowledge.list.category.add': 'Add category',
+	'knowledge.list.category.rename': 'Rename',
+	'knowledge.list.category.delete': 'Delete category',
+	'knowledge.list.category.deleteConfirm':
+		'Documents in this category will move to Uncategorized.',
+	'knowledge.list.category.move': 'Move to category',
+	'knowledge.list.category.all': 'All',
+	'knowledge.list.category.uncategorized': 'Uncategorized',
+	'knowledge.list.category.empty': 'No documents in this category.',
+	'knowledge.list.category.duplicateName': 'Category name already exists',
 
 	'knowledge.assistant.prompts.polish.title': 'Polish document',
 	'knowledge.assistant.prompts.polish.desc': 'Refine wording and improve tone',

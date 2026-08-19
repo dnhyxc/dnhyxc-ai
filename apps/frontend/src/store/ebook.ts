@@ -109,13 +109,17 @@ function bookLastReadMs(book: Book, progMap: Record<string, Prog>): number {
 	return Number.isFinite(addedAt) ? addedAt : 0;
 }
 
+/** 公开书（含他人公开）优先，组内再按最近阅读倒序 */
 function sortBooksByLastRead(
 	books: Book[],
 	progMap: Record<string, Prog>,
 ): Book[] {
-	return [...books].sort(
-		(a, b) => bookLastReadMs(b, progMap) - bookLastReadMs(a, progMap),
-	);
+	return [...books].sort((a, b) => {
+		const aPublic = a.isPublic || a.owner ? 1 : 0;
+		const bPublic = b.isPublic || b.owner ? 1 : 0;
+		if (aPublic !== bPublic) return bPublic - aPublic;
+		return bookLastReadMs(b, progMap) - bookLastReadMs(a, progMap);
+	});
 }
 
 export type EbookUploadPhase = 'reading' | 'uploading';
@@ -439,7 +443,8 @@ class EbookStore {
 	async setBookPublic(bookId: string, isPublic: boolean): Promise<Book> {
 		const updated = await setEbookBookVisibility(bookId, isPublic);
 		runInAction(() => {
-			this.books = this.books.map((b) => (b.id === bookId ? updated : b));
+			const next = this.books.map((b) => (b.id === bookId ? updated : b));
+			this.books = sortBooksByLastRead(next, this.progMap);
 			this.bookCache[bookId] = updated;
 		});
 		void this.fetchPublicCount();
@@ -554,6 +559,8 @@ class EbookStore {
 		bookId: string,
 		categoryId: string | null,
 	): Promise<void> {
+		const current = this.books.find((b) => b.id === bookId);
+		if (current?.owner) return;
 		const updated = await assignEbookBookCategory(bookId, categoryId);
 		runInAction(() => {
 			const stays = this.bookMatchesActiveCategory(updated.categoryId);

@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
@@ -7,12 +8,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Raw, Repository } from 'typeorm';
 import { AssistantSession } from '../assistant/assistant-session.entity';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
+import { CreateKnowledgeCategoryDto } from './dto/create-knowledge-category.dto';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
+import { QueryKnowledgeCategoriesSummaryDto } from './dto/query-knowledge-categories-summary.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
+import { ReorderKnowledgeCategoriesDto } from './dto/reorder-knowledge-categories.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { UpdateKnowledgeCategoryDto } from './dto/update-knowledge-category.dto';
 import { UpdateKnowledgeVisibilityDto } from './dto/update-knowledge-visibility.dto';
 import { Knowledge } from './knowledge.entity';
+import { KnowledgeCategory } from './knowledge-category.entity';
 import { KnowledgeTrash } from './knowledge-trash.entity';
 
 /** 与前端知识库回收站预览的 `knowledgeArticleId` 前缀一致 */
@@ -30,9 +36,30 @@ export type KnowledgeListItem = Pick<
 	| 'author'
 	| 'authorId'
 	| 'isPublic'
+	| 'categoryId'
 	| 'createdAt'
 	| 'updatedAt'
 > & { isOwned: boolean };
+
+export type KnowledgeCategoryDto = {
+	id: string;
+	name: string;
+	sortOrder: number;
+	itemCount: number;
+};
+
+export type KnowledgeCategoriesSummaryDto = {
+	categories: KnowledgeCategoryDto[];
+	uncategorizedCount: number;
+	totalItemCount: number;
+};
+
+const MAX_KNOWLEDGE_CATEGORIES = 50;
+
+const DEFAULT_CATEGORY_NAMES: Record<'zh-CN' | 'en-US', string[]> = {
+	'zh-CN': ['笔记', '文档', '教程', '工作', '其他'],
+	'en-US': ['Notes', 'Docs', 'Tutorials', 'Work', 'Other'],
+};
 
 /** 回收站列表项：不含 content */
 export type KnowledgeTrashListItem = Pick<
@@ -47,6 +74,8 @@ export class KnowledgeService {
 		private readonly knowledgeRepository: Repository<Knowledge>,
 		@InjectRepository(KnowledgeTrash)
 		private readonly knowledgeTrashRepository: Repository<KnowledgeTrash>,
+		@InjectRepository(KnowledgeCategory)
+		private readonly categoryRepo: Repository<KnowledgeCategory>,
 		private readonly embeddingService: KnowledgeEmbeddingService,
 	) {}
 
@@ -160,6 +189,11 @@ export class KnowledgeService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
+		if (query.categoryId && query.uncategorizedOnly) {
+			throw new BadRequestException(
+				'categoryId 与 uncategorizedOnly 不能同时使用',
+			);
+		}
 
 		const qb = this.knowledgeRepository
 			.createQueryBuilder('k')
@@ -169,13 +203,28 @@ export class KnowledgeService {
 				'k.author',
 				'k.authorId',
 				'k.isPublic',
+				'k.categoryId',
 				'k.createdAt',
 				'k.updatedAt',
 			])
-			.where('(k.authorId = :userId OR k.isPublic = true)', { userId })
-			.orderBy('k.updatedAt', 'DESC')
+			.orderBy('k.isPublic', 'DESC')
+			.addOrderBy('k.updatedAt', 'DESC')
 			.take(take)
 			.skip(skip);
+
+		if (query.categoryId || query.uncategorizedOnly) {
+			qb.where('k.authorId = :userId', { userId });
+			if (query.categoryId) {
+				await this.resolveUserCategoryId(userId, query.categoryId);
+				qb.andWhere('k.category_id = :categoryId', {
+					categoryId: query.categoryId,
+				});
+			} else {
+				qb.andWhere('k.category_id IS NULL');
+			}
+		} else {
+			qb.where('(k.authorId = :userId OR k.isPublic = true)', { userId });
+		}
 
 		if (title) {
 			qb.andWhere('LOWER(k.title) LIKE :title', {
@@ -322,6 +371,7 @@ export class KnowledgeService {
 			| 'author'
 			| 'authorId'
 			| 'isPublic'
+			| 'categoryId'
 			| 'createdAt'
 			| 'updatedAt'
 		>,
@@ -333,10 +383,218 @@ export class KnowledgeService {
 			author: row.author,
 			authorId: row.authorId,
 			isPublic: row.isPublic,
+			categoryId: row.categoryId ?? null,
 			isOwned: row.authorId === viewerUserId,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 		};
+	}
+
+	private normalizeCategoryName(name: string): string {
+		return name.trim();
+	}
+
+	private async resolveUserCategoryId(
+		userId: number,
+		categoryId?: string | null,
+	): Promise<string | null> {
+		if (!categoryId) return null;
+		const cat = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!cat) {
+			throw new BadRequestException('分类不存在');
+		}
+		return cat.id;
+	}
+
+	private async assertCategoryNameUnique(
+		userId: number,
+		name: string,
+		excludeId?: string,
+	): Promise<void> {
+		const normalized = this.normalizeCategoryName(name);
+		if (!normalized) {
+			throw new BadRequestException('分类名称不能为空');
+		}
+		const rows = await this.categoryRepo
+			.createQueryBuilder('c')
+			.where('c.user_id = :userId', { userId })
+			.andWhere('LOWER(c.name) = LOWER(:name)', { name: normalized })
+			.getMany();
+		const dup = rows.find((r) => r.id !== excludeId);
+		if (dup) {
+			throw new ConflictException('分类名称已存在');
+		}
+	}
+
+	private async ensureDefaultCategories(
+		userId: number,
+		locale?: 'zh-CN' | 'en-US',
+	): Promise<void> {
+		const count = await this.categoryRepo.count({ where: { userId } });
+		if (count > 0) return;
+		const lang = locale === 'en-US' ? 'en-US' : 'zh-CN';
+		const names = DEFAULT_CATEGORY_NAMES[lang];
+		const rows = names.map((name, index) =>
+			this.categoryRepo.create({ userId, name, sortOrder: index }),
+		);
+		await this.categoryRepo.save(rows);
+	}
+
+	async getCategoriesSummary(
+		userId: number,
+		query: QueryKnowledgeCategoriesSummaryDto = {},
+	): Promise<KnowledgeCategoriesSummaryDto> {
+		await this.ensureDefaultCategories(userId, query.locale);
+		const categories = await this.categoryRepo.find({
+			where: { userId },
+			order: { sortOrder: 'ASC', createdAt: 'ASC' },
+		});
+		const countRows = await this.knowledgeRepository
+			.createQueryBuilder('k')
+			.select('k.category_id', 'categoryId')
+			.addSelect('COUNT(*)', 'cnt')
+			.where('k.authorId = :userId', { userId })
+			.groupBy('k.category_id')
+			.getRawMany<{ categoryId: string | null; cnt: string }>();
+		const countMap = new Map<string, number>();
+		let uncategorizedCount = 0;
+		for (const row of countRows) {
+			const cnt = Number(row.cnt) || 0;
+			if (row.categoryId == null) {
+				uncategorizedCount = cnt;
+			} else {
+				countMap.set(row.categoryId, cnt);
+			}
+		}
+		const totalItemCount = await this.knowledgeRepository.count({
+			where: { authorId: userId },
+		});
+		return {
+			categories: categories.map((c) => ({
+				id: c.id,
+				name: c.name,
+				sortOrder: c.sortOrder,
+				itemCount: countMap.get(c.id) ?? 0,
+			})),
+			uncategorizedCount,
+			totalItemCount,
+		};
+	}
+
+	async createCategory(
+		userId: number,
+		dto: CreateKnowledgeCategoryDto,
+	): Promise<KnowledgeCategoryDto> {
+		const name = this.normalizeCategoryName(dto.name);
+		if (!name) {
+			throw new BadRequestException('分类名称不能为空');
+		}
+		const total = await this.categoryRepo.count({ where: { userId } });
+		if (total >= MAX_KNOWLEDGE_CATEGORIES) {
+			throw new BadRequestException(
+				`最多创建 ${MAX_KNOWLEDGE_CATEGORIES} 个分类`,
+			);
+		}
+		await this.assertCategoryNameUnique(userId, name);
+		const maxSort = await this.categoryRepo
+			.createQueryBuilder('c')
+			.select('MAX(c.sort_order)', 'max')
+			.where('c.user_id = :userId', { userId })
+			.getRawOne<{ max: string | null }>();
+		const sortOrder = (Number(maxSort?.max) || 0) + 1;
+		const row = this.categoryRepo.create({ userId, name, sortOrder });
+		await this.categoryRepo.save(row);
+		return {
+			id: row.id,
+			name: row.name,
+			sortOrder: row.sortOrder,
+			itemCount: 0,
+		};
+	}
+
+	async updateCategory(
+		userId: number,
+		categoryId: string,
+		dto: UpdateKnowledgeCategoryDto,
+	): Promise<KnowledgeCategoryDto> {
+		const row = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('分类不存在');
+		}
+		if (dto.name !== undefined) {
+			const name = this.normalizeCategoryName(dto.name);
+			if (!name) {
+				throw new BadRequestException('分类名称不能为空');
+			}
+			await this.assertCategoryNameUnique(userId, name, categoryId);
+			row.name = name;
+		}
+		if (dto.sortOrder !== undefined) {
+			row.sortOrder = dto.sortOrder;
+		}
+		await this.categoryRepo.save(row);
+		const itemCount = await this.knowledgeRepository.count({
+			where: { authorId: userId, categoryId: row.id },
+		});
+		return {
+			id: row.id,
+			name: row.name,
+			sortOrder: row.sortOrder,
+			itemCount,
+		};
+	}
+
+	async removeCategory(userId: number, categoryId: string): Promise<void> {
+		const row = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('分类不存在');
+		}
+		await this.knowledgeRepository.update(
+			{ authorId: userId, categoryId },
+			{ categoryId: null },
+		);
+		await this.categoryRepo.remove(row);
+	}
+
+	async reorderCategories(
+		userId: number,
+		dto: ReorderKnowledgeCategoriesDto,
+	): Promise<void> {
+		const rows = await this.categoryRepo.find({ where: { userId } });
+		const idSet = new Set(rows.map((r) => r.id));
+		if (dto.orderedIds.some((id) => !idSet.has(id))) {
+			throw new BadRequestException('orderedIds 包含无效分类');
+		}
+		if (dto.orderedIds.length !== rows.length) {
+			throw new BadRequestException('orderedIds 须包含全部分类');
+		}
+		const orderMap = new Map(dto.orderedIds.map((id, index) => [id, index]));
+		for (const row of rows) {
+			row.sortOrder = orderMap.get(row.id) ?? row.sortOrder;
+		}
+		await this.categoryRepo.save(rows);
+	}
+
+	async assignItemCategory(
+		userId: number,
+		id: string,
+		categoryId: string | null,
+	): Promise<KnowledgeListItem> {
+		const row = await this.requireOwned(userId, id);
+		if (categoryId) {
+			await this.resolveUserCategoryId(userId, categoryId);
+			row.categoryId = categoryId;
+		} else {
+			row.categoryId = null;
+		}
+		const saved = await this.knowledgeRepository.save(row);
+		return this.toListItem(saved, userId);
 	}
 
 	private async requireOwned(userId: number, id: string): Promise<Knowledge> {

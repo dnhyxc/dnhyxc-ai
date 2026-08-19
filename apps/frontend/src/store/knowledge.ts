@@ -2,14 +2,22 @@ import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEventHandler } from 'react';
 import {
+	assignKnowledgeItemCategory,
+	createKnowledgeCategory,
 	deleteKnowledge,
 	getKnowledgeDetail,
 	getKnowledgeList,
 	getKnowledgeTrashList,
+	loadKnowledgeCategoriesSummary,
+	removeKnowledgeCategory,
+	reorderKnowledgeCategories,
 	setKnowledgeVisibility,
 	updateKnowledge,
+	updateKnowledgeCategory,
 } from '@/service';
 import type {
+	KnowledgeCategory,
+	KnowledgeCategoryKey,
 	KnowledgeListItem,
 	KnowledgeRecord,
 	KnowledgeTrashListItem,
@@ -20,6 +28,24 @@ import { getLoggedInUserId } from './loggedInUserId';
 const DEFAULT_PAGE_SIZE = 20;
 /** 距底部小于该像素时触发加载下一页 */
 const SCROLL_LOAD_THRESHOLD_PX = 72;
+
+function listQueryFromKey(key: KnowledgeCategoryKey): {
+	categoryId?: string;
+	uncategorizedOnly?: boolean;
+} {
+	if (key.kind === 'category') return { categoryId: key.categoryId };
+	if (key.kind === 'uncategorized') return { uncategorizedOnly: true };
+	return {};
+}
+
+/** 公开文档优先，组内保持原相对顺序（稳定排序） */
+function sortKnowledgeByPublic(list: KnowledgeListItem[]): KnowledgeListItem[] {
+	return [...list].sort((a, b) => {
+		const aPublic = a.isPublic ? 1 : 0;
+		const bPublic = b.isPublic ? 1 : 0;
+		return bPublic - aPublic;
+	});
+}
 
 /** 知识编辑：与上次保存或从列表载入对齐的快照，用于脏检查 */
 export type KnowledgePersistedSnapshot = { title: string; content: string };
@@ -66,6 +92,10 @@ class KnowledgeStore {
 	titleKeyword = '';
 	loading = false;
 	loadingMore = false;
+	categories: KnowledgeCategory[] = [];
+	uncategorizedCount = 0;
+	totalItemCount = 0;
+	activeCategoryKey: KnowledgeCategoryKey = { kind: 'all' };
 
 	// —— 回收站列表分页 ——
 	trashList: KnowledgeTrashListItem[] = [];
@@ -373,6 +403,7 @@ class KnowledgeStore {
 				pageNo: page,
 				pageSize: this.pageSize,
 				title: this.titleKeyword.trim() || undefined,
+				...listQueryFromKey(this.activeCategoryKey),
 			});
 			if (!res.success || !res.data) {
 				return;
@@ -407,17 +438,114 @@ class KnowledgeStore {
 		}
 		const updated = res.data;
 		runInAction(() => {
-			this.list = this.list.map((item) =>
+			const next = this.list.map((item) =>
 				item.id === updated.id
 					? {
 							...item,
 							isPublic: updated.isPublic,
 							isOwned: updated.isOwned ?? true,
+							categoryId: updated.categoryId ?? item.categoryId,
 						}
 					: item,
 			);
+			this.list = sortKnowledgeByPublic(next);
 		});
 		return true;
+	}
+
+	async fetchCategories(): Promise<void> {
+		try {
+			const data = await loadKnowledgeCategoriesSummary();
+			runInAction(() => {
+				this.categories = data.categories;
+				this.uncategorizedCount = data.uncategorizedCount;
+				this.totalItemCount = data.totalItemCount;
+			});
+		} catch {
+			// 分类加载失败不阻塞列表
+		}
+	}
+
+	setActiveCategoryKey(key: KnowledgeCategoryKey): void {
+		this.activeCategoryKey = key;
+		void this.refreshList();
+	}
+
+	itemMatchesActiveCategory(categoryId?: string | null): boolean {
+		const key = this.activeCategoryKey;
+		if (key.kind === 'all') return true;
+		if (key.kind === 'uncategorized') return categoryId == null;
+		return categoryId === key.categoryId;
+	}
+
+	resetActiveCategoryIfEmpty(): void {
+		if (this.activeCategoryKey.kind === 'all') return;
+		if (this.list.length > 0 || this.total > 0) return;
+		this.activeCategoryKey = { kind: 'all' };
+		void this.refreshList();
+	}
+
+	async createCategory(name: string): Promise<KnowledgeCategory> {
+		const created = await createKnowledgeCategory(name);
+		await this.fetchCategories();
+		return created;
+	}
+
+	async renameCategory(id: string, name: string): Promise<void> {
+		await updateKnowledgeCategory(id, { name });
+		await this.fetchCategories();
+	}
+
+	async deleteCategory(id: string): Promise<void> {
+		await removeKnowledgeCategory(id);
+		runInAction(() => {
+			if (
+				this.activeCategoryKey.kind === 'category' &&
+				this.activeCategoryKey.categoryId === id
+			) {
+				this.activeCategoryKey = { kind: 'all' };
+			}
+			this.list = this.list.map((item) =>
+				item.categoryId === id ? { ...item, categoryId: null } : item,
+			);
+		});
+		await Promise.all([this.fetchCategories(), this.fetchPage(1, false)]);
+	}
+
+	async moveCategory(id: string, direction: 'up' | 'down'): Promise<void> {
+		const idx = this.categories.findIndex((c) => c.id === id);
+		if (idx < 0) return;
+		const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapWith < 0 || swapWith >= this.categories.length) return;
+		const ordered = [...this.categories];
+		const tmp = ordered[idx]!;
+		ordered[idx] = ordered[swapWith]!;
+		ordered[swapWith] = tmp;
+		await reorderKnowledgeCategories(ordered.map((c) => c.id));
+		await this.fetchCategories();
+	}
+
+	async assignItemCategory(
+		id: string,
+		categoryId: string | null,
+	): Promise<void> {
+		const current = this.list.find((item) => item.id === id);
+		if (current && current.isOwned === false) return;
+		const updated = await assignKnowledgeItemCategory(id, categoryId);
+		runInAction(() => {
+			const stays = this.itemMatchesActiveCategory(updated.categoryId);
+			if (stays) {
+				this.list = this.list.map((item) =>
+					item.id === id ? { ...item, ...updated } : item,
+				);
+			} else {
+				const had = this.list.some((item) => item.id === id);
+				this.list = this.list.filter((item) => item.id !== id);
+				if (had) this.total = Math.max(0, this.total - 1);
+			}
+			this.resetActiveCategoryIfEmpty();
+		});
+		void this.fetchCategories();
 	}
 
 	async fetchTrashPage(page: number, append: boolean): Promise<void> {
@@ -491,6 +619,8 @@ class KnowledgeStore {
 			this.list = this.list.filter((x) => x.id !== id);
 			this.total = Math.max(0, this.total - 1);
 		});
+		this.resetActiveCategoryIfEmpty();
+		void this.fetchCategories();
 	}
 
 	/** 删除一条：请求接口 + 同步本地列表 */
@@ -543,6 +673,10 @@ class KnowledgeStore {
 		this.titleKeyword = '';
 		this.loading = false;
 		this.loadingMore = false;
+		this.categories = [];
+		this.uncategorizedCount = 0;
+		this.totalItemCount = 0;
+		this.activeCategoryKey = { kind: 'all' };
 	}
 
 	/** 切换账号：清空编辑器草稿与列表/回收站缓存 */

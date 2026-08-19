@@ -513,7 +513,10 @@ export class EbookService {
 		} else if (query.uncategorizedOnly) {
 			qb.andWhere('b.category_id IS NULL');
 		}
-		qb.orderBy('shelf_sort', 'DESC').skip(skip).take(take);
+		qb.orderBy('b.isPublic', 'DESC')
+			.addOrderBy('shelf_sort', 'DESC')
+			.skip(skip)
+			.take(take);
 
 		const [books, total] = await qb.getManyAndCount();
 		const ids = books.map((b) => b.id);

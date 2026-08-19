@@ -85,7 +85,29 @@ export type KnowledgeRecord = {
 	 * 从本地文件夹打开时：保存到磁盘应使用的目录（一般为该文件所在目录），与默认知识库目录互斥
 	 */
 	localDirPath?: string;
+	/** 数据库分类 id；未分类为 null */
+	categoryId?: string | null;
 };
+
+/** 知识库用户分类 */
+export type KnowledgeCategory = {
+	id: string;
+	name: string;
+	sortOrder: number;
+	itemCount: number;
+};
+
+export type KnowledgeCategoriesSummary = {
+	categories: KnowledgeCategory[];
+	uncategorizedCount: number;
+	totalItemCount: number;
+};
+
+/** 知识库列表 Tab：全部 | 某分类 | 未分类 */
+export type KnowledgeCategoryKey =
+	| { kind: 'all' }
+	| { kind: 'category'; categoryId: string }
+	| { kind: 'uncategorized' };
 
 /** 列表项（无正文大字段） */
 export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {

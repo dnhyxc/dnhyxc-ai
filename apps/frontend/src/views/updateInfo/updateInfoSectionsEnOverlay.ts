@@ -468,6 +468,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'A search box is added at the top of both the knowledge base list drawer and the trash drawer: type a document name keyword and press Enter to filter. In cloud mode the backend performs a case-insensitive title LIKE query; in local folder mode filtering is done in the frontend, and all folders containing matching files are automatically expanded. The trash drawer also supports title filtering. When no matches are found, a specific "No matching documents" hint is shown instead of the generic empty state.',
 	},
+	's6-31': {
+		title: 'Knowledge base category management',
+		description:
+			'Cloud knowledge list adds a category tab bar and a "Manage categories" entry; supports creating, renaming, deleting, and reordering categories; documents can be assigned to a category or moved to Uncategorized. First use auto-seeds 5 default categories (different for zh/en), max 50. Deleting a category moves its documents to Uncategorized. Only owned documents can change category; others\' public documents cannot be moved. The manage dialog is a shared component used by both knowledge base and ebook shelf.',
+	},
+	's6-32': {
+		title: 'Public-first sorting for knowledge & ebook lists',
+		description:
+			"In both the knowledge base list and the ebook shelf list, public items (including others' public) are always sorted to the top, with the original relative order preserved within each group (stable sort). Toggling visibility re-sorts the list immediately without a manual refresh.",
+	},
+	's6-33': {
+		title: 'Ebook shelf: non-owned books cannot change category',
+		description:
+			'The "Move to category" menu on ebook shelf cards is only shown for books you can manage on your own shelf. Others\' public books and books on the public shelf no longer show the category move entry, preventing accidental operations.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

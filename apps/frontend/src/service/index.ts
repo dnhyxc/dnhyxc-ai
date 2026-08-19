@@ -8,6 +8,8 @@ import {
 } from '@/constants';
 import { getActiveLocale, translateSync } from '@/i18n';
 import {
+	type KnowledgeCategoriesSummary,
+	type KnowledgeCategory,
 	type KnowledgeListItem,
 	type KnowledgeRecord,
 	ShareInfo,
@@ -92,8 +94,11 @@ import {
 	GET_USER_PROFILE,
 	GET_USERS,
 	IMAGE_OCR,
+	KNOWLEDGE_CATEGORIES,
+	KNOWLEDGE_CATEGORIES_SUMMARY,
 	KNOWLEDGE_DELETE,
 	KNOWLEDGE_DETAIL,
+	KNOWLEDGE_ITEM_CATEGORY,
 	KNOWLEDGE_LIST,
 	KNOWLEDGE_SAVE,
 	KNOWLEDGE_TRASH_DELETE,
@@ -1811,6 +1816,8 @@ export const getKnowledgeList = async (params?: {
 	pageSize?: number;
 	title?: string;
 	authorId?: number;
+	categoryId?: string;
+	uncategorizedOnly?: boolean;
 }) => {
 	return await http.get<{ list: KnowledgeListItem[]; total: number }>(
 		KNOWLEDGE_LIST,
@@ -1820,6 +1827,8 @@ export const getKnowledgeList = async (params?: {
 				pageSize: params?.pageSize,
 				title: params?.title,
 				authorId: params?.authorId,
+				categoryId: params?.categoryId,
+				uncategorizedOnly: params?.uncategorizedOnly,
 			},
 		},
 	);
@@ -1860,6 +1869,68 @@ export const setKnowledgeVisibility = async (id: string, isPublic: boolean) => {
 		{ isPublic },
 		{ params: [id] },
 	);
+};
+
+/** GET /knowledge/categories/summary */
+export const loadKnowledgeCategoriesSummary =
+	async (): Promise<KnowledgeCategoriesSummary> => {
+		const res = await http.get<KnowledgeCategoriesSummary>(
+			KNOWLEDGE_CATEGORIES_SUMMARY,
+			{
+				querys: { locale: getActiveLocale() },
+				silent: true,
+			},
+		);
+		return res.data;
+	};
+
+/** POST /knowledge/categories */
+export const createKnowledgeCategory = async (
+	name: string,
+): Promise<KnowledgeCategory> => {
+	const res = await http.post<KnowledgeCategory>(
+		KNOWLEDGE_CATEGORIES,
+		{ name },
+		{ silent: true },
+	);
+	return res.data;
+};
+
+/** PUT /knowledge/categories/:id */
+export const updateKnowledgeCategory = async (
+	id: string,
+	patch: { name?: string; sortOrder?: number },
+): Promise<KnowledgeCategory> => {
+	const res = await http.put<KnowledgeCategory>(
+		`${KNOWLEDGE_CATEGORIES}/${id}`,
+		patch,
+		{ silent: true },
+	);
+	return res.data;
+};
+
+/** DELETE /knowledge/categories/:id */
+export const removeKnowledgeCategory = async (id: string): Promise<void> => {
+	await http.delete(KNOWLEDGE_CATEGORIES, { params: [id], silent: true });
+};
+
+/** PUT /knowledge/categories/reorder */
+export const reorderKnowledgeCategories = async (
+	orderedIds: string[],
+): Promise<void> => {
+	await http.put(`${KNOWLEDGE_CATEGORIES}/reorder`, { orderedIds });
+};
+
+/** PUT /knowledge/item/:id/category */
+export const assignKnowledgeItemCategory = async (
+	id: string,
+	categoryId: string | null,
+): Promise<KnowledgeListItem> => {
+	const res = await http.put<KnowledgeListItem>(
+		`${KNOWLEDGE_ITEM_CATEGORY}/${id}/category`,
+		{ categoryId },
+	);
+	return res.data;
 };
 
 // ---------- 知识库回收站（knowledge.controller）----------
