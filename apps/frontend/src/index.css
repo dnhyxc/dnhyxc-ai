@@ -28,6 +28,8 @@ body {
 	/* 禁止页面选中文本（避免误选）；编辑器/输入框区域会单独放开 */
 	-webkit-user-select: none;
 	user-select: none;
+	/* Portal（Dialog/Drawer/Popover）挂在 body 下，须在此设字体，不能只写 #root */
+	font-family: var(--font-family);
 	/* find 样式关闭按钮样式 */
 	.monaco-editor .find-widget > .button.codicon-widget-close {
 		top: 8px;
@@ -195,6 +197,11 @@ body {
 	 * 表格行背景：GitHub Markdown 默认用 --bgColor-default/--bgColor-muted（跟系统深浅走），
 	 * 改为跟随应用主题 body.theme-* 的 token。
 	 */
+	/* markdown-kit/github-markdown 给 .markdown-body 写死了 -apple-system 等，需显式覆盖 */
+	.markdown-body {
+		font-family: var(--font-family);
+	}
+
 	.markdown-body table tr {
 		background-color: var(--theme-card);
 		border-top-color: var(--theme-border);
@@ -408,7 +415,6 @@ body {
 	background-image: var(--theme-bg-atmosphere);
 	background-repeat: no-repeat;
 	background-size: cover;
-	font-family: var(--font-family);
 }
 
 :root {

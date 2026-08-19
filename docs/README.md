@@ -212,6 +212,7 @@
 | EPUB 听书连播时播放钮 loading 只在首启出现                          | [ebook/EPUB听书等待加载.md](./ebook/EPUB听书等待加载.md) · [ebook/EPUB听书播放加载.md](./ebook/EPUB听书播放加载.md) |
 | 书架已读进度出现很长小数                                          | [ebook/电子书书架进度百分比.md](./ebook/电子书书架进度百分比.md)                                                                               |
 | 电子书书架按书名搜索（Enter 提交、不区分大小写、关闭恢复完整列表） | [ebook/书架标题搜索.md](./ebook/书架标题搜索.md)                                                                                             |
+| 电子书书架「全部」标签分页不准 / 追加加载后顺序错乱            | [ebook/书架全部标签统一分页.md](./ebook/书架全部标签统一分页.md)                                                                             |
 | EPUB 听书底栏切章 / 暂停续播与系统媒体同步                        | [ebook/EPUB听书栏章节导航.md](./ebook/EPUB听书栏章节导航.md) · [ebook/EPUB听书栏播放头目录.md](./ebook/EPUB听书栏播放头目录.md) · [ebook/EPUB听书软暂停.md](./ebook/EPUB听书软暂停.md) |
 | 听书底栏上下章切到错误邻节（同 spine 多节）                        | [ebook/EPUB听书栏播放头目录.md](./ebook/EPUB听书栏播放头目录.md)                                                                     |
 | 本机听书/听当前第一句无声、第二句正常                               | [english/TTS本地取消结算影响.md](./english/TTS本地取消结算影响.md) · [impact/TTS本地取消结算影响.md](./impact/TTS本地取消结算影响.md) |
@@ -253,6 +254,8 @@
 | 电子书助手流式输出卡顿 | [ebook/电子书助手流式补丁调度.md](./ebook/电子书助手流式补丁调度.md) |
 | Tooltip 无法程序化控制展开 / 无法设置对齐 | [app/提示受控对齐.md](./ui/提示受控对齐.md)（`align` + `open` + `onOpenChange` 透传 Radix） |
 | Tooltip 阴影偏色 / 默认无阴影 / 箭头遮内容 / 工具栏与底部栏 Tooltip 朝下遮挡 / 分类菜单与 Tooltip 抢焦点 | [app/Tooltip方向与阴影修复.md](./app/Tooltip方向与阴影修复.md)（`shadow` 默认 `true` + 投影改 teal-500 + drop-shadow 改 theme-background + Arrow `z-50→z-30` + 工具栏/底部栏 `side="top"` + 分类菜单 `disableHoverableContent`/`disabled` + `onCloseAutoFocus` 阻止回跳） |
+| Portal（Dialog/Drawer/Popover）内字体不是应用字体 / Markdown 预览用系统字体 | [app/Portal与Markdown字体继承.md](./app/Portal与Markdown字体继承.md)（`font-family` 从 `#root` 移至 `body` + `.markdown-body` 显式覆盖第三方 CSS） |
+| 书架与知识库图标按钮无悬停动画 / 导入按钮加载中可误触 / 分类标签样式不一致 | [app/书架知识库视觉微调.md](./app/书架知识库视觉微调.md)（`lucide-stroke-draw-hover` + Tooltip `side="top"` + `disabled={uploading \|\| showInitialLoading}` + Tab `variant="link"` + 图标 `size-4`） |
 | Monaco 编辑器加载时无加载指示 / Suspense 占位无背景 | [app/Monaco加载恢复.md](./ui/Monaco加载恢复.md)（`loading` prop 恢复 + `bg-theme/5` fallback 背景） |
 
 ---

@@ -15,6 +15,8 @@
 | [学习笔记实现.md](./学习笔记实现.md) | 学习笔记实现：MobX `LearningNotesStore`、Host API 依赖注入、累积分页加载、DOCX 导出 |
 | [Tooltip方向与阴影修复.md](./Tooltip方向与阴影修复.md) | Tooltip 阴影默认开启 + 颜色改 teal-500/theme-background + Arrow z-50→z-30；工具栏 / Monaco 底部栏 Tooltip 改 `side="top"`；EbookShelfBookCard 分类菜单 Tooltip 禁 hover + Popover 阻止焦点回跳；Monaco 删除 `console.log` |
 | [搜索组件提取.md](./搜索组件提取.md) | 知识库 `KnowledgeSearchInput` 提取为通用 `@design/SearchInput`；新增 `autoFocus` / `inputRef` / `onEscape` 三个可选 props；删除原业务文件，知识库列表与回收站两处调用切换 |
+| [书架知识库视觉微调.md](./书架知识库视觉微调.md) | 统一电子书书架与知识库列表按钮视觉：图标按钮加 `lucide-stroke-draw-hover` 描边动画；电子书导入 Tooltip `side` 从 `bottom` 改 `top`；导入按钮初始加载期间禁用；知识库分类管理图标 `size-3.5`→`size-4`；分类标签 `variant` 从 `ghost` 改 `link` 并精简样式 |
+| [Portal与Markdown字体继承.md](./Portal与Markdown字体继承.md) | 字体继承修复：`font-family` 从 `#root` 上移到 `body` 使 Portal（Dialog/Drawer/Popover）继承应用字体；`.markdown-body` 显式覆盖 `github-markdown` 写死的系统字体栈 |
 
 ---
 

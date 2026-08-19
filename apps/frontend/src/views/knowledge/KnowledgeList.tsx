@@ -1264,10 +1264,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 										type="button"
 										variant="link"
 										size="sm"
-										className="h-8 shrink-0 gap-1 pl-0!"
+										className="lucide-stroke-draw-hover h-8 shrink-0 gap-1 pl-0!"
 										onClick={() => setCategoryManageOpen(true)}
 									>
-										<CircuitBoard className="size-3.5" aria-hidden />
+										<CircuitBoard className="size-4" aria-hidden />
 										{t('knowledge.list.category.manage')}
 									</Button>
 									<div
@@ -1329,10 +1329,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 													type="button"
 													role="tab"
 													aria-selected={active}
-													variant="ghost"
+													variant="link"
 													size="sm"
 													className={cn(
-														'h-8 shrink-0 gap-1 px-2 font-medium hover:bg-transparent dark:hover:bg-transparent',
+														'h-8 gap-1 px-2 hover:bg-transparent',
 														active
 															? 'text-textcolor hover:text-textcolor'
 															: 'text-textcolor/60 hover:text-textcolor',

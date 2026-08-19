@@ -271,7 +271,7 @@ function EbookShelfPage() {
 								type="button"
 								variant="link"
 								size="sm"
-								className="h-8 shrink-0 gap-1.5 px-0!"
+								className="lucide-stroke-draw-hover h-8 shrink-0 gap-1.5 px-0!"
 								onClick={() => setCategoryManageOpen(true)}
 							>
 								<CircuitBoard className="size-4" aria-hidden />
@@ -284,7 +284,7 @@ function EbookShelfPage() {
 								<EbookShelfSearch />
 								{isTauri ? (
 									<Tooltip
-										side="bottom"
+										side="top"
 										sideOffset={6}
 										delayDuration={300}
 										shadow
@@ -294,8 +294,8 @@ function EbookShelfPage() {
 										<Button
 											variant="link"
 											size="sm"
-											className="h-8 shrink-0 gap-1.5 pr-0!"
-											disabled={uploading}
+											className="lucide-stroke-draw-hover h-8 shrink-0 gap-1.5 pr-0! transition-none"
+											disabled={uploading || showInitialLoading}
 											onClick={onPickTauri}
 										>
 											<FolderOpen className="size-4" aria-hidden />
@@ -305,7 +305,7 @@ function EbookShelfPage() {
 								) : (
 									<>
 										<Tooltip
-											side="bottom"
+											side="top"
 											sideOffset={6}
 											delayDuration={300}
 											shadow
@@ -315,8 +315,8 @@ function EbookShelfPage() {
 											<Button
 												variant="link"
 												size="sm"
-												className="h-8 shrink-0 gap-1.5 px-0!"
-												disabled={uploading}
+												className="lucide-stroke-draw-hover h-8 shrink-0 gap-1.5 px-0!"
+												disabled={uploading || showInitialLoading}
 												onClick={onPickWeb}
 											>
 												<BookOpen className="size-4" aria-hidden />

@@ -471,6 +471,9 @@ export class EbookService {
 		if (scope === 'public') {
 			return this.getPublicShelf(userId, query);
 		}
+		if (scope === 'all') {
+			return this.getAllShelf(userId, query);
+		}
 		if (query.categoryId && query.uncategorizedOnly) {
 			throw new BadRequestException(
 				'categoryId 与 uncategorizedOnly 不能同时使用',
@@ -533,6 +536,156 @@ export class EbookService {
 		}
 		return {
 			books: books.map((b) => this.toBookDto(b)),
+			progMap,
+			total,
+			pageNo,
+			pageSize,
+		};
+	}
+
+	/**
+	 * 「全部」：自有源书 + 他人公开源书，按最近阅读混排分页。
+	 * 自有：进度表 / created_at；他人公开：我对该源书的读书记录进度 / public_at / created_at。
+	 */
+	private async getAllShelf(
+		userId: number,
+		query: QueryEbookShelfDto,
+	): Promise<EbookShelfPageDto> {
+		if (query.categoryId || query.uncategorizedOnly) {
+			throw new BadRequestException(
+				'scope=all 不支持 categoryId / uncategorizedOnly',
+			);
+		}
+
+		const pageNo = query.pageNo ?? 1;
+		const pageSize = query.pageSize ?? 20;
+		const take = pageSize;
+		const skip = (pageNo - 1) * take;
+
+		const countQb = this.bookRepo
+			.createQueryBuilder('b')
+			.where('b.source_book_id IS NULL')
+			.andWhere(
+				new Brackets((w) => {
+					w.where('b.user_id = :userId', { userId }).orWhere(
+						'(b.is_public = true AND b.user_id <> :userId)',
+						{ userId },
+					);
+				}),
+			);
+		this.applyTitleFilter(countQb, query.title);
+		const total = await countQb.getCount();
+
+		const sortExpr = `CASE
+			WHEN p.updated_at IS NOT NULL THEN p.updated_at
+			WHEN b.user_id = :userId THEN b.created_at
+			ELSE COALESCE(b.public_at, b.created_at)
+		END`;
+
+		const idQb = this.bookRepo
+			.createQueryBuilder('b')
+			.leftJoin(
+				EbookBook,
+				'reading',
+				'reading.source_book_id = b.id AND reading.user_id = :userId',
+				{ userId },
+			)
+			.leftJoin(
+				EbookProgress,
+				'p',
+				`p.user_id = :userId AND (
+					(b.user_id = :userId AND p.book_id = b.id) OR
+					(b.user_id <> :userId AND p.book_id = reading.id)
+				)`,
+				{ userId },
+			)
+			.select('b.id', 'id')
+			.addSelect(`MAX(${sortExpr})`, 'shelf_sort')
+			.where('b.source_book_id IS NULL')
+			.andWhere(
+				new Brackets((w) => {
+					w.where('b.user_id = :userId', { userId }).orWhere(
+						'(b.is_public = true AND b.user_id <> :userId)',
+						{ userId },
+					);
+				}),
+			);
+		this.applyTitleFilter(idQb, query.title);
+		const idRows = await idQb
+			.groupBy('b.id')
+			.orderBy('shelf_sort', 'DESC')
+			.addOrderBy('MAX(b.is_public)', 'DESC')
+			.addOrderBy('MAX(b.created_at)', 'DESC')
+			.offset(skip)
+			.limit(take)
+			.getRawMany<{ id: string }>();
+
+		const orderedIds = idRows.map((r) => r.id).filter(Boolean);
+		if (orderedIds.length === 0) {
+			return {
+				books: [],
+				progMap: {},
+				total,
+				pageNo,
+				pageSize,
+			};
+		}
+
+		const bookRows = await this.bookRepo.find({
+			where: { id: In(orderedIds) },
+		});
+		const bookById = new Map(bookRows.map((b) => [b.id, b]));
+		const books = orderedIds
+			.map((id) => bookById.get(id))
+			.filter((b): b is EbookBook => b != null);
+
+		const mineIds = books.filter((b) => b.userId === userId).map((b) => b.id);
+		const publicIds = books.filter((b) => b.userId !== userId).map((b) => b.id);
+
+		const ownerMap = await this.buildUserInfoMap(
+			books.filter((b) => b.userId !== userId).map((b) => b.userId),
+		);
+
+		const readingRecords =
+			publicIds.length === 0
+				? []
+				: await this.bookRepo.find({
+						where: { userId, sourceBookId: In(publicIds) },
+					});
+		const readingBySource = new Map(
+			readingRecords.map((r) => [r.sourceBookId!, r]),
+		);
+		const readingIds = readingRecords.map((r) => r.id);
+		const progBookIds = [...mineIds, ...readingIds];
+		const progresses =
+			progBookIds.length === 0
+				? []
+				: await this.progRepo.find({
+						where: { userId, bookId: In(progBookIds) },
+					});
+		const progByBookId = new Map(progresses.map((p) => [p.bookId, p]));
+
+		const progMap: Record<string, EbookProgDto> = {};
+		const shelfBooks: EbookBookDto[] = [];
+		for (const book of books) {
+			if (book.userId === userId) {
+				shelfBooks.push(this.toBookDto(book));
+				const prog = progByBookId.get(book.id);
+				if (prog) progMap[book.id] = this.toProgDto(prog);
+				continue;
+			}
+			const dto = await this.toBookDtoWithOwner(book, ownerMap);
+			const reading = readingBySource.get(book.id);
+			if (reading) {
+				dto.readingBookId = reading.id;
+				const prog = progByBookId.get(reading.id);
+				if (prog) progMap[book.id] = this.toProgDto(prog);
+			}
+			shelfBooks.push(dto);
+		}
+
+		return {
+			books: shelfBooks,
 			progMap,
 			total,
 			pageNo,

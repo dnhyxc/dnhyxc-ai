@@ -493,6 +493,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The shelf list sort order is changed from "public first" back to "most recently read first"; public books only rank higher when read times are equal.',
 	},
+	's6-36': {
+		title: 'Ebook shelf "All" tab unified mixed paging',
+		description:
+			'The "All" tab previously sent two requests (owned + public) and merged in memory. Now the backend returns a single unified paged query, mixing owned and others\' public books by most recent reading time. Pagination totals are more accurate, append-loading no longer re-sorts on the frontend, and network overhead is reduced.',
+	},
+	's6-37': {
+		title: 'Portal & Markdown font inheritance fix',
+		description:
+			'Fixes Portal components (Dialog/Drawer/Popover) using the browser default font instead of the app font (font-family moved from #root to body). Also overrides the hardcoded system font stack on Markdown preview area set by third-party CSS, so preview content uses the app font correctly.',
+	},
+	's6-38': {
+		title: 'Unified button visuals for shelf & knowledge',
+		description:
+			'Icon buttons on the ebook shelf and knowledge list now have a unified hover stroke-draw animation. Import button tooltips changed from bottom to top. Import buttons are disabled during initial loading to prevent accidental clicks. Knowledge category tabs switched from ghost to link variant for a cleaner look. Category manage icon size unified to size-4.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

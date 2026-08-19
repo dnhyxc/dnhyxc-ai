@@ -81,7 +81,7 @@ function writeLastImportCategoryId(
 }
 
 function shelfQueryFromKey(key: EbookShelfCategoryKey): {
-	scope?: 'mine' | 'public';
+	scope?: 'mine' | 'public' | 'all';
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
 } {
@@ -94,7 +94,7 @@ function shelfQueryFromKey(key: EbookShelfCategoryKey): {
 	if (key.kind === 'uncategorized') {
 		return { uncategorizedOnly: true };
 	}
-	return {};
+	return { scope: 'all' };
 }
 
 function bookLastReadMs(book: Book, progMap: Record<string, Prog>): number {
@@ -180,12 +180,6 @@ class EbookStore {
 	}
 
 	get hasMore(): boolean {
-		if (this.titleKeyword.trim()) {
-			return this.books.length < this.safeTotal();
-		}
-		if (this.activeCategoryKey.kind === 'all') {
-			return this.books.length < this.totalBookCount + this.publicBookTotal;
-		}
 		return this.books.length < this.safeTotal();
 	}
 
@@ -232,15 +226,11 @@ class EbookStore {
 	}
 
 	async hydrate(): Promise<void> {
-		const tasks: Promise<unknown>[] = [
+		await Promise.all([
 			this.fetchCategories(),
 			this.fetchPage(1, false),
-		];
-		// 「全部」Tab 的 fetchPage 已拉公开书并写入 publicBookTotal，无需再 pageSize=1 探测
-		if (this.activeCategoryKey.kind !== 'all') {
-			tasks.push(this.fetchPublicCount());
-		}
-		await Promise.all(tasks);
+			this.fetchPublicCount(),
+		]);
 	}
 
 	/** 阅读页直链/刷新：只拉单书详情，不请求书架分页（始终刷新，避免书架缓存 isPublic 过期误开 sync） */
@@ -336,40 +326,15 @@ class EbookStore {
 				title,
 				...shelfQueryFromKey(key),
 			});
-			const publicData =
-				key.kind === 'all' && page === 1 && !append
-					? await loadEbookShelf({
-							scope: 'public',
-							pageNo: 1,
-							pageSize: 100,
-							title,
-						})
-					: null;
 			if (seq !== this.shelfFetchSeq) return;
 			runInAction(() => {
-				if (publicData) {
-					const pubTotal = Number(publicData.total);
-					this.publicBookTotal =
-						Number.isFinite(pubTotal) && pubTotal >= 0 ? pubTotal : 0;
-				}
-				const mineTotal = Number(data.total);
-				const nextTotal =
-					key.kind === 'all'
-						? (Number.isFinite(mineTotal) && mineTotal >= 0 ? mineTotal : 0) +
-							this.publicBookTotal
-						: Number(data.total);
+				const nextTotal = Number(data.total);
 				this.total =
 					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
 				this.pageNo = page;
-				const nextProgMap =
-					key.kind === 'all' && publicData && !append
-						? {
-								...(publicData.progMap ?? {}),
-								...(data.progMap ?? {}),
-							}
-						: append
-							? this.progMap
-							: (data.progMap ?? {});
+				const nextProgMap = append
+					? { ...this.progMap, ...(data.progMap ?? {}) }
+					: (data.progMap ?? {});
 				if (append) {
 					const existingIds = new Set(this.books.map((b) => b.id));
 					const merged = [...this.books];
@@ -379,29 +344,19 @@ class EbookStore {
 							merged.push(book);
 						}
 					}
-					for (const [bookId, prog] of Object.entries(data.progMap ?? {})) {
-						nextProgMap[bookId] = prog;
-					}
-					this.books = sortBooksByLastRead(merged, nextProgMap);
+					// 服务端已按最近阅读分页排序，追加时勿整表重排以免打乱分页
+					this.books = merged;
 					this.progMap = nextProgMap;
-				} else if (key.kind === 'all' && publicData) {
-					const mineIds = new Set(data.books.map((b) => b.id));
-					const publicBooks = publicData.books.filter(
-						(b) => !mineIds.has(b.id),
-					);
-					this.progMap = nextProgMap;
-					this.seedSyncedProgMap(this.progMap);
-					this.books = sortBooksByLastRead(
-						[...data.books, ...publicBooks],
-						nextProgMap,
-					);
 				} else {
 					this.progMap = nextProgMap;
 					this.seedSyncedProgMap(this.progMap);
-					this.books = sortBooksByLastRead(data.books, nextProgMap);
+					this.books = data.books;
 				}
 				this.ready = true;
 			});
+			if (key.kind === 'all' && page === 1 && !append) {
+				void this.fetchPublicCount();
+			}
 		} catch {
 			if (seq !== this.shelfFetchSeq) return;
 			runInAction(() => {

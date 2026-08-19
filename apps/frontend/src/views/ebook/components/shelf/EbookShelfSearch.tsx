@@ -67,7 +67,7 @@ function EbookShelfSearch() {
 					variant="link"
 					size="sm"
 					className={cn(
-						'h-8 shrink-0 gap-1.5',
+						'lucide-stroke-draw-hover h-8 shrink-0 gap-1.5',
 						open ? 'rounded-l-none border-theme/10 border-l px-2.5' : 'px-0!',
 					)}
 					aria-label={actionLabel}
