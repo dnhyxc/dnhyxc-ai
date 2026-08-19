@@ -1818,6 +1818,7 @@ export const getKnowledgeList = async (params?: {
 	authorId?: number;
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
+	scope?: 'all' | 'public';
 }) => {
 	return await http.get<{ list: KnowledgeListItem[]; total: number }>(
 		KNOWLEDGE_LIST,
@@ -1829,6 +1830,7 @@ export const getKnowledgeList = async (params?: {
 				authorId: params?.authorId,
 				categoryId: params?.categoryId,
 				uncategorizedOnly: params?.uncategorizedOnly,
+				scope: params?.scope,
 			},
 		},
 	);

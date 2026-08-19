@@ -508,6 +508,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Icon buttons on the ebook shelf and knowledge list now have a unified hover stroke-draw animation. Import button tooltips changed from bottom to top. Import buttons are disabled during initial loading to prevent accidental clicks. Knowledge category tabs switched from ghost to link variant for a cleaner look. Category manage icon size unified to size-4.',
 	},
+	's6-39': {
+		title: 'Knowledge "Public" tab and corrected "All" badge',
+		description:
+			'Added a "Public" tab in the cloud knowledge category tab bar (shown only when the count of others\' public docs is > 0). Clicking it only shows public documents owned by others; title search and scroll-to-load-more still work inside this tab. The count badge on the "All" tab now correctly equals your own total plus the others-public total, matching the documents that are actually browsable in the tab bar. The list API gained a scope query parameter ("all" vs. "public") with mutual-exclusion validation against categoryId/uncategorizedOnly; re-categorizing your own documents now also respects public-ownership flags so public and category filters stay consistent.',
+	},
+	's6-40': {
+		title: 'Unified page-size constants for shelf and knowledge',
+		description:
+			'The duplicated default page size and scroll-load-threshold constants used by the ebook shelf and the knowledge list store have been consolidated into a single global constants export. The shelf-specific name is replaced by a generic default page size name so future changes cannot accidentally miss one consumer. Values are unchanged, so first-page counts and scroll-to-load-more behavior remain identical.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

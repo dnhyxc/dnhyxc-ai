@@ -591,7 +591,7 @@ export function EbookShelfBookCard({
 										'text-xs uppercase tracking-wide text-textcolor/75',
 									)}
 								>
-									{t('ebook.shelf.publicBadge')}
+									{t('common.publicBadge')}
 								</span>
 							) : (
 								<span className="size-7 shrink-0" aria-hidden />
@@ -643,7 +643,7 @@ export function EbookShelfBookCard({
 					<div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
 						{showPublicIcon ? (
 							<span className="shrink-0 rounded-sm bg-teal-600 px-1 py-0.5 mr-2 text-xs text-white">
-								{t('ebook.shelf.publicBadge')}
+								{t('common.publicBadge')}
 							</span>
 						) : null}
 						<Tooltip

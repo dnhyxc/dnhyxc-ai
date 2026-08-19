@@ -1,6 +1,7 @@
 import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEventHandler } from 'react';
+import { DEFAULT_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 import {
 	assignKnowledgeItemCategory,
 	createKnowledgeCategory,
@@ -25,17 +26,15 @@ import type {
 import type { SaveKnowledgeMarkdownPayload } from '@/utils/knowledge-save';
 import { getLoggedInUserId } from './loggedInUserId';
 
-const DEFAULT_PAGE_SIZE = 20;
-/** 距底部小于该像素时触发加载下一页 */
-const SCROLL_LOAD_THRESHOLD_PX = 72;
-
 function listQueryFromKey(key: KnowledgeCategoryKey): {
+	scope?: 'all' | 'public';
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
 } {
+	if (key.kind === 'public') return { scope: 'public' };
 	if (key.kind === 'category') return { categoryId: key.categoryId };
 	if (key.kind === 'uncategorized') return { uncategorizedOnly: true };
-	return {};
+	return { scope: 'all' };
 }
 
 /** 公开文档优先，组内保持原相对顺序（稳定排序） */
@@ -95,6 +94,7 @@ class KnowledgeStore {
 	categories: KnowledgeCategory[] = [];
 	uncategorizedCount = 0;
 	totalItemCount = 0;
+	publicItemTotal = 0;
 	activeCategoryKey: KnowledgeCategoryKey = { kind: 'all' };
 
 	// —— 回收站列表分页 ——
@@ -194,7 +194,16 @@ class KnowledgeStore {
 	}
 
 	get hasMore(): boolean {
-		return this.list.length < this.total;
+		return this.list.length < this.safeTotal();
+	}
+
+	/** 「全部」Tab 角标：我的文档 + 他人公开 */
+	get listAllCount(): number {
+		return this.totalItemCount + this.publicItemTotal;
+	}
+
+	safeTotal(): number {
+		return Number.isFinite(this.total) && this.total >= 0 ? this.total : 0;
 	}
 
 	get trashHasMore(): boolean {
@@ -466,16 +475,40 @@ class KnowledgeStore {
 		}
 	}
 
+	async fetchPublicCount(): Promise<void> {
+		if (!getLoggedInUserId()) return;
+		try {
+			const res = await getKnowledgeList({
+				scope: 'public',
+				pageNo: 1,
+				pageSize: 1,
+			});
+			if (!res.success || !res.data) return;
+			runInAction(() => {
+				const nextTotal = Number(res.data.total);
+				this.publicItemTotal =
+					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
+			});
+		} catch {
+			// 公开数量加载失败不阻塞列表
+		}
+	}
+
 	setActiveCategoryKey(key: KnowledgeCategoryKey): void {
 		this.activeCategoryKey = key;
 		void this.refreshList();
 	}
 
-	itemMatchesActiveCategory(categoryId?: string | null): boolean {
+	itemMatchesActiveCategory(
+		item: Pick<KnowledgeListItem, 'categoryId' | 'isPublic' | 'isOwned'>,
+	): boolean {
 		const key = this.activeCategoryKey;
+		if (key.kind === 'public') {
+			return item.isPublic === true && item.isOwned === false;
+		}
 		if (key.kind === 'all') return true;
-		if (key.kind === 'uncategorized') return categoryId == null;
-		return categoryId === key.categoryId;
+		if (key.kind === 'uncategorized') return item.categoryId == null;
+		return item.categoryId === key.categoryId;
 	}
 
 	resetActiveCategoryIfEmpty(): void {
@@ -533,7 +566,7 @@ class KnowledgeStore {
 		if (current && current.isOwned === false) return;
 		const updated = await assignKnowledgeItemCategory(id, categoryId);
 		runInAction(() => {
-			const stays = this.itemMatchesActiveCategory(updated.categoryId);
+			const stays = this.itemMatchesActiveCategory(updated);
 			if (stays) {
 				this.list = this.list.map((item) =>
 					item.id === id ? { ...item, ...updated } : item,
@@ -676,6 +709,7 @@ class KnowledgeStore {
 		this.categories = [];
 		this.uncategorizedCount = 0;
 		this.totalItemCount = 0;
+		this.publicItemTotal = 0;
 		this.activeCategoryKey = { kind: 'all' };
 	}
 

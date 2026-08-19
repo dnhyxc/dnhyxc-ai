@@ -326,12 +326,12 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 								: 'bg-sky-500/15 text-sky-500',
 						)}
 					>
-						{t('knowledge.list.publicBadge')}
+						{t('common.publicBadge')}
 					</span>
 				) : null}
 				{categoryName ? (
 					<span
-						className="bg-teal-200/15 text-teal-200 shrink-0 rounded px-1.5 py-1 text-xs font-medium leading-none"
+						className="bg-green-600/15 text-green-600 shrink-0 rounded px-1.5 py-1 text-xs font-medium leading-none"
 						title={categoryName}
 					>
 						{categoryName}
@@ -375,16 +375,16 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 							shadow
 							content={
 								item.isPublic
-									? t('knowledge.list.makePrivate')
-									: t('knowledge.list.makePublic')
+									? t('common.makePrivate')
+									: t('common.publicBadge')
 							}
 						>
 							<button
 								type="button"
 								aria-label={
 									item.isPublic
-										? t('knowledge.list.makePrivate')
-										: t('knowledge.list.makePublic')
+										? t('common.makePrivate')
+										: t('common.publicBadge')
 								}
 								className={cn(
 									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
@@ -660,6 +660,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 			if (!open || useLocalFolder || !allowCloudList) return;
 			void knowledgeStore.refreshList(appliedQuery);
 			void knowledgeStore.fetchCategories();
+			void knowledgeStore.fetchPublicCount();
 		}, [open, useLocalFolder, allowCloudList, knowledgeStore]);
 
 		useEffect(() => {
@@ -1283,7 +1284,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 												{
 													key: { kind: 'all' } as KnowledgeCategoryKey,
 													label: t('knowledge.list.category.all'),
-													count: knowledgeStore.totalItemCount,
+													count: knowledgeStore.listAllCount,
 												},
 												...knowledgeStore.categories
 													.filter((c) => c.itemCount > 0)
@@ -1295,6 +1296,17 @@ const KnowledgeList: React.FC<IProps> = observer(
 														label: c.name,
 														count: c.itemCount,
 													})),
+												...(knowledgeStore.publicItemTotal > 0
+													? [
+															{
+																key: {
+																	kind: 'public' as const,
+																},
+																label: t('common.publicBadge'),
+																count: knowledgeStore.publicItemTotal,
+															},
+														]
+													: []),
 												...(knowledgeStore.uncategorizedCount > 0
 													? [
 															{

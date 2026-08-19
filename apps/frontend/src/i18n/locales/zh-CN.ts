@@ -22,6 +22,8 @@ export const zhCN = {
 	'common.type-1': '个',
 	'common.type-2': '条',
 	'common.type-3': '项',
+	'common.publicBadge': '公开',
+	'common.makePrivate': '取消公开',
 
 	'image.loadFailed': '图片加载失败',
 
@@ -805,9 +807,6 @@ export const zhCN = {
 	'knowledge.list.openInEditor': '在 Cursor 或 Trae 中打开',
 	'knowledge.list.deleteLocalMdAria': '删除本地 Markdown 文件',
 	'knowledge.list.deleteFromLibraryAria': '从知识库删除',
-	'knowledge.list.makePublic': '公开',
-	'knowledge.list.makePrivate': '取消公开',
-	'knowledge.list.publicBadge': '公开',
 	'knowledge.list.publicConfirmTitle': '确定公开这条知识文档？',
 	'knowledge.list.publicConfirmDesc':
 		'公开后，所有登录用户都可以在列表中拉取并查看该文档',
@@ -1604,12 +1603,9 @@ export const zhCN = {
 	'ebook.shelf.category.move': '移动到分类',
 	'ebook.shelf.category.empty': '此分类暂无书籍。',
 	'ebook.shelf.category.duplicateName': '分类名称已存在',
-	'ebook.shelf.category.public': '公开',
 	'ebook.shelf.publicEmpty': '暂无他人公开的书籍。',
-	'ebook.shelf.publicBadge': '公开',
 	'ebook.shelf.publicOwner': '书主',
 	'ebook.public.makePublic': '公开此书',
-	'ebook.public.makePrivate': '取消公开',
 	'ebook.public.confirmPublicTitle': '公开此书？',
 	'ebook.public.confirmPublicDesc':
 		'全书及你的读书想法将对所有用户可见，并出现在他人书架。',
@@ -1759,7 +1755,6 @@ export const zhCN = {
 	'ebook.read.thought.clusterExcerpt': '摘录 ({length} 字)',
 	'ebook.read.thought.viewDetail': '查看详情',
 	'ebook.read.thought.selectedQuoteHint': '当前显示该想法对应的原文',
-	'ebook.read.thought.visibilityPublic': '公开',
 	'ebook.read.thought.visibilityPrivate': '私密',
 	'ebook.err.open': '打开失败',
 	'ebook.err.loadFailed': '无法加载该书籍，请检查书籍是否存在',

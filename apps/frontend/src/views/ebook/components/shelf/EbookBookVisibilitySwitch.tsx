@@ -70,7 +70,7 @@ export function EbookBookVisibilitySwitch({
 	}, [book.id, pendingPublic, t]);
 
 	const label = isPublic
-		? t('ebook.public.makePrivate')
+		? t('common.makePrivate')
 		: t('ebook.public.makePublic');
 
 	const tooltipContent =

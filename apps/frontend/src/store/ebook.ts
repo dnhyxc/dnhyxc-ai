@@ -1,7 +1,7 @@
 import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEventHandler } from 'react';
-import { EBOOK_SHELF_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
+import { DEFAULT_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
 	addEbookFromPath,
@@ -158,7 +158,7 @@ class EbookStore {
 	progRemoteInflight: Promise<void> | null = null;
 	total = 0;
 	pageNo = 1;
-	pageSize = EBOOK_SHELF_PAGE_SIZE;
+	pageSize = DEFAULT_PAGE_SIZE;
 	ready = false;
 	loading = false;
 	loadingMore = false;

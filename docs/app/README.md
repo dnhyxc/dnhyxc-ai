@@ -17,6 +17,7 @@
 | [搜索组件提取.md](./搜索组件提取.md) | 知识库 `KnowledgeSearchInput` 提取为通用 `@design/SearchInput`；新增 `autoFocus` / `inputRef` / `onEscape` 三个可选 props；删除原业务文件，知识库列表与回收站两处调用切换 |
 | [书架知识库视觉微调.md](./书架知识库视觉微调.md) | 统一电子书书架与知识库列表按钮视觉：图标按钮加 `lucide-stroke-draw-hover` 描边动画；电子书导入 Tooltip `side` 从 `bottom` 改 `top`；导入按钮初始加载期间禁用；知识库分类管理图标 `size-3.5`→`size-4`；分类标签 `variant` 从 `ghost` 改 `link` 并精简样式 |
 | [Portal与Markdown字体继承.md](./Portal与Markdown字体继承.md) | 字体继承修复：`font-family` 从 `#root` 上移到 `body` 使 Portal（Dialog/Drawer/Popover）继承应用字体；`.markdown-body` 显式覆盖 `github-markdown` 写死的系统字体栈 |
+| [书架知识库分页常量归一化.md](./书架知识库分页常量归一化.md) | **全局分页默认值归一**：删除知识库 Store 私有 `DEFAULT_PAGE_SIZE / SCROLL_LOAD_THRESHOLD_PX`，与电子书共用 `@/constants`；`EBOOK_SHELF_PAGE_SIZE` 重命名为通用 `DEFAULT_PAGE_SIZE`；纯重构，运行时值无变化 |
 
 ---
 

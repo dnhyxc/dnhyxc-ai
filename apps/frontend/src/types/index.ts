@@ -103,11 +103,12 @@ export type KnowledgeCategoriesSummary = {
 	totalItemCount: number;
 };
 
-/** 知识库列表 Tab：全部 | 某分类 | 未分类 */
+/** 知识库列表 Tab：全部 | 某分类 | 未分类 | 公开（他人） */
 export type KnowledgeCategoryKey =
 	| { kind: 'all' }
 	| { kind: 'category'; categoryId: string }
-	| { kind: 'uncategorized' };
+	| { kind: 'uncategorized' }
+	| { kind: 'public' };
 
 /** 列表项（无正文大字段） */
 export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {

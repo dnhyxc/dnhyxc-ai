@@ -43,7 +43,7 @@ function EbookShelfCategoryRail() {
 			? [
 					{
 						key: { kind: 'public' as const },
-						label: t('ebook.shelf.category.public'),
+						label: t('common.publicBadge'),
 						count: publicBookTotal,
 					},
 				]

@@ -23,6 +23,8 @@ export const enUS = {
 	'common.type-1': 'of them',
 	'common.type-2': 'items',
 	'common.type-3': 'items',
+	'common.publicBadge': 'Public',
+	'common.makePrivate': 'Make private',
 
 	'image.loadFailed': 'Image failed to load',
 
@@ -874,9 +876,6 @@ export const enUS = {
 	'knowledge.list.openInEditor': 'Open in Cursor or Trae',
 	'knowledge.list.deleteLocalMdAria': 'Delete local Markdown file',
 	'knowledge.list.deleteFromLibraryAria': 'Delete from knowledge library',
-	'knowledge.list.makePublic': 'Make public',
-	'knowledge.list.makePrivate': 'Make private',
-	'knowledge.list.publicBadge': 'Public',
 	'knowledge.list.publicConfirmTitle': 'Make this knowledge document public?',
 	'knowledge.list.publicConfirmDesc':
 		'Once public, all signed-in users can find and open it in the list',
@@ -1746,12 +1745,9 @@ export const enUS = {
 	'ebook.shelf.category.move': 'Move to category',
 	'ebook.shelf.category.empty': 'No books in this category.',
 	'ebook.shelf.category.duplicateName': 'Category name already exists',
-	'ebook.shelf.category.public': 'Public',
 	'ebook.shelf.publicEmpty': 'No public books from others yet.',
-	'ebook.shelf.publicBadge': 'Public',
 	'ebook.shelf.publicOwner': 'Owner',
 	'ebook.public.makePublic': 'Make public',
-	'ebook.public.makePrivate': 'Make private',
 	'ebook.public.confirmPublicTitle': 'Make this book public?',
 	'ebook.public.confirmPublicDesc':
 		'The full book and your reading thoughts will be visible to all users on their shelves.',
@@ -1909,7 +1905,6 @@ export const enUS = {
 	'ebook.read.thought.clusterExcerpt': 'Excerpt ({length} chars)',
 	'ebook.read.thought.viewDetail': 'View note',
 	'ebook.read.thought.selectedQuoteHint': 'Showing quote for selected note',
-	'ebook.read.thought.visibilityPublic': 'Public',
 	'ebook.read.thought.visibilityPrivate': 'Private',
 	'ebook.err.open': 'Failed to open',
 	'ebook.err.loadFailed':

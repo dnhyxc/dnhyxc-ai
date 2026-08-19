@@ -302,7 +302,7 @@ function ThoughtVisibilityBadge({ isPublic }: { isPublic: boolean }) {
 	return (
 		<span className={cn('shrink-0 text-xs', 'text-textcolor/35')}>
 			{isPublic
-				? t('ebook.read.thought.visibilityPublic')
+				? t('common.publicBadge')
 				: t('ebook.read.thought.visibilityPrivate')}
 		</span>
 	);

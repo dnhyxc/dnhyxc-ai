@@ -189,9 +189,15 @@ export class KnowledgeService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
+		const scope = query.scope ?? 'all';
 		if (query.categoryId && query.uncategorizedOnly) {
 			throw new BadRequestException(
 				'categoryId 与 uncategorizedOnly 不能同时使用',
+			);
+		}
+		if (scope === 'public' && (query.categoryId || query.uncategorizedOnly)) {
+			throw new BadRequestException(
+				'scope=public 与 categoryId/uncategorizedOnly 不能同时使用',
 			);
 		}
 
@@ -212,7 +218,9 @@ export class KnowledgeService {
 			.take(take)
 			.skip(skip);
 
-		if (query.categoryId || query.uncategorizedOnly) {
+		if (scope === 'public') {
+			qb.where('k.isPublic = true AND k.authorId != :userId', { userId });
+		} else if (query.categoryId || query.uncategorizedOnly) {
 			qb.where('k.authorId = :userId', { userId });
 			if (query.categoryId) {
 				await this.resolveUserCategoryId(userId, query.categoryId);

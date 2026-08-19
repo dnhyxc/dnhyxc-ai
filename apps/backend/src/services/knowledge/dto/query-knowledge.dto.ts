@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
 	IsBoolean,
+	IsIn,
 	IsInt,
 	IsNumber,
 	IsOptional,
@@ -44,4 +45,9 @@ export class QueryKnowledgeDto {
 	@Transform(({ value }) => value === 'true' || value === true)
 	@IsBoolean()
 	uncategorizedOnly?: boolean;
+
+	/** all：本人 + 他人公开；public：仅他人公开；与 categoryId/uncategorizedOnly 互斥 */
+	@IsOptional()
+	@IsIn(['all', 'public'])
+	scope?: 'all' | 'public';
 }
