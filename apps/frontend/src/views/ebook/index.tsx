@@ -16,6 +16,7 @@ import { EbookPageShell } from './components/layout/EbookPageShell';
 import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
 import { EbookShelfBookCard } from './components/shelf/EbookShelfBookCard';
 import EbookShelfCategoryRail from './components/shelf/EbookShelfCategoryRail';
+import EbookShelfSearch from './components/shelf/EbookShelfSearch';
 import { EbookShelfUploadBanner } from './components/shelf/EbookShelfUploadBanner';
 
 function EbookShelfPage() {
@@ -181,7 +182,7 @@ function EbookShelfPage() {
 		[t],
 	);
 
-	const showInitialLoading = !ebookStore.ready && ebookStore.loading;
+	const showInitialLoading = ebookStore.loading && !ebookStore.loadingMore;
 	const showEmpty =
 		ebookStore.ready &&
 		ebookStore.total === 0 &&
@@ -200,6 +201,12 @@ function EbookShelfPage() {
 		ebookStore.activeCategoryKey.kind !== 'all' &&
 		ebookStore.activeCategoryKey.kind !== 'public';
 	const showLoadMoreHint = ebookStore.loadingMore;
+	const searching = ebookStore.titleKeyword.trim().length > 0;
+	const showSearchEmpty =
+		ebookStore.ready &&
+		ebookStore.total === 0 &&
+		!ebookStore.loading &&
+		searching;
 
 	const isTauri = isTauriRuntime();
 	const uploading = ebookStore.busy;
@@ -273,28 +280,9 @@ function EbookShelfPage() {
 						}
 						middle={<EbookShelfCategoryRail />}
 						trailing={
-							isTauri ? (
-								<Tooltip
-									side="bottom"
-									sideOffset={6}
-									delayDuration={300}
-									shadow
-									className="max-w-xs text-left leading-snug"
-									content={importHint}
-								>
-									<Button
-										variant="link"
-										size="sm"
-										className="h-8 shrink-0 gap-1.5 px-0!"
-										disabled={uploading}
-										onClick={onPickTauri}
-									>
-										<FolderOpen className="size-4" aria-hidden />
-										{t('ebook.shelf.pickLocal')}
-									</Button>
-								</Tooltip>
-							) : (
-								<>
+							<>
+								<EbookShelfSearch />
+								{isTauri ? (
 									<Tooltip
 										side="bottom"
 										sideOffset={6}
@@ -306,23 +294,45 @@ function EbookShelfPage() {
 										<Button
 											variant="link"
 											size="sm"
-											className="h-8 shrink-0 gap-1.5 px-0!"
+											className="h-8 shrink-0 gap-1.5 pr-0!"
 											disabled={uploading}
-											onClick={onPickWeb}
+											onClick={onPickTauri}
 										>
-											<BookOpen className="size-4" aria-hidden />
-											{t('ebook.shelf.pickFile')}
+											<FolderOpen className="size-4" aria-hidden />
+											{t('ebook.shelf.pickLocal')}
 										</Button>
 									</Tooltip>
-									<input
-										ref={fileRef}
-										type="file"
-										accept=".epub,.pdf"
-										className="hidden"
-										onChange={(e) => onFile(e.target.files)}
-									/>
-								</>
-							)
+								) : (
+									<>
+										<Tooltip
+											side="bottom"
+											sideOffset={6}
+											delayDuration={300}
+											shadow
+											className="max-w-xs text-left leading-snug"
+											content={importHint}
+										>
+											<Button
+												variant="link"
+												size="sm"
+												className="h-8 shrink-0 gap-1.5 px-0!"
+												disabled={uploading}
+												onClick={onPickWeb}
+											>
+												<BookOpen className="size-4" aria-hidden />
+												{t('ebook.shelf.pickFile')}
+											</Button>
+										</Tooltip>
+										<input
+											ref={fileRef}
+											type="file"
+											accept=".epub,.pdf"
+											className="hidden"
+											onChange={(e) => onFile(e.target.files)}
+										/>
+									</>
+								)}
+							</>
 						}
 					/>
 				}
@@ -337,6 +347,10 @@ function EbookShelfPage() {
 					{showInitialLoading ? (
 						<div className="flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 							<Loading text={t('common.loading')} />
+						</div>
+					) : showSearchEmpty ? (
+						<div className="text-textcolor/60 py-12 text-center text-sm">
+							{t('ebook.shelf.searchEmpty')}
 						</div>
 					) : showEmpty ? (
 						<div className="text-textcolor/60 py-12 text-center text-sm">

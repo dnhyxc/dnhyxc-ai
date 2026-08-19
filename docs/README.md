@@ -211,6 +211,7 @@
 | EPUB 听书播放本轮修复总览（含切章 / 软暂停 / loading / 选中色）    | [ebook/EPUB听书播放修复2026-07.md](./ebook/EPUB听书播放修复2026-07.md) · [ideas/EPUB听书播放优化.md](./ideas/epub/EPUB听书播放优化.md) |
 | EPUB 听书连播时播放钮 loading 只在首启出现                          | [ebook/EPUB听书等待加载.md](./ebook/EPUB听书等待加载.md) · [ebook/EPUB听书播放加载.md](./ebook/EPUB听书播放加载.md) |
 | 书架已读进度出现很长小数                                          | [ebook/电子书书架进度百分比.md](./ebook/电子书书架进度百分比.md)                                                                               |
+| 电子书书架按书名搜索（Enter 提交、不区分大小写、关闭恢复完整列表） | [ebook/书架标题搜索.md](./ebook/书架标题搜索.md)                                                                                             |
 | EPUB 听书底栏切章 / 暂停续播与系统媒体同步                        | [ebook/EPUB听书栏章节导航.md](./ebook/EPUB听书栏章节导航.md) · [ebook/EPUB听书栏播放头目录.md](./ebook/EPUB听书栏播放头目录.md) · [ebook/EPUB听书软暂停.md](./ebook/EPUB听书软暂停.md) |
 | 听书底栏上下章切到错误邻节（同 spine 多节）                        | [ebook/EPUB听书栏播放头目录.md](./ebook/EPUB听书栏播放头目录.md)                                                                     |
 | 本机听书/听当前第一句无声、第二句正常                               | [english/TTS本地取消结算影响.md](./english/TTS本地取消结算影响.md) · [impact/TTS本地取消结算影响.md](./impact/TTS本地取消结算影响.md) |

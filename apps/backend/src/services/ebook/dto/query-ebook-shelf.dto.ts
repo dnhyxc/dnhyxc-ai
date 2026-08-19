@@ -4,8 +4,10 @@ import {
 	IsIn,
 	IsNumber,
 	IsOptional,
+	IsString,
 	IsUUID,
 	Max,
+	MaxLength,
 	Min,
 } from 'class-validator';
 
@@ -36,4 +38,9 @@ export class QueryEbookShelfDto {
 	@Transform(({ value }) => value === 'true' || value === true)
 	@IsBoolean()
 	uncategorizedOnly?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(200)
+	title?: string;
 }

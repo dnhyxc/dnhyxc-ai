@@ -109,16 +109,17 @@ function bookLastReadMs(book: Book, progMap: Record<string, Prog>): number {
 	return Number.isFinite(addedAt) ? addedAt : 0;
 }
 
-/** 公开书（含他人公开）优先，组内再按最近阅读倒序 */
+/** 最近阅读优先，同阅读时间时公开书靠前 */
 function sortBooksByLastRead(
 	books: Book[],
 	progMap: Record<string, Prog>,
 ): Book[] {
 	return [...books].sort((a, b) => {
+		const byRead = bookLastReadMs(b, progMap) - bookLastReadMs(a, progMap);
+		if (byRead !== 0) return byRead;
 		const aPublic = a.isPublic || a.owner ? 1 : 0;
 		const bPublic = b.isPublic || b.owner ? 1 : 0;
-		if (aPublic !== bPublic) return bPublic - aPublic;
-		return bookLastReadMs(b, progMap) - bookLastReadMs(a, progMap);
+		return bPublic - aPublic;
 	});
 }
 
@@ -170,6 +171,7 @@ class EbookStore {
 	publicBookTotal = 0;
 	activeCategoryKey: EbookShelfCategoryKey = { kind: 'all' };
 	categoriesLoading = false;
+	titleKeyword = '';
 
 	shelfFetchSeq = 0;
 
@@ -178,6 +180,9 @@ class EbookStore {
 	}
 
 	get hasMore(): boolean {
+		if (this.titleKeyword.trim()) {
+			return this.books.length < this.safeTotal();
+		}
 		if (this.activeCategoryKey.kind === 'all') {
 			return this.books.length < this.totalBookCount + this.publicBookTotal;
 		}
@@ -308,6 +313,13 @@ class EbookStore {
 		void this.fetchPage(1, false);
 	}
 
+	async refreshList(keyword?: string): Promise<void> {
+		if (keyword !== undefined) {
+			this.titleKeyword = keyword;
+		}
+		await this.fetchPage(1, false);
+	}
+
 	async fetchPage(page: number, append: boolean): Promise<void> {
 		const seq = ++this.shelfFetchSeq;
 		if (append) {
@@ -317,9 +329,11 @@ class EbookStore {
 		}
 		try {
 			const key = this.activeCategoryKey;
+			const title = this.titleKeyword.trim() || undefined;
 			const data = await loadEbookShelf({
 				pageNo: page,
 				pageSize: this.pageSize,
+				title,
 				...shelfQueryFromKey(key),
 			});
 			const publicData =
@@ -328,6 +342,7 @@ class EbookStore {
 							scope: 'public',
 							pageNo: 1,
 							pageSize: 100,
+							title,
 						})
 					: null;
 			if (seq !== this.shelfFetchSeq) return;
@@ -491,6 +506,7 @@ class EbookStore {
 		this.totalBookCount = 0;
 		this.publicBookTotal = 0;
 		this.activeCategoryKey = { kind: 'all' };
+		this.titleKeyword = '';
 		this.clearUploadState();
 	}
 

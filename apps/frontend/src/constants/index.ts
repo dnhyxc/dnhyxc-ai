@@ -86,4 +86,4 @@ export const HISTORY_PAGE_SIZE = 50;
  */
 export const SCROLL_LOAD_THRESHOLD_PX = 72;
 /** 电子书书架每页条数（与知识库列表默认分页量级一致） */
-export const EBOOK_SHELF_PAGE_SIZE = 50;
+export const EBOOK_SHELF_PAGE_SIZE = 20;

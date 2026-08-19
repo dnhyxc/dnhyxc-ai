@@ -513,8 +513,9 @@ export class EbookService {
 		} else if (query.uncategorizedOnly) {
 			qb.andWhere('b.category_id IS NULL');
 		}
-		qb.orderBy('b.isPublic', 'DESC')
-			.addOrderBy('shelf_sort', 'DESC')
+		this.applyTitleFilter(qb, query.title);
+		qb.orderBy('shelf_sort', 'DESC')
+			.addOrderBy('b.isPublic', 'DESC')
 			.skip(skip)
 			.take(take);
 
@@ -539,6 +540,17 @@ export class EbookService {
 		};
 	}
 
+	private applyTitleFilter(
+		qb: SelectQueryBuilder<EbookBook>,
+		title?: string,
+	): void {
+		const q = title?.trim();
+		if (!q) return;
+		qb.andWhere('LOWER(b.title) LIKE :title', {
+			title: `%${q.toLowerCase()}%`,
+		});
+	}
+
 	private async getPublicShelf(
 		userId: number,
 		query: QueryEbookShelfDto,
@@ -548,11 +560,13 @@ export class EbookService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 
-		const [publicBooks, total] = await this.bookRepo
+		const qb = this.bookRepo
 			.createQueryBuilder('b')
 			.where('b.is_public = :isPublic', { isPublic: true })
 			.andWhere('b.source_book_id IS NULL')
-			.andWhere('b.user_id != :userId', { userId })
+			.andWhere('b.user_id != :userId', { userId });
+		this.applyTitleFilter(qb, query.title);
+		const [publicBooks, total] = await qb
 			.orderBy('b.public_at', 'DESC')
 			.addOrderBy('b.created_at', 'DESC')
 			.skip(skip)

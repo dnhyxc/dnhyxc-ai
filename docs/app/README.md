@@ -14,6 +14,7 @@
 | [文件拖放导航屏蔽.md](./文件拖放导航屏蔽.md) | 拦截拖放文件导航：Rust `block_file_drop_navigation` 插件 + 前端 `dragover` / `drop` `preventDefault` |
 | [学习笔记实现.md](./学习笔记实现.md) | 学习笔记实现：MobX `LearningNotesStore`、Host API 依赖注入、累积分页加载、DOCX 导出 |
 | [Tooltip方向与阴影修复.md](./Tooltip方向与阴影修复.md) | Tooltip 阴影默认开启 + 颜色改 teal-500/theme-background + Arrow z-50→z-30；工具栏 / Monaco 底部栏 Tooltip 改 `side="top"`；EbookShelfBookCard 分类菜单 Tooltip 禁 hover + Popover 阻止焦点回跳；Monaco 删除 `console.log` |
+| [搜索组件提取.md](./搜索组件提取.md) | 知识库 `KnowledgeSearchInput` 提取为通用 `@design/SearchInput`；新增 `autoFocus` / `inputRef` / `onEscape` 三个可选 props；删除原业务文件，知识库列表与回收站两处调用切换 |
 
 ---
 

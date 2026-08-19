@@ -483,6 +483,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The "Move to category" menu on ebook shelf cards is only shown for books you can manage on your own shelf. Others\' public books and books on the public shelf no longer show the category move entry, preventing accidental operations.',
 	},
+	's6-34': {
+		title: 'Ebook shelf: search by book title',
+		description:
+			'A search button is added to the shelf header bar; click it to expand a search input. Type a book title keyword and press Enter to filter both your shelf and the public shelf (case insensitive). Closing the search automatically clears the keyword and restores the full list. When no matches are found, a "No matching books" hint is shown. The page size is also reduced from 50 to 20 to lower initial load pressure.',
+	},
+	's6-35': {
+		title: 'Ebook shelf sort order adjustment',
+		description:
+			'The shelf list sort order is changed from "public first" back to "most recently read first"; public books only rank higher when read times are equal.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

@@ -1707,6 +1707,10 @@ export const enUS = {
 	'ebook.shelf.membershipRequiredUploadMessage':
 		'Uploading books to the cloud is a member benefit. Please subscribe before importing.',
 	'ebook.shelf.pickLocal': 'Select local file',
+	'ebook.shelf.search': 'Search books',
+	'ebook.shelf.searchClose': 'Close search',
+	'ebook.shelf.searchPlaceholder': 'Search by book title',
+	'ebook.shelf.searchEmpty': 'No matching books.',
 	'ebook.shelf.pickFile': 'Import file',
 	'ebook.shelf.empty': 'No books yet.',
 	'ebook.shelf.progress': 'About {pct}% read',

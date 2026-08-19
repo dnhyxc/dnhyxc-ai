@@ -2,6 +2,7 @@ import CategoryManageDialog from '@design/CategoryManageDialog';
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
+import SearchInput from '@design/SearchInput';
 import Tooltip from '@design/Tooltip';
 import {
 	Button,
@@ -47,7 +48,6 @@ import {
 	invokeResolveKnowledgeMarkdownTarget,
 } from '@/utils/knowledge-save';
 import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
-import KnowledgeSearchInput from './KnowledgeSearchInput';
 import {
 	buildLocalMdTree,
 	collectLocalMdDirPaths,
@@ -531,7 +531,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const [expandedDirs, setExpandedDirs] = useState(
 			() => new Set([normalizeFsPath(TAURI_KNOWLEDGE_DIR)]),
 		);
-		/** 已提交的搜索词（回车 / 清除才更新；草稿在 KnowledgeSearchInput 内） */
+		/** 已提交的搜索词（回车 / 清除才更新；草稿在 SearchInput 内） */
 		const [appliedQuery, setAppliedQuery] = useState(
 			() => knowledgeStore.titleKeyword,
 		);
@@ -1251,7 +1251,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 									className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 opacity-50"
 									aria-hidden
 								/>
-								<KnowledgeSearchInput
+								<SearchInput
 									committedQuery={appliedQuery}
 									onCommit={submitTitleSearch}
 									placeholder={t('knowledge.list.searchPlaceholder')}

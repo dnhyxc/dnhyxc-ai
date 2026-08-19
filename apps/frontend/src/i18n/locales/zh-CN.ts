@@ -1567,6 +1567,10 @@ export const zhCN = {
 	'ebook.shelf.membershipRequiredUploadMessage':
 		'上传书籍至云端为会员权益，请先开通会员后再导入。',
 	'ebook.shelf.pickLocal': '选择本地文件',
+	'ebook.shelf.search': '搜索书籍',
+	'ebook.shelf.searchClose': '关闭搜索',
+	'ebook.shelf.searchPlaceholder': '根据书名搜索',
+	'ebook.shelf.searchEmpty': '未找到匹配的书籍。',
 	'ebook.shelf.pickFile': '导入文件',
 	'ebook.shelf.empty': '暂无书籍。',
 	'ebook.shelf.progress': '已读约 {pct}%',

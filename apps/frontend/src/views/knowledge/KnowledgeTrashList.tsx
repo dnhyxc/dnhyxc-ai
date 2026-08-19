@@ -1,6 +1,7 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
+import SearchInput from '@design/SearchInput';
 import { Button, Checkbox, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Search, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -15,7 +16,6 @@ import {
 import useStore from '@/store';
 import type { KnowledgeTrashListItem } from '@/types';
 import { formatDate } from '@/utils';
-import KnowledgeSearchInput from './KnowledgeSearchInput';
 
 interface Props {
 	open: boolean;
@@ -361,7 +361,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 								className="pointer-events-none absolute left-5 top-6.5 size-4 -translate-y-1/2 opacity-50"
 								aria-hidden
 							/>
-							<KnowledgeSearchInput
+							<SearchInput
 								committedQuery={appliedQuery}
 								onCommit={submitTitleSearch}
 								placeholder={t('knowledge.trash.searchPlaceholder')}

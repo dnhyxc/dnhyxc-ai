@@ -1998,6 +1998,7 @@ export const loadEbookShelf = async (params?: {
 	scope?: 'mine' | 'public' | 'all';
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
+	title?: string;
 }): Promise<EbookShelfData> => {
 	const res = await http.get<EbookShelfData>(EBOOK_SHELF, {
 		querys: params,
