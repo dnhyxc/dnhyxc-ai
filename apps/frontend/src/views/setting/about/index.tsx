@@ -200,7 +200,7 @@ const SettingAbout = () => {
 							>
 								<span className="inline-flex size-5 shrink-0 items-center justify-center">
 									{checkLoading ? (
-										<Spinner className="size-4 text-textcolor" />
+										<Spinner className="size-4" />
 									) : (
 										<CircleArrowUp className="size-4" />
 									)}
@@ -220,7 +220,7 @@ const SettingAbout = () => {
 									>
 										<span className="inline-flex size-5 shrink-0 items-center justify-center">
 											{downloading ? (
-												<Spinner className="size-4 text-textcolor" />
+												<Spinner className="size-4" />
 											) : (
 												<Download className="size-4" />
 											)}
