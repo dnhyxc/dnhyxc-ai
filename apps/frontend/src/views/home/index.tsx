@@ -136,9 +136,6 @@ const Home = () => {
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
 							className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md"
-							style={{
-								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
-							}}
 						>
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
 							<header className="relative z-10 shrink-0 overflow-hidden border-b border-theme/3 bg-theme-background/80 pb-4.5 pt-4 md:px-6 md:pt-6">
@@ -196,7 +193,7 @@ const Home = () => {
 										</div>
 									</div>
 
-									{/* Row 2：輪播主體 —— 固定高度 + 剛性 4 行 grid + 左 rail，所有元素 y 座標永遠不變 */}
+									{/* Row 2：轮播图 —— 固定高度 + 4 行 grid + 左 rail，所有元素 y 坐标不变 */}
 									<div
 										className="relative"
 										onMouseEnter={() => {
@@ -248,18 +245,13 @@ const Home = () => {
 																	/>
 																</div>
 																<div
-																	className="mt-1 bg-linear-to-r from-teal-500 via-cyan-500 to-amber-300 bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-13.5 tracking-tight sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]"
-																	style={{
-																		fontFamily:
-																			locale === 'zh-CN'
-																				? '"Syne", "Noto Sans SC", sans-serif'
-																				: '',
-																	}}
+																	className={`flex items-center gap-1 mt-1 bg-linear-to-br ${hue.icon} bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-13.5 tracking-tight sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]`}
 																>
 																	{s.titleMain}
-																	<span className="ml-1.5 sm:ml-2">
-																		{s.titleAccent}
+																	<span className="font-bold mx-2 -mt-1">
+																		-
 																	</span>
+																	{s.titleAccent}
 																</div>
 															</div>
 
@@ -279,20 +271,18 @@ const Home = () => {
 																			type="button"
 																			onClick={c.onClick}
 																			className={cn(
-																				'flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98]',
+																				'pb-0.5 flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98]',
 																				c.primary
 																					? `${hue.btn} relative bg-linear-to-br font-semibold text-white overflow-hidden`
 																					: `${hue.btn} bg-linear-to-br font-medium text-white`,
 																			)}
 																			style={{
-																				fontFamily:
-																					'"Syne", "Noto Sans SC", sans-serif',
 																				touchAction: 'manipulation',
 																			}}
 																		>
 																			{c.label}
 																			<SquareArrowOutUpRight
-																				className="h-4 w-4 -mt-0.5"
+																				className="h-4 w-4 mt-0.5"
 																				aria-hidden
 																			/>
 																		</button>
@@ -381,12 +371,7 @@ const Home = () => {
 											/>
 										</div>
 
-										<h2
-											className="relative text-lg font-bold text-theme-white sm:text-xl"
-											style={{
-												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
-											}}
-										>
+										<h2 className="relative text-lg font-bold text-theme-white sm:text-xl">
 											{feature.title}
 										</h2>
 										<p className="relative mt-2 text-xs font-medium text-textcolor/45 sm:text-sm">
@@ -415,7 +400,6 @@ const Home = () => {
 								viewport={{ once: true, margin: '-40px' }}
 								transition={{ duration: 0.35 }}
 								className="mb-6 text-xl font-semibold text-textcolor"
-								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
 							>
 								{t('home.sections.showcase')}
 							</motion.h3>
@@ -454,10 +438,7 @@ const Home = () => {
 							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
 						>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
-							<h3
-								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
-								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
-							>
+							<h3 className="relative z-10 mb-6 text-xl font-semibold text-textcolor">
 								{t('home.sections.steps')}
 							</h3>
 							<div className="space-y-4">
@@ -518,10 +499,7 @@ const Home = () => {
 							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
 						>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
-							<h3
-								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
-								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
-							>
+							<h3 className="relative z-10 mb-6 text-xl font-semibold text-textcolor">
 								{t('home.sections.quicklinks')}
 							</h3>
 							<div className="space-y-4">

@@ -243,6 +243,7 @@ export function createHeroSlides(opts: {
 			spotlightA: 'via-cyan-400/15',
 			spotlightB: 'from-teal-500/25',
 			spotlightC: 'to-amber-300/0',
+			accent: 'text-teal-500/80',
 			hue: 'teal',
 			cta: [
 				{
@@ -275,6 +276,7 @@ export function createHeroSlides(opts: {
 			spotlightA: 'from-emerald-500/25',
 			spotlightB: 'via-teal-400/18',
 			spotlightC: 'to-cyan-300/0',
+			accent: 'text-emerald-500/68',
 			hue: 'emerald',
 			cta: [
 				{
@@ -296,6 +298,7 @@ export function createHeroSlides(opts: {
 			spotlightA: 'from-amber-500/25',
 			spotlightB: 'via-orange-400/18',
 			spotlightC: 'to-yellow-300/0',
+			accent: 'text-amber-500/80',
 			hue: 'amber',
 			cta: [
 				{
@@ -317,6 +320,7 @@ export function createHeroSlides(opts: {
 			spotlightA: 'from-rose-500/22',
 			spotlightB: 'via-amber-400/16',
 			spotlightC: 'to-pink-300/0',
+			accent: 'text-rose-500/60',
 			hue: 'rose',
 			cta: [
 				{
@@ -338,6 +342,7 @@ export function createHeroSlides(opts: {
 			spotlightA: 'from-violet-500/25',
 			spotlightB: 'via-purple-400/18',
 			spotlightC: 'to-indigo-300/0',
+			accent: 'text-violet-500/80',
 			hue: 'violet',
 			cta: [
 				{
