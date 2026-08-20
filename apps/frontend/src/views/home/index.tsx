@@ -1,8 +1,7 @@
-import { Button } from '@ui/index';
 import { ScrollArea } from '@ui/scroll-area';
 import { motion } from 'framer-motion';
-import { Sparkles, SquareArrowOutUpRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, SquareArrowOutUpRight } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -19,6 +18,9 @@ import {
 	HUE_STYLES,
 } from './content';
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+const HERO_AUTOPLAY_MS = 5200;
+
 const Home = () => {
 	const navigate = useNavigate();
 	const { t, locale } = useI18n();
@@ -28,47 +30,51 @@ const Home = () => {
 	const FEATURES = useMemo(() => createFeatures(navigate, t), [navigate, t]);
 	const QUICKLINKS = useMemo(() => createQuicklinks(t), [t]);
 
+	const rootRef = useRef<HTMLDivElement>(null);
+	const [stageH, setStageH] = useState<number | undefined>(undefined);
+
+	useLayoutEffect(() => {
+		const el = rootRef.current;
+		if (!el) return;
+		const sync = () => setStageH(el.clientHeight);
+		sync();
+		const ro = new ResizeObserver(sync);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
 			console.log('about-send-message', event);
 		});
-
 		const unlistenShortcut = onListen('shortcut-triggered', (event) => {
 			console.log('shortcut-triggered', event);
 		});
-
 		return () => {
 			unlistenAboutPromise.then((unlisten) => unlisten());
 			unlistenShortcut.then((unlisten) => unlisten());
 		};
 	}, []);
 
-	// 使用原生 button + CSS 过渡，避免 motion.button 的 whileTap 与路由卸载叠在同一帧造成卡顿
-	const onClickQuickStart = () => {
-		navigate('/knowledge');
-	};
+	const onQuickStart = () => navigate('/knowledge');
 
-	// ─────────────────── Hero 轮播：左侧 sidebar 功能页介绍 ───────────────────
 	const HERO_SLIDES = useMemo(
 		() =>
 			createHeroSlides({
 				t,
 				locale,
 				navigate,
-				onQuickStart: onClickQuickStart,
+				onQuickStart,
 			}),
-		// ponytail: 与原先一致，故意不把 navigate / onClickQuickStart 列入 deps
+		// ponytail: 与原先一致，故意不把 navigate / onQuickStart 列入 deps
 		[t, locale],
 	);
 
 	const [heroIndex, setHeroIndex] = useState(0);
-	/** 1 前进 / -1 后退；环绕时不能靠 index 大小判断进出场方向 */
 	const [heroDir, setHeroDir] = useState(1);
 	const heroPrevRef = useRef(0);
 	const heroTimerRef = useRef<number | null>(null);
-	const heroHoverRef = useRef<boolean>(false);
-	const HERO_AUTOPLAY_MS = 5200;
-	const heroNumber = HERO_SLIDES[heroIndex]?.number ?? '01';
+	const heroHoverRef = useRef(false);
 
 	const resetHeroTimer = () => {
 		if (heroTimerRef.current != null) {
@@ -78,8 +84,7 @@ const Home = () => {
 	};
 
 	const goHero = (delta: number) => {
-		const dir = delta >= 0 ? 1 : -1;
-		setHeroDir(dir);
+		setHeroDir(delta >= 0 ? 1 : -1);
 		setHeroIndex((prev) => {
 			heroPrevRef.current = prev;
 			const total = HERO_SLIDES.length;
@@ -125,275 +130,242 @@ const Home = () => {
 		};
 	}, [HERO_SLIDES.length]);
 
+	const activeSlide = HERO_SLIDES[heroIndex];
+	const prevNav = CHEVRONS[0]!;
+	const nextNav = CHEVRONS[1]!;
+	const PrevIcon = prevNav.icon;
+	const NextIcon = nextNav.icon;
+
 	return (
-		<div className="relative h-full min-h-0 w-full overflow-hidden rounded-b-md">
+		<div
+			ref={rootRef}
+			className="relative h-full min-h-0 w-full overflow-hidden rounded-b-md"
+		>
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
-					{/* 首屏：单一「欢迎」容器，内含标题区 + 三大入口，占满 Outlet 可视高度 */}
-					<section className="mx-auto w-full px-5.5">
-						<motion.div
-							initial={{ opacity: 0, y: 20 }}
-							animate={{ opacity: 1, y: 0 }}
-							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md"
-						>
-							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 overflow-hidden border-b border-theme/3 bg-theme-background/80 pb-4.5 pt-4 md:px-6 md:pt-6">
-								{/* 右上角大号水印序号：随轮播切换，不挡左右箭头 */}
-								<div
-									className="pointer-events-none absolute right-5 -top-4 z-0 select-none font-extrabold leading-none tracking-tighter"
-									style={{ fontFamily: '"Syne", sans-serif' }}
-									aria-hidden
-								>
-									<span className="inline-flex text-[8rem]">
-										<span className="text-theme/5">{heroNumber[0]}</span>
-										<span className="text-theme/5">{heroNumber[1]}</span>
+					{/* 首屏重做：顶栏品牌条 → 全宽焦点轮播 → 底栏入口 单主视觉，避免左右分栏互相抢戏*/}
+					<section
+						className="box-border flex w-full flex-col px-5.5 pb-5.5"
+						style={
+							stageH != null
+								? { height: stageH, minHeight: stageH }
+								: { minHeight: '100%' }
+						}
+					>
+						<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
+							{/* 氛围：克制青绿光晕 */}
+							<div
+								className="pointer-events-none absolute inset-0"
+								style={{
+									background:
+										'radial-gradient(90% 70% at 70% 30%, color-mix(in oklch, #2dd4bf 10%, transparent), transparent 58%), radial-gradient(70% 55% at 10% 85%, color-mix(in oklch, #22d3ee 7%, transparent), transparent 52%)',
+								}}
+								aria-hidden
+							/>
+
+							{/* 顶栏 */}
+							<header className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-4 px-8">
+								<div className="flex items-center min-w-0 gap-3">
+									<span className="text-2xl font-black  bg-linear-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
+										dnhyxc ai
+									</span>
+									<span className="hidden truncate text-sm text-textcolor/50 md:inline">
+										{t('home.stage.headline')}
 									</span>
 								</div>
+								<span className="hidden shrink-0 items-center gap-2 text-xs tracking-wide text-textcolor/35 sm:inline-flex">
+									<span className="relative flex size-1.5">
+										<span className="absolute inline-flex size-full animate-ping rounded-full bg-teal-400/50" />
+										<span className="relative size-1.5 rounded-full bg-teal-500" />
+									</span>
+									{t('home.stage.status')}
+								</span>
+							</header>
 
-								<div className="relative z-10 mb-1 flex flex-col gap-3">
-									{/* Row 1：品牌徽標（左） + 控制按鈕（右） —— 左右邊界對齊 */}
-									<div className="mb-2.5 flex items-center justify-between">
-										<motion.div
-											initial={{ opacity: 0, x: -12 }}
-											animate={{ opacity: 1, x: 0 }}
-											transition={{ delay: 0.08, duration: 0.4 }}
-											className="inline-flex h-10 items-center gap-2.5 rounded-md border border-teal-500/10 bg-teal-500/15 px-4 backdrop-blur-sm"
-										>
-											<Sparkles
-												className="h-4.5 w-4.5 text-teal-500"
-												aria-hidden
-											/>
-											<span
-												className="text-sm font-bold uppercase tracking-[0.16em] text-teal-300/90 sm:text-[15px]"
-												style={{ fontFamily: '"Syne", sans-serif' }}
+							{/* 焦点轮播：仅此区域悬停暂停自动播放 */}
+							<div
+								className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-7 py-8 md:px-12 md:py-10 lg:px-16"
+								onMouseEnter={() => {
+									heroHoverRef.current = true;
+								}}
+								onMouseLeave={() => {
+									heroHoverRef.current = false;
+								}}
+							>
+								<div className="relative mx-auto grid w-full max-w-3xl overflow-hidden">
+									{HERO_SLIDES.map((s, i) => {
+										const isActive = i === heroIndex;
+										const x = isActive
+											? 0
+											: i === heroPrevRef.current
+												? -36 * heroDir
+												: 36 * heroDir;
+										const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
+										return (
+											<motion.div
+												key={s.id}
+												initial={false}
+												animate={{
+													opacity: isActive ? 1 : 0,
+													x,
+													filter: isActive ? 'blur(0px)' : 'blur(6px)',
+												}}
+												transition={{ duration: 0.45, ease: EASE }}
+												className={cn(
+													'col-start-1 row-start-1 flex min-w-0 flex-col will-change-transform',
+													isActive
+														? 'pointer-events-auto z-10'
+														: 'pointer-events-none z-0',
+												)}
 											>
-												dnhyxc-ai
-											</span>
-										</motion.div>
+												<p className="mb-3 text-sm tracking-[0.18em] text-textcolor/40">
+													<span className="tabular-nums">{s.number}</span>
+													<span className="mx-2 text-textcolor/40">·</span>
+													{s.badge}
+												</p>
 
-										<div className="relative z-10 flex items-center gap-1.5">
-											{CHEVRONS.map((i) => {
-												return (
-													<Button
-														key={i.ariaLabel}
-														onClick={i.onClick}
-														aria-label={i.ariaLabel}
-														className="flex h-10 w-10 items-center justify-center rounded-md border border-teal-500/10 bg-teal-500/15 text-teal-300/80 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-teal-400/10 hover:bg-teal-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none"
-														style={{ touchAction: 'manipulation' }}
+												<h2 className="min-w-0 text-[clamp(1.4rem,2.8vw,2.25rem)] font-bold leading-snug tracking-tight text-textcolor">
+													<span
+														className={cn(
+															'bg-linear-to-r bg-clip-text text-transparent',
+															hue.icon,
+														)}
 													>
-														<i.icon
-															className="h-4 w-4"
-															strokeWidth={2.2}
-															aria-hidden
+														{s.titleMain}
+													</span>
+													<span className="mx-2 font-light text-textcolor/25">
+														·
+													</span>
+													<span className="font-semibold text-textcolor/90">
+														{s.titleAccent}
+													</span>
+												</h2>
+
+												<p className="mt-4 max-w-2xl text-pretty text-sm leading-7 text-textcolor/52 md:text-[0.95rem] md:leading-7">
+													{s.subtitle}
+												</p>
+
+												<div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+													{s.cta.map((c, ci) => (
+														<button
+															key={`${s.id}-cta-${ci}`}
+															type="button"
+															onClick={c.onClick}
+															className={cn(
+																'inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40',
+																c.primary
+																	? 'font-semibold text-teal-500 hover:text-teal-400'
+																	: 'font-medium text-textcolor/50 hover:text-teal-400',
+															)}
+															style={{ touchAction: 'manipulation' }}
+														>
+															{c.label}
+															<ArrowRight className="size-3.5" aria-hidden />
+														</button>
+													))}
+												</div>
+											</motion.div>
+										);
+									})}
+								</div>
+
+								{/* 控制条 */}
+								<div className="mx-auto mt-10 flex w-full max-w-3xl items-center justify-between gap-4 md:mt-12">
+									<p className="hidden text-xs text-textcolor/35 md:block md:max-w-xs">
+										{t('home.stage.services')}
+									</p>
+									<div className="flex items-center gap-3">
+										<button
+											type="button"
+											aria-label={prevNav.ariaLabel}
+											onClick={prevNav.onClick}
+											className="flex size-8 cursor-pointer items-center justify-center rounded-lg hover:border text-textcolor/30 transition-colors hover:border-teal-500/30 hover:bg-teal-500/15 hover:text-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
+											style={{ touchAction: 'manipulation' }}
+										>
+											<PrevIcon className="size-4" strokeWidth={2} />
+										</button>
+										<div className="flex items-center gap-1.5">
+											{HERO_SLIDES.map((_it, idx) => {
+												const active = idx === heroIndex;
+												return (
+													<button
+														key={`pg-${idx}`}
+														type="button"
+														aria-label={`切换到第 ${idx + 1} 张`}
+														onClick={() => setHero(idx)}
+														className="relative h-1.5 cursor-pointer rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40"
+														style={{
+															width: active ? 24 : 7,
+															touchAction: 'manipulation',
+														}}
+													>
+														<span
+															className={cn(
+																'absolute inset-0 rounded-full transition-colors',
+																active
+																	? 'bg-linear-to-r from-teal-400 to-cyan-400'
+																	: 'bg-textcolor/15 hover:bg-textcolor/25',
+															)}
 														/>
-													</Button>
+													</button>
 												);
 											})}
 										</div>
-									</div>
-
-									{/* Row 2：轮播图 —— 固定高度 + 4 行 grid + 左 rail，所有元素 y 坐标不变 */}
-									<div
-										className="relative"
-										onMouseEnter={() => {
-											heroHoverRef.current = true;
-										}}
-										onMouseLeave={() => {
-											heroHoverRef.current = false;
-										}}
-									>
-										<div className="relative h-47 w-full">
-											{HERO_SLIDES.map((s, i) => {
-												const Icon = s.icon;
-												const isActive = i === heroIndex;
-												// 前进：旧片向左退、新片自右侧入；环绕末→首同向
-												const x = isActive
-													? 0
-													: i === heroPrevRef.current
-														? -44 * heroDir
-														: 44 * heroDir;
-												const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
-												return (
-													<motion.div
-														key={`slide-${s.id}`}
-														initial={false}
-														animate={{
-															opacity: isActive ? 1 : 0,
-															x,
-														}}
-														transition={{
-															duration: 0.5,
-															ease: [0.22, 1, 0.36, 1],
-														}}
-														className={`absolute inset-0 ${
-															isActive
-																? 'pointer-events-auto'
-																: 'pointer-events-none'
-														}`}
-													>
-														{/* 3 行弹性布局：顶部图标+标题 / 中部描述占满 / 底部 CTA+计数 */}
-														<div className="flex h-full flex-col">
-															{/* Row 1：图标 + 标题 —— 顶部对齐，标题铺满剩余宽度 */}
-															<div className="flex shrink-0 items-center gap-3">
-																<div
-																	className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-linear-to-br ${hue.icon}`}
-																>
-																	<Icon
-																		className="h-6 w-6 text-white"
-																		aria-hidden
-																	/>
-																</div>
-																<div
-																	className={`flex items-center gap-1 mt-1 bg-linear-to-br ${hue.icon} bg-clip-text text-transparent min-w-0 flex-1 text-balance font-extrabold leading-13.5 tracking-tight sm:text-[2.1rem] md:text-[2.35rem] lg:text-[2.5rem]`}
-																>
-																	{s.titleMain}
-																	<span className="font-bold mx-2 -mt-1">
-																		-
-																	</span>
-																	{s.titleAccent}
-																</div>
-															</div>
-
-															{/* Row 2：描述 —— flex-1 占满中部空间，2 行截断 */}
-															<div className="flex min-h-0 flex-1 items-center py-1.5">
-																<p className="min-w-0 text-pretty text-lg font-medium leading-7 text-textcolor/60">
-																	{s.subtitle}
-																</p>
-															</div>
-
-															{/* Row 3：CTA 按钮（左） + 短横杠指示器（中） + 序号计数（右） —— 底部对齐，铺满宽度 */}
-															<div className="relative flex shrink-0 items-center justify-between gap-3">
-																<div className="flex items-center gap-2.5">
-																	{s.cta.map((c, ci) => (
-																		<button
-																			key={`${s.id}-cta-${ci}`}
-																			type="button"
-																			onClick={c.onClick}
-																			className={cn(
-																				'pb-0.5 flex h-10 cursor-pointer items-center justify-center gap-1.5 hover:shadow-md px-5 text-sm rounded-md transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:outline-none hover:scale-[1.03] active:scale-[0.98]',
-																				c.primary
-																					? `${hue.btn} relative bg-linear-to-br font-semibold text-white overflow-hidden`
-																					: `${hue.btn} bg-linear-to-br font-medium text-white`,
-																			)}
-																			style={{
-																				touchAction: 'manipulation',
-																			}}
-																		>
-																			{c.label}
-																			<SquareArrowOutUpRight
-																				className="h-4 w-4 mt-0.5"
-																				aria-hidden
-																			/>
-																		</button>
-																	))}
-																</div>
-																<div className="absolute right-0 -bottom-1 flex items-center gap-1.5">
-																	{HERO_SLIDES.map((_it, idx) => {
-																		const active = idx === heroIndex;
-																		return (
-																			<button
-																				key={`pg-${s.id}-${idx}`}
-																				type="button"
-																				aria-label={`切换到第 ${idx + 1} 张`}
-																				onClick={() => setHero(idx)}
-																				className="group relative h-2 rounded-full cursor-pointer transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40"
-																				style={{
-																					width: active ? 20 : 8,
-																					touchAction: 'manipulation',
-																				}}
-																			>
-																				<span
-																					className={`absolute inset-0 rounded-full transition-colors duration-300 ${
-																						active
-																							? 'bg-linear-to-r from-teal-400/50 to-cyan-400/40'
-																							: 'bg-theme-white/10 group-hover:bg-theme-white/20'
-																					}`}
-																				/>
-																			</button>
-																		);
-																	})}
-																	<span
-																		className="inline-flex h-7 shrink-0 items-center whitespace-nowrap pl-1 text-xs font-medium text-textcolor/35"
-																		style={{
-																			fontFamily: '"Syne", sans-serif',
-																			fontVariantNumeric: 'tabular-nums',
-																		}}
-																	>
-																		{s.number} /{' '}
-																		{HERO_SLIDES.length
-																			.toString()
-																			.padStart(2, '0')}
-																	</span>
-																</div>
-															</div>
-														</div>
-													</motion.div>
-												);
-											})}
-										</div>
+										<button
+											type="button"
+											aria-label={nextNav.ariaLabel}
+											onClick={nextNav.onClick}
+											className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-textcolor/30 transition-colors hover:border hover:border-teal-500/30 hover:bg-teal-500/15 hover:text-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
+											style={{ touchAction: 'manipulation' }}
+										>
+											<NextIcon className="size-4" strokeWidth={2} />
+										</button>
+										<span className="ml-1 font-mono text-xs tabular-nums tracking-wider text-textcolor/30">
+											{activeSlide?.number ?? '01'}
+											<span className="mx-1 text-textcolor/15">/</span>
+											{HERO_SLIDES.length.toString().padStart(2, '0')}
+										</span>
 									</div>
 								</div>
-							</header>
-							{/* 三大入口：与欢迎同属一块，纵向吃满剩余高度 */}
-							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 p-3 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme/2 md:p-0">
-								{FEATURES.map((feature, tileIndex) => (
-									<motion.div
-										key={feature.title}
-										role="button"
-										tabIndex={0}
-										initial={{ opacity: 0, y: 24 }}
-										animate={{ opacity: 1, y: 0 }}
-										transition={{
-											delay: 0.28 + tileIndex * 0.08,
-											duration: 0.45,
-											ease: [0.22, 1, 0.36, 1],
-										}}
-										// whileHover={{ y: -3 }}
-										whileTap={{ scale: 0.99 }}
-										onClick={feature.onClick}
-										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-background/80 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
-									>
-										<div
-											className={`pointer-events-none absolute right-5 -top-1 text-[5.5rem] font-extrabold leading-none text-theme/5 transition-colors duration-300`}
-											style={{ fontFamily: '"Syne", sans-serif' }}
-											aria-hidden
-										>
-											{feature.index}
-										</div>
-
-										<div
-											className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} group-hover:shadow-md ${feature.glow} sm:h-14 sm:w-14`}
-										>
-											<feature.icon
-												className="h-6 w-6 text-white"
-												strokeWidth={2}
-											/>
-										</div>
-
-										<h2 className="relative text-lg font-bold text-theme-white sm:text-xl">
-											{feature.title}
-										</h2>
-										<p className="relative mt-2 text-xs font-medium text-textcolor/45 sm:text-sm">
-											{feature.subtitle}
-										</p>
-										<p className="relative mt-4 my-1 min-h-0 flex-1 text-sm leading-relaxed text-textcolor/65 line-clamp-4 sm:line-clamp-5">
-											{feature.desc}
-										</p>
-
-										<div className="relative mt-4 flex items-center justify-between gap-2 border-t border-dashed border-theme/5 pt-4 text-sm font-semibold text-teal-500/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-500">
-											<span>{t('home.features.enter')}</span>
-											<SquareArrowOutUpRight className="h-4 w-4" />
-										</div>
-									</motion.div>
-								))}
 							</div>
-						</motion.div>
+
+							{/* 底栏入口 */}
+							<nav
+								aria-label={t('home.sections.showcase')}
+								className="relative z-10 h-16 shrink-0 backdrop-blur-md"
+							>
+								<div className="grid h-full grid-cols-3">
+									{FEATURES.map((feature, i) => (
+										<button
+											key={feature.title}
+											type="button"
+											onClick={feature.onClick}
+											className={cn(
+												'group flex h-full cursor-pointer items-center justify-center gap-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35 px-8',
+												i === 0 && 'justify-start text-left',
+												i === 1 && 'justify-end text-center pr-5',
+												i === 2 && 'justify-end text-right',
+											)}
+										>
+											<span className="text-sm font-semibold tracking-normal text-textcolor transition-colors group-hover:text-teal-500">
+												{feature.title}
+											</span>
+											<span className="truncate text-sm text-textcolor/40">
+												{feature.subtitle}
+											</span>
+										</button>
+									))}
+								</div>
+							</nav>
+						</div>
 					</section>
 
-					{/* 下方内容在 ScrollArea 内滚动 */}
-					<div className="relative mx-auto w-full space-y-5.5 px-5.5 py-5.5">
-						<div className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl">
+					{/* 下方内容 */}
+					<div className="relative mx-auto w-full space-y-5.5 px-5.5 pb-5.5">
+						<div
+							id="home-showcase"
+							className="relative scroll-mt-4 overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
+						>
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -474,15 +446,15 @@ const Home = () => {
 												{item.step}
 											</span>
 										</div>
-										<div className="min-w-0 flex-1 h-14 flex flex-col justify-between">
+										<div className="flex h-14 min-w-0 flex-1 flex-col justify-between">
 											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>
 										</div>
 										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
-											whileHover={{ x: 4 }}
+											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 transition-all duration-300 ease-out group-hover:bg-teal-500/10"
+											whileHover={{ x: 5 }}
 										>
 											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
 										</motion.div>
@@ -521,15 +493,15 @@ const Home = () => {
 												{item.index}
 											</span>
 										</div>
-										<div className="min-w-0 flex-1 h-14 flex flex-col justify-between">
+										<div className="flex h-14 min-w-0 flex-1 flex-col justify-between">
 											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
 												{item.title}
 											</h4>
 											<p className="text-sm text-textcolor/50">{item.desc}</p>
 										</div>
 										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 group-hover:bg-teal-500/10 transition-all duration-300 ease-out"
-											whileHover={{ x: 4 }}
+											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 transition-all duration-300 ease-out group-hover:bg-teal-500/10"
+											whileHover={{ x: 5 }}
 										>
 											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
 										</motion.div>

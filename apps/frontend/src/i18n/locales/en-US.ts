@@ -787,28 +787,41 @@ export const enUS = {
 
 	// 首页文案
 	'home.hero.welcome': 'Welcome',
-	'home.hero.product': 'Smart Assistant',
+	'home.hero.product': 'Smart Workspace',
 	'home.hero.subtitle':
-		'A unified AI workspace for chat, Markdown notes, and English learning. Turn conversations into lasting knowledge—all in one app.',
+		'One desktop app for AI chat, knowledge notes, bookshelf, English learning, and plugins. Stream answers into notes, read and practice side by side—ask, save, and learn in one place.',
 	'home.hero.quickStart': 'Get started',
 	'home.hero.learnMore': 'Learn more',
 	'home.hero.downloadDesktop': 'Download desktop app',
 	'home.hero.knowledge.title': 'Knowledge',
 	'home.hero.knowledge.subtitle': 'Markdown Notes',
 	'home.hero.knowledge.desc':
-		'WYSIWYG Markdown editor with import, dual-preview, auto-save, and trash recovery. Capture inspiration, organize knowledge, and build your personal wiki.',
+		'WYSIWYG Markdown with dual-pane preview, local import/export, auto-save drafts, and trash recovery. Organize by category and tags, search instantly, and turn ideas into reusable knowledge.',
 	'home.hero.ebook.title': 'Bookshelf',
 	'home.hero.ebook.subtitle': 'E-book Reader',
 	'home.hero.ebook.desc':
-		'Import EPUBs with TOC navigation, full-text search, progress tracking, and bookmarks—all on your digital bookshelf for immersive reading.',
+		'Import EPUBs with TOC jump, full-text search, reading progress, and bookmarks. Adjust font and theme, resume anytime, and keep a searchable personal library on your digital shelf.',
 	'home.hero.english.title': 'English Learning',
 	'home.hero.english.subtitle': 'Vocabulary & Quotes',
 	'home.hero.english.desc':
-		'Daily words, quotes, mistakes, and favorites—build vocabulary from every angle. Spaced repetition keeps learning efficient and rewarding.',
+		'Daily words and classic sentences, plus a mistake book and favorites. Spaced-repetition reviews keep progress clear—from practice to mastery in one learning loop.',
 	'home.hero.plugins.title': 'Plugins',
 	'home.hero.plugins.subtitle': 'Extensible',
 	'home.hero.plugins.desc':
-		'Install community plugins or build your own with the dev guide. Customize your workflow in an open ecosystem.',
+		'Install community plugins or build your own with the developer guide. Toggle on demand with permission control, and wire chat, knowledge, and tools into your workflow.',
+	'home.stage.users': 'Curated modules',
+	'home.stage.services':
+		'Chat, notes, reading, and learning—core features one screen away.',
+	'home.stage.servicesLink': 'Highlights',
+	'home.stage.headline': 'Ask · Note · Learn',
+	'home.stage.status': 'Desktop AI workspace',
+	'home.stage.stat.modules': 'Modules',
+	'home.stage.stat.entries': 'Shortcuts',
+	'home.stage.stat.local': 'On-device first',
+	'home.stage.stat.localValue': '100%',
+	'home.stage.metricLabel': 'Capability map',
+	'home.stage.metricHint': 'Core workspace scenarios',
+	'home.stage.statsLink': 'Learn more',
 	'home.features.enter': 'Enter',
 	'home.sections.showcase': 'Highlights',
 	'home.sections.steps': 'Quick start',
