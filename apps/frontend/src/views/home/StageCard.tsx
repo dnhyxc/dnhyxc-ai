@@ -232,8 +232,16 @@ export function StageCard({
 						x: glowX,
 						y: glowY,
 						scale: 1.08,
-						background:
-							'radial-gradient(90% 70% at 70% 30%, color-mix(in oklch, #2dd4bf 10%, transparent), transparent 58%), radial-gradient(70% 55% at 10% 85%, color-mix(in oklch, #22d3ee 7%, transparent), transparent 52%)',
+						background: [
+							// 左上：强调色小光晕（弱于左下，略放大）
+							'radial-gradient(55% 70% at 9% 10%, color-mix(in oklch, #2dd4bf 5%, transparent), transparent 55%)',
+							// 右上氛围
+							'radial-gradient(90% 70% at 70% 30%, color-mix(in oklch, #2dd4bf 10%, transparent), transparent 58%)',
+							// 左下氛围
+							'radial-gradient(70% 55% at 10% 85%, color-mix(in oklch, #22d3ee 7%, transparent), transparent 52%)',
+							// 右下：与左上同规格光晕
+							'radial-gradient(55% 70% at 91% 90%, color-mix(in oklch, #2dd4bf 5%, transparent), transparent 55%)',
+						].join(', '),
 					}}
 					aria-hidden
 				/>
@@ -244,7 +252,7 @@ export function StageCard({
 			) : (
 				<motion.header
 					style={{ x: midX, y: midY }}
-					className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-4 px-8"
+					className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-4 px-5.5"
 				>
 					<div className="flex min-w-0 items-center gap-3">
 						{brand != null &&
@@ -301,7 +309,7 @@ export function StageCard({
 					aria-hidden
 				>
 					<span
-						className="select-none font-black tracking-tight leading-none text-[clamp(7rem,18.78vw,18rem)]"
+						className="pr-1.5 select-none font-black tracking-tight leading-none text-[clamp(7rem,19.2vw,18rem)]"
 						style={{
 							background:
 								'linear-gradient(135deg, var(--brand-accent-light) 0%, var(--brand-accent) 50%, var(--brand-accent-light) 100%)',
@@ -313,7 +321,7 @@ export function StageCard({
 							filter:
 								'drop-shadow(0 0 30px color-mix(in oklch, var(--brand-accent) 15%, transparent))',
 							transformOrigin: 'bottom center',
-							transform: 'translateY(13%) scaleY(0.72)',
+							transform: 'scaleY(0.72)',
 							maskImage: 'linear-gradient(to top, black 0%, transparent 90%)',
 							WebkitMaskImage:
 								'linear-gradient(to top, black 0%, transparent 90%)',
@@ -342,7 +350,7 @@ export function StageCard({
 								type="button"
 								onClick={feature.onClick}
 								className={cn(
-									'group flex h-full cursor-pointer items-center justify-center gap-2 px-8 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35',
+									'group flex h-full cursor-pointer items-center justify-center gap-2 px-5.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35',
 									i === 0 && 'justify-start text-left',
 									i > 0 && i < entryCount - 1 && 'justify-center text-center',
 									i === entryCount - 1 &&

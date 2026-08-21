@@ -3,19 +3,24 @@
  */
 import type { LucideIcon } from 'lucide-react';
 import {
+	BookOpen,
 	ChevronLeft,
 	ChevronRight,
 	Code2,
+	Download,
+	Earth,
+	Feather,
 	FileText,
 	Flower,
 	Globe,
+	LayoutDashboard,
 	LibraryBig,
 	MessageSquare,
+	Monitor,
 	NotebookTabs,
 	Puzzle,
-	Rocket,
-	Shield,
 	Sparkles,
+	UserPlus,
 	Vegan,
 	Zap,
 } from 'lucide-react';
@@ -64,6 +69,34 @@ export const HUE_STYLES: Record<
 	},
 };
 
+/**
+ * 下方三个模块复用首屏 HUE_STYLES 色系：为 hover 阴影 / 光晕提供对应色 Tailwind 类。
+ * 必须是静态字符串以保证 Tailwind JIT 采集。
+ */
+export const HUE_HOVER_SHADOW: Record<string, string> = {
+	teal: 'hover:shadow-teal-500/20',
+	emerald: 'hover:shadow-emerald-500/20',
+	amber: 'hover:shadow-amber-500/20',
+	rose: 'hover:shadow-rose-500/20',
+	violet: 'hover:shadow-violet-500/20',
+};
+
+export const HUE_HOVER_GLOW: Record<string, string> = {
+	teal: 'hover:ring-1 hover:ring-teal-500/30',
+	emerald: 'hover:ring-1 hover:ring-emerald-500/30',
+	amber: 'hover:ring-1 hover:ring-amber-500/30',
+	rose: 'hover:ring-1 hover:ring-rose-500/30',
+	violet: 'hover:ring-1 hover:ring-violet-500/30',
+};
+
+export const HUE_TEXT_GRADIENT: Record<string, string> = {
+	teal: 'from-teal-400 to-cyan-400',
+	emerald: 'from-emerald-400 to-teal-400',
+	amber: 'from-amber-400 to-orange-400',
+	rose: 'from-rose-400 to-amber-400',
+	violet: 'from-violet-400 to-purple-400',
+};
+
 export function createShowcase(t: TFn) {
 	return [
 		{
@@ -71,30 +104,33 @@ export function createShowcase(t: TFn) {
 			title: t('home.showcase.plugin.title'),
 			desc: t('home.showcase.plugin.desc'),
 			color: 'from-violet-400 to-purple-500',
+			/* 复用首屏 HUE_STYLES 色系：图标渐变 / hover 光晕 / 文字色 */
+			hue: 'violet',
+			navigatePlugins: true,
 		},
 		{
-			icon: Rocket,
+			icon: Zap,
 			title: t('home.showcase.fast.title'),
 			desc: t('home.showcase.fast.desc'),
 			color: 'from-sky-400 to-cyan-400',
-		},
-		{
-			icon: Shield,
-			title: t('home.showcase.privacy.title'),
-			desc: t('home.showcase.privacy.desc'),
-			color: 'from-orange-400 to-yellow-400',
+			hue: 'teal',
+			navigateChat: true,
 		},
 		{
 			icon: Globe,
 			title: t('home.showcase.i18n.title'),
 			desc: t('home.showcase.i18n.desc'),
 			color: 'from-green-400 to-cyan-400',
+			hue: 'emerald',
+			navigateEnglish: true,
 		},
 		{
-			icon: Zap,
+			icon: Feather,
 			title: t('home.showcase.lightweight.title'),
 			desc: t('home.showcase.lightweight.desc'),
 			color: 'from-green-400 to-emerald-400',
+			hue: 'rose',
+			navigateAbout: true,
 		},
 	];
 }
@@ -105,9 +141,11 @@ export function createSteps(t: TFn) {
 			step: '1',
 			title: t('home.steps.install.title'),
 			desc: t('home.steps.install.desc'),
-			icon: Rocket,
+			icon: Download,
 			/* 固定原版 teal hex，不跟随全局主题色 */
 			color: 'from-[#14b8a6] to-cyan-600',
+			/* 复用首屏 HUE_STYLES 色系：图标渐变 / hover 光晕 / 文字色 */
+			hue: 'teal',
 			/** 在默认浏览器打开桌面端下载落地页 */
 			downloadDesktop: true,
 		},
@@ -115,8 +153,9 @@ export function createSteps(t: TFn) {
 			step: '2',
 			title: t('home.steps.register.title'),
 			desc: t('home.steps.register.desc'),
-			icon: Shield,
+			icon: UserPlus,
 			color: 'from-cyan-500 to-blue-500',
+			hue: 'emerald',
 			/** 点击后进入登录页「账号注册」视图 */
 			navigateRegister: true,
 		},
@@ -124,8 +163,9 @@ export function createSteps(t: TFn) {
 			step: '3',
 			title: t('home.steps.start.title'),
 			desc: t('home.steps.start.desc'),
-			icon: Zap,
+			icon: Sparkles,
 			color: 'from-orange-500 to-amber-500',
+			hue: 'amber',
 			/** 点击后进入智能对话 */
 			navigateChat: true,
 		},
@@ -135,6 +175,7 @@ export function createSteps(t: TFn) {
 			desc: t('home.steps.pluginDev.desc'),
 			icon: Puzzle,
 			color: 'from-violet-500 to-purple-600',
+			hue: 'violet',
 			/** 在默认浏览器打开插件开发手册 */
 			openPluginDevGuide: true,
 		},
@@ -187,37 +228,42 @@ export function createQuicklinks(t: TFn) {
 	return [
 		{
 			index: '1',
-			icon: Rocket,
+			icon: Monitor,
 			title: t('home.quicklinks.dnhyxc-ai.title'),
 			desc: t('home.quicklinks.dnhyxc-ai.desc'),
 			color: 'from-lime-500 to-emerald-500',
+			/* 复用首屏 HUE_STYLES 色系：图标渐变 / hover 光晕 / 文字色 */
+			hue: 'emerald',
 			downloadDesktop: true,
 			onClick: () => void openExternalUrl('https://dnhyxc.cn:9002'),
 		},
 		{
 			index: '2',
-			icon: Rocket,
+			icon: LayoutDashboard,
 			title: t('home.quicklinks.dnhyxc-ai-admin.title'),
 			desc: t('home.quicklinks.dnhyxc-ai-admin.desc'),
 			color: 'from-lime-400 to-lime-600',
+			hue: 'teal',
 			downloadDesktop: true,
 			onClick: () => void openExternalUrl('https://dnhyxc.cn:9005'),
 		},
 		{
 			index: '3',
-			icon: Code2,
+			icon: BookOpen,
 			title: t('home.quicklinks.blog.title'),
 			desc: t('home.quicklinks.blog.desc'),
 			color: 'from-indigo-300 to-blue-400',
+			hue: 'violet',
 			downloadDesktop: true,
 			onClick: () => void openExternalUrl('https://dnhyxc.cn'),
 		},
 		{
 			index: '4',
-			icon: Code2,
+			icon: Earth,
 			title: t('home.quicklinks.github.title'),
 			desc: t('home.quicklinks.github.desc'),
 			color: 'from-red-300 to-rose-400',
+			hue: 'rose',
 			downloadDesktop: true,
 			onClick: () => void openExternalUrl('https://github.com/dnhyxc'),
 		},

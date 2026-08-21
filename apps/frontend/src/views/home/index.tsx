@@ -1,6 +1,5 @@
 import { ScrollArea } from '@ui/scroll-area';
-import { motion } from 'framer-motion';
-import { ArrowRight, SquareArrowOutUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { FocusCarousel } from '@/components/design/FocusCarousel';
@@ -17,6 +16,7 @@ import {
 	createSteps,
 	HUE_STYLES,
 } from './content';
+import { type HueKey, type ItemCardProps, SectionCards } from './SectionCards';
 import { StageCard } from './StageCard';
 
 const Home = () => {
@@ -64,7 +64,6 @@ const Home = () => {
 				navigate,
 				onQuickStart,
 			}),
-		// ponytail: 与原先一致，故意不把 navigate / onQuickStart 列入 deps
 		[t, locale],
 	);
 
@@ -79,6 +78,59 @@ const Home = () => {
 		[FEATURES],
 	);
 
+	const showcaseItems: ItemCardProps[] = useMemo(
+		() =>
+			SHOWCASE.map((feature) => ({
+				itemKey: feature.title,
+				hue: feature.hue as HueKey,
+				icon: feature.icon,
+				title: feature.title,
+				desc: feature.desc,
+				delay: 0,
+			})),
+		[SHOWCASE, t, navigate],
+	);
+
+	const stepItems: ItemCardProps[] = useMemo(
+		() =>
+			STEPS.map((item) => ({
+				itemKey: item.step,
+				hue: item.hue as HueKey,
+				icon: item.icon,
+				title: item.title,
+				desc: item.desc,
+				ctaLabel: t('home.features.enter'),
+				delay: 0,
+				onClick: () => {
+					if (item.downloadDesktop) {
+						void openExternalUrl(getDesktopDownloadAbsoluteUrl(locale));
+					} else if (item.navigateRegister) {
+						navigate('/login?mode=register');
+					} else if (item.navigateChat) {
+						navigate('/chat');
+					} else if (item.openPluginDevGuide) {
+						void openExternalUrl(getPluginDevGuideAbsoluteUrl(locale));
+					}
+				},
+			})),
+		[STEPS, t, locale, navigate],
+	);
+
+	const quicklinkItems: ItemCardProps[] = useMemo(
+		() =>
+			QUICKLINKS.map((item) => ({
+				itemKey: item.index,
+				hue: item.hue as HueKey,
+				icon: item.icon,
+				title: item.title,
+				desc: item.desc,
+				ctaLabel: t('home.hero.learnMore'),
+				delay: 0,
+				onClick: item.onClick,
+			})),
+		[QUICKLINKS, t],
+	);
+
 	return (
 		<div
 			ref={rootRef}
@@ -86,7 +138,7 @@ const Home = () => {
 		>
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
-					{/* 首屏：顶栏品牌条 → 全宽焦点轮播 → 底栏入口 */}
+					{/* 首屏 */}
 					<section
 						className="box-border flex w-full flex-col px-5.5 pb-5.5"
 						style={
@@ -167,153 +219,23 @@ const Home = () => {
 
 					{/* 下方内容 */}
 					<div className="relative mx-auto w-full space-y-5.5 px-5.5 pb-5.5">
-						<div
+						<SectionCards
 							id="home-showcase"
-							className="relative scroll-mt-4 overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
-						>
-							<motion.h3
-								initial={{ opacity: 0, y: 16 }}
-								whileInView={{ opacity: 1, y: 0 }}
-								viewport={{ once: true, margin: '-40px' }}
-								transition={{ duration: 0.35 }}
-								className="mb-6 text-xl font-semibold text-textcolor"
-							>
-								{t('home.sections.showcase')}
-							</motion.h3>
-							<div className="grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
-								{SHOWCASE.map((feature, idx) => (
-									<motion.div
-										key={feature.title}
-										initial={{ opacity: 0, y: 16 }}
-										whileInView={{ opacity: 1, y: 0 }}
-										viewport={{ once: true, margin: '-20px' }}
-										transition={{ delay: idx * 0.05, duration: 0.35 }}
-										whileHover={{ scale: 1.04, y: -2 }}
-										className="group relative cursor-pointer rounded-md border border-transparent bg-theme/10 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:shadow-sm hover:shadow-teal-500/10"
-									>
-										<div
-											className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg group-hover:shadow-xl`}
-										>
-											<feature.icon className="h-6 w-6 text-white" />
-										</div>
-										<h4 className="mb-1 font-semibold text-textcolor transition-colors">
-											{feature.title}
-										</h4>
-										<p className="text-xs text-textcolor/50 transition-colors">
-											{feature.desc}
-										</p>
-									</motion.div>
-								))}
-							</div>
-						</div>
-
-						<motion.div
-							initial={{ opacity: 0, y: 16 }}
-							whileInView={{ opacity: 1, y: 0 }}
-							viewport={{ once: true, margin: '-40px' }}
-							transition={{ duration: 0.4 }}
-							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
-						>
-							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
-							<h3 className="relative z-10 mb-6 text-xl font-semibold text-textcolor">
-								{t('home.sections.steps')}
-							</h3>
-							<div className="space-y-4">
-								{STEPS.map((item, idx) => (
-									<motion.div
-										key={item.step}
-										initial={{ opacity: 0, x: -12 }}
-										whileInView={{ opacity: 1, x: 0 }}
-										viewport={{ once: true }}
-										transition={{ delay: idx * 0.06, duration: 0.35 }}
-										whileHover={{ scale: 1.01 }}
-										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme/10 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme/5 hover:shadow-sm hover:shadow-teal-500/10"
-										onClick={() => {
-											if (item.downloadDesktop) {
-												void openExternalUrl(
-													getDesktopDownloadAbsoluteUrl(locale),
-												);
-											} else if (item.navigateRegister) {
-												navigate('/login?mode=register');
-											} else if (item.navigateChat) {
-												navigate('/chat');
-											} else if (item.openPluginDevGuide) {
-												void openExternalUrl(
-													getPluginDevGuideAbsoluteUrl(locale),
-												);
-											}
-										}}
-									>
-										<div
-											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
-										>
-											<span className="text-2xl font-bold text-white">
-												{item.step}
-											</span>
-										</div>
-										<div className="flex h-14 min-w-0 flex-1 flex-col justify-between">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
-												{item.title}
-											</h4>
-											<p className="text-sm text-textcolor/50">{item.desc}</p>
-										</div>
-										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 transition-all duration-300 ease-out group-hover:bg-teal-500/10"
-											whileHover={{ x: 5 }}
-										>
-											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
-										</motion.div>
-									</motion.div>
-								))}
-							</div>
-						</motion.div>
-
-						<motion.div
-							initial={{ opacity: 0, y: 16 }}
-							whileInView={{ opacity: 1, y: 0 }}
-							viewport={{ once: true, margin: '-40px' }}
-							transition={{ duration: 0.4 }}
-							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
-						>
-							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
-							<h3 className="relative z-10 mb-6 text-xl font-semibold text-textcolor">
-								{t('home.sections.quicklinks')}
-							</h3>
-							<div className="space-y-4">
-								{QUICKLINKS.map((item, idx) => (
-									<motion.div
-										key={item.index}
-										initial={{ opacity: 0, x: -12 }}
-										whileInView={{ opacity: 1, x: 0 }}
-										viewport={{ once: true }}
-										transition={{ delay: idx * 0.06, duration: 0.35 }}
-										whileHover={{ scale: 1.01 }}
-										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme/10 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme/5 hover:shadow-sm hover:shadow-teal-500/10"
-										onClick={item.onClick}
-									>
-										<div
-											className={`mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-md group-hover:shadow-lg md:mr-5`}
-										>
-											<span className="text-2xl font-bold text-white">
-												{item.index}
-											</span>
-										</div>
-										<div className="flex h-14 min-w-0 flex-1 flex-col justify-between">
-											<h4 className="mb-1 font-semibold text-textcolor transition-colors">
-												{item.title}
-											</h4>
-											<p className="text-sm text-textcolor/50">{item.desc}</p>
-										</div>
-										<motion.div
-											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme/10 transition-all duration-300 ease-out group-hover:bg-teal-500/10"
-											whileHover={{ x: 5 }}
-										>
-											<SquareArrowOutUpRight className="h-4 w-4 text-textcolor/50 group-hover:text-teal-500" />
-										</motion.div>
-									</motion.div>
-								))}
-							</div>
-						</motion.div>
+							title={t('home.sections.showcase')}
+							items={showcaseItems}
+							delayStep={0.05}
+							status={t('home.sections.showcaseStatus')}
+						/>
+						<SectionCards
+							title={t('home.sections.steps')}
+							items={stepItems}
+							status={t('home.sections.stepsStatus')}
+						/>
+						<SectionCards
+							title={t('home.sections.quicklinks')}
+							items={quicklinkItems}
+							status={t('home.sections.quicklinksStatus')}
+						/>
 					</div>
 				</div>
 			</ScrollArea>

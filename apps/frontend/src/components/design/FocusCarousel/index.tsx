@@ -261,7 +261,7 @@ const FocusCarouselBase = forwardRef<
 		const dy = end.clientY - start.y;
 		if (Math.abs(dx) < swipeThreshold) return;
 		if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
-		go(dx > 0 ? -1 : 1);
+		go(dx > 0 ? 1 : -1);
 	};
 
 	const onWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
@@ -276,8 +276,8 @@ const FocusCarouselBase = forwardRef<
 			wheelLockRef.current = false;
 			wheelTimerRef.current = null;
 		}, wheelCooldownMs);
-		// 与触屏一致：水平正向 → 上一张
-		go(dx > 0 ? -1 : 1);
+		// 与触屏一致：水平正向 → 下一张
+		go(dx > 0 ? 1 : -1);
 	};
 
 	const activeSlide = slides[index];
