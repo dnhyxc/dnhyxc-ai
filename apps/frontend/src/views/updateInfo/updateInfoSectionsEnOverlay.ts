@@ -636,6 +636,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixed an issue in pages that show many cards with switches and adjacent labels (e.g. Plugin Center): clicking the label text next to a switch could accidentally toggle the very first card’s switch instead of the one next to the label—turning on the wrong plugin or turning off one you expected to stay on. Now each card’s label text is correctly paired with its own switch, and every switch on the same screen gets a stable, unique identity, even when there are dozens of switches in a list.',
 	},
+	's10-5': {
+		title: 'Home hero stage card & focus carousel refactor',
+		description:
+			'The home first screen is split from a single inline block into two reusable components: a Stage Card (shell) and a Focus Carousel (content). The shell manages the top brand bar, the near-scene main content area, the bottom watermark, and the bottom entry bar. Moving the mouse into the card tilts it slightly toward the cursor (3D rotation) while the top bar, bottom bar, near-scene, and watermark shift by different amounts in the opposite direction, creating layered parallax. Tilt is throttled via requestAnimationFrame and respects the system “reduce motion” preference and IntersectionObserver visibility checks—no wasted computation when off-screen or when reduced motion is on. The carousel adds touch swipe and horizontal trackpad/wheel navigation; existing auto-play, dot navigation, arrows, counter, and bottom entries are unchanged. The showcase grid, step list, and quick links below the first screen are untouched.',
+	},
 	's11-1': {
 		title: 'No second full-audio transcription after stop',
 		description:

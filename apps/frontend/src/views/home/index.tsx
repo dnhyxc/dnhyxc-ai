@@ -3,13 +3,13 @@ import { motion } from 'framer-motion';
 import { ArrowRight, SquareArrowOutUpRight } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { FocusCarousel } from '@/components/design/FocusCarousel';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen, openExternalUrl } from '@/utils';
 import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
 import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
 import {
-	createChevrons,
 	createFeatures,
 	createHeroSlides,
 	createQuicklinks,
@@ -17,9 +17,7 @@ import {
 	createSteps,
 	HUE_STYLES,
 } from './content';
-
-const EASE = [0.22, 1, 0.36, 1] as const;
-const HERO_AUTOPLAY_MS = 5200;
+import { StageCard } from './StageCard';
 
 const Home = () => {
 	const navigate = useNavigate();
@@ -70,71 +68,16 @@ const Home = () => {
 		[t, locale],
 	);
 
-	const [heroIndex, setHeroIndex] = useState(0);
-	const [heroDir, setHeroDir] = useState(1);
-	const heroPrevRef = useRef(0);
-	const heroTimerRef = useRef<number | null>(null);
-	const heroHoverRef = useRef(false);
-
-	const resetHeroTimer = () => {
-		if (heroTimerRef.current != null) {
-			window.clearTimeout(heroTimerRef.current);
-		}
-		heroTimerRef.current = window.setTimeout(tick, HERO_AUTOPLAY_MS);
-	};
-
-	const goHero = (delta: number) => {
-		setHeroDir(delta >= 0 ? 1 : -1);
-		setHeroIndex((prev) => {
-			heroPrevRef.current = prev;
-			const total = HERO_SLIDES.length;
-			return (((prev + delta) % total) + total) % total;
-		});
-		resetHeroTimer();
-	};
-
-	const CHEVRONS = useMemo(() => createChevrons(goHero), [goHero]);
-
-	const setHero = (idx: number) => {
-		if (idx === heroIndex) {
-			resetHeroTimer();
-			return;
-		}
-		heroPrevRef.current = heroIndex;
-		setHeroDir(idx > heroIndex ? 1 : -1);
-		setHeroIndex(idx);
-		resetHeroTimer();
-	};
-
-	const tick = () => {
-		if (!heroHoverRef.current) {
-			setHeroDir(1);
-			setHeroIndex((prev) => {
-				heroPrevRef.current = prev;
-				const total = HERO_SLIDES.length;
-				return (((prev + 1) % total) + total) % total;
-			});
-		}
-		if (heroTimerRef.current != null) {
-			window.clearTimeout(heroTimerRef.current);
-		}
-		heroTimerRef.current = window.setTimeout(tick, HERO_AUTOPLAY_MS);
-	};
-
-	useEffect(() => {
-		heroTimerRef.current = window.setTimeout(tick, HERO_AUTOPLAY_MS);
-		return () => {
-			if (heroTimerRef.current != null) {
-				window.clearTimeout(heroTimerRef.current);
-			}
-		};
-	}, [HERO_SLIDES.length]);
-
-	const activeSlide = HERO_SLIDES[heroIndex];
-	const prevNav = CHEVRONS[0]!;
-	const nextNav = CHEVRONS[1]!;
-	const PrevIcon = prevNav.icon;
-	const NextIcon = nextNav.icon;
+	const stageEntries = useMemo(
+		() =>
+			FEATURES.map((f) => ({
+				id: f.title,
+				title: f.title,
+				subtitle: f.subtitle,
+				onClick: f.onClick,
+			})),
+		[FEATURES],
+	);
 
 	return (
 		<div
@@ -143,7 +86,7 @@ const Home = () => {
 		>
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
-					{/* 首屏重做：顶栏品牌条 → 全宽焦点轮播 → 底栏入口 单主视觉，避免左右分栏互相抢戏*/}
+					{/* 首屏：顶栏品牌条 → 全宽焦点轮播 → 底栏入口 */}
 					<section
 						className="box-border flex w-full flex-col px-5.5 pb-5.5"
 						style={
@@ -152,212 +95,74 @@ const Home = () => {
 								: { minHeight: '100%' }
 						}
 					>
-						<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
-							{/* 氛围：克制青绿光晕 */}
-							<div
-								className="pointer-events-none absolute inset-0"
-								style={{
-									background:
-										'radial-gradient(90% 70% at 70% 30%, color-mix(in oklch, #2dd4bf 10%, transparent), transparent 58%), radial-gradient(70% 55% at 10% 85%, color-mix(in oklch, #22d3ee 7%, transparent), transparent 52%)',
-								}}
-								aria-hidden
-							/>
-
-							{/* 顶栏 */}
-							<header className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-4 px-8">
-								<div className="flex items-center min-w-0 gap-3">
-									<span className="text-2xl font-black  bg-linear-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
-										dnhyxc ai
-									</span>
-									<span className="hidden truncate text-sm text-textcolor/50 md:inline">
-										{t('home.stage.headline')}
-									</span>
-								</div>
-								<span className="hidden shrink-0 items-center gap-2 text-xs tracking-wide text-textcolor/35 sm:inline-flex">
-									<span className="relative flex size-1.5">
-										<span className="absolute inline-flex size-full animate-ping rounded-full bg-teal-400/50" />
-										<span className="relative size-1.5 rounded-full bg-teal-500" />
-									</span>
-									{t('home.stage.status')}
-								</span>
-							</header>
-
-							{/* 焦点轮播：仅此区域悬停暂停自动播放 */}
-							<div
+						<StageCard
+							brand="dnhyxc ai"
+							headline={t('home.stage.headline')}
+							status={t('home.stage.status')}
+							entries={stageEntries}
+							entriesAriaLabel={t('home.sections.showcase')}
+							watermark="DNHYXC"
+						>
+							<FocusCarousel
+								slides={HERO_SLIDES}
+								leftHint={t('home.stage.services')}
+								style={{ touchAction: 'pan-y' }}
 								className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-7 py-8 md:px-12 md:py-10 lg:px-16"
-								onMouseEnter={() => {
-									heroHoverRef.current = true;
-								}}
-								onMouseLeave={() => {
-									heroHoverRef.current = false;
-								}}
-							>
-								<div className="relative mx-auto grid w-full max-w-3xl overflow-hidden">
-									{HERO_SLIDES.map((s, i) => {
-										const isActive = i === heroIndex;
-										const x = isActive
-											? 0
-											: i === heroPrevRef.current
-												? -36 * heroDir
-												: 36 * heroDir;
-										const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
-										return (
-											<motion.div
-												key={s.id}
-												initial={false}
-												animate={{
-													opacity: isActive ? 1 : 0,
-													x,
-													filter: isActive ? 'blur(0px)' : 'blur(6px)',
-												}}
-												transition={{ duration: 0.45, ease: EASE }}
-												className={cn(
-													'col-start-1 row-start-1 flex min-w-0 flex-col will-change-transform',
-													isActive
-														? 'pointer-events-auto z-10'
-														: 'pointer-events-none z-0',
-												)}
-											>
-												<p className="mb-3 text-sm tracking-[0.18em] text-textcolor/40">
-													<span className="tabular-nums">{s.number}</span>
-													<span className="mx-2 text-textcolor/40">·</span>
-													{s.badge}
-												</p>
+								renderSlide={(s) => {
+									const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
+									return (
+										<>
+											<p className="mb-3 text-sm tracking-[0.18em] text-textcolor/40">
+												<span className="tabular-nums">{s.number}</span>
+												<span className="mx-2 text-textcolor/40">·</span>
+												{s.badge}
+											</p>
 
-												<h2 className="min-w-0 text-[clamp(1.4rem,2.8vw,2.25rem)] font-bold leading-snug tracking-tight text-textcolor">
-													<span
-														className={cn(
-															'bg-linear-to-r bg-clip-text text-transparent',
-															hue.icon,
-														)}
-													>
-														{s.titleMain}
-													</span>
-													<span className="mx-2 font-light text-textcolor/25">
-														·
-													</span>
-													<span className="font-semibold text-textcolor/90">
-														{s.titleAccent}
-													</span>
-												</h2>
+											<h2 className="min-w-0 text-[clamp(1.4rem,2.8vw,2.25rem)] font-bold leading-snug tracking-tight text-textcolor">
+												<span
+													className={cn(
+														'bg-linear-to-r bg-clip-text text-transparent',
+														hue.icon,
+													)}
+												>
+													{s.titleMain}
+												</span>
+												<span className="mx-2 font-light text-textcolor/25">
+													·
+												</span>
+												<span className="font-semibold text-textcolor/90">
+													{s.titleAccent}
+												</span>
+											</h2>
 
-												<p className="mt-4 max-w-2xl text-pretty text-sm leading-7 text-textcolor/52 md:text-[0.95rem] md:leading-7">
-													{s.subtitle}
-												</p>
+											<p className="mt-4 max-w-2xl text-pretty text-sm leading-7 text-textcolor/52 md:text-[0.95rem] md:leading-7">
+												{s.subtitle}
+											</p>
 
-												<div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-													{s.cta.map((c, ci) => (
-														<button
-															key={`${s.id}-cta-${ci}`}
-															type="button"
-															onClick={c.onClick}
-															className={cn(
-																'inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40',
-																c.primary
-																	? 'font-semibold text-teal-500 hover:text-teal-400'
-																	: 'font-medium text-textcolor/50 hover:text-teal-400',
-															)}
-															style={{ touchAction: 'manipulation' }}
-														>
-															{c.label}
-															<ArrowRight className="size-3.5" aria-hidden />
-														</button>
-													))}
-												</div>
-											</motion.div>
-										);
-									})}
-								</div>
-
-								{/* 控制条 */}
-								<div className="mx-auto mt-10 flex w-full max-w-3xl items-center justify-between gap-4 md:mt-12">
-									<p className="hidden text-xs text-textcolor/35 md:block md:max-w-xs">
-										{t('home.stage.services')}
-									</p>
-									<div className="flex items-center gap-3">
-										<button
-											type="button"
-											aria-label={prevNav.ariaLabel}
-											onClick={prevNav.onClick}
-											className="flex size-8 cursor-pointer items-center justify-center rounded-lg hover:border text-textcolor/30 transition-colors hover:border-teal-500/30 hover:bg-teal-500/15 hover:text-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
-											style={{ touchAction: 'manipulation' }}
-										>
-											<PrevIcon className="size-4" strokeWidth={2} />
-										</button>
-										<div className="flex items-center gap-1.5">
-											{HERO_SLIDES.map((_it, idx) => {
-												const active = idx === heroIndex;
-												return (
+											<div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+												{s.cta.map((c, ci) => (
 													<button
-														key={`pg-${idx}`}
+														key={`${s.id}-cta-${ci}`}
 														type="button"
-														aria-label={`切换到第 ${idx + 1} 张`}
-														onClick={() => setHero(idx)}
-														className="relative h-1.5 cursor-pointer rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40"
-														style={{
-															width: active ? 24 : 7,
-															touchAction: 'manipulation',
-														}}
+														onClick={c.onClick}
+														className={cn(
+															'inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40',
+															c.primary
+																? 'font-semibold text-teal-500 hover:text-teal-400'
+																: 'font-medium text-textcolor/50 hover:text-teal-400',
+														)}
+														style={{ touchAction: 'manipulation' }}
 													>
-														<span
-															className={cn(
-																'absolute inset-0 rounded-full transition-colors',
-																active
-																	? 'bg-linear-to-r from-teal-400 to-cyan-400'
-																	: 'bg-textcolor/15 hover:bg-textcolor/25',
-															)}
-														/>
+														{c.label}
+														<ArrowRight className="size-3.5" aria-hidden />
 													</button>
-												);
-											})}
-										</div>
-										<button
-											type="button"
-											aria-label={nextNav.ariaLabel}
-											onClick={nextNav.onClick}
-											className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-textcolor/30 transition-colors hover:border hover:border-teal-500/30 hover:bg-teal-500/15 hover:text-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
-											style={{ touchAction: 'manipulation' }}
-										>
-											<NextIcon className="size-4" strokeWidth={2} />
-										</button>
-										<span className="ml-1 font-mono text-xs tabular-nums tracking-wider text-textcolor/30">
-											{activeSlide?.number ?? '01'}
-											<span className="mx-1 text-textcolor/15">/</span>
-											{HERO_SLIDES.length.toString().padStart(2, '0')}
-										</span>
-									</div>
-								</div>
-							</div>
-
-							{/* 底栏入口 */}
-							<nav
-								aria-label={t('home.sections.showcase')}
-								className="relative z-10 h-16 shrink-0 backdrop-blur-md"
-							>
-								<div className="grid h-full grid-cols-3">
-									{FEATURES.map((feature, i) => (
-										<button
-											key={feature.title}
-											type="button"
-											onClick={feature.onClick}
-											className={cn(
-												'group flex h-full cursor-pointer items-center justify-center gap-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35 px-8',
-												i === 0 && 'justify-start text-left',
-												i === 1 && 'justify-end text-center pr-5',
-												i === 2 && 'justify-end text-right',
-											)}
-										>
-											<span className="text-sm font-semibold tracking-normal text-textcolor transition-colors group-hover:text-teal-500">
-												{feature.title}
-											</span>
-											<span className="truncate text-sm text-textcolor/40">
-												{feature.subtitle}
-											</span>
-										</button>
-									))}
-								</div>
-							</nav>
-						</div>
+												))}
+											</div>
+										</>
+									);
+								}}
+							/>
+						</StageCard>
 					</section>
 
 					{/* 下方内容 */}

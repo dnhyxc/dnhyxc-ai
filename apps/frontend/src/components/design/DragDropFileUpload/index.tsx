@@ -14,9 +14,9 @@ import {
 	forwardRef,
 	type InputHTMLAttributes,
 	type KeyboardEvent,
-	type MutableRefObject,
 	type ReactNode,
 	type Ref,
+	type RefObject,
 	useCallback,
 	useImperativeHandle,
 	useMemo,
@@ -466,7 +466,7 @@ const defaultChildren = (ctx: DragDropFileUploadRenderContext) => (
 function assignRef<T>(r: Ref<T> | undefined, node: T | null) {
 	if (!r) return;
 	if (typeof r === 'function') r(node);
-	else (r as MutableRefObject<T | null>).current = node;
+	else (r as RefObject<T | null>).current = node;
 }
 
 export const DragDropFileUpload = forwardRef<
