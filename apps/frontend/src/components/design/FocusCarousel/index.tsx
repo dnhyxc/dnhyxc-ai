@@ -18,7 +18,18 @@ const DEFAULT_AUTOPLAY_MS = 5200;
 const DEFAULT_SLIDE_OFFSET = 36;
 const DEFAULT_SWIPE_THRESHOLD = 48;
 const DEFAULT_WHEEL_THRESHOLD = 16;
-const DEFAULT_WHEEL_COOLDOWN_MS = 450;
+/**
+ * 触控板惯性会在「已切页」之后继续派发 wheel，且中间常有 >450ms 的静默空隙。
+ * 固定冷却会在空隙后误开锁 → 再切一张。
+ * 正确做法：同一次水平滚轮流只允许切一次，以「最后一次水平 wheel 之后静默」判定流结束。
+ */
+const DEFAULT_WHEEL_SETTLE_MS = 380;
+/** 忽略紧随 wheel 导航后的 touchend，避免触控板一手势切两次 */
+const WHEEL_TOUCH_SUPPRESS_MS = 450;
+/** 吸收惯性时，低于此水平位移视为噪声（不续锁定，避免永远解不开） */
+const WHEEL_ABSORB_NOISE = 6;
+/** 单次流最长吸收时间，防止异常连续事件卡死切换 */
+const WHEEL_MAX_ABSORB_MS = 680;
 
 export type FocusCarouselSlide = {
 	id: string;
@@ -55,7 +66,10 @@ export type FocusCarouselProps<T extends FocusCarouselSlide> = {
 	swipeThreshold?: number;
 	/** 滚轮触发切页的最小水平 delta。默认 16 */
 	wheelThreshold?: number;
-	/** 滚轮切页冷却时间（ms），防止连续触发。默认 450 */
+	/**
+	 * 水平滚轮流结束后的静默时长（ms），之后才允许下一次滑动切页。
+	 * 默认 380。原 wheelCooldownMs 语义已纠正为「流结束静默」而非「切页后固定冷却」。
+	 */
 	wheelCooldownMs?: number;
 	/** 非激活页水平位移像素（配合方向做进出动画）。默认 36 */
 	slideOffset?: number;
@@ -105,7 +119,7 @@ const FocusCarouselBase = forwardRef<
 		wheel = true,
 		swipeThreshold = DEFAULT_SWIPE_THRESHOLD,
 		wheelThreshold = DEFAULT_WHEEL_THRESHOLD,
-		wheelCooldownMs = DEFAULT_WHEEL_COOLDOWN_MS,
+		wheelCooldownMs = DEFAULT_WHEEL_SETTLE_MS,
 		slideOffset = DEFAULT_SLIDE_OFFSET,
 		transition,
 		leftHint,
@@ -135,8 +149,11 @@ const FocusCarouselBase = forwardRef<
 	const timerRef = useRef<number | null>(null);
 	const hoverRef = useRef(false);
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-	const wheelLockRef = useRef(false);
-	const wheelTimerRef = useRef<number | null>(null);
+	/** 当前水平滚轮流是否已经切过页（用于吞掉后续惯性） */
+	const wheelStreamConsumedRef = useRef(false);
+	const wheelSettleTimerRef = useRef<number | null>(null);
+	/** 最近一次由 wheel 触发的切页时间 */
+	const lastWheelGoAtRef = useRef(0);
 	const indexRef = useRef(index);
 	indexRef.current = index;
 
@@ -234,14 +251,25 @@ const FocusCarouselBase = forwardRef<
 		timerRef.current = window.setTimeout(tick, autoplayMs);
 		return () => {
 			if (timerRef.current != null) window.clearTimeout(timerRef.current);
-			if (wheelTimerRef.current != null) {
-				window.clearTimeout(wheelTimerRef.current);
-				wheelTimerRef.current = null;
+			if (wheelSettleTimerRef.current != null) {
+				window.clearTimeout(wheelSettleTimerRef.current);
+				wheelSettleTimerRef.current = null;
 			}
 		};
 		// ponytail: 与首页一致，仅随 slides 数量重启自动播放
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [total, autoplayMs]);
+
+	/** 推迟「流结束」解锁；仅在吸收惯性时调用 */
+	const bumpWheelSettle = () => {
+		if (wheelSettleTimerRef.current != null) {
+			window.clearTimeout(wheelSettleTimerRef.current);
+		}
+		wheelSettleTimerRef.current = window.setTimeout(() => {
+			wheelStreamConsumedRef.current = false;
+			wheelSettleTimerRef.current = null;
+		}, wheelCooldownMs);
+	};
 
 	const onTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
 		if (!swipe) return;
@@ -261,6 +289,13 @@ const FocusCarouselBase = forwardRef<
 		const dy = end.clientY - start.y;
 		if (Math.abs(dx) < swipeThreshold) return;
 		if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+		// 触控板一手势常先 wheel 切页再冒 touchend，这里丢掉避免连切两张
+		if (
+			performance.now() - lastWheelGoAtRef.current <
+			WHEEL_TOUCH_SUPPRESS_MS
+		) {
+			return;
+		}
 		go(dx > 0 ? 1 : -1);
 	};
 
@@ -269,14 +304,27 @@ const FocusCarouselBase = forwardRef<
 		const dx = e.deltaX;
 		const dy = e.deltaY;
 		if (Math.abs(dx) <= Math.abs(dy)) return;
+
+		const now = performance.now();
+
+		// 本流已切过：只吸收「仍像惯性」的事件；噪声不得刷新 settle，否则会永远 consumed
+		if (wheelStreamConsumedRef.current) {
+			if (now - lastWheelGoAtRef.current >= WHEEL_MAX_ABSORB_MS) {
+				wheelStreamConsumedRef.current = false;
+			} else if (Math.abs(dx) >= WHEEL_ABSORB_NOISE) {
+				bumpWheelSettle();
+				return;
+			} else {
+				return;
+			}
+		}
+
 		if (Math.abs(dx) < wheelThreshold) return;
-		if (wheelLockRef.current) return;
-		wheelLockRef.current = true;
-		wheelTimerRef.current = window.setTimeout(() => {
-			wheelLockRef.current = false;
-			wheelTimerRef.current = null;
-		}, wheelCooldownMs);
-		// 与触屏一致：水平正向 → 下一张
+		if (wheelStreamConsumedRef.current) return;
+
+		wheelStreamConsumedRef.current = true;
+		lastWheelGoAtRef.current = now;
+		bumpWheelSettle();
 		go(dx > 0 ? 1 : -1);
 	};
 
