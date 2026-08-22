@@ -332,7 +332,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-6': {
 		title: '13.6 Browse and manage libraries',
 		description:
-			'Pick a library on the left; the right pane loads entries with pagination and load-more. Within the same session, switching libraries and returning restores loaded pages and scroll when possible. Delete a word library after confirmation (entries cascade). Favorite stars load incrementally as lists grow.',
+			"Pick a library on the left; the right pane loads entries with pagination and load-more. The entry list remembers which page you last reached — even after closing the browser, quitting the desktop app, or refreshing the page, re-entering the same library jumps straight back to the page you left off at; scroll up to load earlier entries (bidirectional paging). Progress is only cached locally while browsing and reported to the server once when you leave the library, switch to the background, or close the tab; public libraries keep each non-owner reader's progress independently; switching accounts clears the previous account's local progress. Within the same session, switching libraries and returning restores loaded pages and scroll when possible. Delete a word library after confirmation (entries cascade). Favorite stars load incrementally as lists grow.",
 	},
 	'pg-s13-7': {
 		title: '13.7 Pull history, results page, and stop',

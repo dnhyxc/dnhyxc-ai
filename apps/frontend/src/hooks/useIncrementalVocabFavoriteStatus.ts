@@ -1,6 +1,6 @@
 /**
  * 按列表增量查询单词收藏状态：仅对尚未查询过的词请求 /status，结果合并进 Map（wordKey → 收藏 id）。
- * 列表被整体替换（非末尾追加）时清空本地状态并重新查询。
+ * 末尾追加 / 头部 prepend 均视为增量；仅整体替换时才清空本地状态并重新查询。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -44,7 +44,11 @@ export function useIncrementalVocabFavoriteStatus(
 			prevSig.length > 0 &&
 			(itemsWordSig === prevSig ||
 				itemsWordSig.startsWith(`${prevSig}${WORD_SIG_SEP}`));
-		if (!appended) {
+		const prepended =
+			prevSig.length > 0 &&
+			(itemsWordSig === prevSig ||
+				itemsWordSig.endsWith(`${WORD_SIG_SEP}${prevSig}`));
+		if (!appended && !prepended) {
 			setFavoriteIdByWordKey(new Map());
 			queriedKeysRef.current = new Set();
 		}

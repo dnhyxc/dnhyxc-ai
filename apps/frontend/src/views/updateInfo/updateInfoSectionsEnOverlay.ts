@@ -1141,6 +1141,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'During streaming responses in the English learning Agent, message token updates no longer trigger full-page re-renders of the input area, share bar, and session toolbar — typing, intent selection, and session switching remain responsive even during long conversations.',
 	},
+	's24-63': {
+		title: 'Library list resume reading (cross-session)',
+		description:
+			"After picking a word or classic-quote library in the English Learning library, the right-hand entry list now remembers which page you last reached — even after closing the browser, quitting the desktop app, or refreshing the page, re-entering the same library jumps straight back to the page you left off at instead of starting from the top. Scroll up to load earlier entries (bidirectional paging) without re-scrolling from the beginning. Progress is only cached locally while browsing and reported to the server once when you leave the library, switch to the background, or close the tab, avoiding a request per page turn. Public libraries keep each non-owner reader's progress independently; switching accounts clears the previous account's local progress. The experience mirrors cross-session e-book reading-position restoration.",
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

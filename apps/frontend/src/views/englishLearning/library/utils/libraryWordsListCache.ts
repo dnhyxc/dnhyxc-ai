@@ -1,12 +1,16 @@
 /**
- * 资源库词条列表会话内缓存：切换单词库 / 离开页面再返回时恢复已加载分页与滚动位置
+ * 资源库词条列表会话内缓存：切换单词库 / 离开页面再返回时恢复已加载窗口与滚动位置
  */
 
 export type LibraryWordsListCacheEntry<TItem, TLibrary> = {
 	items: TItem[];
 	resolvedLibrary: TLibrary | null;
-	offset: number;
+	/** 当前窗口下界（API offset） */
+	startOffset: number;
+	/** 当前窗口上界（下一页 API offset） */
+	endOffset: number;
 	hasMore: boolean;
+	hasPrevious: boolean;
 	scrollTop: number;
 };
 

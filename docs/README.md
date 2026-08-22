@@ -106,6 +106,7 @@
 | 电子书阅读页插件化接入（PluginHostPage / ebookHostApi）             | [ebook/电子书插件想法列表.md](./ebook/电子书插件想法列表.md)                                                                                    |
 | 后端 Remote 静态资源服务（serveRemote / uploads/remotes）           | [ops/远程静态资源.md](./ops/远程静态资源.md)                                                                                        |
 | remotes registry 仍被缓存 / 桌面吃旧清单                            | [ops/远程无存储缓存.md](./ops/远程无存储缓存.md)                                                                                           |
+| 资源库词条刷新 / 重开应用后回到首屏（续读丢失）                      | [english/资源库词条续读.md](./english/资源库词条续读.md)（跨会话持久化 + 双向分页 + keepalive flush）· [english/文库单词列表缓存.md](./english/文库单词列表缓存.md)（会话内缓存，姊妹稿） |
 | 英语学习「学习笔记」空白或 CORS                                     | [english/学习笔记远程.md](./english/学习笔记远程.md)                                                                                    |
 | 学习笔记富文本编辑器（Tiptap 升级 / HTML 存储）                     | [english/学习笔记富文本编辑.md](./english/学习笔记富文本编辑.md)                                                                          |
 | 学习笔记未保存橙点 / 保存图标脏标记                                 | [english/学习笔记脏保存.md](./english/学习笔记脏保存.md)                                                                            |

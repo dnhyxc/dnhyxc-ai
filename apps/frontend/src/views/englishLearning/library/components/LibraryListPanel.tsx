@@ -29,6 +29,10 @@ import {
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
+import {
+	hydrateEnglishLibraryItemsResumeOffset,
+	resolveEnglishLibraryItemsResumeOffset,
+} from '@/store/englishLibraryItemsResume';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
@@ -38,6 +42,8 @@ export type LibraryListPanelProps = {
 	kind: LibraryKind;
 	selectedId: string | null;
 	initialLibraryId?: string | null;
+	/** 用于把续读 offset 写回左侧列表项，避免再点同一库时读到旧值 */
+	selectedLibrary?: EnglishLibraryListItem | null;
 	onSelect: (library: EnglishLibraryListItem) => void;
 	/** 当前选中的库被删除且列表已空时，由父级清空 URL 与右侧栏 */
 	onLibraryDeleted?: (deletedId: string) => void;
@@ -51,10 +57,33 @@ function formatLibraryDate(iso: string): string {
 	}
 }
 
+/** API 列表项：灌入 store（不覆盖会话更新）并用 store 覆盖展示字段 */
+function withResumeFromStore(
+	kind: LibraryKind,
+	list: EnglishLibraryListItem[],
+): EnglishLibraryListItem[] {
+	return list.map((item) => {
+		hydrateEnglishLibraryItemsResumeOffset(
+			kind,
+			item.id,
+			item.itemsResumeOffset ?? 0,
+		);
+		return {
+			...item,
+			itemsResumeOffset: resolveEnglishLibraryItemsResumeOffset(
+				kind,
+				item.id,
+				item.itemsResumeOffset ?? 0,
+			),
+		};
+	});
+}
+
 export const LibraryListPanel = observer(function LibraryListPanel({
 	kind,
 	selectedId,
 	initialLibraryId,
+	selectedLibrary,
 	onSelect,
 	onLibraryDeleted,
 }: LibraryListPanelProps) {
@@ -85,6 +114,21 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 		autoSelectedRef.current = false;
 	}, [kind, initialLibraryId]);
 
+	// 右侧续读写回后同步到列表项
+	useEffect(() => {
+		if (!selectedLibrary) return;
+		const offset = selectedLibrary.itemsResumeOffset ?? 0;
+		setEntries((prev) => {
+			const idx = prev.findIndex((e) => e.id === selectedLibrary.id);
+			if (idx < 0) return prev;
+			const cur = prev[idx];
+			if ((cur.itemsResumeOffset ?? 0) === offset) return prev;
+			const next = prev.slice();
+			next[idx] = { ...cur, itemsResumeOffset: offset };
+			return next;
+		});
+	}, [selectedLibrary]);
+
 	const fetchFirstPage = useCallback(async () => {
 		fetchingMoreRef.current = false;
 		setLoading(true);
@@ -103,7 +147,10 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
 							offset: 0,
 						});
-			const list = Array.isArray(res.data) ? res.data : [];
+			const list = withResumeFromStore(
+				kind,
+				Array.isArray(res.data) ? res.data : [],
+			);
 			setEntries(list);
 			offsetRef.current = list.length;
 			hasMoreRef.current = list.length >= VOCAB_LIBRARY_LIST_PAGE_SIZE;
@@ -140,7 +187,10 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
 							offset,
 						});
-			const chunk = Array.isArray(res.data) ? res.data : [];
+			const chunk = withResumeFromStore(
+				kind,
+				Array.isArray(res.data) ? res.data : [],
+			);
 			if (chunk.length === 0) {
 				hasMoreRef.current = false;
 				return;

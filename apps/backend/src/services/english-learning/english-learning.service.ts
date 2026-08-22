@@ -109,6 +109,10 @@ import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pa
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
 import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
 import {
+	EnglishLibraryItemsResume,
+	type EnglishLibraryItemsResumeKind,
+} from './entity/english-library-items-resume.entity';
+import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
 } from './entity/english-pack-web-search.entity';
@@ -180,6 +184,8 @@ export type VocabularyLibraryListItem = {
 	createdAt: string;
 	isPublic: boolean;
 	isOwned: boolean;
+	/** 当前用户对该库词条列表的续读 offset；非所有者也可有独立进度 */
+	itemsResumeOffset: number;
 };
 
 /** 单词库内单条词条（分页列表） */
@@ -196,6 +202,8 @@ export type ClassicQuotesLibraryListItem = {
 	createdAt: string;
 	isPublic: boolean;
 	isOwned: boolean;
+	/** 当前用户对该库语句列表的续读 offset；非所有者也可有独立进度 */
+	itemsResumeOffset: number;
 };
 
 /** 经典语句库内单条（分页列表） */
@@ -279,6 +287,8 @@ export class EnglishLearningService {
 		private readonly classicQuotesLibraryRepo: Repository<EnglishClassicQuotesLibrary>,
 		@InjectRepository(EnglishClassicQuotesLibraryItem)
 		private readonly classicQuotesLibraryItemRepo: Repository<EnglishClassicQuotesLibraryItem>,
+		@InjectRepository(EnglishLibraryItemsResume)
+		private readonly libraryItemsResumeRepo: Repository<EnglishLibraryItemsResume>,
 		@InjectRepository(EnglishPracticeReviewState)
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
 		@InjectRepository(EnglishDailyMemorizeRecord)
@@ -1989,6 +1999,7 @@ ${existingHintBlock}
 	private mapVocabularyLibraryListItem(
 		row: EnglishVocabularyLibrary,
 		viewerUserId: number,
+		itemsResumeOffset = 0,
 	): VocabularyLibraryListItem {
 		return {
 			id: row.id,
@@ -1997,7 +2008,136 @@ ${existingHintBlock}
 			createdAt: row.createdAt.toISOString(),
 			isPublic: row.isPublic,
 			isOwned: row.userId === viewerUserId,
+			itemsResumeOffset: Math.max(0, itemsResumeOffset),
 		};
+	}
+
+	private mapClassicQuotesLibraryListItem(
+		row: EnglishClassicQuotesLibrary,
+		viewerUserId: number,
+		itemsResumeOffset = 0,
+	): ClassicQuotesLibraryListItem {
+		return {
+			id: row.id,
+			title: row.title,
+			quoteCount: row.quoteCount,
+			createdAt: row.createdAt.toISOString(),
+			isPublic: row.isPublic,
+			isOwned: row.userId === viewerUserId,
+			itemsResumeOffset: Math.max(0, itemsResumeOffset),
+		};
+	}
+
+	/** 批量挂载当前用户的续读 offset（列表页 ≤100，一次 IN 查询） */
+	private async loadLibraryItemsResumeOffsetMap(
+		userId: number,
+		libraryKind: EnglishLibraryItemsResumeKind,
+		libraryIds: string[],
+	): Promise<Map<string, number>> {
+		const map = new Map<string, number>();
+		if (libraryIds.length === 0) return map;
+		const rows = await this.libraryItemsResumeRepo.find({
+			where: {
+				userId,
+				libraryKind,
+				libraryId: In(libraryIds),
+			},
+			select: ['libraryId', 'resumeOffset'],
+		});
+		for (const row of rows) {
+			map.set(row.libraryId, Math.max(0, row.resumeOffset ?? 0));
+		}
+		return map;
+	}
+
+	private async getLibraryItemsResumeOffset(
+		userId: number,
+		libraryKind: EnglishLibraryItemsResumeKind,
+		libraryId: string,
+	): Promise<number> {
+		const row = await this.libraryItemsResumeRepo.findOne({
+			where: { userId, libraryKind, libraryId },
+			select: ['resumeOffset'],
+		});
+		return Math.max(0, row?.resumeOffset ?? 0);
+	}
+
+	/**
+	 * 按库清理全部浏览进度。
+	 * ponytail: 先按 (library_kind, library_id) 索引取一批 id 再删，避免单次超长 DELETE 锁表；升级路径可改成原生 LIMIT 删。
+	 */
+	private async purgeLibraryItemsResume(
+		libraryKind: EnglishLibraryItemsResumeKind,
+		libraryId: string,
+	): Promise<void> {
+		const chunk = 2000;
+		for (;;) {
+			const rows = await this.libraryItemsResumeRepo.find({
+				where: { libraryKind, libraryId },
+				select: ['id'],
+				take: chunk,
+			});
+			if (rows.length === 0) break;
+			await this.libraryItemsResumeRepo.delete({
+				id: In(rows.map((r) => r.id)),
+			});
+			if (rows.length < chunk) break;
+		}
+	}
+
+	/**
+	 * 取消公开：删掉非所有者进度，保留创建者进度。
+	 * 原因：非所有者已不可见该库，孤儿进度占空间且再公开时可能跳到过期位置。
+	 */
+	private async purgeLibraryItemsResumeExceptOwner(
+		libraryKind: EnglishLibraryItemsResumeKind,
+		libraryId: string,
+		ownerUserId: number,
+	): Promise<void> {
+		const chunk = 2000;
+		for (;;) {
+			const rows = await this.libraryItemsResumeRepo.find({
+				where: {
+					libraryKind,
+					libraryId,
+					userId: Not(ownerUserId),
+				},
+				select: ['id'],
+				take: chunk,
+			});
+			if (rows.length === 0) break;
+			await this.libraryItemsResumeRepo.delete({
+				id: In(rows.map((r) => r.id)),
+			});
+			if (rows.length < chunk) break;
+		}
+	}
+
+	private async upsertLibraryItemsResume(
+		userId: number,
+		libraryKind: EnglishLibraryItemsResumeKind,
+		libraryId: string,
+		offset: number,
+	): Promise<number> {
+		const next = Math.max(0, Math.floor(Number(offset) || 0));
+		if (next <= 0) {
+			await this.libraryItemsResumeRepo.delete({
+				userId,
+				libraryKind,
+				libraryId,
+			});
+			return 0;
+		}
+		await this.libraryItemsResumeRepo.upsert(
+			{
+				userId,
+				libraryKind,
+				libraryId,
+				resumeOffset: next,
+			},
+			['userId', 'libraryKind', 'libraryId'],
+		);
+		return next;
 	}
 
 	/**
@@ -2059,6 +2199,7 @@ ${existingHintBlock}
 	): Promise<{ deleted: boolean }> {
 		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
 		await this.vocabLibraryRepo.remove(lib);
+		await this.purgeLibraryItemsResume('vocab', libraryId);
 		return { deleted: true };
 	}
 
@@ -2076,7 +2217,14 @@ ${existingHintBlock}
 			.take(limit)
 			.skip(offset)
 			.getMany();
-		return rows.map((r) => this.mapVocabularyLibraryListItem(r, userId));
+		const resumeMap = await this.loadLibraryItemsResumeOffsetMap(
+			userId,
+			'vocab',
+			rows.map((r) => r.id),
+		);
+		return rows.map((r) =>
+			this.mapVocabularyLibraryListItem(r, userId, resumeMap.get(r.id) ?? 0),
+		);
 	}
 
 	async updateVocabularyLibraryVisibility(
@@ -2093,9 +2241,22 @@ ${existingHintBlock}
 		if (!lib) {
 			throw new NotFoundException('单词库不存在');
 		}
+		const wasPublic = lib.isPublic;
 		lib.isPublic = dto.isPublic;
 		const saved = await this.vocabLibraryRepo.save(lib);
-		return this.mapVocabularyLibraryListItem(saved, userId);
+		if (wasPublic && !saved.isPublic) {
+			await this.purgeLibraryItemsResumeExceptOwner(
+				'vocab',
+				libraryId,
+				saved.userId,
+			);
+		}
+		const resume = await this.getLibraryItemsResumeOffset(
+			userId,
+			'vocab',
+			libraryId,
+		);
+		return this.mapVocabularyLibraryListItem(saved, userId, resume);
 	}
 
 	async updateVocabularyLibraryTitle(
@@ -2110,7 +2271,28 @@ ${existingHintBlock}
 		}
 		lib.title = t;
 		const saved = await this.vocabLibraryRepo.save(lib);
-		return this.mapVocabularyLibraryListItem(saved, userId);
+		const resume = await this.getLibraryItemsResumeOffset(
+			userId,
+			'vocab',
+			libraryId,
+		);
+		return this.mapVocabularyLibraryListItem(saved, userId, resume);
+	}
+
+	/** 更新单词库词条列表续读 offset（可读即可：自有或公开） */
+	async updateVocabularyLibraryItemsResume(
+		userId: number,
+		libraryId: string,
+		offset: number,
+	): Promise<VocabularyLibraryListItem> {
+		const lib = await this.assertVocabularyLibraryReadable(userId, libraryId);
+		const resume = await this.upsertLibraryItemsResume(
+			userId,
+			'vocab',
+			libraryId,
+			offset,
+		);
+		return this.mapVocabularyLibraryListItem(lib, userId, resume);
 	}
 
 	/** 分页列出某单词库内的词条（按 sort_order 升序） */
@@ -2126,15 +2308,18 @@ ${existingHintBlock}
 		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const rows = await this.vocabLibraryItemRepo.find({
-			where: { libraryId },
-			order: { sortOrder: 'ASC' },
-			take: limit,
-			skip: offset,
-		});
+		const [rows, resume] = await Promise.all([
+			this.vocabLibraryItemRepo.find({
+				where: { libraryId },
+				order: { sortOrder: 'ASC' },
+				take: limit,
+				skip: offset,
+			}),
+			this.getLibraryItemsResumeOffset(userId, 'vocab', libraryId),
+		]);
 
 		return {
-			library: this.mapVocabularyLibraryListItem(lib, userId),
+			library: this.mapVocabularyLibraryListItem(lib, userId, resume),
 			items: rows.map((r) => this.mapLibraryItemRow(r)),
 		};
 	}
@@ -2284,21 +2469,6 @@ ${existingHintBlock}
 		return lib;
 	}
 
-	// 映射经典语句库列表项
-	private mapClassicQuotesLibraryListItem(
-		row: EnglishClassicQuotesLibrary,
-		viewerUserId: number,
-	): ClassicQuotesLibraryListItem {
-		return {
-			id: row.id,
-			title: row.title,
-			quoteCount: row.quoteCount,
-			createdAt: row.createdAt.toISOString(),
-			isPublic: row.isPublic,
-			isOwned: row.userId === viewerUserId,
-		};
-	}
-
 	private async persistClassicQuotesLibrary(
 		userId: number,
 		title: string,
@@ -2349,6 +2519,7 @@ ${existingHintBlock}
 	): Promise<{ deleted: boolean }> {
 		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
 		await this.classicQuotesLibraryRepo.remove(lib);
+		await this.purgeLibraryItemsResume('classic', libraryId);
 		return { deleted: true };
 	}
 
@@ -2365,7 +2536,14 @@ ${existingHintBlock}
 			.take(limit)
 			.skip(offset)
 			.getMany();
-		return rows.map((r) => this.mapClassicQuotesLibraryListItem(r, userId));
+		const resumeMap = await this.loadLibraryItemsResumeOffsetMap(
+			userId,
+			'classic',
+			rows.map((r) => r.id),
+		);
+		return rows.map((r) =>
+			this.mapClassicQuotesLibraryListItem(r, userId, resumeMap.get(r.id) ?? 0),
+		);
 	}
 
 	async updateClassicQuotesLibraryVisibility(
@@ -2382,9 +2560,22 @@ ${existingHintBlock}
 		if (!lib) {
 			throw new NotFoundException('经典语句库不存在');
 		}
+		const wasPublic = lib.isPublic;
 		lib.isPublic = dto.isPublic;
 		const saved = await this.classicQuotesLibraryRepo.save(lib);
-		return this.mapClassicQuotesLibraryListItem(saved, userId);
+		if (wasPublic && !saved.isPublic) {
+			await this.purgeLibraryItemsResumeExceptOwner(
+				'classic',
+				libraryId,
+				saved.userId,
+			);
+		}
+		const resume = await this.getLibraryItemsResumeOffset(
+			userId,
+			'classic',
+			libraryId,
+		);
+		return this.mapClassicQuotesLibraryListItem(saved, userId, resume);
 	}
 
 	async updateClassicQuotesLibraryTitle(
@@ -2399,7 +2590,31 @@ ${existingHintBlock}
 		}
 		lib.title = t;
 		const saved = await this.classicQuotesLibraryRepo.save(lib);
-		return this.mapClassicQuotesLibraryListItem(saved, userId);
+		const resume = await this.getLibraryItemsResumeOffset(
+			userId,
+			'classic',
+			libraryId,
+		);
+		return this.mapClassicQuotesLibraryListItem(saved, userId, resume);
+	}
+
+	/** 更新经典语句库列表续读 offset（可读即可：自有或公开） */
+	async updateClassicQuotesLibraryItemsResume(
+		userId: number,
+		libraryId: string,
+		offset: number,
+	): Promise<ClassicQuotesLibraryListItem> {
+		const lib = await this.assertClassicQuotesLibraryReadable(
+			userId,
+			libraryId,
+		);
+		const resume = await this.upsertLibraryItemsResume(
+			userId,
+			'classic',
+			libraryId,
+			offset,
+		);
+		return this.mapClassicQuotesLibraryListItem(lib, userId, resume);
 	}
 
 	async listClassicQuotesLibraryItems(
@@ -2417,15 +2632,18 @@ ${existingHintBlock}
 		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const rows = await this.classicQuotesLibraryItemRepo.find({
-			where: { libraryId },
-			order: { sortOrder: 'ASC' },
-			take: limit,
-			skip: offset,
-		});
+		const [rows, resume] = await Promise.all([
+			this.classicQuotesLibraryItemRepo.find({
+				where: { libraryId },
+				order: { sortOrder: 'ASC' },
+				take: limit,
+				skip: offset,
+			}),
+			this.getLibraryItemsResumeOffset(userId, 'classic', libraryId),
+		]);
 
 		return {
-			library: this.mapClassicQuotesLibraryListItem(lib, userId),
+			library: this.mapClassicQuotesLibraryListItem(lib, userId, resume),
 			items: rows.map((r) => this.mapClassicLibraryItemRow(r)),
 		};
 	}

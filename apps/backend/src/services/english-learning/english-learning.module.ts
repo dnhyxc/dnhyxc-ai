@@ -13,6 +13,7 @@ import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
 import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
+import { EnglishLibraryItemsResume } from './entity/english-library-items-resume.entity';
 import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
@@ -45,6 +46,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishVocabularyLibraryItem,
 			EnglishClassicQuotesLibrary,
 			EnglishClassicQuotesLibraryItem,
+			EnglishLibraryItemsResume,
 		]),
 	],
 	controllers: [EnglishLearningController],

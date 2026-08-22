@@ -59,6 +59,7 @@ import {
 } from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
+import { UpdateLibraryItemsResumeDto } from './dto/update-library-items-resume.dto';
 import { UpdateLibraryTitleDto } from './dto/update-library-title.dto';
 import { UpdateLibraryVisibilityDto } from './dto/update-library-visibility.dto';
 import {
@@ -455,6 +456,26 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 更新单词库词条列表续读 offset（自有或公开可读） */
+	@Patch('vocabulary-libraries/:libraryId/items-resume')
+	async updateVocabularyLibraryItemsResume(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateVocabularyLibraryItemsResume(
+				userId,
+				libraryId,
+				dto.offset,
+			);
+		return { success: true, data };
+	}
+
 	/** 分页列出某单词库内的词条（按导入顺序 sort_order 升序） */
 	@Get('vocabulary-libraries/:libraryId/items')
 	async listVocabularyLibraryItems(
@@ -625,6 +646,26 @@ export class EnglishLearningController {
 				userId,
 				libraryId,
 				dto,
+			);
+		return { success: true, data };
+	}
+
+	/** 更新经典语句库列表续读 offset（自有或公开可读） */
+	@Patch('classic-quotes-libraries/:libraryId/items-resume')
+	async updateClassicQuotesLibraryItemsResume(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateClassicQuotesLibraryItemsResume(
+				userId,
+				libraryId,
+				dto.offset,
 			);
 		return { success: true, data };
 	}

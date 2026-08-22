@@ -1,5 +1,5 @@
 /**
- * 经典句资源库：右侧语句列表（滚动分页加载）
+ * 经典句资源库：右侧语句列表（续读页 + 双向滚动分页）
  */
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
@@ -25,6 +25,10 @@ import {
 	removeEnglishClassicQuoteFavorite,
 } from '@/service';
 import {
+	resolveEnglishLibraryItemsResumeOffset,
+	setEnglishLibraryItemsResumeOffset,
+} from '@/store/englishLibraryItemsResume';
+import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
@@ -36,11 +40,13 @@ import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
 export type ClassicQuotesLibrarySectionProps = {
 	libraryId: string | null;
 	libraryMeta: EnglishClassicQuotesLibraryListItem | null;
+	onResumeOffsetChange?: (libraryId: string, offset: number) => void;
 };
 
 export function ClassicQuotesLibrarySection({
 	libraryId,
 	libraryMeta,
+	onResumeOffsetChange,
 }: ClassicQuotesLibrarySectionProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
@@ -69,19 +75,40 @@ export function ClassicQuotesLibrarySection({
 
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 
+	/** 浏览中只写本地；离开库时由页面 flush 到 DB */
+	const handleResumeOffsetChange = useCallback(
+		(id: string, offset: number) => {
+			setEnglishLibraryItemsResumeOffset('classic', id, offset);
+			onResumeOffsetChange?.(id, offset);
+		},
+		[onResumeOffsetChange],
+	);
+
 	const {
 		items,
 		resolvedLibrary,
 		loading,
 		loadingMore,
+		loadingPrevious,
 		initialScrollTop,
 		onViewportScroll,
+		onViewportWheel,
+		onViewportPointerDown,
 	} = useLibraryWordsList<
 		EnglishClassicQuotesLibraryItemRow,
 		EnglishClassicQuotesLibraryListItem
 	>({
 		libraryId,
 		cacheNamespace: 'classic',
+		initialResumeOffset: libraryId
+			? resolveEnglishLibraryItemsResumeOffset(
+					'classic',
+					libraryId,
+					libraryMeta?.itemsResumeOffset ?? 0,
+				)
+			: 0,
+		onResumeOffsetChange: handleResumeOffsetChange,
+		viewportRef: scrollViewportRef,
 		fetchPage: fetchClassicPage,
 	});
 
@@ -227,10 +254,17 @@ export function ClassicQuotesLibrarySection({
 					</button>
 				</div>
 			</div>
+			{/*
+			 * 双向分页仍用 ScrollArea；内层强制 block（覆盖默认 flex/table），
+			 * 避免桌面 WKWebView 在 prepend 时把 scrollTop 打回 0 导致黑屏。
+			 */}
 			<ScrollArea
 				ref={scrollViewportRef}
 				className="min-h-0 flex-1 px-4 pb-4"
+				viewportClassName="[overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 				onScroll={onViewportScroll}
+				onWheel={onViewportWheel}
+				onPointerDownCapture={onViewportPointerDown}
 			>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
@@ -238,13 +272,22 @@ export function ClassicQuotesLibrarySection({
 					</div>
 				) : (
 					<>
+						{loadingPrevious ? (
+							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
+								{t('common.loadingMore')}
+							</div>
+						) : null}
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
 								{t('englishLearning.classic.empty')}
 							</div>
 						) : null}
 						{items.length > 0 ? (
-							<div className="grid grid-cols-1 gap-4 @min-[28rem]:grid-cols-2">
+							<div
+								data-library-list
+								className="grid w-full shrink-0 grid-cols-1 gap-4 @min-[28rem]:grid-cols-2"
+							>
 								{items.map((item) => {
 									const contentKey = classicQuoteFavoriteContentKey(
 										item.english,
@@ -256,61 +299,62 @@ export function ClassicQuotesLibrarySection({
 										favoritedContentKeys.has(contentKey);
 									const favBusy = favoriteActionKey === contentKey;
 									return (
-										<ClassicQuoteCard
-											key={key}
-											variant="library"
-											data={{
-												english: item.english,
-												translationZh: item.translationZh,
-												source: item.source,
-												noteZh: item.noteZh,
-											}}
-											playing={playing}
-											onTogglePlay={() =>
-												void toggleQuoteAudio(item.english, key)
-											}
-											playLabels={{
-												play: t('englishLearning.classic.playQuote'),
-												stop: t('englishLearning.tts.stop'),
-											}}
-											trailingActions={
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													disabled={favBusy || !contentKey}
-													onClick={() =>
-														void toggleClassicQuoteFavorite(item, isFavorited)
-													}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-														isFavorited
-															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
-															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-													)}
-													aria-pressed={isFavorited}
-													aria-label={
-														isFavorited
-															? t('englishLearning.classic.unfavoriteQuote')
-															: t('englishLearning.classic.favoriteQuote')
-													}
-												>
-													<Star
+										<div key={key} data-library-item-id={item.id}>
+											<ClassicQuoteCard
+												variant="library"
+												data={{
+													english: item.english,
+													translationZh: item.translationZh,
+													source: item.source,
+													noteZh: item.noteZh,
+												}}
+												playing={playing}
+												onTogglePlay={() =>
+													void toggleQuoteAudio(item.english, key)
+												}
+												playLabels={{
+													play: t('englishLearning.classic.playQuote'),
+													stop: t('englishLearning.tts.stop'),
+												}}
+												trailingActions={
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														disabled={favBusy || !contentKey}
+														onClick={() =>
+															void toggleClassicQuoteFavorite(item, isFavorited)
+														}
 														className={cn(
-															'size-3.5',
-															isFavorited && 'fill-current',
+															'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+															isFavorited
+																? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+																: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
 														)}
-														aria-hidden
-													/>
-												</Button>
-											}
-										/>
+														aria-pressed={isFavorited}
+														aria-label={
+															isFavorited
+																? t('englishLearning.classic.unfavoriteQuote')
+																: t('englishLearning.classic.favoriteQuote')
+														}
+													>
+														<Star
+															className={cn(
+																'size-3.5',
+																isFavorited && 'fill-current',
+															)}
+															aria-hidden
+														/>
+													</Button>
+												}
+											/>
+										</div>
 									);
 								})}
 							</div>
 						) : null}
 						{loadingMore ? (
-							<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
 								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 								{t('common.loadingMore')}
 							</div>

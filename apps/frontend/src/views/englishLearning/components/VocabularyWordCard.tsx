@@ -69,7 +69,7 @@ function WordHeader({
 		return (
 			<Label
 				htmlFor={controlId}
-				className="select-text flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
+				className="select-text h-full flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
 			>
 				<span className="truncate text-lg font-semibold text-textcolor">
 					{word}
@@ -192,7 +192,7 @@ export function VocabularyWordCard({
 	return (
 		<div
 			className={cn(
-				'select-text bg-theme/5 border border-theme/5 flex min-w-0 flex-col rounded-md px-3 py-2.5',
+				'select-text h-full bg-theme/5 border border-theme/5 flex min-w-0 flex-col rounded-md px-3 py-2.5',
 				className,
 			)}
 		>

@@ -14,6 +14,12 @@ import type {
 	EnglishVocabularyLibraryListItem,
 } from '@/service';
 import {
+	clearEnglishLibraryItemsResumeOffset,
+	flushEnglishLibraryItemsResume,
+	resolveEnglishLibraryItemsResumeOffset,
+	setEnglishLibraryItemsResumeOffset,
+} from '@/store/englishLibraryItemsResume';
+import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
@@ -33,6 +39,8 @@ export default function EnglishLearningLibraryPage() {
 
 	const [selectedLibrary, setSelectedLibrary] =
 		useState<EnglishLibraryListItem | null>(null);
+	/** 与 kind 对齐前不展示右侧，避免切 kind 时用错库 id flush */
+	const [selectedKind, setSelectedKind] = useState<LibraryKind | null>(null);
 	/** 仅 kind 切换时用于左侧列表首次选中，避免点击项改 URL 触发列表重载 */
 	const [listBootLibraryId, setListBootLibraryId] = useState<string | null>(
 		() => searchParams.get('library'),
@@ -41,11 +49,18 @@ export default function EnglishLearningLibraryPage() {
 	useEffect(() => {
 		setListBootLibraryId(searchParams.get('library'));
 		setSelectedLibrary(null);
+		setSelectedKind(null);
 	}, [kind]);
 
 	const onSelectLibrary = useCallback(
 		(library: EnglishLibraryListItem) => {
-			setSelectedLibrary(library);
+			const itemsResumeOffset = resolveEnglishLibraryItemsResumeOffset(
+				kind,
+				library.id,
+				library.itemsResumeOffset ?? 0,
+			);
+			setSelectedKind(kind);
+			setSelectedLibrary({ ...library, itemsResumeOffset });
 			setSearchParams(
 				(prev) => {
 					const next = new URLSearchParams(prev);
@@ -62,7 +77,9 @@ export default function EnglishLearningLibraryPage() {
 	const onLibraryDeleted = useCallback(
 		(deletedId: string) => {
 			invalidateLibraryWordsListCache(kind, deletedId);
+			clearEnglishLibraryItemsResumeOffset(kind, deletedId);
 			setSelectedLibrary(null);
+			setSelectedKind(null);
 			setSearchParams(
 				(prev) => {
 					const next = new URLSearchParams(prev);
@@ -75,12 +92,46 @@ export default function EnglishLearningLibraryPage() {
 		[kind, setSearchParams],
 	);
 
-	const libraryIdFromUrl = searchParams.get('library');
-	const activeLibraryId = selectedLibrary?.id ?? libraryIdFromUrl;
+	const onResumeOffsetChange = useCallback(
+		(libraryId: string, offset: number) => {
+			setEnglishLibraryItemsResumeOffset(kind, libraryId, offset);
+			setSelectedLibrary((prev) =>
+				prev?.id === libraryId ? { ...prev, itemsResumeOffset: offset } : prev,
+			);
+		},
+		[kind],
+	);
+
+	const activeLibrary = selectedKind === kind ? selectedLibrary : null;
+	const activeLibraryId = activeLibrary?.id ?? null;
+
+	/** 对齐电子书：切库 / 离页 / 刷新 / 切后台时 flush 续读 */
+	useEffect(() => {
+		const k = kind;
+		const id = activeLibraryId;
+		if (!id) return;
+
+		const flush = (opts?: { keepalive?: boolean }) => {
+			flushEnglishLibraryItemsResume(k, id, opts);
+		};
+		const onPageHide = () => flush({ keepalive: true });
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') {
+				flush({ keepalive: true });
+			}
+		};
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => {
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibility);
+			flush({ keepalive: true });
+		};
+	}, [kind, activeLibraryId]);
 
 	const vocabLibraryMeta =
-		kind === 'vocab' && selectedLibrary
-			? (selectedLibrary as EnglishVocabularyLibraryListItem)
+		kind === 'vocab' && activeLibrary
+			? (activeLibrary as EnglishVocabularyLibraryListItem)
 			: null;
 
 	useEffect(() => {
@@ -104,8 +155,8 @@ export default function EnglishLearningLibraryPage() {
 	]);
 
 	const classicLibraryMeta =
-		kind === 'classic' && selectedLibrary
-			? (selectedLibrary as EnglishClassicQuotesLibraryListItem)
+		kind === 'classic' && activeLibrary
+			? (activeLibrary as EnglishClassicQuotesLibraryListItem)
 			: null;
 
 	return (
@@ -131,6 +182,7 @@ export default function EnglishLearningLibraryPage() {
 									kind={kind}
 									selectedId={activeLibraryId}
 									initialLibraryId={listBootLibraryId}
+									selectedLibrary={activeLibrary}
 									onSelect={onSelectLibrary}
 									onLibraryDeleted={onLibraryDeleted}
 								/>
@@ -147,11 +199,13 @@ export default function EnglishLearningLibraryPage() {
 									<VocabularyLibrarySection
 										libraryId={activeLibraryId}
 										libraryMeta={vocabLibraryMeta}
+										onResumeOffsetChange={onResumeOffsetChange}
 									/>
 								) : (
 									<ClassicQuotesLibrarySection
 										libraryId={activeLibraryId}
 										libraryMeta={classicLibraryMeta}
+										onResumeOffsetChange={onResumeOffsetChange}
 									/>
 								)}
 							</section>

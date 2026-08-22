@@ -173,7 +173,7 @@ export function ClassicQuoteCard({
 	return (
 		<div
 			className={cn(
-				'select-text bg-theme/5 border border-theme/5 flex min-w-0 flex-col rounded-md px-3 py-2.5',
+				'select-text h-full bg-theme/5 border border-theme/5 flex min-w-0 flex-col rounded-md px-3 py-2.5',
 				className,
 			)}
 		>

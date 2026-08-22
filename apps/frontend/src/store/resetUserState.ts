@@ -4,6 +4,7 @@ import assistantStore from './assistant';
 import ebookStore from './ebook';
 import ebookAssistantStore from './ebookAssistant';
 import englishAgentStore from './englishAgent';
+import { clearEnglishLibraryItemsResumeCache } from './englishLibraryItemsResume';
 import EnglishPackStore from './englishPack';
 import { clearEnglishPracticePoolCache } from './englishPracticePool';
 import knowledgeStore from './knowledge';
@@ -28,6 +29,7 @@ export function resetUserState(): void {
 		ebookStore.resetOnUserSwitch();
 		ebookAssistantStore.resetForBook();
 		clearEnglishPracticePoolCache();
+		clearEnglishLibraryItemsResumeCache();
 		clearMinimaxTtsUserPrefsCache();
 		clearPluginEnabledPrefsCache();
 	} finally {

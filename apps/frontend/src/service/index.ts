@@ -812,6 +812,8 @@ export type EnglishVocabularyLibraryListItem = {
 	createdAt: string;
 	isPublic?: boolean;
 	isOwned?: boolean;
+	/** 词条列表续读 offset（当前登录用户；公开库非所有者也独立） */
+	itemsResumeOffset?: number;
 };
 
 export type EnglishVocabularyLibraryItemRow = EnglishVocabularyItem & {
@@ -869,6 +871,44 @@ export const patchEnglishVocabularyLibraryTitle = async (
 	);
 };
 
+/** 更新单词库词条列表续读 offset（可读即可） */
+export const patchEnglishVocabularyLibraryItemsResume = async (
+	libraryId: string,
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<EnglishVocabularyLibraryListItem>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{ offset },
+		{
+			params: [libraryId, 'items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+/** 刷新/关闭页时 keepalive 上报续读（async PATCH 会被浏览器中断） */
+export function patchEnglishVocabularyLibraryItemsResumeKeepalive(
+	libraryId: string,
+	offset: number,
+): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_VOCABULARY_LIBRARIES}/${encodeURIComponent(libraryId)}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
+
 /** 分页列出某单词库内的词条 */
 export const listEnglishVocabularyLibraryItems = async (
 	libraryId: string,
@@ -914,6 +954,8 @@ export type EnglishClassicQuotesLibraryListItem = {
 	createdAt: string;
 	isPublic?: boolean;
 	isOwned?: boolean;
+	/** 语句列表续读 offset（当前登录用户；公开库非所有者也独立） */
+	itemsResumeOffset?: number;
 };
 
 export type EnglishClassicQuotesLibraryItemRow = {
@@ -974,6 +1016,44 @@ export const patchEnglishClassicQuotesLibraryTitle = async (
 		{ params: [libraryId, 'title'] },
 	);
 };
+
+/** 更新经典语句库列表续读 offset（可读即可） */
+export const patchEnglishClassicQuotesLibraryItemsResume = async (
+	libraryId: string,
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<EnglishClassicQuotesLibraryListItem>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{ offset },
+		{
+			params: [libraryId, 'items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+/** 刷新/关闭页时 keepalive 上报续读 */
+export function patchEnglishClassicQuotesLibraryItemsResumeKeepalive(
+	libraryId: string,
+	offset: number,
+): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES}/${encodeURIComponent(libraryId)}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
 
 /** 分页列出某经典语句库内的语句 */
 export const listEnglishClassicQuotesLibraryItems = async (
