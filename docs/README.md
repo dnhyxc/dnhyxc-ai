@@ -34,6 +34,7 @@
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
 | [`ideas/`](./ideas/)         | **规划态**功能实现思路（架构/流程图）   | [ideas/README.md](./ideas/README.md)                                                                                                     |
 | [`impact/`](./impact/)       | 跨功能改动影响面分析                    | [impact/README.md](./impact/README.md)                                                                                                   |
+| [`guide/`](../guide/)         | **开发者上手手册**（按功能域端到端教程） | [guide/README.md](../guide/README.md)                                                                                                     |
 
 ---
 

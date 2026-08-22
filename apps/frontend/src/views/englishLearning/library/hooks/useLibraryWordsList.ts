@@ -1,5 +1,5 @@
 /**
- * 资源库右侧词条列表：双向分页、续读页、瞬时网络重试、切换库时丢弃过期响应、会话内窗口缓存
+ * 资源库右侧词条列表：续读预取（0→续读页）+ 向下滚动加载更多。
  */
 import { Toast } from '@ui/index';
 import {
@@ -9,17 +9,24 @@ import {
 	useEffect,
 	useRef,
 	useState,
-	type WheelEventHandler,
 } from 'react';
-import { flushSync } from 'react-dom';
-import {
-	SCROLL_LOAD_THRESHOLD_PX,
-	VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-} from '@/constants';
+import { VOCAB_LIBRARY_ITEMS_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
 import { retryAsync } from '@/utils/retryAsync';
-import { setLibraryWordsListCache } from '../utils/libraryWordsListCache';
-import { alignResumeOffset } from '../utils/libraryWordsListResume';
+import {
+	getLibraryWordsListCache,
+	setLibraryWordsListCache,
+} from '../utils/libraryWordsListCache';
+import {
+	buildLibraryPrefetchChunks,
+	mapWithConcurrency,
+} from '../utils/libraryWordsListPrefetch';
+import {
+	alignResumeOffset,
+	cacheCoversResumeOffset,
+} from '../utils/libraryWordsListResume';
+
+const PREFETCH_CONCURRENCY = 3;
 
 export type LibraryWordsListResult<TItem, TLibrary> = {
 	library: TLibrary;
@@ -29,13 +36,9 @@ export type LibraryWordsListResult<TItem, TLibrary> = {
 export type UseLibraryWordsListOptions<TItem, TLibrary> = {
 	libraryId: string | null;
 	pageSize?: number;
-	/** 区分单词库 / 经典句库缓存命名空间 */
 	cacheNamespace?: string;
-	/** 进入库时的续读 offset（来自库列表项；切换 libraryId 时读取） */
 	initialResumeOffset?: number;
-	/** 是否把续读写回服务端（非所有者应 false） */
 	persistResume?: boolean;
-	/** 续读变更：写库 + 同步左侧列表 / 选中项 */
 	onResumeOffsetChange?: (libraryId: string, offset: number) => void;
 	viewportRef?: RefObject<HTMLDivElement | null>;
 	fetchPage: (
@@ -60,24 +63,19 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	const [resolvedLibrary, setResolvedLibrary] = useState<TLibrary | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
-	const [loadingPrevious, setLoadingPrevious] = useState(false);
-	/** 从缓存恢复时用于恢复滚动位置 */
 	const [initialScrollTop, setInitialScrollTop] = useState(0);
+	const [initialScrollItemIndex, setInitialScrollItemIndex] = useState(0);
 
 	const startOffsetRef = useRef(0);
 	const endOffsetRef = useRef(0);
 	const hasMoreRef = useRef(true);
-	const hasPreviousRef = useRef(false);
 	const fetchingMoreRef = useRef(false);
-	const fetchingPrevRef = useRef(false);
-	/** prepend 校正期间忽略触顶/触底 */
-	const suppressScrollLoadRef = useRef(false);
-	/** 进入后仅拉续读页；用户滚动/点击后再允许无限加载 */
-	const scrollLoadArmedRef = useRef(false);
-	const lastScrollTopRef = useRef(0);
+	const lastMoreOffsetRef = useRef(-1);
+	const listReadyRef = useRef(false);
+	const scrollTopRef = useRef(0);
 	const libraryIdRef = useRef<string | null>(null);
 	const loadGenRef = useRef(0);
-	const scrollTopRef = useRef(0);
+	const loadingRef = useRef(false);
 	const resolvedLibraryRef = useRef<TLibrary | null>(null);
 	const itemsRef = useRef<TItem[]>([]);
 	const fetchPageRef = useRef(fetchPage);
@@ -89,14 +87,22 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	const fetchFirstPageRef = useRef<
 		(id: string, gen: number, resumeOffset: number) => Promise<void>
 	>(async () => {});
+	const bootedLibraryIdRef = useRef<string | null>(null);
 
 	fetchPageRef.current = fetchPage;
 	tRef.current = t;
+	loadingRef.current = loading;
 	resolvedLibraryRef.current = resolvedLibrary;
 	itemsRef.current = items;
 	initialResumeOffsetRef.current = initialResumeOffset;
 	persistResumeRef.current = persistResume;
 	onResumeOffsetChangeRef.current = onResumeOffsetChange;
+
+	const markListReady = useCallback(() => {
+		requestAnimationFrame(() => {
+			listReadyRef.current = true;
+		});
+	}, []);
 
 	const setResume = useCallback(
 		(offset: number) => {
@@ -126,7 +132,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 				startOffset: startOffsetRef.current,
 				endOffset: endOffsetRef.current,
 				hasMore: hasMoreRef.current,
-				hasPrevious: hasPreviousRef.current,
+				hasPrevious: false,
 				scrollTop: scrollTopRef.current,
 			});
 		},
@@ -134,12 +140,12 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	);
 
 	const fetchPageWithRetry = useCallback(
-		(id: string, offset: number) =>
-			retryAsync(() => fetchPageRef.current(id, pageSize, offset), {
+		(id: string, limit: number, offset: number) =>
+			retryAsync(() => fetchPageRef.current(id, limit, offset), {
 				retries: 2,
 				delayMs: 400,
 			}),
-		[pageSize],
+		[],
 	);
 
 	const applyWindow = useCallback(
@@ -148,58 +154,120 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			startOffset: number,
 			list: TItem[],
 			resolved: TLibrary | null,
+			scrollItemIndex: number,
+			hasMore: boolean,
 		) => {
 			startOffsetRef.current = startOffset;
 			endOffsetRef.current = startOffset + list.length;
-			hasPreviousRef.current = startOffset > 0;
-			hasMoreRef.current = list.length >= pageSize;
+			hasMoreRef.current = hasMore;
 			setItems(list);
 			if (resolved) setResolvedLibrary(resolved);
-			setResume(startOffset);
+			setResume(alignResumeOffset(scrollItemIndex, pageSize));
+			setInitialScrollItemIndex(scrollItemIndex);
 			persistCache(id, { items: list, resolvedLibrary: resolved });
 		},
 		[pageSize, persistCache, setResume],
 	);
 
-	const fetchFirstPage = useCallback(
-		async (id: string, gen: number, resumeOffset: number) => {
+	const restoreFromCache = useCallback(
+		(id: string, resumeOffset: number): boolean => {
+			if (!cacheNamespace) return false;
+			const cached = getLibraryWordsListCache<TItem, TLibrary>(
+				cacheNamespace,
+				id,
+			);
+			if (!cached || cached.items.length === 0) return false;
+			if (!cacheCoversResumeOffset(cached, resumeOffset, pageSize)) {
+				return false;
+			}
+
+			const page = alignResumeOffset(resumeOffset, pageSize);
+			loadGenRef.current += 1;
+			startOffsetRef.current = cached.startOffset;
+			endOffsetRef.current = cached.endOffset;
+			hasMoreRef.current = cached.hasMore;
+			scrollTopRef.current = cached.scrollTop;
+			lastSavedResumeRef.current =
+				page > 0 ? page : alignResumeOffset(cached.startOffset, pageSize);
+			lastMoreOffsetRef.current = -1;
+			const scrollIndex = Math.min(
+				Math.max(0, page - cached.startOffset),
+				Math.max(0, cached.items.length - 1),
+			);
+			setItems(cached.items);
+			setResolvedLibrary(cached.resolvedLibrary);
+			setInitialScrollTop(cached.scrollTop);
+			setInitialScrollItemIndex(scrollIndex);
+			setLoading(false);
+			setLoadingMore(false);
 			fetchingMoreRef.current = false;
-			fetchingPrevRef.current = false;
-			suppressScrollLoadRef.current = true;
-			scrollLoadArmedRef.current = false;
+			return true;
+		},
+		[cacheNamespace, pageSize],
+	);
+
+	const fetchInitialWindow = useCallback(
+		async (id: string, gen: number, resumeOffset: number) => {
+			listReadyRef.current = false;
+			fetchingMoreRef.current = false;
+			lastMoreOffsetRef.current = -1;
 			setLoading(true);
 			setLoadingMore(false);
-			setLoadingPrevious(false);
 			setInitialScrollTop(0);
+			setInitialScrollItemIndex(0);
 			scrollTopRef.current = 0;
-			lastScrollTopRef.current = 0;
-			startOffsetRef.current = resumeOffset;
-			endOffsetRef.current = resumeOffset;
-			hasMoreRef.current = true;
-			hasPreviousRef.current = resumeOffset > 0;
 			setItems([]);
 			setResolvedLibrary(null);
 			try {
-				let startOffset = resumeOffset;
-				let data = await fetchPageWithRetry(id, startOffset);
+				const chunks = buildLibraryPrefetchChunks(resumeOffset, pageSize);
+				const pages = await mapWithConcurrency(
+					chunks,
+					PREFETCH_CONCURRENCY,
+					(chunk) => fetchPageWithRetry(id, chunk.limit, chunk.offset),
+				);
 				if (gen !== loadGenRef.current || libraryIdRef.current !== id) return;
-				let list = Array.isArray(data.items) ? data.items : [];
-				if (list.length === 0 && startOffset > 0) {
-					startOffset = 0;
-					lastSavedResumeRef.current = -1;
-					data = await fetchPageWithRetry(id, 0);
+
+				const list: TItem[] = [];
+				let lib: TLibrary | null = null;
+				for (const page of pages) {
+					const chunk = Array.isArray(page.items) ? page.items : [];
+					list.push(...chunk);
+					if (page.library) lib = page.library;
+				}
+
+				if (list.length === 0 && resumeOffset > 0) {
+					const fallback = await fetchPageWithRetry(id, pageSize, 0);
 					if (gen !== loadGenRef.current || libraryIdRef.current !== id) {
 						return;
 					}
-					list = Array.isArray(data.items) ? data.items : [];
+					const fallbackList = Array.isArray(fallback.items)
+						? fallback.items
+						: [];
+					const hasMore = fallbackList.length >= pageSize;
+					applyWindow(
+						id,
+						0,
+						fallbackList,
+						fallback.library ?? null,
+						0,
+						hasMore,
+					);
+					return;
 				}
-				const resolved = data.library ?? null;
-				applyWindow(id, startOffset, list, resolved);
+
+				const scrollIndex = Math.min(
+					Math.max(0, resumeOffset),
+					Math.max(0, list.length - 1),
+				);
+				const lastPage = pages.at(-1);
+				const lastChunk = chunks.at(-1);
+				const hasMore =
+					(lastPage?.items.length ?? 0) === (lastChunk?.limit ?? 0);
+				applyWindow(id, 0, list, lib, scrollIndex, hasMore);
 			} catch {
 				if (gen !== loadGenRef.current) return;
 				setItems([]);
 				hasMoreRef.current = false;
-				hasPreviousRef.current = false;
 				Toast({
 					type: 'error',
 					title: tRef.current('englishLearning.library.wordsLoadFailed'),
@@ -207,43 +275,38 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			} finally {
 				if (gen === loadGenRef.current) {
 					setLoading(false);
-					requestAnimationFrame(() => {
-						suppressScrollLoadRef.current = false;
-					});
+					markListReady();
 				}
 			}
 		},
-		[applyWindow, fetchPageWithRetry],
+		[applyWindow, fetchPageWithRetry, markListReady, pageSize],
 	);
 
 	const fetchMore = useCallback(async () => {
 		const id = libraryIdRef.current;
 		const gen = loadGenRef.current;
+		const offset = endOffsetRef.current;
 		if (
+			!listReadyRef.current ||
 			!id ||
 			!hasMoreRef.current ||
 			fetchingMoreRef.current ||
-			fetchingPrevRef.current ||
-			suppressScrollLoadRef.current ||
-			!scrollLoadArmedRef.current ||
-			loading
+			loadingRef.current ||
+			lastMoreOffsetRef.current === offset
 		) {
 			return;
 		}
 		fetchingMoreRef.current = true;
+		lastMoreOffsetRef.current = offset;
 		setLoadingMore(true);
-		const offset = endOffsetRef.current;
 		try {
-			const data = await fetchPageWithRetry(id, offset);
+			const data = await fetchPageWithRetry(id, pageSize, offset);
 			if (gen !== loadGenRef.current || libraryIdRef.current !== id) return;
 			const chunk = Array.isArray(data.items) ? data.items : [];
 			const lib = resolvedLibraryRef.current;
 			if (chunk.length === 0) {
 				hasMoreRef.current = false;
-				setItems((prev) => {
-					persistCache(id, { items: prev, resolvedLibrary: lib });
-					return prev;
-				});
+				persistCache(id, { items: itemsRef.current, resolvedLibrary: lib });
 				return;
 			}
 			setItems((prev) => {
@@ -255,6 +318,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			});
 			setResume(offset);
 		} catch {
+			lastMoreOffsetRef.current = -1;
 			if (gen !== loadGenRef.current) return;
 			Toast({
 				type: 'error',
@@ -266,226 +330,73 @@ export function useLibraryWordsList<TItem, TLibrary>({
 				setLoadingMore(false);
 			}
 		}
-	}, [fetchPageWithRetry, loading, pageSize, persistCache, setResume]);
+	}, [fetchPageWithRetry, pageSize, persistCache, setResume]);
 
-	const fetchPrevious = useCallback(async () => {
-		const id = libraryIdRef.current;
-		const gen = loadGenRef.current;
-		if (
-			!id ||
-			!hasPreviousRef.current ||
-			fetchingMoreRef.current ||
-			fetchingPrevRef.current ||
-			suppressScrollLoadRef.current ||
-			!scrollLoadArmedRef.current ||
-			loading
-		) {
-			return;
-		}
-		const start = startOffsetRef.current;
-		if (start <= 0) {
-			hasPreviousRef.current = false;
-			return;
-		}
-		const prevOffset = Math.max(0, start - pageSize);
-		const el = viewportRef?.current ?? null;
+	fetchFirstPageRef.current = fetchInitialWindow;
 
-		fetchingPrevRef.current = true;
-		suppressScrollLoadRef.current = true;
-
-		// 顶部插入 loading 时先钉住视口，避免列表被顶开（与底部 loading 不顶视口对称）
-		if (el) {
-			const h0 = el.scrollHeight;
-			const t0 = el.scrollTop;
-			flushSync(() => {
-				setLoadingPrevious(true);
-			});
-			el.scrollTop = t0 + (el.scrollHeight - h0);
-			scrollTopRef.current = el.scrollTop;
-			lastScrollTopRef.current = el.scrollTop;
-		} else {
-			setLoadingPrevious(true);
-		}
-
-		try {
-			const data = await fetchPageWithRetry(id, prevOffset);
-			if (gen !== loadGenRef.current || libraryIdRef.current !== id) {
-				suppressScrollLoadRef.current = false;
-				return;
-			}
-			const chunk = Array.isArray(data.items) ? data.items : [];
-			const lib = resolvedLibraryRef.current;
-			if (chunk.length === 0) {
-				hasPreviousRef.current = false;
-				if (el) {
-					const h0 = el.scrollHeight;
-					const t0 = el.scrollTop;
-					flushSync(() => {
-						setLoadingPrevious(false);
-					});
-					el.scrollTop = Math.max(0, t0 + (el.scrollHeight - h0));
-					scrollTopRef.current = el.scrollTop;
-					lastScrollTopRef.current = el.scrollTop;
-				} else {
-					setLoadingPrevious(false);
-				}
-				suppressScrollLoadRef.current = false;
-				return;
-			}
-
-			/**
-			 * 根因（桌面 WKWebView 尤甚）：
-			 * - 下滑 append：上方 DOM 不变，视口仍是已绘制内容 → 无闪烁
-			 * - 上滑 prepend：上方插入后若 scrollTop 仍≈0，视口落到未绘制新区 → 黑屏一帧
-			 * ScrollArea 默认内层 flex/table 会加剧 scrollTop 回弹；列表侧用 viewportClassName
-			 * 强制 block，并用 ΔscrollHeight 在同一同步回合钉住视口。
-			 */
-			const heightBefore = el?.scrollHeight ?? 0;
-			const topBefore = el?.scrollTop ?? 0;
-
-			flushSync(() => {
-				setItems((prev) => {
-					const next = [...chunk, ...prev];
-					startOffsetRef.current = prevOffset;
-					endOffsetRef.current = prevOffset + next.length;
-					hasPreviousRef.current = prevOffset > 0;
-					persistCache(id, { items: next, resolvedLibrary: lib });
-					return next;
-				});
-				setLoadingPrevious(false);
-			});
-
-			const viewport = viewportRef?.current;
-			if (viewport) {
-				const nextTop = Math.max(
-					0,
-					topBefore + (viewport.scrollHeight - heightBefore),
-				);
-				viewport.scrollTop = nextTop;
-				scrollTopRef.current = nextTop;
-				lastScrollTopRef.current = nextTop;
-				// 延后写续读，避免父级重渲与钉住抢同一帧
-				queueMicrotask(() => {
-					setResume(prevOffset);
-				});
-				requestAnimationFrame(() => {
-					if (viewportRef?.current === viewport) {
-						viewport.scrollTop = nextTop;
-						scrollTopRef.current = viewport.scrollTop;
-						lastScrollTopRef.current = viewport.scrollTop;
-					}
-					suppressScrollLoadRef.current = false;
-				});
-			} else {
-				setResume(prevOffset);
-				suppressScrollLoadRef.current = false;
-			}
-		} catch {
-			suppressScrollLoadRef.current = false;
-			if (gen !== loadGenRef.current) return;
-			Toast({
-				type: 'error',
-				title: tRef.current('englishLearning.library.wordsLoadMoreFailed'),
-			});
-		} finally {
-			if (gen === loadGenRef.current) {
-				fetchingPrevRef.current = false;
-				setLoadingPrevious(false);
-			}
-		}
-	}, [
-		fetchPageWithRetry,
-		loading,
-		pageSize,
-		persistCache,
-		setResume,
-		viewportRef,
-	]);
-
-	fetchFirstPageRef.current = fetchFirstPage;
-
-	// 切换库时读列表项续读；故意不依赖 initialResumeOffset 后续变更，避免写回后重载
 	useEffect(() => {
 		libraryIdRef.current = libraryId;
-		scrollLoadArmedRef.current = false;
-		lastScrollTopRef.current = 0;
+		listReadyRef.current = false;
+		lastMoreOffsetRef.current = -1;
 		if (!libraryId) {
 			loadGenRef.current += 1;
+			bootedLibraryIdRef.current = null;
 			setItems([]);
 			setResolvedLibrary(null);
 			setInitialScrollTop(0);
+			setInitialScrollItemIndex(0);
 			return;
 		}
+		if (bootedLibraryIdRef.current === libraryId) {
+			return;
+		}
+
 		const resumeOffset = alignResumeOffset(
 			initialResumeOffsetRef.current,
 			pageSize,
 		);
+		if (restoreFromCache(libraryId, resumeOffset)) {
+			bootedLibraryIdRef.current = libraryId;
+			markListReady();
+			return;
+		}
+		bootedLibraryIdRef.current = libraryId;
 		lastSavedResumeRef.current = resumeOffset;
 		const gen = ++loadGenRef.current;
 		void fetchFirstPageRef.current(libraryId, gen, resumeOffset);
-	}, [libraryId, pageSize]);
+	}, [libraryId, pageSize, restoreFromCache, markListReady]);
+
+	useEffect(() => {
+		const el = viewportRef?.current;
+		if (!el || initialScrollTop <= 0) return;
+		el.scrollTop = initialScrollTop;
+		scrollTopRef.current = initialScrollTop;
+	}, [libraryId, initialScrollTop, viewportRef]);
 
 	const onViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
 		(e) => {
-			const el = e.currentTarget;
-			const top = el.scrollTop;
-			const prevTop = lastScrollTopRef.current;
-			const goingUp = top < prevTop - 0.5;
-			const goingDown = top > prevTop + 0.5;
-			lastScrollTopRef.current = top;
-			scrollTopRef.current = top;
-			if (libraryIdRef.current && cacheNamespace) {
-				setLibraryWordsListCache<TItem, TLibrary>(
-					cacheNamespace,
-					libraryIdRef.current,
-					{
-						items: itemsRef.current,
-						resolvedLibrary: resolvedLibraryRef.current,
-						startOffset: startOffsetRef.current,
-						endOffset: endOffsetRef.current,
-						hasMore: hasMoreRef.current,
-						hasPrevious: hasPreviousRef.current,
-						scrollTop: top,
-					},
-				);
-			}
-			if (suppressScrollLoadRef.current || !scrollLoadArmedRef.current) {
-				return;
-			}
-			if (goingUp && top < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchPrevious();
-			}
-			const rest = el.scrollHeight - top - el.clientHeight;
-			if (goingDown && rest < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchMore();
-			}
+			scrollTopRef.current = e.currentTarget.scrollTop;
+			if (!libraryIdRef.current || !cacheNamespace) return;
+			setLibraryWordsListCache<TItem, TLibrary>(
+				cacheNamespace,
+				libraryIdRef.current,
+				{
+					items: itemsRef.current,
+					resolvedLibrary: resolvedLibraryRef.current,
+					startOffset: startOffsetRef.current,
+					endOffset: endOffsetRef.current,
+					hasMore: hasMoreRef.current,
+					hasPrevious: false,
+					scrollTop: scrollTopRef.current,
+				},
+			);
 		},
-		[cacheNamespace, fetchMore, fetchPrevious],
+		[cacheNamespace],
 	);
 
-	const armScrollLoad = useCallback(() => {
-		scrollLoadArmedRef.current = true;
-	}, []);
-
-	const onViewportWheel = useCallback<WheelEventHandler<HTMLDivElement>>(
-		(e) => {
-			armScrollLoad();
-			if (suppressScrollLoadRef.current) return;
-			if (e.deltaY >= 0) {
-				const el = e.currentTarget;
-				const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
-				if (rest < SCROLL_LOAD_THRESHOLD_PX) {
-					void fetchMore();
-				}
-				return;
-			}
-			const el = e.currentTarget;
-			if (el.scrollTop < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchPrevious();
-			}
-		},
-		[armScrollLoad, fetchMore, fetchPrevious],
-	);
+	const onEndReached = useCallback(() => {
+		void fetchMore();
+	}, [fetchMore]);
 
 	return {
 		items,
@@ -493,10 +404,9 @@ export function useLibraryWordsList<TItem, TLibrary>({
 		resolvedLibrary,
 		loading,
 		loadingMore,
-		loadingPrevious,
 		initialScrollTop,
+		initialScrollItemIndex,
 		onViewportScroll,
-		onViewportWheel,
-		onViewportPointerDown: armScrollLoad,
+		onEndReached,
 	};
 }

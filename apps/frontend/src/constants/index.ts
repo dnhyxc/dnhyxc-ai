@@ -55,9 +55,9 @@ export const VOCAB_COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
 /** 历史列表分页大小（与知识库列表分页量级一致） */
 export const VOCAB_HISTORY_PAGE_SIZE = 50;
 /** 单词库列表每页条数 */
-export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 50;
+export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 100;
 /** 单词库内词条每页条数 */
-export const VOCAB_LIBRARY_ITEMS_PAGE_SIZE = 50;
+export const VOCAB_LIBRARY_ITEMS_PAGE_SIZE = 100;
 /** 拉取结果历史会话内词条每页条数（与后端 PACK_HISTORY_ITEMS_PAGE_MAX 上限对齐） */
 export const PACK_ITEMS_PAGE_SIZE = 100;
 /** 收藏状态批量查询单次最多词数，与后端 `VocabularyFavoriteStatusDto` 的 `@ArrayMaxSize(500)` 一致 */

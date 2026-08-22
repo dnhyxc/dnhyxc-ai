@@ -489,7 +489,7 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			200,
+			1000,
 			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
@@ -498,6 +498,32 @@ export class EnglishLearningController {
 			libraryId,
 			{ limit, offset },
 		);
+		return { success: true, data };
+	}
+
+	/** 按库内 offset/limit 分页查询该批词条的收藏状态 */
+	@Get('vocabulary-libraries/:libraryId/favorites-status')
+	async listVocabularyLibraryFavoriteStatus(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data =
+			await this.englishLearningService.listVocabularyLibraryFavoriteStatus(
+				userId,
+				libraryId,
+				{ limit, offset },
+			);
 		return { success: true, data };
 	}
 
@@ -683,12 +709,38 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			200,
+			1000,
 			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
 		const data =
 			await this.englishLearningService.listClassicQuotesLibraryItems(
+				userId,
+				libraryId,
+				{ limit, offset },
+			);
+		return { success: true, data };
+	}
+
+	/** 按库内 offset/limit 分页查询该批语句的收藏状态 */
+	@Get('classic-quotes-libraries/:libraryId/favorites-status')
+	async listClassicQuotesLibraryFavoriteStatus(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data =
+			await this.englishLearningService.listClassicQuotesLibraryFavoriteStatus(
 				userId,
 				libraryId,
 				{ limit, offset },

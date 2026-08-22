@@ -1,16 +1,10 @@
 /**
- * 单词资源库：右侧词条列表（续读页 + 双向滚动分页）
+ * 单词资源库：右侧词条列表（续读预取 + 向下滚动加载）
  */
 import Loading from '@design/Loading';
-import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+import { Button, ScrollArea, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
-import {
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { useIncrementalVocabFavoriteStatus } from '@/hooks/useIncrementalVocabFavoriteStatus';
@@ -35,6 +29,10 @@ import {
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import {
+	LibraryListLoadMoreRow,
+	LibraryVirtuosoGrid,
+} from '../components/LibraryVirtuosoGrid';
 import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
 
 export type VocabularyLibrarySectionProps = {
@@ -74,6 +72,15 @@ export function VocabularyLibrarySection({
 	);
 
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const [gridReady, setGridReady] = useState(false);
+
+	useEffect(() => {
+		setGridReady(false);
+	}, [libraryId]);
+
+	const handleGridReady = useCallback(() => {
+		setGridReady(true);
+	}, []);
 
 	/** 浏览中只写本地；离开库时由页面 flush 到 DB */
 	const handleResumeOffsetChange = useCallback(
@@ -89,11 +96,9 @@ export function VocabularyLibrarySection({
 		resolvedLibrary,
 		loading,
 		loadingMore,
-		loadingPrevious,
-		initialScrollTop,
+		initialScrollItemIndex,
 		onViewportScroll,
-		onViewportWheel,
-		onViewportPointerDown,
+		onEndReached,
 	} = useLibraryWordsList<
 		EnglishVocabularyLibraryItemRow,
 		EnglishVocabularyLibraryListItem
@@ -111,12 +116,6 @@ export function VocabularyLibrarySection({
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchVocabPage,
 	});
-
-	useLayoutEffect(() => {
-		const el = scrollViewportRef.current;
-		if (!el || initialScrollTop <= 0) return;
-		el.scrollTop = initialScrollTop;
-	}, [libraryId, initialScrollTop]);
 
 	useEffect(() => {
 		if (!libraryId) return;
@@ -139,7 +138,7 @@ export function VocabularyLibrarySection({
 		getVocabularyFavoriteId,
 		setVocabularyFavoriteId,
 		clearVocabularyFavorite,
-	} = useIncrementalVocabFavoriteStatus(items);
+	} = useIncrementalVocabFavoriteStatus(items, { libraryId });
 
 	useEffect(() => {
 		stopAllPlayback();
@@ -206,6 +205,7 @@ export function VocabularyLibrarySection({
 	const title = meta?.title?.trim() || '—';
 	const total = meta?.wordCount ?? items.length;
 	const showInitialLoading = loading && items.length === 0;
+	const awaitingGrid = items.length > 0 && !gridReady;
 	const showEmpty = !loading && items.length === 0;
 
 	return (
@@ -249,105 +249,101 @@ export function VocabularyLibrarySection({
 					</button>
 				</div>
 			</div>
-			{/*
-			 * 双向分页仍用 ScrollArea；内层强制 block（覆盖默认 flex/table），
-			 * 避免桌面 WKWebView 在 prepend 时把 scrollTop 打回 0 导致黑屏。
-			 */}
-			<ScrollArea
-				ref={scrollViewportRef}
-				className="min-h-0 flex-1 px-4 pb-4"
-				viewportClassName="[overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-				onScroll={onViewportScroll}
-				onWheel={onViewportWheel}
-				onPointerDownCapture={onViewportPointerDown}
-			>
-				{showInitialLoading ? (
-					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
-						<Loading text={t('englishLearning.library.wordsLoading')} />
-					</div>
-				) : (
-					<>
-						{loadingPrevious ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
-								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-								{t('common.loadingMore')}
-							</div>
-						) : null}
+			{showInitialLoading ? (
+				<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 pb-4 text-center text-sm">
+					<Loading text={t('englishLearning.library.wordsLoading')} />
+				</div>
+			) : (
+				<div className="relative min-h-0 flex-1">
+					{awaitingGrid ? (
+						<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center px-4 pb-4">
+							<Loading text={t('englishLearning.library.wordsLoading')} />
+						</div>
+					) : null}
+					<ScrollArea
+						ref={scrollViewportRef}
+						className="relative min-h-0 h-full px-4 pb-4"
+						viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
+						onScroll={onViewportScroll}
+					>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
 								{t('englishLearning.vocab.empty')}
 							</div>
-						) : null}
-						{items.length > 0 ? (
-							<div
-								data-library-list
-								className="grid w-full shrink-0 grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-4"
-							>
-								{items.map((item) => {
-									const key = `${item.id}-${item.word}`;
-									const playing = playingKey === key;
-									const wordKey = normalizeEnglishVocabWordKey(item.word);
-									const isFavorited = favoritedWordKeys.has(wordKey);
-									const favBusy = favoriteActionKey === wordKey;
-									return (
-										<div key={key} data-library-item-id={item.id}>
-											<VocabularyWordCard
-												variant="library"
-												data={item}
-												playing={playing}
-												onTogglePlay={() =>
-													void toggleWordAudio(item.word, key)
-												}
-												playLabels={{
-													play: t('englishLearning.vocab.playWord'),
-													stop: t('englishLearning.tts.stop'),
-												}}
-												trailingActions={
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														disabled={favBusy}
-														onClick={() =>
-															void toggleVocabularyFavorite(item, isFavorited)
-														}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-															isFavorited
-																? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
-																: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-														)}
-														aria-pressed={isFavorited}
-														aria-label={
-															isFavorited
-																? t('englishLearning.vocab.unfavoriteWord')
-																: t('englishLearning.vocab.favoriteWord')
-														}
-													>
-														<Star
+						) : (
+							<div className="relative w-full">
+								<LibraryVirtuosoGrid
+									key={libraryId}
+									items={items}
+									viewportRef={scrollViewportRef}
+									columnMode="vocab"
+									initialScrollItemIndex={initialScrollItemIndex}
+									getItemKey={(item) => `${item.id}-${item.word}`}
+									onEndReached={onEndReached}
+									onReady={handleGridReady}
+									itemContent={(item) => {
+										const key = `${item.id}-${item.word}`;
+										const playing = playingKey === key;
+										const wordKey = normalizeEnglishVocabWordKey(item.word);
+										const isFavorited = favoritedWordKeys.has(wordKey);
+										const favBusy = favoriteActionKey === wordKey;
+										return (
+											<div data-library-item-id={item.id} className="h-full">
+												<VocabularyWordCard
+													variant="library"
+													data={item}
+													playing={playing}
+													onTogglePlay={() =>
+														void toggleWordAudio(item.word, key)
+													}
+													playLabels={{
+														play: t('englishLearning.vocab.playWord'),
+														stop: t('englishLearning.tts.stop'),
+													}}
+													trailingActions={
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															disabled={favBusy}
+															onClick={() =>
+																void toggleVocabularyFavorite(item, isFavorited)
+															}
 															className={cn(
-																'size-3.5',
-																isFavorited && 'fill-current',
+																'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+																isFavorited
+																	? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+																	: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
 															)}
-															aria-hidden
-														/>
-													</Button>
-												}
-											/>
-										</div>
-									);
-								})}
+															aria-pressed={isFavorited}
+															aria-label={
+																isFavorited
+																	? t('englishLearning.vocab.unfavoriteWord')
+																	: t('englishLearning.vocab.favoriteWord')
+															}
+														>
+															<Star
+																className={cn(
+																	'size-3.5',
+																	isFavorited && 'fill-current',
+																)}
+																aria-hidden
+															/>
+														</Button>
+													}
+												/>
+											</div>
+										);
+									}}
+								/>
+								{loadingMore ? (
+									<LibraryListLoadMoreRow label={t('common.loadingMore')} />
+								) : null}
 							</div>
-						) : null}
-						{loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
-								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-								{t('common.loadingMore')}
-							</div>
-						) : null}
-					</>
-				)}
-			</ScrollArea>
+						)}
+					</ScrollArea>
+				</div>
+			)}
 		</div>
 	);
 }

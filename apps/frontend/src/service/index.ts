@@ -1073,6 +1073,42 @@ export const listEnglishClassicQuotesLibraryItems = async (
 	});
 };
 
+/** 按库内 offset/limit 分页查询该批语句的收藏状态 */
+export const listEnglishClassicQuotesLibraryFavoriteStatus = async (
+	libraryId: string,
+	options?: { limit?: number; offset?: number; silent?: boolean },
+) => {
+	return await http.get<{ favorited: EnglishClassicQuoteFavoriteRef[] }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{
+			params: [libraryId, 'favorites-status'],
+			querys: {
+				limit: options?.limit ?? 50,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+/** 按库内 offset/limit 分页查询该批词条的收藏状态 */
+export const listEnglishVocabularyLibraryFavoriteStatus = async (
+	libraryId: string,
+	options?: { limit?: number; offset?: number; silent?: boolean },
+) => {
+	return await http.get<{ favorited: EnglishVocabFavoriteRef[] }>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{
+			params: [libraryId, 'favorites-status'],
+			querys: {
+				limit: options?.limit ?? 50,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
 /** 与后端收藏去重规则一致：trim + 小写（规范化词形） */
 export function normalizeEnglishVocabWordKey(word: string): string {
 	return word.trim().toLowerCase();

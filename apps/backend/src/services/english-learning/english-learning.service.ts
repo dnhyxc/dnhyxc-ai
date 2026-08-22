@@ -2305,7 +2305,7 @@ ${existingHintBlock}
 		items: VocabularyLibraryItemDto[];
 	}> {
 		const lib = await this.assertVocabularyLibraryReadable(userId, libraryId);
-		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
+		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
 		const [rows, resume] = await Promise.all([
@@ -2322,6 +2322,30 @@ ${existingHintBlock}
 			library: this.mapVocabularyLibraryListItem(lib, userId, resume),
 			items: rows.map((r) => this.mapLibraryItemRow(r)),
 		};
+	}
+
+	/** 按库内 offset/limit 分页查询该批词条的收藏状态（与 items 分页对齐） */
+	async listVocabularyLibraryFavoriteStatus(
+		userId: number,
+		libraryId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{ favorited: Array<{ wordKey: string; id: string }> }> {
+		await this.assertVocabularyLibraryReadable(userId, libraryId);
+		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const rows = await this.vocabLibraryItemRepo.find({
+			where: { libraryId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+			select: ['word'],
+		});
+		const favorited = await this.listVocabularyFavoriteRefsForWords(
+			userId,
+			rows.map((r) => r.word),
+		);
+		return { favorited };
 	}
 
 	/**
@@ -2629,7 +2653,7 @@ ${existingHintBlock}
 			userId,
 			libraryId,
 		);
-		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
+		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
 		const [rows, resume] = await Promise.all([
@@ -2646,6 +2670,30 @@ ${existingHintBlock}
 			library: this.mapClassicQuotesLibraryListItem(lib, userId, resume),
 			items: rows.map((r) => this.mapClassicLibraryItemRow(r)),
 		};
+	}
+
+	/** 按库内 offset/limit 分页查询该批语句的收藏状态（与 items 分页对齐） */
+	async listClassicQuotesLibraryFavoriteStatus(
+		userId: number,
+		libraryId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{ favorited: Array<{ contentKey: string; id: string }> }> {
+		await this.assertClassicQuotesLibraryReadable(userId, libraryId);
+		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const rows = await this.classicQuotesLibraryItemRepo.find({
+			where: { libraryId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+			select: ['english'],
+		});
+		const favorited = await this.listClassicQuoteFavoriteRefsForEnglishes(
+			userId,
+			rows.map((r) => r.english),
+		);
+		return { favorited };
 	}
 
 	async saveImportedClassicQuotesLibrary(
