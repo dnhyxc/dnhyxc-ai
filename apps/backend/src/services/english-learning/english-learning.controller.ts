@@ -62,6 +62,7 @@ import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import { UpdateLibraryItemsResumeDto } from './dto/update-library-items-resume.dto';
 import { UpdateLibraryTitleDto } from './dto/update-library-title.dto';
 import { UpdateLibraryVisibilityDto } from './dto/update-library-visibility.dto';
+import { UpdateResumeModuleSettingDto } from './dto/update-resume-module-setting.dto';
 import {
 	VocabularyFavoriteBodyDto,
 	VocabularyFavoriteRemoveBatchDto,
@@ -930,6 +931,34 @@ export class EnglishLearningController {
 				userId,
 			);
 		return { success: true, data };
+	}
+
+	@Get('items-resume/modules')
+	async getResumeModuleSettings(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getResumeModuleSettings(userId);
+		return { success: true, data: { modules: data } };
+	}
+
+	@Patch('items-resume/modules')
+	async updateResumeModuleSetting(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateResumeModuleSettingDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.updateResumeModuleSetting(
+			userId,
+			dto.moduleKey,
+			dto.enabled,
+		);
+		return { success: true, data: { modules: data } };
 	}
 
 	@Get('practice/daily/records/items-resume')

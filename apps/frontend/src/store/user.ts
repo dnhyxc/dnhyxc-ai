@@ -6,7 +6,7 @@ import {
 import { getStorage, removeStorage, setStorage } from '@/utils';
 import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
-
+import { hydrateElResumeModuleSettings } from '@/views/englishLearning/utils/elResumeModule';
 import { USER_INFO_STORAGE_KEY } from './loggedInUserId';
 import { resetUserState } from './resetUserState';
 
@@ -96,6 +96,9 @@ class UserStore {
 		setStorage(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
 		if (nextId > 0 && isMembershipActiveFromUserInfo(userInfo)) {
 			prefetchMinimaxTtsUserPrefs(nextId);
+		}
+		if (nextId > 0) {
+			void hydrateElResumeModuleSettings();
 		}
 		if (prevId !== nextId) {
 			if (nextId > 0) prefetchPluginEnabledPrefs(nextId);

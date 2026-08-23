@@ -94,6 +94,10 @@ import {
 } from './english-favorites-docx.builder';
 import { ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID } from './english-learning-list-resume.constants';
 import {
+	ENGLISH_LEARNING_RESUME_MODULE_KEYS,
+	type EnglishLearningResumeModuleKey,
+} from './english-learning-resume-module.constants';
+import {
 	applyReviewSrs,
 	defaultReviewStateForNewMistake,
 	parseEaseFactor,
@@ -109,6 +113,7 @@ import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
 import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
+import { EnglishLearningResumeModuleSetting } from './entity/english-learning-resume-module-setting.entity';
 import {
 	EnglishLibraryItemsResume,
 	type EnglishLibraryItemsResumeKind,
@@ -294,6 +299,8 @@ export class EnglishLearningService {
 		private readonly classicQuotesLibraryItemRepo: Repository<EnglishClassicQuotesLibraryItem>,
 		@InjectRepository(EnglishLibraryItemsResume)
 		private readonly libraryItemsResumeRepo: Repository<EnglishLibraryItemsResume>,
+		@InjectRepository(EnglishLearningResumeModuleSetting)
+		private readonly resumeModuleSettingRepo: Repository<EnglishLearningResumeModuleSetting>,
 		@InjectRepository(EnglishPracticeReviewState)
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
 		@InjectRepository(EnglishDailyMemorizeRecord)
@@ -2816,6 +2823,37 @@ ${existingHintBlock}
 			offset,
 		);
 		return { itemsResumeOffset };
+	}
+
+	async getResumeModuleSettings(
+		userId: number,
+	): Promise<Record<EnglishLearningResumeModuleKey, boolean>> {
+		const rows = await this.resumeModuleSettingRepo.find({
+			where: { userId, enabled: false },
+			select: ['moduleKey'],
+		});
+		const disabled = new Set(rows.map((row) => row.moduleKey));
+		const modules = {} as Record<EnglishLearningResumeModuleKey, boolean>;
+		for (const key of ENGLISH_LEARNING_RESUME_MODULE_KEYS) {
+			modules[key] = !disabled.has(key);
+		}
+		return modules;
+	}
+
+	async updateResumeModuleSetting(
+		userId: number,
+		moduleKey: EnglishLearningResumeModuleKey,
+		enabled: boolean,
+	): Promise<Record<EnglishLearningResumeModuleKey, boolean>> {
+		if (enabled) {
+			await this.resumeModuleSettingRepo.delete({ userId, moduleKey });
+		} else {
+			await this.resumeModuleSettingRepo.upsert(
+				{ userId, moduleKey, enabled: false },
+				['userId', 'moduleKey'],
+			);
+		}
+		return this.getResumeModuleSettings(userId);
 	}
 
 	async listClassicQuotesLibraryItems(

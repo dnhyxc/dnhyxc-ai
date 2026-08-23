@@ -93,6 +93,7 @@ export default function EnglishLearningDailyRecordsPage() {
 		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
 		refetchOnEnter: true,
 		onResumeOffsetChange: handleResumeOffsetChange,
+		resumeModuleKey: 'daily-memorize',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchRecordsPage,
 	});

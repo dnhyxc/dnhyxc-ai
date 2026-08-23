@@ -172,7 +172,7 @@ function EnglishAgentScrollShell({
 						<div className="border-theme/5 bg-theme/5 flex w-full gap-2 rounded-md border p-3">
 							<Atom
 								size={18}
-								className="mt-[3px] shrink-0 text-teal-500 opacity-80"
+								className="mt-[3px] shrink-0 text-textcolor opacity-65"
 								aria-hidden
 							/>
 							<div className="flex-1 text-sm leading-relaxed">

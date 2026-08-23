@@ -119,6 +119,7 @@ export function VocabularyLibrarySection({
 				)
 			: 0,
 		onResumeOffsetChange: handleResumeOffsetChange,
+		resumeModuleKey: 'library-vocab',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchVocabPage,
 	});

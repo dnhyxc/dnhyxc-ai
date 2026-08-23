@@ -10,8 +10,7 @@ import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
 import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
 import { SIDEBAR_BTN_GAP } from '../tokens';
-import { EnglishSidebarHeader } from './EnglishSidebarHeader';
-import { SidebarPanel } from './SidebarPanel';
+import { EnglishSidebarCard } from './EnglishSidebarCard';
 
 const chipDefs = [
 	{
@@ -106,15 +105,14 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 	}, [quickIntentsExpanded, showIntentExpandToggle]);
 
 	return (
-		<SidebarPanel className="@container min-w-0">
-			<EnglishSidebarHeader
-				icon={Cog}
-				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.toolbar}
-				title={t('englishLearning.quickIntents')}
-				description={t('englishLearning.toolbarSubtitleShort')}
-				className="mb-2"
-			/>
-
+		<EnglishSidebarCard
+			className="@container min-w-0"
+			icon={Cog}
+			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.toolbar}
+			title={t('englishLearning.quickIntents')}
+			description={t('englishLearning.toolbarSubtitleShort')}
+			headerClassName="mb-2"
+		>
 			<div className="min-w-0">
 				<div className="mb-0.5 flex min-h-6 items-center justify-between gap-2">
 					<div className="text-textcolor/45 flex items-center gap-1.5 text-sm font-medium tracking-wide">
@@ -125,7 +123,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 							type="button"
 							variant="link"
 							size="sm"
-							className="text-textcolor/55 hover:text-textcolor mt-0.5 -mr-2 h-8 w-8 shrink-0 p-0!"
+							className="text-textcolor opacity-55 hover:text-teal-500 hover:opacity-100 mt-0.5 -mr-2 h-8 w-8 shrink-0 p-0!"
 							onClick={() => setQuickIntentsExpanded((v) => !v)}
 							aria-expanded={quickIntentsExpanded}
 							aria-label={
@@ -135,15 +133,9 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 							}
 						>
 							{quickIntentsExpanded ? (
-								<CircleChevronDown
-									className="h-full w-full transition-transform duration-200"
-									aria-hidden
-								/>
+								<CircleChevronDown className="h-full w-full" aria-hidden />
 							) : (
-								<CircleChevronRight
-									className="h-full w-full transition-transform duration-200"
-									aria-hidden
-								/>
+								<CircleChevronRight className="h-full w-full" aria-hidden />
 							)}
 						</Button>
 					) : null}
@@ -192,6 +184,6 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 					</div>
 				</div>
 			) : null}
-		</SidebarPanel>
+		</EnglishSidebarCard>
 	);
 });

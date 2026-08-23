@@ -34,8 +34,7 @@ import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
-import { EnglishSidebarHeader } from '../../sidebar/components/EnglishSidebarHeader';
-import { SidebarPanel } from '../../sidebar/components/SidebarPanel';
+import { EnglishSidebarCard } from '../../sidebar/components/EnglishSidebarCard';
 import {
 	ENGLISH_SIDEBAR_BTN_GRADIENT,
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
@@ -363,36 +362,37 @@ function VocabularyPackSectionInner() {
 	}, [countInput]);
 
 	return (
-		<SidebarPanel className="@container min-w-0">
-			<Confirm
-				open={historyDeleteConfirmOpen}
-				onOpenChange={(open) => {
-					setHistoryDeleteConfirmOpen(open);
-					if (!open) setHistoryDeleteTarget(null);
-				}}
-				title={t('englishLearning.packHistory.deleteConfirmTitle')}
-				description={
-					historyDeleteTarget
-						? t('englishLearning.packHistory.deleteConfirmDesc', {
-								topic: historyDeleteTarget.topic || '—',
-								count: historyDeleteTarget.wordCount,
-							})
-						: '\u00a0'
-				}
-				descriptionClassName="text-left"
-				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
-				cancelText={t('common.cancel')}
-				confirmVariant="destructive"
-				closeOnConfirm={false}
-				onConfirm={() => void executeDeleteHistory()}
-			/>
-			<EnglishSidebarHeader
-				icon={BookText}
-				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.vocabPack}
-				title={t('englishLearning.vocab.title')}
-				description={t('englishLearning.vocab.descShort')}
-			/>
-
+		<EnglishSidebarCard
+			className="@container min-w-0"
+			prepend={
+				<Confirm
+					open={historyDeleteConfirmOpen}
+					onOpenChange={(open) => {
+						setHistoryDeleteConfirmOpen(open);
+						if (!open) setHistoryDeleteTarget(null);
+					}}
+					title={t('englishLearning.packHistory.deleteConfirmTitle')}
+					description={
+						historyDeleteTarget
+							? t('englishLearning.packHistory.deleteConfirmDesc', {
+									topic: historyDeleteTarget.topic || '—',
+									count: historyDeleteTarget.wordCount,
+								})
+							: '\u00a0'
+					}
+					descriptionClassName="text-left"
+					confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
+					cancelText={t('common.cancel')}
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={() => void executeDeleteHistory()}
+				/>
+			}
+			icon={BookText}
+			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.vocabPack}
+			title={t('englishLearning.vocab.title')}
+			description={t('englishLearning.vocab.descShort')}
+		>
 			<label
 				htmlFor="english-vocab-topic"
 				className="text-textcolor/45 mb-1.5 block text-sm font-medium"
@@ -523,7 +523,7 @@ function VocabularyPackSectionInner() {
 				onDeleteEntry={requestDeleteHistory}
 				practiceReturnTo="home"
 			/>
-		</SidebarPanel>
+		</EnglishSidebarCard>
 	);
 }
 

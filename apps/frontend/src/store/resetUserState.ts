@@ -1,5 +1,6 @@
 import { clearPluginEnabledPrefsCache } from '@/federation';
 import { clearMinimaxTtsUserPrefsCache } from '@/utils/minimaxTtsPrefs';
+import { resetElResumeModuleSettingsCache } from '@/views/englishLearning/utils/elResumeModule';
 import assistantStore from './assistant';
 import ebookStore from './ebook';
 import ebookAssistantStore from './ebookAssistant';
@@ -30,6 +31,7 @@ export function resetUserState(): void {
 		ebookAssistantStore.resetForBook();
 		clearEnglishPracticePoolCache();
 		clearElResumeCache();
+		resetElResumeModuleSettingsCache();
 		clearMinimaxTtsUserPrefsCache();
 		clearPluginEnabledPrefsCache();
 	} finally {

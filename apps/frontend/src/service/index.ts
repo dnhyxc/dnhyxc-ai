@@ -78,6 +78,7 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
 	ENGLISH_LEARNING_PRACTICE_DAILY,
 	ENGLISH_LEARNING_PRACTICE_REVIEW,
 	ENGLISH_LEARNING_STREAM_CANCEL,
@@ -1982,6 +1983,36 @@ export function keepClassicFavResume(offset: number): void {
 }
 
 export type ElListResumeKind = 'vocab' | 'classic';
+
+export type ElResumeModuleSettings = Record<
+	| 'library-vocab'
+	| 'library-classic'
+	| 'favorites'
+	| 'mistakes'
+	| 'daily-memorize',
+	boolean
+>;
+
+export const getElResumeModuleSettings = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<{ modules: ElResumeModuleSettings }>(
+		ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
+		{ silent: options?.silent ?? true },
+	);
+};
+
+export const patchElResumeModuleSetting = async (
+	moduleKey: keyof ElResumeModuleSettings,
+	enabled: boolean,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ modules: ElResumeModuleSettings }>(
+		ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
+		{ moduleKey, enabled },
+		{ silent: options?.silent ?? true },
+	);
+};
 
 type ElListResumePatchPair = {
 	patch: (offset: number) => Promise<unknown>;

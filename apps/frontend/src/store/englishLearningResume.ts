@@ -17,6 +17,11 @@ import {
 	patchElListResume,
 } from '@/service';
 import type { LibraryKind } from '@/views/englishLearning/library/types';
+import {
+	entryResumeModuleKey,
+	fixedListResumeModuleKey,
+	isElResumeModuleEnabled,
+} from '@/views/englishLearning/utils/elResumeModule';
 import { alignResumeOffset } from '@/views/englishLearning/utils/libraryWordsListResume';
 
 const PAGE_SIZE_HINT = VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
@@ -47,6 +52,7 @@ export function setElResumeOffset(
 ): void {
 	const id = libraryId.trim();
 	if (!id) return;
+	if (!isElResumeModuleEnabled(entryResumeModuleKey(kind, id))) return;
 	const key = entryKey(kind, id);
 	const next = alignResumeOffset(offset, pageSize);
 	if (next <= 0) {
@@ -76,6 +82,7 @@ export function resolveElResumeOffset(
 	fallback = 0,
 	pageSize = PAGE_SIZE_HINT,
 ): number {
+	if (!isElResumeModuleEnabled(entryResumeModuleKey(kind, libraryId))) return 0;
 	const stored = getElResumeOffset(kind, libraryId);
 	if (stored !== undefined) return stored;
 	return alignResumeOffset(fallback, pageSize);
@@ -111,6 +118,7 @@ export function flushElResume(
 ): void {
 	const id = libraryId.trim();
 	if (!id) return;
+	if (!isElResumeModuleEnabled(entryResumeModuleKey(kind, id))) return;
 	const key = entryKey(kind, id);
 	if (!dirty.has(key)) return;
 	const offset = offsets.get(key) ?? 0;
@@ -175,7 +183,7 @@ export function elFixedListResumeId(scope: ElFixedListScope): string {
 	}
 }
 
-function elFixedListKind(scope: ElFixedListScope): LibraryKind {
+export function elFixedListKind(scope: ElFixedListScope): LibraryKind {
 	return scope.startsWith('classic') ? 'classic' : 'vocab';
 }
 
@@ -183,6 +191,7 @@ export function resolveElFixedListResume(
 	scope: ElFixedListScope,
 	fallback = 0,
 ): number {
+	if (!isElResumeModuleEnabled(fixedListResumeModuleKey(scope))) return 0;
 	const kind = elFixedListKind(scope);
 	const id = elFixedListResumeId(scope);
 	return resolveElResumeOffset(kind, id, fallback, PAGE_SIZE_HINT);
@@ -209,6 +218,7 @@ export function flushElFixedListResume(
 export async function resolveElFixedListInitialResume(
 	scope: ElFixedListScope,
 ): Promise<number> {
+	if (!isElResumeModuleEnabled(fixedListResumeModuleKey(scope))) return 0;
 	const kind = elFixedListKind(scope);
 	const id = elFixedListResumeId(scope);
 	const stored = getElResumeOffset(kind, id);

@@ -6,9 +6,7 @@ import { getEnglishPracticeReviewSummary } from '@/service';
 import { useOpenEnglishPractice } from '../../components/practiceEntry';
 import { ENGLISH_REVIEW_SUMMARY_REFRESH } from '../reviewEvents';
 import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
-import { EnglishSidebarActions } from './EnglishSidebarActions';
-import { EnglishSidebarHeader } from './EnglishSidebarHeader';
-import { SidebarPanel } from './SidebarPanel';
+import { EnglishSidebarCard } from './EnglishSidebarCard';
 
 /** 首页侧栏：今日间隔复习 */
 export function ReviewSession() {
@@ -44,51 +42,46 @@ export function ReviewSession() {
 	const totalDue = vocabDue + classicDue;
 
 	return (
-		<SidebarPanel className="@container min-w-0">
-			<EnglishSidebarHeader
-				icon={CalendarClock}
-				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.review}
-				title={t('route.englishLearning.review.title')}
-				className="mb-5.5"
-				description={
-					loading ? (
-						<span className="inline-flex items-center gap-1.5">
-							<Spinner className="size-3" />
-							{t('englishLearning.review.loadingDue')}
-						</span>
-					) : (
-						t('englishLearning.review.homeDesc', { count: totalDue })
-					)
-				}
-			/>
-			<EnglishSidebarActions
-				actions={[
-					{
-						label: t('englishLearning.review.vocabNav', { count: vocabDue }),
-						onClick: () =>
-							openPractice({
-								source: 'review',
-								contentKind: 'vocab',
-								returnTo: 'home',
-							}),
-						disabled: loading || vocabDue <= 0,
-						gradientKey: 'review',
-					},
-					{
-						label: t('englishLearning.review.classicNav', {
-							count: classicDue,
+		<EnglishSidebarCard
+			className="@container min-w-0"
+			icon={CalendarClock}
+			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.review}
+			headerClassName="mb-5.5"
+			title={t('route.englishLearning.review.title')}
+			description={
+				loading ? (
+					<span className="inline-flex items-center gap-1.5">
+						<Spinner className="size-3" />
+						{t('englishLearning.review.loadingDue')}
+					</span>
+				) : (
+					t('englishLearning.review.homeDesc', { count: totalDue })
+				)
+			}
+			actions={[
+				{
+					label: t('englishLearning.review.vocabNav', { count: vocabDue }),
+					onClick: () =>
+						openPractice({
+							source: 'review',
+							contentKind: 'vocab',
+							returnTo: 'home',
 						}),
-						onClick: () =>
-							openPractice({
-								source: 'review',
-								contentKind: 'classic',
-								returnTo: 'home',
-							}),
-						disabled: loading || classicDue <= 0,
-						gradientKey: 'review',
-					},
-				]}
-			/>
-		</SidebarPanel>
+					disabled: loading || vocabDue <= 0,
+					gradientKey: 'review',
+				},
+				{
+					label: t('englishLearning.review.classicNav', { count: classicDue }),
+					onClick: () =>
+						openPractice({
+							source: 'review',
+							contentKind: 'classic',
+							returnTo: 'home',
+						}),
+					disabled: loading || classicDue <= 0,
+					gradientKey: 'review',
+				},
+			]}
+		/>
 	);
 }

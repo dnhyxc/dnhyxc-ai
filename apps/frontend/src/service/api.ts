@@ -209,6 +209,9 @@ export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
 /** 语句错题集：批量加入、分页列表、删除 */
 export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES =
 	'/english-learning/classic-quote-mistakes';
+/** 各模块列表续读开关（按用户） */
+export const ENGLISH_LEARNING_ITEMS_RESUME_MODULES =
+	'/english-learning/items-resume/modules';
 
 /** 电子书：书架列表与阅读进度（分页） */
 export const EBOOK_SHELF = '/ebook/shelf';

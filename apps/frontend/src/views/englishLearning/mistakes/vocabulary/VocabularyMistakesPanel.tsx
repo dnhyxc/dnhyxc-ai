@@ -96,6 +96,7 @@ export function VocabularyMistakesPanel({
 		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
 		refetchOnEnter: true,
 		onResumeOffsetChange: handleResumeOffsetChange,
+		resumeModuleKey: 'mistakes',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchMistakesPage,
 	});

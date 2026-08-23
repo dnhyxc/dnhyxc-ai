@@ -119,6 +119,7 @@ export function ClassicQuotesLibrarySection({
 				)
 			: 0,
 		onResumeOffsetChange: handleResumeOffsetChange,
+		resumeModuleKey: 'library-classic',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchClassicPage,
 	});

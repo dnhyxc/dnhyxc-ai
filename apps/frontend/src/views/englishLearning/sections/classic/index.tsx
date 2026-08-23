@@ -34,8 +34,7 @@ import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
-import { EnglishSidebarHeader } from '../../sidebar/components/EnglishSidebarHeader';
-import { SidebarPanel } from '../../sidebar/components/SidebarPanel';
+import { EnglishSidebarCard } from '../../sidebar/components/EnglishSidebarCard';
 import {
 	ENGLISH_SIDEBAR_BTN_GRADIENT,
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
@@ -361,36 +360,37 @@ function ClassicQuotesSectionInner() {
 	}, [countInput]);
 
 	return (
-		<SidebarPanel className="@container min-w-0">
-			<Confirm
-				open={historyDeleteConfirmOpen}
-				onOpenChange={(open) => {
-					setHistoryDeleteConfirmOpen(open);
-					if (!open) setHistoryDeleteTarget(null);
-				}}
-				title={t('englishLearning.packHistory.deleteConfirmTitle')}
-				description={
-					historyDeleteTarget
-						? t('englishLearning.packHistory.deleteConfirmDescClassic', {
-								topic: historyDeleteTarget.topic || '—',
-								count: historyDeleteTarget.quoteCount,
-							})
-						: '\u00a0'
-				}
-				descriptionClassName="text-left"
-				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
-				cancelText={t('common.cancel')}
-				confirmVariant="destructive"
-				closeOnConfirm={false}
-				onConfirm={() => void executeDeleteHistory()}
-			/>
-			<EnglishSidebarHeader
-				icon={BookMarked}
-				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.classicPack}
-				title={t('englishLearning.classic.title')}
-				description={t('englishLearning.classic.descShort')}
-			/>
-
+		<EnglishSidebarCard
+			className="@container min-w-0"
+			prepend={
+				<Confirm
+					open={historyDeleteConfirmOpen}
+					onOpenChange={(open) => {
+						setHistoryDeleteConfirmOpen(open);
+						if (!open) setHistoryDeleteTarget(null);
+					}}
+					title={t('englishLearning.packHistory.deleteConfirmTitle')}
+					description={
+						historyDeleteTarget
+							? t('englishLearning.packHistory.deleteConfirmDescClassic', {
+									topic: historyDeleteTarget.topic || '—',
+									count: historyDeleteTarget.quoteCount,
+								})
+							: '\u00a0'
+					}
+					descriptionClassName="text-left"
+					confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
+					cancelText={t('common.cancel')}
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={() => void executeDeleteHistory()}
+				/>
+			}
+			icon={BookMarked}
+			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.classicPack}
+			title={t('englishLearning.classic.title')}
+			description={t('englishLearning.classic.descShort')}
+		>
 			<label
 				htmlFor="english-classic-topic"
 				className="text-textcolor/45 mb-1.5 block text-sm font-medium"
@@ -519,7 +519,7 @@ function ClassicQuotesSectionInner() {
 				onDeleteEntry={requestDeleteHistory}
 				practiceReturnTo="home"
 			/>
-		</SidebarPanel>
+		</EnglishSidebarCard>
 	);
 }
 

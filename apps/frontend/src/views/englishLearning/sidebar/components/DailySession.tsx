@@ -25,9 +25,7 @@ import {
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
 	ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT,
 } from '../sidebarAccents';
-import { EnglishSidebarActions } from './EnglishSidebarActions';
-import { EnglishSidebarHeader } from './EnglishSidebarHeader';
-import { SidebarPanel } from './SidebarPanel';
+import { EnglishSidebarCard } from './EnglishSidebarCard';
 
 /** 首页侧栏：今日记词 */
 export function DailySession() {
@@ -103,41 +101,57 @@ export function DailySession() {
 	}, [isLoggedIn, loadSummary, t]);
 
 	return (
-		<SidebarPanel className="min-w-0">
-			<Confirm
-				open={resetConfirmOpen}
-				onOpenChange={setResetConfirmOpen}
-				title={t('englishLearning.daily.resetConfirmTitle')}
-				description={t('englishLearning.daily.resetConfirmDesc', {
-					count: memorizedCount,
-				})}
-				descriptionClassName="text-left"
-				confirmText={t('englishLearning.daily.resetConfirmAction')}
-				cancelText={t('common.cancel')}
-				confirmVariant="destructive"
-				closeOnConfirm={false}
-				onConfirm={() => void onConfirmReset()}
-			/>
-			<EnglishSidebarHeader
-				icon={Sparkles}
-				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.daily}
-				title={t('route.englishLearning.daily.title')}
-				description={
-					loading ? (
-						<span className="inline-flex items-start gap-1.5">
-							<Spinner className="size-3 text-textcolor/50 mt-0.5" />
-							{t('englishLearning.daily.loading')}
-						</span>
-					) : libraryCount <= 0 ? (
-						t('englishLearning.daily.sidebarDescLibraryEmpty')
-					) : (
-						t('englishLearning.daily.sidebarDescLibrary', {
-							poolCount: libraryCount,
-							sessionCount: libraryPickCount,
-						})
-					)
-				}
-			/>
+		<EnglishSidebarCard
+			className="min-w-0"
+			prepend={
+				<Confirm
+					open={resetConfirmOpen}
+					onOpenChange={setResetConfirmOpen}
+					title={t('englishLearning.daily.resetConfirmTitle')}
+					description={t('englishLearning.daily.resetConfirmDesc', {
+						count: memorizedCount,
+					})}
+					descriptionClassName="text-left"
+					confirmText={t('englishLearning.daily.resetConfirmAction')}
+					cancelText={t('common.cancel')}
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={() => void onConfirmReset()}
+				/>
+			}
+			resumeModuleKey="daily-memorize"
+			icon={Sparkles}
+			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.daily}
+			title={t('route.englishLearning.daily.title')}
+			description={
+				loading ? (
+					<span className="inline-flex items-start gap-1.5">
+						<Spinner className="size-3 text-textcolor/50 mt-0.5" />
+						{t('englishLearning.daily.loading')}
+					</span>
+				) : libraryCount <= 0 ? (
+					t('englishLearning.daily.sidebarDescLibraryEmpty')
+				) : (
+					t('englishLearning.daily.sidebarDescLibrary', {
+						poolCount: libraryCount,
+						sessionCount: libraryPickCount,
+					})
+				)
+			}
+			actions={[
+				{
+					label: t('englishLearning.daily.startLibrary'),
+					onClick: () => navigate('/english-learning/daily'),
+					disabled: loading || (isLoggedIn && libraryPickCount <= 0),
+					gradientKey: 'daily',
+				},
+				{
+					label: t('englishLearning.daily.memorizedLink'),
+					onClick: () => navigate('/english-learning/daily/records'),
+					gradientKey: 'daily',
+				},
+			]}
+		>
 			<DailyWordsPerRoundPicker
 				className="mt-3"
 				headerRight={
@@ -161,21 +175,6 @@ export function DailySession() {
 					</button>
 				}
 			/>
-			<EnglishSidebarActions
-				actions={[
-					{
-						label: t('englishLearning.daily.startLibrary'),
-						onClick: () => navigate('/english-learning/daily'),
-						disabled: loading || (isLoggedIn && libraryPickCount <= 0),
-						gradientKey: 'daily',
-					},
-					{
-						label: t('englishLearning.daily.memorizedLink'),
-						onClick: () => navigate('/english-learning/daily/records'),
-						gradientKey: 'daily',
-					},
-				]}
-			/>
-		</SidebarPanel>
+		</EnglishSidebarCard>
 	);
 }

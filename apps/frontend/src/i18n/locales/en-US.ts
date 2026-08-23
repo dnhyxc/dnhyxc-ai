@@ -1466,6 +1466,23 @@ export const enUS = {
 		'Failed to load items. Please try again later.',
 	'englishLearning.library.wordsLoadMoreFailed':
 		'Failed to load more. Scroll again or try later.',
+	'englishLearning.resume.settingsAria': 'Reading progress settings',
+	'englishLearning.resume.settingsLabel': 'Settings',
+	'englishLearning.resume.clearAction': 'Clear reading progress',
+	'englishLearning.resume.disableAction': 'Disable reading progress',
+	'englishLearning.resume.enableAction': 'Enable reading progress',
+	'englishLearning.resume.clearConfirmTitle': 'Clear reading progress?',
+	'englishLearning.resume.clearConfirmDesc':
+		'Saved reading positions will be removed and lists will reload from the start.',
+	'englishLearning.resume.clearConfirmAction': 'Clear',
+	'englishLearning.resume.clearSuccess': 'Reading progress cleared',
+	'englishLearning.resume.clearFailed': 'Failed to clear reading progress',
+	'englishLearning.resume.disabledToast': 'Reading progress tracking disabled',
+	'englishLearning.resume.enabledToast': 'Reading progress tracking enabled',
+	'englishLearning.resume.loginRequired':
+		'Please sign in to change reading progress settings',
+	'englishLearning.resume.toggleFailed':
+		'Failed to update reading progress settings',
 	'englishLearning.library.quotesLoading': 'Loading quotes…',
 	'englishLearning.favorites.bank': 'Favorites',
 	'englishLearning.favorites.sidebarTitle': 'Categories',

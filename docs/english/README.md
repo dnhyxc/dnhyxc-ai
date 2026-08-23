@@ -54,6 +54,7 @@
 | [资源库虚拟网格.md](./资源库虚拟网格.md) | **资源库虚拟网格**：react-virtuoso 行级虚拟化 + CSS Grid 自适应列数，卡片可变高度，与续读 item index 对齐 |
 | [资源库列表单向虚拟滚动.md](./资源库列表单向虚拟滚动.md) | **资源库单向滚动 Hook**：移除双向分页，并发预取 [0, resumeOffset+pageSize) 完整窗口 + `restoreFromCache` 缓存短路 + Virtuoso 锚点 |
 | [列表悬浮角标.md](./列表悬浮角标.md) | **虚拟列表悬浮角标（FAB）**：`useListScrollCornerFab` 模式判定 + 锚点停靠（停在加载区上方避免误触发 endReached）+ `composeViewportScroll` 滚动事件组合 + ResizeObserver 自适应；收藏/错题/每日记词等虚拟滚动列表右下角置顶/置底按钮 |
+| [续读模块开关.md](./续读模块开关.md) | **续读模块开关与一键清除**：服务端持久化 5 个侧栏模块（单词库/语句库/收藏/错题/每日记词记录）的续读开关（仅存关闭状态）+ 会话级本地缓存（默认全开）+ 侧栏标题齿轮菜单（清除/开关）；`elResumeModule.ts` hydrate/订阅 revision，`englishLearningResume.ts` 三段短路，`useEnglishLearningList` 订阅 revision 自动重载，`EnglishSidebarCard` 统一卡片容器（删 `SidebarPanel`），`EnglishSidebarResumeMenu` 齿轮菜单 |
 | [资源库词条预取并发.md](./资源库词条预取并发.md) | **续读窗口并发预取**：`buildLibraryPrefetchChunks` 按 1000 切片 + `mapWithConcurrency` 限 3 并发池，结果序与输入一致 |
 | [资源库收藏状态分页查询.md](./资源库收藏状态分页查询.md) | **收藏状态按 offset 分页**：后端 GET `.../:libraryId/favorites-status?limit&offset` 接口 + Hook libraryId 模式 + 会话级缓存避免重复查 |
 | [单词收藏状态查询.md](./单词收藏状态查询.md) | 收藏状态查询（旧版：按词 POST 批量；资源库新场景请优先看上面的「分页查询」） |

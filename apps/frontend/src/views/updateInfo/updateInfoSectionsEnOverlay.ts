@@ -1158,6 +1158,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Five English-learning list pages — word favorites, classic-quote favorites, word mistakes, classic-quote mistakes, and daily memorize records — are all upgraded to the same virtual-scrolling grid engine as the resource library entries. Columns adapt automatically (1 on narrow, 2 on medium, 3 on wide), so lists stay smooth no matter the size. Each list now remembers where you left off: re-entering jumps straight back to that entry, even after closing the browser or quitting the desktop app. Progress is reported once when you leave, not on every page turn. Deleting entries refreshes the list in place instead of jumping back to the top. A floating corner button (bottom-right) lets you jump to the bottom or top of long lists instantly without dragging the scrollbar.',
 	},
+	's24-66': {
+		title: 'Per-module resume toggle & one-tap clear',
+		description:
+			'A gear button is added next to the title of each of the five sidebar modules — Vocabulary library, Quotes library, Favorites, Mistake book, and Daily memorize records. The dropdown offers “Clear reading progress” and “Disable/Enable reading progress”. Clear zeroes out both the local and server-side resume positions for the current module (after a confirm dialog) and reloads the list from the top. Disable stops recording resume positions for that module on this device and on every other device signed in to the same account, and the list also reloads from the top right away. Re-enabling restores resume behavior; the next visit picks up from any existing position (or from entry 0 if it was cleared). Toggle state is saved per account and synced across devices; while logged out it is only cached locally (default-on, reset on refresh); switching accounts clears the previous account’s disabled set and the new account defaults to all-on.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

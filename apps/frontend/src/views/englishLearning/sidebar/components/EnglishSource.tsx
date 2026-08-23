@@ -14,9 +14,7 @@ import {
 	ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT,
 } from '../sidebarAccents';
 import { SIDEBAR_LABEL } from '../tokens';
-import { EnglishSidebarActions } from './EnglishSidebarActions';
-import { EnglishSidebarHeader } from './EnglishSidebarHeader';
-import { SidebarPanel } from './SidebarPanel';
+import { EnglishSidebarCard } from './EnglishSidebarCard';
 
 const SOURCE_EXAMPLE_PANEL = {
 	vocab: 'bg-linear-to-r from-cyan-500/8 to-blue-600/8 border-blue-500/10',
@@ -79,13 +77,31 @@ export function EnglishSource({
 		: exampleLabelCollapsed;
 
 	return (
-		<SidebarPanel className="@container min-w-0">
-			<EnglishSidebarHeader
-				icon={Icon}
-				iconGradient={iconGradient}
-				title={title ?? ''}
-				description={description}
-			/>
+		<EnglishSidebarCard
+			className="@container min-w-0"
+			resumeModuleKey={isVocab ? 'library-vocab' : 'library-classic'}
+			icon={Icon}
+			iconGradient={iconGradient}
+			title={title ?? ''}
+			description={description}
+			actionsClassName="mt-0"
+			actions={[
+				{
+					label: isVocab
+						? t('englishLearning.vocab.import')
+						: t('englishLearning.classic.import'),
+					onClick: () => navigate(`/english-learning/import?kind=${type}`),
+					gradientKey,
+				},
+				{
+					label: isVocab
+						? t('englishLearning.library.vocab.bank')
+						: t('englishLearning.library.classic.bank'),
+					onClick: () => navigate(`/english-learning/library?kind=${type}`),
+					gradientKey,
+				},
+			]}
+		>
 			<div>
 				<div
 					className={cn(
@@ -97,7 +113,7 @@ export function EnglishSource({
 						type="button"
 						className={cn(
 							SIDEBAR_LABEL,
-							'inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-textcolor/65',
+							'inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left transition-colors text-textcolor/60 hover:text-teal-500',
 						)}
 						aria-expanded={exampleExpanded}
 						aria-label={exampleLabel}
@@ -152,25 +168,6 @@ export function EnglishSource({
 					</ScrollArea>
 				) : null}
 			</div>
-			<EnglishSidebarActions
-				className="mt-0"
-				actions={[
-					{
-						label: isVocab
-							? t('englishLearning.vocab.import')
-							: t('englishLearning.classic.import'),
-						onClick: () => navigate(`/english-learning/import?kind=${type}`),
-						gradientKey,
-					},
-					{
-						label: isVocab
-							? t('englishLearning.library.vocab.bank')
-							: t('englishLearning.library.classic.bank'),
-						onClick: () => navigate(`/english-learning/library?kind=${type}`),
-						gradientKey,
-					},
-				]}
-			/>
-		</SidebarPanel>
+		</EnglishSidebarCard>
 	);
 }

@@ -103,6 +103,7 @@ export function VocabularyFavoritesSection({
 		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
 		refetchOnEnter: true,
 		onResumeOffsetChange: handleResumeOffsetChange,
+		resumeModuleKey: 'favorites',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchFavoritesPage,
 	});

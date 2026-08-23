@@ -9,10 +9,17 @@ import {
 	useEffect,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from 'react';
 import { VOCAB_LIBRARY_ITEMS_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
 import { retryAsync } from '@/utils/retryAsync';
+import {
+	type ElResumeModuleKey,
+	getElResumeSettingsRevision,
+	hydrateElResumeModuleSettings,
+	subscribeElResumeSettings,
+} from '../utils/elResumeModule';
 import {
 	getLibraryWordsListCache,
 	invalidateLibraryWordsListCache,
@@ -45,6 +52,8 @@ export type UseEnglishLearningListOptions<TItem, TLibrary> = {
 	/** 每次进入（mount / libraryId 生效）跳过会话缓存并重新拉列表 */
 	refetchOnEnter?: boolean;
 	persistResume?: boolean;
+	/** 侧栏续读模块；设置变更时重载列表 */
+	resumeModuleKey?: ElResumeModuleKey;
 	onResumeOffsetChange?: (libraryId: string, offset: number) => void;
 	viewportRef?: RefObject<HTMLDivElement | null>;
 	fetchPage: (
@@ -62,6 +71,7 @@ export function useEnglishLearningList<TItem, TLibrary>({
 	resolveInitialResume,
 	refetchOnEnter = false,
 	persistResume = true,
+	resumeModuleKey,
 	onResumeOffsetChange,
 	viewportRef,
 	fetchPage,
@@ -100,6 +110,13 @@ export function useEnglishLearningList<TItem, TLibrary>({
 	const resolveInitialResumeRef = useRef(resolveInitialResume);
 	const refetchOnEnterRef = useRef(refetchOnEnter);
 	const bootedLibraryIdRef = useRef<string | null>(null);
+
+	const settingsRev = useSyncExternalStore(
+		subscribeElResumeSettings,
+		getElResumeSettingsRevision,
+		getElResumeSettingsRevision,
+	);
+	const prevSettingsRevRef = useRef(settingsRev);
 
 	resolveInitialResumeRef.current = resolveInitialResume;
 	refetchOnEnterRef.current = refetchOnEnter;
@@ -473,6 +490,19 @@ export function useEnglishLearningList<TItem, TLibrary>({
 			await fetchFirstPageRef.current(libraryId, gen, resumeOffset);
 		})();
 	}, [cacheNamespace, libraryId, pageSize, restoreFromCache, markListReady]);
+
+	useEffect(() => {
+		if (!resumeModuleKey) return;
+		void hydrateElResumeModuleSettings();
+	}, [resumeModuleKey]);
+
+	useEffect(() => {
+		if (!resumeModuleKey || !libraryId) return;
+		if (prevSettingsRevRef.current === settingsRev) return;
+		prevSettingsRevRef.current = settingsRev;
+		bootedLibraryIdRef.current = null;
+		void reloadFromStart(false);
+	}, [libraryId, reloadFromStart, resumeModuleKey, settingsRev]);
 
 	useEffect(() => {
 		const el = viewportRef?.current;
