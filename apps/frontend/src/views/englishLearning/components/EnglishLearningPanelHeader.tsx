@@ -24,7 +24,7 @@ export function EnglishLearningPanelHeader({
 	return (
 		<header
 			className={cn(
-				'h-12 flex shrink-0 items-center justify-between gap-4 px-4.5 py-2',
+				'h-12 flex shrink-0 items-center justify-between gap-4 px-4 py-2',
 				className,
 			)}
 		>

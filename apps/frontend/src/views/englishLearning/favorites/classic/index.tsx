@@ -4,15 +4,23 @@
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
-import { Spinner } from '@ui/spinner';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	downloadEnglishClassicQuoteFavoritesDocx,
 	type EnglishClassicQuoteFavoriteListEntry,
+	listEnglishClassicQuoteFavorites,
+	removeEnglishClassicQuoteFavoritesBatch,
 } from '@/service';
+import {
+	elFixedListResumeId,
+	flushElFixedListResume,
+	resolveElFixedListInitialResume,
+	resolveElFixedListResume,
+	setElFixedListResume,
+} from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
@@ -20,9 +28,21 @@ import {
 import { isTauriRuntime } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
+import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
+import {
+	LibraryListLoadMoreRow,
+	LibraryVirtuosoGrid,
+} from '../../library/components/LibraryVirtuosoGrid';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import type { FavoritesListCounts } from '../vocabulary';
-import { useClassicFavoritesList } from './useClassicFavoritesList';
+
+const LIST_SCOPE = 'classic-favorites' as const;
+const LIST_RESUME_ID = elFixedListResumeId(LIST_SCOPE);
 
 export type ClassicQuotesFavoritesSectionProps = {
 	active: boolean;
@@ -34,14 +54,68 @@ export function ClassicQuotesFavoritesSection({
 	onCountsChange,
 }: ClassicQuotesFavoritesSectionProps) {
 	const { t } = useI18n();
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const [gridReady, setGridReady] = useState(false);
+
+	const handleResumeOffsetChange = useCallback(
+		(_id: string, offset: number) => {
+			setElFixedListResume(LIST_SCOPE, offset);
+		},
+		[],
+	);
+
+	const fetchFavoritesPage = useCallback(
+		async (_id: string, limit: number, offset: number) => {
+			const res = await listEnglishClassicQuoteFavorites({
+				limit,
+				offset,
+				silent: true,
+			});
+			if (!res.data) {
+				throw new Error('empty favorites response');
+			}
+			return {
+				items: Array.isArray(res.data.items) ? res.data.items : [],
+				totalCount: res.data.totalCount,
+			};
+		},
+		[],
+	);
+
 	const {
-		entries,
+		items: entries,
 		totalCount,
 		loading,
 		loadingMore,
+		initialScrollItemIndex,
 		onViewportScroll,
-		onBatchRemove,
-	} = useClassicFavoritesList(active);
+		onEndReached,
+		reloadFromStart,
+	} = useEnglishLearningList<EnglishClassicQuoteFavoriteListEntry, null>({
+		libraryId: active ? LIST_RESUME_ID : null,
+		cacheNamespace: 'classic-favorites',
+		initialResumeOffset: resolveElFixedListResume(LIST_SCOPE),
+		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
+		refetchOnEnter: true,
+		onResumeOffsetChange: handleResumeOffsetChange,
+		viewportRef: scrollViewportRef,
+		fetchPage: fetchFavoritesPage,
+	});
+
+	useEffect(() => {
+		setGridReady(false);
+	}, [active]);
+
+	useEffect(() => {
+		if (!active) return;
+		return () => {
+			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
+		};
+	}, [active]);
+
+	const handleGridReady = useCallback(() => {
+		setGridReady(true);
+	}, []);
 
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -69,8 +143,14 @@ export function ClassicQuotesFavoritesSection({
 	}, [totalCount, t]);
 
 	const showInitialLoading = loading && entries.length === 0;
-	const showLoadMoreHint = loadingMore;
-	const showEmpty = !loading && entries.length === 0 && !loadingMore;
+	const awaitingGrid = entries.length > 0 && !gridReady;
+	const showEmpty = !loading && entries.length === 0;
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			entries.length,
+			entries.length > 0,
+		);
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
 
@@ -177,7 +257,10 @@ export function ClassicQuotesFavoritesSection({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemove(toRemove);
+			await removeEnglishClassicQuoteFavoritesBatch(
+				toRemove.map((it) => it.id),
+			);
+			await reloadFromStart(true);
 			setSelectedIds(new Set());
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
@@ -198,7 +281,7 @@ export function ClassicQuotesFavoritesSection({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, onBatchRemove, selectedIds, t]);
+	}, [entries, reloadFromStart, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -208,7 +291,8 @@ export function ClassicQuotesFavoritesSection({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemove([target]);
+			await removeEnglishClassicQuoteFavoritesBatch([target.id]);
+			await reloadFromStart(true);
 			setSelectedIds((prev) => {
 				const next = new Set(prev);
 				next.delete(target.id);
@@ -232,7 +316,7 @@ export function ClassicQuotesFavoritesSection({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [onBatchRemove, singleRemoveTarget, t]);
+	}, [reloadFromStart, singleRemoveTarget, t]);
 
 	const handleExportDocx = async () => {
 		if (entries.length === 0 && !loading) {
@@ -315,81 +399,101 @@ export function ClassicQuotesFavoritesSection({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
-				<ScrollArea
-					className="@container min-h-0 flex-1 px-4"
-					onScroll={onViewportScroll}
-				>
-					{showInitialLoading ? (
-						<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
-							<Loading text={t('englishLearning.classic.favoritesLoading')} />
-						</div>
-					) : (
-						<div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-							{entries.map((row) => {
-								const playKey = `fav-classic-${row.id}`;
-								const playing = playingKey === playKey;
-								return (
-									<ClassicQuoteCard
-										key={row.id}
-										variant="selectable"
-										forceNote
-										data={{
-											english: row.english,
-											translationZh: row.translationZh,
-											source: row.source,
-											noteZh: row.noteZh,
-										}}
-										selection={{
-											controlId: `classic-fav-${row.id}`,
-											checked: selectedIds.has(row.id),
-											disabled: selectionDisabled,
-											onCheckedChange: (checked) =>
-												toggleRowSelected(row.id, checked),
-											ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`,
-										}}
-										playing={playing}
-										onTogglePlay={() =>
-											void onTogglePlayQuote(row.english, playKey)
-										}
-										playLabels={{
-											play: t('englishLearning.classic.playQuote'),
-											stop: t('englishLearning.tts.stop'),
-										}}
-										trailingActions={
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												disabled={selectionDisabled}
-												onClick={() => requestSingleRemove(row)}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
-													'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
-												)}
-												aria-label={t(
-													'englishLearning.favoritesDrawer.removeOneAction',
-												)}
-											>
-												<Trash2 className="size-3.5" />
-											</Button>
-										}
-									/>
-								);
-							})}
-							{showLoadMoreHint ? (
-								<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
-									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-									{t('common.loadingMore')}
-								</div>
-							) : null}
+				{showInitialLoading ? (
+					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
+						<Loading text={t('englishLearning.classic.favoritesLoading')} />
+					</div>
+				) : (
+					<div className="relative min-h-0 flex-1">
+						{awaitingGrid ? (
+							<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center px-4">
+								<Loading text={t('englishLearning.classic.favoritesLoading')} />
+							</div>
+						) : null}
+						<ScrollArea
+							ref={scrollViewportRef}
+							className="relative min-h-0 h-full px-4"
+							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
+							onScroll={composeViewportScroll(
+								onViewportScroll,
+								onScrollCornerFab,
+							)}
+						>
 							{showEmpty ? (
-								<div className="col-span-full text-textcolor/60 py-12 text-center text-sm">
+								<div className="text-textcolor/60 py-12 text-center text-sm">
 									{t('englishLearning.classic.favoritesEmpty')}
 								</div>
-							) : null}
-						</div>
-					)}
-				</ScrollArea>
+							) : (
+								<div className="relative w-full">
+									<LibraryVirtuosoGrid
+										key={LIST_RESUME_ID}
+										items={entries}
+										viewportRef={scrollViewportRef}
+										columnMode="classic"
+										initialScrollItemIndex={initialScrollItemIndex}
+										getItemKey={(row) => row.id}
+										onEndReached={onEndReached}
+										onReady={handleGridReady}
+										itemContent={(row) => {
+											const playKey = `fav-classic-${row.id}`;
+											const playing = playingKey === playKey;
+											return (
+												<ClassicQuoteCard
+													variant="selectable"
+													forceNote
+													data={{
+														english: row.english,
+														translationZh: row.translationZh,
+														source: row.source,
+														noteZh: row.noteZh,
+													}}
+													selection={{
+														controlId: `classic-fav-${row.id}`,
+														checked: selectedIds.has(row.id),
+														disabled: selectionDisabled,
+														onCheckedChange: (checked) =>
+															toggleRowSelected(row.id, checked),
+														ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`,
+													}}
+													playing={playing}
+													onTogglePlay={() =>
+														void onTogglePlayQuote(row.english, playKey)
+													}
+													playLabels={{
+														play: t('englishLearning.classic.playQuote'),
+														stop: t('englishLearning.tts.stop'),
+													}}
+													trailingActions={
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															disabled={selectionDisabled}
+															onClick={() => requestSingleRemove(row)}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+																'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+															)}
+															aria-label={t(
+																'englishLearning.favoritesDrawer.removeOneAction',
+															)}
+														>
+															<Trash2 className="size-3.5" />
+														</Button>
+													}
+												/>
+											);
+										}}
+									/>
+									{loadingMore ? (
+										<LibraryListLoadMoreRow label={t('common.loadingMore')} />
+									) : null}
+								</div>
+							)}
+						</ScrollArea>
+						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+					</div>
+				)}
 				<FavoritesPanelFooter
 					selectAllId="classic-fav-select-all"
 					showPracticeEntry

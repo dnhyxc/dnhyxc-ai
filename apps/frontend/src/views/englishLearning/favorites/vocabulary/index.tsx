@@ -4,24 +4,44 @@
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
-import { Spinner } from '@ui/spinner';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	downloadEnglishVocabularyFavoritesDocx,
 	type EnglishVocabularyFavoriteListEntry,
+	listEnglishVocabularyFavorites,
+	removeEnglishVocabularyFavoritesBatch,
 } from '@/service';
+import {
+	elFixedListResumeId,
+	flushElFixedListResume,
+	resolveElFixedListInitialResume,
+	resolveElFixedListResume,
+	setElFixedListResume,
+} from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
+import {
+	LibraryListLoadMoreRow,
+	LibraryVirtuosoGrid,
+} from '../../library/components/LibraryVirtuosoGrid';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
-import { useVocabularyFavoritesList } from './useVocabularyFavoritesList';
+
+const LIST_SCOPE = 'vocab-favorites' as const;
+const LIST_RESUME_ID = elFixedListResumeId(LIST_SCOPE);
 
 export type FavoritesListCounts = {
 	loaded: number;
@@ -39,14 +59,68 @@ export function VocabularyFavoritesSection({
 	onCountsChange,
 }: VocabularyFavoritesSectionProps) {
 	const { t } = useI18n();
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const [gridReady, setGridReady] = useState(false);
+
+	const handleResumeOffsetChange = useCallback(
+		(_id: string, offset: number) => {
+			setElFixedListResume(LIST_SCOPE, offset);
+		},
+		[],
+	);
+
+	const fetchFavoritesPage = useCallback(
+		async (_id: string, limit: number, offset: number) => {
+			const res = await listEnglishVocabularyFavorites({
+				limit,
+				offset,
+				silent: true,
+			});
+			if (!res.data) {
+				throw new Error('empty favorites response');
+			}
+			return {
+				items: Array.isArray(res.data.items) ? res.data.items : [],
+				totalCount: res.data.totalCount,
+			};
+		},
+		[],
+	);
+
 	const {
-		entries,
+		items: entries,
 		totalCount,
 		loading,
 		loadingMore,
+		initialScrollItemIndex,
 		onViewportScroll,
-		onBatchRemove,
-	} = useVocabularyFavoritesList(active);
+		onEndReached,
+		reloadFromStart,
+	} = useEnglishLearningList<EnglishVocabularyFavoriteListEntry, null>({
+		libraryId: active ? LIST_RESUME_ID : null,
+		cacheNamespace: 'vocab-favorites',
+		initialResumeOffset: resolveElFixedListResume(LIST_SCOPE),
+		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
+		refetchOnEnter: true,
+		onResumeOffsetChange: handleResumeOffsetChange,
+		viewportRef: scrollViewportRef,
+		fetchPage: fetchFavoritesPage,
+	});
+
+	useEffect(() => {
+		setGridReady(false);
+	}, [active]);
+
+	useEffect(() => {
+		if (!active) return;
+		return () => {
+			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
+		};
+	}, [active]);
+
+	const handleGridReady = useCallback(() => {
+		setGridReady(true);
+	}, []);
 
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -74,8 +148,14 @@ export function VocabularyFavoritesSection({
 	}, [totalCount, t]);
 
 	const showInitialLoading = loading && entries.length === 0;
-	const showLoadMoreHint = loadingMore;
-	const showEmpty = !loading && entries.length === 0 && !loadingMore;
+	const awaitingGrid = entries.length > 0 && !gridReady;
+	const showEmpty = !loading && entries.length === 0;
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			entries.length,
+			entries.length > 0,
+		);
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
 
@@ -182,7 +262,8 @@ export function VocabularyFavoritesSection({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemove(toRemove);
+			await removeEnglishVocabularyFavoritesBatch(toRemove.map((it) => it.id));
+			await reloadFromStart(true);
 			setSelectedIds(new Set());
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
@@ -203,7 +284,7 @@ export function VocabularyFavoritesSection({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, onBatchRemove, selectedIds, t]);
+	}, [entries, reloadFromStart, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -213,7 +294,8 @@ export function VocabularyFavoritesSection({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemove([target]);
+			await removeEnglishVocabularyFavoritesBatch([target.id]);
+			await reloadFromStart(true);
 			setSelectedIds((prev) => {
 				const next = new Set(prev);
 				next.delete(target.id);
@@ -237,7 +319,7 @@ export function VocabularyFavoritesSection({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [onBatchRemove, singleRemoveTarget, t]);
+	}, [reloadFromStart, singleRemoveTarget, t]);
 
 	const handleExportDocx = async () => {
 		if (entries.length === 0 && !loading) {
@@ -311,75 +393,95 @@ export function VocabularyFavoritesSection({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
-				<ScrollArea
-					className="@container min-h-0 flex-1 px-4"
-					onScroll={onViewportScroll}
-				>
-					{showInitialLoading ? (
-						<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
-							<Loading text={t('englishLearning.vocab.favoritesLoading')} />
-						</div>
-					) : (
-						<div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-							{entries.map((row) => {
-								const playKey = `fav-vocab-${row.id}`;
-								const playing = playingKey === playKey;
-								return (
-									<VocabularyWordCard
-										key={row.id}
-										variant="selectable"
-										data={row}
-										selection={{
-											controlId: `vocab-fav-${row.id}`,
-											checked: selectedIds.has(row.id),
-											disabled: selectionDisabled,
-											onCheckedChange: (checked) =>
-												toggleRowSelected(row.id, checked),
-											ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`,
-										}}
-										playing={playing}
-										onTogglePlay={() =>
-											void onTogglePlayWord(row.word, playKey)
-										}
-										playLabels={{
-											play: t('englishLearning.vocab.playWord'),
-											stop: t('englishLearning.tts.stop'),
-										}}
-										trailingActions={
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												disabled={selectionDisabled}
-												onClick={() => requestSingleRemove(row)}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
-													'border-theme/10 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
-												)}
-												aria-label={t(
-													'englishLearning.favoritesDrawer.removeOneAction',
-												)}
-											>
-												<Trash2 className="size-3.5" />
-											</Button>
-										}
-									/>
-								);
-							})}
-							{showLoadMoreHint ? (
-								<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
-									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-									{t('common.loadingMore')}
-								</div>
-							) : null}
+				{showInitialLoading ? (
+					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
+						<Loading text={t('englishLearning.vocab.favoritesLoading')} />
+					</div>
+				) : (
+					<div className="relative min-h-0 flex-1">
+						{awaitingGrid ? (
+							<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center px-4">
+								<Loading text={t('englishLearning.vocab.favoritesLoading')} />
+							</div>
+						) : null}
+						<ScrollArea
+							ref={scrollViewportRef}
+							className="relative min-h-0 h-full px-4"
+							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
+							onScroll={composeViewportScroll(
+								onViewportScroll,
+								onScrollCornerFab,
+							)}
+						>
 							{showEmpty ? (
-								<div className="text-textcolor/60 col-span-full py-12 text-center text-sm">
+								<div className="text-textcolor/60 py-12 text-center text-sm">
 									{t('englishLearning.vocab.favoritesEmpty')}
 								</div>
-							) : null}
-						</div>
-					)}
-				</ScrollArea>
+							) : (
+								<div className="relative w-full">
+									<LibraryVirtuosoGrid
+										key={LIST_RESUME_ID}
+										items={entries}
+										viewportRef={scrollViewportRef}
+										columnMode="vocab"
+										initialScrollItemIndex={initialScrollItemIndex}
+										getItemKey={(row) => row.id}
+										onEndReached={onEndReached}
+										onReady={handleGridReady}
+										itemContent={(row) => {
+											const playKey = `fav-vocab-${row.id}`;
+											const playing = playingKey === playKey;
+											return (
+												<VocabularyWordCard
+													variant="selectable"
+													data={row}
+													selection={{
+														controlId: `vocab-fav-${row.id}`,
+														checked: selectedIds.has(row.id),
+														disabled: selectionDisabled,
+														onCheckedChange: (checked) =>
+															toggleRowSelected(row.id, checked),
+														ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`,
+													}}
+													playing={playing}
+													onTogglePlay={() =>
+														void onTogglePlayWord(row.word, playKey)
+													}
+													playLabels={{
+														play: t('englishLearning.vocab.playWord'),
+														stop: t('englishLearning.tts.stop'),
+													}}
+													trailingActions={
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															disabled={selectionDisabled}
+															onClick={() => requestSingleRemove(row)}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+																'border-theme/10 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+															)}
+															aria-label={t(
+																'englishLearning.favoritesDrawer.removeOneAction',
+															)}
+														>
+															<Trash2 className="size-3.5" />
+														</Button>
+													}
+												/>
+											);
+										}}
+									/>
+									{loadingMore ? (
+										<LibraryListLoadMoreRow label={t('common.loadingMore')} />
+									) : null}
+								</div>
+							)}
+						</ScrollArea>
+						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+					</div>
+				)}
 				<FavoritesPanelFooter
 					selectAllId="vocab-fav-select-all"
 					showSelection={!showInitialLoading && entries.length > 0}

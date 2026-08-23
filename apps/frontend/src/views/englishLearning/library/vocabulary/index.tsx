@@ -19,21 +19,26 @@ import {
 	removeEnglishVocabularyFavorite,
 } from '@/service';
 import {
-	resolveEnglishLibraryItemsResumeOffset,
-	setEnglishLibraryItemsResumeOffset,
-} from '@/store/englishLibraryItemsResume';
+	resolveElResumeOffset,
+	setElResumeOffset,
+} from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../components/LibraryVirtuosoGrid';
-import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
 
 export type VocabularyLibrarySectionProps = {
 	libraryId: string | null;
@@ -85,7 +90,7 @@ export function VocabularyLibrarySection({
 	/** 浏览中只写本地；离开库时由页面 flush 到 DB */
 	const handleResumeOffsetChange = useCallback(
 		(id: string, offset: number) => {
-			setEnglishLibraryItemsResumeOffset('vocab', id, offset);
+			setElResumeOffset('vocab', id, offset);
 			onResumeOffsetChange?.(id, offset);
 		},
 		[onResumeOffsetChange],
@@ -93,20 +98,21 @@ export function VocabularyLibrarySection({
 
 	const {
 		items,
+		patchItems,
 		resolvedLibrary,
 		loading,
 		loadingMore,
 		initialScrollItemIndex,
 		onViewportScroll,
 		onEndReached,
-	} = useLibraryWordsList<
+	} = useEnglishLearningList<
 		EnglishVocabularyLibraryItemRow,
 		EnglishVocabularyLibraryListItem
 	>({
 		libraryId,
 		cacheNamespace: 'vocab',
 		initialResumeOffset: libraryId
-			? resolveEnglishLibraryItemsResumeOffset(
+			? resolveElResumeOffset(
 					'vocab',
 					libraryId,
 					libraryMeta?.itemsResumeOffset ?? 0,
@@ -179,10 +185,26 @@ export function VocabularyLibrarySection({
 					if (!favoriteId) return;
 					await removeEnglishVocabularyFavorite(favoriteId);
 					clearVocabularyFavorite(wk);
+					patchItems((list) =>
+						list.map((row) =>
+							normalizeEnglishVocabWordKey(row.word) === wk
+								? { ...row, favoriteId: null }
+								: row,
+						),
+					);
 				} else {
 					const res = await addEnglishVocabularyFavorite(item);
 					const favoriteId = res.data?.id;
-					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
+					if (favoriteId) {
+						setVocabularyFavoriteId(wk, favoriteId);
+						patchItems((list) =>
+							list.map((row) =>
+								normalizeEnglishVocabWordKey(row.word) === wk
+									? { ...row, favoriteId }
+									: row,
+							),
+						);
+					}
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -190,8 +212,20 @@ export function VocabularyLibrarySection({
 				setFavoriteActionKey(null);
 			}
 		},
-		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
+		[
+			getVocabularyFavoriteId,
+			setVocabularyFavoriteId,
+			clearVocabularyFavorite,
+			patchItems,
+		],
 	);
+
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			items.length,
+			Boolean(libraryId) && items.length > 0,
+		);
 
 	if (!libraryId) {
 		return (
@@ -210,7 +244,7 @@ export function VocabularyLibrarySection({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col @container">
-			<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4.5">
+			<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4">
 				<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
 					<span
 						className="text-textcolor min-w-0 truncate text-base font-semibold"
@@ -264,7 +298,10 @@ export function VocabularyLibrarySection({
 						ref={scrollViewportRef}
 						className="relative min-h-0 h-full px-4 pb-4"
 						viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-						onScroll={onViewportScroll}
+						onScroll={composeViewportScroll(
+							onViewportScroll,
+							onScrollCornerFab,
+						)}
 					>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -342,6 +379,7 @@ export function VocabularyLibrarySection({
 							</div>
 						)}
 					</ScrollArea>
+					<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
 				</div>
 			)}
 		</div>

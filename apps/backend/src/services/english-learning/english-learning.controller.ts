@@ -932,6 +932,36 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	@Get('practice/daily/records/items-resume')
+	async getDailyMemorizeRecordsItemsResume(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getDailyMemorizeRecordsItemsResume(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Patch('practice/daily/records/items-resume')
+	async updateDailyMemorizeRecordsItemsResume(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateDailyMemorizeRecordsItemsResume(
+				userId,
+				dto.offset,
+			);
+		return { success: true, data };
+	}
+
 	@Get('practice/daily/records')
 	async listDailyMemorizeRecords(
 		@Req() req: AuthedRequest,
@@ -943,7 +973,7 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			100,
+			1000,
 			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
@@ -954,6 +984,37 @@ export class EnglishLearningController {
 				offset,
 			},
 		);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户错题集（按入库时间倒序） */
+	@Get('vocabulary-mistakes/items-resume')
+	async getVocabularyMistakesItemsResume(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getVocabularyMistakesItemsResume(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Patch('vocabulary-mistakes/items-resume')
+	async updateVocabularyMistakesItemsResume(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateVocabularyMistakesItemsResume(
+				userId,
+				dto.offset,
+			);
 		return { success: true, data };
 	}
 
@@ -969,8 +1030,8 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			100,
-			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
 		const data = await this.englishLearningService.listVocabularyMistakesPage(
@@ -1031,6 +1092,37 @@ export class EnglishLearningController {
 	}
 
 	/** 分页列出当前用户语句错题集（按入库时间倒序） */
+	@Get('classic-quote-mistakes/items-resume')
+	async getClassicQuoteMistakesItemsResume(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getClassicQuoteMistakesItemsResume(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Patch('classic-quote-mistakes/items-resume')
+	async updateClassicQuoteMistakesItemsResume(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateClassicQuoteMistakesItemsResume(
+				userId,
+				dto.offset,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户语句错题集（按入库时间倒序） */
 	@Get('classic-quote-mistakes')
 	async listClassicQuoteMistakesPaginated(
 		@Req() req: AuthedRequest,
@@ -1042,8 +1134,8 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			100,
-			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
 		const data = await this.englishLearningService.listClassicQuoteMistakesPage(
@@ -1104,6 +1196,37 @@ export class EnglishLearningController {
 	}
 
 	/** 分页列出当前用户收藏的单词（按收藏时间倒序） */
+	@Get('vocabulary-favorites/items-resume')
+	async getVocabularyFavoritesItemsResume(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getVocabularyFavoritesItemsResume(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Patch('vocabulary-favorites/items-resume')
+	async updateVocabularyFavoritesItemsResume(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateVocabularyFavoritesItemsResume(
+				userId,
+				dto.offset,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户收藏的单词（按收藏时间倒序） */
 	@Get('vocabulary-favorites')
 	async listVocabularyFavoritesPaginated(
 		@Req() req: AuthedRequest,
@@ -1115,8 +1238,8 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			100,
-			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
 		const data = await this.englishLearningService.listVocabularyFavoritesPage(
@@ -1452,6 +1575,37 @@ export class EnglishLearningController {
 	}
 
 	/** 分页列出当前用户收藏的经典句（按收藏时间倒序） */
+	@Get('classic-quotes-favorites/items-resume')
+	async getClassicQuotesFavoritesItemsResume(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getClassicQuotesFavoritesItemsResume(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Patch('classic-quotes-favorites/items-resume')
+	async updateClassicQuotesFavoritesItemsResume(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateLibraryItemsResumeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateClassicQuotesFavoritesItemsResume(
+				userId,
+				dto.offset,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户收藏的经典句（按收藏时间倒序） */
 	@Get('classic-quotes-favorites')
 	async listClassicQuoteFavoritesPaginated(
 		@Req() req: AuthedRequest,
@@ -1463,8 +1617,8 @@ export class EnglishLearningController {
 			throw new UnauthorizedException('未授权');
 		}
 		const limit = Math.min(
-			100,
-			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+			1000,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
 		);
 		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
 		const data =

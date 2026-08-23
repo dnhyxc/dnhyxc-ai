@@ -497,7 +497,7 @@ function ClassicQuotesSectionInner() {
 							ENGLISH_SIDEBAR_BTN_GRADIENT.classicPack,
 						)}
 					>
-						<span className="max-[380px]:sr-only">
+						<span className="max-[380px]:sr-only truncate">
 							{t('englishLearning.classic.historyOpenDrawer')}
 						</span>
 					</Button>

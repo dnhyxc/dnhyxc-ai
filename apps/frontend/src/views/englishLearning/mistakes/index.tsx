@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import { flushElFixedListResume } from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
@@ -81,6 +82,28 @@ export default function EnglishLearningMistakesPage() {
 					: t('englishLearning.practice.sourceMistakes'),
 		});
 	}, [counts.total, kind, t]);
+
+	useEffect(() => {
+		const flushAll = () => {
+			flushElFixedListResume('vocab-mistakes', {
+				keepalive: true,
+			});
+			flushElFixedListResume('classic-mistakes', {
+				keepalive: true,
+			});
+		};
+		const onPageHide = () => flushAll();
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') flushAll();
+		};
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => {
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibility);
+			flushAll();
+		};
+	}, []);
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">

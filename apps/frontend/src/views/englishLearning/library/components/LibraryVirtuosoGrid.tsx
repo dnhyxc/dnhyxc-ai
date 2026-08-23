@@ -11,8 +11,13 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { Virtuoso } from 'react-virtuoso';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { cn } from '@/lib/utils';
+import {
+	LIBRARY_LIST_AT_BOTTOM_THRESHOLD_PX,
+	shouldBlockLibraryListEndReached,
+} from '../../hooks/useListScrollCornerFab';
+import { registerLibraryVirtuosoScrollParent } from '../../utils/libraryVirtuosoScrollRegistry';
 import {
 	type LibraryGridColumnMode,
 	useLibraryGridColumns,
@@ -81,6 +86,7 @@ export function LibraryVirtuosoGrid<T>({
 	onReady,
 }: LibraryVirtuosoGridProps<T>) {
 	const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+	const virtuosoRef = useRef<VirtuosoHandle>(null);
 	const columns = useLibraryGridColumns(viewportRef, columnMode);
 	const onReadyRef = useRef(onReady);
 	onReadyRef.current = onReady;
@@ -93,6 +99,13 @@ export function LibraryVirtuosoGrid<T>({
 		() => chunkRows(items, columns, getItemKey),
 		[items, columns, getItemKey],
 	);
+
+	useEffect(() => {
+		if (!scrollParent || rows.length === 0) return;
+		const handle = virtuosoRef.current;
+		if (!handle) return;
+		return registerLibraryVirtuosoScrollParent(scrollParent, handle);
+	}, [scrollParent, rows.length]);
 
 	useEffect(() => {
 		if (!scrollParent || rows.length === 0) return;
@@ -135,16 +148,24 @@ export function LibraryVirtuosoGrid<T>({
 
 	return (
 		<Virtuoso
+			ref={virtuosoRef}
 			className={cn('w-full', className)}
 			customScrollParent={scrollParent}
 			data={rows}
 			initialTopMostItemIndex={initialTopMostItemIndex}
 			computeItemKey={(_index, row) => row.key}
+			// 虚拟列表预渲染：减少快速滚动时的空白闪烁
 			overscan={{ main: 400, reverse: 400 }}
 			increaseViewportBy={{ top: 400, bottom: 400 }}
 			minOverscanItemCount={{ top: 2, bottom: 2 }}
-			atBottomThreshold={200}
-			endReached={onEndReached}
+			// 距底部 200px 内视为触底，触发加载更多（与 useListScrollCornerFab 阈值对齐）
+			atBottomThreshold={LIBRARY_LIST_AT_BOTTOM_THRESHOLD_PX}
+			endReached={() => {
+				const vp = viewportRef.current;
+				// FAB 置底停在加载区外时，Virtuoso 仍会按可见区触发 endReached，此处拦截误加载
+				if (vp && shouldBlockLibraryListEndReached(vp)) return;
+				onEndReached();
+			}}
 			itemContent={(_index, row) => (
 				<div>
 					<div className={rowGridClassName} style={rowGridStyle}>

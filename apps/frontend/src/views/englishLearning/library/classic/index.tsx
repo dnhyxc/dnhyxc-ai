@@ -19,21 +19,26 @@ import {
 	removeEnglishClassicQuoteFavorite,
 } from '@/service';
 import {
-	resolveEnglishLibraryItemsResumeOffset,
-	setEnglishLibraryItemsResumeOffset,
-} from '@/store/englishLibraryItemsResume';
+	resolveElResumeOffset,
+	setElResumeOffset,
+} from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../components/LibraryVirtuosoGrid';
-import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
 
 export type ClassicQuotesLibrarySectionProps = {
 	libraryId: string | null;
@@ -85,7 +90,7 @@ export function ClassicQuotesLibrarySection({
 	/** 浏览中只写本地；离开库时由页面 flush 到 DB */
 	const handleResumeOffsetChange = useCallback(
 		(id: string, offset: number) => {
-			setEnglishLibraryItemsResumeOffset('classic', id, offset);
+			setElResumeOffset('classic', id, offset);
 			onResumeOffsetChange?.(id, offset);
 		},
 		[onResumeOffsetChange],
@@ -93,20 +98,21 @@ export function ClassicQuotesLibrarySection({
 
 	const {
 		items,
+		patchItems,
 		resolvedLibrary,
 		loading,
 		loadingMore,
 		initialScrollItemIndex,
 		onViewportScroll,
 		onEndReached,
-	} = useLibraryWordsList<
+	} = useEnglishLearningList<
 		EnglishClassicQuotesLibraryItemRow,
 		EnglishClassicQuotesLibraryListItem
 	>({
 		libraryId,
 		cacheNamespace: 'classic',
 		initialResumeOffset: libraryId
-			? resolveEnglishLibraryItemsResumeOffset(
+			? resolveElResumeOffset(
 					'classic',
 					libraryId,
 					libraryMeta?.itemsResumeOffset ?? 0,
@@ -179,10 +185,26 @@ export function ClassicQuotesLibrarySection({
 					if (!favoriteId) return;
 					await removeEnglishClassicQuoteFavorite(favoriteId);
 					clearClassicQuoteFavorite(ck);
+					patchItems((list) =>
+						list.map((row) =>
+							classicQuoteFavoriteContentKey(row.english) === ck
+								? { ...row, favoriteId: null }
+								: row,
+						),
+					);
 				} else {
 					const res = await addEnglishClassicQuoteFavorite(item);
 					const favoriteId = res.data?.id;
-					if (favoriteId) setClassicQuoteFavoriteId(ck, favoriteId);
+					if (favoriteId) {
+						setClassicQuoteFavoriteId(ck, favoriteId);
+						patchItems((list) =>
+							list.map((row) =>
+								classicQuoteFavoriteContentKey(row.english) === ck
+									? { ...row, favoriteId }
+									: row,
+							),
+						);
+					}
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -194,8 +216,16 @@ export function ClassicQuotesLibrarySection({
 			getClassicQuoteFavoriteId,
 			setClassicQuoteFavoriteId,
 			clearClassicQuoteFavorite,
+			patchItems,
 		],
 	);
+
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			items.length,
+			Boolean(libraryId) && items.length > 0,
+		);
 
 	if (!libraryId) {
 		return (
@@ -214,7 +244,7 @@ export function ClassicQuotesLibrarySection({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col @container">
-			<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4.5">
+			<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4">
 				<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
 					<span
 						className="text-textcolor min-w-0 truncate text-base font-semibold"
@@ -269,7 +299,10 @@ export function ClassicQuotesLibrarySection({
 						ref={scrollViewportRef}
 						className="relative min-h-0 h-full px-4 pb-4"
 						viewportClassName="[overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-						onScroll={onViewportScroll}
+						onScroll={composeViewportScroll(
+							onViewportScroll,
+							onScrollCornerFab,
+						)}
 					>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -302,7 +335,7 @@ export function ClassicQuotesLibrarySection({
 											favoritedContentKeys.has(contentKey);
 										const favBusy = favoriteActionKey === contentKey;
 										return (
-											<div data-library-item-id={item.id}>
+											<div data-library-item-id={item.id} className="h-full">
 												<ClassicQuoteCard
 													variant="library"
 													data={{
@@ -364,6 +397,7 @@ export function ClassicQuotesLibrarySection({
 							</div>
 						)}
 					</ScrollArea>
+					<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
 				</div>
 			)}
 		</div>

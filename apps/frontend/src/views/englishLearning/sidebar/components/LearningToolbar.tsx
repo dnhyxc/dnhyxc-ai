@@ -175,7 +175,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 									}
 								}}
 							>
-								{t(c.labelKey)}
+								<span className="truncate">{t(c.labelKey)}</span>
 							</Button>
 						);
 					})}

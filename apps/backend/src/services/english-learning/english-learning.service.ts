@@ -92,6 +92,7 @@ import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
 } from './english-favorites-docx.builder';
+import { ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID } from './english-learning-list-resume.constants';
 import {
 	applyReviewSrs,
 	defaultReviewStateForNewMistake,
@@ -192,6 +193,8 @@ export type VocabularyLibraryListItem = {
 export type VocabularyLibraryItemDto = VocabularyItemDto & {
 	id: string;
 	sortOrder: number;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId: string | null;
 };
 
 /** 经典语句库（包）列表项 */
@@ -210,6 +213,8 @@ export type ClassicQuotesLibraryListItem = {
 export type ClassicQuotesLibraryItemDto = ClassicQuoteItemDto & {
 	id: string;
 	sortOrder: number;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId: string | null;
 };
 
 /** 单词包生成进度（供 SSE 与回调） */
@@ -1954,6 +1959,7 @@ ${existingHintBlock}
 
 	private mapLibraryItemRow(
 		row: EnglishVocabularyLibraryItem,
+		favoriteId: string | null = null,
 	): VocabularyLibraryItemDto {
 		return {
 			id: row.id,
@@ -1964,7 +1970,32 @@ ${existingHintBlock}
 			segmentation: row.segmentation ?? '',
 			translationZh: row.translationZh,
 			example: row.example,
+			favoriteId,
 		};
+	}
+
+	private async attachVocabularyFavoriteIdsByWord<T extends { word: string }>(
+		userId: number,
+		items: T[],
+	): Promise<Array<T & { favoriteId: string | null }>> {
+		if (items.length === 0) return [];
+		const refs = await this.listVocabularyFavoriteRefsForWords(
+			userId,
+			items.map((i) => i.word),
+		);
+		const idByWordKey = new Map(refs.map((r) => [r.wordKey, r.id]));
+		return items.map((item) => {
+			const wordKey = this.normalizeVocabularyFavoriteWordKey(item.word);
+			const favoriteId = wordKey ? (idByWordKey.get(wordKey) ?? null) : null;
+			return { ...item, favoriteId };
+		});
+	}
+
+	private async attachVocabularyLibraryFavoriteIds(
+		userId: number,
+		items: VocabularyLibraryItemDto[],
+	): Promise<VocabularyLibraryItemDto[]> {
+		return this.attachVocabularyFavoriteIdsByWord(userId, items);
 	}
 
 	private async assertVocabularyLibraryOwned(
@@ -2318,9 +2349,14 @@ ${existingHintBlock}
 			this.getLibraryItemsResumeOffset(userId, 'vocab', libraryId),
 		]);
 
+		const items = await this.attachVocabularyLibraryFavoriteIds(
+			userId,
+			rows.map((r) => this.mapLibraryItemRow(r)),
+		);
+
 		return {
 			library: this.mapVocabularyLibraryListItem(lib, userId, resume),
-			items: rows.map((r) => this.mapLibraryItemRow(r)),
+			items,
 		};
 	}
 
@@ -2453,6 +2489,7 @@ ${existingHintBlock}
 
 	private mapClassicLibraryItemRow(
 		row: EnglishClassicQuotesLibraryItem,
+		favoriteId: string | null = null,
 	): ClassicQuotesLibraryItemDto {
 		return {
 			id: row.id,
@@ -2461,7 +2498,27 @@ ${existingHintBlock}
 			translationZh: row.translationZh,
 			source: row.source ?? '',
 			noteZh: row.noteZh,
+			favoriteId,
 		};
+	}
+
+	private async attachClassicQuotesLibraryFavoriteIds(
+		userId: number,
+		items: ClassicQuotesLibraryItemDto[],
+	): Promise<ClassicQuotesLibraryItemDto[]> {
+		if (items.length === 0) return items;
+		const refs = await this.listClassicQuoteFavoriteRefsForEnglishes(
+			userId,
+			items.map((i) => i.english),
+		);
+		const idByContentKey = new Map(refs.map((r) => [r.contentKey, r.id]));
+		return items.map((item) => {
+			const contentKey = this.classicQuoteFavoriteContentKey(item.english);
+			const favoriteId = contentKey
+				? (idByContentKey.get(contentKey) ?? null)
+				: null;
+			return { ...item, favoriteId };
+		});
 	}
 
 	private async assertClassicQuotesLibraryOwned(
@@ -2641,6 +2698,126 @@ ${existingHintBlock}
 		return this.mapClassicQuotesLibraryListItem(lib, userId, resume);
 	}
 
+	async getVocabularyFavoritesItemsResume(
+		userId: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.getLibraryItemsResumeOffset(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_FAVORITES,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async updateVocabularyFavoritesItemsResume(
+		userId: number,
+		offset: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.upsertLibraryItemsResume(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_FAVORITES,
+			offset,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async getDailyMemorizeRecordsItemsResume(
+		userId: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.getLibraryItemsResumeOffset(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_DAILY_MEMORIZE,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async updateDailyMemorizeRecordsItemsResume(
+		userId: number,
+		offset: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.upsertLibraryItemsResume(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_DAILY_MEMORIZE,
+			offset,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async getClassicQuotesFavoritesItemsResume(
+		userId: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.getLibraryItemsResumeOffset(
+			userId,
+			'classic',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.CLASSIC_FAVORITES,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async updateClassicQuotesFavoritesItemsResume(
+		userId: number,
+		offset: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.upsertLibraryItemsResume(
+			userId,
+			'classic',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.CLASSIC_FAVORITES,
+			offset,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async getVocabularyMistakesItemsResume(
+		userId: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.getLibraryItemsResumeOffset(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_MISTAKES,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async updateVocabularyMistakesItemsResume(
+		userId: number,
+		offset: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.upsertLibraryItemsResume(
+			userId,
+			'vocab',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.VOCAB_MISTAKES,
+			offset,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async getClassicQuoteMistakesItemsResume(
+		userId: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.getLibraryItemsResumeOffset(
+			userId,
+			'classic',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.CLASSIC_MISTAKES,
+		);
+		return { itemsResumeOffset };
+	}
+
+	async updateClassicQuoteMistakesItemsResume(
+		userId: number,
+		offset: number,
+	): Promise<{ itemsResumeOffset: number }> {
+		const itemsResumeOffset = await this.upsertLibraryItemsResume(
+			userId,
+			'classic',
+			ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.CLASSIC_MISTAKES,
+			offset,
+		);
+		return { itemsResumeOffset };
+	}
+
 	async listClassicQuotesLibraryItems(
 		userId: number,
 		libraryId: string,
@@ -2666,9 +2843,14 @@ ${existingHintBlock}
 			this.getLibraryItemsResumeOffset(userId, 'classic', libraryId),
 		]);
 
+		const items = await this.attachClassicQuotesLibraryFavoriteIds(
+			userId,
+			rows.map((r) => this.mapClassicLibraryItemRow(r)),
+		);
+
 		return {
 			library: this.mapClassicQuotesLibraryListItem(lib, userId, resume),
-			items: rows.map((r) => this.mapClassicLibraryItemRow(r)),
+			items,
 		};
 	}
 
@@ -4950,6 +5132,7 @@ ${existingHintBlock}
 			example: string;
 			lastCorrect: boolean;
 			practicedAt: string;
+			favoriteId: string | null;
 		}>;
 		totalCount: number;
 	}> {
@@ -4962,9 +5145,9 @@ ${existingHintBlock}
 				skip: opts.offset,
 			}),
 		]);
-		return {
-			totalCount,
-			items: rows.map((r) => ({
+		const items = await this.attachVocabularyFavoriteIdsByWord(
+			userId,
+			rows.map((r) => ({
 				id: r.id,
 				word: r.word,
 				ipa: r.ipa ?? '',
@@ -4975,6 +5158,10 @@ ${existingHintBlock}
 				lastCorrect: r.lastCorrect,
 				practicedAt: r.practicedAt.toISOString(),
 			})),
+		);
+		return {
+			totalCount,
+			items,
 		};
 	}
 

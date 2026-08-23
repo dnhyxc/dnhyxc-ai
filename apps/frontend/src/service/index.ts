@@ -1,6 +1,7 @@
 import CryptoJS from 'crypto-js';
 import {
 	BASE_URL,
+	ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID,
 	FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 	FAVORITE_STATUS_HTTP_BATCH_SIZE,
 	MEMBERSHIP_PLAN_CODES,
@@ -819,6 +820,8 @@ export type EnglishVocabularyLibraryListItem = {
 export type EnglishVocabularyLibraryItemRow = EnglishVocabularyItem & {
 	id: string;
 	sortOrder: number;
+	/** 当前用户已收藏时返回收藏 id，否则 null（资源库 items 分页） */
+	favoriteId?: string | null;
 };
 
 /** 分页列出当前用户的单词库 */
@@ -872,7 +875,7 @@ export const patchEnglishVocabularyLibraryTitle = async (
 };
 
 /** 更新单词库词条列表续读 offset（可读即可） */
-export const patchEnglishVocabularyLibraryItemsResume = async (
+export const patchVocabLibResume = async (
 	libraryId: string,
 	offset: number,
 	options?: { silent?: boolean },
@@ -888,10 +891,7 @@ export const patchEnglishVocabularyLibraryItemsResume = async (
 };
 
 /** 刷新/关闭页时 keepalive 上报续读（async PATCH 会被浏览器中断） */
-export function patchEnglishVocabularyLibraryItemsResumeKeepalive(
-	libraryId: string,
-	offset: number,
-): void {
+export function keepVocabLibResume(libraryId: string, offset: number): void {
 	if (typeof window === 'undefined') return;
 	const token = localStorage.getItem('token')?.trim();
 	if (!token) return;
@@ -965,6 +965,8 @@ export type EnglishClassicQuotesLibraryItemRow = {
 	translationZh: string;
 	source: string;
 	noteZh: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null（资源库 items 分页） */
+	favoriteId?: string | null;
 };
 
 /** 分页列出当前用户的经典语句库 */
@@ -1018,7 +1020,7 @@ export const patchEnglishClassicQuotesLibraryTitle = async (
 };
 
 /** 更新经典语句库列表续读 offset（可读即可） */
-export const patchEnglishClassicQuotesLibraryItemsResume = async (
+export const patchClassicLibResume = async (
 	libraryId: string,
 	offset: number,
 	options?: { silent?: boolean },
@@ -1034,10 +1036,7 @@ export const patchEnglishClassicQuotesLibraryItemsResume = async (
 };
 
 /** 刷新/关闭页时 keepalive 上报续读 */
-export function patchEnglishClassicQuotesLibraryItemsResumeKeepalive(
-	libraryId: string,
-	offset: number,
-): void {
+export function keepClassicLibResume(libraryId: string, offset: number): void {
 	if (typeof window === 'undefined') return;
 	const token = localStorage.getItem('token')?.trim();
 	if (!token) return;
@@ -1346,13 +1345,55 @@ export const listEnglishVocabularyMistakes = async (options?: {
 		ENGLISH_LEARNING_VOCABULARY_MISTAKES,
 		{
 			querys: {
-				limit: options?.limit ?? 20,
+				limit: options?.limit ?? 50,
 				offset: options?.offset ?? 0,
 			},
 			silent: options?.silent,
 		},
 	);
 };
+
+export const getVocabMissResume = async (options?: { silent?: boolean }) => {
+	return await http.get<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_VOCABULARY_MISTAKES,
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export const patchVocabMissResume = async (
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_VOCABULARY_MISTAKES,
+		{ offset },
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export function keepVocabMissResume(offset: number): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
 
 export const removeEnglishVocabularyMistake = async (id: string) => {
 	return await http.post<{ removed: boolean }>(
@@ -1508,6 +1549,8 @@ export type EnglishDailyMemorizeRecordEntry = {
 	example: string;
 	lastCorrect: boolean;
 	practicedAt: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId?: string | null;
 };
 
 export type EnglishDailyMemorizeRecordsPage = {
@@ -1531,6 +1574,48 @@ export const listEnglishDailyMemorizeRecords = async (options?: {
 		},
 	);
 };
+
+export const getDailyMemoResume = async (options?: { silent?: boolean }) => {
+	return await http.get<{ itemsResumeOffset: number }>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/records`,
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export const patchDailyMemoResume = async (
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ itemsResumeOffset: number }>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/records`,
+		{ offset },
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export function keepDailyMemoResume(offset: number): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_PRACTICE_DAILY}/records/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
 
 export type EnglishClassicQuoteMistakeListEntry = {
 	id: string;
@@ -1569,13 +1654,55 @@ export const listEnglishClassicQuoteMistakes = async (options?: {
 		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
 		{
 			querys: {
-				limit: options?.limit ?? 20,
+				limit: options?.limit ?? 50,
 				offset: options?.offset ?? 0,
 			},
 			silent: options?.silent,
 		},
 	);
 };
+
+export const getClassicMissResume = async (options?: { silent?: boolean }) => {
+	return await http.get<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export const patchClassicMissResume = async (
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
+		{ offset },
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export function keepClassicMissResume(offset: number): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
 
 export const removeEnglishClassicQuoteMistake = async (id: string) => {
 	return await http.post<{ removed: boolean }>(
@@ -1600,13 +1727,55 @@ export const listEnglishVocabularyFavorites = async (options?: {
 		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 		{
 			querys: {
-				limit: options?.limit ?? 20,
+				limit: options?.limit ?? 50,
 				offset: options?.offset ?? 0,
 			},
 			silent: options?.silent,
 		},
 	);
 };
+
+export const getVocabFavResume = async (options?: { silent?: boolean }) => {
+	return await http.get<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export const patchVocabFavResume = async (
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
+		{ offset },
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export function keepVocabFavResume(offset: number): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
 
 /** ---------- 英语学习：经典语句包 ---------- */
 
@@ -1762,13 +1931,110 @@ export const listEnglishClassicQuoteFavorites = async (options?: {
 		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 		{
 			querys: {
-				limit: options?.limit ?? 20,
+				limit: options?.limit ?? 50,
 				offset: options?.offset ?? 0,
 			},
 			silent: options?.silent,
 		},
 	);
 };
+
+export const getClassicFavResume = async (options?: { silent?: boolean }) => {
+	return await http.get<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export const patchClassicFavResume = async (
+	offset: number,
+	options?: { silent?: boolean },
+) => {
+	return await http.patch<{ itemsResumeOffset: number }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
+		{ offset },
+		{
+			params: ['items-resume'],
+			silent: options?.silent ?? true,
+		},
+	);
+};
+
+export function keepClassicFavResume(offset: number): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/items-resume`,
+		{
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ offset }),
+			keepalive: true,
+		},
+	);
+}
+
+export type ElListResumeKind = 'vocab' | 'classic';
+
+type ElListResumePatchPair = {
+	patch: (offset: number) => Promise<unknown>;
+	keepalive: (offset: number) => void;
+};
+
+function resolveElListResumePatch(
+	kind: ElListResumeKind,
+	libraryId: string,
+): ElListResumePatchPair {
+	const id = libraryId.trim();
+	if (kind === 'vocab') {
+		if (id === ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.vocabFavorites) {
+			return { patch: patchVocabFavResume, keepalive: keepVocabFavResume };
+		}
+		if (id === ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.vocabMistakes) {
+			return { patch: patchVocabMissResume, keepalive: keepVocabMissResume };
+		}
+		if (id === ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.vocabDailyMemorize) {
+			return { patch: patchDailyMemoResume, keepalive: keepDailyMemoResume };
+		}
+		return {
+			patch: (offset) => patchVocabLibResume(id, offset),
+			keepalive: (offset) => keepVocabLibResume(id, offset),
+		};
+	}
+
+	if (id === ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.classicFavorites) {
+		return { patch: patchClassicFavResume, keepalive: keepClassicFavResume };
+	}
+	if (id === ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID.classicMistakes) {
+		return { patch: patchClassicMissResume, keepalive: keepClassicMissResume };
+	}
+	return {
+		patch: (offset) => patchClassicLibResume(id, offset),
+		keepalive: (offset) => keepClassicLibResume(id, offset),
+	};
+}
+
+/** 按列表类型 + libraryId 路由续读 PATCH（含 keepalive） */
+export function patchElListResume(
+	kind: ElListResumeKind,
+	libraryId: string,
+	offset: number,
+	opts?: { keepalive?: boolean },
+): Promise<void> {
+	const { patch, keepalive } = resolveElListResumePatch(kind, libraryId);
+	if (opts?.keepalive) {
+		keepalive(offset);
+		return Promise.resolve();
+	}
+	return patch(offset).then(() => undefined);
+}
 
 /**
  * 带鉴权拉取收藏导出 DOCX：`http.get` 取 `ArrayBuffer` 后统一走 {@link downloadBlob}（Web 为 `<a download>`，Tauri 为 `download_blob`）。

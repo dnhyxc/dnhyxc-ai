@@ -322,7 +322,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-4': {
 		title: '13.4 Favorites, drawer, and DOCX export',
 		description:
-			'Favorite words or lines; browse and manage in a paginated drawer, with multi-select and confirmed batch unfavorite. Export word favorites or quote favorites to Word (DOCX); the server aggregates up to about 3000 items per account by favorite time (newest first), independent of the drawer page; word export may include part-of-speech (pos) fields. Browser and desktop both use binary download and local save; desktop dedupe prompts if implemented.',
+			'Favorite words or lines; browse and manage in a paginated drawer, with multi-select and confirmed batch unfavorite. Favorites list uses the same virtual-scrolling grid as the resource library (1/2/3 columns adaptive), staying smooth at any size; it remembers where you left off — re-entering jumps back to that entry even after closing the browser or quitting the desktop app; a floating corner button (bottom-right) lets you jump to the top or bottom; deleting favorites refreshes the list in place without jumping to the first page. Export word favorites or quote favorites to Word (DOCX); the server aggregates up to about 3000 items per account by favorite time (newest first), independent of the drawer page; word export may include part-of-speech (pos) fields. Browser and desktop both use binary download and local save; desktop dedupe prompts if implemented.',
 	},
 	'pg-s13-5': {
 		title: '13.5 Libraries and JSON import',
@@ -362,7 +362,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-12': {
 		title: '13.12 Mistake book (vocab & classic)',
 		description:
-			'Sidebar or in-page tabs; total/loaded counts; remove and footer practice. Re-saving updates last wrong input when spelling differs; snapshots unchanged.',
+			'Sidebar or in-page tabs; total/loaded counts; remove and footer practice. Mistakes list uses the same virtual-scrolling grid as the resource library (1/2/3 columns adaptive), staying smooth at any size; it remembers where you left off — re-entering jumps back to that entry even after closing the browser or quitting the desktop app; a floating corner button (bottom-right) lets you jump to the top or bottom; deleting mistakes refreshes the list in place without jumping to the first page. Re-saving updates last wrong input when spelling differs; snapshots unchanged.',
 	},
 	'pg-s13-14': {
 		title: "13.14 Today's review (spaced repetition)",

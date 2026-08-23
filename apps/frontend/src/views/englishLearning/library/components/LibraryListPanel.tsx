@@ -30,9 +30,9 @@ import {
 	listEnglishVocabularyLibraries,
 } from '@/service';
 import {
-	hydrateEnglishLibraryItemsResumeOffset,
-	resolveEnglishLibraryItemsResumeOffset,
-} from '@/store/englishLibraryItemsResume';
+	hydrateElResumeOffset,
+	resolveElResumeOffset,
+} from '@/store/englishLearningResume';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
@@ -63,14 +63,10 @@ function withResumeFromStore(
 	list: EnglishLibraryListItem[],
 ): EnglishLibraryListItem[] {
 	return list.map((item) => {
-		hydrateEnglishLibraryItemsResumeOffset(
-			kind,
-			item.id,
-			item.itemsResumeOffset ?? 0,
-		);
+		hydrateElResumeOffset(kind, item.id, item.itemsResumeOffset ?? 0);
 		return {
 			...item,
-			itemsResumeOffset: resolveEnglishLibraryItemsResumeOffset(
+			itemsResumeOffset: resolveElResumeOffset(
 				kind,
 				item.id,
 				item.itemsResumeOffset ?? 0,
@@ -331,7 +327,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 				closeOnConfirm={false}
 				onConfirm={() => void executeDeleteLibrary()}
 			/>
-			<div className="h-12 flex items-center justify-between px-4.5 py-1">
+			<div className="h-12 flex items-center justify-between px-4 py-1">
 				<div className="flex items-center gap-2">
 					{kind === 'vocab'
 						? t('englishLearning.library.vocab.title')

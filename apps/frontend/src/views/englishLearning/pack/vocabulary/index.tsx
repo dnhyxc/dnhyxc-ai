@@ -24,7 +24,12 @@ import {
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useVocabularyPackHistoryList } from '../hooks/useVocabularyPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -233,6 +238,13 @@ function VocabularyPackSectionInner({
 			? history.items
 			: EnglishPackStore.vocabItems;
 	const isHistoryMode = useHistoryPagination && history.active;
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			listItems.length,
+			listItems.length > 0 && !showPageLoading,
+		);
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
@@ -302,95 +314,102 @@ function VocabularyPackSectionInner({
 	}
 
 	return (
-		<ScrollArea
-			className="min-h-0 flex-1 pb-4"
-			onScroll={snapshot.onHistoryViewportScroll}
-		>
-			<div className="space-y-5 px-4">
-				{isLiveStreamView || !isHistoryView ? (
-					<PackStreamProgress kind="vocab" />
-				) : null}
+		<div className="relative min-h-0 flex-1">
+			<ScrollArea
+				ref={scrollViewportRef}
+				className="min-h-0 h-full pb-4"
+				onScroll={composeViewportScroll(
+					snapshot.onHistoryViewportScroll,
+					onScrollCornerFab,
+				)}
+			>
+				<div className="space-y-5 px-4">
+					{isLiveStreamView || !isHistoryView ? (
+						<PackStreamProgress kind="vocab" />
+					) : null}
 
-				{listItems.length > 0 ? (
-					<div className="min-w-0 space-y-4">
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-							{listItems.map((item, i) => {
-								const key = isHistoryMode
-									? `history-${i}-${item.word}`
-									: `${i}-${item.word}`;
-								const playing = playingKey === key;
-								const wordKey = normalizeEnglishVocabWordKey(item.word);
-								const isFavorited = favoritedWordKeys.has(wordKey);
-								const favBusy = favoriteActionKey === wordKey;
-								const posDisplay = item.pos?.trim()
-									? item.pos.endsWith('.')
-										? item.pos
-										: `${item.pos}.`
-									: null;
-								return (
-									<VocabularyWordCard
-										key={key}
-										variant="library"
-										className="mb-0"
-										forceExample
-										data={{ ...item, pos: posDisplay }}
-										playing={playing}
-										onTogglePlay={() => void toggleWordAudio(item.word, key)}
-										playLabels={{
-											play: t('englishLearning.vocab.playWord'),
-											stop: t('englishLearning.tts.stop'),
-										}}
-										trailingActions={
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												disabled={favBusy}
-												onClick={() =>
-													void toggleVocabularyFavorite(item, isFavorited)
-												}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-													isFavorited
-														? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
-														: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-												)}
-												aria-pressed={isFavorited}
-												aria-label={
-													isFavorited
-														? t('englishLearning.vocab.unfavoriteWord')
-														: t('englishLearning.vocab.favoriteWord')
-												}
-											>
-												<Star
+					{listItems.length > 0 ? (
+						<div className="min-w-0 space-y-4">
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+								{listItems.map((item, i) => {
+									const key = isHistoryMode
+										? `history-${i}-${item.word}`
+										: `${i}-${item.word}`;
+									const playing = playingKey === key;
+									const wordKey = normalizeEnglishVocabWordKey(item.word);
+									const isFavorited = favoritedWordKeys.has(wordKey);
+									const favBusy = favoriteActionKey === wordKey;
+									const posDisplay = item.pos?.trim()
+										? item.pos.endsWith('.')
+											? item.pos
+											: `${item.pos}.`
+										: null;
+									return (
+										<VocabularyWordCard
+											key={key}
+											variant="library"
+											className="mb-0"
+											forceExample
+											data={{ ...item, pos: posDisplay }}
+											playing={playing}
+											onTogglePlay={() => void toggleWordAudio(item.word, key)}
+											playLabels={{
+												play: t('englishLearning.vocab.playWord'),
+												stop: t('englishLearning.tts.stop'),
+											}}
+											trailingActions={
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													disabled={favBusy}
+													onClick={() =>
+														void toggleVocabularyFavorite(item, isFavorited)
+													}
 													className={cn(
-														'size-3.5',
-														isFavorited && 'fill-current',
+														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+														isFavorited
+															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
 													)}
-													aria-hidden
-												/>
-											</Button>
-										}
-									/>
-								);
-							})}
-						</div>
-						{isHistoryMode && history.loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
-								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-								{t('common.loadingMore')}
+													aria-pressed={isFavorited}
+													aria-label={
+														isFavorited
+															? t('englishLearning.vocab.unfavoriteWord')
+															: t('englishLearning.vocab.favoriteWord')
+													}
+												>
+													<Star
+														className={cn(
+															'size-3.5',
+															isFavorited && 'fill-current',
+														)}
+														aria-hidden
+													/>
+												</Button>
+											}
+										/>
+									);
+								})}
 							</div>
-						) : null}
-					</div>
-				) : null}
+							{isHistoryMode && history.loadingMore ? (
+								<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
+									{t('common.loadingMore')}
+								</div>
+							) : null}
+						</div>
+					) : null}
 
-				{showEmpty ? (
-					<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
-						{snapshot.emptyHint}
-					</div>
-				) : null}
-			</div>
-		</ScrollArea>
+					{showEmpty ? (
+						<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
+							{snapshot.emptyHint}
+						</div>
+					) : null}
+				</div>
+			</ScrollArea>
+			<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+		</div>
 	);
 }
 

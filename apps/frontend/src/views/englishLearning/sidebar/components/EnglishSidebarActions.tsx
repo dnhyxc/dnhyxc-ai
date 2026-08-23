@@ -48,7 +48,7 @@ export function EnglishSidebarActions({
 						)}
 						onClick={action.onClick}
 					>
-						{action.label}
+						<span className="truncate">{action.label}</span>
 					</Button>
 				);
 			})}

@@ -60,8 +60,8 @@ export type ScrollFabProps = {
 	onClick: () => void;
 	toBottomLabel: string;
 	toTopLabel: string;
-	/** 英语学习 footer 使用 bottom-full；默认知识库/电子书使用 calc 定位 */
-	variant?: 'default' | 'english';
+	/** 英语学习 footer 使用 bottom-full；列表右下角使用 corner */
+	variant?: 'default' | 'english' | 'corner';
 };
 
 export type AssistantShellProps = {

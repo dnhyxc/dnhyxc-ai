@@ -1152,6 +1152,12 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Four upgrades to the English Learning library browsing experience. 1) Massive libraries stay smooth: right-hand entries now use a row-level virtual grid. Even libraries with tens of thousands of words or sentences only mount the cards visible on screen, so DOM size stays small and scrolling frames stay stable. Columns adapt automatically: 1 on narrow screens, 2 on medium, 3 on wide. 2) Deep resume lands with content immediately: if you left off at entry #3000, re-entering no longer shows just 100 entries around that point and forces you to scroll up to fill the gap — thousands of entries before and after the resume anchor are rendered in one shot, so scrolling either way has content right away. 3) Switching libraries is nearly instant: flipping back to a library you just viewed restores its scroll position, resume anchor, and loaded entries from a local snapshot instead of re-requesting everything over the network. 4) Favorite stars are correct the moment cards appear: star states for whole batches are queried in the same pagination window and at the same pace as the entries themselves — no more empty-then-lit flicker. The old bidirectional paging (pulling older entries by scrolling up) has been unified into a simpler one-way flow: the first render shows the full resume window, then you scroll down for more. Internal page logic is cleaner, and entering a deep-resume large library is 3–10× faster than before, scaling with depth and entry count.',
 	},
+	's24-65': {
+		title:
+			'Favorites, mistakes & daily records: unified virtual scroll + resume',
+		description:
+			'Five English-learning list pages — word favorites, classic-quote favorites, word mistakes, classic-quote mistakes, and daily memorize records — are all upgraded to the same virtual-scrolling grid engine as the resource library entries. Columns adapt automatically (1 on narrow, 2 on medium, 3 on wide), so lists stay smooth no matter the size. Each list now remembers where you left off: re-entering jumps straight back to that entry, even after closing the browser or quitting the desktop app. Progress is reported once when you leave, not on every page turn. Deleting entries refreshes the list in place instead of jumping back to the top. A floating corner button (bottom-right) lets you jump to the bottom or top of long lists instantly without dragging the scrollbar.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

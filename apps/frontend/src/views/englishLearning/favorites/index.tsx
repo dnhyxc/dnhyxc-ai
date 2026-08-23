@@ -1,9 +1,10 @@
 /**
  * 英语学习：收藏记录（上下布局，顶栏标题 + 右侧分类切换）
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import { flushElFixedListResume } from '@/store/englishLearningResume';
 import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
 import { ClassicQuotesFavoritesSection } from './classic';
 import {
@@ -52,6 +53,28 @@ export default function EnglishLearningFavoritesPage() {
 			: t('englishLearning.classic.favoritesTitle');
 	const counts = kind === 'vocab' ? vocabCounts : classicCounts;
 	const countType = kind === 'vocab' ? t('common.type-1') : t('common.type-2');
+
+	useEffect(() => {
+		const flushAll = () => {
+			flushElFixedListResume('vocab-favorites', {
+				keepalive: true,
+			});
+			flushElFixedListResume('classic-favorites', {
+				keepalive: true,
+			});
+		};
+		const onPageHide = () => flushAll();
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') flushAll();
+		};
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => {
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibility);
+			flushAll();
+		};
+	}, []);
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">

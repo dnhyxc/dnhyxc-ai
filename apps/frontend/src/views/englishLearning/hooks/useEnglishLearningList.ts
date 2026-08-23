@@ -1,5 +1,5 @@
 /**
- * 资源库右侧词条列表：续读预取（0→续读页）+ 向下滚动加载更多。
+ * 英语学习分页列表：续读预取（0→续读页）+ 向下滚动加载更多。
  */
 import { Toast } from '@ui/index';
 import {
@@ -15,6 +15,7 @@ import { useI18n } from '@/hooks';
 import { retryAsync } from '@/utils/retryAsync';
 import {
 	getLibraryWordsListCache,
+	invalidateLibraryWordsListCache,
 	setLibraryWordsListCache,
 } from '../utils/libraryWordsListCache';
 import {
@@ -28,16 +29,21 @@ import {
 
 const PREFETCH_CONCURRENCY = 3;
 
-export type LibraryWordsListResult<TItem, TLibrary> = {
-	library: TLibrary;
+export type ElListPageResult<TItem, TLibrary> = {
+	library?: TLibrary | null;
 	items: TItem[];
+	totalCount?: number;
 };
 
-export type UseLibraryWordsListOptions<TItem, TLibrary> = {
+export type UseEnglishLearningListOptions<TItem, TLibrary> = {
 	libraryId: string | null;
 	pageSize?: number;
 	cacheNamespace?: string;
 	initialResumeOffset?: number;
+	/** 无会话缓存时从服务端拉续读 offset（收藏/错题集等） */
+	resolveInitialResume?: () => Promise<number>;
+	/** 每次进入（mount / libraryId 生效）跳过会话缓存并重新拉列表 */
+	refetchOnEnter?: boolean;
 	persistResume?: boolean;
 	onResumeOffsetChange?: (libraryId: string, offset: number) => void;
 	viewportRef?: RefObject<HTMLDivElement | null>;
@@ -45,21 +51,24 @@ export type UseLibraryWordsListOptions<TItem, TLibrary> = {
 		libraryId: string,
 		limit: number,
 		offset: number,
-	) => Promise<LibraryWordsListResult<TItem, TLibrary>>;
+	) => Promise<ElListPageResult<TItem, TLibrary>>;
 };
 
-export function useLibraryWordsList<TItem, TLibrary>({
+export function useEnglishLearningList<TItem, TLibrary>({
 	libraryId,
 	pageSize = VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
 	cacheNamespace,
 	initialResumeOffset = 0,
+	resolveInitialResume,
+	refetchOnEnter = false,
 	persistResume = true,
 	onResumeOffsetChange,
 	viewportRef,
 	fetchPage,
-}: UseLibraryWordsListOptions<TItem, TLibrary>) {
+}: UseEnglishLearningListOptions<TItem, TLibrary>) {
 	const { t } = useI18n();
 	const [items, setItems] = useState<TItem[]>([]);
+	const [totalCount, setTotalCount] = useState(0);
 	const [resolvedLibrary, setResolvedLibrary] = useState<TLibrary | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
@@ -78,6 +87,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	const loadingRef = useRef(false);
 	const resolvedLibraryRef = useRef<TLibrary | null>(null);
 	const itemsRef = useRef<TItem[]>([]);
+	const totalCountRef = useRef(0);
 	const fetchPageRef = useRef(fetchPage);
 	const tRef = useRef(t);
 	const lastSavedResumeRef = useRef(0);
@@ -87,13 +97,19 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	const fetchFirstPageRef = useRef<
 		(id: string, gen: number, resumeOffset: number) => Promise<void>
 	>(async () => {});
+	const resolveInitialResumeRef = useRef(resolveInitialResume);
+	const refetchOnEnterRef = useRef(refetchOnEnter);
 	const bootedLibraryIdRef = useRef<string | null>(null);
+
+	resolveInitialResumeRef.current = resolveInitialResume;
+	refetchOnEnterRef.current = refetchOnEnter;
 
 	fetchPageRef.current = fetchPage;
 	tRef.current = t;
 	loadingRef.current = loading;
 	resolvedLibraryRef.current = resolvedLibrary;
 	itemsRef.current = items;
+	totalCountRef.current = totalCount;
 	initialResumeOffsetRef.current = initialResumeOffset;
 	persistResumeRef.current = persistResume;
 	onResumeOffsetChangeRef.current = onResumeOffsetChange;
@@ -134,9 +150,28 @@ export function useLibraryWordsList<TItem, TLibrary>({
 				hasMore: hasMoreRef.current,
 				hasPrevious: false,
 				scrollTop: scrollTopRef.current,
+				totalCount: totalCountRef.current,
 			});
 		},
 		[cacheNamespace],
+	);
+
+	/** 就地改列表项并同步会话缓存（如收藏后更新内嵌 favoriteId） */
+	const patchItems = useCallback(
+		(patcher: (items: TItem[]) => TItem[]) => {
+			setItems((prev) => {
+				const next = patcher(prev);
+				const id = libraryIdRef.current;
+				if (id) {
+					persistCache(id, {
+						items: next,
+						resolvedLibrary: resolvedLibraryRef.current,
+					});
+				}
+				return next;
+			});
+		},
+		[persistCache],
 	);
 
 	const fetchPageWithRetry = useCallback(
@@ -156,12 +191,16 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			resolved: TLibrary | null,
 			scrollItemIndex: number,
 			hasMore: boolean,
+			nextTotalCount?: number,
 		) => {
 			startOffsetRef.current = startOffset;
 			endOffsetRef.current = startOffset + list.length;
 			hasMoreRef.current = hasMore;
 			setItems(list);
 			if (resolved) setResolvedLibrary(resolved);
+			if (typeof nextTotalCount === 'number') {
+				setTotalCount(nextTotalCount);
+			}
 			setResume(alignResumeOffset(scrollItemIndex, pageSize));
 			setInitialScrollItemIndex(scrollItemIndex);
 			persistCache(id, { items: list, resolvedLibrary: resolved });
@@ -201,6 +240,9 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			setLoading(false);
 			setLoadingMore(false);
 			fetchingMoreRef.current = false;
+			if (typeof cached.totalCount === 'number') {
+				setTotalCount(cached.totalCount);
+			}
 			return true;
 		},
 		[cacheNamespace, pageSize],
@@ -229,10 +271,14 @@ export function useLibraryWordsList<TItem, TLibrary>({
 
 				const list: TItem[] = [];
 				let lib: TLibrary | null = null;
+				let nextTotalCount: number | undefined;
 				for (const page of pages) {
 					const chunk = Array.isArray(page.items) ? page.items : [];
 					list.push(...chunk);
 					if (page.library) lib = page.library;
+					if (typeof page.totalCount === 'number') {
+						nextTotalCount = page.totalCount;
+					}
 				}
 
 				if (list.length === 0 && resumeOffset > 0) {
@@ -251,6 +297,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 						fallback.library ?? null,
 						0,
 						hasMore,
+						fallback.totalCount,
 					);
 					return;
 				}
@@ -263,7 +310,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 				const lastChunk = chunks.at(-1);
 				const hasMore =
 					(lastPage?.items.length ?? 0) === (lastChunk?.limit ?? 0);
-				applyWindow(id, 0, list, lib, scrollIndex, hasMore);
+				applyWindow(id, 0, list, lib, scrollIndex, hasMore, nextTotalCount);
 			} catch {
 				if (gen !== loadGenRef.current) return;
 				setItems([]);
@@ -304,6 +351,9 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			if (gen !== loadGenRef.current || libraryIdRef.current !== id) return;
 			const chunk = Array.isArray(data.items) ? data.items : [];
 			const lib = resolvedLibraryRef.current;
+			if (typeof data.totalCount === 'number') {
+				setTotalCount(data.totalCount);
+			}
 			if (chunk.length === 0) {
 				hasMoreRef.current = false;
 				persistCache(id, { items: itemsRef.current, resolvedLibrary: lib });
@@ -334,14 +384,54 @@ export function useLibraryWordsList<TItem, TLibrary>({
 
 	fetchFirstPageRef.current = fetchInitialWindow;
 
+	const reloadFromStart = useCallback(
+		async (resetResume = false) => {
+			const id = libraryIdRef.current;
+			if (!id) return;
+			if (cacheNamespace) {
+				invalidateLibraryWordsListCache(cacheNamespace, id);
+			}
+			bootedLibraryIdRef.current = null;
+			listReadyRef.current = false;
+			const gen = ++loadGenRef.current;
+			let resumeOffset = alignResumeOffset(
+				initialResumeOffsetRef.current,
+				pageSize,
+			);
+			if (resetResume) {
+				resumeOffset = 0;
+				lastSavedResumeRef.current = 0;
+				setResume(0);
+			} else if (resolveInitialResumeRef.current) {
+				try {
+					resumeOffset = alignResumeOffset(
+						await resolveInitialResumeRef.current(),
+						pageSize,
+					);
+				} catch {
+					// 用 fallback
+				}
+			}
+			bootedLibraryIdRef.current = id;
+			lastSavedResumeRef.current = resumeOffset;
+			await fetchFirstPageRef.current(id, gen, resumeOffset);
+		},
+		[cacheNamespace, pageSize, setResume],
+	);
+
 	useEffect(() => {
+		const prevLibraryId = libraryIdRef.current;
 		libraryIdRef.current = libraryId;
 		listReadyRef.current = false;
 		lastMoreOffsetRef.current = -1;
 		if (!libraryId) {
 			loadGenRef.current += 1;
+			if (refetchOnEnterRef.current && prevLibraryId && cacheNamespace) {
+				invalidateLibraryWordsListCache(cacheNamespace, prevLibraryId);
+			}
 			bootedLibraryIdRef.current = null;
 			setItems([]);
+			setTotalCount(0);
 			setResolvedLibrary(null);
 			setInitialScrollTop(0);
 			setInitialScrollItemIndex(0);
@@ -351,20 +441,38 @@ export function useLibraryWordsList<TItem, TLibrary>({
 			return;
 		}
 
-		const resumeOffset = alignResumeOffset(
-			initialResumeOffsetRef.current,
-			pageSize,
-		);
-		if (restoreFromCache(libraryId, resumeOffset)) {
-			bootedLibraryIdRef.current = libraryId;
-			markListReady();
-			return;
-		}
-		bootedLibraryIdRef.current = libraryId;
-		lastSavedResumeRef.current = resumeOffset;
 		const gen = ++loadGenRef.current;
-		void fetchFirstPageRef.current(libraryId, gen, resumeOffset);
-	}, [libraryId, pageSize, restoreFromCache, markListReady]);
+		void (async () => {
+			let resumeOffset = alignResumeOffset(
+				initialResumeOffsetRef.current,
+				pageSize,
+			);
+			if (resolveInitialResumeRef.current) {
+				try {
+					resumeOffset = alignResumeOffset(
+						await resolveInitialResumeRef.current(),
+						pageSize,
+					);
+				} catch {
+					// 用 props / store fallback
+				}
+			}
+			if (refetchOnEnterRef.current && cacheNamespace) {
+				invalidateLibraryWordsListCache(cacheNamespace, libraryId);
+			}
+			if (
+				!refetchOnEnterRef.current &&
+				restoreFromCache(libraryId, resumeOffset)
+			) {
+				bootedLibraryIdRef.current = libraryId;
+				markListReady();
+				return;
+			}
+			bootedLibraryIdRef.current = libraryId;
+			lastSavedResumeRef.current = resumeOffset;
+			await fetchFirstPageRef.current(libraryId, gen, resumeOffset);
+		})();
+	}, [cacheNamespace, libraryId, pageSize, restoreFromCache, markListReady]);
 
 	useEffect(() => {
 		const el = viewportRef?.current;
@@ -388,6 +496,7 @@ export function useLibraryWordsList<TItem, TLibrary>({
 					hasMore: hasMoreRef.current,
 					hasPrevious: false,
 					scrollTop: scrollTopRef.current,
+					totalCount: totalCountRef.current,
 				},
 			);
 		},
@@ -401,6 +510,8 @@ export function useLibraryWordsList<TItem, TLibrary>({
 	return {
 		items,
 		setItems,
+		patchItems,
+		totalCount,
 		resolvedLibrary,
 		loading,
 		loadingMore,
@@ -408,5 +519,6 @@ export function useLibraryWordsList<TItem, TLibrary>({
 		initialScrollItemIndex,
 		onViewportScroll,
 		onEndReached,
+		reloadFromStart,
 	};
 }

@@ -25,6 +25,11 @@ import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
+import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
+import {
+	composeViewportScroll,
+	useListScrollCornerFab,
+} from '../../hooks/useListScrollCornerFab';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useClassicQuotesPackHistoryList } from '../hooks/useClassicQuotesPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -234,6 +239,13 @@ function ClassicQuotesPackSectionInner({
 			? history.items
 			: EnglishPackStore.classicItems;
 	const isHistoryMode = useHistoryPagination && history.active;
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
+		useListScrollCornerFab(
+			scrollViewportRef,
+			listItems.length,
+			listItems.length > 0 && !showPageLoading,
+		);
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
@@ -307,97 +319,107 @@ function ClassicQuotesPackSectionInner({
 	}
 
 	return (
-		<ScrollArea
-			className="min-h-0 flex-1 pb-4"
-			onScroll={snapshot.onHistoryViewportScroll}
-		>
-			<div className="space-y-5 px-4">
-				{isLiveStreamView || !isHistoryView ? (
-					<PackStreamProgress kind="classic" />
-				) : null}
+		<div className="relative min-h-0 flex-1">
+			<ScrollArea
+				ref={scrollViewportRef}
+				className="min-h-0 h-full pb-4"
+				onScroll={composeViewportScroll(
+					snapshot.onHistoryViewportScroll,
+					onScrollCornerFab,
+				)}
+			>
+				<div className="space-y-5 px-4">
+					{isLiveStreamView || !isHistoryView ? (
+						<PackStreamProgress kind="classic" />
+					) : null}
 
-				{listItems.length > 0 ? (
-					<div className="min-w-0 space-y-4">
-						<div className="select-text grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-							{listItems.map((item, i) => {
-								const contentKey = classicQuoteFavoriteContentKey(item.english);
-								const key = isHistoryMode
-									? `history-${i}-${contentKey || item.english.slice(0, 48)}`
-									: `${i}-${contentKey || item.english.slice(0, 48)}`;
-								const playing = playingKey === key;
-								const isFavorited =
-									contentKey.length > 0 && favoritedContentKeys.has(contentKey);
-								const favBusy = favoriteActionKey === contentKey;
-								return (
-									<ClassicQuoteCard
-										key={key}
-										variant="library"
-										forceNote
-										data={{
-											english: item.english,
-											translationZh: item.translationZh,
-											source: item.source,
-											noteZh: item.noteZh,
-										}}
-										playing={playing}
-										onTogglePlay={() =>
-											void toggleQuoteAudio(item.english, key)
-										}
-										playLabels={{
-											play: t('englishLearning.classic.playQuote'),
-											stop: t('englishLearning.tts.stop'),
-										}}
-										trailingActions={
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												disabled={favBusy || !contentKey}
-												onClick={() =>
-													void toggleClassicQuoteFavorite(item, isFavorited)
-												}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-													isFavorited
-														? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
-														: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-												)}
-												aria-pressed={isFavorited}
-												aria-label={
-													isFavorited
-														? t('englishLearning.classic.unfavoriteQuote')
-														: t('englishLearning.classic.favoriteQuote')
-												}
-											>
-												<Star
+					{listItems.length > 0 ? (
+						<div className="min-w-0 space-y-4">
+							<div className="select-text grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+								{listItems.map((item, i) => {
+									const contentKey = classicQuoteFavoriteContentKey(
+										item.english,
+									);
+									const key = isHistoryMode
+										? `history-${i}-${contentKey || item.english.slice(0, 48)}`
+										: `${i}-${contentKey || item.english.slice(0, 48)}`;
+									const playing = playingKey === key;
+									const isFavorited =
+										contentKey.length > 0 &&
+										favoritedContentKeys.has(contentKey);
+									const favBusy = favoriteActionKey === contentKey;
+									return (
+										<ClassicQuoteCard
+											key={key}
+											variant="library"
+											forceNote
+											data={{
+												english: item.english,
+												translationZh: item.translationZh,
+												source: item.source,
+												noteZh: item.noteZh,
+											}}
+											playing={playing}
+											onTogglePlay={() =>
+												void toggleQuoteAudio(item.english, key)
+											}
+											playLabels={{
+												play: t('englishLearning.classic.playQuote'),
+												stop: t('englishLearning.tts.stop'),
+											}}
+											trailingActions={
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													disabled={favBusy || !contentKey}
+													onClick={() =>
+														void toggleClassicQuoteFavorite(item, isFavorited)
+													}
 													className={cn(
-														'size-3.5',
-														isFavorited && 'fill-current',
+														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+														isFavorited
+															? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
+															: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
 													)}
-													aria-hidden
-												/>
-											</Button>
-										}
-									/>
-								);
-							})}
-						</div>
-						{isHistoryMode && history.loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
-								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
-								{t('common.loadingMore')}
+													aria-pressed={isFavorited}
+													aria-label={
+														isFavorited
+															? t('englishLearning.classic.unfavoriteQuote')
+															: t('englishLearning.classic.favoriteQuote')
+													}
+												>
+													<Star
+														className={cn(
+															'size-3.5',
+															isFavorited && 'fill-current',
+														)}
+														aria-hidden
+													/>
+												</Button>
+											}
+										/>
+									);
+								})}
 							</div>
-						) : null}
-					</div>
-				) : null}
+							{isHistoryMode && history.loadingMore ? (
+								<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
+									{t('common.loadingMore')}
+								</div>
+							) : null}
+						</div>
+					) : null}
 
-				{showEmpty ? (
-					<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
-						{snapshot.emptyHint}
-					</div>
-				) : null}
-			</div>
-		</ScrollArea>
+					{showEmpty ? (
+						<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
+							{snapshot.emptyHint}
+						</div>
+					) : null}
+				</div>
+			</ScrollArea>
+			<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+		</div>
 	);
 }
 

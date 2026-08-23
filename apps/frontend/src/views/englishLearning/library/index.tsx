@@ -14,20 +14,20 @@ import type {
 	EnglishVocabularyLibraryListItem,
 } from '@/service';
 import {
-	clearEnglishLibraryItemsResumeOffset,
-	flushEnglishLibraryItemsResume,
-	resolveEnglishLibraryItemsResumeOffset,
-	setEnglishLibraryItemsResumeOffset,
-} from '@/store/englishLibraryItemsResume';
+	clearElResumeOffset,
+	flushElResume,
+	resolveElResumeOffset,
+	setElResumeOffset,
+} from '@/store/englishLearningResume';
 import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
+import { invalidateLibraryWordsListCache } from '../utils/libraryWordsListCache';
 import { ClassicQuotesLibrarySection } from './classic';
 import { LibraryListPanel } from './components/LibraryListPanel';
 import type { EnglishLibraryListItem, LibraryKind } from './types';
 import { parseLibraryKind } from './types';
-import { invalidateLibraryWordsListCache } from './utils/libraryWordsListCache';
 import { VocabularyLibrarySection } from './vocabulary';
 
 export default function EnglishLearningLibraryPage() {
@@ -54,7 +54,7 @@ export default function EnglishLearningLibraryPage() {
 
 	const onSelectLibrary = useCallback(
 		(library: EnglishLibraryListItem) => {
-			const itemsResumeOffset = resolveEnglishLibraryItemsResumeOffset(
+			const itemsResumeOffset = resolveElResumeOffset(
 				kind,
 				library.id,
 				library.itemsResumeOffset ?? 0,
@@ -77,7 +77,7 @@ export default function EnglishLearningLibraryPage() {
 	const onLibraryDeleted = useCallback(
 		(deletedId: string) => {
 			invalidateLibraryWordsListCache(kind, deletedId);
-			clearEnglishLibraryItemsResumeOffset(kind, deletedId);
+			clearElResumeOffset(kind, deletedId);
 			setSelectedLibrary(null);
 			setSelectedKind(null);
 			setSearchParams(
@@ -94,7 +94,7 @@ export default function EnglishLearningLibraryPage() {
 
 	const onResumeOffsetChange = useCallback(
 		(libraryId: string, offset: number) => {
-			setEnglishLibraryItemsResumeOffset(kind, libraryId, offset);
+			setElResumeOffset(kind, libraryId, offset);
 			setSelectedLibrary((prev) =>
 				prev?.id === libraryId ? { ...prev, itemsResumeOffset: offset } : prev,
 			);
@@ -112,7 +112,7 @@ export default function EnglishLearningLibraryPage() {
 		if (!id) return;
 
 		const flush = (opts?: { keepalive?: boolean }) => {
-			flushEnglishLibraryItemsResume(k, id, opts);
+			flushElResume(k, id, opts);
 		};
 		const onPageHide = () => flush({ keepalive: true });
 		const onVisibility = () => {

@@ -1,6 +1,6 @@
 /**
  * 按列表增量查询经典句收藏状态。
- * - 资源库：GET .../classic-quotes-libraries/:id/favorites-status?limit&offset
+ * - 资源库：优先用 items 内嵌 favoriteId；否则回退 GET favorites-status
  * - 其他场景：POST .../classic-quotes-favorites/status
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +13,7 @@ import {
 import {
 	buildLibraryRangeChunks,
 	mapWithConcurrency,
-} from '@/views/englishLearning/library/utils/libraryWordsListPrefetch';
+} from '@/views/englishLearning/utils/libraryWordsListPrefetch';
 
 const ENGLISH_SIG_SEP = '\u0001';
 const STATUS_QUERY_DEBOUNCE_MS = 150;
@@ -25,8 +25,16 @@ export type UseIncrementalClassicQuoteFavoriteStatusOptions = {
 	libraryId?: string | null;
 };
 
+type ClassicFavoriteListItem = { english: string; favoriteId?: string | null };
+
+function itemsEmbedFavoriteId(
+	items: ReadonlyArray<ClassicFavoriteListItem>,
+): boolean {
+	return items.some((it) => 'favoriteId' in it);
+}
+
 export function useIncrementalClassicQuoteFavoriteStatus(
-	items: ReadonlyArray<{ english: string }>,
+	items: ReadonlyArray<ClassicFavoriteListItem>,
 	options?: UseIncrementalClassicQuoteFavoriteStatusOptions,
 ) {
 	const libraryId = options?.libraryId ?? null;
@@ -98,6 +106,30 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 					return next;
 				});
 			};
+
+			if (libraryId && itemsEmbedFavoriteId(items)) {
+				const syncFrom =
+					appended && libraryStatusEndRef.current > 0
+						? libraryStatusEndRef.current
+						: 0;
+				const slice = items.slice(syncFrom);
+				if (slice.length === 0) return;
+
+				setFavoriteIdByContentKey((prev) => {
+					const next = new Map(prev);
+					for (const item of slice) {
+						const ck = classicQuoteFavoriteContentKey(item.english);
+						if (!ck || !('favoriteId' in item)) continue;
+						if (item.favoriteId) next.set(ck, item.favoriteId);
+						else next.delete(ck);
+					}
+					return next;
+				});
+				if (cancelled) return;
+				libraryStatusEndRef.current = items.length;
+				sessionLibraryClassicStatusEnd.set(libraryId, items.length);
+				return;
+			}
 
 			if (libraryId) {
 				const statusEnd = libraryStatusEndRef.current;

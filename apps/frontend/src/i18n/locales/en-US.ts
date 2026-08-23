@@ -1496,6 +1496,8 @@ export const enUS = {
 	'englishLearning.loading': 'Loading…',
 	'englishLearning.assistant.scrollToBottom': 'Scroll to bottom',
 	'englishLearning.assistant.scrollToTop': 'Scroll to top',
+	'englishLearning.list.scrollToBottom': 'Scroll to bottom',
+	'englishLearning.list.scrollToTop': 'Scroll to top',
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
 	'englishLearning.chip.vocabulary': 'Vocabulary',

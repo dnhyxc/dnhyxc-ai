@@ -56,7 +56,7 @@ export function FavoritesPanelFooter({
 	const { t } = useI18n();
 
 	return (
-		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-5">
+		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-4">
 			<div className="flex items-center gap-2">
 				{showSelection ? (
 					<div className="flex shrink-0 flex-wrap items-center gap-3">

@@ -1366,6 +1366,8 @@ export const zhCN = {
 	'englishLearning.loading': '加载中…',
 	'englishLearning.assistant.scrollToBottom': '滚动到底部',
 	'englishLearning.assistant.scrollToTop': '滚动到顶部',
+	'englishLearning.list.scrollToBottom': '滚动到底部',
+	'englishLearning.list.scrollToTop': '滚动到顶部',
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
 	'englishLearning.chip.vocabulary': '单词背诵',

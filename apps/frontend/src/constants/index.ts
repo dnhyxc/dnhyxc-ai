@@ -87,3 +87,12 @@ export const HISTORY_PAGE_SIZE = 50;
 export const SCROLL_LOAD_THRESHOLD_PX = 72;
 /** 默认每页条数（与知识库列表默认分页量级一致） */
 export const DEFAULT_PAGE_SIZE = 20;
+
+/** 与后端 english-learning-list-resume.constants 一致 */
+export const ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID = {
+	vocabFavorites: '__el-vocab-favorites__',
+	classicFavorites: '__el-classic-favorites__',
+	vocabMistakes: '__el-vocab-mistakes__',
+	classicMistakes: '__el-classic-mistakes__',
+	vocabDailyMemorize: '__el-vocab-daily-memorize__',
+} as const;

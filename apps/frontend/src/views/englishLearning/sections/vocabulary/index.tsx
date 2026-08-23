@@ -502,7 +502,7 @@ function VocabularyPackSectionInner() {
 							ENGLISH_SIDEBAR_BTN_GRADIENT.vocabPack,
 						)}
 					>
-						<span className="max-[380px]:sr-only">
+						<span className="max-[380px]:sr-only truncate">
 							{t('englishLearning.vocab.historyOpenDrawer')}
 						</span>
 					</Button>

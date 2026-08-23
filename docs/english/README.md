@@ -49,8 +49,11 @@
 | [经典语句库导入.md](./经典语句库导入.md) | 经典句库 |
 | [文库公开编辑.md](./文库公开编辑.md) | **资源库编辑**：重命名、Enter 保存、超管设公共库、列表权限 |
 | [资源库词条续读.md](./资源库词条续读.md) | **资源库词条续读**：跨会话进度持久化（`english_library_items_resume` 表 + keepalive flush）、双向分页、prepend 钉视口、收藏增量识别 prepend、卡片 `h-full` |
+| [固定列表统一虚拟滚动.md](./固定列表统一虚拟滚动.md) | **固定列表统一虚拟滚动与续读**：删除 `useVocabularyFavoritesList` 等 5 个重复 Hook，统一复用 `useEnglishLearningList`（新增 `resolveInitialResume` / `refetchOnEnter` / `reloadFromStart`），复用 `english_library_items_resume` 表（占位 libraryId）做 5 个固定列表的续读 |
+| [英语学习列表模块收口.md](./英语学习列表模块收口.md) | **列表模块路径与命名收口**：`useLibraryWordsList` → `useEnglishLearningList`（类型 `ElListPageResult` / `UseEnglishLearningListOptions`）、`library/utils/*` → `utils/*`、`englishLibraryItemsResume.ts` + scope helper → `englishLearningResume.ts`、服务层 `patchElListResume` 统一路由、后端占位 id 常量独立 |
 | [资源库虚拟网格.md](./资源库虚拟网格.md) | **资源库虚拟网格**：react-virtuoso 行级虚拟化 + CSS Grid 自适应列数，卡片可变高度，与续读 item index 对齐 |
 | [资源库列表单向虚拟滚动.md](./资源库列表单向虚拟滚动.md) | **资源库单向滚动 Hook**：移除双向分页，并发预取 [0, resumeOffset+pageSize) 完整窗口 + `restoreFromCache` 缓存短路 + Virtuoso 锚点 |
+| [列表悬浮角标.md](./列表悬浮角标.md) | **虚拟列表悬浮角标（FAB）**：`useListScrollCornerFab` 模式判定 + 锚点停靠（停在加载区上方避免误触发 endReached）+ `composeViewportScroll` 滚动事件组合 + ResizeObserver 自适应；收藏/错题/每日记词等虚拟滚动列表右下角置顶/置底按钮 |
 | [资源库词条预取并发.md](./资源库词条预取并发.md) | **续读窗口并发预取**：`buildLibraryPrefetchChunks` 按 1000 切片 + `mapWithConcurrency` 限 3 并发池，结果序与输入一致 |
 | [资源库收藏状态分页查询.md](./资源库收藏状态分页查询.md) | **收藏状态按 offset 分页**：后端 GET `.../:libraryId/favorites-status?limit&offset` 接口 + Hook libraryId 模式 + 会话级缓存避免重复查 |
 | [单词收藏状态查询.md](./单词收藏状态查询.md) | 收藏状态查询（旧版：按词 POST 批量；资源库新场景请优先看上面的「分页查询」） |

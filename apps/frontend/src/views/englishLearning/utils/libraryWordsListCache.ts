@@ -1,5 +1,5 @@
 /**
- * 资源库词条列表会话内缓存：切换单词库 / 离开页面再返回时恢复已加载窗口与滚动位置
+ * 英语学习列表会话内缓存：切换库 / 离开再返回时恢复已加载窗口与滚动位置
  */
 
 export type LibraryWordsListCacheEntry<TItem, TLibrary> = {
@@ -12,6 +12,7 @@ export type LibraryWordsListCacheEntry<TItem, TLibrary> = {
 	hasMore: boolean;
 	hasPrevious: boolean;
 	scrollTop: number;
+	totalCount?: number;
 };
 
 type CacheSlot<TItem, TLibrary> = {

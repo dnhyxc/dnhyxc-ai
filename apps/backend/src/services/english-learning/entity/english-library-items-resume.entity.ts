@@ -6,7 +6,7 @@ import {
 	UpdateDateColumn,
 } from 'typeorm';
 
-/** 单词库 / 语句库词条列表续读进度（按浏览用户隔离，公开库非所有者也能记） */
+/** 单词库 / 语句库 / 收藏 / 错题集等列表续读进度（按浏览用户隔离） */
 export type EnglishLibraryItemsResumeKind = 'vocab' | 'classic';
 
 @Entity('english_library_items_resume')

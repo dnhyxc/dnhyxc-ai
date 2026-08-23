@@ -1,6 +1,7 @@
 /**
  * 按列表增量查询单词收藏状态。
- * - 资源库：GET .../vocabulary-libraries/:id/favorites-status?limit&offset（与 items 分页对齐）
+ * - 列表已内嵌 favoriteId（资源库 / 记词记录等）：直接从 items 同步，不打 status 接口
+ * - 资源库无内嵌时：回退 GET favorites-status
  * - 其他场景：POST .../vocabulary-favorites/status（按词批量）
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +14,7 @@ import {
 import {
 	buildLibraryRangeChunks,
 	mapWithConcurrency,
-} from '@/views/englishLearning/library/utils/libraryWordsListPrefetch';
+} from '@/views/englishLearning/utils/libraryWordsListPrefetch';
 
 const WORD_SIG_SEP = '\u0001';
 const STATUS_QUERY_DEBOUNCE_MS = 150;
@@ -22,12 +23,20 @@ const LIBRARY_STATUS_CONCURRENCY = 3;
 /** 会话内已查过的收藏状态，避免列表重挂载 / 缓存恢复时重复打 status */
 const sessionQueriedWordKeys = new Set<string>();
 const sessionFavoriteIdByWordKey = new Map<string, string>();
-/** 资源库：已按 offset 查过 favorites-status 的末尾（不含） */
+/** 资源库：已同步收藏状态的 items 末尾（不含） */
 const sessionLibraryStatusEnd = new Map<string, number>();
 
 export type UseIncrementalVocabFavoriteStatusOptions = {
 	libraryId?: string | null;
 };
+
+type VocabFavoriteListItem = { word: string; favoriteId?: string | null };
+
+function itemsEmbedFavoriteId(
+	items: ReadonlyArray<VocabFavoriteListItem>,
+): boolean {
+	return items.some((it) => 'favoriteId' in it);
+}
 
 function seedFavoriteStateFromSession(items: ReadonlyArray<{ word: string }>) {
 	const map = new Map<string, string>();
@@ -52,7 +61,7 @@ function markWordsFromItemsQueried(items: ReadonlyArray<{ word: string }>) {
 }
 
 export function useIncrementalVocabFavoriteStatus(
-	items: ReadonlyArray<{ word: string }>,
+	items: ReadonlyArray<VocabFavoriteListItem>,
 	options?: UseIncrementalVocabFavoriteStatusOptions,
 ) {
 	const libraryId = options?.libraryId ?? null;
@@ -129,6 +138,36 @@ export function useIncrementalVocabFavoriteStatus(
 					return next;
 				});
 			};
+
+			if (libraryId && itemsEmbedFavoriteId(items)) {
+				const syncFrom =
+					appended && libraryStatusEndRef.current > 0
+						? libraryStatusEndRef.current
+						: 0;
+				const slice = items.slice(syncFrom);
+				if (slice.length === 0) return;
+
+				setFavoriteIdByWordKey((prev) => {
+					const next = new Map(prev);
+					for (const item of slice) {
+						const wk = normalizeEnglishVocabWordKey(item.word);
+						if (!wk || !('favoriteId' in item)) continue;
+						sessionQueriedWordKeys.add(wk);
+						if (item.favoriteId) {
+							next.set(wk, item.favoriteId);
+							sessionFavoriteIdByWordKey.set(wk, item.favoriteId);
+						} else {
+							next.delete(wk);
+							sessionFavoriteIdByWordKey.delete(wk);
+						}
+					}
+					return next;
+				});
+				if (cancelled) return;
+				libraryStatusEndRef.current = items.length;
+				sessionLibraryStatusEnd.set(libraryId, items.length);
+				return;
+			}
 
 			if (libraryId) {
 				const statusEnd = libraryStatusEndRef.current;
