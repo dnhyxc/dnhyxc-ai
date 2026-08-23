@@ -4,13 +4,21 @@
  * - 资源库无内嵌时：回退 GET favorites-status
  * - 其他场景：POST .../vocabulary-favorites/status（按词批量）
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from 'react';
 import {
 	type EnglishVocabFavoriteRef,
 	fetchEnglishVocabularyFavoriteStatus,
 	listEnglishVocabularyLibraryFavoriteStatus,
 	normalizeEnglishVocabWordKey,
 } from '@/service';
+import { patchVocabFavoriteInListCaches } from '@/views/englishLearning/utils/libraryWordsListCache';
 import {
 	buildLibraryRangeChunks,
 	mapWithConcurrency,
@@ -26,6 +34,24 @@ const sessionFavoriteIdByWordKey = new Map<string, string>();
 /** 资源库：已同步收藏状态的 items 末尾（不含） */
 const sessionLibraryStatusEnd = new Map<string, number>();
 
+const VOCAB_FAVORITE_SESSION_EVENT = 'english-vocab-favorite-session-change';
+let vocabFavoriteSessionVersion = 0;
+
+function subscribeVocabFavoriteSession(onStoreChange: () => void) {
+	window.addEventListener(VOCAB_FAVORITE_SESSION_EVENT, onStoreChange);
+	return () =>
+		window.removeEventListener(VOCAB_FAVORITE_SESSION_EVENT, onStoreChange);
+}
+
+function getVocabFavoriteSessionVersion() {
+	return vocabFavoriteSessionVersion;
+}
+
+function bumpVocabFavoriteSession() {
+	vocabFavoriteSessionVersion += 1;
+	window.dispatchEvent(new Event(VOCAB_FAVORITE_SESSION_EVENT));
+}
+
 export type UseIncrementalVocabFavoriteStatusOptions = {
 	libraryId?: string | null;
 };
@@ -36,6 +62,19 @@ function itemsEmbedFavoriteId(
 	items: ReadonlyArray<VocabFavoriteListItem>,
 ): boolean {
 	return items.some((it) => 'favoriteId' in it);
+}
+
+function readVocabFavorited(
+	word: string,
+	embeddedFavoriteId: string | null | undefined,
+	favoriteIdByWordKey: Map<string, string>,
+): boolean {
+	const wk = normalizeEnglishVocabWordKey(word);
+	if (!wk) return false;
+	const sessionId = sessionFavoriteIdByWordKey.get(wk);
+	if (sessionQueriedWordKeys.has(wk)) return Boolean(sessionId);
+	if (favoriteIdByWordKey.has(wk)) return true;
+	return Boolean(embeddedFavoriteId);
 }
 
 function seedFavoriteStateFromSession(items: ReadonlyArray<{ word: string }>) {
@@ -72,10 +111,40 @@ export function useIncrementalVocabFavoriteStatus(
 	const prevItemsWordSigRef = useRef('');
 	const libraryStatusEndRef = useRef(0);
 	const libraryIdRef = useRef<string | null>(null);
+	const sessionVersion = useSyncExternalStore(
+		subscribeVocabFavoriteSession,
+		getVocabFavoriteSessionVersion,
+		getVocabFavoriteSessionVersion,
+	);
 
-	const favoritedWordKeys = useMemo(
-		() => new Set(favoriteIdByWordKey.keys()),
-		[favoriteIdByWordKey],
+	const favoritedWordKeys = useMemo(() => {
+		void sessionVersion;
+		const keys = new Set<string>();
+		for (const item of items) {
+			const wk = normalizeEnglishVocabWordKey(item.word);
+			if (
+				wk &&
+				readVocabFavorited(
+					item.word,
+					'favoriteId' in item ? item.favoriteId : undefined,
+					favoriteIdByWordKey,
+				)
+			) {
+				keys.add(wk);
+			}
+		}
+		for (const wk of favoriteIdByWordKey.keys()) {
+			if (!sessionQueriedWordKeys.has(wk)) keys.add(wk);
+		}
+		return keys;
+	}, [favoriteIdByWordKey, items, sessionVersion]);
+
+	const isVocabularyFavorited = useCallback(
+		(word: string, embeddedFavoriteId?: string | null) => {
+			void sessionVersion;
+			return readVocabFavorited(word, embeddedFavoriteId, favoriteIdByWordKey);
+		},
+		[favoriteIdByWordKey, sessionVersion],
 	);
 
 	const itemsWordSig = useMemo(
@@ -132,16 +201,17 @@ export function useIncrementalVocabFavoriteStatus(
 					const next = new Map(prev);
 					for (const r of refs) {
 						next.set(r.wordKey, r.id);
-						sessionFavoriteIdByWordKey.set(r.wordKey, r.id);
 						sessionQueriedWordKeys.add(r.wordKey);
+						sessionFavoriteIdByWordKey.set(r.wordKey, r.id);
 					}
 					return next;
 				});
+				bumpVocabFavoriteSession();
 			};
 
-			if (libraryId && itemsEmbedFavoriteId(items)) {
+			if (itemsEmbedFavoriteId(items)) {
 				const syncFrom =
-					appended && libraryStatusEndRef.current > 0
+					libraryId && appended && libraryStatusEndRef.current > 0
 						? libraryStatusEndRef.current
 						: 0;
 				const slice = items.slice(syncFrom);
@@ -152,6 +222,12 @@ export function useIncrementalVocabFavoriteStatus(
 					for (const item of slice) {
 						const wk = normalizeEnglishVocabWordKey(item.word);
 						if (!wk || !('favoriteId' in item)) continue;
+						if (sessionQueriedWordKeys.has(wk)) {
+							const sessionId = sessionFavoriteIdByWordKey.get(wk);
+							if (sessionId) next.set(wk, sessionId);
+							else next.delete(wk);
+							continue;
+						}
 						sessionQueriedWordKeys.add(wk);
 						if (item.favoriteId) {
 							next.set(wk, item.favoriteId);
@@ -163,9 +239,12 @@ export function useIncrementalVocabFavoriteStatus(
 					}
 					return next;
 				});
+				bumpVocabFavoriteSession();
 				if (cancelled) return;
-				libraryStatusEndRef.current = items.length;
-				sessionLibraryStatusEnd.set(libraryId, items.length);
+				if (libraryId) {
+					libraryStatusEndRef.current = items.length;
+					sessionLibraryStatusEnd.set(libraryId, items.length);
+				}
 				return;
 			}
 
@@ -249,12 +328,30 @@ export function useIncrementalVocabFavoriteStatus(
 		};
 	}, [itemsWordSig, items, libraryId]);
 
-	const getVocabularyFavoriteId = (wordKey: string) =>
-		favoriteIdByWordKey.get(wordKey);
+	const resolveVocabularyFavoriteId = useCallback(
+		(word: string, embeddedFavoriteId?: string | null) => {
+			void sessionVersion;
+			const wk = normalizeEnglishVocabWordKey(word);
+			if (!wk) return undefined;
+			const sessionId = sessionFavoriteIdByWordKey.get(wk);
+			if (sessionQueriedWordKeys.has(wk)) return sessionId;
+			return favoriteIdByWordKey.get(wk) ?? embeddedFavoriteId ?? undefined;
+		},
+		[favoriteIdByWordKey, sessionVersion],
+	);
+
+	const getVocabularyFavoriteId = (wordKey: string) => {
+		const sessionId = sessionFavoriteIdByWordKey.get(wordKey);
+		if (sessionId) return sessionId;
+		if (sessionQueriedWordKeys.has(wordKey)) return undefined;
+		return favoriteIdByWordKey.get(wordKey);
+	};
 
 	const setVocabularyFavoriteId = (wordKey: string, id: string) => {
 		sessionQueriedWordKeys.add(wordKey);
 		sessionFavoriteIdByWordKey.set(wordKey, id);
+		patchVocabFavoriteInListCaches(wordKey, id);
+		bumpVocabFavoriteSession();
 		setFavoriteIdByWordKey((prev) => {
 			const next = new Map(prev);
 			next.set(wordKey, id);
@@ -263,9 +360,11 @@ export function useIncrementalVocabFavoriteStatus(
 	};
 
 	const clearVocabularyFavorite = (wordKey: string) => {
+		sessionQueriedWordKeys.add(wordKey);
 		sessionFavoriteIdByWordKey.delete(wordKey);
+		patchVocabFavoriteInListCaches(wordKey, null);
+		bumpVocabFavoriteSession();
 		setFavoriteIdByWordKey((prev) => {
-			if (!prev.has(wordKey)) return prev;
 			const next = new Map(prev);
 			next.delete(wordKey);
 			return next;
@@ -274,6 +373,8 @@ export function useIncrementalVocabFavoriteStatus(
 
 	return {
 		favoritedWordKeys,
+		isVocabularyFavorited,
+		resolveVocabularyFavoriteId,
 		getVocabularyFavoriteId,
 		setVocabularyFavoriteId,
 		clearVocabularyFavorite,

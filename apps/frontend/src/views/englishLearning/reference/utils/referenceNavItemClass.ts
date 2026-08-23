@@ -4,9 +4,7 @@ import { cn } from '@/lib/utils';
 export function referenceNavItemClass(active: boolean, className?: string) {
 	return cn(
 		'transition-colors cursor-pointer',
-		active
-			? 'bg-theme/15 text-textcolor'
-			: 'text-textcolor/80 hover:bg-theme/12',
+		active ? 'text-teal-500' : 'text-textcolor/80',
 		className,
 	);
 }

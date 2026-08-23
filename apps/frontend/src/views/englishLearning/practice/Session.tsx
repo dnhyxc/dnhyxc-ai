@@ -11,8 +11,10 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import Tooltip from '@/components/design/Tooltip';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { FavoriteToggleButton } from '../components/FavoriteToggleButton';
 import { DictationPromptBody, SpellingPromptBody } from './components/prompt';
 import { RevealedPanelInner } from './components/reveal';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
@@ -35,7 +37,11 @@ import type {
 } from './types';
 import { gradeSpelling } from './utils/grading';
 import { buildPracticeHintContent, hasPracticeHintContent } from './utils/hint';
-import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
+import {
+	getPracticeAnswerText,
+	isPracticeClassicItem,
+	practiceFavoriteToggleProps,
+} from './utils/item';
 
 export function Session({
 	mode,
@@ -243,30 +249,43 @@ export function Session({
 						title={modeTitle}
 						trailing={
 							phase === 'prompt' ? (
-								<Button
-									variant="link"
-									disabled={!canHint}
-									aria-pressed={hintOpen}
-									aria-label={
-										canHint
-											? hintButtonLabel
-											: t('englishLearning.practice.hintUnavailable')
-									}
-									className="px-0! text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 shrink-0 gap-1 focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none"
-									onClick={(e) => {
-										setHintOpen((v) => !v);
-										// 避免焦点留在按钮上：随后空格会当成按钮激活去切换提示
-										e.currentTarget.blur();
-									}}
-									onKeyDown={(e) => {
-										if (e.key === ' ') e.preventDefault();
-									}}
-								>
-									<Lightbulb className="size-3.5" aria-hidden />
-									<span className="max-w-24 truncate text-sm font-medium">
-										{hintButtonLabel}
-									</span>
-								</Button>
+								<div className="flex shrink-0 items-center gap-2">
+									<FavoriteToggleButton
+										{...practiceFavoriteToggleProps(item)}
+									/>
+									<Tooltip
+										side="top"
+										content={
+											canHint
+												? hintButtonLabel
+												: t('englishLearning.practice.hintUnavailable')
+										}
+									>
+										<Button
+											variant="link"
+											disabled={!canHint}
+											aria-pressed={hintOpen}
+											aria-label={
+												canHint
+													? hintButtonLabel
+													: t('englishLearning.practice.hintUnavailable')
+											}
+											className="px-0! text-teal-500 hover:text-teal-400 h-8 shrink-0 gap-1 focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none"
+											onClick={(e) => {
+												setHintOpen((v) => !v);
+												e.currentTarget.blur();
+											}}
+											onKeyDown={(e) => {
+												if (e.key === ' ') e.preventDefault();
+											}}
+										>
+											<Lightbulb
+												className="size-4.5 -mb-0.5 -mr-1"
+												aria-hidden
+											/>
+										</Button>
+									</Tooltip>
+								</div>
 							) : (
 								<span className="text-destructive min-w-16 text-right text-sm font-medium">
 									{t('englishLearning.practice.incorrect')}

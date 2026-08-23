@@ -1163,6 +1163,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'A gear button is added next to the title of each of the five sidebar modules — Vocabulary library, Quotes library, Favorites, Mistake book, and Daily memorize records. The dropdown offers “Clear reading progress” and “Disable/Enable reading progress”. Clear zeroes out both the local and server-side resume positions for the current module (after a confirm dialog) and reloads the list from the top. Disable stops recording resume positions for that module on this device and on every other device signed in to the same account, and the list also reloads from the top right away. Re-enabling restores resume behavior; the next visit picks up from any existing position (or from entry 0 if it was cleared). Toggle state is saved per account and synced across devices; while logged out it is only cached locally (default-on, reset on refresh); switching accounts clears the previous account’s disabled set and the new account defaults to all-on.',
 	},
+	's24-67': {
+		title: 'Favorite star no longer flickers; syncs across pages',
+		description:
+			'On English-learning lists (resource library, favorites, mistakes, daily memorize, review queue), the favorite star on each card used to flicker “empty then lit” when components remounted or the list scrolled back and forth. Now, once a star is lit it stays lit: entries already queried in the current session are cached locally and reused on remount or cache restore, so the server is not queried again. The backend also returns the favoriteId directly in the response of vocabulary-pack history, mistakes, daily memorize, review queue, and random-pick endpoints, so the star lights up without a second status query. Favoriting or unfavoriting an entry on any page instantly updates the star on every other loaded list card that contains it, with no manual refresh needed.',
+	},
+	's24-68': {
+		title: 'Merged daily feedback panel & favorite-from-practice',
+		description:
+			'The correct / wrong feedback panels in daily memorize are visually and interactively unified — the two panels now share the same layout (distinguished only by green / red tones), with a header of “status icon + text + favorite button + play button” matching the rest of the cards. The play button now uses the standard system button style, with hover and active colors aligned to teal-green. A favorite button is also added to the practice session header, so you can favorite the current item while answering without waiting for the summary or opening the favorites drawer.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

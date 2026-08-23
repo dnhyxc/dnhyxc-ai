@@ -1,6 +1,10 @@
 /**
  * 英语学习列表会话内缓存：切换库 / 离开再返回时恢复已加载窗口与滚动位置
  */
+import {
+	classicQuoteFavoriteContentKey,
+	normalizeEnglishVocabWordKey,
+} from '@/service';
 
 export type LibraryWordsListCacheEntry<TItem, TLibrary> = {
 	items: TItem[];
@@ -79,4 +83,57 @@ export function invalidateLibraryWordsListCache(
 	libraryId: string,
 ) {
 	store.delete(cacheKey(namespace, libraryId));
+}
+
+/** 练习/记词等页收藏变更后，同步已缓存列表中的 favoriteId */
+export function patchVocabFavoriteInListCaches(
+	wordKey: string,
+	favoriteId: string | null,
+) {
+	const wk = wordKey.trim().toLowerCase();
+	if (!wk) return;
+	for (const [key, slot] of store) {
+		const entry = slot.data as LibraryWordsListCacheEntry<
+			{ word: string; favoriteId?: string | null },
+			unknown
+		>;
+		let changed = false;
+		const items = entry.items.map((item) => {
+			if (normalizeEnglishVocabWordKey(item.word) !== wk) return item;
+			const next = favoriteId;
+			if ((item.favoriteId ?? null) === next) return item;
+			changed = true;
+			return { ...item, favoriteId: next };
+		});
+		if (changed) {
+			entry.items = items;
+			touchLru(key, slot);
+		}
+	}
+}
+
+export function patchClassicFavoriteInListCaches(
+	contentKey: string,
+	favoriteId: string | null,
+) {
+	const ck = contentKey.trim();
+	if (!ck) return;
+	for (const [key, slot] of store) {
+		const entry = slot.data as LibraryWordsListCacheEntry<
+			{ english: string; favoriteId?: string | null },
+			unknown
+		>;
+		let changed = false;
+		const items = entry.items.map((item) => {
+			if (classicQuoteFavoriteContentKey(item.english) !== ck) return item;
+			const next = favoriteId;
+			if ((item.favoriteId ?? null) === next) return item;
+			changed = true;
+			return { ...item, favoriteId: next };
+		});
+		if (changed) {
+			entry.items = items;
+			touchLru(key, slot);
+		}
+	}
 }

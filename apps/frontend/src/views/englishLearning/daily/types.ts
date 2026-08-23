@@ -12,6 +12,8 @@ export type DailyVocabCard = {
 	translationZh: string;
 	example: string;
 	origin: DailyCardOrigin;
+	/** 服务端队列/记词记录带回的收藏 id */
+	favoriteId?: string | null;
 };
 
 export type DailyCardStep = 'study' | 'quiz' | 'feedback';

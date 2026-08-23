@@ -4039,7 +4039,7 @@ ${existingHintBlock}
 	): Promise<{
 		streamId: string;
 		itemCount: number;
-		items: VocabularyItemDto[];
+		items: Array<VocabularyItemDto & { favoriteId: string | null }>;
 	}> {
 		const session = await this.vocabPackSessionRepo.findOne({
 			where: { userId, streamId },
@@ -4061,7 +4061,10 @@ ${existingHintBlock}
 		return {
 			streamId,
 			itemCount: session.itemCount,
-			items: rows.map((r) => this.mapVocabPackItemRow(r)),
+			items: await this.attachVocabularyFavoriteIdsByWord(
+				userId,
+				rows.map((r) => this.mapVocabPackItemRow(r)),
+			),
 		};
 	}
 
@@ -4415,6 +4418,7 @@ ${existingHintBlock}
 			translationZh: string;
 			example: string;
 			createdAt: string;
+			favoriteId: string;
 		}>;
 		totalCount: number;
 	}> {
@@ -4438,6 +4442,7 @@ ${existingHintBlock}
 				translationZh: r.translationZh ?? '',
 				example: r.example ?? '',
 				createdAt: r.createdAt.toISOString(),
+				favoriteId: r.id,
 			})),
 		};
 	}
@@ -4671,6 +4676,7 @@ ${existingHintBlock}
 			example: string;
 			lastUserInput: string;
 			createdAt: string;
+			favoriteId: string | null;
 		}>;
 		totalCount: number;
 	}> {
@@ -4685,17 +4691,20 @@ ${existingHintBlock}
 		]);
 		return {
 			totalCount,
-			items: rows.map((r) => ({
-				id: r.id,
-				word: r.word,
-				ipa: r.ipa ?? '',
-				pos: r.pos ?? '',
-				segmentation: r.segmentation ?? '',
-				translationZh: r.translationZh ?? '',
-				example: r.example ?? '',
-				lastUserInput: r.lastUserInput ?? '',
-				createdAt: r.createdAt.toISOString(),
-			})),
+			items: await this.attachVocabularyFavoriteIdsByWord(
+				userId,
+				rows.map((r) => ({
+					id: r.id,
+					word: r.word,
+					ipa: r.ipa ?? '',
+					pos: r.pos ?? '',
+					segmentation: r.segmentation ?? '',
+					translationZh: r.translationZh ?? '',
+					example: r.example ?? '',
+					lastUserInput: r.lastUserInput ?? '',
+					createdAt: r.createdAt.toISOString(),
+				})),
+			),
 		};
 	}
 
@@ -4972,6 +4981,7 @@ ${existingHintBlock}
 					segmentation: string;
 					translationZh: string;
 					example: string;
+					favoriteId: string | null;
 			  }
 			| {
 					contentKind: 'classic';
@@ -5024,6 +5034,7 @@ ${existingHintBlock}
 				segmentation: string;
 				translationZh: string;
 				example: string;
+				favoriteId: string | null;
 			}> = [];
 			for (const s of picked) {
 				const row = byKey.get(s.itemKey);
@@ -5037,9 +5048,12 @@ ${existingHintBlock}
 					segmentation: row.segmentation ?? '',
 					translationZh: row.translationZh ?? '',
 					example: row.example ?? '',
+					favoriteId: null,
 				});
 			}
-			return { items };
+			return {
+				items: await this.attachVocabularyFavoriteIdsByWord(userId, items),
+			};
 		}
 
 		const rows = await this.classicQuoteMistakeRepo.find({
@@ -5456,6 +5470,7 @@ ${existingHintBlock}
 			segmentation: string;
 			translationZh: string;
 			example: string;
+			favoriteId: string | null;
 		}>;
 	}> {
 		const exclude = new Set(
@@ -5469,7 +5484,11 @@ ${existingHintBlock}
 			exclude,
 			usedKeys,
 		);
+		const itemsWithFavorite = await this.attachVocabularyFavoriteIdsByWord(
+			userId,
+			items,
+		);
 
-		return { items };
+		return { items: itemsWithFavorite };
 	}
 }

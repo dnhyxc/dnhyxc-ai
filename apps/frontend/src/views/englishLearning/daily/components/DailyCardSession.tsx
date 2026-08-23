@@ -23,10 +23,9 @@ import { useDailySessionKeyboard } from '../hooks/useDailySessionKeyboard';
 import type { DailyCardStep, DailyQuizOption, DailyVocabCard } from '../types';
 import { buildQuizOptions } from '../utils/buildQuizOptions';
 import { recordStarterMemorizeResult } from '../utils/localSrs';
-import { DailyCorrectFeedback } from './DailyCorrectFeedback';
+import { DailyFeedback } from './DailyFeedback';
 import { DailyQuizWordBar } from './DailyQuizWordBar';
 import { DailyWordHero } from './DailyWordHero';
-import { DailyWrongFeedback } from './DailyWrongFeedback';
 
 type PendingRecord = {
 	key: string;
@@ -249,25 +248,15 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 					) : null}
 
 					{step === 'feedback' ? (
-						lastCorrect ? (
-							<DailyCorrectFeedback
-								feedbackText={feedbackText}
-								card={card}
-								playing={playing}
-								playLabel={playLabel}
-								onPlay={() => void playWord()}
-								t={t}
-							/>
-						) : (
-							<DailyWrongFeedback
-								feedbackText={feedbackText}
-								card={card}
-								playing={playing}
-								playLabel={playLabel}
-								onPlay={() => void playWord()}
-								t={t}
-							/>
-						)
+						<DailyFeedback
+							variant={lastCorrect ? 'correct' : 'wrong'}
+							feedbackText={feedbackText}
+							card={card}
+							playing={playing}
+							playLabel={playLabel}
+							onPlay={() => void playWord()}
+							t={t}
+						/>
 					) : null}
 				</div>
 

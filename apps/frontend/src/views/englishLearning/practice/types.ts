@@ -26,12 +26,16 @@ export type PracticeVocabItem = EnglishVocabularyItem & {
 	contentKind: 'vocab';
 	/** 去重键，与收藏 wordKey 一致 */
 	key: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId?: string | null;
 };
 
 export type PracticeClassicItem = EnglishClassicQuoteItem & {
 	contentKind: 'classic';
 	/** 去重键，与经典句收藏 contentKey 一致 */
 	key: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId?: string | null;
 };
 
 export type PracticeItem = PracticeVocabItem | PracticeClassicItem;

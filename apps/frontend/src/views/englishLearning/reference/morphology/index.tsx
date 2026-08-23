@@ -16,6 +16,7 @@ import { displayIpaWrapped } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ReferencePageShell } from '../components/ReferencePageShell';
 import { referenceNavItemClass } from '../utils/referenceNavItemClass';
+import { useReferenceDetailScrollReset } from '../utils/useReferenceDetailScrollReset';
 import {
 	getMorphologyAffixLabel,
 	MORPHOLOGY_SECTION_KEYS,
@@ -118,10 +119,12 @@ export default function EnglishMorphologyReferencePage() {
 		return t('englishLearning.reference.morphology.tabRoots');
 	};
 
+	const detailScrollRef = useReferenceDetailScrollReset(
+		`${sectionKey}-${categoryIndex}`,
+	);
+
 	return (
-		<ReferencePageShell
-			title={t('englishLearning.reference.morphology.pageTitle')}
-		>
+		<ReferencePageShell>
 			<ResizablePanelGroup
 				id="english-morphology-split"
 				orientation="horizontal"
@@ -132,32 +135,31 @@ export default function EnglishMorphologyReferencePage() {
 					defaultSize="32%"
 					className="min-h-0 min-w-0"
 				>
-					<aside className="flex h-full min-h-0 flex-col border-r border-theme/10 bg-theme-background">
-						<ScrollArea className="min-h-0 flex-1">
-							<div className="space-y-4 p-2">
+					<aside className="flex h-full min-h-0 flex-col border-r border-theme/5 bg-theme-background p-4 pr-0">
+						<ScrollArea className="min-h-0 flex-1 pr-4">
+							<div className="space-y-4">
 								{MORPHOLOGY_SECTION_KEYS.map((key) => {
 									const block = morphologyReference[key];
 									if (block.categories.length === 0) return null;
 									return (
-										<div key={key} className="space-y-0.5">
-											<div className="text-textcolor/45 px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide">
+										<div key={key} className="space-y-1">
+											<div className="text-textcolor/45 pb-2 text-sm font-semibold uppercase tracking-wide">
 												{sectionTitle(key)}
 											</div>
 											{block.categories.map((cat, i) => {
 												const active =
 													sectionKey === key && categoryIndex === i;
 												return (
-													<button
+													<div
 														key={`${key}-${cat.name}`}
-														type="button"
 														onClick={() => onSelectCategory(key, i)}
 														className={referenceNavItemClass(
 															active,
-															'w-full rounded-md px-3 py-2 text-left text-sm',
+															'w-full rounded-md px-2 py-2 text-left text-sm',
 														)}
 													>
 														{cat.name}
-													</button>
+													</div>
 												);
 											})}
 										</div>
@@ -167,14 +169,14 @@ export default function EnglishMorphologyReferencePage() {
 						</ScrollArea>
 					</aside>
 				</ResizablePanel>
-				<ResizableHandle withHandle />
+				<ResizableHandle withHandle className="w-0" />
 				<ResizablePanel
 					id="english-morphology-detail"
 					defaultSize="68%"
 					className="min-h-0 min-w-0"
 				>
-					<ScrollArea className="h-full min-h-0">
-						<div className="space-y-4 p-4 pt-3">
+					<ScrollArea ref={detailScrollRef} className="h-full min-h-0 py-4">
+						<div className="space-y-4 px-4">
 							<div className="text-textcolor text-base font-semibold">
 								{category?.name ?? '—'}
 							</div>
@@ -184,7 +186,7 @@ export default function EnglishMorphologyReferencePage() {
 									return (
 										<div
 											key={affixKey}
-											className="bg-theme/5 rounded-md pb-2.5 border border-theme/5"
+											className="rounded-md pb-2.5 border border-theme/5"
 										>
 											<div className="px-3 py-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-theme/5">
 												<span className="text-textcolor text-lg font-semibold">

@@ -762,7 +762,7 @@ export const listEnglishVocabularyPackItems = async (
 	return await http.get<{
 		streamId: string;
 		itemCount: number;
-		items: EnglishVocabularyItem[];
+		items: (EnglishVocabularyItem & { favoriteId?: string | null })[];
 	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
 		params: [streamId, 'items'],
 		querys: {
@@ -1300,6 +1300,8 @@ export type EnglishVocabularyFavoriteListEntry = {
 	translationZh: string;
 	example: string;
 	createdAt: string;
+	/** 与 id 相同，便于与资源库/记词列表字段对齐 */
+	favoriteId?: string | null;
 };
 
 export type EnglishVocabularyFavoritesPage = {
@@ -1317,6 +1319,8 @@ export type EnglishVocabularyMistakeListEntry = {
 	example: string;
 	lastUserInput: string;
 	createdAt: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId?: string | null;
 };
 
 export type EnglishVocabularyMistakesPage = {
@@ -1416,7 +1420,11 @@ export type EnglishPracticeReviewSummary = {
 };
 
 export type EnglishPracticeReviewQueueItem =
-	| (EnglishVocabularyItem & { contentKind: 'vocab'; key: string })
+	| (EnglishVocabularyItem & {
+			contentKind: 'vocab';
+			key: string;
+			favoriteId?: string | null;
+	  })
 	| (EnglishClassicQuoteItem & { contentKind: 'classic'; key: string });
 
 export type EnglishPracticeReviewRecordItem = {
@@ -1491,6 +1499,8 @@ export const resetEnglishDailyMemorizeLibrary = async () => {
 export type EnglishDailyMemorizeItem = EnglishVocabularyItem & {
 	contentKind: 'vocab';
 	key: string;
+	/** 当前用户已收藏时返回收藏 id，否则 null */
+	favoriteId?: string | null;
 };
 
 export const getEnglishDailyMemorizeSummary = async (options?: {

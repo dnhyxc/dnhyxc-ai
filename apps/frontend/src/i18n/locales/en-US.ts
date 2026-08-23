@@ -1188,7 +1188,7 @@ export const enUS = {
 	'englishLearning.practice.next': 'Next',
 	'englishLearning.practice.viewResults': 'View practice results',
 	'englishLearning.practice.incorrect': 'Spelling error',
-	'englishLearning.practice.hintShow': 'Hint',
+	'englishLearning.practice.hintShow': 'Expand hint',
 	'englishLearning.practice.hintHide': 'Hide hint',
 	'englishLearning.practice.hintUnavailable': 'No extra hints for this word',
 	'englishLearning.practice.hintLabelIpa': 'IPA',

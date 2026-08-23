@@ -99,8 +99,8 @@ export default function EnglishLearningDailyRecordsPage() {
 	});
 
 	const {
-		favoritedWordKeys,
-		getVocabularyFavoriteId,
+		isVocabularyFavorited,
+		resolveVocabularyFavoriteId,
 		setVocabularyFavoriteId,
 		clearVocabularyFavorite,
 	} = useIncrementalVocabFavoriteStatus(entries, { libraryId: LIST_RESUME_ID });
@@ -177,23 +177,26 @@ export default function EnglishLearningDailyRecordsPage() {
 	);
 
 	const toggleVocabularyFavorite = useCallback(
-		async (
-			item: EnglishDailyMemorizeRecordEntry,
-			currentlyFavorited: boolean,
-		) => {
+		async (item: EnglishDailyMemorizeRecordEntry) => {
 			const wk = normalizeEnglishVocabWordKey(item.word);
 			if (!wk) return;
 			setFavoriteActionKey(wk);
 			try {
-				if (currentlyFavorited) {
-					const favoriteId = getVocabularyFavoriteId(wk);
-					if (!favoriteId) return;
+				if (isVocabularyFavorited(item.word, item.favoriteId)) {
+					const favoriteId = resolveVocabularyFavoriteId(
+						item.word,
+						item.favoriteId,
+					);
+					if (!favoriteId) {
+						clearVocabularyFavorite(wk);
+						return;
+					}
 					await removeEnglishVocabularyFavorite(favoriteId);
 					clearVocabularyFavorite(wk);
 				} else {
 					const res = await addEnglishVocabularyFavorite(item);
-					const favoriteId = res.data?.id;
-					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
+					const newId = res.data?.id;
+					if (newId) setVocabularyFavoriteId(wk, newId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -201,7 +204,12 @@ export default function EnglishLearningDailyRecordsPage() {
 				setFavoriteActionKey(null);
 			}
 		},
-		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
+		[
+			isVocabularyFavorited,
+			resolveVocabularyFavoriteId,
+			setVocabularyFavoriteId,
+			clearVocabularyFavorite,
+		],
 	);
 
 	return (
@@ -287,7 +295,10 @@ export default function EnglishLearningDailyRecordsPage() {
 													const wordKey = normalizeEnglishVocabWordKey(
 														item.word,
 													);
-													const isFavorited = favoritedWordKeys.has(wordKey);
+													const isFavorited = isVocabularyFavorited(
+														item.word,
+														item.favoriteId,
+													);
 													const favBusy = favoriteActionKey === wordKey;
 													return (
 														<VocabularyWordCard
@@ -307,15 +318,14 @@ export default function EnglishLearningDailyRecordsPage() {
 																	type="button"
 																	variant="ghost"
 																	size="sm"
-																	disabled={favBusy}
-																	onClick={() =>
-																		void toggleVocabularyFavorite(
-																			item,
-																			isFavorited,
-																		)
-																	}
+																	aria-busy={favBusy}
+																	onClick={() => {
+																		if (favBusy) return;
+																		void toggleVocabularyFavorite(item);
+																	}}
 																	className={cn(
-																		'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+																		'h-7 w-7 shrink-0 cursor-pointer rounded-md border p-0 transition-colors',
+																		favBusy && 'opacity-60',
 																		isFavorited
 																			? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
 																			: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',

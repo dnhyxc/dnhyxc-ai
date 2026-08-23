@@ -248,8 +248,8 @@ function VocabularyPackSectionInner({
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
-		favoritedWordKeys,
-		getVocabularyFavoriteId,
+		isVocabularyFavorited,
+		resolveVocabularyFavoriteId,
 		setVocabularyFavoriteId,
 		clearVocabularyFavorite,
 	} = useIncrementalVocabFavoriteStatus(listItems);
@@ -281,20 +281,26 @@ function VocabularyPackSectionInner({
 	);
 
 	const toggleVocabularyFavorite = useCallback(
-		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
+		async (item: EnglishVocabularyItem & { favoriteId?: string | null }) => {
 			const wk = normalizeEnglishVocabWordKey(item.word);
 			if (!wk) return;
 			setFavoriteActionKey(wk);
 			try {
-				if (currentlyFavorited) {
-					const favoriteId = getVocabularyFavoriteId(wk);
-					if (!favoriteId) return;
+				if (isVocabularyFavorited(item.word, item.favoriteId)) {
+					const favoriteId = resolveVocabularyFavoriteId(
+						item.word,
+						item.favoriteId,
+					);
+					if (!favoriteId) {
+						clearVocabularyFavorite(wk);
+						return;
+					}
 					await removeEnglishVocabularyFavorite(favoriteId);
 					clearVocabularyFavorite(wk);
 				} else {
 					const res = await addEnglishVocabularyFavorite(item);
-					const favoriteId = res.data?.id;
-					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
+					const newId = res.data?.id;
+					if (newId) setVocabularyFavoriteId(wk, newId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -302,7 +308,12 @@ function VocabularyPackSectionInner({
 				setFavoriteActionKey(null);
 			}
 		},
-		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
+		[
+			isVocabularyFavorited,
+			resolveVocabularyFavoriteId,
+			setVocabularyFavoriteId,
+			clearVocabularyFavorite,
+		],
 	);
 
 	if (showPageLoading) {
@@ -332,13 +343,13 @@ function VocabularyPackSectionInner({
 						<div className="min-w-0 space-y-4">
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 								{listItems.map((item, i) => {
+									const wordKey = normalizeEnglishVocabWordKey(item.word);
+									const isFavorited = isVocabularyFavorited(item.word);
 									const key = isHistoryMode
 										? `history-${i}-${item.word}`
 										: `${i}-${item.word}`;
-									const playing = playingKey === key;
-									const wordKey = normalizeEnglishVocabWordKey(item.word);
-									const isFavorited = favoritedWordKeys.has(wordKey);
 									const favBusy = favoriteActionKey === wordKey;
+									const playing = playingKey === key;
 									const posDisplay = item.pos?.trim()
 										? item.pos.endsWith('.')
 											? item.pos
@@ -362,12 +373,14 @@ function VocabularyPackSectionInner({
 													type="button"
 													variant="ghost"
 													size="sm"
-													disabled={favBusy}
-													onClick={() =>
-														void toggleVocabularyFavorite(item, isFavorited)
-													}
+													aria-busy={favBusy}
+													onClick={() => {
+														if (favBusy) return;
+														void toggleVocabularyFavorite(item);
+													}}
 													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+														'h-7 w-7 shrink-0 cursor-pointer rounded-md border p-0 transition-colors',
+														favBusy && 'opacity-60',
 														isFavorited
 															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
 															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',

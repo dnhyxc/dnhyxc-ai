@@ -1085,7 +1085,7 @@ export const zhCN = {
 	'englishLearning.practice.next': '下一题',
 	'englishLearning.practice.viewResults': '查看练习结果',
 	'englishLearning.practice.incorrect': '拼写错误',
-	'englishLearning.practice.hintShow': '提示',
+	'englishLearning.practice.hintShow': '展开提示',
 	'englishLearning.practice.hintHide': '收起提示',
 	'englishLearning.practice.hintUnavailable': '本题暂无额外提示',
 	'englishLearning.practice.hintLabelIpa': '音标',

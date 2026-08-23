@@ -4,6 +4,7 @@ import {
 	type EnglishVocabularyItem,
 	normalizeEnglishVocabWordKey,
 } from '@/service';
+import type { FavoriteToggleButtonProps } from '../../components/FavoriteToggleButton';
 import type {
 	PracticeClassicItem,
 	PracticeContentKind,
@@ -13,14 +14,14 @@ import type {
 
 export function toPracticeVocabItem(
 	word: string,
-	fields: Omit<EnglishVocabularyItem, 'word'>,
+	fields: Omit<EnglishVocabularyItem, 'word'> & { favoriteId?: string | null },
 ): PracticeVocabItem {
 	const key = normalizeEnglishVocabWordKey(word);
 	return { contentKind: 'vocab', word, ...fields, key };
 }
 
 export function toPracticeClassicItem(
-	fields: EnglishClassicQuoteItem,
+	fields: EnglishClassicQuoteItem & { favoriteId?: string | null },
 ): PracticeClassicItem {
 	const english = fields.english.trim();
 	return {
@@ -30,6 +31,9 @@ export function toPracticeClassicItem(
 		source: fields.source ?? '',
 		noteZh: fields.noteZh ?? '',
 		key: classicQuoteFavoriteContentKey(english),
+		...(fields.favoriteId !== undefined
+			? { favoriteId: fields.favoriteId }
+			: {}),
 	};
 }
 
@@ -53,4 +57,12 @@ export function parsePracticeContentKind(
 	raw: string | null,
 ): PracticeContentKind {
 	return raw === 'classic' ? 'classic' : 'vocab';
+}
+
+export function practiceFavoriteToggleProps(
+	item: PracticeItem,
+): FavoriteToggleButtonProps {
+	return item.contentKind === 'vocab'
+		? { kind: 'vocab', item }
+		: { kind: 'classic', item };
 }

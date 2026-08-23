@@ -12,6 +12,7 @@ import {
 import { useI18n } from '@/hooks';
 import { ReferencePageShell } from '../components/ReferencePageShell';
 import { referenceNavItemClass } from '../utils/referenceNavItemClass';
+import { useReferenceDetailScrollReset } from '../utils/useReferenceDetailScrollReset';
 import { GrammarPointBlock } from './GrammarPointBlock';
 import {
 	buildGrammarNavItems,
@@ -101,8 +102,12 @@ export default function EnglishGrammarReferencePage() {
 		[setSearchParams],
 	);
 
+	const detailScrollRef = useReferenceDetailScrollReset(
+		activeNav?.sectionId ?? '',
+	);
+
 	return (
-		<ReferencePageShell title={grammarReference.title}>
+		<ReferencePageShell>
 			<ResizablePanelGroup
 				id="english-grammar-split"
 				orientation="horizontal"
@@ -113,9 +118,9 @@ export default function EnglishGrammarReferencePage() {
 					defaultSize="34%"
 					className="min-h-0 min-w-0"
 				>
-					<aside className="flex h-full min-h-0 flex-col border-r border-theme/10 bg-theme-background">
-						<ScrollArea className="min-h-0 flex-1">
-							<div className="space-y-0.5 p-2 pt-0.5">
+					<aside className="flex h-full min-h-0 flex-col p-4 pr-0 border-r border-theme/5 bg-theme-background">
+						<ScrollArea className="min-h-0 flex-1 pr-4">
+							<div className="space-y-1 pt-0.5">
 								{navRows.map((item) => {
 									const chapter =
 										grammarReference.parts[item.partIndex].chapters[
@@ -124,7 +129,7 @@ export default function EnglishGrammarReferencePage() {
 									return (
 										<div key={item.sectionId}>
 											{item.showChapter ? (
-												<div className="text-textcolor/55 px-2 pb-1 pt-3 text-xs font-medium">
+												<div className="text-textcolor/55 pb-2.5 pt-2.5 first:pt-0 text-sm font-medium">
 													{chapter.title}
 												</div>
 											) : null}
@@ -133,7 +138,7 @@ export default function EnglishGrammarReferencePage() {
 												onClick={() => onSelectSection(item.sectionId)}
 												className={referenceNavItemClass(
 													activeNav?.sectionId === item.sectionId,
-													'w-full rounded-md py-2 pl-4 pr-2 text-left text-sm',
+													'w-full rounded-md py-2 pl-2 text-left text-sm',
 												)}
 											>
 												{item.label}
@@ -145,19 +150,19 @@ export default function EnglishGrammarReferencePage() {
 						</ScrollArea>
 					</aside>
 				</ResizablePanel>
-				<ResizableHandle withHandle />
+				<ResizableHandle withHandle className="w-0" />
 				<ResizablePanel
 					id="english-grammar-detail"
 					defaultSize="66%"
 					className="min-h-0 min-w-0"
 				>
-					<ScrollArea className="h-full min-h-0">
-						<div className="space-y-4 p-4 pt-3.5">
+					<ScrollArea ref={detailScrollRef} className="h-full min-h-0 py-4">
+						<div className="space-y-4 px-4">
 							{section ? (
 								<>
 									<div>
 										{chapterTitle ? (
-											<p className="text-textcolor/50 mb-2.5 text-xs">
+											<p className="text-textcolor/50 mb-2.5 text-sm">
 												{chapterTitle}
 											</p>
 										) : null}

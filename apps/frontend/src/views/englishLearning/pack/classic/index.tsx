@@ -249,8 +249,8 @@ function ClassicQuotesPackSectionInner({
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
-		favoritedContentKeys,
-		getClassicQuoteFavoriteId,
+		isClassicQuoteFavorited,
+		resolveClassicQuoteFavoriteId,
 		setClassicQuoteFavoriteId,
 		clearClassicQuoteFavorite,
 	} = useIncrementalClassicQuoteFavoriteStatus(listItems);
@@ -282,20 +282,26 @@ function ClassicQuotesPackSectionInner({
 	);
 
 	const toggleClassicQuoteFavorite = useCallback(
-		async (item: EnglishClassicQuoteItem, currentlyFavorited: boolean) => {
+		async (item: EnglishClassicQuoteItem & { favoriteId?: string | null }) => {
 			const ck = classicQuoteFavoriteContentKey(item.english);
 			if (!ck) return;
 			setFavoriteActionKey(ck);
 			try {
-				if (currentlyFavorited) {
-					const favoriteId = getClassicQuoteFavoriteId(ck);
-					if (!favoriteId) return;
+				if (isClassicQuoteFavorited(item.english, item.favoriteId)) {
+					const favoriteId = resolveClassicQuoteFavoriteId(
+						item.english,
+						item.favoriteId,
+					);
+					if (!favoriteId) {
+						clearClassicQuoteFavorite(ck);
+						return;
+					}
 					await removeEnglishClassicQuoteFavorite(favoriteId);
 					clearClassicQuoteFavorite(ck);
 				} else {
 					const res = await addEnglishClassicQuoteFavorite(item);
-					const favoriteId = res.data?.id;
-					if (favoriteId) setClassicQuoteFavoriteId(ck, favoriteId);
+					const newId = res.data?.id;
+					if (newId) setClassicQuoteFavoriteId(ck, newId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -304,7 +310,8 @@ function ClassicQuotesPackSectionInner({
 			}
 		},
 		[
-			getClassicQuoteFavoriteId,
+			isClassicQuoteFavorited,
+			resolveClassicQuoteFavoriteId,
 			setClassicQuoteFavoriteId,
 			clearClassicQuoteFavorite,
 		],
@@ -344,13 +351,14 @@ function ClassicQuotesPackSectionInner({
 										? `history-${i}-${contentKey || item.english.slice(0, 48)}`
 										: `${i}-${contentKey || item.english.slice(0, 48)}`;
 									const playing = playingKey === key;
-									const isFavorited =
-										contentKey.length > 0 &&
-										favoritedContentKeys.has(contentKey);
+									const isFavorited = isClassicQuoteFavorited(item.english);
 									const favBusy = favoriteActionKey === contentKey;
+									const cardKey = isHistoryMode
+										? `history-${i}-${contentKey || item.english.slice(0, 48)}`
+										: `${i}-${contentKey || item.english.slice(0, 48)}`;
 									return (
 										<ClassicQuoteCard
-											key={key}
+											key={cardKey}
 											variant="library"
 											forceNote
 											data={{
@@ -372,12 +380,14 @@ function ClassicQuotesPackSectionInner({
 													type="button"
 													variant="ghost"
 													size="sm"
-													disabled={favBusy || !contentKey}
-													onClick={() =>
-														void toggleClassicQuoteFavorite(item, isFavorited)
-													}
+													aria-busy={favBusy}
+													onClick={() => {
+														if (favBusy || !contentKey) return;
+														void toggleClassicQuoteFavorite(item);
+													}}
 													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+														'h-7 w-7 shrink-0 cursor-pointer rounded-md border p-0 transition-colors',
+														favBusy && 'opacity-60',
 														isFavorited
 															? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
 															: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',

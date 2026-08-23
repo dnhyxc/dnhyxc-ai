@@ -3,13 +3,21 @@
  * - 资源库：优先用 items 内嵌 favoriteId；否则回退 GET favorites-status
  * - 其他场景：POST .../classic-quotes-favorites/status
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from 'react';
 import {
 	classicQuoteFavoriteContentKey,
 	type EnglishClassicQuoteFavoriteRef,
 	fetchEnglishClassicQuoteFavoriteStatus,
 	listEnglishClassicQuotesLibraryFavoriteStatus,
 } from '@/service';
+import { patchClassicFavoriteInListCaches } from '@/views/englishLearning/utils/libraryWordsListCache';
 import {
 	buildLibraryRangeChunks,
 	mapWithConcurrency,
@@ -20,6 +28,57 @@ const STATUS_QUERY_DEBOUNCE_MS = 150;
 const LIBRARY_STATUS_CONCURRENCY = 3;
 
 const sessionLibraryClassicStatusEnd = new Map<string, number>();
+const sessionQueriedContentKeys = new Set<string>();
+const sessionFavoriteIdByContentKey = new Map<string, string>();
+
+const CLASSIC_FAVORITE_SESSION_EVENT =
+	'english-classic-favorite-session-change';
+let classicFavoriteSessionVersion = 0;
+
+function subscribeClassicFavoriteSession(onStoreChange: () => void) {
+	window.addEventListener(CLASSIC_FAVORITE_SESSION_EVENT, onStoreChange);
+	return () =>
+		window.removeEventListener(CLASSIC_FAVORITE_SESSION_EVENT, onStoreChange);
+}
+
+function getClassicFavoriteSessionVersion() {
+	return classicFavoriteSessionVersion;
+}
+
+function bumpClassicFavoriteSession() {
+	classicFavoriteSessionVersion += 1;
+	window.dispatchEvent(new Event(CLASSIC_FAVORITE_SESSION_EVENT));
+}
+
+function readClassicQuoteFavorited(
+	english: string,
+	embeddedFavoriteId: string | null | undefined,
+	favoriteIdByContentKey: Map<string, string>,
+): boolean {
+	const ck = classicQuoteFavoriteContentKey(english);
+	if (!ck) return false;
+	const sessionId = sessionFavoriteIdByContentKey.get(ck);
+	if (sessionQueriedContentKeys.has(ck)) return Boolean(sessionId);
+	if (favoriteIdByContentKey.has(ck)) return true;
+	return Boolean(embeddedFavoriteId);
+}
+
+function seedClassicFavoriteStateFromSession(
+	items: ReadonlyArray<{ english: string }>,
+) {
+	const map = new Map<string, string>();
+	const queried = new Set<string>();
+	for (const item of items) {
+		const ck = classicQuoteFavoriteContentKey(item.english);
+		if (!ck) continue;
+		if (sessionQueriedContentKeys.has(ck)) {
+			queried.add(ck);
+			const id = sessionFavoriteIdByContentKey.get(ck);
+			if (id) map.set(ck, id);
+		}
+	}
+	return { map, queried };
+}
 
 export type UseIncrementalClassicQuoteFavoriteStatusOptions = {
 	libraryId?: string | null;
@@ -45,10 +104,44 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 	const prevItemsEnglishSigRef = useRef('');
 	const libraryStatusEndRef = useRef(0);
 	const libraryIdRef = useRef<string | null>(null);
+	const sessionVersion = useSyncExternalStore(
+		subscribeClassicFavoriteSession,
+		getClassicFavoriteSessionVersion,
+		getClassicFavoriteSessionVersion,
+	);
 
-	const favoritedContentKeys = useMemo(
-		() => new Set(favoriteIdByContentKey.keys()),
-		[favoriteIdByContentKey],
+	const favoritedContentKeys = useMemo(() => {
+		void sessionVersion;
+		const keys = new Set<string>();
+		for (const item of items) {
+			const ck = classicQuoteFavoriteContentKey(item.english);
+			if (
+				ck &&
+				readClassicQuoteFavorited(
+					item.english,
+					'favoriteId' in item ? item.favoriteId : undefined,
+					favoriteIdByContentKey,
+				)
+			) {
+				keys.add(ck);
+			}
+		}
+		for (const ck of favoriteIdByContentKey.keys()) {
+			if (!sessionQueriedContentKeys.has(ck)) keys.add(ck);
+		}
+		return keys;
+	}, [favoriteIdByContentKey, items, sessionVersion]);
+
+	const isClassicQuoteFavorited = useCallback(
+		(english: string, embeddedFavoriteId?: string | null) => {
+			void sessionVersion;
+			return readClassicQuoteFavorited(
+				english,
+				embeddedFavoriteId,
+				favoriteIdByContentKey,
+			);
+		},
+		[favoriteIdByContentKey, sessionVersion],
 	);
 
 	const itemsEnglishSig = useMemo(
@@ -85,8 +178,9 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 			(itemsEnglishSig === prevSig ||
 				itemsEnglishSig.endsWith(`${ENGLISH_SIG_SEP}${prevSig}`));
 		if (!appended && !prepended) {
-			setFavoriteIdByContentKey(new Map());
-			queriedKeysRef.current = new Set();
+			const seeded = seedClassicFavoriteStateFromSession(items);
+			setFavoriteIdByContentKey(seeded.map);
+			queriedKeysRef.current = seeded.queried;
 			if (libraryId) {
 				libraryStatusEndRef.current = Math.min(
 					sessionLibraryClassicStatusEnd.get(libraryId) ?? 0,
@@ -102,14 +196,19 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 				if (cancelled || refs.length === 0) return;
 				setFavoriteIdByContentKey((prev) => {
 					const next = new Map(prev);
-					for (const r of refs) next.set(r.contentKey, r.id);
+					for (const r of refs) {
+						next.set(r.contentKey, r.id);
+						sessionQueriedContentKeys.add(r.contentKey);
+						sessionFavoriteIdByContentKey.set(r.contentKey, r.id);
+					}
 					return next;
 				});
+				bumpClassicFavoriteSession();
 			};
 
-			if (libraryId && itemsEmbedFavoriteId(items)) {
+			if (itemsEmbedFavoriteId(items)) {
 				const syncFrom =
-					appended && libraryStatusEndRef.current > 0
+					libraryId && appended && libraryStatusEndRef.current > 0
 						? libraryStatusEndRef.current
 						: 0;
 				const slice = items.slice(syncFrom);
@@ -120,14 +219,29 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 					for (const item of slice) {
 						const ck = classicQuoteFavoriteContentKey(item.english);
 						if (!ck || !('favoriteId' in item)) continue;
-						if (item.favoriteId) next.set(ck, item.favoriteId);
-						else next.delete(ck);
+						if (sessionQueriedContentKeys.has(ck)) {
+							const sessionId = sessionFavoriteIdByContentKey.get(ck);
+							if (sessionId) next.set(ck, sessionId);
+							else next.delete(ck);
+							continue;
+						}
+						sessionQueriedContentKeys.add(ck);
+						if (item.favoriteId) {
+							next.set(ck, item.favoriteId);
+							sessionFavoriteIdByContentKey.set(ck, item.favoriteId);
+						} else {
+							next.delete(ck);
+							sessionFavoriteIdByContentKey.delete(ck);
+						}
 					}
 					return next;
 				});
+				bumpClassicFavoriteSession();
 				if (cancelled) return;
-				libraryStatusEndRef.current = items.length;
-				sessionLibraryClassicStatusEnd.set(libraryId, items.length);
+				if (libraryId) {
+					libraryStatusEndRef.current = items.length;
+					sessionLibraryClassicStatusEnd.set(libraryId, items.length);
+				}
 				return;
 			}
 
@@ -203,10 +317,30 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 		};
 	}, [itemsEnglishSig, items, libraryId]);
 
-	const getClassicQuoteFavoriteId = (contentKey: string) =>
-		favoriteIdByContentKey.get(contentKey);
+	const resolveClassicQuoteFavoriteId = useCallback(
+		(english: string, embeddedFavoriteId?: string | null) => {
+			void sessionVersion;
+			const ck = classicQuoteFavoriteContentKey(english);
+			if (!ck) return undefined;
+			const sessionId = sessionFavoriteIdByContentKey.get(ck);
+			if (sessionQueriedContentKeys.has(ck)) return sessionId;
+			return favoriteIdByContentKey.get(ck) ?? embeddedFavoriteId ?? undefined;
+		},
+		[favoriteIdByContentKey, sessionVersion],
+	);
+
+	const getClassicQuoteFavoriteId = (contentKey: string) => {
+		const sessionId = sessionFavoriteIdByContentKey.get(contentKey);
+		if (sessionId) return sessionId;
+		if (sessionQueriedContentKeys.has(contentKey)) return undefined;
+		return favoriteIdByContentKey.get(contentKey);
+	};
 
 	const setClassicQuoteFavoriteId = (contentKey: string, id: string) => {
+		sessionQueriedContentKeys.add(contentKey);
+		sessionFavoriteIdByContentKey.set(contentKey, id);
+		patchClassicFavoriteInListCaches(contentKey, id);
+		bumpClassicFavoriteSession();
 		setFavoriteIdByContentKey((prev) => {
 			const next = new Map(prev);
 			next.set(contentKey, id);
@@ -215,8 +349,11 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 	};
 
 	const clearClassicQuoteFavorite = (contentKey: string) => {
+		sessionQueriedContentKeys.add(contentKey);
+		sessionFavoriteIdByContentKey.delete(contentKey);
+		patchClassicFavoriteInListCaches(contentKey, null);
+		bumpClassicFavoriteSession();
 		setFavoriteIdByContentKey((prev) => {
-			if (!prev.has(contentKey)) return prev;
 			const next = new Map(prev);
 			next.delete(contentKey);
 			return next;
@@ -225,6 +362,8 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 
 	return {
 		favoritedContentKeys,
+		isClassicQuoteFavorited,
+		resolveClassicQuoteFavoriteId,
 		getClassicQuoteFavoriteId,
 		setClassicQuoteFavoriteId,
 		clearClassicQuoteFavorite,

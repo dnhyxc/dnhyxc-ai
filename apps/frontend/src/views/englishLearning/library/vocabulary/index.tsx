@@ -141,8 +141,8 @@ export function VocabularyLibrarySection({
 	}, [libraryId, libraryMeta, resolvedLibrary, items.length]);
 
 	const {
-		favoritedWordKeys,
-		getVocabularyFavoriteId,
+		isVocabularyFavorited,
+		resolveVocabularyFavoriteId,
 		setVocabularyFavoriteId,
 		clearVocabularyFavorite,
 	} = useIncrementalVocabFavoriteStatus(items, { libraryId });
@@ -176,14 +176,27 @@ export function VocabularyLibrarySection({
 	);
 
 	const toggleVocabularyFavorite = useCallback(
-		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
+		async (item: EnglishVocabularyItem & { favoriteId?: string | null }) => {
 			const wk = normalizeEnglishVocabWordKey(item.word);
 			if (!wk) return;
 			setFavoriteActionKey(wk);
 			try {
-				if (currentlyFavorited) {
-					const favoriteId = getVocabularyFavoriteId(wk);
-					if (!favoriteId) return;
+				if (isVocabularyFavorited(item.word, item.favoriteId)) {
+					const favoriteId = resolveVocabularyFavoriteId(
+						item.word,
+						item.favoriteId,
+					);
+					if (!favoriteId) {
+						clearVocabularyFavorite(wk);
+						patchItems((list) =>
+							list.map((row) =>
+								normalizeEnglishVocabWordKey(row.word) === wk
+									? { ...row, favoriteId: null }
+									: row,
+							),
+						);
+						return;
+					}
 					await removeEnglishVocabularyFavorite(favoriteId);
 					clearVocabularyFavorite(wk);
 					patchItems((list) =>
@@ -195,13 +208,13 @@ export function VocabularyLibrarySection({
 					);
 				} else {
 					const res = await addEnglishVocabularyFavorite(item);
-					const favoriteId = res.data?.id;
-					if (favoriteId) {
-						setVocabularyFavoriteId(wk, favoriteId);
+					const newId = res.data?.id;
+					if (newId) {
+						setVocabularyFavoriteId(wk, newId);
 						patchItems((list) =>
 							list.map((row) =>
 								normalizeEnglishVocabWordKey(row.word) === wk
-									? { ...row, favoriteId }
+									? { ...row, favoriteId: newId }
 									: row,
 							),
 						);
@@ -214,7 +227,8 @@ export function VocabularyLibrarySection({
 			}
 		},
 		[
-			getVocabularyFavoriteId,
+			isVocabularyFavorited,
+			resolveVocabularyFavoriteId,
 			setVocabularyFavoriteId,
 			clearVocabularyFavorite,
 			patchItems,
@@ -323,7 +337,10 @@ export function VocabularyLibrarySection({
 										const key = `${item.id}-${item.word}`;
 										const playing = playingKey === key;
 										const wordKey = normalizeEnglishVocabWordKey(item.word);
-										const isFavorited = favoritedWordKeys.has(wordKey);
+										const isFavorited = isVocabularyFavorited(
+											item.word,
+											item.favoriteId,
+										);
 										const favBusy = favoriteActionKey === wordKey;
 										return (
 											<div data-library-item-id={item.id} className="h-full">
@@ -344,11 +361,14 @@ export function VocabularyLibrarySection({
 															variant="ghost"
 															size="sm"
 															disabled={favBusy}
-															onClick={() =>
-																void toggleVocabularyFavorite(item, isFavorited)
-															}
+															aria-busy={favBusy}
+															onClick={() => {
+																if (favBusy) return;
+																void toggleVocabularyFavorite(item);
+															}}
 															className={cn(
-																'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+																'h-7 w-7 shrink-0 cursor-pointer rounded-md border p-0 transition-colors',
+																favBusy && 'opacity-60',
 																isFavorited
 																	? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
 																	: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',

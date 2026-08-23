@@ -27,6 +27,7 @@ export async function loadDailyCards(
 					translationZh: item.translationZh ?? '',
 					example: item.example ?? '',
 					origin: 'server' as const,
+					favoriteId: item.favoriteId ?? null,
 				}));
 			}
 		} catch {

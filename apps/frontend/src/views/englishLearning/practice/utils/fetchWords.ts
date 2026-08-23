@@ -54,6 +54,7 @@ function vocabFavoriteToItem(
 		segmentation: row.segmentation,
 		translationZh: row.translationZh,
 		example: row.example,
+		favoriteId: row.favoriteId ?? row.id,
 	});
 }
 
@@ -66,6 +67,7 @@ function vocabMistakeToItem(
 		segmentation: row.segmentation,
 		translationZh: row.translationZh,
 		example: row.example,
+		favoriteId: row.favoriteId ?? null,
 	});
 }
 
@@ -78,6 +80,7 @@ function vocabDailyMemorizeToItem(
 		segmentation: row.segmentation,
 		translationZh: row.translationZh,
 		example: row.example,
+		favoriteId: row.favoriteId ?? null,
 	});
 }
 
@@ -90,6 +93,7 @@ function vocabLibraryRowToItem(
 		segmentation: row.segmentation,
 		translationZh: row.translationZh,
 		example: row.example,
+		favoriteId: row.favoriteId ?? null,
 	});
 }
 
@@ -101,6 +105,7 @@ function classicFavoriteToItem(
 		translationZh: row.translationZh,
 		source: row.source,
 		noteZh: row.noteZh,
+		favoriteId: row.id,
 	});
 }
 
@@ -123,6 +128,7 @@ function classicLibraryRowToItem(
 		translationZh: row.translationZh,
 		source: row.source,
 		noteZh: row.noteZh,
+		favoriteId: row.favoriteId ?? null,
 	});
 }
 
@@ -603,6 +609,7 @@ async function fetchPack(
 				segmentation: row.segmentation,
 				translationZh: row.translationZh,
 				example: row.example,
+				favoriteId: row.favoriteId ?? null,
 			}),
 		);
 		return { items };
@@ -647,6 +654,7 @@ async function fetchReview(
 						segmentation: row.segmentation,
 						translationZh: row.translationZh,
 						example: row.example,
+						favoriteId: row.favoriteId ?? null,
 					}),
 		),
 	);

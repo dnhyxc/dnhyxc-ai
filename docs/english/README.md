@@ -58,6 +58,8 @@
 | [资源库词条预取并发.md](./资源库词条预取并发.md) | **续读窗口并发预取**：`buildLibraryPrefetchChunks` 按 1000 切片 + `mapWithConcurrency` 限 3 并发池，结果序与输入一致 |
 | [资源库收藏状态分页查询.md](./资源库收藏状态分页查询.md) | **收藏状态按 offset 分页**：后端 GET `.../:libraryId/favorites-status?limit&offset` 接口 + Hook libraryId 模式 + 会话级缓存避免重复查 |
 | [单词收藏状态查询.md](./单词收藏状态查询.md) | 收藏状态查询（旧版：按词 POST 批量；资源库新场景请优先看上面的「分页查询」） |
+| [收藏状态会话级缓存.md](./收藏状态会话级缓存.md) | **收藏状态会话级缓存与跨页同步**：两个增量收藏 Hook 新增会话级 `sessionFavoriteIdByWordKey` / `sessionQueriedWordKeys` + revision 事件（`bumpXxxFavoriteSession`）；后端在词包历史 / 错题 / 每日记词 / 复习队列 / 随机抽词返回体回填 `favoriteId`；列表快照 `patchVocabFavoriteInListCaches` / `patchClassicFavoriteInListCaches` 同步；消费方迁移到 `isXxxFavorited` / `resolveXxxFavoriteId` 新 API |
+| [收藏按钮统一组件.md](./收藏按钮统一组件.md) | **统一收藏按钮组件**：新建 `FavoriteToggleButton`（单词 / 经典句二选一）+ 合并 `DailyCorrectFeedback` / `DailyWrongFeedback` 为 `DailyFeedback`（`variant` 切换）+ `DailyPlayIconButton` 改 Button+Tooltip + 练习答题页顶栏嵌入收藏钮 + `practiceFavoriteToggleProps` 分发 helper + `button.tsx` hover teal-500→teal-400 |
 | [英语收藏抽屉.md](./英语收藏抽屉.md) | 收藏抽屉 |
 | [英语收藏DOCX导出.md](./英语收藏DOCX导出.md) | 导出 DOCX |
 

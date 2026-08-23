@@ -14,9 +14,9 @@ const buttonVariants = cva(
 					'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
 				outline:
 					'border border-teal-500/80 bg-teal-500/10 text-textcolor shadow-xs hover:bg-teal-500/20 dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
-				secondary: 'bg-teal-500/20 text-textcolor hover:bg-teal-500/30',
+				secondary: 'bg-teal-500/20 text-textcolor hover:bg-teal-400/30',
 				ghost: 'hover:bg-teal-500/10 hover::text-textcolor',
-				link: 'text-textcolor underline-offset-4 hover:text-teal-500',
+				link: 'text-textcolor underline-offset-4 hover:text-teal-400',
 				dynamic:
 					'relative overflow-hidden hover:bg-teal-500/10 before:pointer-events-none before:absolute before:inset-0 before:z-0 before:content-[""] before:-translate-x-full before:bg-linear-to-r before:from-transparent before:via-white/30 before:to-transparent dark:before:via-white/12 before:transition-transform before:duration-500 before:ease-out hover:before:translate-x-full [&>*]:relative [&>*]:z-[1]',
 				loading: 'bg-teal-500/30 hover:bg-teal-500/30',

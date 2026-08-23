@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { useIncrementalClassicQuoteFavoriteStatus } from '@/hooks/useIncrementalClassicQuoteFavoriteStatus';
 import { cn } from '@/lib/utils';
-import type { EnglishClassicQuoteItem } from '@/service';
 import {
 	addEnglishClassicQuoteFavorite,
 	classicQuoteFavoriteContentKey,
@@ -125,8 +124,8 @@ export function ClassicQuotesLibrarySection({
 	});
 
 	const {
-		favoritedContentKeys,
-		getClassicQuoteFavoriteId,
+		isClassicQuoteFavorited,
+		resolveClassicQuoteFavoriteId,
 		setClassicQuoteFavoriteId,
 		clearClassicQuoteFavorite,
 	} = useIncrementalClassicQuoteFavoriteStatus(items, { libraryId });
@@ -176,14 +175,27 @@ export function ClassicQuotesLibrarySection({
 	);
 
 	const toggleClassicQuoteFavorite = useCallback(
-		async (item: EnglishClassicQuoteItem, currentlyFavorited: boolean) => {
+		async (item: EnglishClassicQuotesLibraryItemRow) => {
 			const ck = classicQuoteFavoriteContentKey(item.english);
 			if (!ck) return;
 			setFavoriteActionKey(ck);
 			try {
-				if (currentlyFavorited) {
-					const favoriteId = getClassicQuoteFavoriteId(ck);
-					if (!favoriteId) return;
+				if (isClassicQuoteFavorited(item.english, item.favoriteId)) {
+					const favoriteId = resolveClassicQuoteFavoriteId(
+						item.english,
+						item.favoriteId,
+					);
+					if (!favoriteId) {
+						clearClassicQuoteFavorite(ck);
+						patchItems((list) =>
+							list.map((row) =>
+								classicQuoteFavoriteContentKey(row.english) === ck
+									? { ...row, favoriteId: null }
+									: row,
+							),
+						);
+						return;
+					}
 					await removeEnglishClassicQuoteFavorite(favoriteId);
 					clearClassicQuoteFavorite(ck);
 					patchItems((list) =>
@@ -195,13 +207,13 @@ export function ClassicQuotesLibrarySection({
 					);
 				} else {
 					const res = await addEnglishClassicQuoteFavorite(item);
-					const favoriteId = res.data?.id;
-					if (favoriteId) {
-						setClassicQuoteFavoriteId(ck, favoriteId);
+					const newId = res.data?.id;
+					if (newId) {
+						setClassicQuoteFavoriteId(ck, newId);
 						patchItems((list) =>
 							list.map((row) =>
 								classicQuoteFavoriteContentKey(row.english) === ck
-									? { ...row, favoriteId }
+									? { ...row, favoriteId: newId }
 									: row,
 							),
 						);
@@ -214,7 +226,8 @@ export function ClassicQuotesLibrarySection({
 			}
 		},
 		[
-			getClassicQuoteFavoriteId,
+			isClassicQuoteFavorited,
+			resolveClassicQuoteFavoriteId,
 			setClassicQuoteFavoriteId,
 			clearClassicQuoteFavorite,
 			patchItems,
@@ -331,9 +344,10 @@ export function ClassicQuotesLibrarySection({
 										);
 										const key = `${item.id}-${contentKey || item.english.slice(0, 48)}`;
 										const playing = playingKey === key;
-										const isFavorited =
-											contentKey.length > 0 &&
-											favoritedContentKeys.has(contentKey);
+										const isFavorited = isClassicQuoteFavorited(
+											item.english,
+											item.favoriteId,
+										);
 										const favBusy = favoriteActionKey === contentKey;
 										return (
 											<div data-library-item-id={item.id} className="h-full">
@@ -358,15 +372,15 @@ export function ClassicQuotesLibrarySection({
 															type="button"
 															variant="ghost"
 															size="sm"
-															disabled={favBusy || !contentKey}
-															onClick={() =>
-																void toggleClassicQuoteFavorite(
-																	item,
-																	isFavorited,
-																)
-															}
+															disabled={favBusy}
+															aria-busy={favBusy}
+															onClick={() => {
+																if (favBusy) return;
+																void toggleClassicQuoteFavorite(item);
+															}}
 															className={cn(
-																'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+																'h-7 w-7 shrink-0 cursor-pointer rounded-md border p-0 transition-colors',
+																favBusy && 'opacity-60',
 																isFavorited
 																	? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
 																	: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
