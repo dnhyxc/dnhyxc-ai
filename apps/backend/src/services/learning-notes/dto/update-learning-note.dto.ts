@@ -20,4 +20,9 @@ export class UpdateLearningNoteDto {
 	@IsString()
 	@MaxLength(5_000_000)
 	content?: string;
+
+	/** 本次编辑的上传会话；更新后结算未写入正文的孤儿图 */
+	@IsOptional()
+	@IsUUID()
+	uploadSessionId?: string;
 }

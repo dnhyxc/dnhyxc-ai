@@ -22,6 +22,7 @@
 | [Tauri剪贴板富文本.md](./Tauri剪贴板富文本.md) | **Tauri 剪贴板支持 TipTap**：桌面端 WebView 系统级 Cmd/Ctrl+C/V/X 快捷键接管 TipTap 富文本正文 |
 | [Tauri剪贴板图片文件.md](./Tauri剪贴板图片文件.md) | **Tauri 剪贴板图片与文件列表读取**：Rust `arboard` 位图→PNG→base64、文件列表逐个读图→data URL、`clipboard.ts` 四 flavor 并行读取与降级插入、`getTipTapEditor`/`insertHtmlViaEditor`/`insertClipSegments` 全链路（含改动前/后对比与逐行注释）；与 [../ideas/Tauri剪贴板富文本粘贴.md](../ideas/tauri/Tauri剪贴板富文本粘贴.md) 互为专题/总文档 |
 | [学习笔记CRUD.md](./学习笔记CRUD.md) | **学习笔记 CRUD 与 API 集成**：列表左/编辑器右布局重构、`createNotesApi` 工厂、`Confirm` 删除确认、HostBridge 扩展 `put/delete` 全链路 |
+| [学习笔记图片上传与回收.md](./学习笔记图片上传与回收.md) | **学习笔记正文图片上传与孤儿回收**：COS `notes/` 前缀 + 附件表（`noteId × cosKey`）+ pending 表（`sessionId × cosKey`，TTL 1h）双表引用计数 + 正文为真相源 diff 附件表 + save/update `settlePendingSession` + 删笔记双源收 key + TTL 兜底 GC + 桌面端粘贴 `data:image/` 转 File 派发 `rich-editor:desktop-paste-images` 走 `onUploadImage` 钩子（含改动前/后对比与逐行注释）；与 [Tauri剪贴板图片文件.md](./Tauri剪贴板图片文件.md) 互为前后端姊妹稿 |
 | [学习笔记公开列表.md](./学习笔记公开列表.md) | **学习笔记公开可见与列表卡片重构**：`isPublic` 字段与索引、`PUT /visibility/:id`、`authorMap`/`toListItem`、列表网格与公开徽章、刷新状态机、富文本 hover 描边动画（含改动前/后对比与逐行注释） |
 | [学习笔记保存聚焦标题.md](./学习笔记保存聚焦标题.md) | **保存时标题为空自动聚焦标题**：`focusTitle` 回调滚动到顶并聚焦标题输入框、`onSave` 两路径提取 title 变量、保存失败+dirty+空标题时 `focusTitle()`（含改动前/后对比与逐行注释） |
 | [学习笔记MobX存储.md](./学习笔记MobX存储.md) | **学习笔记 MobX 状态管理与分页**：useState 重构为 MobX store、列表分页加载、滚动到底部加载更多 |

@@ -87,8 +87,13 @@ export function formatCosUploadError(error: unknown): string {
 	return `${base}${suffix}`;
 }
 
-/** COS 对象键合法前缀（头像 assets、聊天附件 chat、电子书 ebooks） */
-export const COS_OBJECT_KEY_PREFIXES = ['assets', 'chat', 'ebooks'] as const;
+/** COS 对象键合法前缀（头像 assets、聊天 chat、电子书 ebooks、学习笔记 notes） */
+export const COS_OBJECT_KEY_PREFIXES = [
+	'assets',
+	'chat',
+	'ebooks',
+	'notes',
+] as const;
 
 export type CosObjectKeyPrefix = (typeof COS_OBJECT_KEY_PREFIXES)[number];
 

@@ -1173,6 +1173,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The correct / wrong feedback panels in daily memorize are visually and interactively unified — the two panels now share the same layout (distinguished only by green / red tones), with a header of “status icon + text + favorite button + play button” matching the rest of the cards. The play button now uses the standard system button style, with hover and active colors aligned to teal-green. A favorite button is also added to the practice session header, so you can favorite the current item while answering without waiting for the summary or opening the favorites drawer.',
 	},
+	's24-69': {
+		title: 'Learning-notes images now on cloud storage with auto-cleanup',
+		description:
+			'Images inside learning-note bodies are now uploaded to server-side cloud object storage, with only the cloud URL kept in the body — no more base64. A few screenshots no longer bloat the note or slow serialization, and Word export no longer re-encodes each image, making long-note export more stable. Desktop pasted images (screenshots, file lists, local images inside rich-text HTML) now also auto-upload to the cloud, matching the browser paste experience. Orphaned objects are also auto-reclaimed: (1) if you paste images into a new note but close without saving, the cloud auto-cleans the unreferenced images after one hour; (2) if you paste then delete an image while editing and save, the deleted image is reference-counted and reclaimed; (3) when you delete an entire note, its referenced images are also cleaned up unless another note still references them. When the same image is referenced by multiple notes, deleting one note only drops the reference without affecting the same image in other notes.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

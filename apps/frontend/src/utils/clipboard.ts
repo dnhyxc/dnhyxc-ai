@@ -262,6 +262,55 @@ function getProseMirrorView(el: HTMLElement): any | null {
 	return null;
 }
 
+/** data URL → File，供学习笔记等走 onUploadImage，避免桌面端直接塞 base64 */
+function dataUrlToFile(dataUrl: string, index = 0): File | null {
+	const m = /^data:([^;,]+);base64,([\s\S]+)$/i.exec(dataUrl.trim());
+	if (!m) return null;
+	const mime = (m[1] || 'image/png').toLowerCase();
+	if (!mime.startsWith('image/')) return null;
+	try {
+		const bin = atob(m[2]);
+		const bytes = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+		const ext = mime.split('/')[1]?.split('+')[0] || 'png';
+		return new File([bytes], `paste-${index}.${ext}`, { type: mime });
+	} catch {
+		return null;
+	}
+}
+
+/** 从 HTML 抽出 data:image，并从 DOM 移除对应 img（交给上传钩子） */
+function extractAndStripDataUrlImages(html: string): {
+	html: string;
+	dataUrls: string[];
+} {
+	const tmp = document.createElement('div');
+	tmp.innerHTML = html;
+	const dataUrls: string[] = [];
+	tmp.querySelectorAll('img').forEach((img) => {
+		const src = img.getAttribute('src')?.trim() ?? '';
+		if (!src.startsWith('data:image/')) return;
+		dataUrls.push(src);
+		img.remove();
+	});
+	return { html: tmp.innerHTML, dataUrls };
+}
+
+/**
+ * 通知 RichEditor ImageUpload：桌面端粘贴的本地图请走 resolveSrc（上传）。
+ * 插件 preventDefault 后 Host 不再插入 base64。
+ */
+function offerDesktopPasteImages(root: HTMLElement, files: File[]): boolean {
+	if (!files.length) return false;
+	const ev = new CustomEvent('rich-editor:desktop-paste-images', {
+		bubbles: true,
+		cancelable: true,
+		detail: { files },
+	});
+	root.dispatchEvent(ev);
+	return ev.defaultPrevented;
+}
+
 /**
  * 有 HTML 时优先用 schema 缓存的 DOMParser.parseSlice（贴近 web 原生粘贴），
  * 否则 TipTap insertContent；保留 <a> / 段落。成功返回处理后的 HTML，失败 null。
@@ -550,7 +599,7 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 			if (key === 'v') {
 				// Tauri WebView 原生 paste 往往到不了 ProseMirror：
 				// 有 HTML → 预处理后 insertContent（对齐 web：保留链接/段落）
-				// 无 HTML → 纯文本 + 文件列表/位图图片
+				// 本地图 → 转 File 交给 RichEditor ImageUpload（上传 COS），勿直接塞 base64
 				event.preventDefault();
 				const root = tipTapBody;
 				void (async () => {
@@ -566,27 +615,46 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 					const editor = getTipTapEditor(root);
 					const view = editor?.view ?? getProseMirrorView(root);
 
-					// 优先：整段 HTML 一次插入（链接、换行与 web 一致）
+					const bitmapDataUrls = [
+						...imageFiles,
+						...(imageDataUrl ? [imageDataUrl] : []),
+					];
+
+					const offerOrFallbackBase64 = (dataUrls: string[]) => {
+						const files = dataUrls
+							.map((src, i) => dataUrlToFile(src, i))
+							.filter((f): f is File => !!f);
+						if (!files.length) return;
+						if (offerDesktopPasteImages(root, files)) return;
+						if (view) {
+							insertClipSegments(
+								view,
+								dataUrls.map((src) => ({ type: 'image' as const, src })),
+							);
+						}
+					};
+
+					// 优先：整段 HTML 一次插入；data: 图抽出走上传钩子
 					if (html && editor) {
-						const inserted = insertHtmlViaEditor(editor, html);
+						const cleaned = extractAndStripDataUrlImages(
+							preprocessClipboardHtml(html),
+						);
+						const inserted = cleaned.html.trim()
+							? insertHtmlViaEditor(editor, cleaned.html)
+							: '';
 						if (inserted != null) {
-							const htmlImageCount = (inserted.match(/<img\b/gi) ?? []).length;
-							const extraImages: string[] = [
-								...imageFiles,
-								...(imageDataUrl ? [imageDataUrl] : []),
-							];
-							const needExtra =
-								htmlImageCount === 0 ||
-								(htmlImageCount < extraImages.length && extraImages.length > 1);
-							if (needExtra && extraImages.length > 0 && view) {
-								insertClipSegments(
-									view,
-									extraImages.map((src) => ({
-										type: 'image' as const,
-										src,
-									})),
-								);
+							const remoteImgCount = ((inserted || '').match(/<img\b/gi) ?? [])
+								.length;
+							// HTML 已抽出 data: 图时不再叠一份位图，避免同图上传两次
+							const localDataUrls = [...cleaned.dataUrls];
+							if (localDataUrls.length === 0) {
+								const needBitmap =
+									remoteImgCount === 0 ||
+									(remoteImgCount < bitmapDataUrls.length &&
+										bitmapDataUrls.length > 1);
+								if (needBitmap) localDataUrls.push(...bitmapDataUrls);
 							}
+							offerOrFallbackBase64(localDataUrls);
 							return;
 						}
 					}
@@ -595,28 +663,37 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 					let segments: ClipSegment[] = [];
 					if (html) segments = parseHtmlSegments(html);
 
+					const localDataUrls: string[] = [];
+					const kept: ClipSegment[] = [];
+					for (const seg of segments) {
+						if (seg.type === 'image' && seg.src.startsWith('data:image/')) {
+							localDataUrls.push(seg.src);
+							continue;
+						}
+						kept.push(seg);
+					}
+					segments = kept;
+
 					const htmlImageCount = segments.filter(
 						(s) => s.type === 'image',
 					).length;
-					const extraImages: string[] = [
-						...imageFiles,
-						...(imageDataUrl ? [imageDataUrl] : []),
-					];
 					const needExtraImages =
 						htmlImageCount === 0 ||
-						(htmlImageCount < extraImages.length && extraImages.length > 1);
+						(htmlImageCount < bitmapDataUrls.length &&
+							bitmapDataUrls.length > 1);
 
-					if (needExtraImages && extraImages.length > 0) {
+					if (needExtraImages && bitmapDataUrls.length > 0) {
 						if (segments.length === 0 && text) {
 							segments.push({ type: 'text', value: text });
 						}
-						for (const src of extraImages) {
-							segments.push({ type: 'image', src });
-						}
+						localDataUrls.push(...bitmapDataUrls);
 					}
 					if (segments.length === 0 && text) {
 						segments.push({ type: 'text', value: text });
 					}
+
+					offerOrFallbackBase64(localDataUrls);
+
 					if (segments.length === 0) return;
 
 					if (view) {

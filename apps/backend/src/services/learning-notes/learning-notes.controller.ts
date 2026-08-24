@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
@@ -12,19 +13,39 @@ import {
 	Req,
 	Res,
 	UnauthorizedException,
+	UploadedFile,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
+import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { QueryLearningNoteDto } from './dto/query-learning-note.dto';
 import { SaveLearningNoteDto } from './dto/save-learning-note.dto';
+import { SettleUploadSessionDto } from './dto/settle-upload-session.dto';
 import { UpdateLearningNoteDto } from './dto/update-learning-note.dto';
 import { UpdateNoteVisibilityDto } from './dto/update-note-visibility.dto';
 import { LearningNotesService } from './learning-notes.service';
 
 type AuthedRequest = Request & { user?: { userId?: number } };
+
+const noteImageUpload = {
+	storage: memoryStorage(),
+	limits: { fileSize: 1024 * 1024 * 20 },
+	fileFilter: (
+		_req: Request,
+		file: Express.Multer.File,
+		cb: (error: Error | null, acceptFile: boolean) => void,
+	) => {
+		if (file.mimetype?.startsWith('image/')) {
+			cb(null, true);
+			return;
+		}
+		cb(new BadRequestException('仅支持图片文件') as unknown as Error, false);
+	},
+};
 
 @Controller('english-learning/notes')
 @UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
@@ -36,6 +57,46 @@ export class LearningNotesController {
 		const userId = req.user?.userId;
 		if (userId == null) throw new UnauthorizedException('未登录');
 		return userId;
+	}
+
+	/** 笔记正文图片 → COS notes/ 前缀（与头像隔离，删文可按引用回收） */
+	@Post('upload-image')
+	@UseInterceptors(FileInterceptor('file', noteImageUpload))
+	async uploadImage(
+		@Req() req: AuthedRequest,
+		@UploadedFile() file: Express.Multer.File,
+		@Body('noteId') noteId?: string,
+		@Body('uploadSessionId') uploadSessionId?: string,
+	) {
+		return this.notesService.uploadImage(
+			this.userId(req),
+			file,
+			noteId,
+			uploadSessionId,
+		);
+	}
+
+	/** 放弃上传会话（删 pending + 无引用 COS） */
+	@Delete('upload-session/:sessionId')
+	async discardUploadSession(
+		@Req() req: AuthedRequest,
+		@Param('sessionId', ParseUUIDPipe) sessionId: string,
+	) {
+		return this.notesService.discardUploadSession(this.userId(req), sessionId);
+	}
+
+	/** 按当前正文结算会话（上传又删、无需保存笔记时回收孤儿图） */
+	@Post('upload-session/:sessionId/settle')
+	async settleUploadSession(
+		@Req() req: AuthedRequest,
+		@Param('sessionId', ParseUUIDPipe) sessionId: string,
+		@Body() dto: SettleUploadSessionDto,
+	) {
+		return this.notesService.settleUploadSession(
+			this.userId(req),
+			sessionId,
+			dto.content ?? '',
+		);
 	}
 
 	@Post('save')

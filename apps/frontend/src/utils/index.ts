@@ -112,7 +112,7 @@ export function extractCosObjectKey(url: string): string | null {
 
 	const tryDecodePath = (rawPath: string) => {
 		const cleaned = rawPath.replace(/^\//, '');
-		if (!/^(?:assets|chat)\//.test(cleaned)) return null;
+		if (!/^(?:assets|chat|notes)\//.test(cleaned)) return null;
 		try {
 			return cleaned
 				.split('/')
