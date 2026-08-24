@@ -1023,7 +1023,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 													variant="ghost"
 													type="button"
 													className={cn(
-														'inline-flex shrink-0 rounded-full lucide-stroke-draw-hover h-8.5 w-8.5 items-center justify-center bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible',
+														'inline-flex ring-2 ring-teal-400/35 shrink-0 rounded-full lucide-stroke-draw-hover h-8.5 w-8.5 items-center justify-center bg-linear-to-r from-teal-300/80 to-teal-500/80 border border-teal-500/10 [&_svg]:overflow-visible',
 														voiceUiActive &&
 															voiceRecording &&
 															'animate-pulse ring-2 ring-teal-400/60',
@@ -1126,7 +1126,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 											aria-label={t?.('chat.entry.send') ?? '发送'}
 											onClick={() => void handleSendOrVoicePrimary()}
 											disabled={sendDisabled}
-											className="lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
+											className="lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-300/80 to-teal-500/80 [&_svg]:overflow-visible"
 										>
 											<Rocket className="-rotate-45" />
 										</Button>
