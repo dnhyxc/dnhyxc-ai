@@ -24,6 +24,7 @@
 | [EPUB听书播放优化.md](./epub/EPUB听书播放优化.md) | **听书播放优化**（主项已落地）：loading / 分句选中色 / 进度取整见 ebook 专题；总索引 [ebook/EPUB听书播放修复2026-07.md](../ebook/EPUB听书播放修复2026-07.md) |
 | [学习笔记富文本编辑.md](./notes/学习笔记富文本编辑.md) | **学习笔记富文本编辑器**（核心已上线）：Tiptap 3.x 封装、自定义 Title 节点、工具栏+气泡菜单、左右分栏布局、M1–M5 分阶段落地 → **归档** [english/学习笔记富文本编辑.md](../english/学习笔记富文本编辑.md) |
 | [学习笔记编辑器预览卡顿.md](./notes/学习笔记编辑器预览卡顿.md) | **学习笔记编辑/预览卡顿**（已上线）：根因拆解、S1–S8（卸 TipTap、列表隔离、长文窗口化编辑/预览、延迟挂载等）、否决虚拟列表/iframe、带注释代码与原理 |
+| [学习笔记独立弹窗.md](./notes/学习笔记独立弹窗.md) | **学习笔记独立弹窗与多窗口同步**（核心已上线）：Tauri 托管关窗（Rust `prevent_close` → `eval`/`emit` → 前端 await 保存 → `destroy`）、BroadcastChannel 跨窗同步总线（七类消息 + `windowId` 回声抑制 + `revision` LWW）、三层保存兜底（store autoSave → DOM await → keepalive）、HTTP 包装自动广播、DOM ponyfill 同步、外观跟随双通道、插件 monkey-patch；含架构/主流程/时序三图 + 全部源码逐行注释 + 分阶段 M1–M3 + 验收清单 → **归档** [english/学习笔记独立弹窗.md](../english/学习笔记独立弹窗.md) |
 | [第三方联邦插件接入.md](./plugins/第三方联邦插件接入.md) | **第三方 MF 插件接入配置**（核心加载已上线）：对方 CORS 契约、`tauri://localhost`、registry 上架、capabilities 不加第三方域、双端验收与 `/mf-proxy` 兜底 |
 | [模块联邦CSS隔离.md](./plugins/模块联邦CSS隔离.md) | **MF 主/子样式互不影响**（已落地）：构建期 scoped CSS vs 半套 Shadow 否决、`untrusted` iframe、验收清单 |
 | [学习笔记列表导出.md](./notes/学习笔记列表导出.md) | **学习笔记列表导出 Word**（规划）：后端拉全量笔记合成单个 .docx、复用单篇 HTML→DOCX 管线、200 篇上限 + 图片预算共享、M1–M2 分阶段 |

@@ -2,6 +2,7 @@ import { NotebookPen } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { usePluginEnabled } from '@/federation';
 import { useI18n } from '@/hooks';
+import { openLearningNotesPopoutWindow } from '../../notes/openPopoutWindow';
 import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
 import { EnglishSidebarCard } from './EnglishSidebarCard';
 
@@ -25,6 +26,11 @@ export function NotesSession() {
 				{
 					label: t('englishLearning.notes.nav'),
 					onClick: () => navigate('/english-learning/notes'),
+					gradientKey: 'notes',
+				},
+				{
+					label: t('englishLearning.notes.popout'),
+					onClick: () => void openLearningNotesPopoutWindow(),
 					gradientKey: 'notes',
 				},
 			]}

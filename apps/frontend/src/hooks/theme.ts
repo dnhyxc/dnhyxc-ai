@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { onEmit } from '@/utils/event';
+import { broadcastHostAppearance } from '@/utils/hostAppearanceSync';
 import { getValue, setValue } from '@/utils/store';
 
 export const THEMES = [
@@ -450,16 +451,21 @@ export const useTheme = () => {
 		}
 		if (emit) {
 			onEmit('theme', themeName);
+			broadcastHostAppearance({ kind: 'theme', value: themeName });
 		}
 	};
 
-	const changeAccent = async (accentId: AccentId) => {
+	const changeAccent = async (accentId: AccentId, emit = true) => {
 		const item = ACCENT_COLORS.find((c) => c.id === accentId);
 		if (!item) return;
 		setAccent(accentId);
 		applyAccentToDocument(accentId);
 		persistAccentBootstrap(accentId);
 		await setValue('accentColor', accentId);
+		if (emit) {
+			void onEmit('accent', accentId);
+			broadcastHostAppearance({ kind: 'accent', value: accentId });
+		}
 	};
 
 	return {

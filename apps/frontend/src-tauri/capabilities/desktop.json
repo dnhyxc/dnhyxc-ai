@@ -1,7 +1,7 @@
 {
 	"identifier": "desktop-capability",
 	"platforms": ["macOS", "windows", "linux"],
-	"windows": ["main", "child-window", "about"],
+	"windows": ["main", "child-window", "about", "learning-notes-popout"],
 	"permissions": [
 		"global-shortcut:default",
 		"global-shortcut:allow-is-registered",

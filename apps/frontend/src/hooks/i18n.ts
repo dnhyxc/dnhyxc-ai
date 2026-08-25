@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { DEFAULT_LOCALE, DICTS, type Locale, SUPPORTED_LOCALES } from '@/i18n';
 import { onEmit } from '@/utils/event';
+import { broadcastHostAppearance } from '@/utils/hostAppearanceSync';
 import { getValue, setValue } from '@/utils/store';
 
 /** 供首屏同步读取，降低刷新时语言晚于首帧 */
@@ -124,6 +125,7 @@ async function setLocaleGlobal(
 	if (opts?.emitEvent !== false) {
 		// 跨窗口同步：主窗口切换语言后，子窗口自动跟随
 		await onEmit('locale', next);
+		broadcastHostAppearance({ kind: 'locale', value: next });
 	}
 }
 

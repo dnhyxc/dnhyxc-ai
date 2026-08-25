@@ -1,4 +1,5 @@
 import type { WindowOptions } from '@/types';
+import { MANAGED_HOST_WINDOW_LABELS } from '@/utils/hostWindowClose';
 import { isTauriRuntime } from './runtime';
 
 function readThemeFromLocalStorage(): 'dark' | 'light' | undefined {
@@ -11,6 +12,9 @@ function readThemeFromLocalStorage(): 'dark' | 'light' | undefined {
 	}
 	return undefined;
 }
+
+/** Web 子窗引用：按 label 复用并 focus（避免 noopener 导致无法聚焦已有窗） */
+const webChildWindows = new Map<string, Window>();
 
 // 创建新窗口
 export const onCreateWindow = async (options: WindowOptions) => {
@@ -38,34 +42,44 @@ export const onCreateWindow = async (options: WindowOptions) => {
 			url.startsWith('http://') || url.startsWith('https://')
 				? url
 				: `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`;
-		window.open(
+		const existing = webChildWindows.get(label);
+		if (existing && !existing.closed) {
+			existing.focus();
+			createdCallback?.();
+			return;
+		}
+		const win = window.open(
 			fullUrl,
 			label,
-			`width=${width},height=${height},left=${x},top=${y},noopener,noreferrer`,
+			`width=${width},height=${height},left=${x},top=${y}`,
 		);
+		if (win) {
+			webChildWindows.set(label, win);
+			win.focus();
+		}
+		createdCallback?.();
+		return;
+	}
+
+	const { invoke } = await import('@tauri-apps/api/core');
+	const focused = await invoke<boolean>('focus_webview_window', { label });
+	if (focused) {
+		if (MANAGED_HOST_WINDOW_LABELS.has(label)) {
+			void invoke('attach_managed_window_close', { label });
+		}
+		if (theme) {
+			const win = await getWindowByLabel(label);
+			try {
+				await win?.setTheme(theme);
+			} catch {
+				// 主题失败不影响置顶
+			}
+		}
 		createdCallback?.();
 		return;
 	}
 
 	const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-
-	const existing = await WebviewWindow.getByLabel(label);
-	if (existing) {
-		try {
-			if (theme) await existing.setTheme(theme);
-		} catch {
-			// 主题失败不影响置顶
-		}
-		try {
-			await existing.unminimize();
-		} catch {
-			// ignore
-		}
-		await existing.show();
-		await existing.setFocus();
-		createdCallback?.();
-		return;
-	}
 
 	const webview = new WebviewWindow(label, {
 		url,
@@ -83,6 +97,9 @@ export const onCreateWindow = async (options: WindowOptions) => {
 		y,
 	});
 	webview.once('tauri://created', () => {
+		if (MANAGED_HOST_WINDOW_LABELS.has(label)) {
+			void invoke('attach_managed_window_close', { label });
+		}
 		createdCallback?.();
 	});
 	webview.once('tauri://error', (e: unknown) => {

@@ -1178,6 +1178,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Images inside learning-note bodies are now uploaded to server-side cloud object storage, with only the cloud URL kept in the body — no more base64. A few screenshots no longer bloat the note or slow serialization, and Word export no longer re-encodes each image, making long-note export more stable. Desktop pasted images (screenshots, file lists, local images inside rich-text HTML) now also auto-upload to the cloud, matching the browser paste experience. Orphaned objects are also auto-reclaimed: (1) if you paste images into a new note but close without saving, the cloud auto-cleans the unreferenced images after one hour; (2) if you paste then delete an image while editing and save, the deleted image is reference-counted and reclaimed; (3) when you delete an entire note, its referenced images are also cleaned up unless another note still references them. When the same image is referenced by multiple notes, deleting one note only drops the reference without affecting the same image in other notes.',
 	},
+	's24-70': {
+		title: 'Learning-notes popout window with multi-window sync',
+		description:
+			'Desktop users can now pop out learning notes into a standalone window — click "Open in window" on the notes card in the sidebar, and notes open in an independent window alongside the main window, so you can study and take notes at the same time. Real-time bidirectional sync is built between the popout and the main window: edit a draft in one window and the other sees it instantly; save or delete a note in one window and the list and preview refresh automatically in the other; note mutations are auto-broadcast at the host layer, transparent to the plugin. Closing the popout does a managed save — the native close button is intercepted, unsaved drafts are written to the backend before the window is actually destroyed, and network failures do not freeze the window. The popout follows the main window theme (light / dark), accent color, and language in real time, so there is no mismatch. Clicking "Open in window" again when the popout is already open brings it to the front instead of opening a duplicate.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

@@ -47,6 +47,9 @@ const EnglishLearningMistakesPage = lazy(
 const EnglishLearningNotesPage = lazy(
 	() => import('@/views/englishLearning/notes'),
 );
+const EnglishLearningNotesPopoutPage = lazy(
+	() => import('@/views/englishLearning/notes/popout'),
+);
 const EnglishLearningPackStreamPage = lazy(
 	() => import('@/views/englishLearning/pack'),
 );
@@ -379,6 +382,13 @@ const routes: RouteConfig[] = [
 	{
 		path: '/win',
 		Component: ChildWindow,
+	},
+	{
+		path: '/english-learning/notes/popout',
+		Component: EnglishLearningNotesPopoutPage,
+		meta: {
+			titleKey: 'route.englishLearning.notes.title',
+		},
 	},
 	{
 		path: '/about',

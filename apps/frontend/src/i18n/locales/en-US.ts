@@ -1492,6 +1492,7 @@ export const enUS = {
 	'englishLearning.favorites.desc': 'View your saved word and quote packs',
 	'englishLearning.notes.desc': 'Capture learning notes via MF plugin demo',
 	'englishLearning.notes.nav': 'Open study notes',
+	'englishLearning.notes.popout': 'Open in window',
 	'englishLearning.favorites.toFavorites': 'Go to my favorites',
 	'englishLearning.favorites.listLoadFailed':
 		'Failed to load favorites. Please try again.',
