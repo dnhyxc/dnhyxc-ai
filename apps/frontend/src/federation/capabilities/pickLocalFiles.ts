@@ -42,7 +42,6 @@ export async function pickLocalFilesForPlugins(
 		list = one ? [one] : null;
 	}
 	if (!list?.length) return null;
-
 	const { convertFileSrc } = await import('@tauri-apps/api/core');
 	return list.map((path) => ({
 		path,

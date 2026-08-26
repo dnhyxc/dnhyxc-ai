@@ -8,7 +8,7 @@ import {
 
 const PLUGIN_ID = 'learningNotes';
 
-/** 将 BroadcastChannel 消息桥接到 MF EventBus，供插件 api.event 订阅 */
+/** 跨窗 sync → MF EventBus 桥接；为何做成组件见 specs/learning-notes-popout-window.md §2.2 */
 export function LearningNotesSyncRelay() {
 	useEffect(() => {
 		return subscribeLearningNotesSync((msg) => {

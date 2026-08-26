@@ -75,6 +75,43 @@ flowchart TB
 3. **LWW + revision**：每窗 `windowId`（`sessionStorage`）+ 单调 `revision`；远端 `revision` 更大则覆盖本地草稿（插件侧应用时走 `applyRemoteDraft`，不触发二次 publish）。
 4. **Popout 复用插件实例契约**：仍走 `PluginHostPage`，不 fork 插件 UI。
 
+### 2.2 `LearningNotesSyncRelay` 为何做成 React 组件
+
+**文件**：`views/englishLearning/notes/LearningNotesSyncRelay.tsx`  
+**挂载点**：内嵌页 `index.tsx` 与 popout 页 `popout.tsx` 中，与 `<PluginHostPage pluginId="learningNotes" />` 同级。
+
+#### 职责
+
+将 `learningNotesSyncBus`（BroadcastChannel + Tauri 全局 emit）收到的跨窗消息，转发到 MF 的 `eventBus`：
+
+```text
+subscribeLearningNotesSync(msg)
+  → eventBus.emit('learningNotes', `sync:${msg.type}`, msg)
+```
+
+插件侧可通过 `api.event.on('learningNotes', 'sync:draft', handler)` 等形式订阅（与 `locale` 等同属 EventBus 通道）。
+
+#### 为何不用「模块 import 时全局 subscribe」或纯函数一次性安装
+
+| 考量 | 组件 + `useEffect` 的做法 |
+| ---- | ------------------------- |
+| **生命周期** | 进入笔记宿主页时订阅，离开路由 / 卸载 popout 时在 cleanup 里 `unsubscribe`，避免 handler 泄漏或在非笔记页继续转发 |
+| **按窗口安装** | 主窗与子窗各自有独立 React 树，各渲染一份 `<LearningNotesSyncRelay />`；每个 WebView 只在「当前窗口挂载了笔记宿主」时安装中继 |
+| **作用域清晰** | 与 `PluginHostPage` 并列，表达「笔记宿主壳层基础设施」，而非 App 根组件或 federation 全局副作用 |
+| **无 UI 副作用** | `return null`，即常见的 headless / effect-only 组件；等价于自定义 hook，但 JSX 声明式挂载更直观 |
+
+#### 与 `api.modules.learningNotes.sync` 的关系
+
+当前插件跨窗同步的**主路径**是 Host API 直连总线：
+
+```typescript
+api.modules.learningNotes.sync.subscribe(handler); // 内部即 subscribeLearningNotesSync
+```
+
+因此 **Relay 不是「安装总线」本身**——总线在 `learningNotesSyncBus.ts` 首次 `publish` / `subscribe` 时即初始化。Relay 额外提供 **EventBus 桥接**，供需要走 `api.event` 的订阅方使用。
+
+若团队约定插件只使用 `modules.sync`，Relay 在运行时可视为可选；仍保留组件形态，是为了在需要 EventBus 通道时，具备与路由/窗口对齐的安装与卸载边界。
+
 ---
 
 ## 3. 路由与窗口
@@ -214,7 +251,7 @@ type LearningNotesHostModule = {
 | `federation/capabilities/learningNotesHostApi.ts`           | `createLearningNotesModulesApi` |
 | `views/englishLearning/notes/popout.tsx`                    | Popout 页壳                     |
 | `views/englishLearning/notes/openPopoutWindow.ts`           | 打开/聚焦窗口                   |
-| `views/englishLearning/notes/LearningNotesSyncRelay.tsx`    | 安装总线 + EventBus 桥接        |
+| `views/englishLearning/notes/LearningNotesSyncRelay.tsx`    | 跨窗 sync → MF EventBus 桥接（见 §2.2；生命周期由 React 组件管理） |
 | `hooks/useHostAppearanceSync.ts`                            | 子窗主题/强调色/语言            |
 | `views/englishLearning/sidebar/components/NotesSession.tsx` | 入口按钮                        |
 | `router/routes.ts`                                          | popout 路由                     |

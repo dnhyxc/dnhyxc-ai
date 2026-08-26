@@ -297,7 +297,7 @@ function EnglishAgentScrollShell({
 				emptyState={
 					<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch px-4.5 text-sm">
 						{/* 上段：Atom 介绍卡（保留原独立卡片样式） */}
-						<div className="bg-theme/5 flex w-full gap-2 rounded-t-md border p-3">
+						<div className="bg-theme/5 flex w-full gap-2 rounded-t-md border border-theme/5 p-3">
 							<Atom
 								size={18}
 								className="mt-[3px] shrink-0 text-textcolor opacity-65"
