@@ -17,8 +17,6 @@ import { http } from '@/utils/fetch';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
 import { createEbookModulesApi } from '../capabilities/ebookHostApi';
 import { createLearningNotesModulesApi } from '../capabilities/learningNotesHostApi';
-import { wrapLearningNotesHttp } from '../capabilities/learningNotesHttpSync';
-import { patchLearningNotesPluginManager } from '../capabilities/patchLearningNotesPlugin';
 import { pickLocalFilesForPlugins } from '../capabilities/pickLocalFiles';
 import {
 	arePluginEnabledPrefsReady,
@@ -35,7 +33,7 @@ import {
 const DOCX_MIME =
 	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-const baseHostHttp: HostHttpClient = {
+const hostHttp: HostHttpClient = {
 	get: ((url: string) => http.get(url)) as HostHttpClient['get'],
 	post: ((url: string, body?: unknown) =>
 		http.post(url, body)) as HostHttpClient['post'],
@@ -43,7 +41,6 @@ const baseHostHttp: HostHttpClient = {
 		http.put(url, body)) as HostHttpClient['put'],
 	delete: ((url: string) => http.delete(url)) as HostHttpClient['delete'],
 };
-const hostHttp = wrapLearningNotesHttp(baseHostHttp) ?? baseHostHttp;
 
 function readTheme(): 'light' | 'dark' {
 	try {
@@ -209,8 +206,6 @@ export const mf = createFederation<RouteConfig>({
 		},
 	},
 });
-
-patchLearningNotesPluginManager(mf.manager);
 
 export const pluginManager = mf.manager;
 export const routeInjector = mf.routeInjector;

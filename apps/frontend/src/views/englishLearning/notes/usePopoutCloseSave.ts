@@ -1,4 +1,4 @@
-import { saveLearningNotesOnWindowClose } from '@/federation/capabilities/learningNotesCloseSave';
+import { runLearningNotesBeforeCloseHandlers } from '@/federation/capabilities/learningNotesHostApi';
 import { registerHostWindowCloseHandler } from '@/utils/hostWindowClose';
 import { isTauriRuntime } from '@/utils/runtime';
 import {
@@ -8,14 +8,17 @@ import {
 
 let registered = false;
 
-/** Popout chunk 加载时即注册，避免 useEffect 前用户点 ❌ */
+/**
+ * Popout chunk 加载时即注册关窗桥。
+ * 实际保存由插件通过 modules.learningNotes.registerBeforeClose 注册。
+ */
 function ensurePopoutCloseSaveHandler(): void {
 	if (registered || !isTauriRuntime()) return;
 	const path = window.location.pathname.replace(/\/+$/, '') || '/';
 	if (path !== LEARNING_NOTES_POPOUT_PATH) return;
 	registered = true;
 	registerHostWindowCloseHandler(LEARNING_NOTES_POPOUT_LABEL, async () => {
-		await saveLearningNotesOnWindowClose();
+		await runLearningNotesBeforeCloseHandlers();
 	});
 }
 

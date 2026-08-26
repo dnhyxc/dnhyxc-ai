@@ -5,9 +5,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ensurePluginEnabledPrefsLoaded, usePluginEnabled } from '@/federation';
+import {
+	ensurePluginEnabledPrefsLoaded,
+	PluginHostPage,
+	usePluginEnabled,
+} from '@/federation';
 import { useI18n } from '@/hooks';
-import { LearningNotesPluginHost } from './LearningNotesPluginHost';
 import { LearningNotesSyncRelay } from './LearningNotesSyncRelay';
 
 export default function EnglishLearningNotesPage() {
@@ -35,7 +38,10 @@ export default function EnglishLearningNotesPage() {
 							{t('plugins.host.delisted')}
 						</p>
 					) : (
-						<LearningNotesPluginHost className="h-full min-h-0 p-0" />
+						<PluginHostPage
+							pluginId="learningNotes"
+							className="h-full min-h-0 p-0"
+						/>
 					)}
 				</div>
 			</div>

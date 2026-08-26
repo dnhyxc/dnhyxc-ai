@@ -117,6 +117,7 @@
 | [09-英语学习.md §9.9–§9.13 列表虚拟滚动、续读体系与收藏统一](./09-英语学习.md) | `english` 列表续读与收藏 | §9.9 固定列表统一虚拟滚动与续读（5 个固定列表合表 + Hook 统一）；§9.10 列表悬浮角标（FAB 锚点停靠 + endReached 拦截）；§9.11 续读模块开关（服务端持久化模块开关 + 会话级缓存 + 侧栏齿轮菜单 + store 三段短路 + Hook 订阅 revision 自动重载）；§9.12 收藏状态会话级缓存（会话级 `Map`/`Set` + revision 事件 + 后端 `favoriteId` 回填 + 列表快照 patch）；§9.13 收藏按钮统一组件（`FavoriteToggleButton` + `DailyFeedback` 合并 + 练习页收藏集成） |
 | [09-英语学习.md §9.14 学习笔记图片上传与回收](./09-英语学习.md) | `english` 学习笔记图片 | 端到端：COS `notes/` 前缀上传 + 附件表（`noteId × cosKey`）+ pending 表（`sessionId × cosKey`，TTL 1h）双表引用计数回收 + 正文为真相源 diff 附件表 + save/update 结算 + 删笔记双源收 key + TTL 兜底 GC + 桌面端粘贴 `data:image/` 转 File 走 `onUploadImage` 钩子；含架构图、子模块速查、维护定位表 |
 | [09-英语学习.md §9.15 学习笔记独立弹窗与多窗口同步](./09-英语学习.md) | `english` 学习笔记弹窗 | 端到端：Tauri 托管关窗（Rust prevent_close → eval → 前端 await 保存 → destroy）+ BroadcastChannel 跨窗同步总线（selection/draft/saved/deleted/list-changed/request-state/state-snapshot）+ HostHttpClient 包装自动广播 + StoreSync（MobX binding）+ DomSync（ProseMirror DOM 兜底）+ 关窗保存三重保障（autoSaveIfDirty → await fetch → keepalive）+ 外观跟随（主题/强调色/语言 BroadcastChannel 广播）+ 插件 monkey-patch 注入同步；含架构图、子模块速查、维护定位表 |
+| [09-英语学习.md §9.16 学习笔记弹窗 Host 瘦身重构](./09-英语学习.md) | `english` 学习笔记弹窗 | 重构：删除 StoreSync / DomSync / HttpSync / CloseSave / PatchPlugin / Popout 共 6 个文件（1083 行），Host 不再读插件 MobX store / ProseMirror DOM / 包装 HTTP / monkey-patch 插件入口；改为 Host 只提供通道（`sync.publish*` / `subscribe` / `registerBeforeClose`），插件注册 `beforeClose` 回调自行保存、订阅总线自行分发；`LearningNotesPluginHost` 从 69 行同步中继简化为 10 行纯挂载；含架构对比图、关键决策、维护速查表 |
 
 ### 7.3 计划中（待后续迭代补全）
 

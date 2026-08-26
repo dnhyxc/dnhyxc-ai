@@ -3,13 +3,16 @@
  */
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { ensurePluginEnabledPrefsLoaded, usePluginEnabled } from '@/federation';
+import {
+	ensurePluginEnabledPrefsLoaded,
+	PluginHostPage,
+	usePluginEnabled,
+} from '@/federation';
 import { useHostAppearanceSync, useI18n, useTheme } from '@/hooks';
 import { hasValidAuthToken } from '@/router/authPaths';
-import { LearningNotesPluginHost } from './LearningNotesPluginHost';
 import { LearningNotesPopoutShell } from './LearningNotesPopoutShell';
 import { LearningNotesSyncRelay } from './LearningNotesSyncRelay';
-import { useLearningNotesPopoutCloseSave } from './useLearningNotesPopoutCloseSave';
+import { useLearningNotesPopoutCloseSave } from './usePopoutCloseSave';
 
 export default function EnglishLearningNotesPopoutPage() {
 	const { t } = useI18n();
@@ -42,7 +45,10 @@ export default function EnglishLearningNotesPopoutPage() {
 						{t('plugins.host.delisted')}
 					</p>
 				) : (
-					<LearningNotesPluginHost className="h-full min-h-0 p-0" />
+					<PluginHostPage
+						pluginId="learningNotes"
+						className="h-full min-h-0 p-0"
+					/>
 				)}
 			</div>
 		</LearningNotesPopoutShell>

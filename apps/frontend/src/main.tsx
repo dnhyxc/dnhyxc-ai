@@ -17,9 +17,7 @@ if (isTauriRuntime()) {
 	window.addEventListener('drop', blockFileNav);
 	installHostWindowCloseBridge();
 	if (isLearningNotesPopout) {
-		void import(
-			'./views/englishLearning/notes/useLearningNotesPopoutCloseSave'
-		);
+		void import('./views/englishLearning/notes/usePopoutCloseSave');
 	}
 }
 
