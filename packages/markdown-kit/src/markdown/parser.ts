@@ -124,6 +124,12 @@ function mermaidBracketLabelLooksTrapezoid(label: string): boolean {
 	return t.length >= 3 && t.startsWith('/') && t.endsWith('/');
 }
 
+/** 方括号内以 `(…)` 包裹：`[(label)]` 子程序形、`[("label")]` 圆柱/数据库形；括号属节点外形，非普通文案 */
+function mermaidBracketLabelLooksShapeModifier(label: string): boolean {
+	const t = label.trim();
+	return t.length >= 2 && t.startsWith('(') && t.endsWith(')');
+}
+
 const MERMAID_FLOWCHART_ID_SKIP = new Set([
 	'subgraph',
 	'end',
@@ -146,7 +152,11 @@ function escapeMermaidDoubleQuotedLabelInner(raw: string): string {
 /** 未加引号的方括号标签是否应补双引号（括号/冒号等易触发 flowchart 解析歧义） */
 function mermaidBracketLabelNeedsQuoting(raw: string): boolean {
 	const t = raw.trim();
-	if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
+	if (
+		t.startsWith('"') ||
+		mermaidBracketLabelLooksTrapezoid(raw) ||
+		mermaidBracketLabelLooksShapeModifier(raw)
+	) {
 		return false;
 	}
 	// / + 历史兼容；() : 常见于中文架构图（如 LRU 淘汰策略 (Max 12)、key: namespace）
@@ -155,7 +165,7 @@ function mermaidBracketLabelNeedsQuoting(raw: string): boolean {
 
 /**
  * 为未加引号且易歧义的方括号文案补双引号，减轻 Mermaid 解析失败（预览区只剩 DSL 文本）。
- * 不改变已带引号的片段；跳过梯形 [/.../]。
+ * 不改变已带引号的片段；跳过梯形 [/.../] 与 `[(…)]` / `[("…")]` 节点外形语法。
  */
 function relaxMermaidBracketLabels(body: string): string {
 	let text = body;
