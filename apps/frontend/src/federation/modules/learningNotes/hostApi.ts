@@ -11,7 +11,7 @@ import {
 	type LearningNotesSyncMessage,
 	publishLearningNotesSync,
 	subscribeLearningNotesSync,
-} from './learningNotesSyncBus';
+} from './syncBus';
 
 /** 关闭前的钩子函数类型 */
 type BeforeCloseFn = () => void | Promise<void>;

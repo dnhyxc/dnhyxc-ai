@@ -14,13 +14,19 @@ import {
 
 ## 目录
 
-| 目录 | 职责 |
-|------|------|
-| `runtime/` | `createFederation` 门面：`mf` / `pluginManager` / injectors |
-| `registry/` | COS registry 拉取、缓存、落盘 |
-| `enabled/` | 账号插件上架偏好 |
-| `host/` | 统一挂载模版：`PluginHostPage` / `PluginHostSurface` / Shell |
-| `capabilities/` | 产品能力：影院全屏、ebook Host API |
+| 目录 | 职责 | 说明 |
+|------|------|------|
+| [`runtime/`](./runtime/README.md) | `createFederation` 门面 | `mf` / `pluginManager` / injectors |
+| [`registry/`](./registry/README.md) | 插件清单 | COS 拉取、缓存、落盘 |
+| [`enabled/`](./enabled/README.md) | 账号上架偏好 | 用户级插件开关 |
+| [`host/`](./host/README.md) | 挂载模版 | Page / Surface / Shell |
+| [`capabilities/`](./capabilities/README.md) | 通用 UI 能力 | `appFullscreen`、`pickLocalFiles` |
+| [`sync/`](./sync/README.md) | 跨窗 sync | BC + Tauri 工厂 |
+| [`modules/`](./modules/README.md) | 插件 Host 模块 | `api.modules.*` |
+
+入口 re-export：[`index.ts`](./index.ts)
+
+**新插件逐步接入**：见 [`新插件接入指南.md`](./新插件接入指南.md)
 
 实现细节见 [`packages/federation-kit/README`](../../../../packages/federation-kit/README.md)。
 

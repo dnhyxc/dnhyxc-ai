@@ -7,7 +7,9 @@
  * - registry/      COS registry 拉取与落盘
  * - enabled/       账号上架偏好
  * - host/          统一挂载模版（Page / Surface / Shell）
- * - capabilities/  产品能力（全屏、ebook API）
+ * - capabilities/  注入 bridge 的通用 UI 能力
+ * - sync/          跨窗 sync 基础设施
+ * - modules/       各插件 api.modules.* 实现
  */
 
 export {
@@ -45,13 +47,6 @@ export {
 	TAURI_WINDOW_FULLSCREEN_EVENT,
 } from './capabilities/appFullscreen';
 export {
-	createEbookModulesApi,
-	type EbookHostHandlers,
-	type EbookHostThought,
-	getEbookHostHandlers,
-	setEbookHostHandlers,
-} from './capabilities/ebookHostApi';
-export {
 	arePluginEnabledPrefsReady,
 	clearPluginEnabledPrefsCache,
 	ensurePluginEnabledPrefsLoaded,
@@ -78,6 +73,25 @@ export {
 	type PluginIconTheme,
 } from './host/pluginIconUrl';
 export {
+	createEbookModulesApi,
+	type EbookHostHandlers,
+	type EbookHostThought,
+	getEbookHostHandlers,
+	setEbookHostHandlers,
+} from './modules/ebook/hostApi';
+export {
+	createLearningNotesModulesApi,
+	type LearningNotesHostModule,
+	runLearningNotesBeforeCloseHandlers,
+} from './modules/learningNotes/hostApi';
+export {
+	LEARNING_NOTES_SYNC_CHANNEL,
+	type LearningNotesSyncMessage,
+	type LearningNotesSyncMode,
+	publishLearningNotesSync,
+	subscribeLearningNotesSync,
+} from './modules/learningNotes/syncBus';
+export {
 	assertRegistryHostApiCompatible,
 	clearPluginRegistryCache,
 	fetchPluginRegistry,
@@ -100,3 +114,4 @@ export {
 	sidebarInjector,
 	startFederation,
 } from './runtime';
+export { createHostPluginSyncBus } from './sync/hostSyncBus';

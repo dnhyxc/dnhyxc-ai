@@ -1,4 +1,4 @@
-import { runLearningNotesBeforeCloseHandlers } from '@/federation/capabilities/learningNotesHostApi';
+import { runLearningNotesBeforeCloseHandlers } from '@/federation';
 import { registerHostWindowCloseHandler } from '@/utils/hostWindowClose';
 import { isTauriRuntime } from '@/utils/runtime';
 import {

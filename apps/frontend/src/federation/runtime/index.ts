@@ -15,8 +15,6 @@ import type { RouteConfig } from '@/router/routes';
 import { downloadBlob, isTauriRuntime, onListen } from '@/utils';
 import { http } from '@/utils/fetch';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
-import { createEbookModulesApi } from '../capabilities/ebookHostApi';
-import { createLearningNotesModulesApi } from '../capabilities/learningNotesHostApi';
 import { pickLocalFilesForPlugins } from '../capabilities/pickLocalFiles';
 import {
 	arePluginEnabledPrefsReady,
@@ -24,6 +22,8 @@ import {
 	getPluginEnabledPref,
 	setPluginEnabledPref,
 } from '../enabled/prefs';
+import { createEbookModulesApi } from '../modules/ebook/hostApi';
+import { createLearningNotesModulesApi } from '../modules/learningNotes/hostApi';
 import {
 	fetchPluginRegistry,
 	PLUGIN_REGISTRY_CACHE_KEY,
@@ -146,7 +146,7 @@ export const mf = createFederation<RouteConfig>({
 		},
 		buildModules: (allow) => {
 			const modules: Record<string, unknown> = {};
-			if (allow.has('http:plugin-api')) {
+			if (allow.has('modules:learningNotes')) {
 				modules.learningNotes = createLearningNotesModulesApi();
 			}
 			if (allow.has('modules:chat')) {

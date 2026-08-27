@@ -47,6 +47,11 @@ export {
 
 export { deepFreeze } from './host-api/deepFreeze';
 export { eventBus } from './host-api/EventBus';
+export {
+	createPluginSyncBus,
+	type PluginSyncBus,
+	type PluginSyncBusTransport,
+} from './host-api/pluginSyncBus';
 
 export {
 	createRouteInjector,

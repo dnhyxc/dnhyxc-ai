@@ -4,7 +4,7 @@ import {
 	type LearningNotesSyncMessage,
 	publishLearningNotesSync,
 	subscribeLearningNotesSync,
-} from '@/federation/capabilities/learningNotesSyncBus';
+} from '@/federation';
 
 const PLUGIN_ID = 'learningNotes';
 
