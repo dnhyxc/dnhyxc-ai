@@ -1363,7 +1363,7 @@ export const zhCN = {
 	'englishLearning.favorites.desc': '查看收藏的单词或语句包',
 	'englishLearning.notes.desc': '用插件记录学习收获',
 	'englishLearning.notes.nav': '打开学习笔记',
-	'englishLearning.notes.popout': '独立打开',
+	'englishLearning.notes.popout': '独立窗口打开',
 	'englishLearning.favorites.toFavorites': '前往我的收藏',
 	'englishLearning.favorites.listLoadFailed': '加载收藏失败，请稍后重试',
 	'englishLearning.favorites.listLoadMoreFailed':
