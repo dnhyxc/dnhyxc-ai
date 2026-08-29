@@ -1,30 +1,15 @@
 import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
+import MessageSendControl from '@design/MessageSendButton';
 import Upload from '@design/Upload';
-import {
-	Button,
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-	ScrollArea,
-	ScrollBar,
-} from '@ui/index';
+import { Button, ScrollArea, ScrollBar } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import {
 	ChevronFirst,
 	ChevronLast,
 	CirclePlus,
 	Globe,
-	Keyboard,
 	Link,
-	Loader2,
-	Mic,
-	Rocket,
-	Square,
-	Target,
 } from 'lucide-react';
 import {
 	useCallback,
@@ -321,41 +306,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	const tauriLiveLastSentBytesRef = useRef(0);
 	/** 上一次 live 回填的纯文本，避免与后端返回相同内容时反复 setInput */
 	const tauriLiveLastTextRef = useRef('');
-	/** Tauri：悬停发送钮时展开输入模式菜单 */
-	const [inputModeMenuOpen, setInputModeMenuOpen] = useState(false);
-	const closeInputModeMenuTimerRef = useRef<number | null>(null);
-
-	const clearCloseInputModeMenuTimer = useCallback(() => {
-		if (closeInputModeMenuTimerRef.current !== null) {
-			window.clearTimeout(closeInputModeMenuTimerRef.current);
-			closeInputModeMenuTimerRef.current = null;
-		}
-	}, []);
-
-	const scheduleCloseInputModeMenu = useCallback(() => {
-		clearCloseInputModeMenuTimer();
-		closeInputModeMenuTimerRef.current = window.setTimeout(() => {
-			closeInputModeMenuTimerRef.current = null;
-			setInputModeMenuOpen(false);
-		}, 220);
-	}, [clearCloseInputModeMenuTimer]);
-
-	const openInputModeMenu = useCallback(() => {
-		if (disableTextInput) return;
-		clearCloseInputModeMenuTimer();
-		setInputModeMenuOpen(true);
-	}, [clearCloseInputModeMenuTimer, disableTextInput]);
-
-	const handleInputModeMenuOpenChange = useCallback(
-		(next: boolean) => {
-			if (disableTextInput) {
-				setInputModeMenuOpen(false);
-				return;
-			}
-			setInputModeMenuOpen(next);
-		},
-		[disableTextInput],
-	);
 
 	const runTauriLiveTranscribePoll = useCallback(async () => {
 		if (!isTauriRuntime()) return;
@@ -581,8 +531,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		if (!needsTeardown) return;
 
 		tauriLiveEpochRef.current += 1;
-		clearCloseInputModeMenuTimer();
-		setInputModeMenuOpen(false);
 		voiceRecordingRef.current = false;
 
 		const recorder = mediaRecorderRef.current;
@@ -597,12 +545,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		stopMediaTracks();
 		setVoiceRecording(false);
 		setVoiceTranscribing(false);
-	}, [
-		clearCloseInputModeMenuTimer,
-		stopMediaTracks,
-		voiceRecording,
-		voiceTranscribing,
-	]);
+	}, [stopMediaTracks, voiceRecording, voiceTranscribing]);
 
 	/**
 	 * 发送消息并重置语音状态：
@@ -635,13 +578,12 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	useEffect(() => {
 		return () => {
 			tauriLiveEpochRef.current += 1;
-			clearCloseInputModeMenuTimer();
 			stopMediaTracks();
 			if (mediaRecorderRef.current?.state === 'recording') {
 				mediaRecorderRef.current.stop();
 			}
 		};
-	}, [clearCloseInputModeMenuTimer, stopMediaTracks]);
+	}, [stopMediaTracks]);
 
 	useEffect(() => {
 		if (!isTauriRuntime()) setInputMode('text');
@@ -683,11 +625,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		void discardActiveVoiceCapture();
 	}, [voiceConversionAllowed, discardActiveVoiceCapture]);
 
-	/** 无正文（disableTextInput）时收起模式菜单；空闲语音态切回文本，避免麦钮被禁用后无法悬停打开菜单 */
 	useEffect(() => {
 		if (!disableTextInput) return;
-		setInputModeMenuOpen(false);
-		clearCloseInputModeMenuTimer();
 		if (
 			isTauriRuntime() &&
 			inputMode === 'voice' &&
@@ -696,13 +635,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		) {
 			setInputMode('text');
 		}
-	}, [
-		clearCloseInputModeMenuTimer,
-		disableTextInput,
-		inputMode,
-		voiceRecording,
-		voiceTranscribing,
-	]);
+	}, [disableTextInput, inputMode, voiceRecording, voiceTranscribing]);
 
 	/** Tauri：输入从非空变为空时停止当前录音/转写（保持语音输入模式） */
 	const prevInputTrimRef = useRef('');
@@ -990,149 +923,42 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									</Button>
 								) : null}
 							</div>
-							{loading && stopGenerating ? (
-								<span
-									className={cn(
-										'inline-flex mb-1 h-8 w-8 items-center justify-center rounded-full',
-										'animate-chat-stop-breathe motion-reduce:animate-none',
-									)}
-								>
-									<Button
-										variant="ghost"
-										onClick={() => stopGenerating?.()}
-										className="lucide-stroke-draw-hover p-0 h-8.5 w-8.5 flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/20 text-rose-500 hover:bg-rose-500/30 hover:text-rose-500 shadow-none [&_svg]:overflow-visible"
-									>
-										<Target
-											className={cn(
-												'h-4 w-4 shrink-0 text-rose-500/60',
-												'animate-chat-stop-icon-breathe motion-reduce:animate-none',
-											)}
-										/>
-									</Button>
-								</span>
-							) : (
-								<div className="mb-1 flex items-center gap-1">
-									{isTauriRuntime() && voiceConversionAllowed ? (
-										<DropdownMenu
-											modal={false}
-											open={disableTextInput ? false : inputModeMenuOpen}
-											onOpenChange={handleInputModeMenuOpenChange}
-										>
-											<DropdownMenuTrigger asChild>
-												<Button
-													variant="ghost"
-													type="button"
-													className={cn(
-														'inline-flex ring-2 ring-teal-400/35 shrink-0 rounded-full lucide-stroke-draw-hover h-8.5 w-8.5 items-center justify-center bg-linear-to-r from-teal-300/80 to-teal-500/80 border border-teal-500/10 [&_svg]:overflow-visible',
-														voiceUiActive &&
-															voiceRecording &&
-															'animate-pulse ring-2 ring-teal-400/60',
-														inputMode === 'voice' &&
-															!voiceRecording &&
-															!voiceTranscribing &&
-															!input.trim() &&
-															'ring-2 ring-teal-400/35',
-													)}
-													onPointerEnter={
-														disableTextInput ? undefined : openInputModeMenu
-													}
-													onPointerLeave={
-														disableTextInput
-															? undefined
-															: scheduleCloseInputModeMenu
-													}
-													onClick={(e) => {
-														e.stopPropagation();
-														setInputModeMenuOpen(false);
-														void handleSendOrVoicePrimary();
-													}}
-													disabled={sendDisabled}
-												>
-													{voicePrimaryShowsSend ? (
-														<Rocket className="-rotate-45" />
-													) : voiceUiActive ? (
-														voiceTranscribing ? (
-															<Loader2 className="h-4 w-4 animate-spin" />
-														) : voiceRecording ? (
-															<Square className="h-3.5 w-3.5 fill-current" />
-														) : (
-															<Mic className="h-4 w-4" />
-														)
-													) : (
-														<Rocket className="-rotate-45" />
-													)}
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent
-												side="top"
-												align="end"
-												sideOffset={6}
-												className="min-w-26"
-												onPointerEnter={clearCloseInputModeMenuTimer}
-												onPointerLeave={scheduleCloseInputModeMenu}
-												onCloseAutoFocus={(e) => e.preventDefault()}
-											>
-												<DropdownMenuLabel className="text-xs font-normal text-textcolor/60">
-													{t?.('chat.entry.inputMode.label') ?? '输入模式'}
-												</DropdownMenuLabel>
-												<DropdownMenuSeparator />
-												<DropdownMenuItem
-													className={cn(
-														'gap-2',
-														inputMode === 'text' &&
-															'text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500',
-													)}
-													onSelect={() => setInputMode('text')}
-												>
-													<Keyboard
-														className={cn(
-															'h-3.5 w-3.5 shrink-0 text-textcolor/95',
-															inputMode === 'text' && 'text-teal-500',
-														)}
-													/>
-													{t?.('chat.entry.inputMode.text') ?? '文本输入'}
-												</DropdownMenuItem>
-												<DropdownMenuItem
-													className={cn(
-														'gap-2',
-														inputMode === 'voice' &&
-															'text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500',
-													)}
-													onSelect={() => setInputMode('voice')}
-												>
-													<Mic
-														className={cn(
-															'h-3.5 w-3.5 shrink-0 text-textcolor/95',
-															inputMode === 'voice' && 'text-teal-500',
-														)}
-													/>
-													{t?.('chat.entry.inputMode.voice') ?? '语音输入'}
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
-									) : (
-										<Button
-											variant="ghost"
-											type="button"
-											title={
-												sendDisabled &&
-												!voiceUiActive &&
-												(!input.trim() || disableTextInput)
-													? (t?.('chat.entry.sendDisabledHintWeb') ??
-														t?.('chat.entry.sendDisabledHint') ??
-														'请先输入内容')
-													: undefined
+							<MessageSendControl
+								loading={loading}
+								onStop={stopGenerating}
+								sendDisabled={sendDisabled}
+								onSend={handleSendOrVoicePrimary}
+								sendLabel={t?.('chat.entry.send') ?? '发送'}
+								sendDisabledHint={
+									sendDisabled &&
+									!voiceUiActive &&
+									(!input.trim() || disableTextInput)
+										? (t?.('chat.entry.sendDisabledHintWeb') ??
+											t?.('chat.entry.sendDisabledHint') ??
+											'请先输入内容')
+										: undefined
+								}
+								voiceMenu={
+									isTauriRuntime() && voiceConversionAllowed
+										? {
+												disableTextInput,
+												inputMode,
+												onInputModeChange: setInputMode,
+												voiceUiActive,
+												voiceRecording,
+												voiceTranscribing,
+												voicePrimaryShowsSend,
+												labels: {
+													inputMode:
+														t?.('chat.entry.inputMode.label') ?? '输入模式',
+													text: t?.('chat.entry.inputMode.text') ?? '文本输入',
+													voice:
+														t?.('chat.entry.inputMode.voice') ?? '语音输入',
+												},
 											}
-											aria-label={t?.('chat.entry.send') ?? '发送'}
-											onClick={() => void handleSendOrVoicePrimary()}
-											disabled={sendDisabled}
-											className="lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-300/80 to-teal-500/80 [&_svg]:overflow-visible"
-										>
-											<Rocket className="-rotate-45" />
-										</Button>
-									)}
-								</div>
-							)}
+										: undefined
+								}
+							/>
 						</div>
 					</div>
 				</div>

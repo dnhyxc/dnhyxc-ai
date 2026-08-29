@@ -2,8 +2,8 @@
  * 知识库助手专用轻量输入条：textarea 非受控，按键不触发 React 重渲染；
  * 仅在「空↔非空」切换时更新，供发送钮 disabled 与 disableTextInput 判定。
  */
-import { Button, ScrollArea, Textarea } from '@ui/index';
-import { Loader2, Rocket, Target } from 'lucide-react';
+import MessageSendControl from '@design/MessageSendButton';
+import { ScrollArea, Textarea } from '@ui/index';
 import {
 	forwardRef,
 	memo,
@@ -192,42 +192,13 @@ const KnowledgeAssistantEntryInner = forwardRef<
 				</ScrollArea>
 				<div className="mb-1 mt-2.5 flex h-10 items-center justify-between p-2.5">
 					<div className="flex min-w-0 items-center gap-2">{toolbar}</div>
-					{loading && stopGenerating ? (
-						<span
-							className={cn(
-								'mb-1 inline-flex h-8 w-8 items-center justify-center rounded-full',
-								'animate-chat-stop-breathe motion-reduce:animate-none',
-							)}
-						>
-							<Button
-								variant="ghost"
-								type="button"
-								onClick={() => stopGenerating()}
-								className="lucide-stroke-draw-hover flex h-8.5 w-8.5 items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/20 p-0 text-rose-500 shadow-none hover:bg-rose-500/30 hover:text-rose-500 [&_svg]:overflow-visible"
-							>
-								<Target
-									className={cn(
-										'h-4 w-4 shrink-0 text-rose-500/60',
-										'animate-chat-stop-icon-breathe motion-reduce:animate-none',
-									)}
-								/>
-							</Button>
-						</span>
-					) : (
-						<Button
-							type="button"
-							variant="ghost"
-							disabled={sendDisabled}
-							onClick={() => void send()}
-							className="lucide-stroke-draw-hover mb-1 flex h-8.5 w-8.5 items-center justify-center rounded-full border border-teal-500/30 bg-teal-500/20 p-0 text-teal-500 hover:bg-teal-500/30 hover:text-teal-500 [&_svg]:overflow-visible"
-						>
-							{loading ? (
-								<Loader2 className="h-4 w-4 animate-spin" />
-							) : (
-								<Rocket className="h-4 w-4" />
-							)}
-						</Button>
-					)}
+					<MessageSendControl
+						loading={loading}
+						onStop={stopGenerating}
+						sendDisabled={sendDisabled}
+						onSend={send}
+						sendLoading={loading}
+					/>
 				</div>
 			</div>
 		</div>
