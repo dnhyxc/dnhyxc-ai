@@ -11,7 +11,6 @@ import {
 import { useHostAppearanceSync, useI18n, useTheme } from '@/hooks';
 import { hasValidAuthToken } from '@/router/authPaths';
 import { LearningNotesPopoutShell } from './LearningNotesPopoutShell';
-import { LearningNotesSyncRelay } from './LearningNotesSyncRelay';
 import { useLearningNotesPopoutCloseSave } from './usePopoutCloseSave';
 
 export default function EnglishLearningNotesPopoutPage() {
@@ -38,7 +37,6 @@ export default function EnglishLearningNotesPopoutPage() {
 
 	return (
 		<LearningNotesPopoutShell>
-			<LearningNotesSyncRelay />
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 				{prefsReady && !enabled ? (
 					<p className="text-textcolor/55 p-4.5">

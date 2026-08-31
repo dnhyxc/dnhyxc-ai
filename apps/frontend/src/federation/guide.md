@@ -496,27 +496,11 @@ export function createMyPluginModulesApi() {
 }
 ```
 
-### 9.3 步骤三（可选）：Host 侧 Sync Relay
+### 9.3 步骤三：Popout 关窗钩子（按需）
 
-若要把 sync 消息转发到 kit `eventBus`（供其它 Host 模块监听），在宿主页挂小组件（参考 [`LearningNotesSyncRelay.tsx`](../../views/englishLearning/notes/LearningNotesSyncRelay.tsx)）：
+插件跨窗同步走 `api.modules.<id>.sync.subscribe`（直连 Host sync 总线），无需再桥接到 kit `eventBus`。
 
-```tsx
-import { eventBus } from '@dnhyxc-ai/federation-kit';
-import { subscribeMyPluginSync } from '@/federation';
-
-export function MyPluginSyncRelay() {
-  useEffect(() => {
-    return subscribeMyPluginSync((msg) => {
-      eventBus.emit('myPlugin', `sync:${msg.type}`, msg);
-    });
-  }, []);
-  return null;
-}
-```
-
-### 9.4 步骤四：Popout 关窗钩子（按需）
-
-参考 learningNotes：`registerBeforeClose` + Host 侧 `runXxxBeforeCloseHandlers`，在 Tauri 关窗前 await 保存。
+关窗保存参考 learningNotes：`registerBeforeClose` + Host 侧 `runXxxBeforeCloseHandlers`，在 Tauri 关窗前 await 保存。
 
 详见 [`modules/learningNotes/README.md`](./modules/learningNotes/README.md)。
 
@@ -606,7 +590,7 @@ iframeRpcHandlers: {
 | 3 | `federation/modules/learningNotes/syncBus.ts` | 消息类型 + publish/subscribe |
 | 4 | `federation/runtime/index.ts` | `buildModules` → `learningNotes` |
 | 5 | `federation/index.ts` | export 模块与 sync 符号 |
-| 6 | `views/englishLearning/notes/index.tsx` | `PluginHostPage` + `<LearningNotesSyncRelay />` |
+| 6 | `views/englishLearning/notes/index.tsx` | `PluginHostPage` |
 | 7 | `views/englishLearning/notes/popout.tsx` | Popout 宿主页 |
 | 8 | `router/routes.ts` | `/english-learning/notes` + `/english-learning/notes/popout` |
 

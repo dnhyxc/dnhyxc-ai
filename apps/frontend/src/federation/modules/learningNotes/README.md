@@ -17,7 +17,6 @@
 
 ## Host 侧
 
-- 宿主页挂载 `<LearningNotesSyncRelay />`（sync → EventBus 桥接，可选）
 - Popout 关窗 → `runLearningNotesBeforeCloseHandlers`（[`usePopoutCloseSave`](../../../views/englishLearning/notes/usePopoutCloseSave.ts)）
 
 ## 插件侧（推荐）
