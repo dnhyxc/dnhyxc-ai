@@ -15,6 +15,7 @@ export type {
 	EnabledStore,
 	HostCapabilities,
 	HostHttpClient,
+	HostIframeAppearance,
 	HostPickedLocalFile,
 	HostTheme,
 	PickLocalFilesOptions,

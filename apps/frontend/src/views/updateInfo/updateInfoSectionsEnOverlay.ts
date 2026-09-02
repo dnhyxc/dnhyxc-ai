@@ -210,6 +210,26 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes the visual misalignment where the sidebar and header would disappear "one step late" when exiting fullscreen on macOS via the green traffic-light button or the window menu "Enter Full Screen" option, causing the shell layer to be visible during the resize animation. Now the macOS native system notifies the frontend to collapse theater mode before the resize animation begins, ensuring the sidebar and header remain hidden throughout the entire resize process, perfectly matching the experience of pressing Esc. When entering fullscreen, the system also debounces the entrance animation to prevent false exit triggers.',
 	},
+	's3-20': {
+		title: 'Untrusted plugins follow host theme and accent color',
+		description:
+			'Untrusted feature modules running in isolated iframes now follow the host theme (light/dark) and accent color in real time—switching the host "Settings → Accent color" or light/dark theme instantly updates button, link, and border colors inside the iframe, so the plugin UI no longer looks out of sync with the host. Also fixes an issue where outline-button borders disappeared in dark mode (caused by mistakenly adding .dark and triggering dark-mode border utilities). Route-switching white-screen freezes on desktop and duplicate handshakes under React Strict Mode are also resolved, and Tab-key focus is no longer hijacked by the host.',
+	},
+	's3-21': {
+		title: 'Plugin Center split into Plugins / Apps with card refactor',
+		description:
+			'The Plugin Center now has two tabs at the top—"Plugins" and "Apps"—that auto-classify modules by type: business-embedded modules (e.g. ebook reader plugins that auto-mount inside a business page) go under "Plugins", while standalone-route modules (e.g. the video player with its own page entry) go under "Apps". Each tab shows a count badge and has its own empty state. Cards are refactored into a three-section layout: the header adds an icon (preferring the SVG icon from the registry, falling back to a puzzle/app-window icon by type), title, and version; the middle shows the description; the footer shows route, sidebar presence, and trust level (e.g. "untrusted" with a Chinese gloss) in a single truncated line. App-type cards also get an "Open" button in the footer—once enabled, you can jump straight to the page without hunting for the sidebar entry.',
+	},
+	's3-22': {
+		title: 'Plugin registry writes restricted to Super Admins only',
+		description:
+			'The write channel for plugin registry JSON manifests is now restricted to Super Admin accounts. Regular signed-in users can no longer overwrite manifests via API, nor do they see the "Edit Registry" button in the Plugin Center header. After auth, the server still runs the original structural validations and Host API compatibility checks, so Super Admins keep the exact same save experience as before.',
+	},
+	's3-23': {
+		title: 'Light-theme borders and body ink fixed',
+		description:
+			'Fixes two light-theme visual issues: soft borders on side drawers, cards, and modals were completely invisible (like pure white blocks floating on a white background), and body text in some scenarios was nearly white-on-white. Now all semi-transparent borders (e.g. around Sheet drawers and card edges) get a soft ink outline in light theme, and body text always reads clearly. Dark theme is unaffected, and the Hero gradient title on the home stage still renders its original white-gradient effect.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:

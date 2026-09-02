@@ -471,13 +471,14 @@ body {
 	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
 	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--font-family: "手札体-简";
-	--theme-color: oklch(100% 0.00011 271.152);
+	/* 与 .theme-white 对齐：theme-color 是描边/淡底用的「墨色」，不能是白（否则 border-theme/10 在浅底上全透明） */
+	--theme-color: oklch(0.15 0.02 264.665);
 	--theme-background: oklch(1 0 0);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.967 0.003 264.542);
 	--theme-border: oklch(0.928 0.006 264.531);
 	--theme-foreground: oklch(0.13 0.028 261.692);
-	--theme-textcolor: oklch(100% 0.00011 271.152);
+	--theme-textcolor: oklch(0.15 0.02 264.665);
 	--theme-default: oklch(0.15 0.02 264.665);
 	--theme-secondary: oklch(0.967 0.003 264.542);
 	--theme-sidebar: oklch(0.985 0.002 247.839);

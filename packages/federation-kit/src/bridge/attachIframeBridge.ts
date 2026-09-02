@@ -1,3 +1,4 @@
+import type { HostIframeAppearance } from '../config/types';
 import type { HostBridgeProps, HostLocale } from '../types';
 
 export const DEFAULT_MF_IFRAME_CHANNEL = 'dnhyxc-mf-iframe';
@@ -90,6 +91,11 @@ export type AttachIframeBridgeOptions = {
 	channel?: string;
 	getLocale: () => HostLocale | string;
 	onLocaleChange?: (handler: (locale: HostLocale) => void) => () => void;
+	/** 随 init / appearance 下发；缺省则 iframe 仅得 theme 字符串 */
+	getAppearance?: () => HostIframeAppearance;
+	onAppearanceChange?: (
+		handler: (appearance: HostIframeAppearance) => void,
+	) => () => void;
 	extraRpc?: Record<
 		string,
 		(bridge: HostBridgeProps, args: unknown[]) => unknown | Promise<unknown>
@@ -105,20 +111,28 @@ export function attachIframeBridge(
 ): () => void {
 	const channel = opts.channel ?? DEFAULT_MF_IFRAME_CHANNEL;
 	const win = () => iframe.contentWindow;
+	/** ready 轮询只应答一次，避免 Strict Mode / 泄漏 interval 打爆主线程 */
+	let readyAcked = false;
+	let lastAppearanceFp = '';
 
 	const sendInit = () => {
 		const w = win();
 		if (!w) return;
+		const appearance = opts.getAppearance?.();
 		w.postMessage(
 			{
 				channel,
 				type: 'init',
-				theme: bridge.api.theme,
+				theme: appearance?.theme ?? bridge.api.theme,
 				locale: opts.getLocale(),
 				plugin: bridge.plugin,
+				...(appearance ? { appearance } : {}),
 			},
 			targetOrigin,
 		);
+		if (appearance) {
+			lastAppearanceFp = `${appearance.theme}|${appearance.darkClass ?? ''}|${JSON.stringify(appearance.cssVars)}`;
+		}
 	};
 
 	const pushLocale = (locale: HostLocale | string) => {
@@ -127,8 +141,21 @@ export function attachIframeBridge(
 		w.postMessage({ channel, type: 'locale', locale }, targetOrigin);
 	};
 
+	const pushAppearance = (appearance: HostIframeAppearance) => {
+		const w = win();
+		if (!w) return;
+		const fp = `${appearance.theme}|${appearance.darkClass ?? ''}|${JSON.stringify(appearance.cssVars)}`;
+		if (fp === lastAppearanceFp) return;
+		lastAppearanceFp = fp;
+		w.postMessage({ channel, type: 'appearance', appearance }, targetOrigin);
+	};
+
 	const unlistenLocale = opts.onLocaleChange?.((next) => {
 		if (next === 'zh-CN' || next === 'en-US') pushLocale(next);
+	});
+
+	const unlistenAppearance = opts.onAppearanceChange?.((next) => {
+		pushAppearance(next);
 	});
 
 	const onMessage = (ev: MessageEvent) => {
@@ -140,6 +167,8 @@ export function attachIframeBridge(
 		if (data.type === 'ready') {
 			const ready = data as ReadyMsg;
 			if (ready.pluginId && ready.pluginId !== bridge.plugin.id) return;
+			if (readyAcked) return;
+			readyAcked = true;
 			sendInit();
 			return;
 		}
@@ -184,16 +213,32 @@ export function attachIframeBridge(
 
 	window.addEventListener('message', onMessage);
 
-	const onLoad = () => sendInit();
-	iframe.addEventListener('load', onLoad);
-	if (iframe.contentDocument?.readyState === 'complete') {
+	const onLoad = () => {
+		// load 可早于 iframe JS；不占 readyAcked，留给真正的 ready 握手
 		sendInit();
+	};
+	iframe.addEventListener('load', onLoad);
+	// 跨域时 contentDocument 可能抛错；勿让 attach 半途抛掉导致监听泄漏、无 cleanup
+	try {
+		if (iframe.contentDocument?.readyState === 'complete') {
+			sendInit();
+		}
+	} catch {
+		/* cross-origin */
 	}
 
+	// iframe JS 就绪略晚于 load 时，ready 会再 init；再补推一次强调色
+	const kick = window.setTimeout(() => {
+		const appearance = opts.getAppearance?.();
+		if (appearance) pushAppearance(appearance);
+	}, 120);
+
 	return () => {
+		window.clearTimeout(kick);
 		window.removeEventListener('message', onMessage);
 		iframe.removeEventListener('load', onLoad);
 		unlistenLocale?.();
+		unlistenAppearance?.();
 	};
 }
 

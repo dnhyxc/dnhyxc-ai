@@ -3,6 +3,7 @@ import type {
 	EnabledStore,
 	HostCapabilities,
 	HostHttpClient,
+	HostIframeAppearance,
 	HostTheme,
 	PluginHostConfig,
 	StyleIsolationConfig,
@@ -133,6 +134,10 @@ export type FederationHost<
 		channel?: string;
 		getLocale: () => HostLocale | string;
 		onLocaleChange?: (handler: (locale: HostLocale) => void) => () => void;
+		getAppearance?: () => HostIframeAppearance;
+		onAppearanceChange?: (
+			handler: (appearance: HostIframeAppearance) => void,
+		) => () => void;
 		extraRpc?: Record<
 			string,
 			(bridge: HostBridgeProps, args: unknown[]) => unknown | Promise<unknown>
@@ -239,6 +244,8 @@ export function createFederation<
 			channel: config.iframeChannel,
 			getLocale: () => capabilities.getLocale(),
 			onLocaleChange: capabilities.onLocaleChange,
+			getAppearance: capabilities.getAppearance,
+			onAppearanceChange: capabilities.onAppearanceChange,
 			extraRpc: config.iframeRpcHandlers,
 		}),
 		config,

@@ -5,6 +5,7 @@
 import Tooltip from '@design/Tooltip';
 import {
 	FederationPlugin,
+	type FederationPluginHost,
 	type PluginHostViewSlots,
 } from '@dnhyxc-ai/federation-kit/react';
 import {
@@ -21,6 +22,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/utils';
 import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
+import { readHostIframeAppearance } from '../capabilities/iframeAppearance';
 import { mf, registerPluginHostPage } from '../runtime';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
 import { PluginPageShell } from './PluginPageShell';
@@ -242,6 +244,21 @@ export function PluginHostPage({
 	const surface = resolveSurface(part, pageShell);
 	const hostLocale = locale === 'en-US' ? 'en-US' : 'zh-CN';
 
+	/** 强制带上 appearance；主题检测与 runtime 一致（含 body.dark） */
+	const host = useMemo((): FederationPluginHost => {
+		return {
+			manager: mf.manager,
+			config: mf.config,
+			getIframeBridgeOptions: () => ({
+				...mf.getIframeBridgeOptions(),
+				getAppearance: () => readHostIframeAppearance(),
+				onAppearanceChange: (handler) =>
+					mf.config.capabilities.onAppearanceChange?.(handler) ??
+					(() => undefined),
+			}),
+		};
+	}, []);
+
 	const slots = useMemo((): PluginHostViewSlots => {
 		const base: PluginHostViewSlots = {
 			rootClassName: cn(className),
@@ -298,7 +315,7 @@ export function PluginHostPage({
 
 	return (
 		<FederationPlugin
-			host={mf}
+			host={host}
 			name={pluginId}
 			className={className}
 			pageShell={pageShell}

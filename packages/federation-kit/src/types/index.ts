@@ -18,6 +18,7 @@ export interface PluginDescriptor {
 	version: string;
 	hostApiRange: string;
 	menu?: { order: number; icon?: string };
+	/** 缺省 true：注入顶层路由；false 由业务页挂 PluginHostPage。true 且无 menu = 仅路由无侧栏 */
 	injectRoute?: boolean;
 	host?: {
 		/** 宿主业务面，如 `ebook.read`；kit 不硬编码 */

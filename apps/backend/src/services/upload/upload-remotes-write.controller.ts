@@ -3,16 +3,23 @@ import { join } from 'node:path';
 import {
 	Body,
 	Controller,
+	ForbiddenException,
 	HttpException,
 	HttpStatus,
 	Param,
 	Put,
+	Req,
+	UnauthorizedException,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { ensureUploadDir, getUploadRemotesDir } from '../../utils/upload-paths';
+import { UserService } from '../user/user.service';
+
+type AuthedRequest = Request & { user?: { userId?: number } };
 
 type PutRemoteBody = {
 	/** 完整 JSON 文本（将写入 uploads/remotes/:filename） */
@@ -20,15 +27,29 @@ type PutRemoteBody = {
 };
 
 /**
- * 写入插件 registry 等 remotes JSON（需登录）。
+ * 写入插件 registry 等 remotes JSON（需超级管理员）。
  * 与公开 GET /api/upload/remotes/:filename、静态 /remotes/ 对应。
  */
 @Controller('upload')
 @UseInterceptors(ResponseInterceptor)
 @UseGuards(JwtGuard)
 export class UploadRemotesWriteController {
+	constructor(private readonly userService: UserService) {}
+
 	@Put('remotes/:filename')
-	putRemote(@Param('filename') filename: string, @Body() body: PutRemoteBody) {
+	async putRemote(
+		@Req() req: AuthedRequest,
+		@Param('filename') filename: string,
+		@Body() body: PutRemoteBody,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		if (!(await this.userService.userHasSuperAdminRole(userId))) {
+			throw new ForbiddenException('需要超级管理员权限');
+		}
+
 		if (
 			!filename ||
 			filename.includes('..') ||

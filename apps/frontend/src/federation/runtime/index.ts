@@ -15,6 +15,10 @@ import type { RouteConfig } from '@/router/routes';
 import { downloadBlob, isTauriRuntime, onListen } from '@/utils';
 import { http } from '@/utils/fetch';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
+import {
+	readHostChromeTheme,
+	readHostIframeAppearance,
+} from '../capabilities/iframeAppearance';
 import { pickLocalFilesForPlugins } from '../capabilities/pickLocalFiles';
 import {
 	arePluginEnabledPrefsReady,
@@ -43,20 +47,7 @@ const hostHttp: HostHttpClient = {
 };
 
 function readTheme(): 'light' | 'dark' {
-	try {
-		const t = document.documentElement.getAttribute('data-theme');
-		if (t === 'dark' || t === 'light') return t;
-		if (document.documentElement.classList.contains('dark')) return 'dark';
-		if (
-			document.body.classList.contains('dark') ||
-			document.body.classList.contains('theme-black')
-		) {
-			return 'dark';
-		}
-	} catch {
-		/* ignore */
-	}
-	return 'light';
+	return readHostChromeTheme();
 }
 
 function readLocale(): 'zh-CN' | 'en-US' {
@@ -161,13 +152,55 @@ export const mf = createFederation<RouteConfig>({
 			return Object.keys(modules).length > 0 ? modules : undefined;
 		},
 		onLocaleChange: (handler) => {
+			let cancelled = false;
 			let unlisten: (() => void) | undefined;
 			void onListen<Locale>('locale', (next) => {
 				if (next === 'zh-CN' || next === 'en-US') handler(next);
 			}).then((fn) => {
+				if (cancelled) {
+					fn();
+					return;
+				}
 				unlisten = fn;
 			});
-			return () => unlisten?.();
+			return () => {
+				cancelled = true;
+				unlisten?.();
+			};
+		},
+		getAppearance: () => readHostIframeAppearance(readTheme()),
+		onAppearanceChange: (handler) => {
+			// theme 切换后 applyThemeVariables 有 ~10ms 延迟；再多等一会避开与路由卸载叠在同一帧
+			let cancelled = false;
+			let timer: number | undefined;
+			let lastFp = '';
+			const push = () => {
+				window.clearTimeout(timer);
+				timer = window.setTimeout(() => {
+					if (cancelled) return;
+					const next = readHostIframeAppearance(readTheme());
+					const fp = `${next.theme}|${next.darkClass ?? ''}|${JSON.stringify(next.cssVars)}`;
+					if (fp === lastFp) return;
+					lastFp = fp;
+					handler(next);
+				}, 80);
+			};
+			const unsubs: Array<() => void> = [];
+			void Promise.all([
+				onListen('theme', push),
+				onListen('accent', push),
+			]).then((fns) => {
+				if (cancelled) {
+					for (const fn of fns) fn();
+					return;
+				}
+				unsubs.push(...fns);
+			});
+			return () => {
+				cancelled = true;
+				window.clearTimeout(timer);
+				for (const u of unsubs) u();
+			};
 		},
 	},
 	iframeRpcHandlers: {

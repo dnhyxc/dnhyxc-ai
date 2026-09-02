@@ -8,6 +8,18 @@ import type {
 
 export type HostTheme = 'light' | 'dark';
 
+/** Host → untrusted iframe：主题与 CSS 变量快照 */
+export type HostIframeAppearance = {
+	theme: HostTheme;
+	/** 计算后的 CSS 自定义属性（含 --background / --brand-accent 等） */
+	cssVars: Record<string, string>;
+	/**
+	 * 是否给 iframe 加 `.dark`。须与 Host 一致：主站常用 `theme-black` 而无 `.dark`，
+	 * 若 iframe 强行 `.dark`，会误触 `dark:border-input` 等，outline 按钮边框会「消失」。
+	 */
+	darkClass?: boolean;
+};
+
 /** 插件选本地文件选项（与宿主 select-files 对齐） */
 export type PickLocalFilesOptions = {
 	/** 如 `.mp4,.webm`；不传则不限制 */
@@ -67,6 +79,15 @@ export interface HostCapabilities {
 	) => Record<string, unknown> | undefined;
 	/** 监听 Host locale 变化；返回取消订阅 */
 	onLocaleChange?: (handler: (locale: HostLocale) => void) => () => void;
+	/**
+	 * untrusted iframe：读取当前主题 + CSS 变量快照（随 init / appearance 下发）。
+	 * 缺省则 iframe 只用 bridge.api.theme，不继承 Host token。
+	 */
+	getAppearance?: () => HostIframeAppearance;
+	/** 主题 / 强调色等变化时推送；返回取消订阅 */
+	onAppearanceChange?: (
+		handler: (appearance: HostIframeAppearance) => void,
+	) => () => void;
 }
 
 export interface EnabledStore {

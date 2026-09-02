@@ -1951,8 +1951,13 @@ export const enUS = {
 	'route.plugins.title': 'Plugins',
 	'plugins.page.title': 'Plugins',
 	'plugins.page.desc':
-		'Plugins Installed (All Disabled by Default). Disabling prevents base loading and hides entry points.',
+		'All off by default. Disabling stops host load and hides entry points',
+	'plugins.page.tabsAria': 'Plugins and apps',
+	'plugins.page.tab.plugin': 'Plugins',
+	'plugins.page.tab.app': 'Apps',
 	'plugins.page.empty': 'No plugins (check that the registry is reachable)',
+	'plugins.page.empty.plugin': 'No plugins (embedded / surface slot)',
+	'plugins.page.empty.app': 'No apps (standalone route injection)',
 	'plugins.page.editRegistry': 'Edit config',
 	'route.plugins.registry.title': 'Plugin registry',
 	'plugins.registry.title': 'Plugin registry',
@@ -2007,7 +2012,7 @@ export const enUS = {
 	'plugins.registry.help.framework':
 		'Optional react | vue. For vue, Remote must export mount(el, bridge); Host has no Vue and only calls mount.',
 	'plugins.registry.help.injectRoute':
-		'Whether PluginManager injects a top-level route. false means the host tree already mounts PluginHostPage.',
+		'Whether PluginManager injects a top-level route. false means the host tree already mounts PluginHostPage; true without menu = route only, no sidebar.',
 	'plugins.registry.help.preload':
 		'Load timing: route/idle (lazy, default) or eager (background preload after init; rarely needed).',
 	'plugins.registry.help.permissions':
@@ -2022,7 +2027,7 @@ export const enUS = {
 	'plugins.registry.iconNoTarget':
 		'Plugin has no menu / host; cannot write icon',
 	'plugins.registry.help.menu':
-		'Sidebar entry: order; icon is an SVG image URL (upload, optional).',
+		'Sidebar entry (optional): present → inject sidebar; omit → route/embed only, no left-nav item. order; icon is an SVG image URL.',
 	'plugins.registry.help.host':
 		'Auto-mount on a host surface: surface (e.g. ebook.read), slot (drawer/toolbar), icon (SVG URL), order.',
 	'plugins.registry.help.iframeUrl':
@@ -2038,7 +2043,14 @@ export const enUS = {
 	'plugins.shelf.toggle': 'List / delist',
 	'plugins.card.route': 'Route',
 	'plugins.card.entry': 'Entry',
+	'plugins.card.enter': 'Open',
 	'plugins.card.trust': 'Trust',
+	'plugins.card.trust.first-party': 'official',
+	'plugins.card.trust.partner': 'partner',
+	'plugins.card.trust.untrusted': 'untrusted',
+	'plugins.card.sidebar': 'Sidebar',
+	'plugins.card.sidebar.on': 'Yes',
+	'plugins.card.sidebar.off': 'No',
 	'plugins.card.noDesc': 'No description',
 	'plugins.host.delisted': 'This plugin is delisted. Re-list it from Plugins.',
 	'plugins.host.missingIframeUrl':

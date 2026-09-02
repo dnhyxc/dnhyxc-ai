@@ -1796,9 +1796,13 @@ export const zhCN = {
 	'route.setting.title': '系统设置',
 	'route.plugins.title': '插件中心',
 	'plugins.page.title': '插件中心',
-	'plugins.page.desc':
-		'查看已接入的插件，默认全部关闭，关闭后基座不再加载，相关业务入口也会隐藏。',
+	'plugins.page.desc': '默认全部关闭，关闭后基座不再加载，相关入口也会隐藏',
+	'plugins.page.tabsAria': '插件与应用',
+	'plugins.page.tab.plugin': '插件',
+	'plugins.page.tab.app': '应用',
 	'plugins.page.empty': '暂无插件（请确认 registry 可访问）',
+	'plugins.page.empty.plugin': '暂无插件（业务内嵌 / surface 槽）',
+	'plugins.page.empty.app': '暂无应用（独立路由注入）',
 	'plugins.page.editRegistry': '编辑配置',
 	'route.plugins.registry.title': '插件配置',
 	'plugins.registry.title': '插件配置',
@@ -1850,7 +1854,7 @@ export const zhCN = {
 	'plugins.registry.help.framework':
 		'可选 react | vue。vue 时 Remote 须导出 mount(el, bridge)；Host 不装 Vue，仅调用 mount。',
 	'plugins.registry.help.injectRoute':
-		'是否由 PluginManager 注入顶层路由。false 表示宿主业务树已挂好 PluginHostPage。',
+		'是否由 PluginManager 注入顶层路由。false 表示宿主业务树已挂好 PluginHostPage；true + 不写 menu = 仅路由、无侧栏。',
 	'plugins.registry.help.preload':
 		'加载时机：route/idle（默认懒加载）或 eager（启动后后台预拉，一般勿用）。',
 	'plugins.registry.help.permissions':
@@ -1864,7 +1868,7 @@ export const zhCN = {
 	'plugins.registry.iconSvgOnly': '仅支持上传 SVG 文件',
 	'plugins.registry.iconNoTarget': '该插件没有 menu / host，无法写入 icon',
 	'plugins.registry.help.menu':
-		'侧栏入口：order 排序；icon 为 SVG 图片 URL（上传后写入，可选）。',
+		'侧栏入口（可选）：有则注入侧栏；省略则仅路由/内嵌，不出现在左侧菜单。order 排序；icon 为 SVG 图片 URL。',
 	'plugins.registry.help.host':
 		'业务页自动挂载：surface（如 ebook.read）、slot（drawer/toolbar）、icon（SVG URL）、order。',
 	'plugins.registry.help.iframeUrl':
@@ -1879,7 +1883,14 @@ export const zhCN = {
 	'plugins.shelf.toggle': '上架 / 下架',
 	'plugins.card.route': '路由',
 	'plugins.card.entry': '入口',
+	'plugins.card.enter': '进入',
 	'plugins.card.trust': '信任',
+	'plugins.card.trust.first-party': '官方',
+	'plugins.card.trust.partner': '合作方',
+	'plugins.card.trust.untrusted': '未信任',
+	'plugins.card.sidebar': '侧栏',
+	'plugins.card.sidebar.on': '有',
+	'plugins.card.sidebar.off': '无',
 	'plugins.card.noDesc': '暂无说明',
 	'plugins.host.delisted': '该插件已下架，可在「插件中心」重新上架。',
 	'plugins.host.missingIframeUrl': '插件「{id}」为 untrusted，但缺少 iframeUrl',

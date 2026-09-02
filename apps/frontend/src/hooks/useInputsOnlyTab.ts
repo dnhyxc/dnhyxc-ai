@@ -1,12 +1,14 @@
 import { useLayoutEffect } from 'react';
 
-/** 可能进入 Tab 序的非表单控件（不含 input/textarea/select 本身） */
+/** 可能进入 Tab 序的非表单控件（不含 input/textarea/select 本身；不含 iframe，避免抢插件焦点） */
 const NON_FIELD_FOCUSABLE =
-	'button, a[href], area[href], iframe, object, embed, summary, [tabindex]:not([tabindex="-1"])';
+	'button, a[href], area[href], object, embed, summary, [tabindex]:not([tabindex="-1"])';
 
 function applyInputsOnlyTab(root: ParentNode) {
 	for (const el of root.querySelectorAll<HTMLElement>(NON_FIELD_FOCUSABLE)) {
 		if (el.matches('input, textarea, select')) continue;
+		// Radix Dialog/Sheet 焦点陷阱依赖 tabbable；强行 -1 会与 FocusScope 互殴卡死主线程
+		if (el.closest('[role="dialog"], [data-radix-focus-guard]')) continue;
 		el.tabIndex = -1;
 	}
 }

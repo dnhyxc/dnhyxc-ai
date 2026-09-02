@@ -8,11 +8,13 @@
 |------|--------|------|
 | `appFullscreen.ts` | `api.ui.setAppFullscreen` | `ui:toast` |
 | `pickLocalFiles.ts` | `api.ui.pickLocalFiles` | `ui:toast` |
+| `iframeAppearance.ts` | iframe `init`/`appearance` CSS token | — |
 
 ## 说明
 
 - **appFullscreen**：应用级影院态 + Tauri/Web 系统全屏；Layout / `PluginPageShell` 订阅显隐
 - **pickLocalFiles**：Tauri 系统对话框 / Web 隐藏 input；返回 `path` + 可播放 `src`
+- **iframeAppearance**：只下发 `--brand-accent*` + theme；背景等由 iframe 本地 `.dark` 处理（避免内联盖住主题）
 
 ## 常用
 

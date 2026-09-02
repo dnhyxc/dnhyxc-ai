@@ -87,6 +87,8 @@
 | 插件开关偏好换号不同步 / Web 与桌面不一致 / 默认全关 / 偏好写回 catalog 污染全局 | [plugins/插件启用偏好持久化.md](./plugins/插件启用偏好持久化.md)                                                                       |
 | 同页多个 Switch 点 Label 文字总是只切第一个 / 多插件卡片 htmlFor 关联错误 | [plugins/动态切换ID修复.md](./plugins/动态切换ID修复.md)                                                                                            |
 | 插件中心卡片白边 / 远程插件污染 border-border                       | [plugins/插件卡片边框主题.md](./plugins/插件卡片边框主题.md)                                                                                      |
+| untrusted iframe 主题/强调色不同步 / outline 按钮边框消失 / Strict Mode 握手重复 / 路由切换白屏 / Tab 序被夺 | [plugins/插件iframe主题下发.md](./plugins/插件iframe主题下发.md)（HostIframeAppearance 快照 + 指纹去重 + about:blank 卸载 + 焦点陷阱兼容） |
+| 插件中心不分插件/应用 / 卡片无图标无入口 / 信任级别硬编码             | [plugins/插件中心卡片重构.md](./plugins/插件中心卡片重构.md)（catalogKind 推断 + Tab 计数 + 图标兜底 + CardFooter 进入按钮）                |
 | 视频播放器插件 / 影院态全屏（藏侧栏 + Tauri 窗口/Web document 全屏） | [video/视频播放器插件.md](./video/视频播放器插件.md)、[plugins/插件影院全屏.md](./plugins/插件影院全屏.md)                                                                                   |
 | 视频播放器想在其它业务复用 / 上传 / 播放 / tooltip 全部解耦      | [video/视频播放器组件重构.md](./video/视频播放器组件重构.md)（组件化拆分 + `TooltipProvider` + 主题色 token）                                                                 |
 | 视频播放器进度条 hover 无缩略图 / 画中画 Safari 不可用 / 长视频刻度卡 | [video/视频播放器功能增强.md](./video/视频播放器功能增强.md)（缩略图预览 + 多平台画中画 + 刻度上限）                                                                 |
@@ -141,6 +143,8 @@
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/对话内存溢出.md](./chat/对话内存溢出.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/流式代码块滚动.md](./chat/流式代码块滚动.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/代理信任与限流.md](./ops/代理信任与限流.md)                                                                                         |
+| 插件 registry 保存接口 403「需要超级管理员权限」/ 非管理员能改插件清单 | [ops/注册表写入超级管理员鉴权.md](./ops/注册表写入超级管理员鉴权.md)（后端三层鉴权 + 前端编辑按钮显隐） |
+| 浅色主题下 Sheet 抽屉无边界 / 卡片弹窗描边全透明 / 正文白字白底不可读 | [ui/Sheet描边与主题墨色修正.md](./ui/Sheet描边与主题墨色修正.md)（浅色 `--theme-color` 墨色基线纠正 + Sheet 四方向 `border-theme/10`） |
 | 复制到助手后输入框不聚焦                                          | [knowledge/助手插入焦点.md](./knowledge/助手插入焦点.md)                                                                             |
 | 设置页大模型 Key                                                  | [llm/LLM运行时设置.md](./llm/LLM运行时设置.md)                                                                                             |
 | 按用户 / 会员默认模型                                             | [llm/会员单用户LLM.md](./llm/会员单用户LLM.md)                                                                                       |

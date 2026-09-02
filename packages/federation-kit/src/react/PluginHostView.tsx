@@ -80,6 +80,11 @@ function UntrustedIframe({
 	iframeBridge: AttachIframeBridgeOptions;
 }) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
+	// 用 ref 持有最新 bridge/opts，避免 identity 抖动反复 detach/attach 打满 postMessage
+	const bridgeRef = useRef(bridge);
+	const optsRef = useRef(iframeBridge);
+	bridgeRef.current = bridge;
+	optsRef.current = iframeBridge;
 
 	useEffect(() => {
 		const el = iframeRef.current;
@@ -90,8 +95,22 @@ function UntrustedIframe({
 		} catch {
 			return;
 		}
-		return attachIframeBridge(el, bridge, origin, iframeBridge);
-	}, [src, bridge, iframeBridge]);
+		const detach = attachIframeBridge(
+			el,
+			bridgeRef.current,
+			origin,
+			optsRef.current,
+		);
+		return () => {
+			// 先停掉 embed 文档再卸 bridge：跨域 iframe 在路由切换时硬拆会导致 WebView 主线程卡死（空白无报错）
+			try {
+				el.src = 'about:blank';
+			} catch {
+				/* ignore */
+			}
+			detach();
+		};
+	}, [src]);
 
 	return (
 		<iframe
