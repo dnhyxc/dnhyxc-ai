@@ -117,7 +117,9 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 		try {
 			setResetLoading(true);
 			const res = await resetPassword({
-				...values,
+				username: values.username,
+				email: values.email,
+				verifyCode: values.verifyCode,
 				password: encrypt(values.password),
 				verifyCodeKey,
 			});
@@ -243,7 +245,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 										onClick={onGetVerifyCode}
 									>
 										{sendLoading ? (
-											<Spinner />
+											<Spinner className="text-white" />
 										) : timeLeft > 0 && timeLeft < 60 ? (
 											`${formatTime(timeLeft)}`
 										) : (

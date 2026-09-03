@@ -28,8 +28,9 @@ export class CreateUserDTO {
 	@IsNotEmpty({
 		message: '密码不能为空',
 	})
-	@Length(6, 32, {
-		message: '用户名长度必须在 5 到 33 个字符之间',
+	/** 前端 AES 密文（hex），长度随明文增长，常见 32/64/… */
+	@Length(32, 256, {
+		message: '密码格式不正确',
 	})
 	password: string;
 

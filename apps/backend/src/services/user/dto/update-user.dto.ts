@@ -44,8 +44,9 @@ export class UpdateUserDTO {
 	@IsString({
 		message: '密码必须是字符串',
 	})
-	@Length(6, 32, {
-		message: '用户名长度必须在 5 到 33 个字符之间',
+	/** 前端 AES 密文（hex），长度随明文增长，常见 32/64/… */
+	@Length(32, 256, {
+		message: '密码格式不正确',
 	})
 	@IsOptional()
 	password: string;
@@ -122,8 +123,9 @@ export class UpdatePasswordDTO {
 	@IsNotEmpty({
 		message: '密码不能为空',
 	})
-	@Length(6, 32, {
-		message: '用户名长度必须在 5 到 33 个字符之间',
+	/** 前端 AES 密文（hex），长度随明文增长，常见 32/64/… */
+	@Length(32, 256, {
+		message: '密码格式不正确',
 	})
 	password: string;
 
@@ -139,7 +141,7 @@ export class UpdatePasswordDTO {
 	@IsNotEmpty({
 		message: '邮箱验证码不能为空',
 	})
-	verifyCode: number;
+	verifyCode: string;
 
 	@IsString()
 	@IsNotEmpty({

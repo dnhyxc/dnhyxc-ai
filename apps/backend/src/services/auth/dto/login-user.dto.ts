@@ -33,8 +33,9 @@ export class LoginUserDTO {
 	@IsNotEmpty({
 		message: '密码不能为空',
 	})
-	@Length(6, 32, {
-		message: '密码长度必须在 6 到 32 个字符之间',
+	/** 前端 AES 密文（hex），长度随明文增长，常见 32/64/… */
+	@Length(32, 256, {
+		message: '密码格式不正确',
 	})
 	password: string;
 	@IsString({

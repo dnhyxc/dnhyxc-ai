@@ -200,7 +200,7 @@ export class AuthService {
 		}
 	}
 
-	async verifyEmail(verifyCodeKey: string, verifyCode: number) {
+	async verifyEmail(verifyCodeKey: string, verifyCode: string | number) {
 		const codeInCache = await this.cache.get(verifyCodeKey);
 		if (!codeInCache) {
 			throw new HttpException(
