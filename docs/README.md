@@ -142,6 +142,7 @@
 | 知识库/电子书列表公开优先排序 + 电子书非本人书不可改分类           | [knowledge/公开优先排序.md](./knowledge/公开优先排序.md)                                                                                       |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/对话内存溢出.md](./chat/对话内存溢出.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/流式代码块滚动.md](./chat/流式代码块滚动.md)                                                                             |
+| 对话/知识库发送钮重复实现 / 语音菜单状态机散落 ChatEntry           | [chat/消息发送按钮封装.md](./chat/消息发送按钮封装.md)（`MessageSendButton` 视觉底座 + `MessageSendControl` 三态状态机抽取） |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/代理信任与限流.md](./ops/代理信任与限流.md)                                                                                         |
 | 插件 registry 保存接口 403「需要超级管理员权限」/ 非管理员能改插件清单 | [ops/注册表写入超级管理员鉴权.md](./ops/注册表写入超级管理员鉴权.md)（后端三层鉴权 + 前端编辑按钮显隐） |
 | 浅色主题下 Sheet 抽屉无边界 / 卡片弹窗描边全透明 / 正文白字白底不可读 | [ui/Sheet描边与主题墨色修正.md](./ui/Sheet描边与主题墨色修正.md)（浅色 `--theme-color` 墨色基线纠正 + Sheet 四方向 `border-theme/10`） |

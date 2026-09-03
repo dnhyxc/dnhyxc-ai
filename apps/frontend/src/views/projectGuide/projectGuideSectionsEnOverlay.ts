@@ -110,6 +110,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'On desktop, hover the round main button to open the input mode menu and switch between text and voice. In voice mode, tap to speak; recognized text fills the input continuously; tap again to stop. Edit before sending. Menu strings follow the UI language.',
 	},
+	'pg-s4-6': {
+		title: '4.6 Unified send button visuals',
+		description:
+			'The send buttons in the main chat input and the knowledge-base assistant input now share one lightweight style (tinted gradient + soft ring) that sits better on card backgrounds in dark themes. The stop-generation button and the desktop voice input-mode menu interactions (hover to expand, leave to close after a delay, tap to send) are unchanged.',
+	},
 	'pg-s5-1': {
 		title: '5.1 Cloud vs local',
 		description:
@@ -523,5 +528,10 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		title: '17.6 Registry access, theme and sheet light-mode UX',
 		description:
 			'Registry permissions: the "Edit Registry" entry in the Plugin Center header is visible only to Super Admin accounts—regular signed-in users neither see the entry nor can save via the API, which instead rejects the request with "Super admin privileges required"; you can still browse the JSON structure inside the editor page, but only admins save via ⌘/Ctrl+S. Light-theme sheet & card borders: when you toggle light/dark or accent colors in "Settings → Appearance", cards, modals, and side sheets all render a soft ink border around all four sides so they never look like pure white blocks floating on a white background; card edges and tinted backgrounds also get a faint ink outline so nothing feels floating. Body text stays readable: in light theme body descriptions, headings, and captions all use a dark ink, avoiding any white-on-white scenario. Hero gradient stays intact: the large gradient title on the home stage still renders its original white-gradient effect, independent of the ink-baseline token used elsewhere. Dark theme is unchanged.',
+	},
+	'pg-s17-7': {
+		title: '17.7 No white flash when switching plugin pages',
+		description:
+			'When entering or switching to an untrusted plugin page in dark theme, the container now paints the host theme background first, then seamlessly hands off once the plugin is ready—no more brief white flash during the handshake phase.',
 	},
 };

@@ -25,3 +25,4 @@
 | [流式选区保持.md](./流式选区保持.md) | **流式选区保持**：`domTextSelection` 文本偏移快照/恢复、`StreamingCodeFenceBlock` 与 `StableMarkdownChunk` 选区保护、稳定 key 策略 |
 | [选区朗读媒体会话.md](./选区朗读媒体会话.md) | **选区朗读 Media Session**：系统 Touch Bar / 控制中心 play·pause 接入选区朗读（`registerPlaybackMediaHandlers` + `pauseRef`/`resumeRef` 闭包新鲜度） |
 | [消息操作朗读内容.md](./消息操作朗读内容.md) | **消息操作条朗读整条内容**：`ChatMessageActions` 新增 Volume2 按钮、`onSpeakContent` prop、`useAssistantSelectionSpeak.start` 暴露，英语 Agent / 电子书 MOKE 助手接入 |
+| [消息发送按钮封装.md](./消息发送按钮封装.md) | **消息发送按钮抽取**：`MessageSendButton` 视觉底座 + `MessageSendControl` 三态状态机（停止 / 语音菜单 / 发送），ChatEntry / KnowledgeAssistantEntry 接入 |

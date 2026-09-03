@@ -38,6 +38,7 @@
 | [Vue插件HMR桥接.md](./plugins/Vue插件HMR桥接.md) | **Vue 插件桥接与 HMR 保障**（规划→已落地）：React Host 加载 Vue Remote 插件，Host 零 Vue 依赖，Remote 自管 `createApp` 生命周期；解决 MF 下 `optimizeDeps` 预打包冲突、双实例、React 重渲染劫持三大 HMR 根因；含架构图 + 主流程图 + HMR 时序图 + 分阶段落地与验收清单 |
 | [模块联邦样式隔离实现.md](./plugins/模块联邦样式隔离实现.md) | **微前端样式隔离实现思路**（核心已落地）：Host 侧「选择器前缀 + CSSOM insertRule patch + Portal body 收编」三层架构，覆盖静态 CSS / CSS-in-JS / body 弹层 / HMR / 同 Remote 多插件共享 realm / 嵌套插件引用计数 / Host 关键样式保护 / untrusted iframe 兜底；含架构图 + 主流程图 + 时序图 + 完整 TS 代码逐行中文注释 + 分阶段落地 + 验收清单 + 读者 5 步复用方案 |
 | [联邦工具提取.md](./plugins/联邦工具提取.md) | **微前端通用包 `@dnhyxc-ai/federation-kit` 抽离**（落地中）：内核 + HostCapabilities DI、style-isolation / react 子路径、本仓薄适配层、M0–M5 与兼容 barrel；任意项目可接入 |
+| [非会员Token用量限制.md](./非会员Token用量限制.md) | **非会员 token 按模型记账（Chat + 向量）**（规划）：已确认免费白名单 `glm-4.7-flash` / `BAAI/bge-large-zh-v1.5` / `BAAI/bge-reranker-v2-m3`；计费模型共用 billable 额度；超额 Confirm |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

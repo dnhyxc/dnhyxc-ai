@@ -230,6 +230,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes two light-theme visual issues: soft borders on side drawers, cards, and modals were completely invisible (like pure white blocks floating on a white background), and body text in some scenarios was nearly white-on-white. Now all semi-transparent borders (e.g. around Sheet drawers and card edges) get a soft ink outline in light theme, and body text always reads clearly. Dark theme is unaffected, and the Hero gradient title on the home stage still renders its original white-gradient effect.',
 	},
+	's3-24': {
+		title: 'No more white flash when switching plugin pages',
+		description:
+			'Further fixes a brief white flash seen when entering or switching to untrusted plugin pages in dark theme — during the handshake phase the iframe used to flash the browser default white background. The plugin container now paints the host theme background first, then seamlessly hands off once the plugin is ready, eliminating the white flash entirely.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:
@@ -309,6 +314,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'New "Speak Content" Button on Assistant Message Actions',
 		description:
 			'A new read-aloud button appears in the message actions bar for assistant messages in the English Learning Agent and Ebook MOKE assistant — tap it to speak the entire message without first selecting text. Reuses the same TTS pipeline and floating control bar as selection speak, with play/pause, stop, and speed controls.',
+	},
+	's4-17': {
+		title: 'Unified send button visuals for chat and assistant',
+		description:
+			'The send buttons in the main chat input and the knowledge-base assistant input now share one visual style — a lighter tinted gradient with a soft ring, less harsh in dark themes and better matched to card backgrounds. The stop-generation button and the desktop voice input-mode menu (hover to expand, leave to close after a delay, tap to send) keep their existing interactions. The two buttons were previously duplicated with slightly different styles; they now converge into one component so future style changes apply in sync.',
 	},
 	's5-1': {
 		title: 'Markdown rendering',

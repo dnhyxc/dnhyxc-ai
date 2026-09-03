@@ -27,7 +27,7 @@
 - `packages/federation-kit/src/bridge/attachIframeBridge.ts` — `AttachIframeBridgeOptions` 增 appearance 入参；`sendInit` 携带 appearance；新增 `pushAppearance`（含指纹去重）；`ready` 单次应答；`onLoad` 不占 ready 槽；120ms kick 补推；cleanup 收尾。
 - `packages/federation-kit/src/createFederation.ts` — `FederationHostOptions` 透传 `getAppearance` / `onAppearanceChange` 给 `attachIframeBridge`。
 - `packages/federation-kit/src/index.ts` — 对外导出 `HostIframeAppearance`。
-- `packages/federation-kit/src/react/PluginHostView.tsx` — `UntrustedIframe` 用 ref 持有最新 bridge/opts，effect 只依赖 `src`；卸载时先 `about:blank` 再 detach。
+- `packages/federation-kit/src/react/PluginHostView.tsx` — `UntrustedIframe` 用 ref 持有最新 bridge/opts，effect 只依赖 `src`；卸载时先 `about:blank` 再 detach；渲染层外层 `<div>` 铺 `--theme-background` + iframe 透明，消除握手前白屏闪烁。
 - `packages/federation-kit/src/types/index.ts` — 给 `injectRoute` 补注释，说明 `true` 且无 `menu` = 仅路由无侧栏。
 - `packages/federation-kit/docs/host-guide/注册中心.md` — 补 menu 字段说明：省略 menu = 仅路由/内嵌，不进左侧菜单。
 
@@ -49,6 +49,7 @@
 6. **ref 稳定 identity，effect 只依赖 `src`**：`UntrustedIframe` 之前依赖 `[src, bridge, iframeBridge]`，bridge/opts 是新对象就触发 detach/attach，反复 `postMessage` 抖动。改用 `useRef` 持有最新值，effect 只依赖 `src`，attach 一次稳定运行。
 7. **Tab 序不抢 iframe**：`useInputsOnlyTab` 此前把 `iframe` 标 `tabIndex=-1`，会夺走插件内部可聚焦元素的 Tab 序；同时与 Radix `FocusScope`（Dialog/Sheet）的焦点陷阱互殴卡死。改为 selector 移除 `iframe`，并在扫描时跳过 `[role="dialog"]` / `[data-radix-focus-guard]` 内的元素，把焦点管理权还给 FocusScope。
 8. **能力可选、缺省回退**：`getAppearance` / `onAppearanceChange` 都是可选方法；不提供时 `attachIframeBridge` 仍走旧路径（仅下发 `bridge.api.theme` 字符串），保证既有接入方零改动。
+9. **渲染层铺主题底色防白屏**：握手前 iframe 未收到外观快照，`document.documentElement` 是浏览器默认白底，暗色主题下切到插件页会白屏闪一下。在 iframe 外层包一个 `<div>` 铺 `var(--theme-background, var(--background, transparent))`，iframe 设 `bg-transparent` + 内联 `backgroundColor: 'transparent'`，握手前透出的即宿主主题色。握手后 iframe 内 `setProperty` 覆盖，二者无缝衔接。
 
 ## 4. 关键代码对比与注释
 
@@ -485,6 +486,77 @@ detach();
 ```
 
 **变更摘要**：新增 `bridgeRef` / `optsRef` 稳定 identity，effect 依赖收窄到 `[src]`；cleanup 先 `about:blank` 让嵌入文档卸载，再 detach，根治跨域 iframe 路由切换卡死主线程。
+
+### 4.5.1 `UntrustedIframe` 渲染层铺主题底色防白屏（`packages/federation-kit/src/react/PluginHostView.tsx`）
+
+**对比范围**：`UntrustedIframe` 组件 `return` 的 JSX，由「直接返回裸 `<iframe>`」改为「外层 `<div>` 铺 Host 主题背景 + iframe 透明」。属本轮增量改动，解决 iframe 握手前短暂白屏闪烁。
+
+**背景**：握手阶段（`ready` → `init` 应答）期间，iframe 尚未收到外观快照，其 `document.documentElement` 背景为浏览器默认白色。在主站暗色主题下，切到 untrusted 插件页会先看到一块白底闪一下，再被 iframe 内 `setProperty` 覆盖成主题色。根因是 iframe 默认白底透出到了视口。解法：在 iframe 外层包一个 div，直接铺 `var(--theme-background, var(--background, transparent))`，iframe 自身设为透明（`bg-transparent` + `backgroundColor: 'transparent'`），握手前透出的就是宿主主题色而非白底。
+
+**改动前** · `packages/federation-kit/src/react/PluginHostView.tsx`（基线，约 L112–L124，`UntrustedIframe` return 片段）
+
+```typescript
+// UntrustedIframe return（旧版：直接返回裸 iframe，握手前透出浏览器默认白底）
+return (
+// 裸 iframe：未包外层 div，暗色主题下握手前会白屏闪一下
+<iframe
+// iframe 元素引用，由 effect 内 attachIframeBridge 接管
+ref={iframeRef}
+// 无障碍 title，用 pluginId 标识
+title={pluginId}
+// 远程入口 src
+src={src}
+// 满铺 + 无边框
+className="h-full w-full border-0"
+// 插件 id 数据属性，供宿主定位
+data-mf-plugin={pluginId}
+// 信任级别：untrusted（跨域隔离）
+data-mf-trust="untrusted"
+// 沙箱权限：脚本 + 同源 + 表单 + 弹窗
+sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+/>
+);
+```
+
+**改动后** · `packages/federation-kit/src/react/PluginHostView.tsx`（当前，约 L115–L134，`UntrustedIframe` return 片段）
+
+```typescript
+// 底层铺 Host 主题色；iframe 握手前透明透出此底，避免默认白屏闪一下
+return (
+// 外层 div：满铺且 min-h-0 避免 flex 子项溢出，铺主题背景
+<div
+// 满宽满高 + min-h-0 保证在 flex 列布局下不撑爆父容器
+className="h-full w-full min-h-0"
+// 内联背景：优先 --theme-background，回退 --background，再回退透明
+style={{
+// 取宿主主题背景变量，握手前即透出主题色，暗色主题不再闪白
+background: 'var(--theme-background, var(--background, transparent))',
+}}
+>
+// iframe：设为透明，让外层主题底色透出
+<iframe
+// iframe 元素引用，由 effect 内 attachIframeBridge 接管
+ref={iframeRef}
+// 无障碍 title，用 pluginId 标识
+title={pluginId}
+// 远程入口 src
+src={src}
+// 满铺 + 无边框 + 透明背景（Tailwind bg-transparent）
+className="h-full w-full border-0 bg-transparent"
+// 内联再强制透明，避免某些 WebView 忽略 class
+style={{ backgroundColor: 'transparent' }}
+// 插件 id 数据属性，供宿主定位
+data-mf-plugin={pluginId}
+// 信任级别：untrusted（跨域隔离）
+data-mf-trust="untrusted"
+// 沙箱权限：脚本 + 同源 + 表单 + 弹窗
+sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+/>
+</div>
+);
+```
+
+**变更摘要**：`return` 由裸 `<iframe>` 改为 `<div 主题底色>` 包透明 `<iframe>`；iframe 自身 `bg-transparent` + 内联 `backgroundColor: 'transparent'`，握手前透出的是宿主 `--theme-background` 而非浏览器白底，消除暗色主题下插件页切换的白屏闪烁。注意 iframe 的 `min-h-0` 由外层 div 承担，保证 flex 布局稳定。
 
 ### 4.6 `readHostIframeAppearance` 与 `readHostChromeTheme`（`apps/frontend/src/federation/capabilities/iframeAppearance.ts`）
 

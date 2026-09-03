@@ -112,16 +112,25 @@ function UntrustedIframe({
 		};
 	}, [src]);
 
+	// 底层铺 Host 主题色；iframe 握手前透明透出此底，避免默认白屏闪一下
 	return (
-		<iframe
-			ref={iframeRef}
-			title={pluginId}
-			src={src}
-			className="h-full w-full border-0"
-			data-mf-plugin={pluginId}
-			data-mf-trust="untrusted"
-			sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-		/>
+		<div
+			className="h-full w-full min-h-0"
+			style={{
+				background: 'var(--theme-background, var(--background, transparent))',
+			}}
+		>
+			<iframe
+				ref={iframeRef}
+				title={pluginId}
+				src={src}
+				className="h-full w-full border-0 bg-transparent"
+				style={{ backgroundColor: 'transparent' }}
+				data-mf-plugin={pluginId}
+				data-mf-trust="untrusted"
+				sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+			/>
+		</div>
 	);
 }
 
