@@ -1515,3 +1515,74 @@ body.theme-beige {
 		fill: currentColor !important;
 	}
 }
+
+/* === 登录页：浮动光点缓慢漂移 === */
+@keyframes login-float-slow {
+	0%,
+	100% {
+		transform: translate(0, 0) scale(1);
+		opacity: 0.55;
+	}
+	33% {
+		transform: translate(16px, -12px) scale(1.05);
+		opacity: 0.75;
+	}
+	66% {
+		transform: translate(-10px, 14px) scale(0.95);
+		opacity: 0.5;
+	}
+}
+
+/* ===== 登录页专属装饰动画 ===== */
+@keyframes login-float-slow {
+	0%,
+	100% {
+		transform: translate(0, 0) scale(1);
+		opacity: 0.6;
+	}
+	33% {
+		transform: translate(20px, -16px) scale(1.06);
+		opacity: 0.85;
+	}
+	66% {
+		transform: translate(-14px, 18px) scale(0.94);
+		opacity: 0.55;
+	}
+}
+
+@keyframes login-pulse-glow {
+	0%,
+	100% {
+		opacity: 0.5;
+		transform: translate(-50%, -50%) scale(1);
+	}
+	50% {
+		opacity: 0.9;
+		transform: translate(-50%, -50%) scale(1.08);
+	}
+}
+
+/* ===== 登录页边框流光（左右循环扫过） ===== */
+
+/* ===== 登录页圆形光环旋转 ===== */
+
+/* ===== 登录页粒子漂浮 ===== */
+@keyframes login-particle-float {
+	0%,
+	100% {
+		transform: translate(0, 0);
+		opacity: 0.3;
+	}
+	25% {
+		transform: translate(30px, -40px);
+		opacity: 0.9;
+	}
+	50% {
+		transform: translate(-20px, -60px);
+		opacity: 0.5;
+	}
+	75% {
+		transform: translate(40px, -30px);
+		opacity: 0.8;
+	}
+}
