@@ -115,6 +115,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Logout from the sidebar menu, File menu, or 401 session-expiry all run the same cleanup routine—local cache, session state, and UI consistently return to the signed-out state, with no residual state after logging out from the menu. When you switch the theme color scheme, all open desktop child windows (e.g. the About window) update in sync, so child windows no longer mismatch the main window theme.',
 	},
+	's2-14': {
+		title: 'Demo account pre-fill & protection',
+		description:
+			"A demo test account is available—visit the homepage with a special query parameter and the login page auto-fills the username and password (password shown as masked dots, inspecting elements won't leak the real password) for one-tap login. Once logged in as the test account, modifying profile, purchasing membership, resetting password, and binding/unbinding WeChat are disabled; the email on the profile page is masked (e.g. d•••e@xx.com) to prevent tampering. When the env vars are not configured, this feature does not affect regular users.",
+	},
+	's2-15': {
+		title: 'Unified profile route',
+		description:
+			'Profile, account settings, and membership payment are now unified under /profile/*. You can enter profile editing or membership payment directly from the personal homepage without navigating to separate pages. Old /account and /pay links automatically redirect to the new paths.',
+	},
+	's2-16': {
+		title: 'Payment page layout optimization',
+		description:
+			'The membership payment page adapts to the new profile route shell—content scrolls within the page when overflowing, no longer spills or gets clipped. The redundant header and badges are removed; copy is more concise (e.g. "Start payment" instead of "Open checkout in page"); overall visuals are cleaner.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

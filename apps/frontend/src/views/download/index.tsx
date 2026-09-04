@@ -195,7 +195,7 @@ const Download = () => {
 					Welcome to dnhyxc-ai
 					<Button
 						className="ml-5 cursor-pointer"
-						onClick={() => navigate('/account')}
+						onClick={() => navigate('/profile/account')}
 					>
 						修改个人信息
 					</Button>

@@ -1,8 +1,109 @@
 import type { HighlightJsThemeId } from '@dnhyxc-ai/markdown-kit';
 
 import type { ThemeName } from '@/hooks/theme';
+import { hasValidAuthToken } from '@/router/authPaths';
 
 export * from './membershipPlans';
+
+/** 仅当 URL `u` 精确等于此值时，登录页预填演示账号（来自 .env） */
+export const DEMO_LOGIN_USERNAME =
+	import.meta.env.VITE_DEMO_LOGIN_USERNAME?.trim() ?? '';
+export const DEMO_LOGIN_PASSWORD =
+	import.meta.env.VITE_DEMO_LOGIN_PASSWORD?.trim() ?? '';
+/** 表单 DOM 只存掩码，避免审查元素泄露真密码 */
+export const DEMO_LOGIN_PASSWORD_MASK = DEMO_LOGIN_PASSWORD
+	? '•'.repeat(DEMO_LOGIN_PASSWORD.length)
+	: '';
+/** 测试账号：前端禁止改资料 / 购会员 / 忘记密码（与演示预填用户名同源） */
+export const PROTECTED_ACCOUNT_USERNAME = DEMO_LOGIN_USERNAME;
+
+export function isDemoLoginUsername(u?: string | null): boolean {
+	return Boolean(DEMO_LOGIN_USERNAME) && u === DEMO_LOGIN_USERNAME;
+}
+
+export function isProtectedAccountUsername(username?: string | null): boolean {
+	return isDemoLoginUsername(username);
+}
+
+const DEMO_LOGIN_HINT_KEY = 'demoLoginUsername';
+
+/**
+ * 仅未登录且 `u=dnhyxc-ai` 时写入 sessionStorage。
+ * 首页无该参数、或已登录：清空，不写入。
+ */
+export function rememberDemoLoginHint(
+	u?: string | null,
+	pathname?: string,
+): void {
+	if (typeof sessionStorage === 'undefined') return;
+	const loggedIn = hasValidAuthToken();
+
+	if (pathname === '/') {
+		if (!loggedIn && isDemoLoginUsername(u)) {
+			sessionStorage.setItem(DEMO_LOGIN_HINT_KEY, DEMO_LOGIN_USERNAME);
+		} else {
+			sessionStorage.removeItem(DEMO_LOGIN_HINT_KEY);
+		}
+		return;
+	}
+
+	if (loggedIn) {
+		sessionStorage.removeItem(DEMO_LOGIN_HINT_KEY);
+		return;
+	}
+	if (u == null || u === '') return;
+	if (isDemoLoginUsername(u)) {
+		sessionStorage.setItem(DEMO_LOGIN_HINT_KEY, DEMO_LOGIN_USERNAME);
+		return;
+	}
+	sessionStorage.removeItem(DEMO_LOGIN_HINT_KEY);
+}
+
+export function getDemoLoginPrefill(): {
+	username: string;
+	password: string;
+} | null {
+	if (typeof window === 'undefined') return null;
+	const fromUrl = new URLSearchParams(window.location.search).get('u');
+	rememberDemoLoginHint(fromUrl, window.location.pathname);
+	const hinted = sessionStorage.getItem(DEMO_LOGIN_HINT_KEY);
+	if (!isDemoLoginUsername(fromUrl) && !isDemoLoginUsername(hinted)) {
+		return null;
+	}
+	return {
+		username: DEMO_LOGIN_USERNAME,
+		password: DEMO_LOGIN_PASSWORD_MASK,
+	};
+}
+
+/** 掩码 → 真密码；其它情况原样返回 */
+export function resolveDemoLoginPassword(
+	username: string,
+	passwordField: string,
+): string {
+	if (
+		isDemoLoginUsername(username.trim()) &&
+		passwordField === DEMO_LOGIN_PASSWORD_MASK
+	) {
+		return DEMO_LOGIN_PASSWORD;
+	}
+	return passwordField;
+}
+
+/** 邮箱中间脱敏，如 2254180771@qq.com → 225****771@qq.com */
+export function maskEmail(email: string): string {
+	const at = email.indexOf('@');
+	if (at <= 0) return email;
+	const local = email.slice(0, at);
+	const domain = email.slice(at);
+	if (local.length <= 2) return '*'.repeat(local.length) + domain;
+	if (local.length <= 5) {
+		return `${local[0]}${'*'.repeat(local.length - 2)}${local.slice(-1)}${domain}`;
+	}
+	const head = 3;
+	const tail = 3;
+	return `${local.slice(0, head)}${'*'.repeat(local.length - head - tail)}${local.slice(-tail)}${domain}`;
+}
 
 export const BASE_URL = import.meta.env.PROD
 	? import.meta.env.VITE_PROD_API_DOMAIN

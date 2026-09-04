@@ -4,7 +4,8 @@
  *
  * Layout / Home / Login 保持 eager；其余页面 React.lazy，避免主包打进全站视图。
  */
-import React, { lazy } from 'react';
+import React, { createElement, lazy } from 'react';
+import { Navigate } from 'react-router';
 import Layout from '@/layout';
 import Home from '@/views/home';
 import Login from '@/views/login';
@@ -71,6 +72,7 @@ const PluginsPage = lazy(() => import('@/views/plugins'));
 const PluginsLayout = lazy(() => import('@/views/plugins/Layout'));
 const PluginRegistryEditorPage = lazy(() => import('@/views/plugins/registry'));
 const Profile = lazy(() => import('@/views/profile'));
+const ProfileLayout = lazy(() => import('@/views/profile/Layout'));
 const ProjectGuidePage = lazy(() => import('@/views/projectGuide'));
 const Setting = lazy(() => import('@/views/setting'));
 const AboutApp = lazy(() => import('@/views/setting/about'));
@@ -156,10 +158,33 @@ const routes: RouteConfig[] = [
 			},
 			{
 				path: '/profile',
-				Component: Profile,
+				Component: ProfileLayout,
 				meta: {
 					titleKey: 'route.profile.title',
 				},
+				children: [
+					{
+						index: true,
+						Component: Profile,
+						meta: {
+							titleKey: 'route.profile.title',
+						},
+					},
+					{
+						path: 'account',
+						Component: Account,
+						meta: {
+							titleKey: 'route.account.title',
+						},
+					},
+					{
+						path: 'pay',
+						Component: Pay,
+						meta: {
+							titleKey: 'route.pay.title',
+						},
+					},
+				],
 			},
 			{
 				path: '/knowledge',
@@ -293,10 +318,8 @@ const routes: RouteConfig[] = [
 			},
 			{
 				path: '/account',
-				Component: Account,
-				meta: {
-					titleKey: 'route.account.title',
-				},
+				Component: () =>
+					createElement(Navigate, { to: '/profile/account', replace: true }),
 			},
 			{
 				path: '/plugins',
@@ -323,10 +346,8 @@ const routes: RouteConfig[] = [
 			},
 			{
 				path: '/pay',
-				Component: Pay,
-				meta: {
-					titleKey: 'route.pay.title',
-				},
+				Component: () =>
+					createElement(Navigate, { to: '/profile/pay', replace: true }),
 			},
 			{
 				path: '/setting',

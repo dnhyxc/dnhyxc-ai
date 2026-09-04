@@ -97,6 +97,7 @@
 | sonner Toast 点击失效 / 关闭按钮按不动                             | [style/Sonner指针事件修复.md](./style/Sonner指针事件修复.md)（Toast 根 + `<Sonner>` className + style 三处 `pointer-events: auto` 加固） |
 | 富文本编辑器标题与正文分离 / Tab 缩进失效 / Cmd+↑↓ 无响应 / 空段落删不掉 | [ui/富文本编辑器特性.md](./ui/富文本编辑器特性.md)（TitleNode + TabIndent + DocEdgeNav + EmptyParagraphDelete 自定义扩展） |
 | 学习笔记列表不分页 / 无法导出 DOCX / 公开状态切换失败 / 保存无 Toast | [app/学习笔记实现.md](./app/学习笔记实现.md)（MobX Store + HostHttp 注入 + 累积分页 + 双端 downloadBlob） |
+| `/account`、`/pay` 迁移到 `/profile/*` 路由壳 / 旧路径重定向       | [app/个人主页路由重构.md](./app/个人主页路由重构.md)（`ProfileLayout` + `Outlet` + `Navigate` 重定向） |
 | 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [video/视频播放器Chrome影院主题.md](./video/视频播放器Chrome影院主题.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |
 | 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [plugins/插件影院全屏.md](./plugins/插件影院全屏.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [plugins/插件影院全屏.md](./plugins/插件影院全屏.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |
@@ -146,6 +147,9 @@
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/代理信任与限流.md](./ops/代理信任与限流.md)                                                                                         |
 | 插件 registry 保存接口 403「需要超级管理员权限」/ 非管理员能改插件清单 | [ops/注册表写入超级管理员鉴权.md](./ops/注册表写入超级管理员鉴权.md)（后端三层鉴权 + 前端编辑按钮显隐） |
 | 浅色主题下 Sheet 抽屉无边界 / 卡片弹窗描边全透明 / 正文白字白底不可读 | [ui/Sheet描边与主题墨色修正.md](./ui/Sheet描边与主题墨色修正.md)（浅色 `--theme-color` 墨色基线纠正 + Sheet 四方向 `border-theme/10`） |
+| 独立页 / 外链打开时强调色不跟随主站 | [ui/强调色外链同步.md](./ui/强调色外链同步.md)（URL `?accent=` 解析 + `appendShareAccentQuery` 分享链接 + 首屏内联脚本优先） |
+| 非可显示 SecretInput 密码框明文泄露 | [ui/SecretInput显示修正.md](./ui/SecretInput显示修正.md)（`inputType` 三元逻辑反转，`revealable=false` 时默认 `password`） |
+| 桌面下载页硬编码 teal 光晕 / Hero 标题不跟随强调色 | [ui/桌面下载页视觉重构.md](./ui/桌面下载页视觉重构.md)（`color-mix(in oklch, var(--brand-accent))` 光晕 + 渐变标题 + 单卡片布局） |
 | 复制到助手后输入框不聚焦                                          | [knowledge/助手插入焦点.md](./knowledge/助手插入焦点.md)                                                                             |
 | 设置页大模型 Key                                                  | [llm/LLM运行时设置.md](./llm/LLM运行时设置.md)                                                                                             |
 | 按用户 / 会员默认模型                                             | [llm/会员单用户LLM.md](./llm/会员单用户LLM.md)                                                                                       |
@@ -162,7 +166,9 @@
 | Edge 云端不可用 / 非会员选路 / 分模式语速被覆盖               | [english/云端TTS边缘语音.md](./english/云端TTS边缘语音.md) §5                                                                                  |
 | TTS 从点喇叭到出声（前后端全链路）                                | [english/TTS端到端指南.md](./english/TTS端到端指南.md)                                                                                     |
 | 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/Stripe会员计费.md](./pay/Stripe会员计费.md) §6–§7                                                                             |
+| 支付页在 ProfileLayout 下溢出 / header 冗余 / 文案臃肿            | [pay/支付页布局重构.md](./pay/支付页布局重构.md)（ScrollArea 包裹 + 移除 header + 文案精简 + 测试账号拦截） |
 | 换号后仍看到上一账号的草稿或助手对话                              | [auth/用户切换状态重置.md](./auth/用户切换状态重置.md)                                                                                       |
+| 演示账号预填 + 测试账号保护（禁止改资料 / 购会员 / 忘记密码）   | [auth/测试账号预填与保护.md](./auth/测试账号预填与保护.md)（掩码密码 + `superRefine` 条件校验 + `sessionStorage` 跨页保持 + 6 页拦截） |
 | 登录成功瞬间又回到登录页 / cloud-tts 401                          | [auth/登录云端TTS预取401.md](./auth/登录云端TTS预取401.md)                                                                             |
 | Tauri 桌面频繁 Toast「网络异常，请检查网络后重试」                | [tauri/Tauri HTTP全方法重试.md](./tauri/Tauri HTTP全方法重试.md)                                                                              |
 | 小程序 EPUB 章节 409 / Processor 无日志 / **已解析换章仍 ~1s** | [ebook/小程序EPUB服务端解析.md](./ebook/小程序EPUB服务端解析.md) §3.1、§4.7、[ideas/小程序EPUB解析逻辑.md](./ideas/miniprogram/小程序EPUB解析逻辑.md) |

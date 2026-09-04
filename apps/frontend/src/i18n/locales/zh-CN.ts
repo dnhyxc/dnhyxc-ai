@@ -568,6 +568,7 @@ export const zhCN = {
 
 	'account.toast.updateSuccess': '修改成功',
 	'account.toast.updateFailed': '修改失败',
+	'account.toast.testAccountForbidden': '测试账号，禁止操作',
 	'account.toast.verifyCodeSent': '获取验证码成功',
 	'account.toast.verifyCodeKeyMissing': '验证码 Key 不能为空',
 	'account.toast.emailUpdated': '邮箱修改成功',
@@ -1916,7 +1917,7 @@ export const zhCN = {
 	'route.guard.unknownPage': '该页面',
 
 	'downloadPage.hero.badge': '桌面客户端 · 正式发行版',
-	'downloadPage.hero.title': '下载 dnhyxc-ai 桌面版',
+	'downloadPage.hero.title': '欢迎下载 dnhyxc-ai 桌面端',
 	'downloadPage.hero.subtitle':
 		'在 macOS 上获得完整系统能力：全局快捷键、本地文件夹、开机自启等。',
 	'downloadPage.hero.versionLabel': 'v{version}',
@@ -1936,12 +1937,13 @@ export const zhCN = {
 		'推荐大多数用户使用 DMG：下载后打开，将应用拖入「应用程序」。如需命令行或自动更新通道，可选用 .tar.gz。',
 	'downloadPage.mac.downloadDmg': '下载 .dmg',
 	'downloadPage.mac.downloadTarGz': '下载 .tar.gz（更新通道）',
+	'downloadPage.mac.installGuide': '安装说明',
 	'downloadPage.mac.stepInstall':
-		'打开 DMG，将 dnhyxc-ai 拖入「应用程序」后即可从启动台打开。',
+		'打开下载的 DMG 安装包，将 dnhyxc-ai 拖入「应用程序」后即可从启动台打开使用。',
 	'downloadPage.mac.stepGatekeeper':
-		'若提示「无法验证开发者」，可在「系统设置 → 隐私与安全性」中选择仍要打开，或右键应用图标打开。',
+		'若提示「无法验证开发者」，请到「系统设置 → 隐私与安全性」选择仍要打开，或右键点图标打开。',
 	'downloadPage.mac.stepUpdater':
-		'应用内置更新检查（关于 → 检查更新）；也可留意本站更新说明获取发行要点。',
+		'应用内置更新检查功能（关于 → 检查更新）；也可随时留意本站更新说明用以获取到最新发行要点。',
 	'downloadPage.mac.noteIntel':
 		'当前安装包面向 Apple 芯片（ARM64）。若使用 Intel Mac，请关注后续是否提供 x64 构建。',
 	'downloadPage.mac.noteSource':
@@ -1996,7 +1998,6 @@ export const zhCN = {
 	'pay.toast.paid.membershipMessage': '会员已开通，个人资料页可查看权益。',
 	'pay.toast.mountNodeNotReady': '挂载节点未就绪',
 
-	'pay.badge.stripeEmbedded': 'Stripe 嵌入式收银台',
 	'pay.title': '会员充值',
 	'pay.loginRequiredHint': '发起支付前需要登录账号。',
 	'pay.goLogin': '去登录',
@@ -2017,9 +2018,8 @@ export const zhCN = {
 	'pay.form.product': '商品说明（可选）',
 	'pay.form.product.placeholder': '例如：月度会员',
 
-	'pay.actions.openEmbedded': '在页面内打开收银台',
-	'pay.footer.stripeProvided': '支付表单由 Stripe 嵌入组件提供',
-	'pay.actions.closeEmbedded': '关闭收银台',
+	'pay.actions.openEmbedded': '开启支付',
+	'pay.actions.closeEmbedded': '关闭支付',
 
 	'pay.currency.cny': 'CNY · 人民币',
 	'pay.currency.usd': 'USD · 美元',

@@ -606,6 +606,8 @@ export const enUS = {
 	// 账号更新成功提示文案
 	'account.toast.updateSuccess': 'Updated successfully.',
 	'account.toast.updateFailed': 'Update failed.',
+	'account.toast.testAccountForbidden':
+		'Test account — this action is not allowed.',
 	'account.toast.verifyCodeSent': 'Verification code sent.',
 	'account.toast.verifyCodeKeyMissing':
 		'Verification code key cannot be empty.',
@@ -2077,7 +2079,7 @@ export const enUS = {
 	'route.guard.unknownPage': 'This page',
 
 	'downloadPage.hero.badge': 'Desktop · Stable',
-	'downloadPage.hero.title': 'Download dnhyxc-ai for desktop',
+	'downloadPage.hero.title': 'Welcome to dnhyxc-ai Desktop',
 	'downloadPage.hero.subtitle':
 		'Get the full macOS experience: global shortcuts, local folders, launch at login, and more. ',
 	'downloadPage.hero.versionLabel': 'v{version}',
@@ -2098,6 +2100,7 @@ export const enUS = {
 		'Most users should grab the DMG. Prefer the .tar.gz if you need the updater channel layout.',
 	'downloadPage.mac.downloadDmg': 'Download .dmg',
 	'downloadPage.mac.downloadTarGz': 'Download .tar.gz (updater)',
+	'downloadPage.mac.installGuide': 'Installation',
 	'downloadPage.mac.stepInstall':
 		'Open the DMG and drag dnhyxc-ai into Applications, then launch from Launchpad.',
 	'downloadPage.mac.stepGatekeeper':
@@ -2162,7 +2165,6 @@ export const enUS = {
 		'Membership is active. View benefits on your profile.',
 	'pay.toast.mountNodeNotReady': 'Mount node is not ready.',
 
-	'pay.badge.stripeEmbedded': 'Stripe embedded checkout',
 	'pay.title': 'Membership billing',
 	'pay.loginRequiredHint': 'You need to sign in before starting a payment.',
 	'pay.goLogin': 'Go to sign in',
@@ -2185,10 +2187,8 @@ export const enUS = {
 	'pay.form.product': 'Product description (optional)',
 	'pay.form.product.placeholder': 'e.g. Monthly membership',
 
-	'pay.actions.openEmbedded': 'Open checkout on this page',
-	'pay.footer.stripeProvided':
-		'Payment form is provided by Stripe embedded components',
-	'pay.actions.closeEmbedded': 'Close checkout',
+	'pay.actions.openEmbedded': 'Open payment',
+	'pay.actions.closeEmbedded': 'Close payment',
 
 	'pay.currency.cny': 'CNY · RMB',
 	'pay.currency.usd': 'USD · US Dollar',

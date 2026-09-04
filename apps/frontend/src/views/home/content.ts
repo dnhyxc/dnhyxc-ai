@@ -235,7 +235,7 @@ export function createQuicklinks(t: TFn) {
 			/* 复用首屏 HUE_STYLES 色系：图标渐变 / hover 光晕 / 文字色 */
 			hue: 'emerald',
 			downloadDesktop: true,
-			onClick: () => void openExternalUrl('https://dnhyxc.cn:9002'),
+			onClick: () => void openExternalUrl('https://dnhyxc.cn:9002?u=dnhyxc-ai'),
 		},
 		{
 			index: '2',

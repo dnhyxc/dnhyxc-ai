@@ -195,6 +195,35 @@ function resolveAccentId(raw: string | null | undefined): AccentId | null {
 	return ACCENT_COLORS.some((c) => c.id === raw) ? (raw as AccentId) : null;
 }
 
+/** 从查询串解析强调色 id（独立页 / 外链打开时对齐壳内设置） */
+export function parseAccentFromSearch(search: string): AccentId | null {
+	const params = new URLSearchParams(
+		search.startsWith('?') ? search : `?${search}`,
+	);
+	return resolveAccentId(params.get('accent') || params.get('accentColor'));
+}
+
+/**
+ * 为分享/独立页绝对 URL 追加 accent 查询参数
+ */
+export function appendShareAccentQuery(
+	url: string,
+	accentId: AccentId,
+): string {
+	try {
+		const base =
+			typeof window !== 'undefined'
+				? window.location.origin
+				: 'http://localhost';
+		const u = new URL(url, url.startsWith('http') ? undefined : base);
+		u.searchParams.set('accent', accentId);
+		return u.toString();
+	} catch {
+		const sep = url.includes('?') ? '&' : '?';
+		return `${url}${sep}accent=${encodeURIComponent(accentId)}`;
+	}
+}
+
 /** 将主题色写入 html：--brand-accent 及 light/dark 派生 */
 export function applyAccentToDocument(accentId: AccentId) {
 	const item =
@@ -216,9 +245,12 @@ export function applyAccentToDocument(accentId: AccentId) {
 	);
 }
 
-function readAccentBootstrapSync(): AccentId | null {
+/** 与 index.html 首屏逻辑一致：URL → bootstrap → settings */
+export function readAccentBootstrapSync(): AccentId | null {
 	if (typeof window === 'undefined') return null;
 	try {
+		const fromUrl = parseAccentFromSearch(window.location.search);
+		if (fromUrl) return fromUrl;
 		const b = resolveAccentId(
 			localStorage.getItem(ACCENT_BOOTSTRAP_STORAGE_KEY),
 		);
@@ -352,9 +384,13 @@ export const useTheme = () => {
 				}
 			}
 
-			const storedAccent = resolveAccentId(
-				(await getValue('accentColor')) as string | undefined,
-			);
+			const accentFromUrl =
+				typeof window !== 'undefined'
+					? parseAccentFromSearch(window.location.search)
+					: null;
+			const storedAccent =
+				accentFromUrl ??
+				resolveAccentId((await getValue('accentColor')) as string | undefined);
 			if (storedAccent) {
 				setAccent(storedAccent);
 				applyAccentToDocument(storedAccent);

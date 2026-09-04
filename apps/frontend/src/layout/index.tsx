@@ -14,6 +14,7 @@ import { Toast } from '@ui/sonner';
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Outlet, useLocation, useNavigate } from 'react-router';
+import { rememberDemoLoginHint } from '@/constants';
 import { ChatCoreProvider } from '@/contexts';
 import {
 	getAppFullscreen,
@@ -35,6 +36,13 @@ const Layout = () => {
 	const [theater, setTheater] = useState(getAppFullscreen);
 
 	useTheme();
+
+	useLayoutEffect(() => {
+		rememberDemoLoginHint(
+			new URLSearchParams(location.search).get('u'),
+			location.pathname,
+		);
+	}, [location.pathname, location.search]);
 
 	const needAuth = requiresAuthForPath(location.pathname);
 	const authed = hasValidAuthToken();
@@ -133,7 +141,7 @@ const Layout = () => {
 						</div>
 					</TooltipProvider>
 					{!isTauriRuntime() && !theater ? (
-						<footer className="absolute bottom-1 left-0 w-full pr-6.5 text-right text-xs text-textcolor/55">
+						<footer className="absolute bottom-1 left-0 w-full pr-6.5 text-center text-xs text-textcolor/55">
 							<a
 								href="https://beian.miit.gov.cn/"
 								target="_blank"

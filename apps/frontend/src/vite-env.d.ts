@@ -16,6 +16,9 @@ interface ImportMetaEnv {
 	/** MiniMax 云端语音设置页默认值 */
 	readonly VITE_MINIMAX_API_KEY?: string;
 	readonly VITE_MINIMAX_MODEL_NAME?: string;
+	/** 演示账号预填（仅开发/联调；未配置则不启用） */
+	readonly VITE_DEMO_LOGIN_USERNAME?: string;
+	readonly VITE_DEMO_LOGIN_PASSWORD?: string;
 	/** 浏览器独立运行时的版本展示（可选） */
 	readonly VITE_APP_VERSION?: string;
 	/** Host 插件契约 semver；与 registry 的 hostApiRange 对齐，缺省 1.0.0 */

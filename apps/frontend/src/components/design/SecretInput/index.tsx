@@ -61,7 +61,7 @@ function SecretInput({
 	const toggleDisabled = disabled || (disableToggleWhenEmpty && !hasValue);
 	const showAriaLabel = showLabel ?? t('setting.llm.showApiKey');
 	const hideAriaLabel = hideLabel ?? t('setting.llm.hideApiKey');
-	const inputType = revealable && !revealed ? 'password' : 'text';
+	const inputType = revealable && revealed ? 'text' : 'password';
 
 	return (
 		<div className={cn('relative w-full', wrapperClassName)}>

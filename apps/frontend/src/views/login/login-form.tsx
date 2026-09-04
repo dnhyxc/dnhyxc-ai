@@ -16,6 +16,12 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+	DEMO_LOGIN_PASSWORD_MASK,
+	getDemoLoginPrefill,
+	isDemoLoginUsername,
+	resolveDemoLoginPassword,
+} from '@/constants';
 import { useI18n } from '@/hooks';
 import { createVerifyCode, login } from '@/service';
 import useStore from '@/store';
@@ -65,45 +71,85 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 		}
 	};
 
-	const formSchema = z.object({
-		username: z
-			.string()
-			.trim()
-			.min(2, {
-				message: t('auth.validation.usernameMin'),
-			}),
-		password: z
-			.string()
-			.trim()
-			.min(8, { message: t('auth.validation.passwordMin') })
-			.regex(
-				/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
-				{
+	const formSchema = z
+		.object({
+			username: z
+				.string()
+				.trim()
+				.min(2, {
+					message: t('auth.validation.usernameMin'),
+				}),
+			password: z
+				.string()
+				.trim()
+				.min(1, {
+					message: t('auth.validation.passwordMin'),
+				}),
+			captchaText: z
+				.string()
+				.trim()
+				.min(4, {
+					message: t('auth.validation.captchaMin'),
+				}),
+		})
+		.superRefine((data, ctx) => {
+			if (
+				isDemoLoginUsername(data.username) &&
+				data.password === DEMO_LOGIN_PASSWORD_MASK
+			) {
+				return;
+			}
+			if (data.password.length < 8) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['password'],
+					message: t('auth.validation.passwordMin'),
+				});
+				return;
+			}
+			if (
+				!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/.test(
+					data.password,
+				)
+			) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['password'],
 					message: t('auth.validation.passwordComplex'),
-				},
-			),
-		captchaText: z
-			.string()
-			.trim()
-			.min(4, {
-				message: t('auth.validation.captchaMin'),
-			}),
-	});
+				});
+			}
+		});
 
+	const demo = getDemoLoginPrefill();
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
-			username: '',
-			password: '',
+			username: demo?.username ?? '',
+			password: demo?.password ?? '',
 			captchaText: '',
 		},
 	});
+	const username = form.watch('username');
+	const hidePasswordReveal = isDemoLoginUsername(username.trim());
+
+	useEffect(() => {
+		if (
+			!hidePasswordReveal &&
+			form.getValues('password') === DEMO_LOGIN_PASSWORD_MASK
+		) {
+			form.setValue('password', '');
+		}
+	}, [hidePasswordReveal, form]);
 
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
 		try {
+			const password = resolveDemoLoginPassword(
+				values.username,
+				values.password,
+			);
 			const res = await login({
 				...values,
-				password: encrypt(values.password),
+				password: encrypt(password),
 				captchaId: captchaInfo.captchaId,
 			});
 			if (res.success) {
@@ -149,6 +195,8 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 									autoComplete="current-password"
 									showLabel={t('auth.showPassword')}
 									hideLabel={t('auth.hidePassword')}
+									revealable={!hidePasswordReveal}
+									readOnly={hidePasswordReveal}
 									{...field}
 								/>
 							</FormControl>

@@ -1,7 +1,8 @@
 import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { rememberDemoLoginHint } from '@/constants';
 import { useI18n, useTheme } from '@/hooks';
 import ForgetPwdForm from './forget-pwd-form';
 import LoginByEmailForm from './login-by-email-form';
@@ -20,6 +21,10 @@ const Login = () => {
 	const { t } = useI18n();
 
 	useTheme();
+
+	useEffect(() => {
+		rememberDemoLoginHint(searchParams.get('u'), '/login');
+	}, [searchParams]);
 
 	const onRegister = (status?: boolean) => {
 		const next = status !== undefined ? status : !isRegister;

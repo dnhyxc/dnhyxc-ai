@@ -1,11 +1,13 @@
 import Image from '@design/Image';
 import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
+import { Toast } from '@ui/sonner';
 import { ArrowRight, Check, CreditCard, Crown, Settings2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
+import { isProtectedAccountUsername, maskEmail } from '@/constants';
 import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
@@ -97,7 +99,11 @@ const Profile = observer(() => {
 			},
 			{
 				label: t('account.fields.email'),
-				value: u?.email?.trim() ? u.email : '—',
+				value: u?.email?.trim()
+					? isProtectedAccountUsername(u.username)
+						? maskEmail(u.email)
+						: u.email
+					: '—',
 			},
 			{
 				label: t('account.fields.gender'),
@@ -226,7 +232,16 @@ const Profile = observer(() => {
 											variant="default"
 											size="sm"
 											className="cursor-pointer gap-1.5 border-theme/25 shadow-sm"
-											onClick={() => navigate('/account')}
+											onClick={() => {
+												if (isProtectedAccountUsername(u?.username)) {
+													Toast({
+														type: 'warning',
+														title: t('account.toast.testAccountForbidden'),
+													});
+													return;
+												}
+												navigate('/profile/account');
+											}}
 										>
 											<Settings2 className="size-4 shrink-0" />
 											{t('profile.actions.editAccount')}
@@ -236,7 +251,16 @@ const Profile = observer(() => {
 											size="sm"
 											disabled={isPaidMember}
 											className="cursor-pointer gap-1.5 font-semibold shadow-sm"
-											onClick={() => navigate('/pay')}
+											onClick={() => {
+												if (isProtectedAccountUsername(u?.username)) {
+													Toast({
+														type: 'warning',
+														title: t('account.toast.testAccountForbidden'),
+													});
+													return;
+												}
+												navigate('/profile/pay');
+											}}
 										>
 											<CreditCard className="size-4 shrink-0" />
 											{t('profile.actions.buyMembership')}

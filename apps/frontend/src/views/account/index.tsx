@@ -8,6 +8,7 @@ import { SquarePen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
 import Upload from '@/components/design/Upload';
+import { isProtectedAccountUsername } from '@/constants';
 import { useI18n, useStorageInfo } from '@/hooks';
 import { updateUser, uploadCosFile } from '@/service';
 import useStore from '@/store';
@@ -31,6 +32,14 @@ const Account = () => {
 	});
 
 	const { storageInfo, setStorageInfo } = useStorageInfo();
+	const accountLocked = isProtectedAccountUsername(storageInfo?.username);
+
+	const toastTestAccountForbidden = () => {
+		Toast({
+			type: 'warning',
+			title: t('account.toast.testAccountForbidden'),
+		});
+	};
 
 	useEffect(() => {
 		setAccountInfo({
@@ -53,10 +62,18 @@ const Account = () => {
 	};
 
 	const setEdit = (key: string) => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		setEditKey(key);
 	};
 
 	const onEditEmail = () => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		setOpen(true);
 	};
 
@@ -159,6 +176,10 @@ const Account = () => {
 	);
 
 	const onSubmit = async (key: string) => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		const value = accountInfo[key as keyof typeof accountInfo];
 
 		const profile = {
@@ -226,6 +247,10 @@ const Account = () => {
 	};
 
 	const uploadAvatarToCos = async (file: File) => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		const res = await uploadCosFile(file);
 		if (res?.data?.url) {
 			setAccountInfo((prev) => ({
@@ -236,11 +261,19 @@ const Account = () => {
 	};
 
 	const onUpload = async (file: FileWithPreview | FileWithPreview[]) => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		const files = Array.isArray(file) ? file : [file];
 		await uploadAvatarToCos(files[0].file);
 	};
 
 	const onClearFileUrl = () => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		setAccountInfo({
 			...accountInfo,
 			avatar: '',
@@ -248,6 +281,10 @@ const Account = () => {
 	};
 
 	const onChangeAvatar = () => {
+		if (accountLocked) {
+			toastTestAccountForbidden();
+			return;
+		}
 		onSubmit('avatar');
 	};
 

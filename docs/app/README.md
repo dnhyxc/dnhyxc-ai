@@ -19,6 +19,7 @@
 | [Portal与Markdown字体继承.md](./Portal与Markdown字体继承.md) | 字体继承修复：`font-family` 从 `#root` 上移到 `body` 使 Portal（Dialog/Drawer/Popover）继承应用字体；`.markdown-body` 显式覆盖 `github-markdown` 写死的系统字体栈 |
 | [书架知识库分页常量归一化.md](./书架知识库分页常量归一化.md) | **全局分页默认值归一**：删除知识库 Store 私有 `DEFAULT_PAGE_SIZE / SCROLL_LOAD_THRESHOLD_PX`，与电子书共用 `@/constants`；`EBOOK_SHELF_PAGE_SIZE` 重命名为通用 `DEFAULT_PAGE_SIZE`；纯重构，运行时值无变化 |
 | [首页舞台卡片重构.md](./首页舞台卡片重构.md) | **首屏拆为 `StageCard` 壳层 + `FocusCarousel` 轮播**：删除 `Home` 内联 hero 状态与 JSX，下沉到两个可复用组件；`StageCard` 提供顶栏 / 近景区 / 水印 / 底栏入口 + 鼠标 3D 倾斜与分层视差（RAF 节流、`prefers-reduced-motion` / `IntersectionObserver` 守卫）；`FocusCarousel` 提供叠层 fade + 方向位移 + blur 切页、自动播放、触屏与水平滚轮、受控 / 非受控双模式 |
+| [个人主页路由重构.md](./个人主页路由重构.md) | `/profile` 路由改为 `ProfileLayout` + 子路由（资料 / 账号 / 充值），`/account`、`/pay` 旧路径用 `Navigate` 重定向到 `/profile/account`、`/profile/pay` |
 
 ---
 

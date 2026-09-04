@@ -2,6 +2,7 @@ import { Button } from '@ui/button';
 import { Toast } from '@ui/sonner';
 import { CheckCircle, Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isProtectedAccountUsername } from '@/constants';
 import { useI18n } from '@/hooks';
 import {
 	createWechatLinkCode,
@@ -9,7 +10,10 @@ import {
 	unbindWechat,
 	type WechatStatus,
 } from '@/service';
-import { userScopedStorageKey } from '@/store/loggedInUserId';
+import {
+	getLoggedInUserInfoFromStorage,
+	userScopedStorageKey,
+} from '@/store/loggedInUserId';
 import { copyToClipboard } from '@/utils/clipboard';
 
 const LINK_SESSION_KEY = 'wechat_link_code';
@@ -132,6 +136,16 @@ export default function WechatBindPanel() {
 	}, []);
 
 	async function onCreateCode() {
+		const stored = getLoggedInUserInfoFromStorage();
+		const username =
+			typeof stored?.username === 'string' ? stored.username : undefined;
+		if (isProtectedAccountUsername(username)) {
+			Toast({
+				type: 'warning',
+				title: t('account.toast.testAccountForbidden'),
+			});
+			return;
+		}
 		setLoading(true);
 		try {
 			const res = await createWechatLinkCode();
@@ -166,6 +180,16 @@ export default function WechatBindPanel() {
 	}
 
 	async function onUnbind() {
+		const stored = getLoggedInUserInfoFromStorage();
+		const username =
+			typeof stored?.username === 'string' ? stored.username : undefined;
+		if (isProtectedAccountUsername(username)) {
+			Toast({
+				type: 'warning',
+				title: t('account.toast.testAccountForbidden'),
+			});
+			return;
+		}
 		setLoading(true);
 		try {
 			await unbindWechat();

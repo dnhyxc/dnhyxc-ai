@@ -242,6 +242,16 @@
 						return null;
 					}
 				}
+				function accentFromSearch() {
+					try {
+						const s = location.search || "";
+						const p = new URLSearchParams(s.startsWith("?") ? s : `?${s}`);
+						const raw = p.get("accent") || p.get("accentColor");
+						return raw && ACCENT_HEX[raw] ? raw : null;
+					} catch (_e) {
+						return null;
+					}
+				}
 				function accentFromStorage() {
 					try {
 						const b = localStorage.getItem("dnhyxc_accent_bootstrap");
@@ -259,7 +269,7 @@
 				if (theme) {
 					document.body.classList.add(`theme-${theme}`);
 				}
-				var accentId = accentFromStorage() || "teal";
+				var accentId = accentFromSearch() || accentFromStorage() || "teal";
 				var hex = ACCENT_HEX[accentId] || ACCENT_HEX.teal;
 				var root = document.documentElement;
 				root.style.setProperty("--brand-accent", hex);

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { isProtectedAccountUsername } from '@/constants';
 import { useCountdown, useI18n } from '@/hooks';
 import { resetPassword, sendResetPasswordEmail } from '@/service';
 import { encrypt, formatTime, removeStorage } from '@/utils';
@@ -93,6 +94,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 			});
 			return;
 		}
+		if (isProtectedAccountUsername(form.watch('username'))) {
+			Toast({
+				title: t('account.toast.testAccountForbidden'),
+				type: 'warning',
+			});
+			return;
+		}
 		try {
 			startTimer();
 			setSendLoading(true);
@@ -114,6 +122,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 	};
 
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
+		if (isProtectedAccountUsername(values.username)) {
+			Toast({
+				title: t('account.toast.testAccountForbidden'),
+				type: 'warning',
+			});
+			return;
+		}
 		try {
 			setResetLoading(true);
 			const res = await resetPassword({
