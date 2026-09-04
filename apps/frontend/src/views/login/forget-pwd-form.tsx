@@ -279,7 +279,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 						disabled={resetLoading}
 						onClick={form.handleSubmit(onSubmit)}
 					>
-						{resetLoading ? <Spinner /> : null}
+						{resetLoading ? <Spinner className="text-white" /> : null}
 						{t('auth.resetPassword.submit')}
 					</Button>
 					<Button
