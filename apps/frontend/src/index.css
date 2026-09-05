@@ -1268,6 +1268,63 @@ body.theme-beige {
 		infinite;
 }
 
+/* 登录页：主网格交点实心圆呼吸 */
+@keyframes login-grid-dot-breathe {
+	0%,
+	100% {
+		transform: translate(-50%, -50%) scale(1);
+		opacity: 0.45;
+	}
+	50% {
+		transform: translate(-50%, -50%) scale(1.45);
+		opacity: 1;
+	}
+}
+
+.login-grid-dot {
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	background: var(--brand-accent);
+	box-shadow: 0 0 10px 2px
+		color-mix(in oklch, var(--brand-accent) 55%, transparent);
+	animation: login-grid-dot-breathe ease-in-out infinite;
+}
+
+/* 四角各自不同周期 + 相位（互质秒数，对角也不会齐） */
+.login-grid-dot:nth-child(1) {
+	animation-duration: 2.1s;
+	animation-delay: -0.2s;
+}
+.login-grid-dot:nth-child(2) {
+	animation-duration: 2.9s;
+	animation-delay: -1.4s;
+}
+.login-grid-dot:nth-child(3) {
+	animation-duration: 3.7s;
+	animation-delay: -0.8s;
+}
+.login-grid-dot:nth-child(4) {
+	animation-duration: 4.6s;
+	animation-delay: -2.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.login-grid-dot {
+		animation: none;
+		opacity: 0.75;
+		transform: translate(-50%, -50%);
+	}
+}
+
+/* 登录页：流星拖尾画布 */
+@media (prefers-reduced-motion: reduce) {
+	.login-flow {
+		display: none;
+	}
+}
+
 /* 主布局：鼠标光圈透明度呼吸（layout data-gradient-container） */
 @keyframes pointer-glow-breathe {
 	0%,
