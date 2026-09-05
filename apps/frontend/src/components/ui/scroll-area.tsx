@@ -53,7 +53,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 				<ScrollAreaPrimitive.Viewport
 					ref={ref}
 					tabIndex={viewportTabIndex}
-					data-tauri-drag-region={dataTauriDragRegion}
+					{...(dataTauriDragRegion ? { 'data-tauri-drag-region': '' } : {})}
 					data-slot="scroll-area-viewport"
 					className={cn(
 						'focus-visible:ring-ring/50 size-full max-w-full min-w-0 rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1',
