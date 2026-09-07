@@ -6,18 +6,21 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
+import { Cache } from '@nestjs/cache-manager';
 import {
 	BadRequestException,
 	ForbiddenException,
 	HttpException,
 	HttpStatus,
+	Inject,
 	Injectable,
-	Logger,
+	type LoggerService,
 	NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import {
 	DataSource,
 	In,
@@ -92,6 +95,17 @@ import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
 } from './english-favorites-docx.builder';
+import {
+	type CachedClassicItemRow,
+	type CachedLibraryRow,
+	type CachedVocabItemRow,
+	EL_LIB_ITEMS_TTL_MS,
+	EL_LIB_LIST_TTL_MS,
+	EnglishLearningLibraryCache,
+	elItemsPageKey,
+	elItemsVerKey,
+	elLibsPageKey,
+} from './english-learning-library.cache';
 import { ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID } from './english-learning-list-resume.constants';
 import {
 	ENGLISH_LEARNING_RESUME_MODULE_KEYS,
@@ -262,7 +276,7 @@ export type VocabularyHistoryListItem = {
  */
 @Injectable()
 export class EnglishLearningService {
-	private readonly logger = new Logger(EnglishLearningService.name);
+	private readonly libraryCache: EnglishLearningLibraryCache;
 
 	constructor(
 		private readonly dataSource: DataSource,
@@ -271,6 +285,9 @@ export class EnglishLearningService {
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
+		cache: Cache,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 		@InjectRepository(EnglishVocabularyPackSession)
 		private readonly vocabPackSessionRepo: Repository<EnglishVocabularyPackSession>,
 		@InjectRepository(EnglishVocabularyPackItem)
@@ -306,7 +323,9 @@ export class EnglishLearningService {
 		@InjectRepository(EnglishDailyMemorizeRecord)
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
 		private readonly userService: UserService,
-	) {}
+	) {
+		this.libraryCache = new EnglishLearningLibraryCache(cache, this.logger);
+	}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
 	private isAbortLike(e: unknown): boolean {
@@ -1965,7 +1984,16 @@ ${existingHintBlock}
 	}
 
 	private mapLibraryItemRow(
-		row: EnglishVocabularyLibraryItem,
+		row: {
+			id: string;
+			sortOrder: number;
+			word: string;
+			ipa: string;
+			pos?: string | null;
+			segmentation?: string | null;
+			translationZh: string;
+			example: string;
+		},
 		favoriteId: string | null = null,
 	): VocabularyLibraryItemDto {
 		return {
@@ -2064,6 +2092,212 @@ ${existingHintBlock}
 			isOwned: row.userId === viewerUserId,
 			itemsResumeOffset: Math.max(0, itemsResumeOffset),
 		};
+	}
+
+	private serializeVocabLibraryRow(
+		row: EnglishVocabularyLibrary,
+	): CachedLibraryRow {
+		return {
+			id: row.id,
+			userId: row.userId,
+			title: row.title,
+			count: row.wordCount,
+			isPublic: row.isPublic,
+			createdAt:
+				row.createdAt instanceof Date
+					? row.createdAt.toISOString()
+					: String(row.createdAt),
+		};
+	}
+
+	private reviveVocabLibraryRow(
+		row: CachedLibraryRow,
+	): EnglishVocabularyLibrary {
+		return {
+			id: row.id,
+			userId: row.userId,
+			title: row.title,
+			wordCount: row.count,
+			isPublic: row.isPublic,
+			createdAt: new Date(row.createdAt),
+		} as EnglishVocabularyLibrary;
+	}
+
+	private serializeClassicLibraryRow(
+		row: EnglishClassicQuotesLibrary,
+	): CachedLibraryRow {
+		return {
+			id: row.id,
+			userId: row.userId,
+			title: row.title,
+			count: row.quoteCount,
+			isPublic: row.isPublic,
+			createdAt:
+				row.createdAt instanceof Date
+					? row.createdAt.toISOString()
+					: String(row.createdAt),
+		};
+	}
+
+	private reviveClassicLibraryRow(
+		row: CachedLibraryRow,
+	): EnglishClassicQuotesLibrary {
+		return {
+			id: row.id,
+			userId: row.userId,
+			title: row.title,
+			quoteCount: row.count,
+			isPublic: row.isPublic,
+			createdAt: new Date(row.createdAt),
+		} as EnglishClassicQuotesLibrary;
+	}
+
+	/** 库列表旁路缓存：key 含 publicVer+mineVer，写路径 bump 世代即失效；resume/isOwned 不进缓存 */
+	private async loadVocabLibrariesPageCached(
+		userId: number,
+		limit: number,
+		offset: number,
+	): Promise<{ rows: EnglishVocabularyLibrary[]; cacheHit: boolean }> {
+		const { publicVer, mineVer } = await this.libraryCache.getListVers(
+			'vocab',
+			userId,
+		);
+		const key = elLibsPageKey(
+			'vocab',
+			userId,
+			publicVer,
+			mineVer,
+			limit,
+			offset,
+		);
+		const hit = await this.libraryCache.getSafe<CachedLibraryRow[]>(key);
+		if (hit) {
+			this.logger.log(
+				`[lib-cache-vocab-list] HIT vocab libs userId=${userId} limit=${limit} offset=${offset} count=${hit.length}`,
+			);
+			return {
+				rows: hit.map((r) => this.reviveVocabLibraryRow(r)),
+				cacheHit: true,
+			};
+		}
+		const rows = await this.vocabLibraryRepo
+			.createQueryBuilder('lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.orderBy('lib.createdAt', 'DESC')
+			.take(limit)
+			.skip(offset)
+			.getMany();
+		await this.libraryCache.setSafe(
+			key,
+			rows.map((r) => this.serializeVocabLibraryRow(r)),
+			EL_LIB_LIST_TTL_MS,
+		);
+		return { rows, cacheHit: false };
+	}
+
+	private async loadClassicLibrariesPageCached(
+		userId: number,
+		limit: number,
+		offset: number,
+	): Promise<{ rows: EnglishClassicQuotesLibrary[]; cacheHit: boolean }> {
+		const { publicVer, mineVer } = await this.libraryCache.getListVers(
+			'classic',
+			userId,
+		);
+		const key = elLibsPageKey(
+			'classic',
+			userId,
+			publicVer,
+			mineVer,
+			limit,
+			offset,
+		);
+		const hit = await this.libraryCache.getSafe<CachedLibraryRow[]>(key);
+		if (hit) {
+			this.logger.log(
+				`[lib-cache-classic-list] HIT classic libs userId=${userId} limit=${limit} offset=${offset} count=${hit.length}`,
+			);
+			return {
+				rows: hit.map((r) => this.reviveClassicLibraryRow(r)),
+				cacheHit: true,
+			};
+		}
+		const rows = await this.classicQuotesLibraryRepo
+			.createQueryBuilder('lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.orderBy('lib.createdAt', 'DESC')
+			.take(limit)
+			.skip(offset)
+			.getMany();
+		await this.libraryCache.setSafe(
+			key,
+			rows.map((r) => this.serializeClassicLibraryRow(r)),
+			EL_LIB_LIST_TTL_MS,
+		);
+		return { rows, cacheHit: false };
+	}
+
+	/** 词条分页缓存：不含 favoriteId；权限与库元数据仍走 assertReadable */
+	private async loadVocabItemsPageCached(
+		libraryId: string,
+		limit: number,
+		offset: number,
+	): Promise<{ rows: CachedVocabItemRow[]; cacheHit: boolean }> {
+		const itemsVer = await this.libraryCache.getVer(
+			elItemsVerKey('vocab', libraryId),
+		);
+		const key = elItemsPageKey('vocab', libraryId, itemsVer, limit, offset);
+		const hit = await this.libraryCache.getSafe<CachedVocabItemRow[]>(key);
+		if (hit) {
+			this.logger.log(
+				`[lib-cache-vocab-items] HIT vocab items libraryId=${libraryId} limit=${limit} offset=${offset} count=${hit.length}`,
+			);
+			return { rows: hit, cacheHit: true };
+		}
+
+		const rows = await this.vocabLibraryItemRepo.find({
+			where: { libraryId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+		const cached: CachedVocabItemRow[] = rows.map((r) => {
+			const { favoriteId: _f, ...rest } = this.mapLibraryItemRow(r);
+			return rest;
+		});
+		await this.libraryCache.setSafe(key, cached, EL_LIB_ITEMS_TTL_MS);
+		return { rows: cached, cacheHit: false };
+	}
+
+	private async loadClassicItemsPageCached(
+		libraryId: string,
+		limit: number,
+		offset: number,
+	): Promise<{ rows: CachedClassicItemRow[]; cacheHit: boolean }> {
+		const itemsVer = await this.libraryCache.getVer(
+			elItemsVerKey('classic', libraryId),
+		);
+		const key = elItemsPageKey('classic', libraryId, itemsVer, limit, offset);
+		const hit = await this.libraryCache.getSafe<CachedClassicItemRow[]>(key);
+		if (hit) {
+			this.logger.log(
+				`[lib-cache-classic-items] HIT classic items libraryId=${libraryId} limit=${limit} offset=${offset} count=${hit.length}`,
+			);
+			return { rows: hit, cacheHit: true };
+		}
+
+		const rows = await this.classicQuotesLibraryItemRepo.find({
+			where: { libraryId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+		const cached: CachedClassicItemRow[] = rows.map((r) => {
+			const { favoriteId: _f, ...rest } = this.mapClassicLibraryItemRow(r);
+			return rest;
+		});
+		await this.libraryCache.setSafe(key, cached, EL_LIB_ITEMS_TTL_MS);
+		return { rows: cached, cacheHit: false };
 	}
 
 	/** 批量挂载当前用户的续读 offset（列表页 ≤100，一次 IN 查询） */
@@ -2192,40 +2426,46 @@ ${existingHintBlock}
 		}
 		const wordCount = itemsJson.length;
 
-		return this.dataSource.transaction(async (manager) => {
-			const libRepo = manager.getRepository(EnglishVocabularyLibrary);
-			const itemRepo = manager.getRepository(EnglishVocabularyLibraryItem);
+		return this.dataSource
+			.transaction(async (manager) => {
+				const libRepo = manager.getRepository(EnglishVocabularyLibrary);
+				const itemRepo = manager.getRepository(EnglishVocabularyLibraryItem);
 
-			const lib = await libRepo.save(
-				libRepo.create({
-					userId,
-					title: t,
-					wordCount,
-				}),
-			);
+				const lib = await libRepo.save(
+					libRepo.create({
+						userId,
+						title: t,
+						wordCount,
+					}),
+				);
 
-			const itemRows = itemsJson.map((item, index) =>
-				itemRepo.create({
-					libraryId: lib.id,
-					userId,
-					sortOrder: index,
-					word: item.word,
-					ipa: item.ipa,
-					pos: item.pos ?? '',
-					segmentation: item.segmentation ?? '',
-					translationZh: item.translationZh,
-					example: item.example,
-				}),
-			);
+				const itemRows = itemsJson.map((item, index) =>
+					itemRepo.create({
+						libraryId: lib.id,
+						userId,
+						sortOrder: index,
+						word: item.word,
+						ipa: item.ipa,
+						pos: item.pos ?? '',
+						segmentation: item.segmentation ?? '',
+						translationZh: item.translationZh,
+						example: item.example,
+					}),
+				);
 
-			// 大批量时分块插入，避免单条 SQL 过长
-			const chunkSize = 500;
-			for (let i = 0; i < itemRows.length; i += chunkSize) {
-				await itemRepo.save(itemRows.slice(i, i + chunkSize));
-			}
+				// 大批量时分块插入，避免单条 SQL 过长
+				const chunkSize = 500;
+				for (let i = 0; i < itemRows.length; i += chunkSize) {
+					await itemRepo.save(itemRows.slice(i, i + chunkSize));
+				}
 
-			return { id: lib.id, wordCount: lib.wordCount };
-		});
+				return { id: lib.id, wordCount: lib.wordCount };
+			})
+			.then(async (result) => {
+				// 事务成功后再失效列表缓存，避免未提交数据被读进 Redis
+				await this.libraryCache.onLibraryCreated('vocab', userId);
+				return result;
+			});
 	}
 
 	/**
@@ -2236,8 +2476,15 @@ ${existingHintBlock}
 		libraryId: string,
 	): Promise<{ deleted: boolean }> {
 		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
+		const wasPublic = lib.isPublic;
 		await this.vocabLibraryRepo.remove(lib);
 		await this.purgeLibraryItemsResume('vocab', libraryId);
+		await this.libraryCache.onLibraryDeleted(
+			'vocab',
+			userId,
+			libraryId,
+			wasPublic,
+		);
 		return { deleted: true };
 	}
 
@@ -2245,24 +2492,25 @@ ${existingHintBlock}
 	async listVocabularyLibraries(
 		userId: number,
 		options?: { limit?: number; offset?: number },
-	): Promise<VocabularyLibraryListItem[]> {
+	): Promise<{ items: VocabularyLibraryListItem[]; cacheHit: boolean }> {
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
-		const rows = await this.vocabLibraryRepo
-			.createQueryBuilder('lib')
-			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
-			.orderBy('lib.createdAt', 'DESC')
-			.take(limit)
-			.skip(offset)
-			.getMany();
+		const { rows, cacheHit } = await this.loadVocabLibrariesPageCached(
+			userId,
+			limit,
+			offset,
+		);
 		const resumeMap = await this.loadLibraryItemsResumeOffsetMap(
 			userId,
 			'vocab',
 			rows.map((r) => r.id),
 		);
-		return rows.map((r) =>
-			this.mapVocabularyLibraryListItem(r, userId, resumeMap.get(r.id) ?? 0),
-		);
+		return {
+			items: rows.map((r) =>
+				this.mapVocabularyLibraryListItem(r, userId, resumeMap.get(r.id) ?? 0),
+			),
+			cacheHit,
+		};
 	}
 
 	async updateVocabularyLibraryVisibility(
@@ -2289,6 +2537,7 @@ ${existingHintBlock}
 				saved.userId,
 			);
 		}
+		await this.libraryCache.onLibraryVisibilityChanged('vocab', saved.userId);
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'vocab',
@@ -2309,6 +2558,11 @@ ${existingHintBlock}
 		}
 		lib.title = t;
 		const saved = await this.vocabLibraryRepo.save(lib);
+		await this.libraryCache.onLibraryTitleChanged(
+			'vocab',
+			userId,
+			saved.isPublic,
+		);
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'vocab',
@@ -2341,29 +2595,27 @@ ${existingHintBlock}
 	): Promise<{
 		library: VocabularyLibraryListItem;
 		items: VocabularyLibraryItemDto[];
+		cacheHit: boolean;
 	}> {
+		// 权限与库元数据始终读库，避免缓存越权 / 标题过期
 		const lib = await this.assertVocabularyLibraryReadable(userId, libraryId);
 		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const [rows, resume] = await Promise.all([
-			this.vocabLibraryItemRepo.find({
-				where: { libraryId },
-				order: { sortOrder: 'ASC' },
-				take: limit,
-				skip: offset,
-			}),
+		const [page, resume] = await Promise.all([
+			this.loadVocabItemsPageCached(libraryId, limit, offset),
 			this.getLibraryItemsResumeOffset(userId, 'vocab', libraryId),
 		]);
 
 		const items = await this.attachVocabularyLibraryFavoriteIds(
 			userId,
-			rows.map((r) => this.mapLibraryItemRow(r)),
+			page.rows.map((r) => this.mapLibraryItemRow(r)),
 		);
 
 		return {
 			library: this.mapVocabularyLibraryListItem(lib, userId, resume),
 			items,
+			cacheHit: page.cacheHit,
 		};
 	}
 
@@ -2495,7 +2747,14 @@ ${existingHintBlock}
 	}
 
 	private mapClassicLibraryItemRow(
-		row: EnglishClassicQuotesLibraryItem,
+		row: {
+			id: string;
+			sortOrder: number;
+			english: string;
+			translationZh: string;
+			source?: string | null;
+			noteZh: string;
+		},
 		favoriteId: string | null = null,
 	): ClassicQuotesLibraryItemDto {
 		return {
@@ -2568,37 +2827,42 @@ ${existingHintBlock}
 		}
 		const quoteCount = itemsJson.length;
 
-		return this.dataSource.transaction(async (manager) => {
-			const libRepo = manager.getRepository(EnglishClassicQuotesLibrary);
-			const itemRepo = manager.getRepository(EnglishClassicQuotesLibraryItem);
+		return this.dataSource
+			.transaction(async (manager) => {
+				const libRepo = manager.getRepository(EnglishClassicQuotesLibrary);
+				const itemRepo = manager.getRepository(EnglishClassicQuotesLibraryItem);
 
-			const lib = await libRepo.save(
-				libRepo.create({
-					userId,
-					title: t,
-					quoteCount,
-				}),
-			);
+				const lib = await libRepo.save(
+					libRepo.create({
+						userId,
+						title: t,
+						quoteCount,
+					}),
+				);
 
-			const itemRows = itemsJson.map((item, index) =>
-				itemRepo.create({
-					libraryId: lib.id,
-					userId,
-					sortOrder: index,
-					english: item.english,
-					translationZh: item.translationZh,
-					source: item.source ?? '',
-					noteZh: item.noteZh,
-				}),
-			);
+				const itemRows = itemsJson.map((item, index) =>
+					itemRepo.create({
+						libraryId: lib.id,
+						userId,
+						sortOrder: index,
+						english: item.english,
+						translationZh: item.translationZh,
+						source: item.source ?? '',
+						noteZh: item.noteZh,
+					}),
+				);
 
-			const chunkSize = 500;
-			for (let i = 0; i < itemRows.length; i += chunkSize) {
-				await itemRepo.save(itemRows.slice(i, i + chunkSize));
-			}
+				const chunkSize = 500;
+				for (let i = 0; i < itemRows.length; i += chunkSize) {
+					await itemRepo.save(itemRows.slice(i, i + chunkSize));
+				}
 
-			return { id: lib.id, quoteCount: lib.quoteCount };
-		});
+				return { id: lib.id, quoteCount: lib.quoteCount };
+			})
+			.then(async (result) => {
+				await this.libraryCache.onLibraryCreated('classic', userId);
+				return result;
+			});
 	}
 
 	async deleteClassicQuotesLibrary(
@@ -2606,32 +2870,44 @@ ${existingHintBlock}
 		libraryId: string,
 	): Promise<{ deleted: boolean }> {
 		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
+		const wasPublic = lib.isPublic;
 		await this.classicQuotesLibraryRepo.remove(lib);
 		await this.purgeLibraryItemsResume('classic', libraryId);
+		await this.libraryCache.onLibraryDeleted(
+			'classic',
+			userId,
+			libraryId,
+			wasPublic,
+		);
 		return { deleted: true };
 	}
 
 	async listClassicQuotesLibraries(
 		userId: number,
 		options?: { limit?: number; offset?: number },
-	): Promise<ClassicQuotesLibraryListItem[]> {
+	): Promise<{ items: ClassicQuotesLibraryListItem[]; cacheHit: boolean }> {
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
-		const rows = await this.classicQuotesLibraryRepo
-			.createQueryBuilder('lib')
-			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
-			.orderBy('lib.createdAt', 'DESC')
-			.take(limit)
-			.skip(offset)
-			.getMany();
+		const { rows, cacheHit } = await this.loadClassicLibrariesPageCached(
+			userId,
+			limit,
+			offset,
+		);
 		const resumeMap = await this.loadLibraryItemsResumeOffsetMap(
 			userId,
 			'classic',
 			rows.map((r) => r.id),
 		);
-		return rows.map((r) =>
-			this.mapClassicQuotesLibraryListItem(r, userId, resumeMap.get(r.id) ?? 0),
-		);
+		return {
+			items: rows.map((r) =>
+				this.mapClassicQuotesLibraryListItem(
+					r,
+					userId,
+					resumeMap.get(r.id) ?? 0,
+				),
+			),
+			cacheHit,
+		};
 	}
 
 	async updateClassicQuotesLibraryVisibility(
@@ -2658,6 +2934,7 @@ ${existingHintBlock}
 				saved.userId,
 			);
 		}
+		await this.libraryCache.onLibraryVisibilityChanged('classic', saved.userId);
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'classic',
@@ -2678,6 +2955,11 @@ ${existingHintBlock}
 		}
 		lib.title = t;
 		const saved = await this.classicQuotesLibraryRepo.save(lib);
+		await this.libraryCache.onLibraryTitleChanged(
+			'classic',
+			userId,
+			saved.isPublic,
+		);
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'classic',
@@ -2863,6 +3145,7 @@ ${existingHintBlock}
 	): Promise<{
 		library: ClassicQuotesLibraryListItem;
 		items: ClassicQuotesLibraryItemDto[];
+		cacheHit: boolean;
 	}> {
 		const lib = await this.assertClassicQuotesLibraryReadable(
 			userId,
@@ -2871,24 +3154,20 @@ ${existingHintBlock}
 		const limit = Math.min(1000, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const [rows, resume] = await Promise.all([
-			this.classicQuotesLibraryItemRepo.find({
-				where: { libraryId },
-				order: { sortOrder: 'ASC' },
-				take: limit,
-				skip: offset,
-			}),
+		const [page, resume] = await Promise.all([
+			this.loadClassicItemsPageCached(libraryId, limit, offset),
 			this.getLibraryItemsResumeOffset(userId, 'classic', libraryId),
 		]);
 
 		const items = await this.attachClassicQuotesLibraryFavoriteIds(
 			userId,
-			rows.map((r) => this.mapClassicLibraryItemRow(r)),
+			page.rows.map((r) => this.mapClassicLibraryItemRow(r)),
 		);
 
 		return {
 			library: this.mapClassicQuotesLibraryListItem(lib, userId, resume),
 			items,
+			cacheHit: page.cacheHit,
 		};
 	}
 

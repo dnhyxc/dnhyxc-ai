@@ -10,6 +10,7 @@ import {
 	listEnglishVocabularyLibraries,
 	patchElListResume,
 	patchElResumeModuleSetting,
+	unwrapEnglishLibraryListPage,
 } from '@/service';
 import type { ElFixedListScope } from '@/store/englishLearningResume';
 import {
@@ -183,6 +184,7 @@ async function clearFixedScopeResume(scope: ElFixedListScope): Promise<void> {
 	}
 }
 
+/** 清除词库/语句库全部续读 */
 async function clearLibraryKindResume(kind: LibraryKind): Promise<void> {
 	const cacheNs = kind;
 	const listFn =
@@ -191,7 +193,7 @@ async function clearLibraryKindResume(kind: LibraryKind): Promise<void> {
 			: listEnglishClassicQuotesLibraries;
 	if (hasValidAuthToken()) {
 		const res = await listFn({ limit: 1000, offset: 0 });
-		const libs = Array.isArray(res.data) ? res.data : [];
+		const libs = unwrapEnglishLibraryListPage<{ id: string }>(res.data);
 		await Promise.all(
 			libs.map(async (lib) => {
 				clearElResumeOffset(kind, lib.id);

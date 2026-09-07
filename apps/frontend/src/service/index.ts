@@ -818,6 +818,25 @@ export type EnglishVocabularyLibraryListItem = {
 	itemsResumeOffset?: number;
 };
 
+/** 资源库列表分页：含 Redis 旁路是否命中 */
+export type EnglishLibraryListPage<T> = {
+	items: T[];
+	cacheHit: boolean;
+};
+
+/** 兼容旧数组 data 与新 `{ items, cacheHit }` */
+export function unwrapEnglishLibraryListPage<T>(data: unknown): T[] {
+	if (Array.isArray(data)) return data as T[];
+	if (
+		data &&
+		typeof data === 'object' &&
+		Array.isArray((data as EnglishLibraryListPage<T>).items)
+	) {
+		return (data as EnglishLibraryListPage<T>).items;
+	}
+	return [];
+}
+
 export type EnglishVocabularyLibraryItemRow = EnglishVocabularyItem & {
 	id: string;
 	sortOrder: number;
@@ -830,15 +849,14 @@ export const listEnglishVocabularyLibraries = async (options?: {
 	limit?: number;
 	offset?: number;
 }) => {
-	return await http.get<EnglishVocabularyLibraryListItem[]>(
-		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
-		{
-			querys: {
-				limit: options?.limit ?? 20,
-				offset: options?.offset ?? 0,
-			},
+	return await http.get<
+		EnglishLibraryListPage<EnglishVocabularyLibraryListItem>
+	>(ENGLISH_LEARNING_VOCABULARY_LIBRARIES, {
+		querys: {
+			limit: options?.limit ?? 20,
+			offset: options?.offset ?? 0,
 		},
-	);
+	});
 };
 
 /** 删除单词库（含库内全部词条） */
@@ -918,6 +936,7 @@ export const listEnglishVocabularyLibraryItems = async (
 	return await http.get<{
 		library: EnglishVocabularyLibraryListItem;
 		items: EnglishVocabularyLibraryItemRow[];
+		cacheHit: boolean;
 	}>(ENGLISH_LEARNING_VOCABULARY_LIBRARIES, {
 		params: [libraryId, 'items'],
 		querys: {
@@ -975,15 +994,14 @@ export const listEnglishClassicQuotesLibraries = async (options?: {
 	limit?: number;
 	offset?: number;
 }) => {
-	return await http.get<EnglishClassicQuotesLibraryListItem[]>(
-		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
-		{
-			querys: {
-				limit: options?.limit ?? 20,
-				offset: options?.offset ?? 0,
-			},
+	return await http.get<
+		EnglishLibraryListPage<EnglishClassicQuotesLibraryListItem>
+	>(ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES, {
+		querys: {
+			limit: options?.limit ?? 20,
+			offset: options?.offset ?? 0,
 		},
-	);
+	});
 };
 
 /** 删除经典语句库（含库内全部语句） */
@@ -1063,6 +1081,7 @@ export const listEnglishClassicQuotesLibraryItems = async (
 	return await http.get<{
 		library: EnglishClassicQuotesLibraryListItem;
 		items: EnglishClassicQuotesLibraryItemRow[];
+		cacheHit: boolean;
 	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES, {
 		params: [libraryId, 'items'],
 		querys: {

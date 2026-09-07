@@ -110,6 +110,10 @@ export function useEnglishLearningList<TItem, TLibrary>({
 	const resolveInitialResumeRef = useRef(resolveInitialResume);
 	const refetchOnEnterRef = useRef(refetchOnEnter);
 	const bootedLibraryIdRef = useRef<string | null>(null);
+	/** 相同 id/limit/offset 进行中的请求合并，避免进库竞态双打 */
+	const inflightPageRef = useRef(
+		new Map<string, Promise<ElListPageResult<TItem, TLibrary>>>(),
+	);
 
 	const settingsRev = useSyncExternalStore(
 		subscribeElResumeSettings,
@@ -117,6 +121,8 @@ export function useEnglishLearningList<TItem, TLibrary>({
 		getElResumeSettingsRevision,
 	);
 	const prevSettingsRevRef = useRef(settingsRev);
+	/** 进库时吸收当前 settingsRev，避免 hydrate bump 与首屏加载叠成双请求 */
+	const settingsLibraryIdRef = useRef<string | null>(null);
 
 	resolveInitialResumeRef.current = resolveInitialResume;
 	refetchOnEnterRef.current = refetchOnEnter;
@@ -192,11 +198,19 @@ export function useEnglishLearningList<TItem, TLibrary>({
 	);
 
 	const fetchPageWithRetry = useCallback(
-		(id: string, limit: number, offset: number) =>
-			retryAsync(() => fetchPageRef.current(id, limit, offset), {
+		(id: string, limit: number, offset: number) => {
+			const key = `${id}:${limit}:${offset}`;
+			const hit = inflightPageRef.current.get(key);
+			if (hit) return hit;
+			const req = retryAsync(() => fetchPageRef.current(id, limit, offset), {
 				retries: 2,
 				delayMs: 400,
-			}),
+			}).finally(() => {
+				inflightPageRef.current.delete(key);
+			});
+			inflightPageRef.current.set(key, req);
+			return req;
+		},
 		[],
 	);
 
@@ -496,10 +510,21 @@ export function useEnglishLearningList<TItem, TLibrary>({
 		void hydrateElResumeModuleSettings();
 	}, [resumeModuleKey]);
 
+	// 换库时同步 settings 世代：首屏由 libraryId effect 拉数，不在此处重载
+	useEffect(() => {
+		if (settingsLibraryIdRef.current === libraryId) return;
+		settingsLibraryIdRef.current = libraryId;
+		prevSettingsRevRef.current = settingsRev;
+	}, [libraryId, settingsRev]);
+
 	useEffect(() => {
 		if (!resumeModuleKey || !libraryId) return;
 		if (prevSettingsRevRef.current === settingsRev) return;
 		prevSettingsRevRef.current = settingsRev;
+		// 首屏未就绪时的 revision 变化（多为 hydrate）：忽略，防止与进库加载双打 items
+		if (!listReadyRef.current || bootedLibraryIdRef.current !== libraryId) {
+			return;
+		}
 		bootedLibraryIdRef.current = null;
 		void reloadFromStart(false);
 	}, [libraryId, reloadFromStart, resumeModuleKey, settingsRev]);

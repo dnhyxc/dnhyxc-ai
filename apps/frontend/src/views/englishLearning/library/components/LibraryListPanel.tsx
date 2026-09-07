@@ -28,6 +28,7 @@ import {
 	type EnglishVocabularyLibraryListItem,
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
+	unwrapEnglishLibraryListPage,
 } from '@/service';
 import {
 	hydrateElResumeOffset,
@@ -145,7 +146,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 						});
 			const list = withResumeFromStore(
 				kind,
-				Array.isArray(res.data) ? res.data : [],
+				unwrapEnglishLibraryListPage(res.data),
 			);
 			setEntries(list);
 			offsetRef.current = list.length;
@@ -185,7 +186,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 						});
 			const chunk = withResumeFromStore(
 				kind,
-				Array.isArray(res.data) ? res.data : [],
+				unwrapEnglishLibraryListPage(res.data),
 			);
 			if (chunk.length === 0) {
 				hasMoreRef.current = false;
