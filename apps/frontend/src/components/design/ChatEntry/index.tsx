@@ -153,6 +153,8 @@ interface ChatEntryProps {
 	focusInputAtEndKey?: number;
 	/** 透传到原生 textarea（如电子书侧栏用 id 延后聚焦） */
 	textareaId?: string;
+	/** 最大宽度 */
+	maxWidth?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -182,6 +184,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	inputWrapClassName,
 	focusInputAtEndKey,
 	textareaId,
+	maxWidth = 'max-w-3xl',
 }) => {
 	const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const textareaRef = chatInputRef ?? internalTextareaRef;
@@ -758,15 +761,16 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	return (
 		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
 			{/*
-				w-full：避免在 flex 父级或「外层已 max-w-3xl」嵌套时，内层再度 mx-auto 却不撑满导致卡片视觉上缩进。
-				与知识库消息列表容器「max-w-3xl + w-full」语义对齐。
+				w-full：避免在 flex 父级或「外层已 maxWidth max-w-3xl」嵌套时，内层再度 mx-auto 却不撑满导致卡片视觉上缩进。
+				与知识库消息列表容器 maxWidth 「max-w-3xl + w-full」语义对齐。
 			*/}
-			<div className="mx-auto flex w-full max-w-3xl">
+			<div className={cn('mx-auto flex w-full', maxWidth)}>
 				<div className="relative min-w-0 flex-1">
 					{children}
 					<div
 						className={cn(
-							'flex w-full max-w-3xl flex-col overflow-y-auto rounded-md border border-theme/10 bg-theme/2',
+							'flex w-full flex-col overflow-y-auto rounded-md border border-theme/10 bg-theme/2',
+							maxWidth,
 							inputWrapClassName,
 						)}
 					>
@@ -800,7 +804,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								<div className="w-full px-3 group">
 									<ScrollArea
 										ref={scrollContainer}
-										className="relative max-w-3xl rounded-md"
+										className={cn('relative rounded-md', maxWidth)}
 										onScroll={handleScrollUpdate}
 									>
 										<div className="flex items-center rounded-md">

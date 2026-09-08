@@ -57,6 +57,9 @@ export type AgentPanelProps = {
 
 const getEnglishMessages = () => englishAgentStore.messages;
 
+/** 英语学习 Agent 最大宽度 */
+const AGENT_MAX_WIDTH = 'max-w-5xl';
+
 /**
  * English Agent 空态 Logo：纯 2D 点亮效果
  *
@@ -276,7 +279,7 @@ function EnglishAgentScrollShell({
 	const conversationColumnActive = !isHydrating && messageCount > 0;
 
 	const toolStatusBlock = toolStatus ? (
-		<div className="max-w-3xl px-4.5 py-3">
+		<div className={cn('px-4.5 py-3', AGENT_MAX_WIDTH)}>
 			<div className="w-full border border-theme/10 rounded-md bg-theme/5 text-textcolor/60 shrink-0 px-4 py-2 text-center text-sm">
 				{toolStatus}
 			</div>
@@ -294,8 +297,14 @@ function EnglishAgentScrollShell({
 				isLoading={isHydrating}
 				loadingText={t('englishLearning.loading')}
 				hasMessages={messageCount > 0}
+				maxWidth={AGENT_MAX_WIDTH}
 				emptyState={
-					<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch px-4.5 text-sm">
+					<div
+						className={cn(
+							AGENT_MAX_WIDTH,
+							'text-textcolor/70 mx-auto flex w-full flex-1 flex-col justify-between self-stretch px-4.5 text-sm',
+						)}
+					>
 						{/* 上段：Atom 介绍卡（保留原独立卡片样式） */}
 						<div className="bg-theme/5 flex w-full gap-2 rounded-t-md border border-theme/5 p-3">
 							<Atom
@@ -312,7 +321,12 @@ function EnglishAgentScrollShell({
 						 * 避免容器边界和光晕产生方形对比；
 						 * mt-4 保证图标距上段介绍卡有安全距离，避免发光贴边
 						 */}
-						<div className="flex-1 w-full mb-4.5 pb-8 bg-theme/3 border-l border-r border-b border-theme/5 rounded-b-md">
+						<div
+							className={cn(
+								AGENT_MAX_WIDTH,
+								'flex-1 w-full mb-4.5 pb-8 bg-theme/3 border-l border-r border-b border-theme/5 rounded-b-md',
+							)}
+						>
 							<EnglishAgentLogo />
 						</div>
 					</div>
@@ -343,6 +357,7 @@ function EnglishAgentScrollShell({
 					<AssistantFooter
 						embedded={conversationColumnActive}
 						containerClassName="px-4.5"
+						maxWidth={AGENT_MAX_WIDTH}
 						showScrollFab={
 							conversationColumnActive && scrollFabMode !== 'hidden'
 						}
@@ -471,6 +486,7 @@ export const AgentPanel = observer(function AgentPanel({
 				chatInputRef={chatInputRef}
 				input={input}
 				setInput={setInput}
+				maxWidth={AGENT_MAX_WIDTH}
 				className="w-full px-0 pb-4.5"
 				textareaClassName="min-h-12 rounded-md"
 				inputWrapClassName="border-theme/5 bg-theme/5"

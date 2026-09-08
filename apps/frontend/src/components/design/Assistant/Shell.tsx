@@ -21,6 +21,7 @@ export function AssistantShell({
 	messageContainerClassName,
 	scrollAreaClassName,
 	footer,
+	maxWidth = 'max-w-3xl',
 }: AssistantShellProps) {
 	return (
 		<div
@@ -53,7 +54,8 @@ export function AssistantShell({
 							<div
 								data-stick-scroll-content
 								className={cn(
-									'relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col px-4 pt-4 select-none',
+									'relative mx-auto flex min-h-0 w-full min-w-0 flex-col px-4 pt-4 select-none',
+									maxWidth,
 									messageContainerClassName,
 								)}
 							>

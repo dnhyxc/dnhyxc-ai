@@ -83,6 +83,7 @@ export type AssistantShellProps = {
 	scrollAreaClassName?: string;
 	/** 底部输入区（单一挂载点，避免空态/有消息切换时 remount 历史抽屉） */
 	footer?: ReactNode;
+	maxWidth?: string;
 };
 
 export type AssistantFooterProps = {
@@ -94,6 +95,7 @@ export type AssistantFooterProps = {
 	/** 输入框上方悬浮层（如朗读控制条），定位相对本 Footer 内容区 */
 	floatAbove?: ReactNode;
 	children: ReactNode;
+	maxWidth?: string;
 };
 
 export type SelectMessageByChatId = (chatId: string) => Message | undefined;
