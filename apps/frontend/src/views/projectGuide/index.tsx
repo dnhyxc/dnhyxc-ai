@@ -41,7 +41,7 @@ const ProjectGuidePage = () => {
 			</header>
 
 			<ScrollArea className="min-h-0 flex-1" viewportClassName="pb-1">
-				<main className="mx-auto w-full max-w-3xl px-4 py-6">
+				<main className="mx-auto w-full max-w-4xl px-4 py-6">
 					{sections.map((section) => (
 						<section key={section.id} className="pb-14 last:pb-4">
 							<h2 className="mb-6 text-base font-semibold text-textcolor sm:text-lg">

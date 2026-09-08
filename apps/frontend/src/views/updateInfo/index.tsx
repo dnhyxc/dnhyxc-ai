@@ -45,7 +45,7 @@ const UpdateInfoPage = () => {
 			</header>
 
 			<ScrollArea className="min-h-0 flex-1" viewportClassName="pb-1">
-				<main className="mx-auto w-full max-w-3xl px-4 py-6">
+				<main className="mx-auto w-full max-w-4xl px-4 py-6">
 					<p className="mb-10 text-[15px] leading-7 text-textcolor/72">
 						{intro}
 					</p>

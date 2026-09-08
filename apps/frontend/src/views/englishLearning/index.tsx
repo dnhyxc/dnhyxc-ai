@@ -29,6 +29,8 @@ const EnglishLearning = observer(function EnglishLearning() {
 	const [input, setInput] = useState('');
 	/** Agent 输入框（ChatTextArea），快捷意图填入后用于自动聚焦 */
 	const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+	/** 递增后 ChatEntry 将光标置于文本末尾（Web 在已聚焦时改 value 会把光标打到开头） */
+	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
 	/** 当前由快捷意图自动填入输入框的展示名（与 chip 文案一致），用于取消选中时精确移除 */
 	const intentInputAutoFillRef = useRef<string | null>(null);
 
@@ -61,10 +63,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 			if (payload.mode === 'select') {
 				intentInputAutoFillRef.current = payload.label;
 				setInput(payload.label);
-				// 等布局提交后再聚焦，避免 ref 未更新或光标未落到文本域
-				requestAnimationFrame(() => {
-					chatInputRef.current?.focus();
-				});
+				setFocusInputAtEndKey((k) => k + 1);
 				return;
 			}
 			const snap = intentInputAutoFillRef.current;
@@ -148,6 +147,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 								input={input}
 								setInput={setInput}
 								chatInputRef={chatInputRef}
+								focusInputAtEndKey={focusInputAtEndKey}
 								sendMessage={sendMessage}
 								onNewChat={onNewChat}
 							/>
