@@ -315,7 +315,7 @@ function EbookShelfPage() {
 											<Button
 												variant="link"
 												size="sm"
-												className="lucide-stroke-draw-hover h-8 shrink-0 gap-1.5 px-0!"
+												className="lucide-stroke-draw-hover h-8 shrink-0 gap-1.5 pr-0! transition-none"
 												disabled={uploading || showInitialLoading}
 												onClick={onPickWeb}
 											>
