@@ -123,7 +123,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 									viewportClassName="rounded-md"
 									scrollbarClassName="!top-4.5 !bottom-4.5 h-auto"
 								>
-									<div className="flex min-h-0 flex-1 flex-col">
+									<div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
 										<EnglishLearningSidebar
 											onQuickIntentInputSync={onQuickIntentInputSync}
 										/>

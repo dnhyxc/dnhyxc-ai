@@ -152,7 +152,7 @@ export const VOCAB_COUNT_MAX = 12000;
  * 单词数量、经典语句等数量的常用预设选项。
  * 用于快捷按钮，方便用户一键选择。
  */
-export const VOCAB_COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
+export const VOCAB_COUNT_PRESETS = [100, 500, 1000, 3000, 12000] as const;
 /** 历史列表分页大小（与知识库列表分页量级一致） */
 export const VOCAB_HISTORY_PAGE_SIZE = 50;
 /** 单词库列表每页条数 */
@@ -176,7 +176,7 @@ export const QUOTE_COUNT_MAX = 6000;
  * 英文经典语句、单词等数量的常用预设选项。
  * 用于快捷按钮，方便用户一键选择。
  */
-export const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 6000] as const;
+export const COUNT_PRESETS = [100, 500, 1000, 3000, 5000] as const;
 /**
  * 经典语句/单词历史列表每页拉取的条数，用于分页加载。
  */

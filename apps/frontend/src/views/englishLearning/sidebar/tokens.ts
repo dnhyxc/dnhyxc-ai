@@ -2,7 +2,9 @@
 
 export const SIDEBAR_CARD = 'rounded-md border border-theme/5 bg-theme/5 p-4';
 
-export const SIDEBAR_SECTION_STACK = 'flex flex-col gap-4.5';
+/** 侧栏卡片栈：随侧栏变宽 auto-fill 多列（单卡最小约 22rem，窄时仍单列撑满） */
+export const SIDEBAR_SECTION_STACK =
+	'grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-4.5';
 
 export const SIDEBAR_HEADER_ROW = 'mb-4 flex items-start gap-3';
 
