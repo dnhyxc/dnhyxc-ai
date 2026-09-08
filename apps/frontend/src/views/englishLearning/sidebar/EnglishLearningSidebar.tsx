@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useI18n } from '@/hooks';
+import { useEnglishSidebarMasonry } from '../hooks/useEnglishSidebarMasonry';
 import { ClassicQuotesSection } from '../sections/classic';
 import { VocabularyPackSection } from '../sections/vocabulary';
 import { DailySession } from './components/DailySession';
@@ -22,9 +24,11 @@ export function EnglishLearningSidebar({
 	onQuickIntentInputSync,
 }: EnglishLearningSidebarProps) {
 	const { t } = useI18n();
+	const masonryRef = useRef<HTMLDivElement>(null);
+	useEnglishSidebarMasonry(masonryRef);
 
 	return (
-		<div className={SIDEBAR_SECTION_STACK}>
+		<div ref={masonryRef} className={SIDEBAR_SECTION_STACK}>
 			<DailySession />
 			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />
 			<EnglishSource

@@ -2,9 +2,23 @@
 
 export const SIDEBAR_CARD = 'rounded-md border border-theme/5 bg-theme/5 p-4';
 
-/** 侧栏卡片栈：随侧栏变宽 auto-fill 多列（单卡最小约 22rem，窄时仍单列撑满） */
-export const SIDEBAR_SECTION_STACK =
-	'grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-4.5';
+/** 侧栏卡片栈：瀑布流（1px 行轨 + JS span；原生 masonry/grid-lanes 用 supports 增强） */
+export const SIDEBAR_SECTION_STACK = [
+	'grid w-full min-w-0 items-start',
+	'grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))]',
+	'auto-rows-[1px] gap-x-4.5 gap-y-0',
+	'*:mb-4.5 *:last:mb-0 *:h-max *:min-w-0',
+	// Firefox / 旧实验语法
+	'supports-[grid-template-rows:masonry]:grid-rows-[masonry]',
+	'supports-[grid-template-rows:masonry]:auto-rows-[initial]',
+	'supports-[grid-template-rows:masonry]:gap-4.5',
+	'supports-[grid-template-rows:masonry]:*:mb-0',
+	// Safari 等：grid-lanes
+	'supports-[display:grid-lanes]:[display:grid-lanes]',
+	'supports-[display:grid-lanes]:auto-rows-[initial]',
+	'supports-[display:grid-lanes]:gap-4.5',
+	'supports-[display:grid-lanes]:*:mb-0',
+].join(' ');
 
 export const SIDEBAR_HEADER_ROW = 'mb-4 flex items-start gap-3';
 
