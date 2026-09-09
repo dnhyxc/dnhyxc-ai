@@ -6,8 +6,8 @@ import { FocusCarousel } from '@/components/design/FocusCarousel';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen, openExternalUrl } from '@/utils';
+import { getPluginDevGuideAbsoluteUrl } from '@/utils/remote-docs-url';
 import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
-import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
 import {
 	createFeatures,
 	createHeroSlides,

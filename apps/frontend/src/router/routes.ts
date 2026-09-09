@@ -1,6 +1,7 @@
 /**
  * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
- * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/update-info`、`/project-guide`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
+ * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
+ * `/update-info`、`/project-guide`、`/plugin-dev-guide` 由 plugins-registry remoteDocs* 注入（文案在 micro-apps/remote-docs）。
  *
  * Layout / Home / Login 保持 eager；其余页面 React.lazy，避免主包打进全站视图。
  */
@@ -67,13 +68,11 @@ const Knowledge = lazy(() => import('@/views/knowledge'));
 const LegalServicePolicy = lazy(() => import('@/views/legal/servicePolicy'));
 const LegalUserAgreement = lazy(() => import('@/views/legal/userAgreement'));
 const Pay = lazy(() => import('@/views/pay'));
-const PluginDevGuidePage = lazy(() => import('@/views/pluginDevGuide'));
 const PluginsPage = lazy(() => import('@/views/plugins'));
 const PluginsLayout = lazy(() => import('@/views/plugins/Layout'));
 const PluginRegistryEditorPage = lazy(() => import('@/views/plugins/registry'));
 const Profile = lazy(() => import('@/views/profile'));
 const ProfileLayout = lazy(() => import('@/views/profile/Layout'));
-const ProjectGuidePage = lazy(() => import('@/views/projectGuide'));
 const Setting = lazy(() => import('@/views/setting'));
 const AboutApp = lazy(() => import('@/views/setting/about'));
 const CloudTtsSetting = lazy(() => import('@/views/setting/cloudTts'));
@@ -81,7 +80,6 @@ const LlmSetting = lazy(() => import('@/views/setting/llm'));
 const AppSystem = lazy(() => import('@/views/setting/system'));
 const ThemeSetting = lazy(() => import('@/views/setting/theme'));
 const Share = lazy(() => import('@/views/share'));
-const UpdateInfoPage = lazy(() => import('@/views/updateInfo'));
 const ChildWindow = lazy(() => import('@/views/win'));
 
 export interface RouteMeta {
@@ -429,27 +427,7 @@ const routes: RouteConfig[] = [
 			titleKey: 'route.legal.userAgreement',
 		},
 	},
-	{
-		path: '/update-info',
-		Component: UpdateInfoPage,
-		meta: {
-			titleKey: 'route.updateInfo.title',
-		},
-	},
-	{
-		path: '/project-guide',
-		Component: ProjectGuidePage,
-		meta: {
-			titleKey: 'route.projectGuide.title',
-		},
-	},
-	{
-		path: '/plugin-dev-guide',
-		Component: PluginDevGuidePage,
-		meta: {
-			titleKey: 'route.pluginDevGuide.title',
-		},
-	},
+	// /update-info、/project-guide、/plugin-dev-guide → plugins-registry remoteDocs*
 	{
 		path: '/download-desktop',
 		Component: DesktopDownloadPage,

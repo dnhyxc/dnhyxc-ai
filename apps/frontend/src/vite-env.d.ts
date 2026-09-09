@@ -25,6 +25,10 @@ interface ImportMetaEnv {
 	readonly VITE_HOST_API_VERSION?: string;
 	/** 插件 registry 完整 URL；留空则走 resolveUploadedFileUrl(/remotes/plugins-registry.json) */
 	readonly VITE_PLUGIN_REGISTRY_URL?: string;
+	/** remote-docs 独立站 origin；dev 缺省 http://127.0.0.1:9013，prod 缺省 https://dnhyxc.cn:9017 */
+	readonly VITE_REMOTE_DOCS_ORIGIN?: string;
+	readonly VITE_DEV_WEB_DOMAIN?: string;
+	readonly VITE_PROD_WEB_DOMAIN?: string;
 }
 declare module 'markdown-it-katex';
 declare module 'markdown-it';

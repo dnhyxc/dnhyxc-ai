@@ -4,10 +4,10 @@
 
 | Markdown 姊妹稿 | 中文主数据 | 英文映射（`locale === 'en-US'` 时覆盖） |
 |-----------------|------------|----------------------------------------|
-| `docs/project-update-info.md` | `apps/frontend/src/views/updateInfo/updateInfoSections.ts` | `apps/frontend/src/views/updateInfo/updateInfoSectionsEnOverlay.ts` |
-| `docs/project-guide.md` | `apps/frontend/src/views/projectGuide/projectGuideSections.ts` | `apps/frontend/src/views/projectGuide/projectGuideSectionsEnOverlay.ts` |
+| `docs/project-update-info.md` | `micro-apps/remote-docs/src/views/updateInfo/updateInfoSections.ts` | `…/updateInfoSectionsEnOverlay.ts` |
+| `docs/project-guide.md` | `micro-apps/remote-docs/src/views/projectGuide/projectGuideSections.ts` | `…/projectGuideSectionsEnOverlay.ts` |
 
-**允许改动的业务源码范围**（仅此 4 个文件 + `docs/` 内姊妹稿与专题文）：不得借同步之名改动其它 `apps/**` 文件。
+**允许改动的业务源码范围**（仅此 4 个文件 + `docs/` 内姊妹稿与专题文）：不得借同步之名改动其它 `apps/**` 文件；数据源在 `micro-apps/remote-docs`。
 
 ---
 

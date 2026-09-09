@@ -17,7 +17,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { openExternalUrl } from '@/utils';
 import { withStandaloneLangSearch } from '@/utils/public-doc-url';
+import {
+	getProjectGuideAbsoluteUrl,
+	getUpdateInfoAbsoluteUrl,
+} from '@/utils/remote-docs-url';
 import { DOWNLOAD_DESKTOP_PATH } from './paths';
 import {
 	getBundledDesktopRelease,
@@ -331,7 +336,9 @@ const DesktopDownloadPage = () => {
 								<button
 									type="button"
 									className="cursor-pointer inline-flex items-center gap-1 transition-colors hover:text-teal-500"
-									onClick={() => navigate('/update-info')}
+									onClick={() =>
+										void openExternalUrl(getUpdateInfoAbsoluteUrl(locale))
+									}
 								>
 									{t('downloadPage.links.releaseNotes')}
 									<ArrowRight className="size-3" />
@@ -339,7 +346,9 @@ const DesktopDownloadPage = () => {
 								<button
 									type="button"
 									className="cursor-pointer inline-flex items-center gap-1 transition-colors hover:text-teal-500"
-									onClick={() => navigate('/project-guide')}
+									onClick={() =>
+										void openExternalUrl(getProjectGuideAbsoluteUrl(locale))
+									}
 								>
 									{t('downloadPage.links.userGuide')}
 									<ArrowRight className="size-3" />

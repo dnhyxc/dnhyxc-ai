@@ -20,10 +20,10 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 1. **允许改动的路径（白名单）**
    - `docs/**/*.md`（专题实现文、索引、产品姊妹稿）。
    - **仅当**更新了 `docs/project-update-info.md` 和/或 `docs/project-guide.md` 时， additionally：
-     - `apps/frontend/src/views/updateInfo/updateInfoSections.ts`
-     - `apps/frontend/src/views/updateInfo/updateInfoSectionsEnOverlay.ts`
-     - `apps/frontend/src/views/projectGuide/projectGuideSections.ts`
-     - `apps/frontend/src/views/projectGuide/projectGuideSectionsEnOverlay.ts`
+     - `../micro-apps/remote-docs/src/views/updateInfo/updateInfoSections.ts`
+     - `../micro-apps/remote-docs/src/views/updateInfo/updateInfoSectionsEnOverlay.ts`
+     - `../micro-apps/remote-docs/src/views/projectGuide/projectGuideSections.ts`
+     - `../micro-apps/remote-docs/src/views/projectGuide/projectGuideSectionsEnOverlay.ts`
    - 不得编辑上述白名单以外的 `apps/**`、`packages/**`、`libs/**`、根配置、`scripts/**`（除非用户 Explicitly 授权扩大范围）。
 
 2. **代码块与源码关系**（仅适用于**专题实现文**，不适用于 `project-guide.md` / `project-update-info.md`）

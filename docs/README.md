@@ -98,6 +98,7 @@
 | 富文本编辑器标题与正文分离 / Tab 缩进失效 / Cmd+↑↓ 无响应 / 空段落删不掉 | [ui/富文本编辑器特性.md](./ui/富文本编辑器特性.md)（TitleNode + TabIndent + DocEdgeNav + EmptyParagraphDelete 自定义扩展） |
 | 学习笔记列表不分页 / 无法导出 DOCX / 公开状态切换失败 / 保存无 Toast | [app/学习笔记实现.md](./app/学习笔记实现.md)（MobX Store + HostHttp 注入 + 累积分页 + 双端 downloadBlob） |
 | `/account`、`/pay` 迁移到 `/profile/*` 路由壳 / 旧路径重定向       | [app/个人主页路由重构.md](./app/个人主页路由重构.md)（`ProfileLayout` + `Outlet` + `Navigate` 重定向） |
+| 更新信息 / 产品指南 / 插件开发手册打开为独立站（非 SPA 内页）           | [app/独立文档站迁移.md](./app/独立文档站迁移.md)（`remote-docs-url.ts` + `openExternalUrl`，三路由移出主站） |
 | 视频播放器影院态全屏下控制条看不见（黑底白字）                     | [video/视频播放器Chrome影院主题.md](./video/视频播放器Chrome影院主题.md)（`chromeFg` / `chromeFgMuted` 派生语义色） |
 | 刷新插件路由（如 /video-player）先闪 404 再出插件页                  | [plugins/插件影院全屏.md](./plugins/插件影院全屏.md)（`pluginsReady` + `PluginRoutesPending` 占位）                                         |
 | 插件全屏后 Host 侧栏仍在 / Esc 后壳卡住                              | [plugins/插件影院全屏.md](./plugins/插件影院全屏.md)（`api.ui.setAppFullscreen` + Layout `fullscreenchange` 兜底）                           |

@@ -17,6 +17,16 @@ export * from './event';
 export * from './format-bytes';
 export * from './knowledge-save';
 export { openExternalUrl } from './open-external';
+export {
+	getPluginDevGuideAbsoluteUrl,
+	getProjectGuideAbsoluteUrl,
+	getRemoteDocsAbsoluteUrl,
+	getRemoteDocsOrigin,
+	getUpdateInfoAbsoluteUrl,
+	PLUGIN_DEV_GUIDE_PATH,
+	PROJECT_GUIDE_PATH,
+	UPDATE_INFO_PATH,
+} from './remote-docs-url';
 export { isTauriRuntime } from './runtime';
 export * from './select-files';
 export * from './store';

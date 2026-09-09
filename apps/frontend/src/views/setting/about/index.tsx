@@ -32,9 +32,10 @@ import {
 	setValue,
 	type UpdateType,
 } from '@/utils';
+import { getUpdateInfoAbsoluteUrl } from '@/utils/remote-docs-url';
 
 const SettingAbout = () => {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	const [updateInfo, setUpdateInfo] = useState<UpdateType | null>(null);
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
@@ -232,9 +233,7 @@ const SettingAbout = () => {
 										variant="outline"
 										className="cursor-pointer min-w-24 ml-5"
 										onClick={() =>
-											void openExternalUrl(
-												storageInfo?.notes || updateInfo?.body || '',
-											)
+											void openExternalUrl(getUpdateInfoAbsoluteUrl(locale))
 										}
 									>
 										<Info className="mt-0.5 mr-1" />

@@ -27,8 +27,10 @@ import {
 import type { NavigateFunction } from 'react-router';
 import type { Locale } from '@/i18n';
 import { openExternalUrl } from '@/utils';
-import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
-import { getProjectGuideAbsoluteUrl } from '@/views/projectGuide/paths';
+import {
+	getPluginDevGuideAbsoluteUrl,
+	getProjectGuideAbsoluteUrl,
+} from '@/utils/remote-docs-url';
 
 type TFn = (key: string, params?: Record<string, unknown>) => string;
 

@@ -21,7 +21,7 @@ import { Button, Spinner } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/utils';
-import { getPluginDevGuideAbsoluteUrl } from '@/views/pluginDevGuide/paths';
+import { getPluginDevGuideAbsoluteUrl } from '@/utils/remote-docs-url';
 import { readHostIframeAppearance } from '../capabilities/iframeAppearance';
 import { mf, registerPluginHostPage } from '../runtime';
 import { PluginErrorBoundary } from './PluginErrorBoundary';
