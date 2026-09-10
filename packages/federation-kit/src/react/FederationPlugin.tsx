@@ -8,7 +8,7 @@ import {
 	useState,
 } from 'react';
 import type { AttachIframeBridgeOptions } from '../bridge/attachIframeBridge';
-import type { PluginHostConfig } from '../config/types';
+import type { HostTheme, PluginHostConfig } from '../config/types';
 import { type FederationHost, getDefaultFederation } from '../createFederation';
 import type { HostLocale } from '../types';
 import {
@@ -63,6 +63,8 @@ export type FederationPluginProps = {
 	part?: 'toolbar' | 'drawer-triggers' | 'drawer';
 	slots?: PluginHostViewSlots;
 	locale?: HostLocale;
+	/** 可选；缺省跟 capabilities.getTheme + onAppearanceChange */
+	theme?: HostTheme;
 	ErrorBoundary?: PluginHostViewProps['ErrorBoundary'];
 	/** 覆盖默认 host；跨入口双份打包时建议显式传入 */
 	host?: FederationPluginHost;
@@ -81,6 +83,7 @@ export function FederationPlugin({
 	part,
 	slots,
 	locale: localeProp,
+	theme: themeProp,
 	ErrorBoundary,
 	host: hostProp,
 }: FederationPluginProps) {
@@ -104,6 +107,10 @@ export function FederationPlugin({
 		() => localeProp ?? host.config.capabilities.getLocale(),
 	);
 
+	const [theme, setTheme] = useState<HostTheme>(
+		() => themeProp ?? host.config.capabilities.getTheme(),
+	);
+
 	useEffect(() => {
 		if (localeProp) {
 			setLocale(localeProp);
@@ -115,6 +122,20 @@ export function FederationPlugin({
 		});
 	}, [host, localeProp]);
 
+	useEffect(() => {
+		if (themeProp) {
+			setTheme(themeProp);
+			return;
+		}
+		// getTheme 只在 effect 挂载时跑一次，对齐当前主题
+		setTheme(host.config.capabilities.getTheme());
+		// 复用 iframe 已接好的 appearance 通道；仅取 theme，accent 变化时同值 setTheme 会被 React 跳过
+		return host.config.capabilities.onAppearanceChange?.((next) => {
+			// Host 后续切亮/暗只走此回调；不 setTheme 则本地 state 仍是旧值，PluginHostView 跟不上
+			setTheme(next.theme);
+		});
+	}, [host, themeProp]);
+
 	const iframeBridge: AttachIframeBridgeOptions = useMemo(
 		() => host.getIframeBridgeOptions(),
 		[host],
@@ -124,6 +145,7 @@ export function FederationPlugin({
 		pluginId: id,
 		manager: host.manager,
 		locale,
+		theme,
 		iframeBridge,
 		pageShell,
 		variant: resolvedVariant,

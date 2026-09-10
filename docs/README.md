@@ -79,6 +79,7 @@
 | 改 remote-plugins 内容页面刷两次 / Importing a module script failed | [plugins/远程插件HMR.md](./plugins/远程插件HMR.md)                                                                                                    |
 | 插件生命周期钩子同文件挂载 + Fast Refresh 兼容（App.activate / default 静态属性） | [app/插件生命周期共置.md](./plugins/插件生命周期共置.md)                                                                               |
 | MF 插件语言同步（Host → Remote locale 推送 / i18n 完整接入）         | [plugins/模块联邦插件语言同步.md](./plugins/模块联邦插件语言同步.md)                                                                                            |
+| MF 插件主题热推送（Host → Remote theme light/dark 推送，与 locale 对称） | [plugins/插件主题热推送.md](./plugins/插件主题热推送.md)（withLiveTheme + eventBus.emit("theme")） |
 | MF 动态插件系统完整实现（Vite / PluginManager / 路由注入）          | [plugins/动态插件系统.md](./plugins/动态插件系统.md)（含改动前/后对比与逐行注释）                                                              |
 | 插件开发手册（环境 / 组件 / 样式 / HostBridge / 发布）              | [plugins/插件开发指南.md](./plugins/插件开发指南.md)                                                                                      |
 | 主项目接入插件方式（自动路由 / 手动挂载 / iframe 隔离）             | [plugins/宿主插件集成指南.md](./plugins/宿主插件集成指南.md)                                                                            |

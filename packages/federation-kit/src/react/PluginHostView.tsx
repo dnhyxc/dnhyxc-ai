@@ -11,6 +11,7 @@ import {
 	type AttachIframeBridgeOptions,
 	attachIframeBridge,
 } from '../bridge/attachIframeBridge';
+import type { HostTheme } from '../config/types';
 import { eventBus } from '../host-api/EventBus';
 import type { PluginManager } from '../runtime/createPluginRuntime';
 import { attachPluginStyleIsolation, styleRealmKey } from '../style-isolation';
@@ -43,6 +44,12 @@ export type PluginHostViewProps = {
 	pluginId: string;
 	manager: PluginHostManager;
 	locale: HostLocale;
+	/**
+	 * 当前 chrome 主题（light/dark）。传入后与 locale 一样热推：
+	 * withLiveTheme 覆写 bridge.api.theme + eventBus.emit('theme')。
+	 * 缺省则保持历史行为（api.theme 创建时冻结、无热推）。
+	 */
+	theme?: HostTheme;
 	iframeBridge: AttachIframeBridgeOptions;
 	pageShell?: boolean;
 	/** toolbar 紧凑态；影响 loading/error slots 的 variant */
@@ -64,6 +71,19 @@ function withLiveLocale(
 		api: {
 			...bridge.api,
 			locale,
+		},
+	};
+}
+
+function withLiveTheme(
+	bridge: HostBridgeProps,
+	theme: HostTheme,
+): HostBridgeProps {
+	return {
+		...bridge,
+		api: {
+			...bridge.api,
+			theme,
 		},
 	};
 }
@@ -139,6 +159,7 @@ export function PluginHostView({
 	pluginId,
 	manager,
 	locale,
+	theme,
 	iframeBridge,
 	pageShell,
 	variant = 'default',
@@ -209,10 +230,18 @@ export function PluginHostView({
 		eventBus.emit(pluginId, 'locale', locale);
 	}, [pluginId, status, locale]);
 
-	const liveBridge = useMemo(
-		() => (loaded?.bridge ? withLiveLocale(loaded.bridge, locale) : null),
-		[loaded?.bridge, locale],
-	);
+	// 与 locale 对称；仅在传入 theme 时推送，避免旧调用方无 theme 时误发
+	useEffect(() => {
+		if (status !== 'activated' || theme === undefined) return;
+		eventBus.emit(pluginId, 'theme', theme);
+	}, [pluginId, status, theme]);
+
+	const liveBridge = useMemo(() => {
+		if (!loaded?.bridge) return null;
+		let bridge = withLiveLocale(loaded.bridge, locale);
+		if (theme !== undefined) bridge = withLiveTheme(bridge, theme);
+		return bridge;
+	}, [loaded?.bridge, locale, theme]);
 
 	const wrap = (node: ReactNode) => {
 		const inner = pageShell && slots?.shell ? slots.shell(node) : node;
