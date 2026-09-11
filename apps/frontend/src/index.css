@@ -215,7 +215,7 @@ body {
 	.chat-md-code-block {
 		position: relative;
 		margin: 0.75rem 0;
-		border: 1px solid var(--theme-border);
+		border: 1px solid color-mix(in oklch, var(--theme-color) 10%, transparent);
 		border-radius: 0.5rem;
 		background: color-mix(in oklch, var(--theme-secondary) 55%, transparent);
 		user-select: text;
@@ -223,6 +223,11 @@ body {
 		max-width: 100%;
 		min-width: 0;
 		box-sizing: border-box;
+	}
+
+	/* Mermaid 围栏外壳：与 .chat-md-code-block 同底，工具条叠色后才与 code 一致 */
+	.chat-md-mermaid-block {
+		background: color-mix(in oklch, var(--theme-secondary) 55%, transparent);
 	}
 
 	/* 占位：吸顶时内联工具栏 visibility:hidden，高度由 JS 写 min-height，避免正文跳动 */
@@ -239,8 +244,9 @@ body {
 		gap: 0.5rem;
 		/* 对齐吸顶浮动条：`pl-3 pr-px h-8.5` 的视觉节奏 */
 		padding: 0.28rem 1px 0.32rem 0.72rem;
-		border-radius: 0.5rem 0.5rem 0 0;
-		background: color-mix(in oklch, var(--theme-background) 50%, transparent);
+		border-radius: 0.4rem 0.4rem 0 0;
+		/* 叠在 secondary 底上；与 MermaidFenceToolbar / 浮动条同色 bg-theme/8 */
+		background: color-mix(in oklch, var(--theme-color) 8%, transparent);
 		backdrop-filter: blur(8px);
 		-webkit-backdrop-filter: blur(8px);
 	}
@@ -250,10 +256,10 @@ body {
 		pointer-events: none;
 	}
 
-	/* Portal 到 body 的吸顶条：整块圆角与描边，与块内工具栏视觉一致 */
+	/* Portal 到 body 的吸顶条：仅底部圆角 */
 	.chat-md-code-toolbar--floating {
 		border: 1px solid var(--theme-border);
-		border-radius: 0.5rem;
+		border-radius: 0 0 0.5rem 0.5rem;
 		border-bottom: 1px solid var(--theme-border);
 		box-shadow:
 			0 4px 24px color-mix(in oklch, var(--theme-background) 40%, black),
@@ -358,13 +364,23 @@ body {
 		overflow-x: auto;
 	}
 
-	/* Mermaid 块：上下各 10px 间距（含 .markdown-body 内与 mermaid 岛宿主内） */
+	/* 透出外壳 secondary/55，避免 hljs 主题实色底盖住围栏底色 */
+	.chat-md-code-block code.hljs,
+	.chat-md-code-block .hljs {
+		background: transparent !important;
+		padding: 0 !important;
+	}
+
+	/* Mermaid 块：有外壳时透出 secondary；无外壳（静态 HTML）仍自带底色 */
 	.markdown-body .markdown-mermaid-wrap,
 	.mermaid-island-root .markdown-mermaid-wrap {
-		margin-bottom: 10px;
 		max-width: 100%;
 		overflow-x: auto;
-		background: color-mix(in oklch, var(--theme-background) 18%, transparent);
+		background: color-mix(in oklch, var(--theme-secondary) 55%, transparent);
+	}
+	.chat-md-mermaid-block .markdown-mermaid-wrap,
+	.chat-md-mermaid-block .mermaid-island-root .markdown-mermaid-wrap {
+		background: transparent;
 	}
 	.markdown-body .markdown-mermaid-wrap svg,
 	.mermaid-island-root .markdown-mermaid-wrap svg {
@@ -374,9 +390,9 @@ body {
 	}
 	.markdown-mermaid-wrap {
 		border-radius: 0 0 0.5rem 0.5rem;
-		margin-bottom: 20px !important;
 	}
-	/* 流式聊天图表 code 样式 */
+
+	/* 流式 / 代码模式：在外壳内透出底色，避免与工具条二次叠色 */
 	.markdown-body {
 		.chat-md-mermaid-streaming {
 			border-radius: 0 0 0.5rem 0.5rem;
@@ -384,6 +400,10 @@ body {
 			background: color-mix(in oklch, var(--theme-background) 18%, transparent);
 			color: var(--theme-textcolor);
 		}
+	}
+	.chat-md-mermaid-block .chat-md-mermaid-streaming {
+		margin-bottom: 0 !important;
+		background: transparent;
 	}
 
 	.md-editor-dark,

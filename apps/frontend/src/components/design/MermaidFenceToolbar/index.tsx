@@ -33,10 +33,11 @@ const COPY_FEEDBACK_MS = 1600;
 
 /** 吸顶后与 ChatCodeFloatingToolbar（`ChatCodeToolBar/index.tsx`）工具条视觉一致 */
 const MERMAID_TOOLBAR_PINNED_CHROME =
-	'rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]';
+	'rounded-t-none rounded-b-md bg-theme/8 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]';
 
-/** 未吸顶时与历史实现一致（仅圆角与背景，无阴影/毛玻璃/额外内边距） */
-const MERMAID_TOOLBAR_RESTING_CHROME = 'rounded-t-md bg-theme-background/50';
+/** 未吸顶：与 `.chat-md-code-toolbar` 同色（`bg-theme/8`） */
+const MERMAID_TOOLBAR_RESTING_CHROME =
+	'rounded-t-[0.4rem] bg-theme/8 backdrop-blur-[8px]';
 
 export type MermaidFenceToolbarProps = {
 	/** 用于 Observer 在 block 切换时重建 */
@@ -77,12 +78,12 @@ export function MermaidFenceToolbar({
 		<>
 			<div
 				ref={sentinelRef}
-				className="h-px w-full shrink-0 pointer-events-none"
+				className="w-full shrink-0 pointer-events-none"
 				aria-hidden
 			/>
 			<div
 				className={cn(
-					'px-px sticky top-0 z-10 flex h-8.5 select-none items-center justify-between gap-2',
+					'backdrop-blur-sm px-px sticky top-0 z-10 flex h-8.5 select-none items-center justify-between gap-2',
 					isPinned
 						? MERMAID_TOOLBAR_PINNED_CHROME
 						: MERMAID_TOOLBAR_RESTING_CHROME,
@@ -210,12 +211,15 @@ export function MermaidFenceToolbarActions({
 	);
 
 	return (
-		<div data-mermaid-preview-scope={blockId} className="mt-4.5">
+		<div
+			data-mermaid-preview-scope={blockId}
+			className="chat-md-mermaid-block mt-4.5 mb-5 rounded-md border border-theme/10"
+		>
 			<MermaidFenceToolbar blockId={blockId}>
 				<Button
 					variant="link"
 					size="sm"
-					className="h-8 px-2 text-textcolor/80"
+					className="h-6 px-2 text-textcolor/80"
 					onClick={toggle}
 				>
 					<Code2 size={16} />
@@ -228,7 +232,7 @@ export function MermaidFenceToolbarActions({
 				<div className="flex items-center justify-end">
 					<Button
 						variant="link"
-						className="text-textcolor/80"
+						className="h-6 text-textcolor/80"
 						size="sm"
 						onClick={onCopy}
 					>
@@ -242,7 +246,7 @@ export function MermaidFenceToolbarActions({
 					<Button
 						variant="link"
 						size="sm"
-						className="text-textcolor/80"
+						className="h-6 text-textcolor/80"
 						onClick={onPreview}
 						disabled={mode !== 'diagram'}
 					>
@@ -255,7 +259,7 @@ export function MermaidFenceToolbarActions({
 					<Button
 						variant="link"
 						size="sm"
-						className="text-textcolor/80"
+						className="h-6 text-textcolor/80"
 						type="button"
 						onClick={(e) => void onDownload(e)}
 					>

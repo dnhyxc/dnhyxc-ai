@@ -54,7 +54,7 @@ export default function ChatCodeToolbarFloating(props: { t?: ChatI18nT }) {
 
 	const node = (
 		<div
-			className="flex items-center justify-between gap-2 pl-3 h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
+			className="flex items-center justify-between gap-2 pl-3 h-8.5 rounded-t-none rounded-b-md bg-theme/8 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
 			style={{
 				position: 'fixed',
 				top: state.top,

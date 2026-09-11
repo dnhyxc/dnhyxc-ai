@@ -22,9 +22,10 @@ import {
 	Sparkle,
 	Sparkles,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useTheme } from '@/hooks/theme';
+import { useMarkdownHashLinkViewportScroll } from '@/hooks/useMarkdownHashLinkViewportScroll';
 import { uploadFile } from '@/service';
 import { isValidImageUrl } from '@/utils';
 import { streamFetch } from '@/utils/sse';
@@ -73,6 +74,15 @@ const DocumentProcessor = () => {
 		trigger: content,
 		parser,
 	});
+
+	const getAnalysisScrollViewport = useCallback(
+		() => scrollContainerRef.current,
+		[],
+	);
+	useMarkdownHashLinkViewportScroll(
+		analysisMarkdownRef,
+		getAnalysisScrollViewport,
+	);
 
 	useEffect(() => {
 		return () => {

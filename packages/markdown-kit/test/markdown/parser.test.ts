@@ -50,6 +50,19 @@ describe('MarkdownParser', () => {
 		expect(html).toContain('标题');
 	});
 
+	it('外链带 target=_blank，页内锚点不带', () => {
+		const parser = new MarkdownParser(baseParserOptions);
+		const html = parser.render('[外](http://127.0.0.1:9012/) 与 [锚](#sec)');
+		const external = html.match(
+			/<a\b[^>]*href="http:\/\/127\.0\.0\.1:9012\/"[^>]*>/,
+		);
+		expect(external?.[0]).toContain('target="_blank"');
+		expect(external?.[0]).toContain('rel="noopener noreferrer"');
+		const hash = html.match(/<a\b[^>]*href="#sec"[^>]*>/);
+		expect(hash?.[0]).toBeTruthy();
+		expect(hash?.[0]).not.toContain('target=');
+	});
+
 	it('默认不渲染 raw HTML（防 XSS）', () => {
 		const parser = new MarkdownParser(baseParserOptions);
 		const html = parser.render('<script>evil</script>');

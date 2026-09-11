@@ -414,6 +414,73 @@ useEffect(() => {
 
 - **`export * from './useMarkdownHashLinkViewportScroll'`** 已加入 `apps/frontend/src/hooks/index.ts`，业务可 **`import { useMarkdownHashLinkViewportScroll } from '@/hooks'`**。
 
+### 9.9 宿主三：`document/index.tsx`（文档分析页）
+
+> **改动前**（基线，约 L25 / L74–L76）：该页渲染 Markdown 分析结果（`analysisMarkdownRef` + `useMermaidInMarkdownRoot`），但**未接入** `useMarkdownHashLinkViewportScroll`。正文中的 `#` 锚点链接走浏览器默认片段导航，可能误滚外层 Layout。
+
+**改动前** · `apps/frontend/src/views/document/index.tsx`（基线，约 L25 / L74–L76）
+
+```tsx
+// 旧版：从 react 导入 useEffect 等，无 useCallback
+import { useEffect, useMemo, useRef, useState } from 'react';
+// 旧版：无 useMarkdownHashLinkViewportScroll 导入
+import { getChatMarkdownHighlightTheme } from '@/constants';
+import { useTheme } from '@/hooks/theme';
+import { uploadFile } from '@/service';
+
+// ...（省略组件体）
+
+// 旧版：useMermaidInMarkdownRoot 之后直接 useEffect 清理 timer
+useMermaidInMarkdownRoot({
+	rootRef: analysisMarkdownRef,
+	preferDark: appTheme === 'black',
+	trigger: content,
+	parser,
+});
+
+useEffect(() => {
+	return () => {
+```
+
+**改动后** · `apps/frontend/src/views/document/index.tsx`（当前源码，约 L25–L28 / L78–L85）
+
+```tsx
+// 新增 useCallback：getAnalysisScrollViewport 回调需要 memoized 引用
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getChatMarkdownHighlightTheme } from '@/constants';
+import { useTheme } from '@/hooks/theme';
+// 新增：导入公共锚点滚动 Hook
+import { useMarkdownHashLinkViewportScroll } from '@/hooks/useMarkdownHashLinkViewportScroll';
+import { uploadFile } from '@/service';
+import { isValidImageUrl } from '@/utils';
+import { streamFetch } from '@/utils/sse';
+
+// ...（省略组件体）
+
+useMermaidInMarkdownRoot({
+	rootRef: analysisMarkdownRef,
+	preferDark: appTheme === 'black',
+	trigger: content,
+	parser,
+});
+
+// 新增：返回滚动容器的回调，scrollContainerRef 指向 ScrollArea Viewport
+const getAnalysisScrollViewport = useCallback(
+	() => scrollContainerRef.current,
+	[],
+);
+// 新增：挂载锚点导航——外链拦截 + # 锚点只滚 scrollContainerRef
+useMarkdownHashLinkViewportScroll(
+	analysisMarkdownRef,
+	getAnalysisScrollViewport,
+);
+
+useEffect(() => {
+	return () => {
+```
+
+**变更摘要**：新增 `useMarkdownHashLinkViewportScroll` 调用，将文档分析页的 `#` 锚点导航收敛到公共 Hook；`getAnalysisScrollViewport` 返回 `scrollContainerRef.current`（ScrollArea Viewport），确保只滚正确视口。
+
 ---
 
-*文档版本：与仓库中 `external-link-click.ts`、`hooks/useMarkdownHashLinkViewportScroll.ts`、`Monaco/preview.tsx`、`ChatAssistantMessage/index.tsx`、`Monaco/utils.ts`（`scrollPreviewViewportToRevealElement`）当前实现对齐；修改上述实现时请同步更新本文 §5–§6 与 **§9**。*
+*文档版本：与仓库中 `external-link-click.ts`、`hooks/useMarkdownHashLinkViewportScroll.ts`、`Monaco/preview.tsx`、`ChatAssistantMessage/index.tsx`、`Monaco/utils.ts`（`scrollPreviewViewportToRevealElement`）、`document/index.tsx` 当前实现对齐；修改上述实现时请同步更新本文 §5–§6 与 **§9**。*
