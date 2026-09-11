@@ -20,6 +20,7 @@ import {
 	Code2,
 	Folder,
 	FolderOpen,
+	FolderSearch,
 	Globe,
 	LayoutList,
 	Search,
@@ -37,7 +38,7 @@ import type {
 	KnowledgeListItem,
 	KnowledgeRecord,
 } from '@/types';
-import { formatDate, isTauriRuntime } from '@/utils';
+import { formatDate, isTauriRuntime, revealItemInDir } from '@/utils';
 import { getRequestErrorMessage } from '@/utils/fetch';
 import {
 	formatTauriInvokeError,
@@ -90,6 +91,12 @@ interface KnowledgeListRowProps {
 	onActivate: (item: KnowledgeListItem) => void;
 	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void;
 	onVisibilityClick?: (e: React.MouseEvent, item: KnowledgeListItem) => void;
+	/** 本地文件夹模式：在访达 / 资源管理器中显示（在编辑器按钮左侧） */
+	showRevealInFolder?: boolean;
+	onRevealInFolderClick?: (
+		e: React.MouseEvent,
+		item: KnowledgeListItem,
+	) => void;
 	/** 本地文件夹模式：在 Cursor / Trae 中打开（按钮在删除左侧） */
 	showOpenInExternalEditor?: boolean;
 	onOpenInExternalEditorClick?: (
@@ -111,6 +118,15 @@ interface KnowledgeFolderRowProps {
 	expanded: boolean;
 	onToggle: (path: string) => void;
 }
+
+/** hover 时标题右侧预留：索引 = 可见操作按钮数（≥4 同最大档） */
+const ROW_HOVER_PR = [
+	'',
+	'group-hover:pr-8',
+	'group-hover:pr-14',
+	'group-hover:pr-22',
+	'group-hover:pr-30',
+] as const;
 
 function localFileToListItem(node: LocalMdTreeFile): KnowledgeListItem {
 	return {
@@ -251,6 +267,8 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		onActivate,
 		onTrashClick,
 		onVisibilityClick,
+		showRevealInFolder = false,
+		onRevealInFolderClick,
 		showOpenInExternalEditor = false,
 		onOpenInExternalEditorClick,
 		depth = 0,
@@ -265,6 +283,8 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		}
 	};
 
+	const showReveal =
+		showRevealInFolder && !!item.localAbsolutePath && !!onRevealInFolderClick;
 	const showOpenEditor =
 		showOpenInExternalEditor &&
 		!!item.localAbsolutePath &&
@@ -279,21 +299,14 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		!item.localAbsolutePath &&
 		!!onMoveCategory &&
 		categories.length > 0;
-	const actionCount =
-		(showOpenEditor ? 1 : 0) +
-		(showVisibility ? 1 : 0) +
-		(showCategory ? 1 : 0) +
-		(showTrash ? 1 : 0);
-	const hoverPr =
-		actionCount >= 4
-			? 'group-hover:pr-30'
-			: actionCount >= 3
-				? 'group-hover:pr-22'
-				: actionCount === 2
-					? 'group-hover:pr-14'
-					: actionCount === 1
-						? 'group-hover:pr-8'
-						: '';
+	const actionCount = [
+		showReveal,
+		showOpenEditor,
+		showVisibility,
+		showCategory,
+		showTrash,
+	].filter(Boolean).length;
+	const hoverPr = ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 	const author = item.author?.trim() || '';
 	const updatedLabel = t('knowledge.list.updatedAt', {
 		time: formatDate(item.updatedAt?.toString() ?? ''),
@@ -343,6 +356,30 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 			</div>
 			{actionCount > 0 ? (
 				<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
+					{showReveal ? (
+						<Tooltip
+							side="top"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={t('knowledge.list.revealInFolder')}
+						>
+							<button
+								type="button"
+								aria-label={t('knowledge.list.revealInFolder')}
+								className={cn(
+									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+									'hover:text-teal-500 hover:bg-teal-500/10',
+								)}
+								onClick={(e) => {
+									e.stopPropagation();
+									onRevealInFolderClick?.(e, item);
+								}}
+							>
+								<FolderSearch size={16} />
+							</button>
+						</Tooltip>
+					) : null}
 					{showOpenEditor ? (
 						<Tooltip
 							side="top"
@@ -980,6 +1017,24 @@ const KnowledgeList: React.FC<IProps> = observer(
 			[knowledgeStore, t],
 		);
 
+		/** 本地列表：在访达 / 资源管理器中选中该文件 */
+		const onRevealInFolderClick = useCallback(
+			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				const p = knowledge.localAbsolutePath;
+				if (!p) return;
+				try {
+					await revealItemInDir(p);
+				} catch (err) {
+					Toast({
+						type: 'error',
+						title: t('knowledge.list.revealInFolderFailed'),
+						message: formatTauriInvokeError(err),
+					});
+				}
+			},
+			[t],
+		);
+
 		/** 本地列表：在 Cursor / Trae 中打开（由 Rust detect_markdown_editor，优先 Cursor） */
 		const onOpenInExternalEditorClick = useCallback(
 			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
@@ -1411,6 +1466,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 														}
 														onActivate={handleRowClick}
 														onTrashClick={onTrashClick}
+														showRevealInFolder={isTauriRuntime()}
+														onRevealInFolderClick={onRevealInFolderClick}
 														showOpenInExternalEditor={isTauriRuntime()}
 														onOpenInExternalEditorClick={
 															onOpenInExternalEditorClick

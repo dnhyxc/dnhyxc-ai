@@ -16,7 +16,7 @@ export * from './event';
 export * from './event';
 export * from './format-bytes';
 export * from './knowledge-save';
-export { openExternalUrl } from './open-external';
+export { openExternalUrl, revealItemInDir } from './open-external';
 export {
 	getPluginDevGuideAbsoluteUrl,
 	getProjectGuideAbsoluteUrl,

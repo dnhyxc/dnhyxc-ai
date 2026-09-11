@@ -644,3 +644,132 @@ const toggleLocalDir = useCallback((path: string) => {
 - **键盘可达**：目录行支持 Enter/Space 键展开，`tabIndex={0}` 可聚焦
 - **选择新文件夹**：自动重置展开状态，仅展开新根目录
 - **云端模式不受影响**：仅当 `useLocalFolder=true` 时启用树渲染
+
+## 5.11 知识列表在访达中显示
+
+### 5.11.1 功能概述
+
+桌面端（Tauri）知识库**本地文件夹模式**下，列表行 hover 时新增「在访达中显示」按钮（macOS 访达 / Windows 资源管理器），点击后在系统文件管理器中选中并显示该 `.md` 文件。按钮位于「在编辑器中打开」左侧，仅桌面端可见。
+
+### 5.11.2 架构
+
+```
+用户 hover 本地 .md 列表行
+  │
+  ├─ KnowledgeListRow 组件
+  │   ├─ showReveal = showRevealInFolder && localAbsolutePath && onRevealInFolderClick
+  │   ├─ actionCount = [showReveal, showOpenEditor, showVisibility, showCategory, showTrash].filter(Boolean).length
+  │   ├─ hoverPr = ROW_HOVER_PR[min(actionCount, 4)]   ← 查表
+  │   └─ JSX: {showReveal ? <FolderSearch button> : null}
+  │
+  └─ onRevealInFolderClick (KnowledgeList 主组件)
+      └─ revealItemInDir(path)
+          └─ Tauri invoke('plugin:opener|reveal_item_in_dir', { paths: [path] })
+```
+
+**关键决策**：
+
+1. **`revealItemInDir` 放在 `open-external.ts`**：与 `openExternalUrl` 同属「打开外部应用」语义，共用 `isTauriRuntime` 与 dynamic import 模式。
+2. **Tauri `plugin:opener|reveal_item_in_dir`**：Tauri 官方 opener 插件已封装跨平台文件选中逻辑（macOS `NSWorkspace` / Windows `Explorer.exe`），无需自写 Rust。
+3. **`ROW_HOVER_PR` 查表替代 if-else 链**：原 4 档嵌套三元式已达 4 层，新增第 5 档后改为数组索引查表，扩展只需加一项。
+4. **按钮在编辑器按钮左侧**：reveal（定位文件）→ editor（编辑文件），从左到右符合操作流。
+
+### 5.11.3 关键代码
+
+```typescript
+// ===== 1. revealItemInDir 工具函数：utils/open-external.ts =====
+
+/** 在系统文件管理器中选中并显示文件（macOS 访达 / Windows 资源管理器）。仅 Tauri 可用。 */
+export async function revealItemInDir(path: string): Promise<void> {
+	// 空路径或非 Tauri 环境直接短路
+	if (!path || !isTauriRuntime()) return;
+	// 动态 import Tauri core 的 invoke
+	const { invoke } = await import('@tauri-apps/api/core');
+	// 调 opener 插件命令，传入单元素路径数组
+	await invoke('plugin:opener|reveal_item_in_dir', { paths: [path] });
+}
+
+// ===== 2. ROW_HOVER_PR 常量：views/knowledge/KnowledgeList.tsx =====
+
+/** hover 时标题右侧预留：索引 = 可见操作按钮数（≥4 同最大档） */
+const ROW_HOVER_PR = [
+	'',                  // 0 个按钮
+	'group-hover:pr-8',  // 1 个
+	'group-hover:pr-14', // 2 个
+	'group-hover:pr-22', // 3 个
+	'group-hover:pr-30', // 4+ 个
+] as const;
+
+// ===== 3. KnowledgeListRow 组件内 actionCount 重构 =====
+
+// 新增 showReveal 计算
+const showReveal =
+	showRevealInFolder && !!item.localAbsolutePath && !!onRevealInFolderClick;
+// 重构：数组 filter 计数替代三元式累加
+const actionCount = [
+	showReveal, showOpenEditor, showVisibility, showCategory, showTrash,
+].filter(Boolean).length;
+// 重构：查表替代嵌套三元式
+const hoverPr = ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
+
+// ===== 4. JSX 新增 FolderSearch 按钮（在 Code2 按钮左侧） =====
+
+{showReveal ? (
+	<Tooltip side="top" sideOffset={6} delayDuration={200} shadow
+		content={t('knowledge.list.revealInFolder')}>
+		<button type="button"
+			aria-label={t('knowledge.list.revealInFolder')}
+			className={cn(
+				'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
+				'hover:text-teal-500 hover:bg-teal-500/10',
+			)}
+			onClick={(e) => {
+				e.stopPropagation();
+				onRevealInFolderClick?.(e, item);
+			}}>
+			<FolderSearch size={16} />
+		</button>
+	</Tooltip>
+) : null}
+
+// ===== 5. onRevealInFolderClick callback（KnowledgeList 主组件） =====
+
+const onRevealInFolderClick = useCallback(
+	async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+		const p = knowledge.localAbsolutePath;
+		if (!p) return;
+		try {
+			await revealItemInDir(p);
+		} catch (err) {
+			Toast({
+				type: 'error',
+				title: t('knowledge.list.revealInFolderFailed'),
+				message: formatTauriInvokeError(err),
+			});
+		}
+	},
+	[t],
+);
+
+// ===== 6. 渲染传参 =====
+
+<KnowledgeListRow
+	// ...（其它 props 不变）
+	showRevealInFolder={isTauriRuntime()}
+	onRevealInFolderClick={onRevealInFolderClick}
+	showOpenInExternalEditor={isTauriRuntime()}
+	onOpenInExternalEditorClick={onOpenInExternalEditorClick}
+/>
+```
+
+### 5.11.4 维护速查
+
+| 问题现象 | 先查哪个子模块 | 具体文件 / 排查点 |
+| --- | --- | --- |
+| **访达按钮不显示** | `showReveal` 计算条件 | `showRevealInFolder` 是否传了 `isTauriRuntime()`；`item.localAbsolutePath` 是否有值；`onRevealInFolderClick` 是否传入 |
+| **点击访达按钮无反应** | `revealItemInDir` | 非 Tauri 环境会短路返回；`invoke` 是否抛错（看控制台） |
+| **点击后弹错误 Toast** | Tauri opener 权限 | capabilities JSON 是否含 `core:opener:allow-reveal-item-in-dir`；路径是否有效 |
+| **hover 标题被按钮遮挡** | `ROW_HOVER_PR` 查表 | `actionCount` 是否正确计数；`ROW_HOVER_PR` 数组是否被修改导致索引错位 |
+| **新增按钮后 padding 不够** | `ROW_HOVER_PR` 档位 | 按钮数 > 4 时全部命中 `pr-30` 最大档；若不够需追加 `pr-38` 等更大档 |
+| Web 端出现访达按钮 | `isTauriRuntime()` | Web 端 `isTauriRuntime()` 应返回 false；确认 `showRevealInFolder` 传参 |
+

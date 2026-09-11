@@ -22,3 +22,12 @@ export async function openExternalUrl(url: string): Promise<void> {
 	}
 	window.open(url, '_blank', 'noopener,noreferrer');
 }
+
+/**
+ * 在系统文件管理器中选中并显示文件（macOS 访达 / Windows 资源管理器）。仅 Tauri 可用。
+ */
+export async function revealItemInDir(path: string): Promise<void> {
+	if (!path || !isTauriRuntime()) return;
+	const { invoke } = await import('@tauri-apps/api/core');
+	await invoke('plugin:opener|reveal_item_in_dir', { paths: [path] });
+}

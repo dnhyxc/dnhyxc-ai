@@ -892,6 +892,8 @@ export const enUS = {
 	'knowledge.shortcuts.openTrash': 'Meta + Shift + T',
 
 	'knowledge.list.openInEditor': 'Open in Cursor or Trae',
+	'knowledge.list.revealInFolder': 'Reveal in Finder',
+	'knowledge.list.revealInFolderFailed': 'Could not reveal in Finder',
 	'knowledge.list.deleteLocalMdAria': 'Delete local Markdown file',
 	'knowledge.list.deleteFromLibraryAria': 'Delete from knowledge library',
 	'knowledge.list.publicConfirmTitle': 'Make this knowledge document public?',

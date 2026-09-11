@@ -821,6 +821,8 @@ export const zhCN = {
 	'knowledge.shortcuts.openTrash': 'Meta + Shift + T',
 
 	'knowledge.list.openInEditor': '在 Cursor 或 Trae 中打开',
+	'knowledge.list.revealInFolder': '在访达中显示',
+	'knowledge.list.revealInFolderFailed': '无法在访达中显示',
 	'knowledge.list.deleteLocalMdAria': '删除本地 Markdown 文件',
 	'knowledge.list.deleteFromLibraryAria': '从知识库删除',
 	'knowledge.list.publicConfirmTitle': '确定公开这条知识文档？',
