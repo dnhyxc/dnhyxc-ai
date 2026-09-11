@@ -21,13 +21,13 @@ export type AttachExternalLinkClickOptions = {
 };
 
 /**
- * 在给定容器上接管链接点击，统一用系统默认浏览器打开。
+ * 在给定容器上接管链接点击，统一用系统默认浏览器 / 新标签打开。
  *
- * 说明：
- * - Tauri：`openExternalUrl` 内部走 opener 插件（系统默认浏览器）。
- * - Web：`openExternalUrl` 内部走 window.open 新标签页。
- *
- * 页内锚点（`skipHashAnchors`）：见类型字段说明；实录见 `docs/monaco/markdown-preview-toc-hash-navigation.md`。
+ * 与 `markdown-kit` 的 `patchExternalLinksOpenBlank`（渲染层补 `target="_blank"`）互补：
+ * - kit：Web 兜底，防同页导航顶掉 SPA；**不**调 Tauri opener。
+ * - 本拦截：`preventDefault` 后走 `openExternalUrl`（Tauri → 系统浏览器；Web → window.open）。
+ * - 桌面壳 / MF 嵌 WebView **不能**只靠 `_blank`，须保留本拦截。
+ * - 场景表：`docs/tools/外链新标签打开.md` §5；页内 `#` 见 `docs/monaco/Markdown预览目录哈希导航.md`。
  */
 export function attachExternalLinkClickInterceptor(
 	container: HTMLElement,

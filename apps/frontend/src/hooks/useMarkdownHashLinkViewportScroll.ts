@@ -22,6 +22,8 @@ export type AttachMarkdownHashLinkNavigationOptions = {
 /**
  * 在 Markdown 宿主根节点上挂载：外链拦截（`#` 仅 `preventDefault`）+ 冒泡 `click` 处理目录/页内锚点。
  *
+ * - 外链：捕获阶段 `attachExternalLinkClickInterceptor` → `openExternalUrl`（Tauri 系统浏览器）。
+ *   与 kit 渲染层 `target="_blank"` 互补，桌面不能只靠 `_blank`（见 `docs/tools/外链新标签打开.md` §5）。
  * - 在 **整棵 `host` 子树** 内 `querySelector('#id')`，兼容多块 `.markdown-body`（Mermaid 拆岛等）。
  * - 使用 `scrollPreviewViewportToRevealElement`，**禁止**对标题 `scrollIntoView`，避免滚动链误滚 Layout。
  *

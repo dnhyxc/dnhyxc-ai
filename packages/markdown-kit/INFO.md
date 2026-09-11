@@ -74,7 +74,7 @@ document.getElementById('preview')!.innerHTML = parser.render('# 标题\n\n正�
 ```
 
 - **`render(text)`**：返回包裹 **`containerClass`**（默认 `markdown-body`）的 HTML 字符串；失败时调用可选 **`onError`**，并回退为带容器的原文。
-- **内置能力**：`html` / `linkify` / `typographer` / `breaks`（均可通过构造选项关闭或调整；其中 `html` **默认关闭**，避免 raw HTML 带来 XSS 风险）、**KaTeX**（`$...$` 等 + `\(...\)` / `\[...\]`）、**highlight.js** 围栏高亮、**GFM 待办列表**（`markdown-it-task-lists` + 裸 `[x]`/`[ ]` 补丁）。
+- **内置能力**：`html` / `linkify` / `typographer` / `breaks`（均可通过构造选项关闭或调整；其中 `html` **默认关闭**，避免 raw HTML 带来 XSS 风险）、**KaTeX**（`$...$` 等 + `\(...\)` / `\[...\]`）、**highlight.js** 围栏高亮、**GFM 待办列表**（`markdown-it-task-lists` + 裸 `[x]`/`[ ]` 补丁）、**外链默认 `target="_blank"`**（页内 `#` 除外；仅渲染层属性，桌面系统浏览器仍须宿主点击拦截，见仓库 `docs/tools/外链新标签打开.md` §5）。
 
 ### 1.0 安全提示：raw HTML 与 XSS
 

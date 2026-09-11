@@ -427,8 +427,12 @@ class MarkdownParser {
 	}
 
 	/**
-	 * 外链默认新标签打开（页内 `#` 锚点除外），避免 SPA / WebView 内同页导航顶掉应用。
-	 * 桌面壳仍建议宿主拦截点击走系统浏览器（见 Host `attachExternalLinkClickInterceptor`）。
+	 * 渲染层：给外链 `<a>` 补 `target="_blank"` + `rel="noopener noreferrer"`（页内 `#` 除外）。
+	 *
+	 * - **只改 HTML 属性**，不处理 click、不调 opener；避免 SPA 同页导航顶掉应用（Web 兜底）。
+	 * - **不能替代**宿主点击拦截：Tauri / MF 嵌桌面时 `_blank` 仍常是应用内窗口，须
+	 *   `attachExternalLinkClickInterceptor` → `openExternalUrl`（系统浏览器）。
+	 * - 主项目 / remote-docs 何时还要拦：见 `docs/tools/外链新标签打开.md` §5。
 	 */
 	private patchExternalLinksOpenBlank(): void {
 		const md = this.md;

@@ -150,7 +150,7 @@
 | 插件 registry 保存接口 403「需要超级管理员权限」/ 非管理员能改插件清单 | [ops/注册表写入超级管理员鉴权.md](./ops/注册表写入超级管理员鉴权.md)（后端三层鉴权 + 前端编辑按钮显隐） |
 | 浅色主题下 Sheet 抽屉无边界 / 卡片弹窗描边全透明 / 正文白字白底不可读 | [ui/Sheet描边与主题墨色修正.md](./ui/Sheet描边与主题墨色修正.md)（浅色 `--theme-color` 墨色基线纠正 + Sheet 四方向 `border-theme/10`） |
 | 独立页 / 外链打开时强调色不跟随主站 | [ui/强调色外链同步.md](./ui/强调色外链同步.md)（URL `?accent=` 解析 + `appendShareAccentQuery` 分享链接 + 首屏内联脚本优先） |
-| Markdown 外链在当前页打开顶掉应用 | [tools/外链新标签打开.md](./tools/外链新标签打开.md)（`patchExternalLinksOpenBlank` + `target="_blank"` + `rel="noopener noreferrer"`） |
+| Markdown 外链在当前页打开顶掉应用 / 桌面要进系统浏览器 | [tools/外链新标签打开.md](./tools/外链新标签打开.md)（kit 补 `target="_blank"` + Host/remote-docs 点击拦截分工，见 §5） |
 | 代码块与 Mermaid 围栏视觉不统一 / hljs 实色底覆盖外壳 | [mermaid/围栏视觉统一.md](./mermaid/围栏视觉统一.md)（`bg-theme/8` 统一 + hljs 透明 + `.chat-md-mermaid-block` 外壳） |
 | 非可显示 SecretInput 密码框明文泄露 | [ui/SecretInput显示修正.md](./ui/SecretInput显示修正.md)（`inputType` 三元逻辑反转，`revealable=false` 时默认 `password`） |
 | 桌面下载页硬编码 teal 光晕 / Hero 标题不跟随强调色 | [ui/桌面下载页视觉重构.md](./ui/桌面下载页视觉重构.md)（`color-mix(in oklch, var(--brand-accent))` 光晕 + 渐变标题 + 单卡片布局） |

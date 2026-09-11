@@ -5,6 +5,9 @@ import { isTauriRuntime } from './runtime';
  * Tauri：经 core.invoke 调 opener（避免动态 import `@tauri-apps/plugin-opener`
  * 在 Vite 长跑 HMR 后触发 504 Outdated Optimize Dep）。
  * Web：window.open。
+ *
+ * 与 markdown-kit `patchExternalLinksOpenBlank`（仅补 target=_blank）互补：桌面须走本函数
+ * 才能进系统浏览器。见 `docs/tools/外链新标签打开.md` §5。
  */
 export async function openExternalUrl(url: string): Promise<void> {
 	if (!url) return;
