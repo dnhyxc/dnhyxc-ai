@@ -10,7 +10,11 @@ import { ChatModule } from '../chat/chat.module';
 import { ChatSessions } from '../chat/session.entity';
 import { EbookAssistantMessage } from '../ebook-assistant/ebook-assistant-message.entity';
 import { EbookAssistantSession } from '../ebook-assistant/ebook-assistant-session.entity';
+import { EnglishAgentMessage } from '../english-learning/entity/english-agent-message.entity';
+import { EnglishAgentSession } from '../english-learning/entity/english-agent-session.entity';
 import { Knowledge } from '../knowledge/knowledge.entity';
+import { SkillTryMessage } from '../skill/skill-try-message.entity';
+import { SkillTrySession } from '../skill/skill-try-session.entity';
 import { ShareController } from './share.controller';
 import { ShareService } from './share.service';
 
@@ -27,6 +31,10 @@ import { ShareService } from './share.service';
 			AssistantMessage,
 			AgentSession,
 			AgentMessage,
+			EnglishAgentSession,
+			EnglishAgentMessage,
+			SkillTrySession,
+			SkillTryMessage,
 			EbookAssistantSession,
 			EbookAssistantMessage,
 			Knowledge,

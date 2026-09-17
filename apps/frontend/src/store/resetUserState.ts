@@ -10,6 +10,8 @@ import EnglishPackStore from './englishPack';
 import { clearEnglishPracticePoolCache } from './englishPracticePool';
 import knowledgeStore from './knowledge';
 import knowledgeRagQaStore from './knowledgeRagQa';
+import skillStore from './skill';
+import skillTryStore from './skillTry';
 
 let resetting = false;
 
@@ -27,6 +29,8 @@ export function resetUserState(): void {
 		englishAgentStore.resetConversation();
 		EnglishPackStore.resetOnUserSwitch();
 		knowledgeStore.resetOnUserSwitch();
+		skillStore.resetOnUserSwitch();
+		skillTryStore.resetOnUserSwitch();
 		ebookStore.resetOnUserSwitch();
 		ebookAssistantStore.resetForBook();
 		clearEnglishPracticePoolCache();

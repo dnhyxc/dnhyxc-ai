@@ -1,5 +1,5 @@
 /**
- * 助手输入区工具条（历史 / 新对话 / 删除）：对接 knowledge / ebook / english Store。
+ * 助手输入区工具条（新对话 / 历史 / 删除）：对接 knowledge / ebook / english / skill Store。
  */
 import { observer } from 'mobx-react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
@@ -8,9 +8,15 @@ import { useI18n } from '@/hooks';
 import assistantStore from '@/store/assistant';
 import ebookAssistantStore from '@/store/ebookAssistant';
 import englishAgentStore from '@/store/englishAgent';
+import skillStore from '@/store/skill';
+import skillTryStore from '@/store/skillTry';
 import { AssistantEntryToolbar } from './EntryToolbar';
 
-export type AssistantSessionStoreKind = 'document' | 'ebook' | 'english';
+export type AssistantSessionStoreKind =
+	| 'document'
+	| 'ebook'
+	| 'english'
+	| 'skill';
 
 export type AssistantSessionEntryToolbarProps = {
 	store: AssistantSessionStoreKind;
@@ -23,6 +29,8 @@ export type AssistantSessionEntryToolbarProps = {
 	flushScrollToBottom: (options?: { force?: boolean }) => void;
 	layout?: 'knowledge' | 'english';
 	extraActions?: ReactNode;
+	/** 历史/新对话仅图标 + Tooltip（知识库窄栏、Skill 侧栏、英语 Agent 等） */
+	iconOnlyActions?: boolean;
 	/** english：新对话草稿创建后的业务回调 */
 	onNewConversation?: () => void | Promise<void>;
 };
@@ -39,6 +47,7 @@ export const AssistantSessionEntryToolbar = observer(
 		flushScrollToBottom,
 		layout,
 		extraActions,
+		iconOnlyActions = false,
 		onNewConversation,
 	}: AssistantSessionEntryToolbarProps) {
 		const { t } = useI18n();
@@ -56,6 +65,7 @@ export const AssistantSessionEntryToolbar = observer(
 					enableStreamStickToBottom={enableStreamStickToBottom}
 					flushScrollToBottom={flushScrollToBottom}
 					layout={layout ?? 'knowledge'}
+					iconOnlyActions={iconOnlyActions}
 					historyAriaLabel={t('knowledge.assistant.history')}
 					historyLockedToast={t('knowledge.assistant.sessionSavingViewHistory')}
 					newConversationLockedToast={t('knowledge.assistant.sessionSaving')}
@@ -69,9 +79,10 @@ export const AssistantSessionEntryToolbar = observer(
 							sessionList.length === 0 &&
 							!assistantStore.historySessionLoadingMore,
 					}}
-					onNewConversation={() =>
-						void assistantStore.createNewSessionForCurrentDocument()
-					}
+					onNewConversation={() => {
+						skillStore.clearSelected();
+						void assistantStore.createNewSessionForCurrentDocument();
+					}}
 					onDeleteSession={(sessionId) =>
 						assistantStore.deleteSessionForCurrentDocument(sessionId)
 					}
@@ -79,8 +90,12 @@ export const AssistantSessionEntryToolbar = observer(
 						activeSessionId: assistantStore.activeSessionId,
 						isSessionStreaming: (sessionId) =>
 							assistantStore.isSessionStreaming(sessionId),
-						onSwitchSession: (sessionId) =>
-							assistantStore.switchSessionForCurrentDocument(sessionId),
+						onSwitchSession: (sessionId) => {
+							if (sessionId !== assistantStore.activeSessionId) {
+								skillStore.clearSelected();
+							}
+							return assistantStore.switchSessionForCurrentDocument(sessionId);
+						},
 						onViewportScroll: assistantStore.onHistorySessionViewportScroll,
 						closeDrawerBeforeSwitch: false,
 					}}
@@ -133,6 +148,56 @@ export const AssistantSessionEntryToolbar = observer(
 			);
 		}
 
+		if (store === 'skill') {
+			const sessionList = skillTryStore.sessionList;
+			return (
+				<AssistantEntryToolbar
+					visible={visible}
+					showSessionActions={showSessionActions}
+					isSessionSwitcherLocked={isSessionSwitcherLocked}
+					isHistoryDrawerOpen={isHistoryDrawerOpen}
+					setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
+					enableStreamStickToBottom={enableStreamStickToBottom}
+					flushScrollToBottom={flushScrollToBottom}
+					layout={layout ?? 'knowledge'}
+					iconOnlyActions
+					historyAriaLabel={t('knowledge.assistant.history')}
+					historyLockedToast={t('knowledge.assistant.sessionSavingViewHistory')}
+					newConversationLockedToast={t('knowledge.assistant.sessionSaving')}
+					history={{
+						sessionList,
+						showInitialPlaceholder:
+							skillTryStore.historySessionLoading && sessionList.length === 0,
+						showLoadMoreHint: skillTryStore.historySessionLoadingMore,
+						showEmptyHint:
+							!skillTryStore.historySessionLoading &&
+							sessionList.length === 0 &&
+							!skillTryStore.historySessionLoadingMore,
+					}}
+					onNewConversation={() => {
+						setIsHistoryDrawerOpen(false);
+						skillTryStore.newChat();
+						void onNewConversation?.();
+					}}
+					onDeleteSession={(sessionId) =>
+						skillTryStore.deleteSession(sessionId)
+					}
+					historyActions={{
+						activeSessionId: skillTryStore.activeSessionId,
+						isSessionStreaming: (sessionId) =>
+							skillTryStore.isSessionStreaming(sessionId),
+						onSwitchSession: (sessionId) =>
+							skillTryStore.switchSession(sessionId),
+						onViewportScroll: skillTryStore.onHistorySessionViewportScroll,
+						closeDrawerBeforeSwitch: false,
+						onRenameSession: (sessionId, title) =>
+							skillTryStore.renameSession(sessionId, title),
+					}}
+					extraActions={extraActions}
+				/>
+			);
+		}
+
 		const sessionList = englishAgentStore.sessionList;
 		const historyOpenLabel =
 			t?.('englishLearning.vocab.historyOpenDrawer') ?? '历史记录';
@@ -147,8 +212,8 @@ export const AssistantSessionEntryToolbar = observer(
 				enableStreamStickToBottom={enableStreamStickToBottom}
 				flushScrollToBottom={flushScrollToBottom}
 				layout={layout ?? 'english'}
+				iconOnlyActions
 				historyAriaLabel={historyOpenLabel}
-				historyButtonLabel={historyOpenLabel}
 				historyLockedToast={historyOpenLabel}
 				newConversationLockedToast={t('knowledge.assistant.sessionSaving')}
 				history={{

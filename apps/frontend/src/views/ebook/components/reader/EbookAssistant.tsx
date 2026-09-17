@@ -207,7 +207,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 				onClick: onScrollFabClick,
 				toBottomLabel: t('knowledge.assistant.scrollToBottom'),
 				toTopLabel: t('knowledge.assistant.scrollToTop'),
-				variant: 'english',
+				variant: 'panel',
 			}}
 			floatAbove={selectionSpeak.floatAbove}
 		>
@@ -227,7 +227,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 					setInput={setInput}
 					className="w-full px-0 pb-4"
 					textareaClassName={cn('min-h-12', epubReaderChromeTextareaClass)}
-					inputWrapClassName="border border-theme/10"
+					inputWrapClassName="border-theme/5 bg-theme/5"
 					sendMessage={sendMessage}
 					placeholder={t('ebook.read.assistant.placeholder')}
 					disableTextInput={false}
@@ -293,6 +293,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 				messageList={aiMessages.map((message, index) => (
 					<AssistantMessageRow
 						key={message.chatId}
+						variant="panel"
 						selectMessageByChatId={selectEbookMessageByChatId}
 						t={t}
 						chatId={message.chatId}

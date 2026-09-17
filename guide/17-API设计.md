@@ -260,6 +260,28 @@ Response:
 }
 ```
 
+### 17.4.5 知识库助手与 Skill 对话
+
+```
+POST   /api/v1/assistant/sse               助手问答（无 Skill）
+GET    /api/v1/assistant/session/:id       会话详情（含 appliedSkills）
+POST   /api/v1/assistant/session/title     更新会话标题（Body: { sessionId, title }）
+POST   /api/v1/assistant/session/import-transcript  草稿迁入（可透传 appliedSkills）
+
+# 有 Skill：公共 Agent（UI 仍写助手 Store）
+POST   /api/v1/agent/sse
+Body: {
+  "sessionId": "<agent 停流句柄>",
+  "content": "...",
+  "skillIds": ["uuid", "..."],
+  "memorySource": "assistant",
+  "assistantSessionId": "<助手会话 uuid>"
+}
+→ SSE：skillsApplied / content / done …
+```
+
+已保存用 `memorySource=assistant`；未保存草稿显式 `agent`。见 [guide/05 §5.12](./05-知识库与RAG.md)。
+
 ---
 
 ## 17.5 英语学习 API
@@ -291,14 +313,20 @@ Body: { "topic": "自由", "count": 5 }
 → SSE stream
 ```
 
-### 17.5.3 Agent 对话
+### 17.5.3 Agent 对话（公共 SSE；英语入口）
 
 ```
-GET    /api/v1/agent/sessions              列出会话
-POST   /api/v1/agent/sessions              创建会话
-DELETE /api/v1/agent/sessions/:id          删除会话
-POST   /api/v1/agent/chat                  发送消息（SSE）
+POST   /api/v1/agent/session               创建会话（Body 可含 memorySource=english_learning）
+GET    /api/v1/agent/sessions              列出会话（现网仅英语业务表）
+GET    /api/v1/agent/session/:sessionId    会话详情（按表路由）
+POST   /api/v1/agent/session/title         更新标题
+DELETE /api/v1/agent/session/:sessionId    删除会话
+POST   /api/v1/agent/sse                   发送消息（SSE；可带 memorySource / skillIds）
+POST   /api/v1/agent/stop                  停止生成
 ```
+
+`memorySource`：`agent` | `assistant` | `english_learning` | `skill_try`。  
+知识库 Skill / Skill 试跑亦走同一 `/agent/sse`，见 §17.4.5、§17.10。
 
 ### 17.5.4 今日记词
 
@@ -440,7 +468,23 @@ GET  /api/v1/video/:id/stream              获取播放流
 
 ---
 
-## 17.9 错误码
+## 17.9 Skill API
+
+```
+POST   /api/v1/skill/save                  新建 Skill
+GET    /api/v1/skill/list                  列表
+GET    /api/v1/skill/detail/:id            详情
+PUT    /api/v1/skill/update/:id            更新
+DELETE /api/v1/skill/delete/:id            删除
+GET    /api/v1/skill/sessions              试跑会话列表
+POST   /api/v1/skill/session               创建试跑会话（与 agent_sessions 同 id）
+```
+
+试跑/生成对话走 `POST /api/v1/agent/sse`，`memorySource=skill_try`（可带 `skillIds` / `assistMode`）。见 [guide/05 §5.13](./05-知识库与RAG.md)。
+
+---
+
+## 17.10 错误码
 
 | 码 | 含义 | 建议 |
 |----|------|------|

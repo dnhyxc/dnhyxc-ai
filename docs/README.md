@@ -33,6 +33,7 @@
 | [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/Stripe会员计费.md](./pay/Stripe会员计费.md)、[pay/会员激活钩子.md](./pay/会员激活钩子.md) |
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
 | [`ideas/`](./ideas/)         | **规划态**功能实现思路（架构/流程图）   | [ideas/README.md](./ideas/README.md)                                                                                                     |
+| [`agent/`](./agent/)         | Agent 通用调用与业务消息分表            | [agent/README.md](./agent/README.md)                                                                                                     |
 | [`impact/`](./impact/)       | 跨功能改动影响面分析                    | [impact/README.md](./impact/README.md)                                                                                                   |
 | [`guide/`](../guide/)         | **开发者上手手册**（按功能域端到端教程） | [guide/README.md](../guide/README.md)                                                                                                     |
 
@@ -54,6 +55,7 @@
 | 对话硅基接入                                                      | [llm/硅基对话统一.md](./llm/硅基对话统一.md)                                                                             |
 | 聊天附件预览失败                                                  | [chat/对话上传预览.md](./chat/对话上传预览.md)                                                                                             |
 | 助手消息选区朗读 / 右键菜单无反应 / 与听书同时出声                | [chat/助手选区朗读指南.md](./chat/助手选区朗读指南.md) |
+| Skill 页开合库打断朗读 / 试跑与生成消息串台 / 切会话不停播        | [knowledge/Skill侧栏朗读与会话切换.md](./knowledge/Skill侧栏朗读与会话切换.md) |
 | 助手拖选移出窗口后整页上移 / 底边黑缝 / 上下留白不一致              | [ui/选区拖拽壳层滚动指南.md](./ui/选区拖拽壳层滚动指南.md)                                                                     |
 | 选区朗读控制条无法拖动缩放 / 高亮漂移 / 中英混排朗读不准          | [chat/助手选区朗读指南.md](./chat/助手选区朗读指南.md) · [chat/选区朗读通用.md](./chat/选区朗读通用.md)（历史对照） · [ebook/TTS音频进度同步.md](./ebook/TTS音频进度同步.md)         |
 | 流式对话中选区文字丢失 / 拖选后选区自动消失 | [chat/流式选区保持.md](./chat/流式选区保持.md) |
@@ -138,6 +140,13 @@
 | 知识库长文编辑卡顿（标题/正文/助手输入）                          | [knowledge/知识编辑器长文本性能.md](./knowledge/知识编辑器长文本性能.md)                                                             |
 | 预览+助手同开卡顿（流式输入/滚动/打字机）                         | [knowledge/知识预览助手性能.md](./knowledge/知识预览助手性能.md) · [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) |
 | 长预览滚动卡顿 / 预览+助手双侧滚动卡顿                            | [knowledge/知识预览滚动卡顿.md](./knowledge/知识预览滚动卡顿.md) · [ideas/知识库滚动卡顿修复.md](./ideas/knowledge/知识库滚动卡顿修复.md) |
+| 知识库 Skill（AI→Agent，须兼容现网能力）（规划） | [ideas/知识库Skill编辑与Agent接入.md](./ideas/knowledge/知识库Skill编辑与Agent接入.md) |
+| Skill 生成按编辑器锚定（规划→实现中） | [ideas/knowledge/Skill生成工件锚定.md](./ideas/knowledge/Skill生成工件锚定.md) |
+| Skill 侧栏朗读与会话切换（mode 分桶 / remount 不停播） | [knowledge/Skill侧栏朗读与会话切换.md](./knowledge/Skill侧栏朗读与会话切换.md) |
+| 知识库 Skill 对话接入（`/` 选择、Agent SSE、memorySource） | [knowledge/知识库Skill对话.md](./knowledge/知识库Skill对话.md) |
+| 已应用 Skill 落库（刷新后 tip 仍在） | [knowledge/已应用Skill落库.md](./knowledge/已应用Skill落库.md) |
+| Skill 编辑与试跑（独立 `/skills` 页、`memorySource=skill_try`） | [knowledge/Skill编辑试跑.md](./knowledge/Skill编辑试跑.md) |
+| Agent 通用调用 + 业务消息分表（M0–M4 已落地） | [agent/Agent记忆分表.md](./agent/Agent记忆分表.md) · [agent/Agent业务消息分表落地.md](./agent/Agent业务消息分表落地.md) · [agent/业务记忆文件归位.md](./agent/业务记忆文件归位.md) · [ideas/agent/Agent业务消息分表.md](./ideas/agent/Agent业务消息分表.md) |
 | 长文多代码块预览持续滚动卡顿（吸顶栏热路径）                      | [knowledge/知识预览代码工具条滚动.md](./knowledge/知识预览代码工具条滚动.md) · [impact/知识预览代码工具条滚动.md](./impact/知识预览代码工具条滚动.md) |
 | 本地知识库文件夹目录树浏览（可展开层级/键盘可达）                 | [knowledge/知识库文件夹树.md](./knowledge/知识库文件夹树.md)                                                                               |
 | 知识库列表与回收站：按文档标题搜索（Enter 提交、不区分大小写）    | [knowledge/知识库列表搜索标题.md](./knowledge/知识库列表搜索标题.md)                                                                     |

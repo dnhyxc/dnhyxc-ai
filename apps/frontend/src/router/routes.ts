@@ -65,6 +65,7 @@ const EnglishMorphologyReferencePage = lazy(
 	() => import('@/views/englishLearning/reference/morphology'),
 );
 const Knowledge = lazy(() => import('@/views/knowledge'));
+const Skills = lazy(() => import('@/views/skills'));
 const LegalServicePolicy = lazy(() => import('@/views/legal/servicePolicy'));
 const LegalUserAgreement = lazy(() => import('@/views/legal/userAgreement'));
 const Pay = lazy(() => import('@/views/pay'));
@@ -189,6 +190,13 @@ const routes: RouteConfig[] = [
 				Component: Knowledge,
 				meta: {
 					titleKey: 'route.knowledge.title',
+				},
+			},
+			{
+				path: '/skills',
+				Component: Skills,
+				meta: {
+					titleKey: 'route.skills.title',
 				},
 			},
 			{

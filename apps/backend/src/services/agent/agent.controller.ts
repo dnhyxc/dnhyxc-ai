@@ -15,10 +15,11 @@ import {
 import type { Request } from 'express';
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
-import { AgentService } from './agent.service';
+import { AgentService, formatAgentStreamError } from './agent.service';
 import { AgentChatDto } from './dto/agent-chat.dto';
 import { AgentStopDto } from './dto/agent-stop.dto';
 import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
+import { UpdateAgentSessionTitleDto } from './dto/update-agent-session-title.dto';
 
 type AuthedRequest = Request & { user?: { userId: number } };
 
@@ -84,6 +85,23 @@ export class AgentController {
 		return { success: true, data };
 	}
 
+	@Post('session/title')
+	async updateSessionTitle(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateAgentSessionTitleDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.agentService.updateSessionTitle(
+			userId,
+			dto.sessionId,
+			dto.title,
+		);
+		return { success: true, data };
+	}
+
 	@Delete('session/:sessionId')
 	async deleteSession(
 		@Req() req: AuthedRequest,
@@ -112,6 +130,14 @@ export class AgentController {
 		}
 		const source$ = this.agentService.chatStream(userId, dto).pipe(
 			map((chunk) => {
+				if (chunk.type === 'error') {
+					return {
+						data: {
+							error: chunk.data,
+							done: true,
+						},
+					};
+				}
 				if (chunk.type === 'searchOrganic') {
 					return {
 						data: {
@@ -131,6 +157,15 @@ export class AgentController {
 						},
 					};
 				}
+				if (chunk.type === 'skillsApplied') {
+					return {
+						data: {
+							type: 'skillsApplied',
+							skills: chunk.data.skills,
+							done: false,
+						},
+					};
+				}
 				return {
 					data: {
 						type: chunk.type,
@@ -145,10 +180,10 @@ export class AgentController {
 			data: { done: true },
 		});
 		return concat(source$, done$).pipe(
-			catchError((error: Error) =>
+			catchError((error: unknown) =>
 				of({
 					data: {
-						error: error?.message || '处理失败',
+						error: formatAgentStreamError(error),
 						done: true,
 					},
 				}),

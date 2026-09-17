@@ -139,6 +139,9 @@ export const SETTINGS_CLOUD_TTS = '/settings/cloud-tts';
 export const SETTINGS_PLUGIN_ENABLED = '/settings/plugin-enabled';
 
 export const ASSISTANT_SESSION = '/assistant/session';
+/** 更新助手会话标题 */
+export const ASSISTANT_SESSION_TITLE = '/assistant/session/title';
+export const ASSISTANT_SESSION_APPEND_TURN = '/assistant/session/append-turn';
 /** 按知识条目标识拉取该文章下全部会话（历史记录） */
 export const ASSISTANT_SESSIONS_FOR_KNOWLEDGE =
 	'/assistant/sessions/for-knowledge';
@@ -160,8 +163,19 @@ export const EBOOK_ASSISTANT_STOP = '/ebook-assistant/stop';
 /** LangChain Agent（工具调用 + SSE） */
 export const AGENT_SESSION = '/agent/session';
 export const AGENT_SESSIONS = '/agent/sessions';
+export const AGENT_SESSION_TITLE = '/agent/session/title';
 export const AGENT_SSE = '/agent/sse';
 export const AGENT_STOP = '/agent/stop';
+
+/** Skill / Prompt（独立表，不进知识向量） */
+export const SKILL_SAVE = '/skill/save';
+export const SKILL_LIST = '/skill/list';
+export const SKILL_DETAIL = '/skill/detail';
+export const SKILL_UPDATE = '/skill/update';
+export const SKILL_DELETE = '/skill/delete';
+export const SKILL_SESSION = '/skill/session';
+export const SKILL_SESSIONS = '/skill/sessions';
+/** PUT 时 params: [sessionId, 'skill'] → /skill/session/:id/skill */
 
 /** 英语学习：按主题生成结构化单词包（IPA + 释义 + 例句） */
 export const ENGLISH_LEARNING_VOCABULARY_PACK =

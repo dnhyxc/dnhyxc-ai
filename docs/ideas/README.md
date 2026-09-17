@@ -11,6 +11,9 @@
 | [电子书阅读进度保存.md](./ebook/电子书阅读进度保存.md)           | **阅读进度保存**（已上线）：EPUB CFI / PDF 页码、三层防抖、keepalive flush、端到端架构与时序                                                                   |
 | [知识预览助手性能.md](./knowledge/知识预览助手性能.md) | **知识库预览+助手同开卡顿**（已上线）：规划态思路；**归档见** [knowledge/知识预览助手性能.md](../knowledge/知识预览助手性能.md) |
 | [知识库滚动卡顿修复.md](./knowledge/知识库滚动卡顿修复.md) | **知识库预览/助手滚动卡顿详细解决步骤**（已上线）：S0–S7 逐步问题→代码→意图→为何有效；**归档见** [knowledge/知识预览滚动卡顿.md](../knowledge/知识预览滚动卡顿.md)、[knowledge/知识预览代码工具条滚动.md](../knowledge/知识预览代码工具条滚动.md) |
+| [知识库Skill编辑与Agent接入.md](./knowledge/知识库Skill编辑与Agent接入.md) | **Skill 页 + 知识库 AI→Agent SSE + `/` 选 Skill**（规划）；**硬约束不破坏知识库既有能力**；强制加载与 `apply_skill` 预置 |
+| [Skill生成工件锚定.md](./knowledge/Skill生成工件锚定.md) | **Skill 生成按编辑器锚定**（核心已落地）：会话按 `mode:skillId`/`__draft__` 隔离、条件 `intentPrefix` 控 token、保存回填；**朗读/切会话修复归档** [Skill侧栏朗读与会话切换.md](../knowledge/Skill侧栏朗读与会话切换.md) |
+| [Agent业务消息分表.md](./agent/Agent业务消息分表.md) | **Agent 通用调用 + 业务分表**：M0–M4 已落地 → [归档](../agent/Agent业务消息分表落地.md) |
 | [EPUB公开想法下划线修复.md](./epub/EPUB公开想法下划线修复.md) | **公开书多人想法虚线叠层 bug**（已落地）：断续/双线根因、CFI 投影扣减、rank 叠层、排查手册 |
 | [EPUB滚动卡顿性能.md](./epub/EPUB滚动卡顿性能.md) | **EPUB 连续滚动卡顿**（已上线）：双轨 patch 调度、rect 快路径、relocated 80ms 合并、叠层投影缓存、复杂度对比与调试手册 |
 | [电子书公开想法实时同步.md](./ebook/电子书公开想法实时同步.md) | **公开书想法实时同步**（核心已上线）：/sync 增量、双轨触发、点击列表聚类 → **归档** [EPUB公开想法实时同步影响.md](../ebook/EPUB公开想法实时同步影响.md) |

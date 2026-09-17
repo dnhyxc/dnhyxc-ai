@@ -1,4 +1,5 @@
 import Confirm from '@design/Confirm';
+import Tooltip from '@design/Tooltip';
 import { Button, Toast } from '@ui/index';
 import { CirclePlus, Clock } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -7,20 +8,25 @@ import { cn } from '@/lib/utils';
 import { AssistantHistoryDrawer } from './HistoryDrawer';
 import type { AssistantEntryToolbarProps } from './types';
 
+const iconBtnClass =
+	'mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/5 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible';
+
 function SessionHistoryButton({
 	layout,
 	disabled,
 	ariaLabel,
 	buttonLabel,
+	iconOnly,
 	onClick,
 }: {
 	layout: AssistantEntryToolbarProps['layout'];
 	disabled: boolean;
 	ariaLabel: string;
 	buttonLabel?: string;
+	iconOnly?: boolean;
 	onClick: () => void;
 }) {
-	if (layout === 'english') {
+	if (layout === 'english' && !iconOnly) {
 		return (
 			<Button
 				variant="link"
@@ -35,10 +41,10 @@ function SessionHistoryButton({
 		);
 	}
 
-	return (
+	const btn = (
 		<Button
 			variant="link"
-			className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/5 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
+			className={iconBtnClass}
 			aria-label={ariaLabel}
 			disabled={disabled}
 			onClick={onClick}
@@ -46,19 +52,44 @@ function SessionHistoryButton({
 			<Clock className="h-4 w-4" />
 		</Button>
 	);
+
+	if (!iconOnly) return btn;
+	return (
+		<Tooltip side="bottom" content={ariaLabel}>
+			{btn}
+		</Tooltip>
+	);
 }
 
 function SessionNewConversationButton({
 	layout,
 	disabled,
 	label,
+	iconOnly,
 	onClick,
 }: {
 	layout: AssistantEntryToolbarProps['layout'];
 	disabled: boolean;
 	label: string;
+	iconOnly?: boolean;
 	onClick: () => void;
 }) {
+	if (iconOnly) {
+		return (
+			<Tooltip side="bottom" content={label}>
+				<Button
+					variant="link"
+					className={iconBtnClass}
+					aria-label={label}
+					disabled={disabled}
+					onClick={onClick}
+				>
+					<CirclePlus className="h-4 w-4" />
+				</Button>
+			</Tooltip>
+		);
+	}
+
 	return (
 		<Button
 			size="sm"
@@ -79,7 +110,7 @@ function SessionNewConversationButton({
 }
 
 /**
- * 助手输入区工具条：删除确认 + 历史/新对话 + 可扩展 extraActions + 历史抽屉 slot。
+ * 助手输入区工具条：删除确认 + 新对话/历史 + 可扩展 extraActions + 历史抽屉 slot。
  */
 export function AssistantEntryToolbar({
 	visible = true,
@@ -98,6 +129,7 @@ export function AssistantEntryToolbar({
 	historyLockedToast,
 	newConversationLockedToast,
 	historyButtonLabel,
+	iconOnlyActions = false,
 	extraActions,
 }: AssistantEntryToolbarProps) {
 	const { t } = useI18n();
@@ -161,6 +193,7 @@ export function AssistantEntryToolbar({
 			disabled={isSessionSwitcherLocked}
 			ariaLabel={historyAriaLabel}
 			buttonLabel={historyButtonLabel}
+			iconOnly={iconOnlyActions}
 			onClick={openHistory}
 		/>
 	);
@@ -170,22 +203,17 @@ export function AssistantEntryToolbar({
 			layout={layout}
 			disabled={isSessionSwitcherLocked}
 			label={t('knowledge.assistant.newConversation')}
+			iconOnly={iconOnlyActions}
 			onClick={startNewConversation}
 		/>
 	);
 
-	const sessionActions =
-		layout === 'english' ? (
-			<>
-				{newConversationButton}
-				{historyButton}
-			</>
-		) : (
-			<>
-				{historyButton}
-				{newConversationButton}
-			</>
-		);
+	const sessionActions = (
+		<>
+			{newConversationButton}
+			{historyButton}
+		</>
+	);
 
 	const historyDrawerProps = {
 		isSessionSwitcherLocked,

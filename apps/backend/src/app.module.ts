@@ -38,6 +38,7 @@ import { PromptModule } from './services/prompt/prompt.module';
 import { QdrantModule } from './services/qdrant/qdrant.module';
 import { RolesModule } from './services/roles/roles.module';
 import { ShareModule } from './services/share/share.module';
+import { SkillModule } from './services/skill/skill.module';
 import { SpeechTranscriptionModule } from './services/speech-transcription/speech-transcription.module';
 import { UploadModule } from './services/upload/upload.module';
 import { UserModule } from './services/user/user.module';
@@ -109,6 +110,7 @@ const connections = new Map();
 		QdrantModule,
 		KnowledgeModule,
 		KnowledgeQaModule,
+		SkillModule,
 		ShareModule,
 		PayModule,
 		PluginPrefsModule,

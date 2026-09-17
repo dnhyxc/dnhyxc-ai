@@ -60,8 +60,8 @@ export type ScrollFabProps = {
 	onClick: () => void;
 	toBottomLabel: string;
 	toTopLabel: string;
-	/** 英语学习 footer 使用 bottom-full；列表右下角使用 corner */
-	variant?: 'default' | 'english' | 'corner';
+	/** default = 主聊样式；panel = 侧栏/嵌入助手（知识库、技能、电子书、英语学习等） */
+	variant?: 'default' | 'panel' | 'corner';
 };
 
 export type AssistantShellProps = {
@@ -106,8 +106,8 @@ export type AssistantShareSelection = {
 	setCheckedMessage?: (message: Message) => void;
 };
 
-/** default = 知识库/电子书；english = 英语学习 Agent */
-export type AssistantMessageVariant = 'default' | 'english';
+/** default = 主聊气泡；panel = 侧栏/嵌入助手气泡（知识库、技能、电子书、英语学习等） */
+export type AssistantMessageVariant = 'default' | 'panel';
 
 export type AssistantMessageRowProps = {
 	selectMessageByChatId: SelectMessageByChatId;
@@ -120,6 +120,8 @@ export type AssistantMessageRowProps = {
 	variant?: AssistantMessageVariant;
 	isLoading?: boolean;
 	onSaveToKnowledge?: (message: Message) => void;
+	/** 覆盖保存按钮 title（Skill 生成：写入编辑器） */
+	saveKnowledgeTitle?: string;
 	allowAiShare?: boolean;
 	shareSelection?: AssistantShareSelection;
 	onShare?: (message?: Message) => void;
@@ -142,6 +144,7 @@ export type AssistantMessageBubbleProps = {
 	variant: AssistantMessageVariant;
 	isLoading?: boolean;
 	onSaveToKnowledge?: (message: Message) => void;
+	saveKnowledgeTitle?: string;
 	allowAiShare: boolean;
 	shareSelection?: AssistantShareSelection;
 	onShare?: (message?: Message) => void;
@@ -164,6 +167,11 @@ export type AssistantHistoryDrawerActions = {
 	onViewportScroll?: UIEventHandler<HTMLDivElement>;
 	/** 切换会话前关闭抽屉（英语学习防抖动） */
 	closeDrawerBeforeSwitch?: boolean;
+	/** 传入则显示编辑图标；返回 false 表示保存失败、保持编辑态 */
+	onRenameSession?: (
+		sessionId: string,
+		title: string,
+	) => boolean | Promise<boolean>;
 };
 
 export type AssistantEntryToolbarHistoryState = {
@@ -206,6 +214,8 @@ export type AssistantEntryToolbarProps = {
 	newConversationLockedToast?: string;
 	/** english 布局：历史按钮旁文案（可选） */
 	historyButtonLabel?: string;
+	/** 历史/新对话仅图标 + Tooltip（Skill 侧栏等窄栏） */
+	iconOnlyActions?: boolean;
 	/** 扩展区：如 AI/RAG 模式切换 */
 	extraActions?: ReactNode;
 };

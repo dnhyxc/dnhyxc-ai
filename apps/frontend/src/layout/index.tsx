@@ -21,7 +21,7 @@ import {
 	installAppFullscreenExitSync,
 	subscribeAppFullscreen,
 } from '@/federation';
-import { useI18n, useTheme } from '@/hooks';
+import { useDocumentShortcuts, useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
 import { formatRoutePageLabel } from '@/router/routeMeta';
@@ -36,6 +36,7 @@ const Layout = () => {
 	const [theater, setTheater] = useState(getAppFullscreen);
 
 	useTheme();
+	useDocumentShortcuts();
 
 	useLayoutEffect(() => {
 		rememberDemoLoginHint(

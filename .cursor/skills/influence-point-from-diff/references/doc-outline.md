@@ -1,6 +1,6 @@
 # Influence-point 文档骨架
 
-落盘路径：`docs/Influence-point/<简体中文短名>.md`（建议 4～12 字，语义明确；禁止英文 kebab-case 与泛名；与 SKILL §5 一致）
+落盘路径：`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/Influence-point/<简体中文短名>.md`（相对本仓：`../micro-apps/remote-docs/wiki/Influence-point/`；建议 4～12 字，语义明确；禁止英文 kebab-case 与泛名；与 SKILL §5 一致）
 
 ---
 

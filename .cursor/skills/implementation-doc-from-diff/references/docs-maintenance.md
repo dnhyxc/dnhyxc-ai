@@ -1,41 +1,42 @@
-# docs/ 目录整理规则（新增或更新专题文后必做）
+# wiki/ 目录整理规则（新增或更新专题文后必做）
 
-在 `docs/` 下**新建**或**显著改名/搬迁**专题 `*.md` 后，除写入正文外，须**自动整理**整个 `docs/` 索引体系，避免文档孤岛与重复叙述。
+在 `<WIKI_ROOT>/`（`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/`）下**新建**或**显著改名/搬迁**专题 `*.md` 后，除写入正文外，须**自动整理**整个 wiki 索引体系，避免文档孤岛与重复叙述。
 
 ## 1. 必更新索引（按影响范围）
 
 | 文件 | 何时更新 |
 |------|----------|
-| [`docs/README.md`](../../../../docs/README.md) | 新功能域、新「常见排查」现象、跨域重要专题 |
-| `docs/<功能域>/README.md` | 该功能域下新增/更名/废弃的专题文（如 `chat/`、`cos/`、`knowledge/`） |
+| `<WIKI_ROOT>/README.md` | 新功能域、新「常见排查」现象、跨域重要专题 |
+| `<WIKI_ROOT>/<功能域>/README.md` | 该功能域下新增/更名/废弃的专题文（如 `chat/`、`cos/`、`knowledge/`） |
 | 相关专题文文首「延伸阅读」 | 与本轮改动强相关的旧文：补链到新文，或改为「详见 xxx（主文档）」避免双份维护 |
 
-**不再使用**已废弃的 `documentation-master-index.md`；以 `docs/README.md` + 各子目录 `README.md` 为登记表。
+以 `<WIKI_ROOT>/README.md` + 各子目录 `README.md` 为登记表。**不要**再更新本仓 `docs/README.md` 登记新实现专题。
 
 ## 2. 功能域落盘（与 SKILL 硬约束一致）
 
-- 专题文路径：**`docs/<功能域>/<file>.md`**，规则见 [`doc-domain-layout.md`](doc-domain-layout.md)。
-- **禁止** `docs/backend/`、`docs/frontend/`；**禁止**在 `docs/` 根目录新增专题（姊妹稿除外）。
-- 无对应目录时：**创建** `docs/<功能域>/` + `README.md`，并更新 `docs/README.md`。
+- 专题文路径：**`<WIKI_ROOT>/<功能域>/<file>.md`**，规则见 [`doc-domain-layout.md`](doc-domain-layout.md)。
+- **禁止** `backend/`、`frontend/`；**禁止**在 `<WIKI_ROOT>/` 根目录新增专题（姊妹稿除外）；**禁止**写入 `ideas/`；**禁止**本仓 `docs/` 新专题。
+- 无对应目录时：**创建** `<WIKI_ROOT>/<功能域>/` + `README.md`，并更新 `<WIKI_ROOT>/README.md`。
 
 ## 3. 去重与主从分工
 
 - **一功能一文件**：一轮改动若含多个独立功能实现，**各写各的**专题文；**禁止**把多项实现堆进同一 `*.md`。可选在域 `README.md` 增「本轮变更索引」表（仅链接 + 一句话），索引文**不得**重复各专题的代码块。
-- **同一主题只保留一份「实现细节 + 代码摘录」**：例如 COS 展示代理以某篇中文专题为主文档，相关域其它文只保留摘要 + 链接。完整功能域表见 `docs/README.md`。
-- **用户向 vs 开发者向**：`project-guide.md` / `project-update-info.md` 不写路径；实现路径写在专题文与 `docs/README.md`。
+- **同一主题只保留一份「实现细节 + 代码摘录」**：例如 COS 展示代理以某篇中文专题为主文档，相关域其它文只保留摘要 + 链接。完整功能域表见 `<WIKI_ROOT>/README.md`。
+- **用户向 vs 开发者向**：`项目指南.md` / `项目更新信息.md` 不写路径；实现路径写在专题文与 `<WIKI_ROOT>/README.md`。
 - **文件名**：简体中文、简短且语义明确，与 SKILL §4 一致；勿用英文 kebab-case，勿用 `说明.md`、`更新.md`、`notes.md`。
 
 ## 4. 整理自检清单
 
 - [ ] 本轮若有多项独立功能，是否已拆成**多篇**专题（而非一篇大包）？
-- [ ] 新专题是否落在正确 `docs/<功能域>/`（见 `doc-domain-layout.md`）？
-- [ ] 新功能域目录与 `README.md` 是否已创建并登记 `docs/README.md`？
-- [ ] 新专题是否出现在对应 `docs/<功能域>/README.md`？
-- [ ] 是否需在 `docs/README.md`「按功能域」或「常见排查」表增一行？
+- [ ] 新专题是否落在正确 `<WIKI_ROOT>/<功能域>/`（见 `doc-domain-layout.md`）？
+- [ ] 新功能域目录与 `README.md` 是否已创建并登记 `<WIKI_ROOT>/README.md`？
+- [ ] 新专题是否出现在对应 `<WIKI_ROOT>/<功能域>/README.md`？
+- [ ] 是否需在 `<WIKI_ROOT>/README.md`「按功能域」或「常见排查」表增一行？
 - [ ] 是否与既有文档重复？若重复，是否已收窄旧文并加交叉链接？
 - [ ] 专题文文首是否有「延伸阅读 / 文档角色（主文档）」说明？
-- [ ] `project-guide.md` 入口（§14）是否仍指向 `docs/README.md`（仅维护索引链接，不在产品正文写仓库路径）
+- [ ] `项目指南.md` 对开发文档是否仍只保留「查阅总索引」级表述（不在产品正文写仓库路径）？
+- [ ] 是否**未**往本仓 `docs/` 双写？
 
 ## 5. 子目录无 README 时
 
-若在某功能域首批落盘且尚无 `README.md`，须**新建**该目录（若整个目录也不存在则一并创建）及 `README.md`（一句话职责 + 专题索引表），并在 `docs/README.md` 功能域表补一行入口。
+若在某功能域首批落盘且尚无 `README.md`，须**新建**该目录（若整个目录也不存在则一并创建）及 `README.md`（一句话职责 + 专题索引表），并在 `<WIKI_ROOT>/README.md` 功能域表补一行入口。

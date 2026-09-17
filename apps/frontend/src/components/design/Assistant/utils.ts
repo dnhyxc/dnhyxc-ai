@@ -2,10 +2,10 @@ import { cn } from '@/lib/utils';
 import type { Message } from '@/types/chat';
 import type { AssistantMessageVariant, AssistantShareSelection } from './types';
 
-/** 单条消息流式订阅 revision（正文 + 思考区 + 流式态） */
+/** 单条消息流式订阅 revision（正文 + 思考区 + 流式态 + 已应用 Skill） */
 export function buildMessageRev(message: Message): string {
 	return message.role === 'assistant'
-		? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}`
+		? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}:${message.appliedSkills?.length ?? 0}`
 		: `${message.content.length}`;
 }
 
@@ -34,7 +34,7 @@ export function messageRowClass(
 	variant: AssistantMessageVariant,
 	isUser: boolean,
 ): string {
-	if (variant === 'english') {
+	if (variant === 'panel') {
 		return cn(
 			'relative flex w-full min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 group last:pb-8.5',
 			isUser ? 'items-end' : 'items-stretch',
@@ -50,12 +50,12 @@ export function messageLabelClass(
 	variant: AssistantMessageVariant,
 	isUser: boolean,
 ): string {
-	if (variant === 'english') {
+	if (variant === 'panel') {
 		return cn(
 			'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-text rounded-md p-4 text-textcolor',
 			isUser
-				? 'w-fit max-w-[min(100%,36rem)] border border-teal-500/5 bg-teal-500/8 px-4 pt-2 pb-2.5'
-				: 'w-full border border-theme/5 bg-theme-secondary/60 py-3',
+				? 'w-fit max-w-[min(100%,36rem)] border border-theme/5 bg-teal-500/10 px-4 pt-2 pb-2.5'
+				: 'w-full border border-theme/5 bg-theme/5 py-3',
 		);
 	}
 	return cn(
@@ -69,7 +69,7 @@ export function messageLabelClass(
 export function messageUserContentClass(
 	variant: AssistantMessageVariant,
 ): string {
-	if (variant === 'english') {
+	if (variant === 'panel') {
 		return 'min-w-0 max-w-full text-left [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto';
 	}
 	return 'text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto';
@@ -78,6 +78,6 @@ export function messageUserContentClass(
 export function messageAssistantContentClass(
 	variant: AssistantMessageVariant,
 ): string | undefined {
-	if (variant === 'english') return undefined;
+	if (variant === 'panel') return undefined;
 	return 'min-w-0 w-full max-w-full [&_.streaming-md-body]:min-w-0 [&_.markdown-mermaid-wrap]:max-w-full';
 }

@@ -8,6 +8,7 @@ import {
 	NotebookTabs,
 	Package,
 	Puzzle,
+	ShipWheel,
 	TreePalm,
 	TvMinimalPlay,
 	Vegan,
@@ -36,6 +37,7 @@ export const ICON_MAP = {
 	TvMinimalPlay: <TvMinimalPlay />,
 	FlaskConical: <FlaskConical />,
 	Puzzle: <Puzzle />,
+	ShipWheel: <ShipWheel />,
 };
 
 export const MENUS: SidebarMenuConfig[] = [
@@ -48,6 +50,12 @@ export const MENUS: SidebarMenuConfig[] = [
 		nameKey: 'nav.knowledge',
 		icon: 'NotebookTabs',
 		path: '/knowledge',
+	},
+	{
+		nameKey: 'nav.skills',
+		icon: 'ShipWheel',
+		path: '/skills',
+		requiresAuth: true,
 	},
 	{
 		nameKey: 'nav.ebook',

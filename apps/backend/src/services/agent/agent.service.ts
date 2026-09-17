@@ -3,6 +3,7 @@ import { type AIMessageChunk, HumanMessage } from '@langchain/core/messages';
 import type { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
+	BadRequestException,
 	Inject,
 	Injectable,
 	type LoggerService,
@@ -18,42 +19,46 @@ import {
 	createLlm,
 	GLM_THINKING_DISABLED_KWARGS,
 } from '../../utils/create-llm';
+import { AssistantTableMemory } from '../assistant/assistant-table-memory';
+import { EnglishTableMemory } from '../english-learning/english-table-memory';
+import { EnglishAgentSession } from '../english-learning/entity/english-agent-session.entity';
 import { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
 import { LlmConfigService } from '../llm-config/llm-config.service';
+import { SkillService } from '../skill/skill.service';
+import { SkillTrySession } from '../skill/skill-try-session.entity';
+import { SkillTryTableMemory } from '../skill/skill-try-table-memory';
 import { WebSearchService } from '../web-search/web-search.service';
 import type {
 	SerperOrganicItem,
 	WebSearchOrganicItem,
 } from '../web-search/web-search.types';
+import {
+	DEFAULT_AGENT_SYSTEM_PROMPT,
+	ENGLISH_LEARNING_SYSTEM_APPEND,
+	SKILL_GENERATE_SYSTEM_APPEND,
+} from './agent.prompt';
 import { AgentMemoryService } from './agent-memory.service';
 import { buildAgentLangchainMiddleware } from './agent-middleware';
 import { AgentSession } from './agent-session.entity';
+import {
+	buildAgentSkillTools,
+	formatSkillsSystemAppend,
+	formatSkillsUserForcePrefix,
+	preseedApplySkillMessages,
+} from './agent-skill-tools';
 import { buildAgentLangChainTools } from './agent-tools';
+import type { AgentTurnMemory, AppliedSkillRef } from './agent-turn-memory';
 import { AgentChatDto } from './dto/agent-chat.dto';
 import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
 
-// 默认Agent系统提示语（中文，指令型，包含工具使用指引）
-const DEFAULT_AGENT_SYSTEM_PROMPT = `你是一个具备工具调用能力的智能助手（ReAct Agent）。请准确、有条理地回答；不确定时请说明；不要编造事实。
-涉及用户自有文档、笔记、已入库知识时优先使用「知识库检索」工具；需要时效信息或公开网页时使用互联网搜索工具。
-引用互联网检索摘录时，在句末使用【1】【2】等与摘录序号一致的角标（全角方括号），便于展示来源胶囊。`;
-
-/** 英语学习场景下追加的系统提示（assistMode=english_learning） */
-const ENGLISH_LEARNING_SYSTEM_APPEND = `【英语学习专项约束】
-你面向希望提升英语（English）的普通话使用者，内容可覆盖单词、短语、短文、口语表达与即时翻译需求。
-0）服务范围（优先遵守）：仅回答与英语学习直接相关的问题，例如词汇与短语、语法、阅读与写作、口语表达、中英互译、英文材料理解、学习方法与练习设计等。若用户问题明显与英语学习无关（如编程调试、数学/物理等非英语学科作业、生活百科、财经投资建议、非英语学习类长文创作、闲聊八卦等），不得调用任何工具，也不要展开无关解答；应礼貌说明本对话为「英语学习助手」，当前问题超出服务范围，并简短建议用户改用通用智能对话或其它合适渠道。语气友善、克制，一两段即可，勿训斥用户。
-1）词汇与短语：给出释义、常见搭配、1～2 个地道例句；凡列出单词或短语须标注 IPA 音标（国际音标）；表格或列表逐条给出读音标注；说明仅供参考，以权威词典为准。
-2）短文：可按用户水平（如 A1～C1 或初中/高中/四级等自述）生成或改写精读材料，配关键句讲解；长文分段输出便于跟读。
-3）口语：提供场景对话范例、可替换说法、常用应答；说明无法替代真人纠音与外教课。
-4）实时翻译：用户粘贴中英文段落时给出对应译文；可逐句对照或先原文后译文；专有名词、歧义词简要注明取舍理由；不声称等同专业同声传译或法律医学认证译文。
-5）名著与文献：以导读、节选、摘要、讨论为主；公版作品可短节选并注释；仍在版权期的现代作品避免大段复制原文，以摘要与仿写练习为主。
-6）工具：仅在问题属于英语学习范畴时调用；用户生词本与笔记已入库时优先「知识库检索」；需核查用法或新闻英语时可适度「互联网搜索」摘要并标注信息性质。
-7）边界：拒绝违规内容；敏感话题以中性语言学习角度处理或礼貌拒绝。`;
-
-function resolveAgentSystemPrompt(dto: AgentChatDto): string {
+function resolveAgentSystemPrompt(dto: AgentChatDto, skillAppend = ''): string {
+	let base = DEFAULT_AGENT_SYSTEM_PROMPT;
 	if (dto.assistMode === 'english_learning') {
-		return `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${ENGLISH_LEARNING_SYSTEM_APPEND}`;
+		base = `${base}\n\n${ENGLISH_LEARNING_SYSTEM_APPEND}`;
+	} else if (dto.assistMode === 'skill_generate') {
+		base = `${base}\n\n${SKILL_GENERATE_SYSTEM_APPEND}`;
 	}
-	return DEFAULT_AGENT_SYSTEM_PROMPT;
+	return skillAppend ? `${base}${skillAppend}` : base;
 }
 
 /** 合并多轮 internet_search 的 organic，按 link 去重 */
@@ -113,6 +118,28 @@ function extractChunkText(chunk: AIMessageChunk | undefined): string {
 		.join('');
 }
 
+/** 从 LangChain / HTTP 异常中抽出可读文案（含 429 限流嵌套 message） */
+export function formatAgentStreamError(err: unknown): string {
+	if (err == null) return '处理失败';
+	if (typeof err === 'string' && err.trim()) return err.trim();
+	if (err instanceof Error && err.message.trim()) return err.message.trim();
+	if (typeof err === 'object') {
+		const o = err as Record<string, unknown>;
+		if (typeof o.message === 'string' && o.message.trim()) {
+			return o.message.trim();
+		}
+		const nested = o.error;
+		if (nested && typeof nested === 'object') {
+			const m = (nested as { message?: unknown }).message;
+			if (typeof m === 'string' && m.trim()) return m.trim();
+		}
+		if (o.lc_error_code === 'MODEL_RATE_LIMIT' || o.status === 429) {
+			return '模型请求过于频繁，请稍后再试';
+		}
+	}
+	return '处理失败';
+}
+
 // SSE消息类型定义，支持普通文本和tool相关事件
 export type AgentSseChunk =
 	| { type: 'content'; data: string }
@@ -129,22 +156,112 @@ export type AgentSseChunk =
 	| {
 			type: 'messageIds';
 			data: { userMessageId: string; assistantMessageId: string };
-	  };
+	  }
+	/** 本轮实际加载并强制执行的 Skill（供前端展示） */
+	| {
+			type: 'skillsApplied';
+			data: { skills: Array<{ id: string; title: string }> };
+	  }
+	/** 业务失败：须 next+complete，勿 subscriber.error（Nest SSE 中途 error 常丢帧） */
+	| { type: 'error'; data: string };
 
 @Injectable()
 export class AgentService {
 	constructor(
 		@InjectRepository(AgentSession)
-		private readonly sessionRepo: Repository<AgentSession>, // TypeORM仓库，操作会话表
-		private readonly memory: AgentMemoryService, // 管理Agent记忆的服务，处理历史消息等
-		private readonly cache: Cache, // 使用NestJS缓存，存流式状态
-		private readonly configService: ConfigService, // 读取环境配置
+		private readonly sessionRepo: Repository<AgentSession>,
+		@InjectRepository(SkillTrySession)
+		private readonly skillTrySessionRepo: Repository<SkillTrySession>,
+		@InjectRepository(EnglishAgentSession)
+		private readonly englishSessionRepo: Repository<EnglishAgentSession>,
+		private readonly memory: AgentMemoryService,
+		private readonly assistantTableMemory: AssistantTableMemory,
+		private readonly englishTableMemory: EnglishTableMemory,
+		private readonly skillTryTableMemory: SkillTryTableMemory,
+		private readonly cache: Cache,
+		private readonly configService: ConfigService,
 		private readonly llmConfigService: LlmConfigService,
-		private readonly webSearchService: WebSearchService, // 提供Web搜索工具
-		private readonly knowledgeQaService: KnowledgeQaService, // 提供知识库 RAG 工具工厂
+		private readonly webSearchService: WebSearchService,
+		private readonly knowledgeQaService: KnowledgeQaService,
+		private readonly skillService: SkillService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
-		private readonly logger: LoggerService, // 日志
+		private readonly logger: LoggerService,
 	) {}
+
+	/** 按会话归属推断业务记忆（未显式传 memorySource 时）；业务表未建则当作无归属 */
+	private async inferMemorySource(
+		sessionId: string,
+	): Promise<'english_learning' | 'skill_try' | null> {
+		try {
+			const eng = await this.englishSessionRepo.exist({
+				where: { id: sessionId },
+			});
+			if (eng) return 'english_learning';
+		} catch (e) {
+			this.logger.warn?.(
+				`[AgentService] 推断 english 记忆跳过: ${e instanceof Error ? e.message : e}`,
+			);
+		}
+		try {
+			const tryRow = await this.skillTrySessionRepo.exist({
+				where: { id: sessionId },
+			});
+			if (tryRow) return 'skill_try';
+		} catch (e) {
+			this.logger.warn?.(
+				`[AgentService] 推断 skill_try 记忆跳过: ${e instanceof Error ? e.message : e}`,
+			);
+		}
+		return null;
+	}
+
+	/**
+	 * 解析本轮业务记忆实现与 businessSessionId。
+	 * runSessionId（agent session）仍用于停流/epoch；消息读写走 turnMemory。
+	 */
+	private async resolveTurnMemory(
+		userId: number,
+		dto: AgentChatDto,
+		runSessionId: string,
+	): Promise<{ turnMemory: AgentTurnMemory; businessSessionId: string }> {
+		let source = dto.memorySource;
+		if (!source) {
+			source = (await this.inferMemorySource(runSessionId)) ?? 'agent';
+		}
+
+		if (source === 'assistant') {
+			const aid = (dto.assistantSessionId ?? '').trim();
+			if (!aid) {
+				throw new BadRequestException(
+					'memorySource=assistant 时须提供 assistantSessionId',
+				);
+			}
+			return {
+				turnMemory: this.assistantTableMemory.forUser(userId),
+				businessSessionId: aid,
+			};
+		}
+		if (source === 'english_learning') {
+			return {
+				turnMemory: this.englishTableMemory,
+				businessSessionId: runSessionId,
+			};
+		}
+		if (source === 'skill_try') {
+			return {
+				turnMemory: this.skillTryTableMemory,
+				businessSessionId: runSessionId,
+			};
+		}
+		if (source === 'agent') {
+			// M4：产品路径应已迁出；保留实现供遗留/未建业务行的句柄
+			return {
+				turnMemory: this.memory,
+				businessSessionId: runSessionId,
+			};
+		}
+		throw new BadRequestException(`不支持的 memorySource: ${source}`);
+	}
 
 	/**
 	 * 获取特定session的流式epoch缓存key
@@ -224,18 +341,57 @@ export class AgentService {
 	 */
 	async createSession(userId: number, dto?: CreateAgentSessionDto) {
 		const id = randomUUID();
+		const title = dto?.title?.trim() || null;
 		const session = this.sessionRepo.create({
 			id,
 			userId,
-			title: dto?.title?.trim() || null,
+			title,
 			updatedAt: new Date(),
 		});
 		await this.sessionRepo.save(session);
+		if (dto?.memorySource === 'english_learning') {
+			await this.englishSessionRepo.save(
+				this.englishSessionRepo.create({
+					id,
+					userId,
+					title,
+					updatedAt: new Date(),
+				}),
+			);
+		}
 		return { sessionId: id, title: session.title };
 	}
 
+	/** 更新会话标题（智能对话 / Skill 历史编辑共用） */
+	async updateSessionTitle(
+		userId: number,
+		sessionId: string,
+		rawTitle: string,
+	) {
+		const sid = (sessionId ?? '').trim();
+		const title = (rawTitle ?? '').trim().slice(0, 255);
+		if (!sid) {
+			throw new NotFoundException('会话不存在');
+		}
+		if (!title) {
+			throw new BadRequestException('标题不能为空');
+		}
+		await this.assertSessionOwned(userId, sid);
+		const now = new Date();
+		await this.sessionRepo.update(
+			{ id: sid, userId },
+			{ title, updatedAt: now },
+		);
+		await this.englishSessionRepo.update(
+			{ id: sid, userId },
+			{ title, updatedAt: now },
+		);
+		return { sessionId: sid, title };
+	}
+
 	/**
-	 * 分页列出当前用户的 Agent 会话（按更新时间倒序，供英语学习历史抽屉）
+	 * 分页列出英语学习会话（english_agent_sessions）。
+	 * 不再扫全部 agent_sessions，避免知识库 Skill 运行句柄混入列表。
 	 */
 	async listSessions(
 		userId: number,
@@ -254,7 +410,7 @@ export class AgentService {
 	}> {
 		const pn = Math.max(1, Math.floor(pageNo));
 		const ps = Math.min(50, Math.max(1, Math.floor(pageSize)));
-		const qb = this.sessionRepo
+		const qb = this.englishSessionRepo
 			.createQueryBuilder('s')
 			.where('s.user_id = :uid', { uid: userId })
 			.orderBy('s.updated_at', 'DESC')
@@ -275,11 +431,66 @@ export class AgentService {
 	}
 
 	/**
-	 * 查询会话详情及全部消息（升序）
-	 * @param userId 用户ID（做权限隔离）
-	 * @param sessionId 会话ID
+	 * 查询会话详情及全部消息（升序）；按业务表路由。
 	 */
 	async getSessionDetail(userId: number, sessionId: string) {
+		const eng = await this.englishSessionRepo.findOne({
+			where: { id: sessionId, userId },
+			select: ['id', 'title', 'createdAt', 'updatedAt'],
+		});
+		if (eng) {
+			const messages = await this.englishTableMemory.listMessagesAsc(sessionId);
+			return {
+				session: {
+					sessionId: eng.id,
+					title: eng.title,
+					createdAt: eng.createdAt,
+					updatedAt: eng.updatedAt,
+				},
+				messages: messages.map((m) => ({
+					id: m.id,
+					turnId: m.turnId,
+					role: m.role,
+					content: m.content,
+					searchOrganic: m.searchOrganic ?? null,
+					createdAt: m.createdAt,
+				})),
+			};
+		}
+
+		const tryRow = await this.skillTrySessionRepo.findOne({
+			where: { id: sessionId, userId },
+			select: ['id'],
+		});
+		if (tryRow) {
+			const session = await this.sessionRepo.findOne({
+				where: { id: sessionId, userId },
+				select: ['id', 'title', 'createdAt', 'updatedAt'],
+			});
+			if (!session) {
+				return { session: null, messages: [] };
+			}
+			const messages =
+				await this.skillTryTableMemory.listMessagesAsc(sessionId);
+			return {
+				session: {
+					sessionId: session.id,
+					title: session.title,
+					createdAt: session.createdAt,
+					updatedAt: session.updatedAt,
+				},
+				messages: messages.map((m) => ({
+					id: m.id,
+					turnId: m.turnId,
+					role: m.role,
+					content: m.content,
+					searchOrganic: m.searchOrganic ?? null,
+					appliedSkills: m.appliedSkills ?? null,
+					createdAt: m.createdAt,
+				})),
+			};
+		}
+
 		const session = await this.sessionRepo.findOne({
 			where: { id: sessionId, userId },
 			select: ['id', 'title', 'createdAt', 'updatedAt'],
@@ -373,10 +584,15 @@ export class AgentService {
 	 */
 	chatStream(userId: number, dto: AgentChatDto): Observable<AgentSseChunk> {
 		return new Observable<AgentSseChunk>((subscriber) => {
-			// 捕获异常落日志给observable error
-			void this.runChatStream(subscriber, userId, dto).catch((e) =>
-				subscriber.error(e),
-			);
+			void this.runChatStream(subscriber, userId, dto).catch((e) => {
+				// 兜底：runChatStream 内未收口时仍走 next(error)+complete，避免 Nest SSE 丢错
+				if (subscriber.closed) return;
+				subscriber.next({
+					type: 'error',
+					data: formatAgentStreamError(e),
+				});
+				subscriber.complete();
+			});
 		});
 	}
 
@@ -388,21 +604,25 @@ export class AgentService {
 		userId: number,
 		dto: AgentChatDto,
 	): Promise<void> {
-		let sessionId = dto.sessionId; // 可能是新会话
+		let sessionId = dto.sessionId; // agent 运行句柄（停流/epoch）
 		let session!: AgentSession;
 		let accumulated = ''; // 用户本轮assistant回复内容临时拼接
 		/** 本轮合并后的联网检索列表（去重），落库与 SSE 推送前补 position */
 		let turnSearchOrganic: WebSearchOrganicItem[] = [];
 		let assistantMessageId: string | undefined;
 		let activeTurnId: string | undefined;
-		let streamSessionId: string | undefined;
+		/** 业务消息表 sessionId：与 turnMemory 同源 */
+		let businessSessionId: string | undefined;
+		let turnMemory: AgentTurnMemory = this.memory;
+		/** 本轮强制 Skill（收尾写入业务表 applied_skills） */
+		let turnAppliedSkills: AppliedSkillRef[] | null = null;
 
 		/**
 		 * 当前turn完成时的存储收尾，更新内容/清理无回复
 		 */
 		const finalizeTurn = async () => {
 			if (
-				!streamSessionId ||
+				!businessSessionId ||
 				!activeTurnId ||
 				!assistantMessageId ||
 				!session
@@ -411,7 +631,7 @@ export class AgentService {
 			}
 			if (!accumulated.trim()) {
 				// 若assistant回复为空，删掉本轮消息
-				await this.memory.deleteTurnPair(streamSessionId, activeTurnId);
+				await turnMemory.deleteTurnPair(businessSessionId, activeTurnId);
 				return;
 			}
 			// 正常则补全 assistant 正文与联网胶囊数据源
@@ -419,11 +639,16 @@ export class AgentService {
 				turnSearchOrganic.length > 0
 					? withAgentOrganicPositions(turnSearchOrganic)
 					: null;
-			await this.memory.updateAssistantContent(
-				streamSessionId,
+			await turnMemory.updateAssistantContent(
+				businessSessionId,
 				assistantMessageId,
 				accumulated,
-				organicToSave,
+				{
+					searchOrganic: organicToSave,
+					...(turnAppliedSkills?.length
+						? { appliedSkills: turnAppliedSkills }
+						: {}),
+				},
 			);
 		};
 
@@ -432,7 +657,7 @@ export class AgentService {
 		 * （如用户abort，assistant内容有就存，没有则删）
 		 */
 		const cleanupTurnOnFailure = async () => {
-			if (!streamSessionId || !activeTurnId || !assistantMessageId) {
+			if (!businessSessionId || !activeTurnId || !assistantMessageId) {
 				return;
 			}
 			try {
@@ -441,14 +666,19 @@ export class AgentService {
 						turnSearchOrganic.length > 0
 							? withAgentOrganicPositions(turnSearchOrganic)
 							: null;
-					await this.memory.updateAssistantContent(
-						streamSessionId,
+					await turnMemory.updateAssistantContent(
+						businessSessionId,
 						assistantMessageId,
 						accumulated,
-						organicToSave,
+						{
+							searchOrganic: organicToSave,
+							...(turnAppliedSkills?.length
+								? { appliedSkills: turnAppliedSkills }
+								: {}),
+						},
 					);
 				} else {
-					await this.memory.deleteTurnPair(streamSessionId, activeTurnId);
+					await turnMemory.deleteTurnPair(businessSessionId, activeTurnId);
 				}
 			} catch (cleanupErr: unknown) {
 				this.logger.error?.('[AgentService] 本轮消息收尾失败', cleanupErr);
@@ -456,7 +686,7 @@ export class AgentService {
 		};
 
 		try {
-			// （1）会话校验/新建
+			// （1）会话校验/新建（agent 运行句柄）
 			if (!sessionId) {
 				const id = randomUUID();
 				session = this.sessionRepo.create({
@@ -469,17 +699,21 @@ export class AgentService {
 			} else {
 				session = await this.assertSessionOwned(userId, sessionId);
 			}
-			streamSessionId = sessionId;
 
-			// （2）会话自动摘要压缩（如需要）
-			await this.memory.compactSessionIfNeeded(sessionId);
+			const resolved = await this.resolveTurnMemory(userId, dto, sessionId);
+			turnMemory = resolved.turnMemory;
+			businessSessionId = resolved.businessSessionId;
 
-			// （3）新一轮对话turn占位
+			// （2）会话自动摘要压缩（如需要；assistant Memory 为 no-op）
+			await turnMemory.compactSessionIfNeeded(businessSessionId, userId);
+
+			// （3）新一轮对话turn占位（写入业务表）
 			const turnId = randomUUID();
 			activeTurnId = turnId;
 			const { userMessageId: uid, assistantMessageId: aid } =
-				await this.memory.insertUserAndAssistantPlaceholder(
-					session,
+				// 插入用户和助手消息占位符，用于后续的对话记录
+				await turnMemory.insertUserAndAssistantPlaceholder(
+					businessSessionId,
 					turnId,
 					dto.content.trim(),
 				);
@@ -489,13 +723,10 @@ export class AgentService {
 				data: { userMessageId: uid, assistantMessageId: aid },
 			});
 
-			// （4）构建 langchain message 历史（user 行入库为纯 `content`；intentPrefix 仅注入本轮模型输入）
+			// （4）构建 langchain message 历史（与业务表同源）
 			const lcMessages =
-				await this.memory.buildLangChainMessagesFromDb(sessionId);
-			const intent =
-				dto.assistMode === 'english_learning'
-					? dto.intentPrefix?.trim()
-					: undefined;
+				await turnMemory.buildLangChainMessagesFromDb(businessSessionId);
+			const intent = dto.intentPrefix?.trim();
 			if (intent) {
 				for (let i = lcMessages.length - 1; i >= 0; i -= 1) {
 					const msg = lcMessages[i];
@@ -512,6 +743,74 @@ export class AgentService {
 					lcMessages[i] = new HumanMessage(`${intent}\n\n${plain}`);
 					break;
 				}
+			}
+
+			const skillBodies = await this.skillService.findByIdsForUser(
+				dto.skillIds,
+				userId,
+			);
+			if (skillBodies.length) {
+				turnAppliedSkills = skillBodies.map((s) => ({
+					id: s.id,
+					title: s.title,
+				}));
+				subscriber.next({
+					type: 'skillsApplied',
+					data: {
+						skills: turnAppliedSkills,
+					},
+				});
+				/**
+				 * 立刻把本轮强制 Skill 快照写入业务助手行（applied_skills）。
+				 *
+				 * 为何在这里、而不是只等流结束 finalizeTurn：
+				 * - 上文 insertUserAndAssistantPlaceholder 已插入助手占位行，此时 content 仍是空串；
+				 *   正文要等模型流完才由 finalizeTurn / cleanupTurnOnFailure 补全。
+				 * - 前端此时已通过 SSE `skillsApplied` 展示「已应用 Skill」；若进程在流中崩溃、
+				 *   或客户端只依赖落库字段做刷新回读，仅 finalize 一次写入会丢快照。
+				 * - 此处先写 appliedSkills，流结束后 finalize 会再带同一快照 + 完整正文更新同一行
+				 *   （AssistantTableMemory 仅在 appliedSkills.length>0 时写列，不会被 null 清掉）。
+				 *
+				 * 第三个参数传 ''：与占位行现状一致，只借 updateAssistantContent 通道改元数据，
+				 * 不提前写入半成品正文；真正正文仍由后续 finalize 用 accumulated 覆盖。
+				 */
+				await turnMemory.updateAssistantContent(
+					// 业务会话 id（assistant_* / english_* / skill_try_* 与 memorySource 对齐）
+					businessSessionId,
+					// 本轮助手占位行 id（与 messageIds SSE 下发的一致）
+					assistantMessageId,
+					// 保持空正文：流尚未开始，避免把半成品写进库
+					'',
+					// 仅落库本轮 Skill 的 {id,title}[]，供刷新后 UI 回显
+					{ appliedSkills: turnAppliedSkills },
+				);
+				const force = formatSkillsUserForcePrefix(skillBodies);
+				if (force) {
+					for (let i = lcMessages.length - 1; i >= 0; i -= 1) {
+						const msg = lcMessages[i];
+						if (!(msg instanceof HumanMessage)) continue;
+						const c = msg.content;
+						const plain =
+							typeof c === 'string'
+								? c
+								: Array.isArray(c)
+									? (c as { text?: string }[])
+											.map((p) => (typeof p?.text === 'string' ? p.text : ''))
+											.join('')
+									: String(c ?? '');
+						lcMessages[i] = new HumanMessage(`${force}${plain}`);
+						break;
+					}
+				}
+				const preseed = preseedApplySkillMessages(skillBodies);
+				let insertAt = lcMessages.length;
+				for (let i = lcMessages.length - 1; i >= 0; i -= 1) {
+					if (lcMessages[i] instanceof HumanMessage) {
+						insertAt = i;
+						break;
+					}
+				}
+				lcMessages.splice(insertAt, 0, ...preseed);
 			}
 
 			// （5）流式并发控制（epoch机制），每次流式启动+1，高并发终止旧流
@@ -533,37 +832,43 @@ export class AgentService {
 				},
 			);
 
-			// （7）拼装工具集（见 agent-langchain-tools.ts）
-			const tools = buildAgentLangChainTools(
-				{
-					webSearchService: this.webSearchService,
-					knowledgeQaService: this.knowledgeQaService,
-					userId,
-				},
-				{
-					onInternetSearchComplete: (r) => {
-						const batch = r.organic;
-						if (!batch?.length) return;
-						turnSearchOrganic = mergeAgentSearchOrganic(
-							turnSearchOrganic,
-							batch,
-						);
-						subscriber.next({
-							type: 'searchOrganic',
-							data: {
-								organic: withAgentOrganicPositions(turnSearchOrganic),
-							},
-						});
+			// （7）拼装工具集（见 agent-tools.ts）+ 本轮 Skill 工具
+			const tools = [
+				...buildAgentLangChainTools(
+					{
+						webSearchService: this.webSearchService,
+						knowledgeQaService: this.knowledgeQaService,
+						userId,
 					},
-				},
-			);
+					{
+						onInternetSearchComplete: (r) => {
+							const batch = r.organic;
+							if (!batch?.length) return;
+							turnSearchOrganic = mergeAgentSearchOrganic(
+								turnSearchOrganic,
+								batch,
+							);
+							subscriber.next({
+								type: 'searchOrganic',
+								data: {
+									organic: withAgentOrganicPositions(turnSearchOrganic),
+								},
+							});
+						},
+					},
+				),
+				...buildAgentSkillTools(skillBodies),
+			];
 
 			// （8）创建Agent
 			const agent = createAgent({
 				// 构建Agent所需核心参数，包括主模型、工具集、系统提示与中间件
 				model: mainLlm, // 主聊天大模型，流式推理
 				tools, // 工具列表（如 Web 检索、RAG、当前日期等）
-				systemPrompt: resolveAgentSystemPrompt(dto),
+				systemPrompt: resolveAgentSystemPrompt(
+					dto,
+					formatSkillsSystemAppend(skillBodies),
+				),
 				middleware: buildAgentLangchainMiddleware({
 					summaryLlm: summaryLlm,
 					estimatePromptTokens: (msgs) =>
@@ -622,13 +927,21 @@ export class AgentService {
 			// 通知流结束
 			subscriber.complete();
 		} catch (err: unknown) {
-			// 仅非用户abort时记录err
-			if (!this.isUserAbortError(err)) {
+			const aborted = this.isUserAbortError(err);
+			if (!aborted) {
 				this.logger.error?.('[AgentService] chatStream failed', err);
 			}
 			await cleanupTurnOnFailure();
-			// 向外传播异常
-			subscriber.error(err);
+			if (aborted) {
+				subscriber.complete();
+			} else {
+				// 用 error 帧而非 subscriber.error：否则浏览器常只看到流结束、正文空白
+				subscriber.next({
+					type: 'error',
+					data: formatAgentStreamError(err),
+				});
+				subscriber.complete();
+			}
 		} finally {
 			// 清理会话busy态，防止流式残留
 			if (sessionId) {
@@ -680,11 +993,12 @@ export class AgentService {
 		}
 		// 终止所有正在进行的流（epoch+1）
 		await this.incrementStreamEpoch(sid);
-		// 清理busy态
 		await this.cache.del(this.streamBusyKey(sid));
-		// 清理记忆摘要
+		await this.englishTableMemory.deleteSummary(sid);
+		await this.skillTryTableMemory.deleteSummary(sid);
 		await this.memory.deleteSummary(sid);
-		// 删数据库会话本体
+		await this.englishSessionRepo.delete({ id: sid, userId });
+		await this.skillTrySessionRepo.delete({ id: sid, userId });
 		await this.sessionRepo.delete({ id: sid, userId });
 		return { sessionId: sid };
 	}

@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
 	// 新增：按知识条目标识拉取该文章下“全部”助手会话（用于历史记录抽屉）。
 	// 说明：原先只需要 getAssistantSessionByKnowledgeArticle（最近会话），多会话后必须有列表接口。
+	createAgentSession,
 	createAssistantSession,
 	deleteAssistantSession,
 	getAssistantSessionByKnowledgeArticle,
@@ -17,9 +18,12 @@ import {
 	getAssistantSessionsByKnowledgeArticle,
 	importAssistantTranscript,
 	patchAssistantSessionKnowledgeArticle,
+	stopAgentStream,
 	stopAssistantStream,
+	updateAssistantSessionTitle,
 } from '@/service';
 import type { Message } from '@/types/chat';
+import { AGENT_SSE_USER_ABORT_MARKER, streamAgentSse } from '@/utils/agentSse';
 import {
 	ASSISTANT_SSE_USER_ABORT_MARKER,
 	streamAssistantSse,
@@ -123,6 +127,16 @@ export interface AssistantStoreApi {
 		raw?: string,
 		options?: { extraUserContentForModel?: string },
 	): Promise<void>;
+	/**
+	 * 知识库 AI 模式统一走 Agent SSE（`skillIds` 可空）。
+	 * 已保存文档：`memorySource=assistant`；草稿：`memorySource=agent`。
+	 * 消息仍写入本 store 列表以复用助手壳。RAG 模式勿调用。
+	 */
+	sendMessageWithAgentSkills(
+		raw: string,
+		skillIds: string[],
+		options?: { intentPrefix?: string },
+	): Promise<void>;
 	stopGenerating(): Promise<void>;
 	/** 切换账号：中止全部助手 SSE 并清空内存会话 */
 	resetOnUserSwitch(): void;
@@ -148,11 +162,16 @@ function mapApiMessagesToUi(
 		role: string;
 		content: string;
 		createdAt: string;
+		appliedSkills?: Array<{ id: string; title: string }> | null;
 	}>,
 ): Message[] {
 	const out: Message[] = [];
 	for (const m of rows) {
 		if (m.role !== 'user' && m.role !== 'assistant') continue;
+		const applied =
+			m.role === 'assistant' && m.appliedSkills?.length
+				? m.appliedSkills
+				: undefined;
 		out.push({
 			id: m.id,
 			chatId: m.id,
@@ -161,6 +180,7 @@ function mapApiMessagesToUi(
 			timestamp: new Date(m.createdAt),
 			createdAt: new Date(m.createdAt),
 			isStreaming: false,
+			...(applied ? { appliedSkills: applied } : {}),
 		});
 	}
 	return out;
@@ -174,16 +194,63 @@ function knowledgeArticleBindingFromDocumentKey(documentKey: string): string {
 }
 
 /** 将当前内存消息转为后端 `import-transcript` 所需的行序列（含未结束流式时的已生成片段） */
-function buildImportTranscriptLinesFromMessages(
-	messages: Message[],
-): Array<{ role: 'user' | 'assistant'; content: string }> {
-	const lines: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+function buildImportTranscriptLinesFromMessages(messages: Message[]): Array<{
+	role: 'user' | 'assistant';
+	content: string;
+	appliedSkills?: Array<{ id: string; title: string }>;
+}> {
+	const lines: Array<{
+		role: 'user' | 'assistant';
+		content: string;
+		appliedSkills?: Array<{ id: string; title: string }>;
+	}> = [];
 	for (const m of messages) {
 		if (m.role !== 'user' && m.role !== 'assistant') continue;
-		lines.push({ role: m.role, content: m.content ?? '' });
+		const applied =
+			m.role === 'assistant' && m.appliedSkills?.length
+				? m.appliedSkills
+				: undefined;
+		lines.push({
+			role: m.role,
+			content: m.content ?? '',
+			...(applied ? { appliedSkills: applied } : {}),
+		});
 	}
 	// 与后端 `ImportAssistantTranscriptDto` 的 `@ArrayMaxSize(200)` 对齐；超出时只迁入「最近」200 条（时间顺序保留，即末尾窗口）
 	return lines.slice(-200);
+}
+
+/** 助手会话 ↔ Agent 会话本地链接（Skill 路径多轮续聊；刷新后仍能复用同一 Agent session） */
+const AGENT_LINK_LS_PREFIX = 'ka:agentSid:';
+
+function readLinkedAgentSessionId(assistantSid: string): string | null {
+	if (typeof window === 'undefined') return null;
+	try {
+		return localStorage.getItem(AGENT_LINK_LS_PREFIX + assistantSid);
+	} catch {
+		return null;
+	}
+}
+
+function writeLinkedAgentSessionId(
+	assistantSid: string,
+	agentSid: string,
+): void {
+	if (typeof window === 'undefined') return;
+	try {
+		localStorage.setItem(AGENT_LINK_LS_PREFIX + assistantSid, agentSid);
+	} catch {
+		// ignore quota / private mode
+	}
+}
+
+function clearLinkedAgentSessionId(assistantSid: string): void {
+	if (typeof window === 'undefined') return;
+	try {
+		localStorage.removeItem(AGENT_LINK_LS_PREFIX + assistantSid);
+	} catch {
+		// ignore
+	}
 }
 
 /** 不落库多轮：已进入 UI 的轮次（排除末尾空占位助手） */
@@ -308,6 +375,22 @@ export class AssistantStore {
 	 * 为 false 时使用 ephemeral SSE，不落库；首次保存后由 `flushEphemeralTranscriptIfNeeded` 迁入。
 	 */
 	knowledgeAssistantPersistenceAllowed = true;
+
+	/**
+	 * Skill 发送用的 Agent sessionId（与 Assistant session 分离）。
+	 * key：持久化为 assistantSessionId；ephemeral 为 `doc:${canonical}`。
+	 * 禁止按文档共用一个 Agent：否则切历史后误触 stop、或另一会话开 Skill，会 epoch 杀掉后台流。
+	 */
+	private agentSessionByScope: Record<string, string> = {};
+
+	private agentScopeKey(
+		assistantSid: string | null,
+		canonical: string,
+	): string {
+		const sid = (assistantSid ?? '').trim();
+		if (sid) return sid;
+		return `doc:${canonical}`;
+	}
 
 	constructor() {
 		makeAutoObservable(this);
@@ -1065,6 +1148,9 @@ export class AssistantStore {
 	/**
 	 * 在会话列表中查找第一个「无历史消息、且非发送/流式/拉历史中」的可复用空会话。
 	 * 列表约定为 updatedAt 倒序，优先命中最近仍为空占位的新会话。
+	 *
+	 * 有 title 的不复用：Skill 路径消息落在 Agent 表，助手会话常无 messages 但仍有标题；
+	 * 若仅按「无 messages」复用会误切到旧历史（如「润色文档」）。
 	 */
 	private async findFirstReusableEmptySessionId(
 		canonical: string,
@@ -1076,6 +1162,8 @@ export class AssistantStore {
 			// 读取会话 id，去除空白。若为空或被排除，则跳过本次循环
 			const sid = (item.sessionId ?? '').trim();
 			if (!sid || sid === excludeSessionId) continue;
+			// 已有标题 = 曾发起过对话（含仅 Skill/Agent 落库），不是「新对话」占位
+			if ((item.title ?? '').trim()) continue;
 
 			// 优先检查本地缓存（stateBySession）中是否已有此会话的状态信息
 			const sstate = this.stateBySession[sid];
@@ -1116,9 +1204,9 @@ export class AssistantStore {
 
 	/**
 	 * 为当前激活的文档创建或进入「新对话」会话（用于用户点击“新对话”按钮）。
-	 * - 当前激活会话已为空且无进行中流式/发送时：不重复创建，仅提示。
-	 * - 否则若列表中已有空会话：切换到该会话，不调用 forceNew 创建。
-	 * - 否则：沿用原逻辑 `createAssistantSession(..., forceNew: true)` 新建。
+	 * - 当前激活会话为无标题占位空会话且无进行中流式/发送时：不重复创建，仅复用。
+	 * - 否则若列表中已有无标题空会话：切换到该会话，不调用 forceNew 创建。
+	 * - 否则：`createAssistantSession(..., forceNew: true)` 新建。
 	 */
 	async createNewSessionForCurrentDocument(): Promise<string | null> {
 		if (this.isAssistantSessionSwitcherLocked) {
@@ -1160,8 +1248,14 @@ export class AssistantStore {
 			const cur = this.ensureSessionState(active);
 			// 3. 检查该会话消息列表中是否有消息正在流式输出（用户切换 tab 时可能残留未完结流式）
 			const curStreaming = cur.messages.some((m) => m.isStreaming);
-			// 4. 满足“当前已激活会话为空会话（无历史消息）且不在发送/流式/加载历史”时，直接复用，无需新建
+			const activeTitle = (
+				(this.sessionsByDocument[canonical] ?? []).find(
+					(s) => s.sessionId === active,
+				)?.title ?? ''
+			).trim();
+			// 4. 仅当「无标题占位空会话」时直接复用；有标题说明已是真实历史（Skill 可能无本地/助手 messages）
 			if (
+				!activeTitle &&
 				cur.messages.length === 0 && // 会话消息列表为空
 				!cur.isSending && // 没有正在发送
 				!curStreaming && // 没有流式消息
@@ -1419,8 +1513,10 @@ export class AssistantStore {
 				};
 			}
 
-			// 3) 清理会话态缓存
+			// 3) 清理会话态缓存 + Skill 用的 Agent 会话链接
 			delete this.stateBySession[deletedId];
+			delete this.agentSessionByScope[deletedId];
+			clearLinkedAgentSessionId(deletedId);
 
 			// 4) 若删的是当前激活会话：切换到列表第一条或清空指针与消息
 			const curActive = this.activeSessionByDocument[canonical] ?? null;
@@ -1721,18 +1817,298 @@ export class AssistantStore {
 		}
 	}
 
-	async stopGenerating(): Promise<void> {
-		// 先断 SSE：若先 await 网关，期间 delta 仍会 apply，`...prev` 会保持 isStreaming=true
-		this.abortStream?.();
-		this.abortStream = null;
+	/**
+	 * 知识库 AI 模式：Agent SSE（`skillIds` 可空，空则不强制 Skill）。
+	 * 消息仍写入助手列表；已保存写 `assistant_*`（含水印摘要），草稿写 `agent_*`。
+	 * 勿对 RAG 模式调用。底层 `sendMessage`（/assistant/sse）仍保留，供其它兼容路径使用。
+	 */
+	async sendMessageWithAgentSkills(
+		raw: string,
+		skillIds: string[],
+		options?: { intentPrefix?: string },
+	): Promise<void> {
+		const ids = (skillIds ?? []).map((x) => x.trim()).filter(Boolean);
+
+		const documentKey = (this.activeDocumentKey ?? '').trim();
+		if (!documentKey) {
+			Toast({ type: 'warning', title: '文档未就绪' });
+			return;
+		}
+		const canonical = this.canonicalKey(documentKey);
+		const ephemeral = !this.knowledgeAssistantPersistenceAllowed;
+		const text = (raw ?? '').trim();
+		if (!text) return;
+
+		if (!readToken()) {
+			Toast({ type: 'warning', title: '请先登录后再使用助手' });
+			return;
+		}
+
+		let assistantSid: string | null = null;
+		if (!ephemeral) {
+			assistantSid = await this.ensureSessionForCurrentDocument();
+			if (!assistantSid) return;
+		}
+
+		const docState = this.ensureState(canonical);
+		const state = ephemeral ? docState : this.ensureSessionState(assistantSid!);
+		if (state.isSending || state.isHistoryLoading) return;
+
+		// Agent 不走 assistant SSE，不会自动写首条用户问题为标题；无标题时显式对齐
+		if (!ephemeral && assistantSid) {
+			const list = this.sessionsByDocument[canonical] ?? [];
+			const row = list.find((s) => s.sessionId === assistantSid);
+			if (!row?.title?.trim()) {
+				const titlePreview = text.slice(0, 60);
+				runInAction(() => {
+					const now = new Date().toISOString();
+					if (row) {
+						this.sessionsByDocument[canonical] = list.map((s) =>
+							s.sessionId === assistantSid
+								? { ...s, title: titlePreview, updatedAt: now }
+								: s,
+						);
+					} else {
+						this.sessionsByDocument[canonical] = [
+							{
+								sessionId: assistantSid!,
+								title: titlePreview,
+								createdAt: now,
+								updatedAt: now,
+							},
+							...list,
+						];
+					}
+				});
+				void updateAssistantSessionTitle(assistantSid, titlePreview)
+					.then(() => this.refreshSessionListForCurrentDocument())
+					.catch(() => undefined);
+			} else {
+				void this.refreshSessionListForCurrentDocument().catch(() => {});
+			}
+		}
+
+		const agentScope = this.agentScopeKey(assistantSid, canonical);
+		let agentSid =
+			this.agentSessionByScope[agentScope] ??
+			(assistantSid ? readLinkedAgentSessionId(assistantSid) : null);
+		if (!agentSid) {
+			try {
+				const res = await createAgentSession({
+					title: text.slice(0, 40) || '知识库助手',
+				});
+				agentSid = res.data?.sessionId ?? null;
+				if (!agentSid) {
+					Toast({ type: 'error', title: '创建 Agent 会话失败' });
+					return;
+				}
+			} catch {
+				Toast({ type: 'error', title: '创建 Agent 会话失败' });
+				return;
+			}
+		}
 		runInAction(() => {
-			this.isSending = false;
+			this.agentSessionByScope[agentScope] = agentSid!;
+		});
+		if (assistantSid) {
+			writeLinkedAgentSessionId(assistantSid, agentSid);
+		}
+
+		/** 生成走 Agent SSE；持久会话时 memorySource=assistant，消息只写 assistant_* */
+		state.abortStream?.();
+		runInAction(() => {
+			state.abortStream = null;
+		});
+
+		const userChatId = uuidv4();
+		const assistantChatId = uuidv4();
+		let userRowId = userChatId;
+		let assistantRowId = assistantChatId;
+
+		runInAction(() => {
+			state.isSending = true;
+			state.messages.push({
+				chatId: userRowId,
+				role: 'user',
+				content: text,
+				timestamp: new Date(),
+			});
+			state.messages.push({
+				chatId: assistantRowId,
+				role: 'assistant',
+				content: '',
+				timestamp: new Date(),
+				isStreaming: true,
+				thinkContent: '',
+			});
+		});
+
+		const intentPrefix = (options?.intentPrefix ?? '').trim();
+		let accumulated = '';
+		const flushAssistantPatch = () => {
+			runInAction(() => {
+				const idx = state.messages.findIndex(
+					(m) => m.chatId === assistantRowId,
+				);
+				if (idx < 0) return;
+				const prev = state.messages[idx] as Message;
+				if (prev.content === accumulated) return;
+				prev.content = accumulated;
+			});
+		};
+		const assistantPatchScheduler =
+			createStreamingMobxPatchScheduler(flushAssistantPatch);
+
+		try {
+			const abort = await streamAgentSse({
+				body: {
+					sessionId: agentSid,
+					content: text,
+					...(ids.length ? { skillIds: ids } : {}),
+					...(intentPrefix ? { intentPrefix } : {}),
+					// 已保存：落 assistant_*；草稿 ephemeral：显式 agent，避免未传 source 时误查业务表
+					...(!ephemeral && assistantSid
+						? {
+								memorySource: 'assistant' as const,
+								assistantSessionId: assistantSid,
+							}
+						: { memorySource: 'agent' as const }),
+				},
+				callbacks: {
+					onMessageIds: ({ userMessageId, assistantMessageId }) => {
+						runInAction(() => {
+							const ui = state.messages.findIndex(
+								(m) => m.chatId === userRowId,
+							);
+							const ai = state.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (ui >= 0) {
+								const prev = state.messages[ui] as Message;
+								state.messages[ui] = { ...prev, chatId: userMessageId };
+							}
+							if (ai >= 0) {
+								const prev = state.messages[ai] as Message;
+								state.messages[ai] = {
+									...prev,
+									chatId: assistantMessageId,
+								};
+							}
+							userRowId = userMessageId;
+							assistantRowId = assistantMessageId;
+						});
+					},
+					onDelta: (d) => {
+						if (d) accumulated += d;
+						assistantPatchScheduler.schedule();
+					},
+					onSkillsApplied: (skills) => {
+						runInAction(() => {
+							const idx = state.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx < 0) return;
+							const prev = state.messages[idx] as Message;
+							state.messages[idx] = { ...prev, appliedSkills: skills };
+						});
+					},
+					onComplete: (err) => {
+						assistantPatchScheduler.flush();
+						const userAborted = err === AGENT_SSE_USER_ABORT_MARKER;
+						runInAction(() => {
+							state.isSending = false;
+							const idx = state.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx >= 0) {
+								const prev = state.messages[idx] as Message;
+								const next: Message = {
+									...prev,
+									isStreaming: false,
+								};
+								if (err && !userAborted) {
+									next.content = next.content || `生成失败：${err}`;
+									next.isStopped = true;
+								}
+								state.messages[idx] = next;
+							}
+							state.abortStream = null;
+						});
+					},
+					onError: (e) => {
+						assistantPatchScheduler.flush();
+						runInAction(() => {
+							state.isSending = false;
+							const idx = state.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx >= 0) {
+								const prev = state.messages[idx] as Message;
+								state.messages[idx] = {
+									...prev,
+									isStreaming: false,
+									content: prev.content || e.message,
+								};
+							}
+							state.abortStream = null;
+						});
+					},
+				},
+			});
+			state.abortStream = abort;
+		} catch {
+			assistantPatchScheduler.flush();
+			runInAction(() => {
+				state.isSending = false;
+				const idx = state.messages.findIndex(
+					(m) => m.chatId === assistantRowId,
+				);
+				if (idx >= 0) {
+					const prev = state.messages[idx] as Message;
+					state.messages[idx] = { ...prev, isStreaming: false };
+				}
+				state.abortStream = null;
+			});
+		}
+	}
+
+	async stopGenerating(): Promise<void> {
+		// 只停「当前展示会话」：切到其它历史后误触停止，不得杀掉后台仍在流式的会话
+		const state = this.activeState;
+		const activeStreaming =
+			Boolean(state.abortStream) || state.messages.some((m) => m.isStreaming);
+		if (!activeStreaming) return;
+
+		// 先断 SSE：若先 await 网关，期间 delta 仍会 apply，`...prev` 会保持 isStreaming=true
+		state.abortStream?.();
+		runInAction(() => {
+			state.abortStream = null;
+			state.isSending = false;
 			// 用“替换对象”而不是原地 mutate：保证 UI 在文档切换/映射迁移时也能稳定刷新停止态
-			this.messages = this.messages.map((m) => {
+			state.messages = state.messages.map((m) => {
 				if (!m.isStreaming) return m;
 				return { ...m, isStreaming: false, isStopped: true };
 			});
 		});
+
+		const canonical = this.canonicalKey(this.activeDocumentKey);
+		const agentScope = this.agentScopeKey(
+			this.knowledgeAssistantPersistenceAllowed ? this.activeSessionId : null,
+			canonical,
+		);
+		const agentSid =
+			this.agentSessionByScope[agentScope] ??
+			(this.activeSessionId
+				? readLinkedAgentSessionId(this.activeSessionId)
+				: null);
+		if (agentSid) {
+			try {
+				await stopAgentStream({ sessionId: agentSid });
+			} catch {
+				// 无进行中时后端返回失败，忽略
+			}
+		}
+
 		const sid = this.sessionId;
 		if (!sid) {
 			// ephemeral：尝试用 streamId 停止后端流（若后端支持）
@@ -1776,6 +2152,7 @@ export class AssistantStore {
 			this.historySessionLoadingByDocument = {};
 			this.historySessionLoadingMoreByDocument = {};
 			this.stateBySession = {};
+			this.agentSessionByScope = {};
 			this.knowledgeAssistantPersistenceAllowed = true;
 		});
 	}

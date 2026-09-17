@@ -47,6 +47,7 @@ export const KnowledgeAssistantMessageList = observer(
 		return messages.map((message, index) => (
 			<AssistantMessageRow
 				key={message.chatId}
+				variant="panel"
 				selectMessageByChatId={
 					isRagMode ? selectRagMessageByChatId : selectAssistantMessageByChatId
 				}

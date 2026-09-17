@@ -65,13 +65,6 @@ const Download = () => {
 		});
 
 		const unlistenShortcut = onListen('shortcut-triggered', async (event) => {
-			if (event === 'new_workflow') {
-				Toast({
-					title: '快捷键触发',
-					type: 'success',
-					message: '新建工作流',
-				});
-			}
 			if (event === 'open_subwindow') {
 				const theme = (await getValue('theme')) as 'dark' | 'light';
 				onCreateWindow({

@@ -256,6 +256,8 @@ export interface MarkdownEditorProps {
 	 * 请与外层 `h-full min-h-0 flex-1` 及 `height="100%"` 配合使用。
 	 */
 	compactChrome?: boolean;
+	/** 外壳圆角；三栏贴边布局可关。默认 true */
+	rounded?: boolean;
 	loading?: React.ReactNode | null;
 }
 
@@ -301,6 +303,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	onInsertSelectionToAssistant,
 	customBottomBarNode = null,
 	compactChrome = false,
+	rounded = true,
 	loading = null,
 }) => {
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
@@ -1859,7 +1862,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		>
 			<div
 				className={cn(
-					'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme-background',
+					'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
+					rounded && 'rounded-md',
 					compactChrome && 'min-h-0 flex-1',
 				)}
 			>

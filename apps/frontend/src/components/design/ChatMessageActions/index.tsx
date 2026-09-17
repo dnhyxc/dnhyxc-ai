@@ -45,6 +45,8 @@ interface MessageActionsProps {
 	deleteCheckedMessage?: (message: Message) => void;
 	/** 将助手回复写入知识库草稿（由 ChatBot 注入后跳转知识页） */
 	onSaveToKnowledge?: (message: Message) => void;
+	/** 覆盖「保存到知识库」按钮 title（如 Skill 页「写入编辑器」） */
+	saveKnowledgeTitle?: string;
 	/**
 	 * 朗读整条助手消息正文（与选区朗读同一套 TTS / 悬浮条）。
 	 * 不传则不展示；仅 `role !== 'user'` 时渲染，且位于分享按钮之后。
@@ -81,6 +83,7 @@ export const MessageActions = ({
 	checkedMessages,
 	setCheckedMessage,
 	onSaveToKnowledge,
+	saveKnowledgeTitle,
 	onSpeakContent,
 	needShare = true,
 	needSave = true,
@@ -243,7 +246,9 @@ export const MessageActions = ({
 							<div
 								className="cursor-pointer hover:text-textcolor"
 								title={
-									t?.('chat.messageActions.saveToKnowledge') ?? '保存到知识库'
+									saveKnowledgeTitle ??
+									t?.('chat.messageActions.saveToKnowledge') ??
+									'保存到知识库'
 								}
 							>
 								<LayersPlus

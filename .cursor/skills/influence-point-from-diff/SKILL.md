@@ -2,7 +2,7 @@
 name: influence-point-from-diff
 description: >-
   基于当前改动（git diff、@ 文件或会话内已落地变更）分析对既有功能需求的影响面，
-  产出影响点矩阵、风险与回归清单，写入 docs/Influence-point/。
+  产出影响点矩阵、风险与回归清单，写入 micro-apps/remote-docs/wiki/Influence-point/。
   文件名用简体中文且简短语义明确；默认只写文档不改业务源码。
   适用于「影响点分析/影响面/Influence-point/改动会不会影响原有功能/回归范围/波及哪些模块」等。
 ---
@@ -16,33 +16,44 @@ description: >-
 1. **是否影响原有功能需求** — 逐项对照既有能力，给出 **是 / 否 / 有条件变化** 及理由。
 2. **影响点具体有哪些** — 模块 × 场景矩阵、潜在风险、未改动项、回归清单。
 
-**落盘**：`docs/Influence-point/<中文文件名>.md`（见 § 文件名规则）。**默认不改业务源码**。
+写入 **remote-docs wiki Influence-point**：
+
+| 写法                      | 路径                                                                        |
+| ------------------------- | --------------------------------------------------------------------------- |
+| **绝对路径（权威）**      | `/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/Influence-point/` |
+| **相对本仓（dnhyxc-ai）** | `../micro-apps/remote-docs/wiki/Influence-point/`                           |
+
+下文记作 **`<INFLUENCE_ROOT>`**，落盘时优先用绝对路径，避免写进本仓 `docs/Influence-point/`。
+
+**默认不改业务源码**。写入 sibling 仓时若沙箱拒写，需申请可写权限。
 
 ## 与相近 Skill 的边界
 
-| Skill | 侧重点 | 输出目录 |
-|-------|--------|----------|
-| **本 Skill** | 对**既有功能**的波及与回归 | `docs/Influence-point/` |
-| `implementation-doc-from-diff` | 改动**如何实现**、前后代码对比 | `docs/<功能域>/` |
-| `code-review` | 正确性 / 安全 / 性能审查 | 聊天回复，不落盘 |
-| `feature-implementation-idea` | 未实现的规划方案 | `docs/ideas/` |
+| Skill                          | 侧重点                         | 输出目录                                |
+| ------------------------------ | ------------------------------ | --------------------------------------- |
+| **本 Skill**                   | 对**既有功能**的波及与回归     | `<INFLUENCE_ROOT>/`                     |
+| `implementation-doc-from-diff` | 改动**如何实现**、前后代码对比 | 本仓 `docs/<功能域>/`                   |
+| `code-review`                  | 正确性 / 安全 / 性能审查       | 聊天回复，不落盘                        |
+| `feature-implementation-idea`  | 未实现的规划方案               | `../micro-apps/remote-docs/wiki/ideas/` |
 
 同一轮改动可同时触发本 Skill 与 `implementation-doc-from-diff`：**两篇分工不同**，文首「延伸阅读」互链，**禁止**把影响矩阵整段复制进实现思路专题。
 
+**禁止**再往本仓 `docs/Influence-point/` 落新影响点文（该目录已迁至 remote-docs wiki Influence-point）。
+
 ## 硬约束
 
-1. **白名单路径**：仅新建或更新 `docs/Influence-point/**/*.md`；可更新 [`docs/Influence-point/README.md`](../../../docs/Influence-point/README.md) 索引表。**不得**改 `apps/**`、`packages/**` 等，除非用户明确要求。
+1. **白名单路径**：仅新建或更新 `<INFLUENCE_ROOT>/**/*.md`；可更新 `<INFLUENCE_ROOT>/README.md` 索引表。**不得**改 `apps/**`、`packages/**` 等，除非用户明确要求。
 2. **结论以源码为准**：分析须通读 diff 涉及文件及**调用方**；文末固定句：**（若与仓库最新源码不一致，以源码为准）**。
 3. **阅读约定**（写入文首或 §1 脚注）：「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
 4. **一主题一文件**：一轮含多个**独立**改动主题时，各写一篇；禁止把互不隶属的主题堆进同一正文。
-5. **语言**：正文简体中文；路径用仓库相对路径便于跳转。
+5. **语言**：正文简体中文；路径用仓库相对路径便于跳转（源码路径相对本仓；姊妹稿相对 `<INFLUENCE_ROOT>` 或对应 wiki 目录）。
 
 ## 何时启用
 
 - 「写影响点分析 / Influence-point / 影响面」
 - 「这次改动会不会影响 XXX / 原有功能 / 回归范围」
-- 「分析 diff 的波及点并写入 docs」
-- 用户 `@docs/Influence-point` 并要求分析当前改动
+- 「分析 diff 的波及点并写入 Influence-point」
+- 用户 `@Influence-point` / `@remote-docs/wiki/Influence-point` 并要求分析当前改动
 
 ## 工作流（按顺序）
 
@@ -61,7 +72,7 @@ description: >-
 
 在写结论前，必须建立**对照清单**（写入文档 §1「分析目的」）：
 
-1. **产品/规格文档**：`docs/ebook/`、`docs/ideas/`、`apps/frontend/specs/`、`docs/ebook/developer/` 等与改动域相关的说明；grep 改动符号名、模块名。
+1. **产品/规格文档**：`docs/ebook/`、remote-docs `wiki/ideas/`、`apps/frontend/specs/`、`docs/ebook/developer/` 等与改动域相关的说明；grep 改动符号名、模块名。
 2. **调用链**：对 diff 中导出符号、hook 返回值、组件 props 用 `codegraph_callers` / `Grep` 找**全部**调用方；标注对外 API 是否变更。
 3. **并存能力**：同一 UI 入口、互斥关系（如听书 vs 听当前）、共享 DOM 层（marks-pane / listen overlay）是否仍隔离。
 4. **数据与 sync**：是否触及 annotation sync、持久化、SSE、MobX store。
@@ -72,12 +83,12 @@ description: >-
 
 对每个**既有能力**（来自 §2 清单）给出判定：
 
-| 判定 | 含义 |
-|------|------|
-| **否** | 行为、API、DOM 边界与改前一致 |
-| **是** | 破坏、移除或改变用户可感知语义 |
+| 判定           | 含义                                         |
+| -------------- | -------------------------------------------- |
+| **否**         | 行为、API、DOM 边界与改前一致                |
+| **是**         | 破坏、移除或改变用户可感知语义               |
 | **有条件变化** | 主路径不变，特定条件下行为不同（须写清条件） |
-| **低 / 无** | 仅增强、性能微变、或仅开发体验 |
+| **低 / 无**    | 仅增强、性能微变、或仅开发体验               |
 
 汇总为 **结论摘要表**（维度 | 是否影响 | 说明），放在 §1 末尾。
 
@@ -101,11 +112,11 @@ description: >-
 
 ### 5) 文件名与落盘
 
-**目录**：`docs/Influence-point/`
+**目录**：`<INFLUENCE_ROOT>/` = `/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/Influence-point/`（相对本仓：`../micro-apps/remote-docs/wiki/Influence-point/`）。目录不存在则创建。
 
 **文件名规则**（**简体中文**，**简短**且**语义明确**）：
 
-- 格式：`docs/Influence-point/<中文短名>.md`
+- 格式：`<INFLUENCE_ROOT>/<中文短名>.md`
 - **简短**：建议 **4～12 个汉字**（含必要专有词时仍宜一眼读完）；避免「……影响点分析 / 改动报告 / 最终版」等堆后缀。
 - **语义明确**：读者只看文件名即可判断**域 + 能力/对象**（可用「对象 + 主题」结构，如 `划线听书播放条.md`、`标记层抽取.md`）。
 - **禁止**英文 kebab-case（如 `epub-quote-listen-player-bar.md`）；**禁止**泛名：`分析.md`、`影响.md`、`改动.md`、`报告.md`、`临时.md`；**禁止**日期戳与多主题串名。
@@ -120,9 +131,9 @@ description: >-
 
 ### 6) 更新索引
 
-1. 在 [`docs/Influence-point/README.md`](../../../docs/Influence-point/README.md) 表格**新增一行**：链接 | 一句话范围（与现有行风格一致）。
-2. 若存在对应的 `docs/ebook/` 或 `docs/<域>/` 实现专题，在其「延伸阅读」补链到本篇（**只加链接**，不重写实现文）。
-3. **不必**改 `docs/README.md`（Influence-point 已在总索引）；除非用户要求全库索引同步。
+1. 在 `<INFLUENCE_ROOT>/README.md` 表格**新增一行**：链接 | 一句话范围（与现有行风格一致）。
+2. 若存在对应的本仓 `docs/<域>/` 实现专题，在其「延伸阅读」补链到本篇（**只加链接**，不重写实现文）；链接用可跳转的相对或绝对路径。
+3. **不要**再改本仓 `docs/Influence-point/README.md` / `docs/README.md` 登记新影响点文；除非用户要求全库索引同步。
 
 ### 7) 落盘前自检
 
@@ -130,7 +141,8 @@ description: >-
 - [ ] 每个「是/有条件变化」结论有**调用链或源码证据**（路径或符号名）
 - [ ] §3 矩阵行数 ≥ 改动触达的独立场景数
 - [ ] §6 回归项可手工执行、无实现细节依赖
-- [ ] 文件名为**简体中文**、简短且语义明确（§5，非英文 kebab-case）；README 已登记
+- [ ] 文件名为**简体中文**、简短且语义明确（§5，非英文 kebab-case）；`<INFLUENCE_ROOT>/README.md` 已登记
+- [ ] 落盘在 `<INFLUENCE_ROOT>/`，未写进本仓 `docs/Influence-point/`
 - [ ] 未修改白名单外源码
 
 ## 输出模板

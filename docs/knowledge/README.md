@@ -40,6 +40,11 @@
 | [知识库助手插入选区AI检索.md](./知识库助手插入选区AI检索.md) | 选中写入 AI/RAG 输入框 |
 | [知识库助手多会话前端实现.md](./知识库助手多会话前端实现.md) | 多会话前端 |
 | [知识库助手多会话后端实现.md](./知识库助手多会话后端实现.md) | 多会话后端 |
+| [知识库Skill对话.md](./知识库Skill对话.md) | **Skill `/` 多选 + Agent SSE**：`sendMessageWithAgentSkills`、`memorySource` assistant/agent、`appliedSkills`、标题与停流链接；不再 `append-turn` 双写 |
+| [已应用Skill落库.md](./已应用Skill落库.md) | **「已应用 Skill」持久化**：`applied_skills` 列、流前早写、详情回读、草稿 `import-transcript` 透传；刷新后 tip 仍在 |
+| [Skill编辑试跑.md](./Skill编辑试跑.md) | **独立 Skill 管理页** `/skills`（列表 / Monaco / 试跑·生成）：CRUD、`skill_try_sessions`、`memorySource=skill_try`；与知识库 `/` 对话解耦 |
+| [Skill侧栏朗读与会话切换.md](./Skill侧栏朗读与会话切换.md) | **Skill 侧栏**：朗读条抬到页面防 remount 误断；`mode:skillId` 分桶；切 Skill/模式/历史显式停播 |
+| [Skill生成工件锚定.md](../ideas/knowledge/Skill生成工件锚定.md) | **生成模式按编辑器锚定**（规划→实现）：会话隔离、条件 intentPrefix、保存回填、M4 mode 分桶 |
 
 `知识库助手完成.md` 文首「问题修复记录」汇总上述链接；新增修复文时请同步该节。
 

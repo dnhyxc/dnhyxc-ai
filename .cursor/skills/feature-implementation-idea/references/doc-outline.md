@@ -1,8 +1,10 @@
-# docs/ideas 实现思路 — 正文模板
+# wiki/ideas 实现思路 — 正文模板
 
 落盘时按此骨架填写；**§4～§6 三图必填**。编号可微调，但不可删除「图」相关章节。
 
-**文件名**：`docs/ideas/<简体中文短名>.md`（建议 4～12 字，语义明确；禁止英文 kebab-case 与泛名）；与 SKILL 硬约束 §1 一致。
+**落盘根目录**：`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/ideas/`（相对本仓：`../micro-apps/remote-docs/wiki/ideas/`）。
+
+**文件名**：`<IDEAS_ROOT>/<可选功能域>/<简体中文短名>.md`（建议 4～12 字，语义明确；禁止英文 kebab-case 与泛名）；与 SKILL 硬约束 §1 一致。
 
 ---
 
@@ -77,7 +79,7 @@
 
 ## 4. 架构图
 
-（Mermaid `flowchart TB` 或 `graph LR` — 见 diagram-guide.md）
+（Mermaid `flowchart TB` / `graph TD` / `graph LR` — 节点含 `"<b>名</b><br/>━━━<br/>• 要点"`，连线带语义标签，建议含图例；见 diagram-guide.md）
 
 **图内方法说明**：
 
@@ -96,7 +98,7 @@
 
 ## 5. 主流程图
 
-（Mermaid `flowchart TD` — 含成功与主要失败分支）
+（Mermaid `flowchart TD` — 起止圆角、判断菱形、分支标注是/否；步骤节点写清做什么；含成功与主要失败分支）
 
 **图内方法说明**：
 
@@ -114,7 +116,7 @@
 
 ## 6. 核心时序图
 
-（Mermaid `sequenceDiagram` — Happy path，≥3 参与者）
+（Mermaid `sequenceDiagram` — Happy path，≥3 参与者；消息线只写短方法名；参数/返回值用 `Note right of`）
 
 **图内方法说明**：
 
@@ -153,10 +155,19 @@
 
 ### 8.2 关键接口（伪代码或 TypeScript 草图）
 
+（≤30 行/块；**每一行非空、非纯花括号**上方注释「做什么 + 为什么」，见 [`code-line-comments.md`](code-line-comments.md)）
+
 ```typescript
-// 仅签名级草图，≤30 行/块
-type Example = { ... };
-function doSomething(input: Example): Result;
+// 试跑/生成共用创建入参；generate 可无 skillId 表示草稿桶
+type CreateTrySessionInput = {
+	// try 必须绑 Skill；generate 可选
+	kind: 'try' | 'generate';
+	// 已保存 id；缺省则走 skill_id IS NULL 草稿桶
+	skillId?: string;
+};
+
+// 新建锚定会话契约：返回 sessionId 供 SSE 使用
+function createTrySession(input: CreateTrySessionInput): { sessionId: string };
 ```
 
 ### 8.3 数据模型

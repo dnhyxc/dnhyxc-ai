@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { capitalizeWords, getValue, setValue } from '@/utils';
 import {
 	chordStringsSemanticallyEqual,
+	isValidShortcutChord,
 	KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
 } from '@/utils/knowledge-shortcuts';
 import { isTauriRuntime } from '@/utils/runtime';
@@ -35,6 +36,38 @@ const System = () => {
 	shortcutInfoRef.current = shortcutInfo;
 	const checkShortcutRef = useRef(checkShortcut);
 	checkShortcutRef.current = checkShortcut;
+	/** keydown 同步写入，避免 keyup 读到尚未 commit 的 React state（会卡在仅 Meta） */
+	const pendingChordRef = useRef('');
+	/** 捕获会话中，完整 chord 只提交一次（防 Meta keyup 二次触发） */
+	const capturingRef = useRef(false);
+
+	const resetCapturingItem = useCallback((activeKey: number | null) => {
+		pendingChordRef.current = '';
+		capturingRef.current = false;
+		if (activeKey == null) {
+			setCheckShortcut(null);
+			return;
+		}
+		setShortcutInfo((prev) =>
+			prev.map((item) =>
+				item.key === activeKey ? { ...item, shortcut: '' } : item,
+			),
+		);
+		setCheckShortcut(null);
+	}, []);
+
+	/** 录入期间卸掉全局快捷键，避免 OS 抢走主键（否则页面只收到 Meta） */
+	const suspendGlobalShortcuts = useCallback(async () => {
+		if (isTauriRuntime()) {
+			await desktopInvoke('clear_all_shortcuts');
+		}
+	}, []);
+
+	const restoreGlobalShortcuts = useCallback(() => {
+		if (isTauriRuntime()) {
+			void desktopInvoke('reload_all_shortcuts');
+		}
+	}, []);
 
 	const getShortCutInfo = useCallback(async () => {
 		const next = await Promise.all(
@@ -57,6 +90,159 @@ const System = () => {
 		void getShortCutInfo();
 	}, [getShortCutInfo]);
 
+	const onClickPage = (e: { target: EventTarget | null }) => {
+		const target = e.target as HTMLElement | null;
+		if (target?.id !== 'shortcut') {
+			const activeKey = checkShortcutRef.current;
+			resetCapturingItem(activeKey);
+			restoreGlobalShortcuts();
+		}
+	};
+
+	const onKeydown = useCallback((e: KeyboardEvent) => {
+		const activeKey = checkShortcutRef.current;
+		if (activeKey == null || !capturingRef.current) return;
+		const info = shortcutInfoRef.current.find((item) => item.key === activeKey);
+		if (!info?.key) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+
+		const modifiers: string[] = [];
+		if (e.metaKey) modifiers.push('Meta');
+		if (e.ctrlKey) modifiers.push('Control');
+		if (e.altKey) modifiers.push('Alt');
+		if (e.shiftKey) modifiers.push('Shift');
+
+		// 主键：优先 e.key；Cmd 组合下部分环境 key 异常时用 e.code（KeyD → D）
+		let primary: string | null = null;
+		if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+			if (e.key.length === 1) {
+				primary = capitalizeWords(e.key);
+			} else {
+				const letter = /^Key([A-Z])$/.exec(e.code);
+				const digit = /^Digit([0-9])$/.exec(e.code);
+				if (letter) primary = letter[1];
+				else if (digit) primary = digit[1];
+				else primary = capitalizeWords(e.key);
+			}
+		}
+		if (primary) modifiers.push(primary);
+
+		const shortcuts = modifiers.join(' + ');
+		pendingChordRef.current = shortcuts;
+		setShortcutInfo((prev) =>
+			prev.map((item) =>
+				item.key === activeKey ? { ...item, shortcut: shortcuts } : item,
+			),
+		);
+	}, []);
+
+	const onKeyup = useCallback(
+		(_e: KeyboardEvent) => {
+			if (!capturingRef.current) return;
+			const activeKey = checkShortcutRef.current;
+			const info = shortcutInfoRef.current.find(
+				(item) => item.key === activeKey,
+			);
+			if (activeKey == null || !info?.key) return;
+
+			const shortcuts = pendingChordRef.current.trim();
+			// 仅修饰键（如单独 Meta）不算完成，等主键
+			if (!isValidShortcutChord(shortcuts)) return;
+
+			capturingRef.current = false;
+			const pageOnly = info.registerGlobally === false;
+
+			const list = shortcutInfoRef.current;
+			const conflict = list.find(
+				(item) =>
+					item.key !== activeKey &&
+					chordStringsSemanticallyEqual(
+						shortcuts,
+						item.shortcut.trim() || item.defaultShortcut,
+					),
+			);
+			if (conflict) {
+				Toast({
+					type: 'info',
+					title: t('setting.system.shortcuts.conflictTitle'),
+					message: t('setting.system.shortcuts.conflictMessage', {
+						label: t(conflict.labelKey) || conflict.label,
+					}),
+				});
+				resetCapturingItem(activeKey);
+				restoreGlobalShortcuts();
+				return;
+			}
+
+			/** 知识库等：只写 store；窗口菜单项还需同步菜单加速键 */
+			if (pageOnly) {
+				void (async () => {
+					await setValue(`shortcut_${info.key}`, shortcuts);
+					setShortcutInfo((prev) =>
+						prev.map((item) =>
+							item.key === activeKey
+								? { ...item, shortcut: '', defaultShortcut: shortcuts }
+								: item,
+						),
+					);
+					setCheckShortcut(null);
+					pendingChordRef.current = '';
+					window.dispatchEvent(
+						new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
+					);
+					if (info.syncWindowMenu && isTauriRuntime()) {
+						void desktopInvoke('sync_window_menu_shortcuts');
+					}
+					restoreGlobalShortcuts();
+				})();
+				return;
+			}
+
+			if (!isTauriRuntime()) {
+				Toast({
+					type: 'info',
+					title: t('setting.system.shortcuts.globalOnlyDesktop'),
+				});
+				resetCapturingItem(activeKey);
+				return;
+			}
+
+			desktopInvoke('register_shortcut', {
+				shortcutStr: shortcuts,
+				currentKey: activeKey,
+			})
+				.then(() => {
+					void setValue(`shortcut_${info.key}`, shortcuts);
+					setShortcutInfo((prev) =>
+						prev.map((item) =>
+							item.key === activeKey
+								? {
+										...item,
+										shortcut: '',
+										defaultShortcut: shortcuts,
+									}
+								: item,
+						),
+					);
+					setCheckShortcut(null);
+					pendingChordRef.current = '';
+					restoreGlobalShortcuts();
+				})
+				.catch((error: string) => {
+					Toast({
+						type: 'error',
+						title: t('setting.system.shortcuts.registerFailed'),
+						message: error,
+					});
+					console.error(error, 'error');
+					resetCapturingItem(activeKey);
+					restoreGlobalShortcuts();
+				});
+		},
+		[t, resetCapturingItem, restoreGlobalShortcuts],
+	);
 	useEffect(() => {
 		window.addEventListener('keydown', onKeydown, true);
 		window.addEventListener('keyup', onKeyup, true);
@@ -67,145 +253,7 @@ const System = () => {
 			window.removeEventListener('keyup', onKeyup, true);
 			window.removeEventListener('click', onClickPage);
 		};
-	}, [checkShortcut, shortcutInfo]);
-
-	const onClickPage = (e: { target: EventTarget | null }) => {
-		const target = e.target as HTMLElement | null;
-		if (target?.id !== 'shortcut') {
-			setCheckShortcut(null);
-			if (isTauriRuntime()) {
-				void desktopInvoke('reload_all_shortcuts');
-			}
-		}
-	};
-
-	const onKeydown = useCallback(
-		(e: KeyboardEvent) => {
-			const info = shortcutInfo.find((item) => item.key === checkShortcut);
-			if (!info?.key) return;
-			let shortcuts = info.shortcut;
-
-			const modifiers: string[] = [];
-			if (e.metaKey) modifiers.push('Meta');
-			if (e.ctrlKey) modifiers.push('Control');
-			if (e.altKey) modifiers.push('Alt');
-			if (e.shiftKey) modifiers.push('Shift');
-
-			const key = e.key;
-			if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
-				modifiers.push(capitalizeWords(key));
-			}
-
-			shortcuts = modifiers.join(' + ');
-
-			setShortcutInfo((prev) =>
-				prev.map((item) =>
-					item.key === checkShortcut ? { ...item, shortcut: shortcuts } : item,
-				),
-			);
-		},
-		[shortcutInfo, checkShortcut],
-	);
-
-	const onKeyup = useCallback((_e: KeyboardEvent) => {
-		const activeKey = checkShortcutRef.current;
-		const info = shortcutInfoRef.current.find((item) => item.key === activeKey);
-		if (!info?.key || !info.shortcut) return;
-
-		const shortcuts = info.shortcut;
-		const pageOnly = info.registerGlobally === false;
-
-		const list = shortcutInfoRef.current;
-		const conflict = list.find(
-			(item) =>
-				item.key !== activeKey &&
-				chordStringsSemanticallyEqual(
-					shortcuts,
-					item.shortcut.trim() || item.defaultShortcut,
-				),
-		);
-		if (conflict) {
-			Toast({
-				type: 'info',
-				title: t('setting.system.shortcuts.conflictTitle'),
-				message: t('setting.system.shortcuts.conflictMessage', {
-					label: t(conflict.labelKey) || conflict.label,
-				}),
-			});
-			setShortcutInfo((prev) =>
-				prev.map((item) =>
-					item.key === activeKey ? { ...item, shortcut: '' } : item,
-				),
-			);
-			setCheckShortcut(null);
-			if (!pageOnly && isTauriRuntime()) {
-				void desktopInvoke('reload_all_shortcuts');
-			}
-			return;
-		}
-
-		/** 知识库等：只写 store；窗口菜单项还需同步菜单加速键 */
-		if (pageOnly) {
-			void (async () => {
-				await setValue(`shortcut_${info.key}`, shortcuts);
-				setShortcutInfo((prev) =>
-					prev.map((item) =>
-						item.key === activeKey
-							? { ...item, shortcut: shortcuts, defaultShortcut: shortcuts }
-							: item,
-					),
-				);
-				window.dispatchEvent(
-					new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
-				);
-				if (info.syncWindowMenu && isTauriRuntime()) {
-					void desktopInvoke('sync_window_menu_shortcuts');
-				}
-			})();
-			return;
-		}
-
-		if (!isTauriRuntime()) {
-			Toast({
-				type: 'info',
-				title: t('setting.system.shortcuts.globalOnlyDesktop'),
-			});
-			return;
-		}
-
-		desktopInvoke('register_shortcut', {
-			shortcutStr: shortcuts,
-			currentKey: activeKey,
-		})
-			.then(() => {
-				setShortcutInfo((prev) =>
-					prev.map((item) => {
-						if (item.key === activeKey) {
-							void setValue(`shortcut_${item.key}`, shortcuts);
-							return {
-								...item,
-								shortcut: shortcuts,
-								defaultShortcut: shortcuts,
-							};
-						}
-						return item;
-					}),
-				);
-			})
-			.catch((error: string) => {
-				Toast({
-					type: 'error',
-					title: t('setting.system.shortcuts.registerFailed'),
-					message: error,
-				});
-				console.error(error, 'error');
-				setShortcutInfo((prev) =>
-					prev.map((item) =>
-						item.key === activeKey ? { ...item, shortcut: '' } : item,
-					),
-				);
-			});
-	}, []);
+	}, [onKeydown, onKeyup]);
 
 	const checkStartType = async () => {
 		if (!isTauriRuntime()) {
@@ -261,6 +309,8 @@ const System = () => {
 	};
 
 	const onChangeShortCut = async (value: number) => {
+		pendingChordRef.current = '';
+		capturingRef.current = true;
 		setShortcutInfo((prev) =>
 			prev.map((item) =>
 				item.key === value
@@ -272,11 +322,8 @@ const System = () => {
 			),
 		);
 		setCheckShortcut(value);
-		const item = DEFAULT_INFO.find((i) => i.key === value);
-		const isGlobal = item?.registerGlobally !== false;
-		if (isGlobal && isTauriRuntime()) {
-			await desktopInvoke('clear_all_shortcuts');
-		}
+		// 页内快捷键也要先卸全局，否则已占用组合（如 Meta+O）的主键进不了页面
+		await suspendGlobalShortcuts();
 	};
 
 	return (
@@ -369,9 +416,6 @@ const System = () => {
 							};
 
 							const separator = t('setting.system.shortcuts.separator');
-							const knowledgePrefix = t(
-								'setting.system.shortcuts.group.knowledge',
-							);
 
 							const groups = new Map<string, Group>();
 							for (const i of shortcutInfo) {
@@ -409,20 +453,11 @@ const System = () => {
 									continue;
 								}
 
-								// 约定：label 形如「知识库：保存」；若存在两级（如「知识库：产品：保存」），则按「知识库：产品」再细分
-								const groupTitle =
-									first === knowledgePrefix && parts.length >= 3
-										? `${knowledgePrefix}${separator || '：'}${parts[1]}`
-										: first;
-								const dropCount =
-									first === knowledgePrefix && parts.length >= 3
-										? 2
-										: parts.length >= 2
-											? 1
-											: 0;
+								// 约定：label 形如「知识库：保存」→ 分组「知识库」、展示「保存」
+								const groupTitle = first;
 								const displayLabel =
-									dropCount > 0
-										? parts.slice(dropCount).join(separator || '：')
+									parts.length >= 2
+										? parts.slice(1).join(separator || '：')
 										: localizedLabel;
 
 								const g = groups.get(groupTitle) ?? {

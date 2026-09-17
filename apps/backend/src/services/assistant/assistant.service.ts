@@ -36,6 +36,7 @@ import {
 	AssistantMessageRole,
 } from './assistant-message.entity';
 import { AssistantSession } from './assistant-session.entity';
+import { AssistantSessionSummary } from './assistant-session-summary.entity';
 import { AssistantChatDto } from './dto/assistant-chat.dto';
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
@@ -358,6 +359,63 @@ export class AssistantService {
 		return { sessionId: id, title: session.title };
 	}
 
+	/** 更新助手会话标题（Skill 路径不走 assistant SSE，需显式写首条用户问题为标题） */
+	async updateSessionTitle(
+		userId: number,
+		sessionId: string,
+		rawTitle: string,
+	) {
+		const sid = (sessionId ?? '').trim();
+		const title = (rawTitle ?? '').trim().slice(0, 255);
+		if (!sid) {
+			throw new NotFoundException('会话不存在');
+		}
+		if (!title) {
+			throw new BadRequestException('标题不能为空');
+		}
+		await this.assertSessionOwned(userId, sid);
+		await this.sessionRepo.update(
+			{ id: sid, userId },
+			{ title, updatedAt: new Date() },
+		);
+		return { sessionId: sid, title };
+	}
+
+	/**
+	 * 追加一轮 user+assistant 到助手会话（知识库 Skill：生成仍走 Agent，历史与无 Skill 同表）。
+	 * 不改动 agent_*；英语学习等 Agent 会话不受影响。
+	 */
+	async appendTurn(
+		userId: number,
+		dto: {
+			sessionId: string;
+			userContent: string;
+			assistantContent: string;
+		},
+	): Promise<{ userMessageId: string; assistantMessageId: string }> {
+		const sid = (dto.sessionId ?? '').trim();
+		if (!sid) {
+			throw new NotFoundException('会话不存在');
+		}
+		const userContent = (dto.userContent ?? '').trim();
+		if (!userContent) {
+			throw new BadRequestException('用户消息不能为空');
+		}
+		const session = await this.assertSessionOwned(userId, sid);
+		const turnId = randomUUID();
+		const ids = await this.insertUserAndAssistantPlaceholder(
+			session,
+			turnId,
+			userContent,
+		);
+		await this.updateAssistantContent(
+			ids.assistantMessageId,
+			dto.assistantContent ?? '',
+			session,
+		);
+		return ids;
+	}
+
 	/**
 	 * 按知识条目标识列出该文章下的全部会话（用于历史记录/切换会话）。
 	 */
@@ -456,8 +514,9 @@ export class AssistantService {
 		await this.incrementStreamEpoch(sid);
 		await this.cache.del(this.streamBusyKey(sid));
 
-		// 事务：先删消息再删会话，避免外键约束导致失败
+		// 事务：先删摘要与消息再删会话，避免外键/孤儿行
 		await this.dataSource.transaction(async (manager) => {
+			await manager.delete(AssistantSessionSummary, { sessionId: sid });
 			await manager.delete(AssistantMessage, { session: { id: sid } });
 			await manager.delete(AssistantSession, { id: sid, userId });
 		});
@@ -500,7 +559,7 @@ export class AssistantService {
 		const messages = await this.messageRepo.find({
 			where: { session: { id: sessionId } },
 			order: { createdAt: 'ASC' },
-			select: ['id', 'turnId', 'role', 'content', 'createdAt'],
+			select: ['id', 'turnId', 'role', 'content', 'appliedSkills', 'createdAt'],
 		});
 		return {
 			session: {
@@ -514,6 +573,7 @@ export class AssistantService {
 				turnId: m.turnId,
 				role: m.role,
 				content: m.content,
+				appliedSkills: m.appliedSkills ?? null,
 				createdAt: m.createdAt,
 			})),
 		};
@@ -819,6 +879,13 @@ export class AssistantService {
 			const next = dto.lines[i];
 			const assistantContent =
 				next?.role === 'assistant' ? (next.content ?? '') : '';
+			const appliedSkills =
+				next?.role === 'assistant' && next.appliedSkills?.length
+					? next.appliedSkills.map((s) => ({
+							id: s.id,
+							title: s.title,
+						}))
+					: null;
 			if (next?.role === 'assistant') {
 				i++;
 			}
@@ -828,15 +895,20 @@ export class AssistantService {
 					role: AssistantMessageRole.ASSISTANT,
 					content: assistantContent,
 					turnId,
+					appliedSkills,
 				}),
 			);
 			inserted++;
 		}
 		const now = new Date();
+		// 已有标题（含 Skill 路径显式写入）保留，避免每次全量迁入覆盖用户/首轮标题
+		const nextTitle = session.title?.trim()
+			? session.title
+			: titleFromFirstUser;
 		await this.sessionRepo.update(
 			{ id: sessionId, userId },
 			{
-				title: titleFromFirstUser,
+				title: nextTitle,
 				updatedAt: now,
 			},
 		);

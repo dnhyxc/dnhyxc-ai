@@ -1,8 +1,15 @@
-# docs/ 功能域目录与落盘规则
+# wiki/ 功能域目录与落盘规则
 
-专题实现文**必须**落在与改动**产品功能**一致的 `docs/<功能域>/` 下，**禁止**再使用已废弃的 `docs/backend/`、`docs/frontend/` 等按技术栈划分的顶层目录。
+专题实现文**必须**落在与改动**产品功能**一致的 `<WIKI_ROOT>/<功能域>/` 下，**禁止**再使用已废弃的 `backend/`、`frontend/` 等按技术栈划分的顶层目录；**禁止**再往本仓 `docs/` 落新专题。
 
-权威登记表：仓库根 [`docs/README.md`](../../../../docs/README.md)。
+| 写法 | 路径 |
+|------|------|
+| **绝对路径（权威）** | `/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/` |
+| **相对本仓（dnhyxc-ai）** | `../micro-apps/remote-docs/wiki/` |
+
+权威登记表：[`<WIKI_ROOT>/README.md`](../../../../../micro-apps/remote-docs/wiki/README.md)（绝对路径：`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/README.md`）。
+
+**规划态**文 → `<WIKI_ROOT>/ideas/`（Skill：`feature-implementation-idea`）；**本 Skill 不要**写进 `ideas/`。
 
 ---
 
@@ -12,89 +19,84 @@
 
 | 改动涉及 | 落盘目录 | 典型源码前缀（仅供对照） |
 |----------|----------|-------------------------|
-| 主站对话、分享、联网、聊天附件 | `docs/chat/` | `apps/backend/src/services/chat/`、`apps/frontend/src/views/chat/`、`ChatBot` |
-| 知识库、RAG、文档助手、本地文件夹 | `docs/knowledge/` | `apps/frontend/src/views/knowledge/`、knowledge/assistant 后端 |
-| 英语学习（词包、收藏、TTS、Agent） | `docs/english/` | `english-learning`、`agent` 英语学习 |
-| 腾讯云 COS 上传、`/ext-cos/` 展示 | `docs/cos/` | `upload/cos`、`resolveCosUrl*`、vite `/ext-cos` |
-| 大模型接入（硅基、`createLlm`、设置页 LLM） | `docs/llm/` | `create-llm`、`llm-runtime-settings`、`siliconflow` |
-| 部署、Nginx、本地上传 `uploads/` | `docs/ops/` | `deploy`、`nginx`、`upload-paths` |
-| 路由守卫、401、Tauri、i18n、登录流程 | `docs/app/` | `router/`、`src-tauri/`、全局 `utils` 横切（非单一业务页） |
-| Monaco / Markdown 编辑器 | `docs/monaco/` | `MarkdownEditor`、`monaco` |
-| Mermaid 围栏、预览缩放 | `docs/mermaid/` | `Mermaid`、`markdown-kit` 图表 |
-| `@dnhyxc-ai/markdown-kit` 包 | `docs/tools/` | `packages/markdown-kit` |
-| React Hooks 通用模式 | `docs/react/` | `hooks/` 且**无**单一业务域 |
-| 系统快捷键 | `docs/setting/` | `views/setting/system` |
-| 发布、更新页同步脚本 | `docs/meta/` | `scripts/release`、`update-info` 生成 |
+| 主站对话、分享、联网、聊天附件 | `<WIKI_ROOT>/chat/` | `apps/backend/src/services/chat/`、`apps/frontend/src/views/chat/`、`ChatBot` |
+| 知识库、RAG、文档助手、本地文件夹 | `<WIKI_ROOT>/knowledge/` | `apps/frontend/src/views/knowledge/`、knowledge/assistant 后端 |
+| 英语学习（词包、收藏、TTS、Agent） | `<WIKI_ROOT>/english/` | `english-learning`、`agent` 英语学习 |
+| 腾讯云 COS 上传、`/ext-cos/` 展示 | `<WIKI_ROOT>/cos/` | `upload/cos`、`resolveCosUrl*`、vite `/ext-cos` |
+| 大模型接入（硅基、`createLlm`、设置页 LLM） | `<WIKI_ROOT>/llm/` | `create-llm`、`llm-runtime-settings`、`siliconflow` |
+| 部署、Nginx、本地上传 `uploads/` | `<WIKI_ROOT>/ops/` | `deploy`、`nginx`、`upload-paths` |
+| 路由守卫、401、Tauri、i18n、登录流程 | `<WIKI_ROOT>/app/` | `router/`、`src-tauri/`、全局 `utils` 横切（非单一业务页） |
+| Monaco / Markdown 编辑器 | `<WIKI_ROOT>/monaco/` | `MarkdownEditor`、`monaco` |
+| Mermaid 围栏、预览缩放 | `<WIKI_ROOT>/mermaid/` | `Mermaid`、`markdown-kit` 图表 |
+| `@dnhyxc-ai/markdown-kit` 包 | `<WIKI_ROOT>/tools/` | `packages/markdown-kit` |
+| React Hooks 通用模式 | `<WIKI_ROOT>/react/` | `hooks/` 且**无**单一业务域 |
+| 系统快捷键 | `<WIKI_ROOT>/setting/` | `views/setting/system` |
+| 发布、更新页同步脚本 | `<WIKI_ROOT>/meta/` | `scripts/release`、`update-info` 生成 |
+| 电子书书架、EPUB/PDF | `<WIKI_ROOT>/ebook/` | `ebook`、`epub` |
+| Agent 分表 / Skill 后端 | `<WIKI_ROOT>/agent/` | `services/agent`、`services/skill` |
+| 改动影响面 | `<WIKI_ROOT>/impact/` | Influence-point 类分析 |
+| 插件 / MF | `<WIKI_ROOT>/plugins/` | `plugins`、federation |
+| Tauri 桌面特性 | `<WIKI_ROOT>/tauri/` | `src-tauri` |
+| 认证 | `<WIKI_ROOT>/auth/` | 路由守卫、登录 |
+| 样式隔离 | `<WIKI_ROOT>/style/` | `@scope`、Portal |
+| 视频 | `<WIKI_ROOT>/video/` | 播放器 |
+| 国际化 | `<WIKI_ROOT>/i18n/` | locales |
+| 通用 UI | `<WIKI_ROOT>/ui/` | 组件/交互 |
+| 支付 | `<WIKI_ROOT>/pay/` | Stripe |
 
 **跨域改动（一轮含多个独立功能）**：
 
-- **每个独立功能各写一篇**专题，分别落在各自功能域（例如 `docs/chat/助手分享条.md` + `docs/ebook/本地路径去重.md`）。
-- 文首「延伸阅读」互链；`docs/README.md` 或各域 `README.md` 可增一行索引。
-- **禁止**为「省事」只选一个主域，把其它域的实现细节与代码块全部塞进同一篇 Markdown。
-- **同一功能**的前端 + 后端仍写在**一篇**专题内（按 ### 分模块），**不要**按 `backend/` vs `frontend/` 拆成两篇技术栈文档（且禁止恢复 `docs/backend/`、`docs/frontend/` 目录）。
+- **每个独立功能各写一篇**专题，分别落在各自功能域（例如 `<WIKI_ROOT>/chat/助手分享条.md` + `<WIKI_ROOT>/ebook/本地路径去重.md`）。
+- 文首「延伸阅读」互链；`<WIKI_ROOT>/README.md` 或各域 `README.md` 可增一行索引。
+- **不要**合并成「本轮总文档」塞进某一个域。
+- **同一功能**的前端 + 后端仍写在**一篇**专题内（按 ### 分模块），**不要**按 `backend/` vs `frontend/` 拆成两篇技术栈文档。
 
-**仅根目录**（不写进子目录）：`docs/project-guide.md`、`docs/project-update-info.md`（产品向姊妹稿）。
+**仅根目录**（不写进子目录）：`<WIKI_ROOT>/项目指南.md`、`<WIKI_ROOT>/项目更新信息.md`（产品向姊妹稿）。
 
----
-
-## 2. 目录命名（必须简短）
-
-- 使用**小写**、**短**、**单一功能**：如 `chat`、`cos`、`llm`、`ops`、`app`、`english`。
-- **禁止**过长或泛名目录：`backend`、`frontend`、`notes`、`misc`、`temp`。
-- **禁止**恢复 `docs/backend/`、`docs/frontend/`；历史链接应改指向上表对应域。
-
-新建目录示例（仅当产品新增独立能力域且上表无合适项时）：
-
-| 可接受 | 避免 |
-|--------|------|
-| `pay/`、`notify/` | `payment-integration-docs/` |
-| `auth/`（若与 `app/` 路由守卫拆不开则仍用 `app/`） | `user-authentication-module/` |
-
-新目录名建议 **2～8 个字符**；创建后必须在 `docs/README.md`「功能域目录」表增一行。
+**禁止**：`<WIKI_ROOT>/ideas/`（规划态）、本仓 `docs/` 新专题。
 
 ---
 
-## 2.1 专题文件名（中文，与目录名分工）
+## 2. 命名约定
 
-- **目录名**：短英文（上表）。
-- **专题 `.md` 文件名**：**简体中文**、简短、语义明确（细则见 SKILL §4）；示例 `docs/chat/助手分享条.md`。
-- **禁止**用英文 kebab-case 作专题文件名（历史英文专题可不强制改名；**新建**一律中文）。
+- **功能域目录名**：短英文（上表）。
+- **禁止**恢复 `backend/`、`frontend/`；历史链接应改指向上表对应域。
+- 新目录名建议 **2～8 个字符**；创建后必须在 `<WIKI_ROOT>/README.md`「功能域目录」表增一行。
+- **专题 `.md` 文件名**：**简体中文**、简短、语义明确（细则见 SKILL §4）；示例 `<WIKI_ROOT>/chat/助手分享条.md`。
 
 ---
 
-## 3. 目录不存在时（必须创建）
+## 3. 新建功能域目录
 
-落盘前检查 `docs/<功能域>/` 是否存在：
+落盘前检查 `<WIKI_ROOT>/<功能域>/` 是否存在：
 
-1. **无此目录** → 创建 `docs/<功能域>/`。
-2. **无 `README.md`** → 新建 `docs/<功能域>/README.md`（一句话说明该域职责 + 表格索引已有/本轮新增专题）。
-3. 在 [`docs/README.md`](../../../../docs/README.md) 的「功能域目录」表补一行入口。
-4. 若现象适合排查表 → 在 `docs/README.md`「常见排查」补链。
+1. **无此目录** → 创建 `<WIKI_ROOT>/<功能域>/`。
+2. **无 `README.md`** → 新建 `<WIKI_ROOT>/<功能域>/README.md`（一句话说明该域职责 + 表格索引已有/本轮新增专题）。
+3. 在 `<WIKI_ROOT>/README.md` 的「功能域目录」表补一行入口。
+4. 若现象适合排查表 → 在 `<WIKI_ROOT>/README.md`「常见排查」补链。
 
-不得把专题文直接写在 `docs/` 根下（`project-guide.md` / `project-update-info.md` 除外）。
+不得把专题文直接写在 `<WIKI_ROOT>/` 根下（姊妹稿除外）；不得写进本仓 `docs/`。
 
 ---
 
 ## 4. 从源码路径反推功能域（速查）
 
-```
-apps/backend/src/services/chat/     → chat/（后端部分写在 chat 专题即可）
-apps/backend/src/services/upload/   → cos/ 或 ops/（COS 用 cos/，本地上传用 ops/）
-apps/backend/src/services/share/    → chat/
-apps/backend/src/services/english-learning/ → english/
-apps/frontend/src/views/chat/       → chat/
-apps/frontend/src/views/knowledge/  → knowledge/
-apps/frontend/src/views/english-learning/ → english/
-apps/frontend/src/utils/index.ts    → 若仅 COS 展示链 → cos/；若路由鉴权 → app/
-packages/markdown-kit/              → tools/
-```
+| 源码线索 | 优先域 |
+|----------|--------|
+| `views/chat`、`services/chat`、分享 | `chat` |
+| `views/knowledge`、RAG、assistant 知识库 | `knowledge` |
+| `english-learning`、`englishAgent` | `english` |
+| `ebook`、`epub` | `ebook` |
+| `skill`、`agent`、`memorySource` | `agent` 或 `knowledge`（Skill 页 UI 偏 knowledge） |
+| `create-llm`、硅基 | `llm` |
+| `cos`、`ext-cos` | `cos` |
+| `src-tauri` 窗口/菜单 | `tauri` 或 `app` |
+| Monaco | `monaco` |
 
 ---
 
 ## 5. 自检（落盘前）
 
-- [ ] 若一轮含多个独立功能，是否已**各写一篇**（未全部堆在同一文件）？
-- [ ] 专题路径是否为 `docs/<功能域>/<简短中文文件名>.md`（非英文 kebab-case）？
-- [ ] `<功能域>` 是否在 `docs/README.md` 已登记？
-- [ ] 是否误用 `docs/backend/`、`docs/frontend/` 或 `docs/` 根目录堆专题？
-- [ ] 跨域内容是否指定了主文档 + 它处摘要链接（见 `docs-maintenance.md` §2）？
+- [ ] 专题路径是否为 `<WIKI_ROOT>/<功能域>/<简短中文文件名>.md`（非英文 kebab-case）？
+- [ ] `<功能域>` 是否在 `<WIKI_ROOT>/README.md` 已登记？
+- [ ] 是否误用 `backend/`、`frontend/`、根目录、`ideas/`，或误写本仓 `docs/`？

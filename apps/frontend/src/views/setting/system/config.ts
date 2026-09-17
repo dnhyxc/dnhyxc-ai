@@ -15,7 +15,7 @@ export type ShortcutSettingItem = {
 	action: string;
 	/**
 	 * true（默认）：绑定后调用 Tauri 注册全局快捷键；
-	 * false：仅写入 store，由具体页面（如知识库）在窗口内监听。
+	 * false：仅写入 store，由应用内监听（保存/新建由 Layout 统一监听；其余由页面监听）。
 	 */
 	registerGlobally?: boolean;
 	/** 写入 store 后同步到窗口菜单右侧加速键 */
@@ -171,13 +171,24 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.save',
-		label: '知识库：保存',
+		label: '通用：保存',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.save,
 		id: 'shortcut',
 		shortcut: '',
 		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		placeholder: '按键盘输入快捷键',
 		action: 'knowledge_save',
+		registerGlobally: false,
+	},
+	{
+		labelKey: 'setting.system.shortcuts.item.knowledge.clearDraft',
+		label: '通用：新建',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.clear,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_clear',
 		registerGlobally: false,
 	},
 	{
@@ -189,17 +200,6 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.import,
 		placeholder: '按键盘输入快捷键',
 		action: 'knowledge_import',
-		registerGlobally: false,
-	},
-	{
-		labelKey: 'setting.system.shortcuts.item.knowledge.clearDraft',
-		label: '知识库：清空草稿',
-		key: KNOWLEDGE_SHORTCUT_KEY_IDS.clear,
-		id: 'shortcut',
-		shortcut: '',
-		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
-		placeholder: '按键盘输入快捷键',
-		action: 'knowledge_clear',
 		registerGlobally: false,
 	},
 	{
@@ -222,17 +222,6 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
 		placeholder: '按键盘输入快捷键',
 		action: 'knowledge_open_library',
-		registerGlobally: false,
-	},
-	{
-		labelKey: 'setting.system.shortcuts.item.knowledge.toggleActionBar',
-		label: '知识库：切换操作栏',
-		key: KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar,
-		id: 'shortcut',
-		shortcut: '',
-		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
-		placeholder: '按键盘输入快捷键',
-		action: 'knowledge_toggle_markdown_bottom_bar',
 		registerGlobally: false,
 	},
 	{
@@ -259,8 +248,19 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
+		labelKey: 'setting.system.shortcuts.item.knowledge.toggleActionBar',
+		label: '编辑器：切换操作栏',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_toggle_markdown_bottom_bar',
+		registerGlobally: false,
+	},
+	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.editSource',
-		label: '知识库：操作栏：编辑源码',
+		label: '编辑器：编辑源码',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1,
 		id: 'shortcut',
 		shortcut: '',
@@ -271,7 +271,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.diff',
-		label: '知识库：操作栏：分屏对照（Diff）',
+		label: '编辑器：分屏对照（Diff）',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction2,
 		id: 'shortcut',
 		shortcut: '',
@@ -282,7 +282,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.previewRender',
-		label: '知识库：操作栏：预览渲染',
+		label: '编辑器：预览渲染',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction3,
 		id: 'shortcut',
 		shortcut: '',
@@ -293,7 +293,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.toggleAssistant',
-		label: '知识库：操作栏：开关 AI 助手',
+		label: '编辑器：开关 AI 助手',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction4,
 		id: 'shortcut',
 		shortcut: '',
@@ -304,7 +304,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.splitPreview',
-		label: '知识库：操作栏：分屏预览',
+		label: '编辑器：分屏预览',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction5,
 		id: 'shortcut',
 		shortcut: '',
@@ -315,7 +315,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.followBidirectional',
-		label: '知识库：操作栏：双边跟随',
+		label: '编辑器：双边跟随',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction6,
 		id: 'shortcut',
 		shortcut: '',
@@ -327,7 +327,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	{
 		labelKey:
 			'setting.system.shortcuts.item.knowledge.bar.followPreviewFollowsEditor',
-		label: '知识库：操作栏：右边跟随左边',
+		label: '编辑器：右边跟随左边',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction7,
 		id: 'shortcut',
 		shortcut: '',
@@ -339,7 +339,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	{
 		labelKey:
 			'setting.system.shortcuts.item.knowledge.bar.followEditorFollowsPreview',
-		label: '知识库：操作栏：左边跟随右边',
+		label: '编辑器：左边跟随右边',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction8,
 		id: 'shortcut',
 		shortcut: '',
@@ -350,7 +350,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.toggleOverrideSave',
-		label: '知识库：操作栏：开关覆盖保存',
+		label: '编辑器：开关覆盖保存',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction9,
 		id: 'shortcut',
 		shortcut: '',
@@ -361,7 +361,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.toggleAutoSave',
-		label: '知识库：操作栏：开关自动保存',
+		label: '编辑器：开关自动保存',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0,
 		id: 'shortcut',
 		shortcut: '',
@@ -372,7 +372,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.bar.resetPosition',
-		label: '知识库：操作栏：复位初始位置',
+		label: '编辑器：复位初始位置',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition,
 		id: 'shortcut',
 		shortcut: '',
@@ -380,17 +380,6 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		placeholder: '按键盘输入快捷键',
 		action: 'knowledge_markdown_bar_reset_position',
 		registerGlobally: false,
-	},
-	{
-		labelKey: 'setting.system.shortcuts.item.newWorkflow',
-		label: '新建工作流',
-		key: 4,
-		id: 'shortcut',
-		shortcut: '',
-		defaultShortcut: 'Command + N',
-		placeholder: '按键盘输入快捷键',
-		action: 'new_workflow',
-		registerGlobally: true,
 	},
 	{
 		labelKey: 'setting.system.shortcuts.item.openSubwindow',

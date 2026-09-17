@@ -55,6 +55,7 @@ export const enUS = {
 	// 导航栏文案
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',
+	'nav.skills': 'Skills',
 	'nav.ebook': 'Bookshelf',
 	'nav.chat': 'Smart Chat',
 	'nav.englishLearning': 'English',
@@ -417,7 +418,6 @@ export const enUS = {
 	'setting.system.shortcuts.item.hide': 'Hide app',
 	'setting.system.shortcuts.item.hideOrShowApp': 'Toggle app visibility',
 	'setting.system.shortcuts.item.reload': 'Reload app',
-	'setting.system.shortcuts.item.newWorkflow': 'Create workflow',
 	'setting.system.shortcuts.item.openSubwindow': 'Open subwindow',
 	'setting.system.shortcuts.item.window.minimize': 'Minimize window',
 	'setting.system.shortcuts.item.window.close': 'Close window',
@@ -428,39 +428,38 @@ export const enUS = {
 	'setting.system.shortcuts.item.file.about': 'About',
 	'setting.system.shortcuts.item.file.logout': 'Log out',
 	'setting.system.shortcuts.item.file.quit': 'Quit',
-	'setting.system.shortcuts.item.knowledge.save': 'Knowledge: Save',
+	'setting.system.shortcuts.item.knowledge.save': 'General: Save',
+	'setting.system.shortcuts.item.knowledge.clearDraft': 'General: New',
 	'setting.system.shortcuts.item.knowledge.import': 'Knowledge: Import file',
-	'setting.system.shortcuts.item.knowledge.clearDraft':
-		'Knowledge: Clear draft',
 	'setting.system.shortcuts.item.knowledge.share': 'Knowledge: Share article',
 	'setting.system.shortcuts.item.knowledge.openList': 'Knowledge: Open list',
-	'setting.system.shortcuts.item.knowledge.toggleActionBar':
-		'Knowledge: Toggle action bar',
 	'setting.system.shortcuts.item.knowledge.openTrash': 'Knowledge: Open trash',
 	'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant':
 		'Knowledge: Send selection to assistant input',
+	'setting.system.shortcuts.item.knowledge.toggleActionBar':
+		'Editor: Toggle action bar',
 	'setting.system.shortcuts.item.knowledge.bar.editSource':
-		'Knowledge: Action bar: Edit source',
+		'Editor: Edit source',
 	'setting.system.shortcuts.item.knowledge.bar.diff':
-		'Knowledge: Action bar: Split diff (Diff)',
+		'Editor: Split diff (Diff)',
 	'setting.system.shortcuts.item.knowledge.bar.previewRender':
-		'Knowledge: Action bar: Preview render',
+		'Editor: Preview render',
 	'setting.system.shortcuts.item.knowledge.bar.toggleAssistant':
-		'Knowledge: Action bar: Toggle AI assistant',
+		'Editor: Toggle AI assistant',
 	'setting.system.shortcuts.item.knowledge.bar.splitPreview':
-		'Knowledge: Action bar: Split preview',
+		'Editor: Split preview',
 	'setting.system.shortcuts.item.knowledge.bar.followBidirectional':
-		'Knowledge: Action bar: Bidirectional follow',
+		'Editor: Bidirectional follow',
 	'setting.system.shortcuts.item.knowledge.bar.followPreviewFollowsEditor':
-		'Knowledge: Action bar: Preview follows editor',
+		'Editor: Preview follows editor',
 	'setting.system.shortcuts.item.knowledge.bar.followEditorFollowsPreview':
-		'Knowledge: Action bar: Editor follows preview',
+		'Editor: Editor follows preview',
 	'setting.system.shortcuts.item.knowledge.bar.toggleOverrideSave':
-		'Knowledge: Action bar: Toggle override save',
+		'Editor: Toggle override save',
 	'setting.system.shortcuts.item.knowledge.bar.toggleAutoSave':
-		'Knowledge: Action bar: Toggle auto save',
+		'Editor: Toggle auto save',
 	'setting.system.shortcuts.item.knowledge.bar.resetPosition':
-		'Knowledge: Action bar: Reset position',
+		'Editor: Reset position',
 
 	'setting.about.toast.latestVersion': "You're on the latest version",
 	'setting.about.toast.fetchVersionFailed': 'Failed to fetch version info',
@@ -880,13 +879,13 @@ export const enUS = {
 	'knowledge.import.failed': 'Import failed',
 	'knowledge.import.tooLarge': 'File is too large (max 5MB)',
 	'knowledge.import.notMd': 'Only .md files can be imported',
-	'knowledge.toolbar.clear': 'Clear',
+	'knowledge.toolbar.clear': 'New',
 	'knowledge.toolbar.share': 'Share',
 	'knowledge.toolbar.library': 'Library',
 	'knowledge.toolbar.trash': 'Trash',
 	'knowledge.shortcuts.save': 'Meta + S / Control + S',
 	'knowledge.shortcuts.import': 'Meta + I',
-	'knowledge.shortcuts.clear': 'Meta + Shift + D',
+	'knowledge.shortcuts.clear': 'Meta + Shift + N',
 	'knowledge.shortcuts.share': 'Meta + Shift + O',
 	'knowledge.shortcuts.openLibrary': 'Meta + Shift + L',
 	'knowledge.shortcuts.openTrash': 'Meta + Shift + T',
@@ -989,6 +988,8 @@ export const enUS = {
 		'Are you sure you want to delete this conversation? This action cannot be undone.',
 	'knowledge.assistant.conversationNameLabel': 'Conversation: “{name}”',
 	'knowledge.assistant.conversationFallback': 'Chat {id}',
+	'knowledge.assistant.editConversationTitle': 'Edit title',
+	'knowledge.assistant.titleRequired': 'Title cannot be empty',
 	'knowledge.assistant.history': 'History',
 	'knowledge.assistant.historyEmpty': 'No conversations yet',
 	'knowledge.assistant.noBodyToWrite': 'No body content to write.',
@@ -1727,9 +1728,46 @@ export const enUS = {
 	'route.coding.title': 'Coding',
 	'route.profile.title': 'Profile',
 	'route.knowledge.title': 'Knowledge',
+	'route.skills.title': 'Skills',
 	'route.ebook.title': 'Moke BookHouse',
 	'route.ebook.shelf': 'My bookshelf',
 	'route.ebook.read': 'Reading',
+
+	'skill.list.empty': 'No skills yet. Create one to get started.',
+	'skill.toolbar.library': 'Skill library',
+	'skill.toolbar.libraryShow': 'Show skill list',
+	'skill.toolbar.libraryHide': 'Hide skill list',
+	'skill.new': 'New',
+	'skill.save': 'Save',
+	'skill.save.unsaved': 'Save (unsaved changes)',
+	'skill.delete': 'Delete',
+	'skill.title.placeholder': 'Skill title',
+	'skill.content.placeholder': 'Write skill / prompt body (Markdown)',
+	'skill.try.placeholder': 'Try the current skill…',
+	'skill.try.send': 'Send',
+	'skill.try.empty': 'Try the current skill on the right',
+	'skill.try.saveFirst': 'Save the skill first, then try it here.',
+	'skill.panel.mode.try': 'Try',
+	'skill.panel.mode.generate': 'Generate',
+	'skill.generate.placeholder':
+		'Describe a new skill, or how to revise what’s in the editor…',
+	'skill.generate.empty':
+		'Chat is tied to the current skill (new draft or saved). Draft from scratch or revise the editor content; tap “Write to editor” when ready, then review and save',
+	'skill.generate.applyToEditor': 'Write to editor',
+	'skill.generate.applied': 'Written to the editor — review and save',
+	'skill.generate.emptyApply': 'Empty reply — nothing to write',
+	'skill.generate.parseFail':
+		'Could not parse title and body; ask for a # Title format',
+	'skill.slash.placeholder': 'Search skills…',
+	'skill.slash.hint': 'Keep typing to filter; space closes',
+	'skill.slash.filtering': 'Filter: {q}',
+	'skill.slash.empty': 'No matching skills',
+	'skill.slash.confirm': 'Confirm',
+	'skill.slash.add': 'Add skill',
+	'skill.applied.label': 'Applied skills',
+	'skill.chips.aria': 'Selected skills',
+	'skill.delete.confirmTitle': 'Delete skill?',
+	'skill.delete.confirmDesc': 'This cannot be undone.',
 
 	'ebook.shelf.title': 'My bookshelf',
 	'ebook.shelf.hint':

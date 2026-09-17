@@ -17,10 +17,12 @@ import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
 import { useI18n, useTheme } from '@/hooks';
 import { useAssistantPaneBusy } from '@/hooks/useAssistantPaneBusy';
+import { bindDocumentShortcutHandlers } from '@/hooks/useDocumentShortcuts';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
+import skillStore from '@/store/skill';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
@@ -485,6 +487,7 @@ const Knowledge = observer(() => {
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
+		skillStore.clearSelected();
 		// 清空内容会把“编辑态条目”切回 `draft-new`。
 		// 关键：这里不能仅用 `assistantArticleBinding === 'draft-new'` 判断“未保存草稿”，
 		// 因为“是否允许助手持久化”还取决于：
@@ -978,7 +981,7 @@ const Knowledge = observer(() => {
 	]);
 
 	/**
-	 * 知识库快捷键：组合键在系统设置中配置（shortcut_6/7/8/9），仅在本页捕获执行；
+	 * 知识库专属快捷键（导入/分享/列表/回收站/粘贴到助手）；保存/新建由 Layout 统一监听。
 	 * 捕获阶段优先于 Monaco 默认行为。
 	 */
 	useEffect(() => {
@@ -990,19 +993,9 @@ const Knowledge = observer(() => {
 			) {
 				return;
 			}
-			if (chordMatchesStored(knowledgeChords.save, e)) {
-				e.preventDefault();
-				void onSave();
-				return;
-			}
 			if (chordMatchesStored(knowledgeChords.import, e)) {
 				e.preventDefault();
 				onImport();
-				return;
-			}
-			if (chordMatchesStored(knowledgeChords.clear, e)) {
-				e.preventDefault();
-				resetEditorToNewDraft();
 				return;
 			}
 			if (chordMatchesStored(knowledgeChords.share, e)) {
@@ -1039,13 +1032,45 @@ const Knowledge = observer(() => {
 		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, [
 		knowledgeChords,
-		onSave,
 		onImport,
 		saveLoading,
 		importLoading,
 		knowledgeStore.knowledgeOverwriteOpen,
-		resetEditorToNewDraft,
 		isCloudLoggedIn,
+	]);
+
+	/** 注册应用内「通用：保存 / 新建」到 Layout 统一监听 */
+	useEffect(() => {
+		const handleSave = () => {
+			if (
+				saveLoading ||
+				importLoading ||
+				knowledgeStore.knowledgeOverwriteOpen
+			) {
+				return;
+			}
+			void onSave();
+		};
+		const handleNew = () => {
+			if (
+				saveLoading ||
+				importLoading ||
+				knowledgeStore.knowledgeOverwriteOpen
+			) {
+				return;
+			}
+			resetEditorToNewDraft();
+		};
+		return bindDocumentShortcutHandlers({
+			onSave: handleSave,
+			onNew: handleNew,
+		});
+	}, [
+		onSave,
+		resetEditorToNewDraft,
+		saveLoading,
+		importLoading,
+		knowledgeStore.knowledgeOverwriteOpen,
 	]);
 
 	const onConfirmOverwrite = useCallback(async () => {
@@ -1175,6 +1200,7 @@ const Knowledge = observer(() => {
 
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
+			skillStore.clearSelected();
 			// 他人公开文档：按新草稿打开（保存走新建），避免误改对方条目
 			const editable = record.isOwned !== false;
 			const editingId = editable ? record.id : null;
@@ -1214,6 +1240,7 @@ const Knowledge = observer(() => {
 			content: string;
 			trashItemId: string;
 		}) => {
+			skillStore.clearSelected();
 			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
 			const nextAssistantKey = knowledgeAssistantDocumentKey(
 				knowledgeAssistantArticleBinding({

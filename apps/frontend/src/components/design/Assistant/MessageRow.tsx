@@ -27,6 +27,7 @@ function AssistantMessageBubble({
 	variant,
 	isLoading,
 	onSaveToKnowledge,
+	saveKnowledgeTitle,
 	allowAiShare,
 	shareSelection,
 	onShare,
@@ -82,6 +83,7 @@ function AssistantMessageBubble({
 							setCheckedMessage={setCheckedMessage}
 							onCopy={onCopy}
 							onSaveToKnowledge={onSaveToKnowledge}
+							saveKnowledgeTitle={saveKnowledgeTitle}
 							onSpeakContent={onSpeakContent}
 							t={t}
 						/>
@@ -94,7 +96,7 @@ function AssistantMessageBubble({
 
 /**
  * 助手单条消息行：MobX observer + 按 chatId 解析 Message。
- * `variant="default"` 对齐知识库/电子书；`variant="english"` 对齐英语学习 Agent。
+ * `variant="default"` 主聊气泡；`variant="panel"` 侧栏/嵌入助手气泡。
  */
 export const AssistantMessageRow = observer(function AssistantMessageRow({
 	selectMessageByChatId,

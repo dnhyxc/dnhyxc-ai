@@ -1,6 +1,6 @@
 # 基于改动的实现说明文档 — 章节骨架（可选）
 
-按需删减；代码块内须**逐行上方**讲解注释（见 `code-line-comments.md`），正文宜交代「为什么」。
+按需删减；代码块内对非空非纯花括号行须上方注释「做什么 + 为什么」（见 `code-line-comments.md`），正文宜交代「为什么」。
 
 **文件名（与 SKILL 一致）**：新建专题 `*.md` 时须用**简体中文**、**简短**、**语义明确**（建议 4～12 字，概括该篇单一功能）；**禁止**英文 kebab-case 与 `说明.md` / `更新.md` 等泛名；**一轮多项独立功能须多篇文件**，勿合并。正文 `# 标题` 可与文件名不完全相同。
 
@@ -16,11 +16,12 @@
 ## 3. 实现思路
 
 - 核心决策与权衡
-- 数据流 / 调用链（可配简易列表或 mermaid）
+- 数据流 / 调用链：**复杂时须用 Mermaid**（禁止 ASCII；节点 `"<b>名</b><br/>━━━<br/>• 要点"`；连线带语义标签；时序详情进 `Note right of`；建议图例与 `🆕`）。细则见 [`diagram-guide.md`](diagram-guide.md)。
+- 图下可用 2～4 句「读图要点」点出本轮边界；图不能代替 §4 成对代码块。
 
 ## 4. 关键实现（改动前 / 改动后对比 + 注释）
 
-对每个实质改动的逻辑单元，须成对展示改动前与改动后（`code-before-after.md`），完整符号定义（`code-symbol-scope.md`），且**每一行源码**上方一行**详细**注释——**100% 覆盖**（`code-line-comments.md` §1.2 扫描）。纯新增 / 纯删除见 `code-before-after.md` §4。
+对每个实质改动的逻辑单元，须成对展示改动前与改动后（`code-before-after.md`），完整符号定义（`code-symbol-scope.md`），且对**每一行非空、非纯花括号**源码上方写 **做什么 + 为什么** 的中文注释（`code-line-comments.md`）。纯新增 / 纯删除见 `code-before-after.md` §4。
 
 ### 4.1 `<符号名>`（`path/to/file.ext`）
 
@@ -29,16 +30,16 @@
 **改动前** · `path/to/file.ext`（基线，约 L起–L止 或 符号名）
 
 ```lang
-// （该行源码的作用）
+// 该行做什么 + 为什么（旧版）
 （基线源码行）
-// （下一行源码的作用）
+// 下一行做什么 + 为什么
 （基线源码下一行）
 ```
 
 **改动后** · `path/to/file.ext`（当前，约 L起–L止 或 符号名）
 
 ```lang
-// （该行源码的作用，可注明相对改动前的变化）
+// 该行做什么 + 为什么（可点出相对改动前的变化）
 （当前源码行）
 ```
 
@@ -66,8 +67,10 @@
 
 ## 8. 落盘后（Agent 自检，不必写入专题正文）
 
-- 已按 `docs-maintenance.md` 更新 `docs/README.md` 与领域 README。
-- 若用户可感知：已更新 `project-update-info.md` / `project-guide.md`（无路径，见 `product-user-docs.md`）。
+- 已按 `docs-maintenance.md` 更新 `<WIKI_ROOT>/README.md` 与领域 README。
+- 若用户可感知：已更新 `项目更新信息.md` / `项目指南.md`（无路径，见 `product-user-docs.md`）。
+- 专题落在 `<WIKI_ROOT>/<功能域>/`，**未**写入本仓 `docs/` 或 `ideas/`。
 - 实质改动是否均有改动前/改动后成对代码块（见 `code-before-after.md` §6）。
-- 代码块是否 **100% 逐行**详细注释且 §1.2 扫描通过（`code-line-comments.md` §8）。
+- 代码块是否对非空非纯花括号行 **100%** 上方注释（做什么+为什么），且机械扫描通过（`code-line-comments.md`）？
 - 代码块是否含完整符号声明与闭合（见 `code-symbol-scope.md` §6）。
+- 跨模块/分支/落库时是否已有合格 Mermaid（节点要点 + 连线标签；见 `diagram-guide.md`）。

@@ -1,15 +1,14 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import {
+	FilePlus,
 	LibraryBig,
-	OctagonX,
 	SaveIcon,
 	Share2,
 	SquareArrowRight,
 	Trash2,
 } from 'lucide-react';
 import { useI18n } from '@/hooks';
-import { cn } from '@/lib/utils';
 
 /** 固定 16×16；裁切转圈/描边溢出，避免行高被带着上下晃 */
 const iconSlot =
@@ -19,7 +18,7 @@ const iconSlot =
 const linkBtn =
 	'lucide-stroke-draw-hover flex items-center gap-1 px-0! has-[>svg]:px-0! text-textcolor transition-none hover:text-teal-500 disabled:hover:text-textcolor';
 
-/** 编辑器顶栏：知识库 / 草稿 / 保存 */
+/** 编辑器顶栏：导入 / 新建 / 保存 / … */
 const KnowledgeEditorToolbar = (props: {
 	onOpenLibrary: () => void;
 	onOpenTrash: () => void;
@@ -81,6 +80,17 @@ const KnowledgeEditorToolbar = (props: {
 			</Tooltip>
 			<Tooltip
 				side="top"
+				content={shortcutHintClear ?? t('knowledge.shortcuts.clear')}
+			>
+				<Button variant="link" className={linkBtn} onClick={onNewDraft}>
+					<span className={iconSlot}>
+						<FilePlus aria-hidden />
+					</span>
+					<span>{t('knowledge.toolbar.clear')}</span>
+				</Button>
+			</Tooltip>
+			<Tooltip
+				side="top"
 				content={shortcutHintSave ?? t('knowledge.shortcuts.save')}
 			>
 				<Button
@@ -94,21 +104,6 @@ const KnowledgeEditorToolbar = (props: {
 						<SaveIcon aria-hidden />
 					</span>
 					<span>{t('knowledge.toolbar.save')}</span>
-				</Button>
-			</Tooltip>
-			<Tooltip
-				side="top"
-				content={shortcutHintClear ?? t('knowledge.shortcuts.clear')}
-			>
-				<Button
-					variant="link"
-					className={cn(linkBtn, 'hover:text-orange-500')}
-					onClick={onNewDraft}
-				>
-					<span className={iconSlot}>
-						<OctagonX aria-hidden />
-					</span>
-					<span>{t('knowledge.toolbar.clear')}</span>
 				</Button>
 			</Tooltip>
 			{isCloudLoggedIn && (

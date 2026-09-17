@@ -395,7 +395,7 @@ export class EbookAssistantService {
 			session = resolved.session;
 			streamSessionId = sessionId;
 
-			await this.memory.compactSessionIfNeeded(sessionId);
+			await this.memory.compactSessionIfNeeded(sessionId, userId);
 
 			const turnId = randomUUID();
 			activeTurnId = turnId;

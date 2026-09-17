@@ -164,6 +164,7 @@ export class EnglishAgentStore {
 		try {
 			const res = await createAgentSession({
 				title: titleFallback,
+				memorySource: 'english_learning',
 			});
 			const sid = res.data?.sessionId;
 			if (!sid) {
@@ -366,7 +367,10 @@ export class EnglishAgentStore {
 			return null;
 		}
 		try {
-			const res = await createAgentSession({ title: titleFallback });
+			const res = await createAgentSession({
+				title: titleFallback,
+				memorySource: 'english_learning',
+			});
 			const sid = res.data?.sessionId;
 			if (!sid) {
 				Toast({ type: 'error', title: '创建学习会话失败' });
@@ -570,6 +574,7 @@ export class EnglishAgentStore {
 					sessionId: sid,
 					content: userText,
 					assistMode: 'english_learning',
+					memorySource: 'english_learning',
 					...(intentPrefixSnapshot
 						? { intentPrefix: intentPrefixSnapshot }
 						: {}),
@@ -620,17 +625,21 @@ export class EnglishAgentStore {
 							);
 							if (idx >= 0) {
 								const prev = st.messages[idx] as Message;
-								if (prev.isStreaming) {
-									st.messages[idx] = {
-										...prev,
-										isStreaming: false,
-										...(err &&
-										err !== AGENT_SSE_USER_ABORT_MARKER &&
-										!prev.content
-											? { content: `生成失败：${err}` }
-											: {}),
-									};
-								}
+								const userAborted = err === AGENT_SSE_USER_ABORT_MARKER;
+								const kept = accumulated || prev.content || '';
+								const content = kept.trim()
+									? kept
+									: userAborted
+										? ''
+										: err
+											? `生成失败：${err}`
+											: '本轮未生成文本，请重试';
+								st.messages[idx] = {
+									...prev,
+									content,
+									isStreaming: false,
+									...(err && !userAborted ? { isStopped: true } : {}),
+								};
 							}
 							st.abortStream = null;
 							st.toolStatus = null;
@@ -639,6 +648,9 @@ export class EnglishAgentStore {
 							}
 						});
 						void this.refreshSessionList();
+						if (err && err !== AGENT_SSE_USER_ABORT_MARKER) {
+							Toast({ type: 'error', title: err });
+						}
 					},
 					onError: () => {
 						assistantPatchScheduler.flush();
@@ -652,7 +664,8 @@ export class EnglishAgentStore {
 								st.messages[idx] = {
 									...prev,
 									isStreaming: false,
-									content: prev.content || '请求中断',
+									isStopped: true,
+									content: accumulated || prev.content || '请求中断',
 								};
 							}
 							st.abortStream = null;

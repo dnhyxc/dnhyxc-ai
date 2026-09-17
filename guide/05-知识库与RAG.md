@@ -10,7 +10,9 @@
 | **knowledge-embedding** | Markdown 切分（chunk）、DashScope embedding 生成、覆盖式入库 | `knowledge-embedding.service.ts` |
 | **qdrant** | Qdrant SDK 封装：collection 管理、upsert、search、delete | `qdrant.service.ts` |
 | **knowledge-qa** | 检索问答 SSE、事件模型、GLM 流式解析 | `knowledge-qa.controller.ts`、`knowledge-qa.service.ts` |
-| **assistant** | 助手对话/会话管理、ephemeral 模式 | `assistant.controller.ts`、`assistant.service.ts` |
+| **assistant** | 助手对话/会话管理、ephemeral、`AssistantTableMemory`、`applied_skills` | `assistant.controller.ts`、`assistant.service.ts`、`assistant-table-memory.ts` |
+| **skill** | Skill CRUD、试跑会话索引（不进向量库） | `skill.controller.ts`、`skill.service.ts` |
+| **agent** | 公共 Agent SSE（`skillIds` / `memorySource` / 停流句柄） | `agent.controller.ts`、`agent.service.ts`、`agent-skill-tools.ts` |
 
 ### 5.1.2 架构图
 
@@ -393,10 +395,12 @@ async function sendEphemeralMessage(content: string) {
 | `/knowledge/trash/:id` | POST | 恢复 |
 | `/knowledge/trash/:id` | DELETE | 永久删除 |
 | `/knowledge/qa/ask` | POST + SSE | RAG 问答 |
-| `/assistant/sse` | POST + SSE | 知识库助手问答 |
+| `/assistant/sse` | POST + SSE | 知识库助手问答（无 Skill 主路径） |
 | `/assistant/session` | POST | 创建助手会话 |
-| `/assistant/session/:id` | GET | 获取会话详情 |
-| `/assistant/session/import-transcript` | POST | 草稿迁入云端 |
+| `/assistant/session/:id` | GET | 获取会话详情（含 `appliedSkills`） |
+| `/assistant/session/import-transcript` | POST | 草稿迁入云端（可透传 `appliedSkills`） |
+| `/agent/sse` | POST + SSE | 带 Skill 时助手走公共 Agent（见 §5.12） |
+| `/skill/list` / `save` / `update` / `delete` | GET/POST/PUT/DELETE | Skill CRUD（见 §5.13） |
 | `/assistant/session/for-knowledge/:id` | GET | 按知识条目查会话 |
 | `/assistant/stop` | POST | 停止助手流 |
 
@@ -450,7 +454,7 @@ export class Knowledge {
   updatedAt: Date;
 }
 
-// assistant-session.entity.ts
+// assistant-session.entity.ts（示意；现网为消息表 + 会话表拆分）
 @Entity('assistant_sessions')
 export class AssistantSession {
   @PrimaryGeneratedUUID()
@@ -462,14 +466,21 @@ export class AssistantSession {
   @Column({ nullable: true })
   knowledgeId?: string;
 
-  @Column('json', { default: [] })
-  history: AssistantMessage[];
-
   @Column({ type: 'datetime', nullable: true })
   lastActiveAt?: Date;
 
   @CreateDateColumn()
   createdAt: Date;
+}
+
+// assistant-message.entity.ts（节选）
+@Entity('assistant_messages')
+export class AssistantMessage {
+  // ... role / content / turnId ...
+
+  /** 本轮已应用 Skill 快照（仅 id+title），刷新后 tip 回显 */
+  @Column({ name: 'applied_skills', type: 'json', nullable: true })
+  appliedSkills?: { id: string; title: string }[] | null;
 }
 ```
 
@@ -772,4 +783,56 @@ const onRevealInFolderClick = useCallback(
 | **hover 标题被按钮遮挡** | `ROW_HOVER_PR` 查表 | `actionCount` 是否正确计数；`ROW_HOVER_PR` 数组是否被修改导致索引错位 |
 | **新增按钮后 padding 不够** | `ROW_HOVER_PR` 档位 | 按钮数 > 4 时全部命中 `pr-30` 最大档；若不够需追加 `pr-38` 等更大档 |
 | Web 端出现访达按钮 | `isTauriRuntime()` | Web 端 `isTauriRuntime()` 应返回 false；确认 `showRevealInFolder` 传参 |
+
+---
+
+## 5.12 知识库 Skill 对话（`/` 多选 + Agent SSE）
+
+### 5.12.1 功能概述
+
+知识库右侧助手 UI **壳不变**；无 Skill 仍走 `/assistant/sse`。用户在输入框用 **`/`** 唤起 `SkillSlashPicker` 多选后，本轮改走公共 **`POST /agent/sse`**，请求带 `skillIds`，服务端强制加载 + `apply_skill` 预置。
+
+| 场景 | `memorySource` | 消息落表 |
+|------|----------------|----------|
+| 已保存文档 + Skill | `assistant` + `assistantSessionId` | `assistant_messages`（单写，不再 `append-turn` 双写） |
+| 未保存草稿 + Skill | 显式 `agent` | `agent_messages`（避免缺省推断误查未建业务表） |
+| 无 Skill | — | 仍 `/assistant/sse` → `assistant_*` |
+
+前端：`assistantStore.sendMessageWithAgentSkills`；SSE `skillsApplied` → 消息 `appliedSkills` 胶囊；停流用本地 Agent session 链接。
+
+### 5.12.2 调用链（摘要）
+
+```
+/ → SkillSlashPicker → skillIds
+  → streamAgentSse({ skillIds, memorySource, assistantSessionId? })
+  → AgentService：resolveTurnMemory → 强制 Skill 工具
+  → skillsApplied → UI tip；内容流写回 assistantStore.messages
+```
+
+专题详解：[docs/knowledge/知识库Skill对话.md](../docs/knowledge/知识库Skill对话.md)
+
+---
+
+## 5.13 Skill 编辑与试跑（独立页 `/skills`）
+
+与知识库 `/` **解耦**：三栏（列表 / Monaco / 右侧试跑·生成）。CRUD 落 `skill` 表（**不进** Qdrant）。试跑固定 `memorySource=skill_try` → `skill_try_messages`；会话索引 `skill_try_sessions` 与 `agent_sessions` **同 id**（停流仍用 Agent 句柄）。
+
+| 模式 | 要点 |
+|------|------|
+| try | 须先保存得 `skillId`；SSE 带 `skillIds: [id]` |
+| generate | 用户级全局历史；可选 `intentPrefix`（编辑器草稿）写回 Monaco |
+
+专题：[docs/knowledge/Skill编辑试跑.md](../docs/knowledge/Skill编辑试跑.md)
+
+---
+
+## 5.14 已应用 Skill 落库（刷新后 tip）
+
+根因曾是：无 `applied_skills` 列 / 详情未回读 / `import-transcript` 丢字段 / 仅 finalize 偏晚。现网：
+
+1. `assistant_messages.applied_skills`（json，`{ id, title }[]`）
+2. Agent 流前早写空正文 + 快照；finalize / cleanup 再写正文 + 同一快照
+3. `getSessionDetail` 与草稿 `import-transcript` 透传该字段
+
+专题：[docs/knowledge/已应用Skill落库.md](../docs/knowledge/已应用Skill落库.md)
 

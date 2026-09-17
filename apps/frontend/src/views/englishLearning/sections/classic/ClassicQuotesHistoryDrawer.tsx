@@ -112,7 +112,7 @@ function ClassicQuotesHistoryDrawerInner({
 												})}
 											</span>
 											{(h.webSearchRoundCount ?? 0) > 0 ? (
-												<span className="text-violet-600/85 dark:text-violet-400/85">
+												<span className="text-teal-600/85 dark:text-teal-400/85">
 													{t('englishLearning.packHistory.webSearchRounds', {
 														n: h.webSearchRoundCount ?? 0,
 													})}
@@ -135,7 +135,7 @@ function ClassicQuotesHistoryDrawerInner({
 											className="absolute top-0 right-0 my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
 											aria-label={t('englishLearning.classic.historyStreaming')}
 										>
-											<Spinner className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+											<Spinner className="size-4 shrink-0 text-teal-600 dark:text-teal-400" />
 										</div>
 									) : (
 										<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">

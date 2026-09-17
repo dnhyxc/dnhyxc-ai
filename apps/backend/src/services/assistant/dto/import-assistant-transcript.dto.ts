@@ -16,6 +16,19 @@ import {
 	ValidateNested,
 } from 'class-validator';
 
+/** 助手行可选：迁入时保留「已应用 Skill」快照 */
+export class AssistantTranscriptAppliedSkillDto {
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(64)
+	id!: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(255)
+	title!: string;
+}
+
 export class AssistantTranscriptLineDto {
 	@IsIn(['user', 'assistant'])
 	role!: 'user' | 'assistant';
@@ -23,6 +36,14 @@ export class AssistantTranscriptLineDto {
 	@IsString()
 	@MaxLength(100_000)
 	content!: string;
+
+	/** 仅 assistant 行有意义；草稿阶段 SSE 已带到前端的 Skill 快照 */
+	@IsOptional()
+	@IsArray()
+	@ArrayMaxSize(8)
+	@ValidateNested({ each: true })
+	@Type(() => AssistantTranscriptAppliedSkillDto)
+	appliedSkills?: AssistantTranscriptAppliedSkillDto[];
 }
 
 /** 将客户端草稿阶段的对话迁入已保存知识条目对应的助手会话（落库） */

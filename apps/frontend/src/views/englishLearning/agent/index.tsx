@@ -321,7 +321,7 @@ function EnglishAgentScrollShell({
 							onClick: onScrollFabClick,
 							toBottomLabel: t('englishLearning.assistant.scrollToBottom'),
 							toTopLabel: t('englishLearning.assistant.scrollToTop'),
-							variant: 'english',
+							variant: 'panel',
 						}}
 						floatAbove={floatAbove}
 					>

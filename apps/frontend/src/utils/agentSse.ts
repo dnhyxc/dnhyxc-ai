@@ -47,6 +47,8 @@ export interface AgentSseCallbacks {
 	onError?: (err: Error) => void;
 	/** 联网检索 organic（与 Chat SSE searchOrganic 对齐，用于正文胶囊） */
 	onSearchOrganic?: (organic: SearchOrganicItem[]) => void;
+	/** 本轮强制加载的 Skill（id + title） */
+	onSkillsApplied?: (skills: Array<{ id: string; title: string }>) => void;
 	/** 占位落库后服务端下发的真实消息 ID，用于分享等与库内 id 对齐 */
 	onMessageIds?: (ids: {
 		userMessageId: string;
@@ -70,6 +72,7 @@ export async function streamAgentSse(options: {
 		onComplete,
 		onError,
 		onSearchOrganic,
+		onSkillsApplied,
 		onMessageIds,
 	} = callbacks;
 
@@ -161,6 +164,27 @@ export async function streamAgentSse(options: {
 							Array.isArray(parsed.organic)
 						) {
 							onSearchOrganic?.(parsed.organic as SearchOrganicItem[]);
+							continue;
+						}
+						if (
+							parsed.type === 'skillsApplied' &&
+							Array.isArray(parsed.skills)
+						) {
+							const skills = (
+								parsed.skills as Array<{ id?: unknown; title?: unknown }>
+							)
+								.filter(
+									(s) =>
+										typeof s?.id === 'string' &&
+										typeof s?.title === 'string' &&
+										s.id &&
+										s.title,
+								)
+								.map((s) => ({
+									id: s.id as string,
+									title: s.title as string,
+								}));
+							if (skills.length) onSkillsApplied?.(skills);
 							continue;
 						}
 						if (

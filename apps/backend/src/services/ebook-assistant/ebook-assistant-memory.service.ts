@@ -4,13 +4,17 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
+import type { ChatOpenAI } from '@langchain/openai';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
+import {
+	createLlm,
+	GLM_THINKING_DISABLED_KWARGS,
+} from '../../utils/create-llm';
 import { estimateTokenCount } from '../assistant/assistant-context.util';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import {
 	EbookAssistantMessage,
 	EbookAssistantMessageRole,
@@ -18,8 +22,8 @@ import {
 import { EbookAssistantSession } from './ebook-assistant-session.entity';
 import { EbookAssistantSessionSummary } from './ebook-assistant-session-summary.entity';
 
-const MAX_TAIL_MESSAGE_ROWS = 48;
-const COMPACT_ROW_THRESHOLD = 56;
+const MAX_TAIL_MESSAGE_ROWS = 45;
+const COMPACT_ROW_THRESHOLD = 53;
 
 /** 占位标题：首条用户消息落库后会被真实摘要替换 */
 const PLACEHOLDER_SESSION_TITLES = new Set(['阅读对话', '新对话']);
@@ -47,36 +51,22 @@ export class EbookAssistantMemoryService {
 		@InjectRepository(EbookAssistantSessionSummary)
 		private readonly summaryRepo: Repository<EbookAssistantSessionSummary>,
 		private readonly configService: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 	) {}
 
-	private getGlmModelName(): string {
-		return (
-			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
-			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
-			'glm-4.7'
+	private async buildCompactionModel(userId: number): Promise<ChatOpenAI> {
+		return createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				userId,
+				streaming: false,
+				temperature: 0.2,
+				maxTokens: 2048,
+				modelKwargs: GLM_THINKING_DISABLED_KWARGS,
+			},
+			this.llmConfigService,
 		);
-	}
-
-	private buildCompactionModel(): ChatOpenAI {
-		const apiKey = this.configService.get<string>(ModelEnum.ZHIPU_API_KEY);
-		const baseURL =
-			this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
-			'https://open.bigmodel.cn/api/paas/v4';
-		const modelName =
-			this.configService.get<string>('AGENT_SUMMARY_MODEL_NAME')?.trim() ||
-			this.getGlmModelName();
-		if (!apiKey) {
-			throw new Error('智谱 API 密钥未配置（ZHIPU_API_KEY）');
-		}
-		return new ChatOpenAI({
-			apiKey,
-			modelName,
-			temperature: 0.2,
-			maxTokens: 2048,
-			configuration: { baseURL },
-			streaming: false,
-			modelKwargs: { thinking: { type: 'disabled' as const } },
-		});
 	}
 
 	private formatRowsTranscript(rows: EbookAssistantMessage[]): string {
@@ -88,7 +78,10 @@ export class EbookAssistantMemoryService {
 			.join('\n');
 	}
 
-	async compactSessionIfNeeded(sessionId: string): Promise<void> {
+	async compactSessionIfNeeded(
+		sessionId: string,
+		userId: number,
+	): Promise<void> {
 		const summaryRow =
 			(await this.summaryRepo.findOne({ where: { sessionId } })) ??
 			this.summaryRepo.create({
@@ -114,7 +107,7 @@ export class EbookAssistantMemoryService {
 
 		const toFold = rows.slice(0, foldCount);
 		const transcript = this.formatRowsTranscript(toFold);
-		const model = this.buildCompactionModel();
+		const model = await this.buildCompactionModel(userId);
 		const merged = await model.invoke([
 			new SystemMessage(
 				'你是摘要助手。将「已有摘要」与「新增对话片段」合并为一条连贯的中文摘要，保留事实、结论与用户偏好；省略寒暄，控制在约 2000 字以内。',

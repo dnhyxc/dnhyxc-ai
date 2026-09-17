@@ -98,8 +98,8 @@ function CardActionButtons({
 					className={cn(
 						'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
 						playing
-							? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-							: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
+							? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
+							: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
 					)}
 					aria-label={playing ? playLabels.stop : playLabels.play}
 				>

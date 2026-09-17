@@ -69,6 +69,8 @@ export interface Message {
 	};
 	/** 联网搜索 Serper organic 热点（助手消息） */
 	searchOrganic?: SearchOrganicItem[] | null;
+	/** 本轮 Agent 强制应用的 Skill（SSE skillsApplied） */
+	appliedSkills?: Array<{ id: string; title: string }> | null;
 }
 
 export interface ChatRequestParams {

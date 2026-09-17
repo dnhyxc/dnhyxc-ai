@@ -24,7 +24,11 @@ import { ChatMessages } from '../chat/chat.entity';
 import { MessageService } from '../chat/message.service';
 import { EbookAssistantMessage } from '../ebook-assistant/ebook-assistant-message.entity';
 import { EbookAssistantSession } from '../ebook-assistant/ebook-assistant-session.entity';
+import { EnglishAgentMessage } from '../english-learning/entity/english-agent-message.entity';
+import { EnglishAgentSession } from '../english-learning/entity/english-agent-session.entity';
 import { Knowledge } from '../knowledge/knowledge.entity';
+import { SkillTryMessage } from '../skill/skill-try-message.entity';
+import { SkillTrySession } from '../skill/skill-try-session.entity';
 import {
 	CreateShareDto,
 	CreateShareResponseDto,
@@ -52,6 +56,14 @@ export class ShareService {
 		private readonly agentSessionRepo: Repository<AgentSession>,
 		@InjectRepository(AgentMessage)
 		private readonly agentMessageRepo: Repository<AgentMessage>,
+		@InjectRepository(EnglishAgentSession)
+		private readonly englishAgentSessionRepo: Repository<EnglishAgentSession>,
+		@InjectRepository(EnglishAgentMessage)
+		private readonly englishAgentMessageRepo: Repository<EnglishAgentMessage>,
+		@InjectRepository(SkillTrySession)
+		private readonly skillTrySessionRepo: Repository<SkillTrySession>,
+		@InjectRepository(SkillTryMessage)
+		private readonly skillTryMessageRepo: Repository<SkillTryMessage>,
 		@InjectRepository(EbookAssistantSession)
 		private readonly ebookAssistantSessionRepo: Repository<EbookAssistantSession>,
 		@InjectRepository(EbookAssistantMessage)
@@ -170,8 +182,95 @@ export class ShareService {
 			};
 		}
 
-		// 3) LangChain Agent 专项会话（英语学习等）：agent_sessions / agent_messages
+		// 3) Agent 系：优先英语业务表 → Skill 试跑表 → 遗留 agent_messages
 		if (params.sessionType === 'agent') {
+			const mapAgentLikeRows = (
+				session: { id: string; title: string | null },
+				rows: Array<{
+					id: string;
+					role: string;
+					content: string;
+					createdAt: Date;
+				}>,
+			) => {
+				let orderedRows = rows;
+				if (params.messageIds?.length) {
+					const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+					orderedRows = [...rows].sort((a, b) => {
+						const ai = orderIndex.get(a.id);
+						const bi = orderIndex.get(b.id);
+						if (ai == null && bi == null) {
+							const at = this.toEpochMs(a.createdAt, 0);
+							const bt = this.toEpochMs(b.createdAt, 0);
+							if (at !== bt) return at - bt;
+							return String(a.id).localeCompare(String(b.id));
+						}
+						if (ai == null) return 1;
+						if (bi == null) return -1;
+						return ai - bi;
+					});
+				}
+				const messages = orderedRows.map((m) => ({
+					id: m.id,
+					chatId: m.id,
+					role: (m.role === 'assistant' ? 'assistant' : 'user') as
+						| 'user'
+						| 'assistant',
+					content: m.content ?? '',
+					timestamp: this.toEpochMs(m.createdAt),
+				}));
+				return {
+					title:
+						session.title ||
+						this.generateTitle(messages as unknown as ChatMessages[]),
+					messages,
+				};
+			};
+
+			const loadFromRepo = async <
+				T extends EnglishAgentMessage | SkillTryMessage | AgentMessage,
+			>(
+				messageRepo: Repository<T>,
+			) => {
+				const qb = messageRepo
+					.createQueryBuilder('m')
+					.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
+					.where('m.session_id = :sid', { sid: params.sessionId });
+				if (params.messageIds?.length) {
+					qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
+				}
+				return qb
+					.orderBy('m.created_at', 'ASC')
+					.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
+					.addOrderBy('m.id', 'ASC')
+					.getMany();
+			};
+
+			const engSession = await this.englishAgentSessionRepo.findOne({
+				where: { id: params.sessionId },
+				select: ['id', 'title'],
+			});
+			if (engSession) {
+				const rows = await loadFromRepo(this.englishAgentMessageRepo);
+				return mapAgentLikeRows(engSession, rows);
+			}
+
+			const trySession = await this.skillTrySessionRepo.findOne({
+				where: { id: params.sessionId },
+				select: ['id'],
+			});
+			if (trySession) {
+				const agentSession = await this.agentSessionRepo.findOne({
+					where: { id: params.sessionId },
+					select: ['id', 'title'],
+				});
+				if (!agentSession) {
+					throw new NotFoundException('会话不存在');
+				}
+				const rows = await loadFromRepo(this.skillTryMessageRepo);
+				return mapAgentLikeRows(agentSession, rows);
+			}
+
 			const session = await this.agentSessionRepo.findOne({
 				where: { id: params.sessionId },
 				select: ['id', 'title', 'createdAt', 'updatedAt'],
@@ -179,55 +278,8 @@ export class ShareService {
 			if (!session) {
 				throw new NotFoundException('会话不存在');
 			}
-
-			const qb = this.agentMessageRepo
-				.createQueryBuilder('m')
-				.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
-				.where('m.session_id = :sid', { sid: params.sessionId });
-
-			if (params.messageIds?.length) {
-				qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
-			}
-
-			const rows = await qb
-				.orderBy('m.created_at', 'ASC')
-				.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
-				.addOrderBy('m.id', 'ASC')
-				.getMany();
-
-			let orderedRows = rows;
-			if (params.messageIds?.length) {
-				const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
-				orderedRows = [...rows].sort((a, b) => {
-					const ai = orderIndex.get(a.id);
-					const bi = orderIndex.get(b.id);
-					if (ai == null && bi == null) {
-						const at = this.toEpochMs(a.createdAt, 0);
-						const bt = this.toEpochMs(b.createdAt, 0);
-						if (at !== bt) return at - bt;
-						return String(a.id).localeCompare(String(b.id));
-					}
-					if (ai == null) return 1;
-					if (bi == null) return -1;
-					return ai - bi;
-				});
-			}
-
-			const messages = orderedRows.map((m) => ({
-				id: m.id,
-				chatId: m.id,
-				role: (m.role === 'assistant' ? 'assistant' : 'user') as
-					| 'user'
-					| 'assistant',
-				content: m.content ?? '',
-				timestamp: this.toEpochMs(m.createdAt),
-			}));
-			return {
-				title:
-					session.title ||
-					this.generateTitle(messages as unknown as ChatMessages[]),
-				messages,
-			};
+			const rows = await loadFromRepo(this.agentMessageRepo);
+			return mapAgentLikeRows(session, rows);
 		}
 
 		// 4) 电子书阅读助手：ebook_assistant_sessions / ebook_assistant_messages

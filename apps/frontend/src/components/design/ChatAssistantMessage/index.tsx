@@ -221,7 +221,10 @@ function ChatAssistantMessageInner({
 	// 正文：先规范化落库里的 <a data-organic-cite>，再将 【n】/[n] 转为占位符；真实 <a> 在 Markdown 渲染后注入（避免 md html:false 转义）
 	const bodyText = useMemo(() => {
 		const thinkingText = t?.('chat.assistant.thinking') ?? '思考中...';
-		let raw = message.content || (message?.thinkContent ? '' : thinkingText);
+		// 「思考中」仅流式中占位；结束后若 content 仍空则留空，避免火箭已可发却仍显示思考中
+		let raw =
+			message.content ||
+			(message.isStreaming && !message.thinkContent ? thinkingText : '');
 		const org = message.searchOrganic;
 		if (raw === thinkingText) {
 			return raw;
@@ -504,6 +507,22 @@ function ChatAssistantMessageInner({
 			onContextMenuCapture={onSelectionContextMenuCapture}
 			onPointerDownCapture={onSelectionPointerDownCapture}
 		>
+			{message?.appliedSkills && message.appliedSkills.length > 0 ? (
+				<div className="border border-theme/10 bg-theme/5 w-fit mb-3 px-2 pt-0.5 pb-1 rounded-md flex flex-wrap items-center gap-1.5 text-sm text-textcolor/60">
+					<span className="shrink-0">
+						{t?.('skill.applied.label') ?? '已应用 Skill'}：
+					</span>
+					{message.appliedSkills.map((s) => (
+						<span
+							key={s.id}
+							className="inline-flex max-w-full items-center text-textcolor"
+							title={s.title}
+						>
+							<span className="truncate">{s.title}</span>
+						</span>
+					))}
+				</div>
+			) : null}
 			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
 				<div
 					className="flex items-center text-[13px] text-textcolor/50 mb-3 bg-theme/5 hover:bg-theme/10 w-fit py-2 px-3 rounded-md cursor-pointer select-none"
@@ -770,6 +789,7 @@ function areChatAssistantMessageMemoPropsEqual(
 		pm.content === nm.content &&
 		(pm.thinkContent ?? '') === (nm.thinkContent ?? '') &&
 		pm.searchOrganic === nm.searchOrganic &&
+		pm.appliedSkills === nm.appliedSkills &&
 		pm.isStreaming === nm.isStreaming &&
 		pm.finishReason === nm.finishReason &&
 		prev.isShowThinkContent === next.isShowThinkContent &&

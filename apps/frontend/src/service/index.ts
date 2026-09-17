@@ -35,10 +35,13 @@ import type {
 } from '@/views/ebook/types';
 import {
 	AGENT_SESSION,
+	AGENT_SESSION_TITLE,
 	AGENT_SESSIONS,
 	AGENT_STOP,
 	ASSISTANT_SESSION,
+	ASSISTANT_SESSION_APPEND_TURN,
 	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
+	ASSISTANT_SESSION_TITLE,
 	ASSISTANT_SESSIONS_FOR_KNOWLEDGE,
 	ASSISTANT_STOP,
 	COMPLETE_CHECKOUT_MEMBERSHIP,
@@ -120,6 +123,13 @@ import {
 	SETTINGS_LLM_DEFAULTS,
 	SETTINGS_LLM_VECTOR,
 	SETTINGS_PLUGIN_ENABLED,
+	SKILL_DELETE,
+	SKILL_DETAIL,
+	SKILL_LIST,
+	SKILL_SAVE,
+	SKILL_SESSION,
+	SKILL_SESSIONS,
+	SKILL_UPDATE,
 	SPEECH_TRANSCRIPTION,
 	STOP_SSE,
 	UPDATE_EMAIL,
@@ -409,6 +419,7 @@ export type AssistantSessionDetailPayload = {
 		turnId: string | null;
 		role: string;
 		content: string;
+		appliedSkills?: Array<{ id: string; title: string }> | null;
 		createdAt: string;
 	}>;
 };
@@ -424,6 +435,29 @@ export const createAssistantSession = async (payload?: {
 		ASSISTANT_SESSION,
 		payload ?? {},
 	);
+};
+
+/** 更新助手会话标题（Skill 路径首条用户问题） */
+export const updateAssistantSessionTitle = async (
+	sessionId: string,
+	title: string,
+) => {
+	return await http.post<{ sessionId: string; title: string }>(
+		ASSISTANT_SESSION_TITLE,
+		{ sessionId, title },
+	);
+};
+
+/** Skill 路径：将本轮对话追加到知识库助手会话表（与无 Skill 同表；不改 agent_*） */
+export const appendAssistantSessionTurn = async (body: {
+	sessionId: string;
+	userContent: string;
+	assistantContent: string;
+}) => {
+	return await http.post<{
+		userMessageId: string;
+		assistantMessageId: string;
+	}>(ASSISTANT_SESSION_APPEND_TURN, body);
 };
 
 export type AssistantSessionListItem = {
@@ -489,7 +523,11 @@ export const importAssistantTranscript = async (body: {
 	knowledgeArticleId: string;
 	/** 可选：指定导入到哪个会话（用于多会话场景）；不传则兼容旧行为导入到最近会话 */
 	sessionId?: string;
-	lines: Array<{ role: 'user' | 'assistant'; content: string }>;
+	lines: Array<{
+		role: 'user' | 'assistant';
+		content: string;
+		appliedSkills?: Array<{ id: string; title: string }>;
+	}>;
 }) => {
 	return await http.post<{ sessionId: string; inserted: number }>(
 		ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
@@ -603,15 +641,31 @@ export type AgentSessionDetailPayload = {
 		role: string;
 		content: string;
 		searchOrganic?: SearchOrganicItem[] | null;
+		appliedSkills?: Array<{ id: string; title: string }> | null;
 		createdAt: string;
 	}>;
 };
 
 /** 创建空 Agent 会话 */
-export const createAgentSession = async (body?: { title?: string }) => {
-	return await http.post<{ sessionId: string; title: string | null }>(
-		AGENT_SESSION,
-		body ?? {},
+export const createAgentSession = async (body?: {
+	title?: string;
+	/** 英语学习：同时建 english_agent_sessions */
+	memorySource?: 'english_learning';
+}) => {
+	return await http.post<{
+		sessionId: string;
+		title: string | null;
+	}>(AGENT_SESSION, body ?? {});
+};
+
+/** 更新 Agent 会话标题 */
+export const updateAgentSessionTitle = async (
+	sessionId: string,
+	title: string,
+) => {
+	return await http.post<{ sessionId: string; title: string }>(
+		AGENT_SESSION_TITLE,
+		{ sessionId, title },
 	);
 };
 
@@ -629,7 +683,7 @@ export type AgentSessionListRow = {
 	updatedAt: string;
 };
 
-/** 分页列出当前用户的 Agent 会话（按更新时间倒序） */
+/** 分页列出当前用户的 Agent 会话（排除 Skill 试跑，供英语学习） */
 export const listAgentSessions = async (params: {
 	pageNo?: number;
 	pageSize?: number;
@@ -659,6 +713,101 @@ export const stopAgentStream = async (body: { sessionId: string }) => {
 	return await http.post<{ success: boolean; message: string }>(
 		AGENT_STOP,
 		body,
+	);
+};
+
+/** ---------- Skill / Prompt ---------- */
+
+export type SkillRecord = {
+	id: string;
+	title: string;
+	content: string;
+	authorId: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** POST /skill/save */
+export const saveSkill = async (body: { title: string; content: string }) => {
+	return await http.post<SkillRecord>(SKILL_SAVE, body);
+};
+
+/** GET /skill/list */
+export const listSkills = async () => {
+	return await http.get<SkillRecord[]>(SKILL_LIST);
+};
+
+/** GET /skill/detail/:id */
+export const getSkillDetail = async (id: string) => {
+	return await http.get<SkillRecord>(SKILL_DETAIL, { params: [id] });
+};
+
+/** PUT /skill/update/:id */
+export const updateSkill = async (
+	id: string,
+	body: { title: string; content: string },
+) => {
+	return await http.put<SkillRecord>(
+		SKILL_UPDATE,
+		{ ...body, id },
+		{ params: [id] },
+	);
+};
+
+/** DELETE /skill/delete/:id */
+export const deleteSkill = async (id: string) => {
+	return await http.delete<{ ok: boolean }>(SKILL_DELETE, {
+		params: [id],
+	});
+};
+
+/** POST /skill/session — Skill 侧栏会话（写入 skill_try_sessions） */
+export const createSkillTrySession = async (body: {
+	skillId?: string;
+	title?: string;
+	kind?: 'try' | 'generate';
+}) => {
+	return await http.post<{
+		sessionId: string;
+		title: string | null;
+		skillId: string | null;
+		kind: 'try' | 'generate';
+	}>(SKILL_SESSION, body);
+};
+
+/** GET /skill/sessions — 按 kind + skillId 列历史（generate 无 skillId → 草稿桶） */
+export const listSkillTrySessions = async (params: {
+	skillId?: string | null;
+	kind?: 'try' | 'generate';
+	pageNo?: number;
+	pageSize?: number;
+}) => {
+	return await http.get<{
+		skillId: string | null;
+		kind: 'try' | 'generate';
+		list: AgentSessionListRow[];
+		pageNo: number;
+		pageSize: number;
+		total: number;
+	}>(SKILL_SESSIONS, {
+		querys: {
+			kind: params.kind ?? 'try',
+			...(params.skillId?.trim() ? { skillId: params.skillId.trim() } : {}),
+			pageNo: params.pageNo ?? 1,
+			pageSize: params.pageSize ?? 20,
+		},
+	});
+};
+
+/** PUT /skill/session/:id/skill — 草稿生成会话绑定到已保存 Skill */
+export const bindSkillTrySession = async (
+	sessionId: string,
+	skillId: string,
+) => {
+	return await http.put<{ sessionId: string; skillId: string }>(
+		SKILL_SESSION,
+		{ skillId },
+		{ params: [sessionId, 'skill'] },
 	);
 };
 

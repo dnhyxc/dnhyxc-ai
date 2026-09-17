@@ -15,7 +15,7 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	 * Markdown 编辑器底部操作栏：按顺序的快速操作（⌘+1…⌘+0）
 	 *
 	 * 说明：
-	 * - 这些快捷键**仅在知识库页面内生效**（registerGlobally=false）
+	 * - 应用内监听（registerGlobally=false）；保存/新建由 Layout 统一监听
 	 * - 由 `MarkdownEditor` 内部根据当前可用按钮（是否有 Diff/助手/自动保存等）决定是否执行
 	 */
 	markdownBarAction1: 12,
@@ -39,8 +39,7 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	save: 'Meta + S',
 	import: 'Meta + I',
-	/** 避免 Meta+Control+D：在 macOS 上常被系统拦截，应用收不到 keydown */
-	clear: 'Meta + Shift + D',
+	clear: 'Meta + Shift + N',
 	/** Command（Meta）+ Shift + O：分享知识文章 */
 	share: 'Meta + Shift + O',
 	/** Command（Meta）+ Shift + L */
@@ -117,6 +116,11 @@ function parseChordString(raw: string | undefined | null): ParsedChord | null {
 	return { meta, control, alt, shift, key: keyNorm };
 }
 
+/** 判断存储串是否为可用快捷键（至少一个修饰键 + 一个主键） */
+export function isValidShortcutChord(raw: string | undefined | null): boolean {
+	return parseChordString(raw) != null;
+}
+
 /** 判断两条快捷键存储串是否语义相同（忽略 Command/Meta、Ctrl/Control 等写法差异） */
 export function chordStringsSemanticallyEqual(
 	a: string | undefined | null,
@@ -176,29 +180,6 @@ export function chordMatchesStored(
 	if (e.altKey !== parsed.alt) return false;
 	if (e.shiftKey !== parsed.shift) return false;
 	return eventKeyMatchesChord(e, parsed.key);
-}
-
-/** 旧默认在 macOS 上几乎收不到 keydown，读到则迁移为新默认并写回 store */
-function normalizeLegacyClearChord(stored: string | undefined): {
-	value: string;
-	didMigrate: boolean;
-} {
-	const raw = stored?.trim() ?? '';
-	if (!raw) {
-		return {
-			value: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
-			didMigrate: false,
-		};
-	}
-	const norm = raw
-		.replace(/\s*\+\s*/g, ' + ')
-		.replace(/\s+/g, ' ')
-		.trim();
-	const low = norm.toLowerCase();
-	if (low === 'meta + control + d' || low === 'command + control + d') {
-		return { value: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear, didMigrate: true };
-	}
-	return { value: raw, didMigrate: false };
 }
 
 /** 旧默认 Meta+Control+L 改为 Command+Shift+L，读到则写回 store */
@@ -340,14 +321,6 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition}`,
 		),
 	]);
-	const { value: clear, didMigrate: clearMigrated } =
-		normalizeLegacyClearChord(c);
-	if (clearMigrated) {
-		await setValue(
-			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`,
-			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
-		);
-	}
 	const { value: openLibrary, didMigrate: libMigrated } =
 		normalizeLegacyOpenLibraryChord(o);
 	if (libMigrated) {
@@ -367,7 +340,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	return {
 		save: s?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		import: imp?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.import,
-		clear,
+		clear: c?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
 		share: sh?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
 		openLibrary,
 		toggleMarkdownBottomBar,

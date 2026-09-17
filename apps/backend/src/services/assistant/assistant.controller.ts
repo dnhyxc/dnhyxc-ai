@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { AssistantService } from './assistant.service';
+import { AppendAssistantTurnDto } from './dto/append-assistant-turn.dto';
 import { AssistantChatDto } from './dto/assistant-chat.dto';
 import { AssistantSessionForKnowledgeDto } from './dto/assistant-session-for-knowledge.dto';
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
@@ -25,6 +26,7 @@ import { AssistantStopDto } from './dto/assistant-stop.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
 import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.dto';
 import { UpdateAssistantSessionKnowledgeDto } from './dto/update-assistant-session-knowledge.dto';
+import { UpdateAssistantSessionTitleDto } from './dto/update-assistant-session-title.dto';
 
 type AuthedRequest = Request & { user?: { userId: number } };
 
@@ -58,6 +60,38 @@ export class AssistantController {
 			return { success: false, message: '未登录' };
 		}
 		const data = await this.assistantService.importTranscript(userId, dto);
+		return { success: true, data };
+	}
+
+	/** 更新助手会话标题（须在 `session/:id` 之前注册） */
+	@Post('session/title')
+	async updateSessionTitle(
+		@Req() req: AuthedRequest,
+		@Body() dto: UpdateAssistantSessionTitleDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.updateSessionTitle(
+			userId,
+			dto.sessionId,
+			dto.title,
+		);
+		return { success: true, data };
+	}
+
+	/** Skill 路径：将本轮对话追加到知识库助手会话（须在 `session/:id` 之前注册） */
+	@Post('session/append-turn')
+	async appendTurn(
+		@Req() req: AuthedRequest,
+		@Body() dto: AppendAssistantTurnDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.appendTurn(userId, dto);
 		return { success: true, data };
 	}
 

@@ -3,6 +3,7 @@ import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './i18n';
 export * from './theme';
+export * from './useDocumentShortcuts';
 export * from './useHostAppearanceSync';
 export * from './useInputsOnlyTab';
 export * from './useIsSuperAdmin';

@@ -48,6 +48,13 @@ export class AssistantMessage {
 	@Column({ type: 'longtext' })
 	content: string;
 
+	/**
+	 * 本轮 Agent 强制应用的 Skill 快照（id + title），供刷新后 UI 展示；
+	 * 仅助手行有意义，用户行一般为 null。
+	 */
+	@Column({ name: 'applied_skills', type: 'json', nullable: true })
+	appliedSkills: Array<{ id: string; title: string }> | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 }

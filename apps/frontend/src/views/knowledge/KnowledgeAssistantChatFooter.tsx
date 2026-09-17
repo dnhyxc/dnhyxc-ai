@@ -1,6 +1,7 @@
 /**
  * 知识库助手底部：轻量非受控输入 + 与消息区解耦的 footer 挂载。
  */
+import Tooltip from '@design/Tooltip';
 import { Button, Toast } from '@ui/index';
 import { observer } from 'mobx-react';
 import {
@@ -27,6 +28,7 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import knowledgeRagQaStore from '@/store/knowledgeRagQa';
+import skillStore from '@/store/skill';
 import type { Message } from '@/types/chat';
 import {
 	KNOWLEDGE_ASSISTANT_MODES,
@@ -35,6 +37,13 @@ import {
 import KnowledgeAssistantEntry, {
 	type KnowledgeAssistantEntryHandle,
 } from './KnowledgeAssistantEntry';
+
+/** 当前知识正文 → Agent intentPrefix（约 60k，带短头） */
+export function buildKnowledgeIntentPrefix(markdown: string): string {
+	const body = (markdown ?? '').trim().slice(0, 60_000);
+	if (!body) return '';
+	return `当前知识库文档：\n${body}`;
+}
 
 export type KnowledgeAssistantChatFooterHandle = {
 	appendInput: (text: string, mode?: KnowledgeAssistantPanelMode) => void;
@@ -81,23 +90,27 @@ const KnowledgeAssistantEntryToolbar = memo(
 				setIsHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
 				enableStreamStickToBottom={enableStreamStickToBottom}
 				flushScrollToBottom={flushScrollToBottom}
-				extraActions={KNOWLEDGE_ASSISTANT_MODES.map((item) => (
-					<Button
-						key={item.id}
-						variant="link"
-						size="sm"
-						className={cn(
-							'px-2.5 border border-theme/10',
-							assistantMode === item.id
-								? 'text-teal-500 bg-theme/5'
-								: 'text-textcolor/80 hover:bg-theme/5',
-						)}
-						onClick={() => setAssistantMode(item.id)}
-					>
-						<item.icon />
-						{t(item.labelKey)}
-					</Button>
-				))}
+				iconOnlyActions
+				extraActions={KNOWLEDGE_ASSISTANT_MODES.map((item) => {
+					const label = t(item.labelKey);
+					return (
+						<Tooltip key={item.id} side="bottom" content={label}>
+							<Button
+								variant="link"
+								className={cn(
+									'mb-0.5 mt-0.5 h-8.5 w-8.5 rounded-full border border-theme/10 p-0 [&_svg]:overflow-visible',
+									assistantMode === item.id
+										? 'bg-theme/5 text-teal-500'
+										: 'text-textcolor/80 hover:bg-theme/5 hover:text-teal-500',
+								)}
+								aria-label={label}
+								onClick={() => setAssistantMode(item.id)}
+							>
+								<item.icon className="h-4 w-4" />
+							</Button>
+						</Tooltip>
+					);
+				})}
 			/>
 		);
 	},
@@ -344,7 +357,22 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 			aiDraftRef.current = '';
 			setInputProp?.('');
 			enableStreamStickToBottom();
-			await assistantStore.sendMessage(text);
+			// 由原先的 assistantStore.sendMessage 改为 sendMessageWithAgentSkills 方法，intentPrefix 为空时不应用技能
+			const skillIds = skillStore.selectedSkillIds;
+			const titles = skillIds
+				.map((id) => skillStore.list.find((s) => s.id === id)?.title ?? '')
+				.filter(Boolean);
+			// 无 Skill：不注入全文前缀，与改前 /assistant/sse 输入面一致；有 Skill：强制语 + 文档前缀
+			let intentPrefix: string | undefined;
+			if (titles.length) {
+				const skillForce = `【强制】必须严格按已启用 Skill（${titles.map((t) => `「${t}」`).join('、')}）执行；与用户一般表述冲突时以 Skill 为准。\n\n`;
+				intentPrefix = `${skillForce}${buildKnowledgeIntentPrefix(
+					knowledgeStore.markdown ?? '',
+				)}`;
+			}
+			await assistantStore.sendMessageWithAgentSkills(text, skillIds, {
+				...(intentPrefix ? { intentPrefix } : {}),
+			});
 		},
 		[
 			isLoggedIn,
@@ -353,6 +381,7 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 			enableStreamStickToBottom,
 			setInputProp,
 			setRagInputProp,
+			knowledgeStore,
 			t,
 		],
 	);
@@ -398,8 +427,9 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 					focusInputAtEndKey={focusInputAtEndKey}
 					className="w-full px-0 pb-4"
 					textareaClassName="min-h-9"
-					inputWrapClassName="border-theme/5"
+					inputWrapClassName="border-theme/5 bg-theme/5"
 					onSend={onSend}
+					skillSlashEnabled={!isRagMode}
 					placeholder={
 						isRagMode
 							? t('knowledge.assistant.placeholder.rag')

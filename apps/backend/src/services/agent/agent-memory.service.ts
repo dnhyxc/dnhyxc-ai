@@ -4,29 +4,37 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
+import type { ChatOpenAI } from '@langchain/openai';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
+import {
+	createLlm,
+	GLM_THINKING_DISABLED_KWARGS,
+} from '../../utils/create-llm';
 import { estimateTokenCount } from '../assistant/assistant-context.util';
-import type { SerperOrganicItem } from '../web-search/web-search.types';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import { AgentMessage, AgentMessageRole } from './agent-message.entity';
 import { AgentSession } from './agent-session.entity';
 import { AgentSessionSummary } from './agent-session-summary.entity';
+import type {
+	AgentTurnMemory,
+	UpdateAssistantContentOpts,
+} from './agent-turn-memory';
 
 /** 水印之后最多保留多少条消息行参与模型上下文（user/assistant 交错） */
-const MAX_TAIL_MESSAGE_ROWS = 48;
+const MAX_TAIL_MESSAGE_ROWS = 45;
 
 /** 超过此行数则触发「持久化摘要折叠」 */
-const COMPACT_ROW_THRESHOLD = 56;
+const COMPACT_ROW_THRESHOLD = 53;
 
 /**
  * 基于 MySQL 实体维护 LangChain 所需的会话记忆（摘要表 + 消息表）
+ * 亦为 AgentTurnMemory 默认实现（memorySource 缺省 / agent）
  */
 @Injectable()
-export class AgentMemoryService {
+export class AgentMemoryService implements AgentTurnMemory {
 	constructor(
 		@InjectRepository(AgentSession)
 		private readonly sessionRepo: Repository<AgentSession>,
@@ -35,39 +43,26 @@ export class AgentMemoryService {
 		@InjectRepository(AgentSessionSummary)
 		private readonly summaryRepo: Repository<AgentSessionSummary>,
 		private readonly configService: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 	) {}
 
-	/** 与 Assistant 一致：智谱 GLM 模型名 */
-	private getGlmModelName(): string {
-		return (
-			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
-			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
-			'glm-4.7'
+	/** 与 Agent 主链路一致：createLlm + 用户前端大模型设置 */
+	private async buildCompactionModel(userId: number): Promise<ChatOpenAI> {
+		return createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				userId,
+				streaming: false,
+				temperature: 0.2,
+				maxTokens: 2048,
+				modelKwargs: GLM_THINKING_DISABLED_KWARGS,
+			},
+			this.llmConfigService,
 		);
 	}
 
-	private buildCompactionModel(): ChatOpenAI {
-		const apiKey = this.configService.get<string>(ModelEnum.ZHIPU_API_KEY);
-		const baseURL =
-			this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
-			'https://open.bigmodel.cn/api/paas/v4';
-		const modelName =
-			this.configService.get<string>('AGENT_SUMMARY_MODEL_NAME')?.trim() ||
-			this.getGlmModelName();
-		if (!apiKey) {
-			throw new Error('智谱 API 密钥未配置（ZHIPU_API_KEY）');
-		}
-		return new ChatOpenAI({
-			apiKey,
-			modelName,
-			temperature: 0.2,
-			maxTokens: 2048,
-			configuration: { baseURL },
-			streaming: false,
-			modelKwargs: { thinking: { type: 'disabled' as const } },
-		});
-	}
-
+	// 将消息列表格式化为字符串，用于合并摘要
 	private formatRowsTranscript(rows: AgentMessage[]): string {
 		return rows
 			.map((r) => {
@@ -80,7 +75,10 @@ export class AgentMemoryService {
 	/**
 	 * 将较早消息折叠进摘要表，并推进水印，避免跨请求上下文无限增长。
 	 */
-	async compactSessionIfNeeded(sessionId: string): Promise<void> {
+	async compactSessionIfNeeded(
+		sessionId: string,
+		userId: number,
+	): Promise<void> {
 		const summaryRow =
 			(await this.summaryRepo.findOne({
 				where: { sessionId },
@@ -106,9 +104,13 @@ export class AgentMemoryService {
 			return;
 		}
 
+		// 获取需要折叠的消息列表
 		const toFold = rows.slice(0, foldCount);
+		// 将消息列表格式化为字符串，用于合并摘要
 		const transcript = this.formatRowsTranscript(toFold);
-		const model = this.buildCompactionModel();
+		// 构建合并摘要模型
+		const model = await this.buildCompactionModel(userId);
+		// 合并摘要
 		const merged = await model.invoke([
 			new SystemMessage(
 				'你是摘要助手。将「已有摘要」与「新增对话片段」合并为一条连贯的中文摘要，保留事实、结论与用户偏好；省略寒暄，控制在约 2000 字以内。',
@@ -118,6 +120,7 @@ export class AgentMemoryService {
 			),
 		]);
 
+		// 获取合并摘要结果
 		const text =
 			typeof merged.content === 'string'
 				? merged.content
@@ -127,7 +130,9 @@ export class AgentMemoryService {
 							.join('')
 					: String(merged.content ?? '');
 
+		// 更新摘要
 		summaryRow.summary = text.trim();
+		// 更新水印
 		summaryRow.coversBeforeAt = toFold[toFold.length - 1]!.createdAt;
 		await this.summaryRepo.save(summaryRow);
 	}
@@ -191,10 +196,17 @@ export class AgentMemoryService {
 	}
 
 	async insertUserAndAssistantPlaceholder(
-		session: AgentSession,
+		sessionId: string,
 		turnId: string,
 		userContent: string,
 	): Promise<{ userMessageId: string; assistantMessageId: string }> {
+		const session = await this.sessionRepo.findOne({
+			where: { id: sessionId },
+		});
+		if (!session) {
+			throw new Error(`Agent 会话不存在: ${sessionId}`);
+		}
+
 		const user = this.messageRepo.create({
 			session,
 			role: AgentMessageRole.USER,
@@ -224,16 +236,15 @@ export class AgentMemoryService {
 		sessionId: string,
 		assistantMessageId: string,
 		content: string,
-		/** undefined：不修改 search_organic；null：清空；数组：落库 */
-		searchOrganic?: SerperOrganicItem[] | null,
+		opts?: UpdateAssistantContentOpts,
 	): Promise<void> {
 		const now = new Date();
 		const patch: {
 			content: string;
-			searchOrganic?: SerperOrganicItem[] | null;
+			searchOrganic?: UpdateAssistantContentOpts['searchOrganic'];
 		} = { content };
-		if (searchOrganic !== undefined) {
-			patch.searchOrganic = searchOrganic;
+		if (opts?.searchOrganic !== undefined) {
+			patch.searchOrganic = opts.searchOrganic;
 		}
 		await Promise.all([
 			this.messageRepo.update({ id: assistantMessageId }, patch),

@@ -9,7 +9,6 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ShortcutActionType {
     Reload,
-    NewWorkflow,
     OpenSubWindow,
     HideOrShowApp,
 }
@@ -25,7 +24,7 @@ impl ShortcutActionType {
         match key {
             2 => Some(ShortcutActionType::HideOrShowApp),
             3 => Some(ShortcutActionType::Reload),
-            4 => Some(ShortcutActionType::NewWorkflow),
+            // 4 曾为 NewWorkflow，已移除；保留编号空隙以免打乱已存 shortcut_5
             5 => Some(ShortcutActionType::OpenSubWindow),
             _ => None,
         }
@@ -179,9 +178,6 @@ pub fn handle_shortcut<R: Runtime>(
                         let _ = window.eval("window.location.reload()");
                         let _ = app.emit("shortcut-triggered", "reload");
                     }
-                }
-                ShortcutActionType::NewWorkflow => {
-                    let _ = app.emit("shortcut-triggered", "new_workflow");
                 }
                 ShortcutActionType::OpenSubWindow => {
                     let _ = app.emit("shortcut-triggered", "open_subwindow");
