@@ -38,6 +38,11 @@ export type BuildAgentLangChainToolsDeps = {
 	 * 是否注册「当前日期」工具。默认 true（聊天等）；英语学习主检索等可按主题推断传 `includeCurrentDateTool: infer…(topic)`，无需求则不注册。
 	 */
 	includeCurrentDateTool?: boolean;
+	/**
+	 * 本轮 internet_search 成功执行上限（闭包计数）。达限后工具返回提示文案、不再打检索 API。
+	 * 英语学习等场景可传 3，与 middleware 封顶双保险。
+	 */
+	maxInternetSearchCallsPerRun?: number;
 };
 
 export type BuildAgentLangChainToolsOpts = {
@@ -56,15 +61,28 @@ export function buildAgentLangChainTools(
 	deps: BuildAgentLangChainToolsDeps,
 	opts?: BuildAgentLangChainToolsOpts,
 ): DynamicTool[] {
+	const maxSearch = deps.maxInternetSearchCallsPerRun;
+	let searchCalls = 0;
 	const tools: DynamicTool[] = [
 		...deps.webSearchService.createLangChainWebSearchTools({
 			onSearchComplete: opts?.onInternetSearchComplete,
 			recency: deps.webSearchRecency,
 			tavilyStartDate: deps.webSearchTavilyStartDate,
 			tavilyEndDate: deps.webSearchTavilyEndDate,
+			beforeSearch: () => {
+				if (maxSearch == null) return null;
+				if (searchCalls >= maxSearch) {
+					return (
+						`本轮联网已达上限（${maxSearch} 次）。` +
+						`请立刻根据已有检索结果与常识作答，禁止再次调用 internet_search。`
+					);
+				}
+				searchCalls += 1;
+				return null;
+			},
 		}),
 		deps.knowledgeQaService.createAgentKnowledgeRagTool(deps.userId),
-		createAgentDateTool(),
+		...(deps.includeCurrentDateTool === false ? [] : [createAgentDateTool()]),
 	];
 	return tools;
 }

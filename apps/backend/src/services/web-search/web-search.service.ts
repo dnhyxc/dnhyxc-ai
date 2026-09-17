@@ -87,6 +87,11 @@ export class WebSearchService {
 		/** Tavily 专用：显式日历区间（YYYY-MM-DD）；与 recency 并存时由 Tavily 层优先使用区间 */
 		tavilyStartDate?: string;
 		tavilyEndDate?: string;
+		/**
+		 * 在真正打检索 API 前调用；返回非空字符串则跳过检索并作为工具结果。
+		 * 用于本轮联网次数硬顶，避免 Agent 空转烧 recursionLimit。
+		 */
+		beforeSearch?: () => string | null;
 	}): DynamicTool[] {
 		const provider = this.resolveProvider(opts?.provider);
 		const recency = opts?.recency;
@@ -97,8 +102,10 @@ export class WebSearchService {
 				name: 'internet_search',
 				description:
 					'联网搜索公开网页。输入简洁的检索关键词或问题，返回可引用的网页标题、链接与摘要。' +
-					'【调用约束】仅在确有公开网页信息缺口时调用（事实核验、时效、冷门专名/作品、出处线索等）；禁止为「先搜再说」或走流程而例行调用；若常识与知识库已足够则不要调用。',
+					'【调用约束】仅在确有公开网页信息缺口时调用（事实核验、时效、冷门专名/作品、出处线索等）；禁止为「先搜再说」或走流程而例行调用；若常识与知识库已足够则不要调用；禁止本轮反复换 query 连续调用。',
 				func: async (input: string) => {
+					const blocked = opts?.beforeSearch?.();
+					if (blocked) return blocked;
 					const searchQuery =
 						typeof input === 'string' ? input : String(input ?? '');
 					const r = await this.formatSearchContextForPrompt(searchQuery, {

@@ -38,7 +38,10 @@ import {
 	SKILL_GENERATE_SYSTEM_APPEND,
 } from './agent.prompt';
 import { AgentMemoryService } from './agent-memory.service';
-import { buildAgentLangchainMiddleware } from './agent-middleware';
+import {
+	agentStreamRecursionLimit,
+	buildAgentLangchainMiddleware,
+} from './agent-middleware';
 import { AgentSession } from './agent-session.entity';
 import {
 	buildAgentSkillTools,
@@ -839,6 +842,9 @@ export class AgentService {
 						webSearchService: this.webSearchService,
 						knowledgeQaService: this.knowledgeQaService,
 						userId,
+						...(dto.assistMode === 'english_learning'
+							? { maxInternetSearchCallsPerRun: 3 }
+							: {}),
 					},
 					{
 						onInternetSearchComplete: (r) => {
@@ -860,6 +866,11 @@ export class AgentService {
 				...buildAgentSkillTools(skillBodies),
 			];
 
+			const agentProfile =
+				dto.assistMode === 'english_learning'
+					? ('english_learning' as const)
+					: ('default' as const);
+
 			// （8）创建Agent
 			const agent = createAgent({
 				// 构建Agent所需核心参数，包括主模型、工具集、系统提示与中间件
@@ -873,13 +884,19 @@ export class AgentService {
 					summaryLlm: summaryLlm,
 					estimatePromptTokens: (msgs) =>
 						this.memory.estimatePromptTokens(msgs),
+					profile: agentProfile,
 				}),
 			});
 
 			// （9）开始流式事件主循环
 			const eventStream = agent.streamEvents(
 				{ messages: lcMessages },
-				{ version: 'v2', signal: abortController.signal },
+				{
+					version: 'v2',
+					signal: abortController.signal,
+					// 默认 25：英语学习反复 search 时易 GRAPH_RECURSION_LIMIT；显式抬高并靠中间件封顶工具
+					recursionLimit: agentStreamRecursionLimit(agentProfile),
+				},
 			);
 
 			for await (const ev of eventStream) {

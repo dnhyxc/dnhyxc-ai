@@ -1463,6 +1463,8 @@ export class EnglishLearningService {
 					webSearchRecency: webSearchTime.recency,
 					webSearchTavilyStartDate: webSearchTime.tavilyStartDate,
 					webSearchTavilyEndDate: webSearchTime.tavilyEndDate,
+					// 主检索阶段：联网至多 3 次，避免无限 search 烧图步数
+					maxInternetSearchCallsPerRun: 3,
 					// includeCurrentDateTool:
 					// 	this.inferEnglishPackUserNeedsCurrentDateTool(topic),
 				},
@@ -1493,8 +1495,12 @@ export class EnglishLearningService {
 				// 仅保留工具次数上限（与 chat Agent 中间件一致），无会话摘要折叠
 				middleware: [
 					toolCallLimitMiddleware({
-						runLimit: 12,
-						threadLimit: 12,
+						toolName: 'internet_search',
+						runLimit: 3,
+						exitBehavior: 'continue',
+					}),
+					toolCallLimitMiddleware({
+						runLimit: 8,
 						exitBehavior: 'continue',
 					}),
 				],
