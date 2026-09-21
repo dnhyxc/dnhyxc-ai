@@ -46,6 +46,9 @@ const EnglishLearningLibraryPage = lazy(
 const EnglishLearningMistakesPage = lazy(
 	() => import('@/views/englishLearning/mistakes'),
 );
+const EnglishLearningReviewPage = lazy(
+	() => import('@/views/englishLearning/review'),
+);
 const EnglishLearningNotesPage = lazy(
 	() => import('@/views/englishLearning/notes'),
 );
@@ -54,6 +57,9 @@ const EnglishLearningNotesPopoutPage = lazy(
 );
 const EnglishLearningPackStreamPage = lazy(
 	() => import('@/views/englishLearning/pack'),
+);
+const EnglishLearningAnnotatePage = lazy(
+	() => import('@/views/englishLearning/annotate'),
 );
 const EnglishLearningPracticePage = lazy(
 	() => import('@/views/englishLearning/practice'),
@@ -279,6 +285,13 @@ const routes: RouteConfig[] = [
 						},
 					},
 					{
+						path: 'review',
+						Component: EnglishLearningReviewPage,
+						meta: {
+							titleKey: 'route.englishLearning.review.title',
+						},
+					},
+					{
 						path: 'practice',
 						Component: EnglishLearningPracticePage,
 						meta: {
@@ -304,6 +317,13 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningPackStreamPage,
 						meta: {
 							titleKey: 'route.englishLearning.stream.title',
+						},
+					},
+					{
+						path: 'annotate',
+						Component: EnglishLearningAnnotatePage,
+						meta: {
+							titleKey: 'route.englishLearning.annotate.title',
 						},
 					},
 					{

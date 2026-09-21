@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
 import { SegmentationLine } from '../../../components/SegmentationLine';
 import type { PracticeClassicItem, PracticeItem } from '../../types';
+import { posAbbrToZh } from '../../utils/wordMeta';
 import { practicePanelBodyClass } from '../session/PanelLayout';
 import { FieldCells } from '../session/PracticeFieldGrid';
 
@@ -21,7 +22,7 @@ export function buildVocabRevealedDetailRows(
 	compact: boolean,
 ): ReactNode[] {
 	const body = practicePanelBodyClass(compact);
-	const pos = item.pos?.trim();
+	const pos = posAbbrToZh(item.pos ?? '');
 	const rows: ReactNode[] = [];
 
 	rows.push(

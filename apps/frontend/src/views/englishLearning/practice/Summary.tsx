@@ -4,7 +4,6 @@
 import { ScrollArea, Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
-import { cn } from '@/lib/utils';
 import {
 	batchAddEnglishClassicQuoteMistakes,
 	batchAddEnglishVocabularyMistakes,
@@ -22,7 +21,6 @@ import {
 	SummaryStatsPanel,
 	WrongListItem,
 } from './components/summary';
-import { PRACTICE_PAGE_CONTENT_CLASS } from './constants';
 import type { SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
 import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
@@ -201,19 +199,8 @@ export function Summary({
 	};
 
 	return (
-		<div
-			className={cn(
-				PRACTICE_PAGE_CONTENT_CLASS,
-				'flex w-full flex-col',
-				hasWordList ? 'min-h-0 flex-1' : undefined,
-			)}
-		>
-			<PracticeCard
-				className={cn(
-					'border-theme/10 flex flex-col overflow-hidden p-0 shadow-sm',
-					hasWordList && 'min-h-0 flex-1',
-				)}
-			>
+		<div className="mx-auto flex h-full min-h-0 w-full flex-1 flex-col">
+			<PracticeCard className="border-theme/10 flex h-full min-h-0 flex-1 flex-col overflow-hidden p-0 shadow-sm">
 				<SummaryStatsPanel
 					compact={hasWordList}
 					accuracyPct={accuracyPct}
@@ -251,7 +238,7 @@ export function Summary({
 							className="min-h-0 flex-1"
 							viewportClassName="max-h-full"
 						>
-							<div className="grid gap-2.5 p-2 sm:grid-cols-2">
+							<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-2.5 p-2">
 								{wrongItems.map((item) => (
 									<WrongListItem
 										key={item.key}
@@ -291,12 +278,7 @@ export function Summary({
 					</div>
 				) : null}
 
-				<div
-					className={cn(
-						'flex w-full items-center justify-between border-theme/10 h-16.5 shrink-0 border-t bg-theme/5 p-2.5',
-						hasWordList && 'mt-auto',
-					)}
-				>
+				<div className="border-theme/10 mt-auto flex h-16.5 w-full shrink-0 items-center justify-between border-t bg-theme/5 p-2.5">
 					<SummaryActions
 						hasWrongItems={hasWrongList}
 						continueLoading={continueLoading}

@@ -30,11 +30,13 @@ export type FavoriteToggleButtonProps =
 			kind: 'vocab';
 			item: VocabFavoriteToggleItem;
 			className?: string;
+			tabIndex?: number;
 	  }
 	| {
 			kind: 'classic';
 			item: ClassicQuoteFavoriteToggleItem;
 			className?: string;
+			tabIndex?: number;
 	  };
 
 function useFavoriteToggleBindings(props: FavoriteToggleButtonProps) {
@@ -198,6 +200,7 @@ function useFavoriteToggleBindings(props: FavoriteToggleButtonProps) {
 
 export function FavoriteToggleButton({
 	className,
+	tabIndex,
 	...props
 }: FavoriteToggleButtonProps) {
 	const { favBusy, isFavorited, onToggle, favoriteLabel, unfavoriteLabel } =
@@ -209,16 +212,20 @@ export function FavoriteToggleButton({
 				type="button"
 				variant="link"
 				size="sm"
+				tabIndex={tabIndex}
 				aria-busy={favBusy}
-				onClick={() => void onToggle()}
 				className={cn(
-					'h-8 w-8 shrink-0 cursor-pointer rounded-md p-0 transition-colors',
+					'h-8 w-8 shrink-0 cursor-pointer rounded-md border-0 p-0 shadow-none transition-colors focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none',
 					favBusy && 'opacity-60',
 					isFavorited ? 'text-teal-500' : 'text-textcolor/55',
 					className,
 				)}
 				aria-pressed={isFavorited}
 				aria-label={isFavorited ? unfavoriteLabel : favoriteLabel}
+				onClick={(e) => {
+					void onToggle();
+					e.currentTarget.blur();
+				}}
 			>
 				<Star
 					className={cn('size-4.5', isFavorited && 'fill-current')}

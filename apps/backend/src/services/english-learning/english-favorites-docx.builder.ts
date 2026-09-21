@@ -32,7 +32,12 @@ function formatIpaForDocxExport(ipa: string): string {
 	return `/${t}/`;
 }
 
-/** 单词收藏：标题 + 逐条（词、音标、释义、例句） */
+export type EnglishDocxHeading = {
+	title?: string;
+	subtitle?: string;
+};
+
+/** 单词列表：标题 + 逐条（词、音标、释义、例句）；收藏 / 错题 / 复习共用 */
 export async function buildVocabularyFavoritesDocxBuffer(
 	rows: ReadonlyArray<{
 		word: string;
@@ -42,16 +47,18 @@ export async function buildVocabularyFavoritesDocxBuffer(
 		translationZh: string;
 		example: string;
 	}>,
+	heading?: EnglishDocxHeading,
 ): Promise<Buffer> {
+	const title = heading?.title?.trim() || '英语单词收藏';
+	const subtitle =
+		heading?.subtitle?.trim() || `共 ${rows.length} 条（按收藏时间倒序）`;
 	const children: Paragraph[] = [
 		new Paragraph({
 			heading: HeadingLevel.HEADING_1,
-			children: [new TextRun({ text: '英语单词收藏', bold: true })],
+			children: [new TextRun({ text: title, bold: true })],
 		}),
 		new Paragraph({
-			children: [
-				new TextRun({ text: `共 ${rows.length} 条（按收藏时间倒序）` }),
-			],
+			children: [new TextRun({ text: subtitle })],
 		}),
 		new Paragraph({ text: '' }),
 	];
@@ -123,7 +130,7 @@ export async function buildVocabularyFavoritesDocxBuffer(
 	return Buffer.from(await Packer.toBuffer(doc));
 }
 
-/** 经典句收藏：标题 + 逐条（英文、译文、出处、赏析） */
+/** 经典句列表：标题 + 逐条（英文、译文、出处、赏析）；收藏 / 错题 / 复习共用 */
 export async function buildClassicQuoteFavoritesDocxBuffer(
 	rows: ReadonlyArray<{
 		english: string;
@@ -131,16 +138,18 @@ export async function buildClassicQuoteFavoritesDocxBuffer(
 		source: string;
 		noteZh: string;
 	}>,
+	heading?: EnglishDocxHeading,
 ): Promise<Buffer> {
+	const title = heading?.title?.trim() || '英语经典句收藏';
+	const subtitle =
+		heading?.subtitle?.trim() || `共 ${rows.length} 条（按收藏时间倒序）`;
 	const children: Paragraph[] = [
 		new Paragraph({
 			heading: HeadingLevel.HEADING_1,
-			children: [new TextRun({ text: '英语经典句收藏', bold: true })],
+			children: [new TextRun({ text: title, bold: true })],
 		}),
 		new Paragraph({
-			children: [
-				new TextRun({ text: `共 ${rows.length} 条（按收藏时间倒序）` }),
-			],
+			children: [new TextRun({ text: subtitle })],
 		}),
 		new Paragraph({ text: '' }),
 	];

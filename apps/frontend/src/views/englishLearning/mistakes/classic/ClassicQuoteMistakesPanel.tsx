@@ -5,12 +5,22 @@ import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	downloadEnglishClassicQuoteMistakesDocx,
+	downloadEnglishPracticeReviewDueDocx,
 	type EnglishClassicQuoteMistakeListEntry,
 	listEnglishClassicQuoteMistakes,
+	listEnglishPracticeReviewClassicDue,
 	removeEnglishClassicQuoteMistakesBatch,
 } from '@/service';
 import {
@@ -24,12 +34,14 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
+import { isTauriRuntime } from '@/utils';
 import {
 	isPlaybackAvailable,
 	playPreferred,
 	stopAllPlayback,
 } from '@/utils/speech';
 import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
+import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
 import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
@@ -40,10 +52,12 @@ import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
+import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 
+export type ClassicMistakesListMode = 'mistakes' | 'review';
+
 const LIST_SCOPE = 'classic-mistakes' as const;
-const LIST_RESUME_ID = elFixedListResumeId(LIST_SCOPE);
 
 export type MistakesListCounts = {
 	loaded: number;
@@ -53,30 +67,47 @@ export type MistakesListCounts = {
 export type ClassicQuoteMistakesPanelProps = {
 	active?: boolean;
 	onCountsChange?: (counts: MistakesListCounts) => void;
+	listMode?: ClassicMistakesListMode;
+	headerTitle: ReactNode;
+	headerTrailing?: ReactNode;
 };
 
 export function ClassicQuoteMistakesPanel({
 	active = true,
 	onCountsChange,
+	listMode = 'mistakes',
+	headerTitle,
+	headerTrailing,
 }: ClassicQuoteMistakesPanelProps) {
 	const { t } = useI18n();
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const [gridReady, setGridReady] = useState(false);
+	const isReview = listMode === 'review';
+	const LIST_RESUME_ID = isReview
+		? '__el-classic-review__'
+		: elFixedListResumeId(LIST_SCOPE);
 
 	const handleResumeOffsetChange = useCallback(
 		(_id: string, offset: number) => {
+			if (isReview) return;
 			setElFixedListResume(LIST_SCOPE, offset);
 		},
-		[],
+		[isReview],
 	);
 
 	const fetchMistakesPage = useCallback(
 		async (_id: string, limit: number, offset: number) => {
-			const res = await listEnglishClassicQuoteMistakes({
-				limit,
-				offset,
-				silent: true,
-			});
+			const res = isReview
+				? await listEnglishPracticeReviewClassicDue({
+						limit,
+						offset,
+						silent: true,
+					})
+				: await listEnglishClassicQuoteMistakes({
+						limit,
+						offset,
+						silent: true,
+					});
 			if (!res.data) {
 				throw new Error('empty classic mistakes response');
 			}
@@ -85,7 +116,7 @@ export function ClassicQuoteMistakesPanel({
 				totalCount: res.data.totalCount,
 			};
 		},
-		[],
+		[isReview],
 	);
 
 	const {
@@ -99,12 +130,14 @@ export function ClassicQuoteMistakesPanel({
 		reloadFromStart,
 	} = useEnglishLearningList<EnglishClassicQuoteMistakeListEntry, null>({
 		libraryId: active ? LIST_RESUME_ID : null,
-		cacheNamespace: 'classic-mistakes',
-		initialResumeOffset: resolveElFixedListResume(LIST_SCOPE),
-		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
+		cacheNamespace: isReview ? 'classic-review' : 'classic-mistakes',
+		initialResumeOffset: isReview ? 0 : resolveElFixedListResume(LIST_SCOPE),
+		resolveInitialResume: isReview
+			? undefined
+			: () => resolveElFixedListInitialResume(LIST_SCOPE),
 		refetchOnEnter: true,
-		onResumeOffsetChange: handleResumeOffsetChange,
-		resumeModuleKey: 'mistakes',
+		onResumeOffsetChange: isReview ? undefined : handleResumeOffsetChange,
+		resumeModuleKey: isReview ? undefined : 'mistakes',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchMistakesPage,
 	});
@@ -114,11 +147,11 @@ export function ClassicQuoteMistakesPanel({
 	}, [active]);
 
 	useEffect(() => {
-		if (!active) return;
+		if (!active || isReview) return;
 		return () => {
 			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
 		};
-	}, [active]);
+	}, [active, isReview]);
 
 	const handleGridReady = useCallback(() => {
 		setGridReady(true);
@@ -127,6 +160,7 @@ export function ClassicQuoteMistakesPanel({
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
+	const [exportingDocx, setExportingDocx] = useState(false);
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
@@ -142,19 +176,25 @@ export function ClassicQuoteMistakesPanel({
 			entries.length > 0,
 		);
 	const practiceDisabled = loading || totalCount === 0;
+	const exportDisabled =
+		exportingDocx || loading || (!loading && entries.length === 0);
 
 	useEffect(() => {
 		onCountsChange?.({ loaded: entries.length, total: totalCount });
 	}, [entries.length, totalCount, onCountsChange]);
 
 	useEffect(() => {
-		if (totalCount > 0) {
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.mistakes('classic'), {
-				total: totalCount,
-				title: t('englishLearning.practice.sourceClassicMistakes'),
-			});
-		}
-	}, [totalCount, t]);
+		if (totalCount <= 0) return;
+		const poolKey = isReview
+			? englishPracticePoolKeys.review('classic')
+			: englishPracticePoolKeys.mistakes('classic');
+		setEnglishPracticePoolMeta(poolKey, {
+			total: totalCount,
+			title: isReview
+				? t('englishLearning.practice.sourceClassicReview')
+				: t('englishLearning.practice.sourceClassicMistakes'),
+		});
+	}, [isReview, totalCount, t]);
 
 	const entryIdSet = useMemo(
 		() => new Set(entries.map((e) => e.id)),
@@ -242,6 +282,7 @@ export function ClassicQuoteMistakesPanel({
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
 			setSingleRemoveTarget(null);
+			if (isReview) dispatchEnglishReviewSummaryRefresh();
 			Toast({
 				type: 'success',
 				title: t('englishLearning.mistakes.removeBatchSuccess'),
@@ -258,7 +299,7 @@ export function ClassicQuoteMistakesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, reloadFromStart, selectedIds, t]);
+	}, [entries, isReview, reloadFromStart, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -277,6 +318,7 @@ export function ClassicQuoteMistakesPanel({
 			});
 			setSingleRemoveTarget(null);
 			setSingleRemoveConfirmOpen(false);
+			if (isReview) dispatchEnglishReviewSummaryRefresh();
 			Toast({
 				type: 'success',
 				title: t('englishLearning.mistakes.removeSuccess'),
@@ -293,7 +335,7 @@ export function ClassicQuoteMistakesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [reloadFromStart, singleRemoveTarget, t]);
+	}, [isReview, reloadFromStart, singleRemoveTarget, t]);
 
 	const toggleQuotePlay = useCallback(
 		async (english: string, key: string) => {
@@ -333,6 +375,45 @@ export function ClassicQuoteMistakesPanel({
 	const removeDisabled =
 		batchRemoving || selectedIds.size === 0 || entries.length === 0;
 
+	const handleExportDocx = async () => {
+		if (entries.length === 0 && !loading) {
+			Toast({
+				type: 'info',
+				title: t(
+					isReview
+						? 'englishLearning.review.exportDocxEmpty'
+						: 'englishLearning.mistakes.exportDocxEmpty',
+				),
+			});
+			return;
+		}
+		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+		setExportingDocx(true);
+		try {
+			if (isReview) {
+				await downloadEnglishPracticeReviewDueDocx('classic', ids);
+			} else {
+				await downloadEnglishClassicQuoteMistakesDocx(ids);
+			}
+			if (!isTauriRuntime()) {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.classic.exportDocxSuccess'),
+				});
+			}
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title:
+					e instanceof Error
+						? e.message
+						: t('englishLearning.classic.exportDocxFail'),
+			});
+		} finally {
+			setExportingDocx(false);
+		}
+	};
+
 	return (
 		<>
 			<Confirm
@@ -371,6 +452,37 @@ export function ClassicQuoteMistakesPanel({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
+				<EnglishLearningPanelHeader
+					titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+					title={headerTitle}
+					actions={
+						<MistakesPanelFooter
+							selectAllId={
+								isReview
+									? 'review-classic-select-all'
+									: 'classic-mistakes-select-all'
+							}
+							showSelection={!showInitialLoading && entries.length > 0}
+							selectAllCheckboxState={selectAllCheckboxState}
+							selectionDisabled={selectionDisabled}
+							onToggleSelectAll={toggleSelectAllLoaded}
+							selectedCount={selectedIds.size}
+							removeDisabled={removeDisabled}
+							batchRemoving={batchRemoving}
+							onRequestRemove={requestRemoveConfirm}
+							exportDisabled={exportDisabled}
+							exportingDocx={exportingDocx}
+							onExportDocx={handleExportDocx}
+							exportLabel={t('englishLearning.classic.exportDocx')}
+							showPracticeEntry
+							practiceContentKind="classic"
+							practiceSource={isReview ? 'review' : 'mistakes'}
+							practiceDisabled={practiceDisabled}
+							practicePoolTotal={totalCount}
+						/>
+					}
+					trailing={headerTrailing}
+				/>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
 						<Loading text={t('common.loading')} />
@@ -384,7 +496,7 @@ export function ClassicQuoteMistakesPanel({
 						) : null}
 						<ScrollArea
 							ref={scrollViewportRef}
-							className="relative min-h-0 h-full px-4"
+							className="relative min-h-0 h-full p-4"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 							onScroll={composeViewportScroll(
 								onViewportScroll,
@@ -393,7 +505,11 @@ export function ClassicQuoteMistakesPanel({
 						>
 							{showEmpty ? (
 								<div className="text-textcolor/60 py-12 text-center text-sm">
-									{t('englishLearning.mistakes.classicEmpty')}
+									{t(
+										isReview
+											? 'englishLearning.review.empty'
+											: 'englishLearning.mistakes.classicEmpty',
+									)}
 								</div>
 							) : (
 								<div className="relative w-full">
@@ -475,21 +591,6 @@ export function ClassicQuoteMistakesPanel({
 						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
 					</div>
 				)}
-				<MistakesPanelFooter
-					selectAllId="classic-mistakes-select-all"
-					showSelection={!showInitialLoading && entries.length > 0}
-					selectAllCheckboxState={selectAllCheckboxState}
-					selectionDisabled={selectionDisabled}
-					onToggleSelectAll={toggleSelectAllLoaded}
-					selectedCount={selectedIds.size}
-					removeDisabled={removeDisabled}
-					batchRemoving={batchRemoving}
-					onRequestRemove={requestRemoveConfirm}
-					showPracticeEntry
-					practiceContentKind="classic"
-					practiceDisabled={practiceDisabled}
-					practicePoolTotal={totalCount}
-				/>
 			</div>
 		</>
 	);

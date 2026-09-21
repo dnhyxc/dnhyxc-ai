@@ -27,13 +27,18 @@ type PracticeShortcutKey =
 	| 'enter'
 	| 'shiftSpace'
 	| 'space'
+	| 'ctrlShiftP'
+	| 'ctrlShiftI'
 	| 'left'
 	| 'right'
 	| 'up'
 	| 'down';
 
 const PRACTICE_SHORTCUT_ICONS: Record<
-	Exclude<PracticeShortcutKey, 'shiftSpace' | 'space'>,
+	Exclude<
+		PracticeShortcutKey,
+		'shiftSpace' | 'space' | 'ctrlShiftP' | 'ctrlShiftI'
+	>,
 	{ Icon: LucideIcon; ariaKey: string }
 > = {
 	enter: {
@@ -57,6 +62,27 @@ const PRACTICE_SHORTCUT_ICONS: Record<
 
 const KEY_BADGE =
 	'border-theme/15 bg-theme/5 text-textcolor/80 rounded px-1 py-px text-[10px] font-medium leading-none';
+
+function CtrlShiftLetterBadge({
+	letter,
+	ariaKey,
+}: {
+	letter: string;
+	ariaKey: string;
+}) {
+	const { t } = useI18n();
+	return (
+		<span
+			className="inline-flex shrink-0 items-center gap-0.5"
+			role="img"
+			aria-label={t(ariaKey)}
+		>
+			<kbd className={KEY_BADGE}>Ctrl</kbd>
+			<kbd className={KEY_BADGE}>Shift</kbd>
+			<kbd className={KEY_BADGE}>{letter}</kbd>
+		</span>
+	);
+}
 
 function ShortcutKeyIcon({
 	shortcutKey,
@@ -86,6 +112,22 @@ function ShortcutKeyIcon({
 			>
 				{t('englishLearning.practice.shortcuts.keySpace')}
 			</kbd>
+		);
+	}
+	if (shortcutKey === 'ctrlShiftP') {
+		return (
+			<CtrlShiftLetterBadge
+				letter="P"
+				ariaKey="englishLearning.practice.shortcuts.keyCtrlShiftP"
+			/>
+		);
+	}
+	if (shortcutKey === 'ctrlShiftI') {
+		return (
+			<CtrlShiftLetterBadge
+				letter="I"
+				ariaKey="englishLearning.practice.shortcuts.keyCtrlShiftI"
+			/>
 		);
 	}
 	const { Icon, ariaKey } = PRACTICE_SHORTCUT_ICONS[shortcutKey];
@@ -142,13 +184,14 @@ function ShortcutSection({
 
 export function PracticeShortcutsMenu({
 	practiceMode: _practiceMode,
+	slotBoard = false,
 }: PracticeShortcutsMenuProps) {
 	const { t } = useI18n();
 
 	type ShortcutRowDef = { label: string; keys: PracticeShortcutKey[] };
 
 	const sections = useMemo((): { title: string; rows: ShortcutRowDef[] }[] => {
-		const playKeysWrong: PracticeShortcutKey[] = ['space'];
+		const playKeys: PracticeShortcutKey[] = ['shiftSpace'];
 
 		const promptRows: ShortcutRowDef[] = [
 			{
@@ -157,9 +200,21 @@ export function PracticeShortcutsMenu({
 			},
 			{
 				label: t('englishLearning.practice.shortcuts.play'),
-				keys: ['shiftSpace'],
+				keys: playKeys,
 			},
 		];
+		if (slotBoard) {
+			promptRows.push(
+				{
+					label: t('englishLearning.practice.shortcuts.togglePos'),
+					keys: ['ctrlShiftP'],
+				},
+				{
+					label: t('englishLearning.practice.shortcuts.toggleIpa'),
+					keys: ['ctrlShiftI'],
+				},
+			);
+		}
 
 		return [
 			{
@@ -171,7 +226,7 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: playKeysWrong,
+						keys: playKeys,
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.showAnswer'),
@@ -196,7 +251,7 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: playKeysWrong,
+						keys: playKeys,
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.previous'),
@@ -213,7 +268,7 @@ export function PracticeShortcutsMenu({
 				],
 			},
 		];
-	}, [t]);
+	}, [slotBoard, t]);
 
 	return (
 		<DropdownMenu>
@@ -233,6 +288,8 @@ export function PracticeShortcutsMenu({
 				align="end"
 				sideOffset={8}
 				className="w-[min(20rem,calc(100vw-2rem))] p-0"
+				// 关闭后勿把焦点还回 ? 按钮，否则空格会再次点开（与练习播放快捷键冲突）
+				onCloseAutoFocus={(e) => e.preventDefault()}
 			>
 				<DropdownMenuLabel className="text-textcolor px-3 py-2.5 text-sm font-semibold">
 					{t('englishLearning.practice.shortcuts.title')}

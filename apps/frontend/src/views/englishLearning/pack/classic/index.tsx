@@ -329,7 +329,7 @@ function ClassicQuotesPackSectionInner({
 		<div className="relative min-h-0 flex-1">
 			<ScrollArea
 				ref={scrollViewportRef}
-				className="min-h-0 h-full pb-4"
+				className="min-h-0 h-full py-4"
 				onScroll={composeViewportScroll(
 					snapshot.onHistoryViewportScroll,
 					onScrollCornerFab,

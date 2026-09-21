@@ -8,11 +8,13 @@ import {
 	IsInt,
 	IsOptional,
 	IsString,
+	IsUUID,
 	Max,
 	MaxLength,
 	Min,
 	ValidateNested,
 } from 'class-validator';
+import { ENGLISH_PRACTICE_SESSION_MAX } from '../constant';
 import { VocabularyMistakeBatchItemDto } from './vocabulary-mistake.dto';
 
 export class PracticeReviewQueueQueryDto {
@@ -23,7 +25,7 @@ export class PracticeReviewQueueQueryDto {
 	@Type(() => Number)
 	@IsInt()
 	@Min(1)
-	@Max(50)
+	@Max(ENGLISH_PRACTICE_SESSION_MAX)
 	count?: number;
 
 	/** 逗号分隔，本轮已练条目 key */
@@ -31,6 +33,37 @@ export class PracticeReviewQueueQueryDto {
 	@IsString()
 	@MaxLength(8000)
 	excludeKeys?: string;
+}
+
+/** 今日待复习分页列表（与错题集列表同构字段） */
+export class PracticeReviewDueListQueryDto {
+	@IsIn(['vocab', 'classic'])
+	contentKind!: 'vocab' | 'classic';
+
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(1000)
+	limit?: number;
+
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(0)
+	offset?: number;
+}
+
+/** 导出今日待复习 DOCX：contentKind 必填；ids 可选（有则仅导出所选） */
+export class PracticeReviewExportDocxDto {
+	@IsIn(['vocab', 'classic'])
+	contentKind!: 'vocab' | 'classic';
+
+	@IsOptional()
+	@IsArray()
+	@ArrayMaxSize(3000)
+	@IsUUID('4', { each: true })
+	ids?: string[];
 }
 
 export class PracticeReviewRecordItemDto {
@@ -48,7 +81,7 @@ export class PracticeReviewRecordItemDto {
 export class PracticeReviewRecordDto {
 	@IsArray()
 	@ArrayMinSize(1)
-	@ArrayMaxSize(50)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => PracticeReviewRecordItemDto)
 	attempts!: PracticeReviewRecordItemDto[];
@@ -59,7 +92,7 @@ export class PracticeDailyQueueQueryDto {
 	@Type(() => Number)
 	@IsInt()
 	@Min(1)
-	@Max(50)
+	@Max(ENGLISH_PRACTICE_SESSION_MAX)
 	count?: number;
 
 	/** @deprecated 今日记词仅词汇库随机，间隔复习见 practice/review */
@@ -80,7 +113,7 @@ export class PracticeDailyRecordDto {
 
 	@IsArray()
 	@ArrayMinSize(1)
-	@ArrayMaxSize(50)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => PracticeReviewRecordItemDto)
 	attempts!: PracticeReviewRecordItemDto[];
@@ -88,7 +121,7 @@ export class PracticeDailyRecordDto {
 	/** source=library 时传入本轮练过的词条快照，用于加入错题集 */
 	@IsOptional()
 	@IsArray()
-	@ArrayMaxSize(50)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => VocabularyMistakeBatchItemDto)
 	vocabItems?: VocabularyMistakeBatchItemDto[];

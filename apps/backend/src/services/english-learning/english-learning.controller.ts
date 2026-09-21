@@ -12,6 +12,8 @@ import {
 	Get,
 	Header,
 	HttpException,
+	Inject,
+	type LoggerService,
 	Param,
 	Patch,
 	Post,
@@ -27,12 +29,23 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
 import { diskStorage } from 'multer';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
+import { AnnotateSourceTaskService } from './annotate-source-task.service';
 import {
 	PACK_SSE_COMPLETE_OMIT_ITEMS_THRESHOLD,
 	PACK_SSE_KEEPALIVE_INTERVAL_MS,
 } from './constant';
+import {
+	AnnotateClassicLibraryDto,
+	AnnotateClassicPackDto,
+} from './dto/annotate-classic-source.dto';
+import {
+	AnnotateSentenceWordsBatchDto,
+	AnnotateSentenceWordsDto,
+} from './dto/annotate-sentence-words.dto';
+import { CreateAnnotateSourceTaskDto } from './dto/annotate-source-task.dto';
 import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
 import {
 	ClassicQuoteFavoriteBodyDto,
@@ -51,9 +64,12 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import { ImportSentenceWordAnnotationsDto } from './dto/import-sentence-word-annotations.dto';
 import {
 	PracticeDailyQueueQueryDto,
 	PracticeDailyRecordDto,
+	PracticeReviewDueListQueryDto,
+	PracticeReviewExportDocxDto,
 	PracticeReviewQueueQueryDto,
 	PracticeReviewRecordDto,
 } from './dto/practice-review.dto';
@@ -64,6 +80,7 @@ import { UpdateLibraryTitleDto } from './dto/update-library-title.dto';
 import { UpdateLibraryVisibilityDto } from './dto/update-library-visibility.dto';
 import { UpdateResumeModuleSettingDto } from './dto/update-resume-module-setting.dto';
 import {
+	EnglishExportDocxDto,
 	VocabularyFavoriteBodyDto,
 	VocabularyFavoriteRemoveBatchDto,
 	VocabularyFavoriteRemoveDto,
@@ -78,7 +95,10 @@ import {
 	type EnglishLearningPackAgentToolEvent,
 	EnglishLearningService,
 } from './english-learning.service';
-import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
+import {
+	annotateTaskAbortKey,
+	EnglishLearningStreamAbortRegistry,
+} from './english-learning-stream-abort.registry';
 
 /** 长任务 SSE 心跳，避免库内加载/向量匹配期间被代理或客户端判为断流 */
 function startEnglishPackSseKeepalive(
@@ -170,12 +190,26 @@ function vocabularyLibraryJsonUploadMulterOptions() {
 
 /**
  * SSE 客户端断开或显式 cancel 时中止生成：多路监听，避免仅 `req.close` 不触发。
+ * abort 醒目日志由 armStreamAbortOnceLog 统一打一次。
  */
+function armStreamAbortOnceLog(signal: AbortSignal, detail: string): void {
+	signal.addEventListener(
+		'abort',
+		() => {
+			console.warn(
+				`\n========================================================\n[EnglishLearning] ★ 大模型已停止调用 ★ ${detail}\n========================================================\n`,
+			);
+		},
+		{ once: true },
+	);
+}
+
 function wireEnglishLearningSseAbort(
 	req: Request,
 	streamAbort: AbortController,
 ): () => void {
 	const onDisconnect = () => {
+		if (streamAbort.signal.aborted) return;
 		streamAbort.abort();
 	};
 	if (req.aborted) {
@@ -198,7 +232,135 @@ function wireEnglishLearningSseAbort(
 		req.removeListener('error', onDisconnect);
 		socket?.removeListener('close', onDisconnect);
 		res?.removeListener('close', onDisconnect);
-		streamAbort.abort();
+		if (!streamAbort.signal.aborted) {
+			streamAbort.abort();
+		}
+	};
+}
+
+function annotateProgressSnapshot(p: Record<string, unknown>) {
+	const n = (k: string) => {
+		const v = Number(p[k]);
+		return Number.isFinite(v) ? v : 0;
+	};
+	return {
+		total: n('total'),
+		hit: n('hit'),
+		miss: n('miss'),
+		annotated: n('annotated'),
+		failed: n('failed'),
+		remaining: n('remaining'),
+		tokensPrompt: n('tokensPrompt'),
+		tokensCompletion: n('tokensCompletion'),
+		tokensTotal: n('tokensTotal'),
+	};
+}
+
+type AnnotateProgressSeed = ReturnType<typeof annotateProgressSnapshot>;
+
+/**
+ * 整集标注 SSE：进度落库 + 跨暂停的 token 累计（本趟 LLM 计数叠在 seed 上）。
+ */
+function createAnnotateProgressBook(opts: {
+	seed?: AnnotateProgressSeed | null;
+	persist: (snap: AnnotateProgressSeed, force: boolean) => void;
+}) {
+	const basePrompt = opts.seed?.tokensPrompt ?? 0;
+	const baseCompletion = opts.seed?.tokensCompletion ?? 0;
+	let last: AnnotateProgressSeed = opts.seed
+		? { ...opts.seed }
+		: {
+				total: 0,
+				hit: 0,
+				miss: 0,
+				annotated: 0,
+				failed: 0,
+				remaining: 0,
+				tokensPrompt: 0,
+				tokensCompletion: 0,
+				tokensTotal: 0,
+			};
+
+	const sessionTokens = (data: Record<string, unknown>) => {
+		const prompt = Number(data.tokensPrompt);
+		const completion = Number(data.tokensCompletion);
+		const sp = Number.isFinite(prompt) ? prompt : 0;
+		const sc = Number.isFinite(completion) ? completion : 0;
+		return {
+			tokensPrompt: basePrompt + sp,
+			tokensCompletion: baseCompletion + sc,
+			tokensTotal: basePrompt + baseCompletion + sp + sc,
+		};
+	};
+
+	const nOr = (v: unknown, fallback: number) => {
+		const n = Number(v);
+		return Number.isFinite(n) ? n : fallback;
+	};
+
+	/** 改写事件里的 token 字段为累计值，并刷新 last / 落库 */
+	const remember = (data: Record<string, unknown>) => {
+		if (data.type === 'annotate.start') {
+			const miss = nOr(data.miss, 0);
+			last = {
+				total: nOr(data.total, 0),
+				hit: nOr(data.hit, 0),
+				miss,
+				annotated: 0,
+				failed: 0,
+				remaining: miss,
+				tokensPrompt: basePrompt,
+				tokensCompletion: baseCompletion,
+				tokensTotal: basePrompt + baseCompletion,
+			};
+			data.tokensPrompt = last.tokensPrompt;
+			data.tokensCompletion = last.tokensCompletion;
+			data.tokensTotal = last.tokensTotal;
+			opts.persist(last, true);
+			return;
+		}
+		if (data.type === 'annotate.progress' && data.heartbeat !== true) {
+			const tok = sessionTokens(data);
+			last = {
+				total: nOr(data.total, last.total),
+				hit: nOr(data.hit, last.hit),
+				miss: nOr(data.miss, last.miss),
+				annotated: nOr(data.annotated, 0),
+				failed: nOr(data.failed, 0),
+				remaining: nOr(data.remaining, 0),
+				...tok,
+			};
+			data.tokensPrompt = tok.tokensPrompt;
+			data.tokensCompletion = tok.tokensCompletion;
+			data.tokensTotal = tok.tokensTotal;
+			opts.persist(last, false);
+			return;
+		}
+		if (data.type === 'annotate.complete') {
+			const tok = sessionTokens(data);
+			const failed = nOr(data.failed, last.failed);
+			last = {
+				total: nOr(data.total, last.total),
+				hit: nOr(data.hit, last.hit),
+				miss: last.miss,
+				annotated: nOr(data.annotated, last.annotated),
+				failed,
+				remaining: failed > 0 ? failed : 0,
+				...tok,
+			};
+			data.tokensPrompt = tok.tokensPrompt;
+			data.tokensCompletion = tok.tokensCompletion;
+			data.tokensTotal = tok.tokensTotal;
+			data.remaining = last.remaining;
+		}
+	};
+
+	return {
+		get last() {
+			return last;
+		},
+		remember,
+		flush: () => opts.persist(last, true),
 	};
 }
 
@@ -271,7 +433,10 @@ function classicQuoteHttpMessage(e: HttpException): string {
 export class EnglishLearningController {
 	constructor(
 		private readonly englishLearningService: EnglishLearningService,
+		private readonly annotateSourceTaskService: AnnotateSourceTaskService,
 		private readonly streamAbortRegistry: EnglishLearningStreamAbortRegistry,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	/**
@@ -828,6 +993,526 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 今日待复习分页列表（到期且错题仍在） */
+	@Get('practice/review/items')
+	async listPracticeReviewDue(
+		@Req() req: AuthedRequest,
+		@Query() query: PracticeReviewDueListQueryDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(1000, Math.max(1, query.limit ?? 50));
+		const offset = Math.max(0, query.offset ?? 0);
+		const data = await this.englishLearningService.listPracticeReviewDuePage(
+			userId,
+			{
+				contentKind: query.contentKind,
+				limit,
+				offset,
+			},
+		);
+		return { success: true, data };
+	}
+
+	/** 导出今日待复习为 DOCX（body: contentKind + 可选 ids） */
+	@Post('practice/review/export-docx')
+	async exportPracticeReviewDueDocx(
+		@Req() req: AuthedRequest,
+		@Body() dto: PracticeReviewExportDocxDto,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportPracticeReviewDueDocxBuffer(
+				userId,
+				dto.contentKind,
+				dto.ids,
+			);
+		const kind = dto.contentKind === 'classic' ? 'classic' : 'vocab';
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			`attachment; filename="english-review-${kind}.docx"`,
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
+	}
+
+	/** 经典句看中写：按分词标注词性 / IPA / 释义 */
+	@Post('practice/annotate-sentence-words')
+	async annotateSentenceWords(
+		@Req() req: AuthedRequest,
+		@Body() dto: AnnotateSentenceWordsDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.annotateSentenceWords({
+			userId,
+			english: dto.english,
+			words: dto.words,
+		});
+		return { success: true, data };
+	}
+
+	/** 练习开局：批量标注；库内命中跳过模型 */
+	@Post('practice/annotate-sentence-words/batch')
+	async annotateSentenceWordsBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: AnnotateSentenceWordsBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.annotateSentenceWordsBatch({
+			userId,
+			items: dto.items,
+			cacheOnly: dto.cacheOnly === true,
+		});
+		return { success: true, data };
+	}
+
+	/** 手动导入词标注 JSON：无 LLM，同 cache_key 覆盖；允许部分句 */
+	@Post('practice/annotate-sentence-words/import')
+	async importSentenceWordAnnotations(
+		@Req() req: AuthedRequest,
+		@Body() dto: ImportSentenceWordAnnotationsDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.importSentenceWordAnnotations({
+				userId,
+				source: dto.source,
+				libraryId: dto.libraryId,
+				streamId: dto.streamId,
+				items: dto.items,
+			});
+		return { success: true, data };
+	}
+
+	/** 整集标注任务列表（刷新后恢复进度页） */
+	@Get('annotate-source-tasks')
+	async listAnnotateSourceTasks(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const rows = await this.annotateSourceTaskService.listForUser(userId);
+		return {
+			success: true,
+			data: { items: rows.map((r) => this.annotateSourceTaskService.toDto(r)) },
+		};
+	}
+
+	/** 创建或复用同源未结束任务 */
+	@Post('annotate-source-tasks')
+	async createAnnotateSourceTask(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateAnnotateSourceTaskDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const { task, reused } = await this.annotateSourceTaskService.createOrGet({
+			userId,
+			source: dto.source,
+			libraryId: dto.libraryId,
+			streamId: dto.streamId,
+			title: dto.title,
+		});
+		return {
+			success: true,
+			data: { task: this.annotateSourceTaskService.toDto(task), reused },
+		};
+	}
+
+	@Post('annotate-source-tasks/:id/pause')
+	async pauseAnnotateSourceTask(
+		@Req() req: AuthedRequest,
+		@Param('id') id: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const taskId = id.trim();
+		// 刷新 keepalive / 点停止：先掐 SSE→LLM，再改任务状态
+		const aborted = this.streamAbortRegistry.cancelByStreamId(
+			userId,
+			annotateTaskAbortKey(taskId),
+		);
+		if (aborted) {
+			this.logger.warn(
+				`[EnglishLearning] ★ 大模型已停止调用 ★ reason=pause_api taskId=${taskId} userId=${userId}`,
+			);
+		} else {
+			this.logger.warn(
+				`[EnglishLearning] pause_api 未命中进行中的标注流 taskId=${taskId} userId=${userId}（可能已断或未登记）`,
+			);
+		}
+		const task = await this.annotateSourceTaskService.pause(userId, taskId);
+		return {
+			success: true,
+			data: { task: this.annotateSourceTaskService.toDto(task) },
+		};
+	}
+
+	/** 资源库点「查看进度」：刷新 updatedAt，进度页顶前（刷新后仍保持） */
+	@Post('annotate-source-tasks/:id/bump')
+	async bumpAnnotateSourceTask(
+		@Req() req: AuthedRequest,
+		@Param('id') id: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const task = await this.annotateSourceTaskService.bumpList(
+			userId,
+			id.trim(),
+		);
+		return {
+			success: true,
+			data: { task: this.annotateSourceTaskService.toDto(task) },
+		};
+	}
+
+	@Post('annotate-source-tasks/:id/resume')
+	async resumeAnnotateSourceTask(
+		@Req() req: AuthedRequest,
+		@Param('id') id: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const task = await this.annotateSourceTaskService.resume(userId, id.trim());
+		return {
+			success: true,
+			data: { task: this.annotateSourceTaskService.toDto(task) },
+		};
+	}
+
+	@Delete('annotate-source-tasks/finished')
+	async dismissFinishedAnnotateSourceTasks(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		const removed =
+			await this.annotateSourceTaskService.dismissFinished(userId);
+		return { success: true, data: { removed } };
+	}
+
+	@Delete('annotate-source-tasks/:id')
+	async dismissAnnotateSourceTask(
+		@Req() req: AuthedRequest,
+		@Param('id') id: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		await this.annotateSourceTaskService.dismiss(userId, id.trim());
+		return { success: true };
+	}
+
+	/** 语句库整集词标注预热（SSE 进度） */
+	@Post('classic-quotes-libraries/annotate-sentence-words/stream')
+	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
+	annotateClassicLibrarySourceStream(
+		@Req() req: AuthedRequest,
+		@Body() dto: AnnotateClassicLibraryDto,
+	): Observable<{ data: Record<string, unknown> }> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		return new Observable((subscriber) => {
+			const streamAbort = new AbortController();
+			const taskId = dto.taskId?.trim() || '';
+			armStreamAbortOnceLog(
+				streamAbort.signal,
+				`reason=library_annotate_abort userId=${userId} libraryId=${dto.libraryId} taskId=${taskId || '-'}`,
+			);
+			const detachSseAbort = wireEnglishLearningSseAbort(req, streamAbort);
+			if (taskId) {
+				this.streamAbortRegistry.register(
+					userId,
+					annotateTaskAbortKey(taskId),
+					streamAbort,
+				);
+			}
+			const persist = (snap: AnnotateProgressSeed, force: boolean) => {
+				if (!taskId) return;
+				void this.annotateSourceTaskService.writeProgress(
+					userId,
+					taskId,
+					snap,
+					{
+						force,
+					},
+				);
+			};
+			let book = createAnnotateProgressBook({ persist });
+			const emit = (data: Record<string, unknown>) => {
+				book.remember(data);
+				try {
+					subscriber.next({ data });
+				} catch {
+					streamAbort.abort();
+				}
+			};
+			const pauseWithFlush = async () => {
+				if (!taskId) return;
+				await this.annotateSourceTaskService.writeProgress(
+					userId,
+					taskId,
+					book.last,
+					{ force: true },
+				);
+				await this.annotateSourceTaskService.pauseIfRunning(userId, taskId);
+			};
+			const keepalive = setInterval(() => {
+				emit({
+					type: 'annotate.progress',
+					heartbeat: true,
+					...book.last,
+				});
+			}, PACK_SSE_KEEPALIVE_INTERVAL_MS);
+			void (async () => {
+				try {
+					if (taskId) {
+						try {
+							const row = await this.annotateSourceTaskService.getOwned(
+								userId,
+								taskId,
+							);
+							book = createAnnotateProgressBook({
+								seed: row.progress,
+								persist,
+							});
+						} catch {
+							// 无任务则从零计 token
+						}
+					}
+					await this.englishLearningService.annotateClassicLibrarySource({
+						userId,
+						libraryId: dto.libraryId,
+						signal: streamAbort.signal,
+						onEvent: (ev) => emit({ ...ev }),
+					});
+					if (taskId && !streamAbort.signal.aborted) {
+						const snap = book.last;
+						if (snap.failed > 0) {
+							await this.annotateSourceTaskService.markError(
+								userId,
+								taskId,
+								`有 ${snap.failed} 句标注失败，可点继续重试`,
+								snap,
+							);
+						} else {
+							await this.annotateSourceTaskService.markDone(
+								userId,
+								taskId,
+								snap,
+							);
+						}
+					}
+					subscriber.complete();
+				} catch (e) {
+					if (
+						streamAbort.signal.aborted ||
+						(e instanceof Error && e.name === 'AbortError')
+					) {
+						await pauseWithFlush();
+						this.logger.warn(
+							`[EnglishLearning] annotate library SSE aborted userId=${userId} libraryId=${dto.libraryId}`,
+						);
+						subscriber.complete();
+						return;
+					}
+					const message =
+						e instanceof Error ? e.message.slice(0, 200) : String(e);
+					if (taskId) {
+						await this.annotateSourceTaskService.markError(
+							userId,
+							taskId,
+							message,
+						);
+					}
+					emit({ type: 'annotate.error', message });
+					subscriber.complete();
+				} finally {
+					clearInterval(keepalive);
+					if (taskId) {
+						this.streamAbortRegistry.unregister(annotateTaskAbortKey(taskId));
+					}
+					detachSseAbort();
+				}
+			})();
+			return () => {
+				streamAbort.abort();
+				clearInterval(keepalive);
+				if (taskId) {
+					this.streamAbortRegistry.unregister(annotateTaskAbortKey(taskId));
+				}
+				detachSseAbort();
+				void pauseWithFlush();
+			};
+		});
+	}
+
+	/** Pack 整集词标注预热（SSE 进度） */
+	@Post('classic-quotes-history/annotate-sentence-words/stream')
+	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
+	annotateClassicPackSourceStream(
+		@Req() req: AuthedRequest,
+		@Body() dto: AnnotateClassicPackDto,
+	): Observable<{ data: Record<string, unknown> }> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		return new Observable((subscriber) => {
+			const streamAbort = new AbortController();
+			const taskId = dto.taskId?.trim() || '';
+			armStreamAbortOnceLog(
+				streamAbort.signal,
+				`reason=pack_annotate_abort userId=${userId} streamId=${dto.streamId} taskId=${taskId || '-'}`,
+			);
+			const detachSseAbort = wireEnglishLearningSseAbort(req, streamAbort);
+			if (taskId) {
+				this.streamAbortRegistry.register(
+					userId,
+					annotateTaskAbortKey(taskId),
+					streamAbort,
+				);
+			}
+			const persist = (snap: AnnotateProgressSeed, force: boolean) => {
+				if (!taskId) return;
+				void this.annotateSourceTaskService.writeProgress(
+					userId,
+					taskId,
+					snap,
+					{
+						force,
+					},
+				);
+			};
+			let book = createAnnotateProgressBook({ persist });
+			const emit = (data: Record<string, unknown>) => {
+				book.remember(data);
+				try {
+					subscriber.next({ data });
+				} catch {
+					streamAbort.abort();
+				}
+			};
+			const pauseWithFlush = async () => {
+				if (!taskId) return;
+				await this.annotateSourceTaskService.writeProgress(
+					userId,
+					taskId,
+					book.last,
+					{ force: true },
+				);
+				await this.annotateSourceTaskService.pauseIfRunning(userId, taskId);
+			};
+			const keepalive = setInterval(() => {
+				emit({
+					type: 'annotate.progress',
+					heartbeat: true,
+					...book.last,
+				});
+			}, PACK_SSE_KEEPALIVE_INTERVAL_MS);
+			void (async () => {
+				try {
+					if (taskId) {
+						try {
+							const row = await this.annotateSourceTaskService.getOwned(
+								userId,
+								taskId,
+							);
+							book = createAnnotateProgressBook({
+								seed: row.progress,
+								persist,
+							});
+						} catch {
+							// 无任务则从零计 token
+						}
+					}
+					await this.englishLearningService.annotateClassicPackSource({
+						userId,
+						streamId: dto.streamId,
+						signal: streamAbort.signal,
+						onEvent: (ev) => emit({ ...ev }),
+					});
+					if (taskId && !streamAbort.signal.aborted) {
+						const snap = book.last;
+						if (snap.failed > 0) {
+							await this.annotateSourceTaskService.markError(
+								userId,
+								taskId,
+								`有 ${snap.failed} 句标注失败，可点继续重试`,
+								snap,
+							);
+						} else {
+							await this.annotateSourceTaskService.markDone(
+								userId,
+								taskId,
+								snap,
+							);
+						}
+					}
+					subscriber.complete();
+				} catch (e) {
+					if (
+						streamAbort.signal.aborted ||
+						(e instanceof Error && e.name === 'AbortError')
+					) {
+						await pauseWithFlush();
+						this.logger.warn(
+							`[EnglishLearning] annotate pack SSE aborted userId=${userId} streamId=${dto.streamId}`,
+						);
+						subscriber.complete();
+						return;
+					}
+					const message =
+						e instanceof Error ? e.message.slice(0, 200) : String(e);
+					if (taskId) {
+						await this.annotateSourceTaskService.markError(
+							userId,
+							taskId,
+							message,
+						);
+					}
+					emit({ type: 'annotate.error', message });
+					subscriber.complete();
+				} finally {
+					clearInterval(keepalive);
+					if (taskId) {
+						this.streamAbortRegistry.unregister(annotateTaskAbortKey(taskId));
+					}
+					detachSseAbort();
+				}
+			})();
+			return () => {
+				streamAbort.abort();
+				clearInterval(keepalive);
+				if (taskId) {
+					this.streamAbortRegistry.unregister(annotateTaskAbortKey(taskId));
+				}
+				detachSseAbort();
+				void pauseWithFlush();
+			};
+		});
+	}
+
 	@Get('practice/review/queue')
 	async getPracticeReviewQueue(
 		@Req() req: AuthedRequest,
@@ -1070,6 +1755,34 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 导出当前用户单词错题为 DOCX（可选 ids，至多 3000 条） */
+	@Post('vocabulary-mistakes/export-docx')
+	async exportVocabularyMistakesDocx(
+		@Req() req: AuthedRequest,
+		@Body() dto: EnglishExportDocxDto,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportVocabularyMistakesDocxBuffer(
+				userId,
+				dto.ids,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-vocabulary-mistakes.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
+	}
+
 	/** 批量加入错题集（已存在词形跳过，不更新） */
 	@Post('vocabulary-mistakes/batch')
 	async batchAddVocabularyMistakes(
@@ -1172,6 +1885,34 @@ export class EnglishLearningController {
 			{ limit, offset },
 		);
 		return { success: true, data };
+	}
+
+	/** 导出当前用户经典句错题为 DOCX（可选 ids，至多 3000 条） */
+	@Post('classic-quote-mistakes/export-docx')
+	async exportClassicQuoteMistakesDocx(
+		@Req() req: AuthedRequest,
+		@Body() dto: EnglishExportDocxDto,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportClassicQuoteMistakesDocxBuffer(
+				userId,
+				dto.ids,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-classic-quote-mistakes.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
 	}
 
 	/** 批量加入语句错题集（已存在内容键跳过，不更新） */
@@ -1278,10 +2019,11 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户单词收藏为 DOCX（服务端拉全量至多 3000 条，与列表分页无关） */
-	@Get('vocabulary-favorites/export-docx')
+	/** 导出当前用户单词收藏为 DOCX（可选 ids，至多 3000 条） */
+	@Post('vocabulary-favorites/export-docx')
 	async exportVocabularyFavoritesDocx(
 		@Req() req: AuthedRequest,
+		@Body() dto: EnglishExportDocxDto,
 		@Res() res: Response,
 	): Promise<void> {
 		const userId = req.user?.userId;
@@ -1291,6 +2033,7 @@ export class EnglishLearningController {
 		const buf =
 			await this.englishLearningService.exportVocabularyFavoritesDocxBuffer(
 				userId,
+				dto.ids,
 			);
 		res.setHeader(
 			'Content-Type',
@@ -1658,10 +2401,11 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户经典句收藏为 DOCX（服务端拉全量至多 3000 条） */
-	@Get('classic-quotes-favorites/export-docx')
+	/** 导出当前用户经典句收藏为 DOCX（可选 ids，至多 3000 条） */
+	@Post('classic-quotes-favorites/export-docx')
 	async exportClassicQuoteFavoritesDocx(
 		@Req() req: AuthedRequest,
+		@Body() dto: EnglishExportDocxDto,
 		@Res() res: Response,
 	): Promise<void> {
 		const userId = req.user?.userId;
@@ -1671,6 +2415,7 @@ export class EnglishLearningController {
 		const buf =
 			await this.englishLearningService.exportClassicQuoteFavoritesDocxBuffer(
 				userId,
+				dto.ids,
 			);
 		res.setHeader(
 			'Content-Type',

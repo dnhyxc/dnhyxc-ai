@@ -8,6 +8,7 @@ import {
 	MaxLength,
 	ValidateNested,
 } from 'class-validator';
+import { ENGLISH_PRACTICE_SESSION_MAX } from '../constant';
 import { ClassicQuoteFavoriteBodyDto } from './classic-quote-favorite.dto';
 
 export class ClassicQuoteMistakeBatchItemDto extends ClassicQuoteFavoriteBodyDto {
@@ -20,7 +21,7 @@ export class ClassicQuoteMistakeBatchItemDto extends ClassicQuoteFavoriteBodyDto
 /** 结算页批量加入语句错题集（已存在内容键：错拼不同则更新 lastUserInput） */
 export class ClassicQuoteMistakeBatchDto {
 	@IsArray()
-	@ArrayMaxSize(50)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => ClassicQuoteMistakeBatchItemDto)
 	items!: ClassicQuoteMistakeBatchItemDto[];

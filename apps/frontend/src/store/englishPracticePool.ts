@@ -18,6 +18,8 @@ export const englishPracticePoolKeys = {
 		`${kindPrefix(contentKind)}:favorites`,
 	mistakes: (contentKind: PracticeContentKind) =>
 		`${kindPrefix(contentKind)}:mistakes`,
+	review: (contentKind: PracticeContentKind) =>
+		`${kindPrefix(contentKind)}:review`,
 	dailyMemorize: () => 'vocab:daily-memorize',
 	library: (libraryId: string, contentKind: PracticeContentKind) =>
 		`${kindPrefix(contentKind)}:library:${libraryId}`,
@@ -72,6 +74,8 @@ export function resolveEnglishPracticePoolKey(params: {
 			return englishPracticePoolKeys.favorites(contentKind);
 		case 'mistakes':
 			return englishPracticePoolKeys.mistakes(contentKind);
+		case 'review':
+			return englishPracticePoolKeys.review(contentKind);
 		case 'dailyMemorize':
 			return englishPracticePoolKeys.dailyMemorize();
 		case 'library': {

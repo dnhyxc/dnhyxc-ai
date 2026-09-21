@@ -299,19 +299,19 @@ export function VocabularyLibrarySection({
 				</div>
 			</div>
 			{showInitialLoading ? (
-				<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 pb-4 text-center text-sm">
+				<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center p-4 text-center text-sm">
 					<Loading text={t('englishLearning.library.wordsLoading')} />
 				</div>
 			) : (
 				<div className="relative min-h-0 flex-1">
 					{awaitingGrid ? (
-						<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center px-4 pb-4">
+						<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center p-4">
 							<Loading text={t('englishLearning.library.wordsLoading')} />
 						</div>
 					) : null}
 					<ScrollArea
 						ref={scrollViewportRef}
-						className="relative min-h-0 h-full px-4 pb-4"
+						className="relative min-h-0 h-full p-4"
 						viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 						onScroll={composeViewportScroll(
 							onViewportScroll,

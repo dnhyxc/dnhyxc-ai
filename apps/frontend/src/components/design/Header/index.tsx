@@ -169,6 +169,64 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		const rawTrail =
 			findBreadcrumbTrail(routes, location.pathname, '', []) ?? [];
 		const trail = dedupeAdjacent(rawTrail);
+		if (
+			location.pathname === '/english-learning/practice' &&
+			trail.length > 0
+		) {
+			const params = new URLSearchParams(location.search);
+			const kind = params.get('contentKind');
+			const setupLabel =
+				kind === 'classic'
+					? t('englishLearning.practice.classicSetupTitle')
+					: t('englishLearning.practice.setupTitle');
+			const setupParams = new URLSearchParams(params);
+			setupParams.delete('run');
+			const setupQuery = setupParams.toString();
+			const setupPath = setupQuery
+				? `${location.pathname}?${setupQuery}`
+				: location.pathname;
+
+			if (params.get('run') === '1') {
+				const mode =
+					params.get('mode') === 'spelling' ? 'spelling' : 'dictation';
+				const modeLabel =
+					mode === 'dictation'
+						? kind === 'classic'
+							? t('englishLearning.practice.modeDictationClassic')
+							: t('englishLearning.practice.modeDictationVocab')
+						: kind === 'classic'
+							? t('englishLearning.practice.modeSpellingClassic')
+							: t('englishLearning.practice.modeSpellingVocab');
+				trail[trail.length - 1] = {
+					label: setupLabel,
+					path: setupPath,
+				};
+				trail.push({
+					label: modeLabel,
+					path: `${location.pathname}${location.search}`,
+				});
+			} else {
+				trail[trail.length - 1] = {
+					...trail[trail.length - 1],
+					label: setupLabel,
+				};
+			}
+		}
+
+		if (
+			location.pathname === '/english-learning/daily' &&
+			trail.length > 0 &&
+			new URLSearchParams(location.search).get('run') === '1'
+		) {
+			trail[trail.length - 1] = {
+				...trail[trail.length - 1],
+				path: location.pathname,
+			};
+			trail.push({
+				label: t('englishLearning.daily.sessionTitleLibrary'),
+				path: `${location.pathname}${location.search}`,
+			});
+		}
 
 		if (trail.length >= 2) {
 			return { breadcrumbTrail: trail, headerTitle: undefined };
@@ -183,7 +241,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		// 无匹配时不回落到聊天标题；插件页依赖 buildRoutes 注入的 meta
 		const single = findRouteTitle(routes, location.pathname, '');
 		return { breadcrumbTrail: null, headerTitle: single };
-	}, [location.pathname, routeEpoch, locale, t]);
+	}, [location.pathname, location.search, routeEpoch, locale, t]);
 
 	const toSetting = () => {
 		navigate('/setting');

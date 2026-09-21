@@ -2,25 +2,25 @@ import { Button } from '@ui/index';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { PracticeCard } from '../../practice/components/shell';
-import {
-	PRACTICE_PAGE_CONTENT_CLASS,
-	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-} from '../../practice/constants';
-import { DAILY_FOOTER_PANEL_CLASS } from '../constants';
+import { SessionHeader } from '../../components/SessionHeader';
+import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../practice/constants';
 
 type DailyDonePanelProps = {
+	title: string;
 	onBackHome: () => void;
 };
 
-export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
+export function DailyDonePanel({ title, onBackHome }: DailyDonePanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 
 	return (
-		<div className={PRACTICE_PAGE_CONTENT_CLASS}>
-			<PracticeCard className="border-theme/10 overflow-hidden p-0 shadow-sm">
-				<div className="border-theme/10 bg-teal-500/10 flex flex-col items-center gap-2 border-b px-4 py-8 text-center">
+		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
+			<SessionHeader className="px-3.5">
+				<span className="min-w-0 truncate">{title}</span>
+			</SessionHeader>
+			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
+				<div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center">
 					<p className="text-textcolor text-lg font-semibold">
 						{t('englishLearning.daily.doneTitle')}
 					</p>
@@ -28,31 +28,29 @@ export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
 						{t('englishLearning.daily.doneDesc')}
 					</p>
 				</div>
-				<div className="border-theme/10 border-t px-4 py-2">
-					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'flex gap-2')}>
-						<Button
-							type="button"
-							className={cn(
-								'h-10 min-w-0 flex-1 gap-2',
-								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-							)}
-							onClick={onBackHome}
-						>
-							{t('englishLearning.daily.backHome')}
-						</Button>
-						<Button
-							type="button"
-							className={cn(
-								'h-10 min-w-0 flex-1 gap-2',
-								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-							)}
-							onClick={() => navigate('/english-learning/daily/records')}
-						>
-							{t('englishLearning.daily.memorizedLink')}
-						</Button>
-					</div>
+				<div className="mx-auto flex w-full max-w-4xl shrink-0 gap-2">
+					<Button
+						type="button"
+						className={cn(
+							'h-10 min-w-0 flex-1 gap-2',
+							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+						)}
+						onClick={onBackHome}
+					>
+						{t('englishLearning.daily.backHome')}
+					</Button>
+					<Button
+						type="button"
+						className={cn(
+							'h-10 min-w-0 flex-1 gap-2',
+							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+						)}
+						onClick={() => navigate('/english-learning/daily/records')}
+					>
+						{t('englishLearning.daily.memorizedLink')}
+					</Button>
 				</div>
-			</PracticeCard>
+			</div>
 		</div>
 	);
 }

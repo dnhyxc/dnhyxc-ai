@@ -4,8 +4,9 @@
 import { Button } from '@ui/index';
 import { Square, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { displayIpaWrapped } from '@/utils';
 import type { WrongListItemProps } from '../../types';
-import { getPracticeAnswerText } from '../../utils/item';
+import { getPracticeAnswerText, isPracticeVocabItem } from '../../utils/item';
 
 export function WrongListItem({
 	item,
@@ -16,6 +17,8 @@ export function WrongListItem({
 	variant = 'wrong',
 }: WrongListItemProps) {
 	const isCorrect = variant === 'correct';
+	const pos = isPracticeVocabItem(item) ? item.pos?.trim() : '';
+	const ipa = isPracticeVocabItem(item) ? item.ipa?.trim() : '';
 	return (
 		<div
 			className={cn(
@@ -25,12 +28,29 @@ export function WrongListItem({
 					: 'border-l-rose-600/65',
 			)}
 		>
-			<div className="h-full min-w-0 flex flex-col justify-between flex-1 select-text">
-				<div className="line-clamp-2 text-base font-semibold text-textcolor">
-					{getPracticeAnswerText(item)}
+			<div className="flex h-full min-w-0 flex-1 flex-col justify-between select-text">
+				<div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+					<span className="line-clamp-2 text-base font-semibold text-textcolor">
+						{getPracticeAnswerText(item)}
+					</span>
+					{pos ? (
+						<span className="text-textcolor/50 shrink-0 text-sm font-normal">
+							{pos}
+						</span>
+					) : null}
 				</div>
+				{ipa ? (
+					<span className="text-textcolor/55 mt-1 min-w-0 truncate font-mono text-xs">
+						{displayIpaWrapped(ipa)}
+					</span>
+				) : null}
 				{item.translationZh?.trim() ? (
-					<p className="text-textcolor/65 mt-0.5 line-clamp-2 text-sm leading-snug">
+					<p
+						className={cn(
+							'text-textcolor/65 line-clamp-2 text-sm leading-snug',
+							ipa ? 'mt-1.5' : 'mt-0.5',
+						)}
+					>
 						{item.translationZh}
 					</p>
 				) : null}

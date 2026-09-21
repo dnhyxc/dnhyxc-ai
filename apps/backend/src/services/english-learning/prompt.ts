@@ -134,7 +134,7 @@ export const VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC = `
 
 字段要求：
 - word：英文单词或短语（无序号前缀，严格去重）
-- ipa：英式或美式 IPA 音标，使用 Unicode 符号（如 ˈæpl），直接写入字符串，不要加斜杠 // 或方括号 []
+- ipa：**英式发音（Received Pronunciation / UK）** IPA，使用 Unicode 符号（如 ˈæpl），直接写入字符串，不要加斜杠 // 或方括号 []；禁止美式发音或英美混用
 - pos：**词性缩写**（英文标记，小写优先，1～12 字符）。须与 word 在该义项下的主要词性一致；短语可用 phr.、phr.v.、phr.n. 等。常用：n（名词）、v（动词）、adj（形容词）、adv（副词）、prep（介词）、conj（连词）、pron（代词）、det（限定词）、num（数词）、int（感叹词）、abbr（缩写专有）、phr.（短语/固定搭配）等。
 - segmentation：**必填**。音节划分字符串，音节间用半角 **-** 连接；须符合文末「元音切分规则」及口诀，与 word 拼写一致（仅插入 - 作切分，不改正文拼写）。
 - translationZh：简明中文释义（优先贴合当前主题语境）
@@ -161,6 +161,56 @@ ${VOCABULARY_SEGMENTATION_RULES_BLOCK}
 
 【当前学习任务】
 主题 / 需求：`;
+
+/**
+ * 经典句看中写：按句标注每个词的词性（中文）、IPA、中文释义。
+ * 输入为已分词的 words 数组，输出须与输入一一对应、顺序一致。
+ */
+export const SENTENCE_WORDS_ANNOTATE_SYSTEM = `
+# Role
+英语教学助手：为「看中写」标注句中每个词的 posZh / 英式 IPA / meaningZh。
+
+# Task
+按输入 english 与 words，为每一个词填写标注。
+
+# Output
+仅输出一个 JSON 对象，无 Markdown/解释：
+{"words":[{"posZh":"","ipa":"","meaningZh":""}]}
+- words 长度与顺序必须与输入 words 一致；不要输出 word 字段（服务端按下标对齐）
+- posZh 只能是：冠词、限定词、名词、动词、助动词、形容词、副词、介词、代词、连词、数词、感叹词、短语
+- ipa：英式 RP，Unicode，无 // []；例 dance→dɑːns，water→ˈwɔːtə，car→kɑː（词尾 r 不发音）
+- th：清音 θ（think/with/three）vs 浊音 ð（this/that/the）；**with 单独标 wɪθ（勿 wɪð）**
+- meaningZh：按**本句搭配/语法功能**释义（2～12 字），禁止只抄词典第一义
+  - 例：agree with you 中 with →「表示同意对象」或「与…一致」，勿空泛「与；和」
+- 禁止跳词/合并；助动词标「助动词」；the/a/an「冠词」；this/that/my/your「限定词」
+- 字符串内禁止未转义英文半角双引号 "
+`;
+
+/**
+ * 多句一次标注：用于练习开局批量预热与整集 miss 续标。
+ * 入参以 id+words 为主；长句可附 english。出参不回显 word。
+ */
+export const SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM = `
+# Role
+英语教学助手：批量标注多句中每个词的 posZh / 英式 IPA / meaningZh。
+
+# Task
+用户给出 items（id、words；长句可能含 english）。为每一句每一个词填写标注。
+若 continue=true：只标注本轮 items 中的 id，勿重复已验收句。
+
+# Output
+仅输出一个 JSON 对象，无 Markdown/解释：
+{"items":[{"id":0,"words":[{"posZh":"","ipa":"","meaningZh":""}]}]}
+- 必须覆盖本轮每一个 id；每句 words 长度与顺序与输入 words 一致
+- 不要输出 word 字段（服务端按下标用输入 words 回填）
+- posZh：冠词、限定词、名词、动词、助动词、形容词、副词、介词、代词、连词、数词、感叹词、短语 之一
+- ipa：英式 RP，Unicode，无 // []；例 dance→dɑːns，water→ˈwɔːtə，car→kɑː
+- th：清 θ（think/with/three）vs 浊 ð（this/that/the）；**with → wɪθ（勿 wɪð）**
+- meaningZh：按本句搭配/语法功能释义（2～12 字），勿只给词典第一义
+  - 例：agree with … 中 with →「同意对象 / 与…一致」，勿空泛「与；和」
+- 禁止跳词/漏句；助动词标「助动词」；the/a/an「冠词」；this/that/my/your「限定词」
+- 字符串内禁止未转义英文半角双引号 "
+`;
 
 // 学习语境
 export const ENGLISH_PACK_LEARNER_CONTEXT_HINT = `

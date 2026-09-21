@@ -1,5 +1,5 @@
 /**
- * 英语学习：错题集（单词 / 语句，顶栏计数与切换，底栏移除与练习）
+ * 英语学习：错题集（单词 / 语句）
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
@@ -9,7 +9,6 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
 import { ClassicQuoteMistakesPanel } from './classic/ClassicQuoteMistakesPanel';
 import {
 	type MistakesKind,
@@ -52,7 +51,6 @@ export default function EnglishLearningMistakesPage() {
 		total: 0,
 	});
 
-	// 旧路径 /mistakes/classic → 查询参数，便于与收藏页一致维护
 	useEffect(() => {
 		if (!location.pathname.endsWith('/mistakes/classic')) return;
 		navigate(mistakesPagePath('classic'), { replace: true });
@@ -71,6 +69,29 @@ export default function EnglishLearningMistakesPage() {
 			: t('englishLearning.mistakes.classicNav');
 	const counts = kind === 'vocab' ? vocabCounts : classicCounts;
 	const countType = kind === 'vocab' ? t('common.type-1') : t('common.type-2');
+
+	const headerTitle = (
+		<>
+			<span className="min-w-0 truncate" title={title}>
+				{title}
+			</span>
+			<span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm font-normal">
+				{t('englishLearning.library.listCount', {
+					count: counts.total,
+					type: countType,
+				})}{' '}
+				/{' '}
+				{t('common.loaded', {
+					count: counts.loaded,
+					type: countType,
+				})}
+			</span>
+		</>
+	);
+
+	const headerTrailing = (
+		<MistakesKindTabs kind={kind} onSelectKind={onSelectKind} />
+	);
 
 	useEffect(() => {
 		if (counts.total <= 0) return;
@@ -109,40 +130,21 @@ export default function EnglishLearningMistakesPage() {
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
-					<EnglishLearningPanelHeader
-						titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
-						title={
-							<>
-								<span className="min-w-0 truncate" title={title}>
-									{title}
-								</span>
-								<span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm font-normal">
-									{t('englishLearning.library.listCount', {
-										count: counts.total,
-										type: countType,
-									})}{' '}
-									/{' '}
-									{t('common.loaded', {
-										count: counts.loaded,
-										type: countType,
-									})}
-								</span>
-							</>
-						}
-						trailing={
-							<MistakesKindTabs kind={kind} onSelectKind={onSelectKind} />
-						}
-					/>
-					<section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-						{kind === 'vocab' ? (
-							<VocabularyMistakesPanel active onCountsChange={setVocabCounts} />
-						) : (
-							<ClassicQuoteMistakesPanel
-								active
-								onCountsChange={setClassicCounts}
-							/>
-						)}
-					</section>
+					{kind === 'vocab' ? (
+						<VocabularyMistakesPanel
+							active
+							headerTitle={headerTitle}
+							headerTrailing={headerTrailing}
+							onCountsChange={setVocabCounts}
+						/>
+					) : (
+						<ClassicQuoteMistakesPanel
+							active
+							headerTitle={headerTitle}
+							headerTrailing={headerTrailing}
+							onCountsChange={setClassicCounts}
+						/>
+					)}
 				</div>
 			</div>
 		</div>

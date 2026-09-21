@@ -1,6 +1,7 @@
 import Confirm from '@design/Confirm';
 import { Spinner, Toast } from '@ui/index';
 import { Sparkles } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
@@ -10,6 +11,7 @@ import {
 	getEnglishDailyMemorizeSummary,
 	resetEnglishDailyMemorizeLibrary,
 } from '@/service';
+import englishDailyStore from '@/store/englishDaily';
 import { DailyWordsPerRoundPicker } from '../../daily/components/DailyWordsPerRoundPicker';
 import { useDailyWordCount } from '../../daily/hooks/useDailyWordCount';
 import {
@@ -28,29 +30,31 @@ import {
 import { EnglishSidebarCard } from './EnglishSidebarCard';
 
 /** 首页侧栏：今日记词 */
-export function DailySession() {
+export const DailySession = observer(function DailySession() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const [loading, setLoading] = useState(true);
-	const [libraryCount, setLibraryCount] = useState(0);
 	const [memorizedCount, setMemorizedCount] = useState(0);
 	const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 	const [resetting, setResetting] = useState(false);
 	const [wordsPerRound] = useDailyWordCount();
 
+	const libraryCount = englishDailyStore.libraryCount ?? 0;
+
 	const loadSummary = useCallback(async () => {
 		setLoading(true);
+		englishDailyStore.beginLibraryCount();
 		try {
 			if (hasValidAuthToken()) {
 				const res = await getEnglishDailyMemorizeSummary({ silent: true });
-				setLibraryCount(res.data?.libraryCount ?? 0);
+				englishDailyStore.setLibraryCount(res.data?.libraryCount ?? 0);
 				setMemorizedCount(res.data?.memorizedCount ?? 0);
 			} else {
-				setLibraryCount(countStarterLibraryEligible());
+				englishDailyStore.setLibraryCount(countStarterLibraryEligible());
 				setMemorizedCount(countStarterMemorized());
 			}
 		} catch {
-			setLibraryCount(0);
+			englishDailyStore.setLibraryCount(0);
 			setMemorizedCount(0);
 		} finally {
 			setLoading(false);
@@ -177,4 +181,4 @@ export function DailySession() {
 			/>
 		</EnglishSidebarCard>
 	);
-}
+});

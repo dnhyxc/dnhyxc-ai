@@ -2,7 +2,7 @@
  * 单词听写 / 拼写练习 — 路由页（index）
  */
 import { Toast } from '@ui/index';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { stopAllPlayback } from '@/utils/speech';
@@ -22,8 +22,10 @@ import type {
 	PracticeSource,
 } from './types';
 import { fetchPracticeContinueQueue } from './utils/fetchWords';
-import { parsePracticeContentKind } from './utils/item';
+import { isPracticeClassicItem, parsePracticeContentKind } from './utils/item';
 import { parsePracticePoolTotal } from './utils/paths';
+import { segmentEnglishSentence } from './utils/segmentSentence';
+import { prefetchSentenceWordAnnotationsBatch } from './utils/sentenceWordAnnotationCache';
 
 function parseSource(raw: string | null): PracticeSource {
 	if (
@@ -54,7 +56,7 @@ function mergePracticedKeys(prev: string[], items: PracticeItem[]): string[] {
 export default function EnglishLearningPracticePage() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
-	const [searchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useSearchParams();
 
 	const initialContentKind = useMemo(
 		() => parsePracticeContentKind(searchParams.get('contentKind')),
@@ -125,7 +127,11 @@ export default function EnglishLearningPracticePage() {
 			return;
 		}
 		if (initialSource === 'review') {
-			navigate('/english-learning');
+			navigate(
+				kind === 'classic'
+					? '/english-learning/review?kind=classic'
+					: '/english-learning/review?kind=vocab',
+			);
 			return;
 		}
 		if (initialSource === 'pack') {
@@ -147,6 +153,47 @@ export default function EnglishLearningPracticePage() {
 		returnToHome,
 	]);
 
+	const skipRunResetRef = useRef(false);
+
+	const markPracticeRunning = useCallback(
+		(mode: PracticeMode) => {
+			skipRunResetRef.current = true;
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev);
+					next.set('mode', mode);
+					next.set('run', '1');
+					return next;
+				},
+				{ replace: true },
+			);
+		},
+		[setSearchParams],
+	);
+
+	const clearPracticeRunning = useCallback(() => {
+		setSearchParams(
+			(prev) => {
+				if (!prev.has('run')) return prev;
+				const next = new URLSearchParams(prev);
+				next.delete('run');
+				return next;
+			},
+			{ replace: true },
+		);
+	}, [setSearchParams]);
+
+	const resetToSetup = useCallback(() => {
+		stopAllPlayback();
+		setPhase('setup');
+		setConfig(null);
+		setQueue([]);
+		setIndex(0);
+		setResults([]);
+		setSessionCursor(null);
+		setPracticedKeys([]);
+	}, []);
+
 	const onStarted = useCallback(
 		(
 			items: PracticeItem[],
@@ -159,18 +206,29 @@ export default function EnglishLearningPracticePage() {
 			setQueue(items);
 			setIndex(0);
 			setResults([]);
+			markPracticeRunning(setup.mode);
 			setPhase('running');
+
+			// 经典句：开局先 cacheOnly 灌内存，miss 再异步补模型
+			const classicItems = items.filter(isPracticeClassicItem);
+			if (classicItems.length > 0) {
+				prefetchSentenceWordAnnotationsBatch(
+					classicItems.map((it) => ({
+						english: it.english,
+						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+					})),
+				);
+			}
 		},
-		[],
+		[markPracticeRunning],
 	);
 
 	const onRetryWrong = useCallback(
 		(wrongQueue: PracticeItem[]) => {
 			if (!config || wrongQueue.length === 0) return;
 			const n = wrongQueue.length;
-			const count = (
-				n <= 10 ? 10 : n <= 20 ? 20 : n <= 30 ? 30 : n <= 40 ? 40 : 50
-			) as PracticeCountOption;
+			const stepped = Math.ceil(n / 10) * 10;
+			const count = Math.min(100, Math.max(10, stepped)) as PracticeCountOption;
 			const nextConfig: PracticeSetupConfig = {
 				...config,
 				contentKind: config.contentKind,
@@ -182,8 +240,18 @@ export default function EnglishLearningPracticePage() {
 			setIndex(0);
 			setResults([]);
 			setPhase('running');
+			markPracticeRunning(nextConfig.mode);
+			const classicItems = wrongQueue.filter(isPracticeClassicItem);
+			if (classicItems.length > 0) {
+				prefetchSentenceWordAnnotationsBatch(
+					classicItems.map((it) => ({
+						english: it.english,
+						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+					})),
+				);
+			}
 		},
-		[config],
+		[config, markPracticeRunning],
 	);
 
 	const onContinuePractice = useCallback(async () => {
@@ -217,6 +285,15 @@ export default function EnglishLearningPracticePage() {
 			setIndex(0);
 			setResults([]);
 			setPhase('running');
+			const classicItems = items.filter(isPracticeClassicItem);
+			if (classicItems.length > 0) {
+				prefetchSentenceWordAnnotationsBatch(
+					classicItems.map((it) => ({
+						english: it.english,
+						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+					})),
+				);
+			}
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -231,15 +308,18 @@ export default function EnglishLearningPracticePage() {
 	}, [config, initialPoolTotal, practicedKeys, sessionCursor, t]);
 
 	const onBackToSetup = useCallback(() => {
-		stopAllPlayback();
-		setPhase('setup');
-		setConfig(null);
-		setQueue([]);
-		setIndex(0);
-		setResults([]);
-		setSessionCursor(null);
-		setPracticedKeys([]);
-	}, []);
+		resetToSetup();
+		clearPracticeRunning();
+	}, [clearPracticeRunning, resetToSetup]);
+
+	useEffect(() => {
+		if (searchParams.get('run') === '1') {
+			skipRunResetRef.current = false;
+			return;
+		}
+		if (skipRunResetRef.current || phase === 'setup') return;
+		resetToSetup();
+	}, [phase, resetToSetup, searchParams]);
 
 	const onStepComplete = useCallback((result: PracticeAttemptResult) => {
 		setResults((prev) => [...prev, result]);
@@ -294,19 +374,18 @@ export default function EnglishLearningPracticePage() {
 		<PracticePageShell
 			title={shellTitle}
 			subtitle={shellSubtitle}
-			contentLayout={phase === 'summary' ? 'fill' : 'center'}
-			onBack={
-				phase === 'setup' || phase === 'running' || phase === 'summary'
-					? phase === 'running'
-						? onBackToSetup
-						: onExit
-					: undefined
+			contentLayout={
+				phase === 'summary' || phase === 'running' || phase === 'setup'
+					? 'fill'
+					: 'center'
 			}
+			flush={phase === 'running' || phase === 'setup'}
+			onBack={phase === 'summary' ? onExit : undefined}
 			backLabel={t('englishLearning.practice.back')}
 			headerRight={
-				<PracticeShortcutsMenu
-					practiceMode={phase === 'running' ? config?.mode : undefined}
-				/>
+				phase === 'summary' ? (
+					<PracticeShortcutsMenu practiceMode={undefined} slotBoard={false} />
+				) : undefined
 			}
 		>
 			{phase === 'setup' ? (
@@ -318,6 +397,9 @@ export default function EnglishLearningPracticePage() {
 					initialStreamId={initialStreamId}
 					initialSourceTitle={initialSourceTitle}
 					initialPoolTotal={initialPoolTotal}
+					headerExtra={
+						<PracticeShortcutsMenu practiceMode={undefined} slotBoard={false} />
+					}
 					onStarted={onStarted}
 				/>
 			) : null}
@@ -325,10 +407,15 @@ export default function EnglishLearningPracticePage() {
 				<Session
 					mode={config.mode}
 					item={currentItem}
+					sourceTitle={config.sourceTitle}
 					isLastQuestion={index >= queue.length - 1}
 					canGoPrevious={index > 0}
 					onGoPrevious={onGoPrevious}
 					onStepComplete={onStepComplete}
+					progressLabel={shellSubtitle}
+					headerExtra={
+						<PracticeShortcutsMenu practiceMode={config.mode} slotBoard />
+					}
 				/>
 			) : null}
 			{phase === 'summary' && config ? (

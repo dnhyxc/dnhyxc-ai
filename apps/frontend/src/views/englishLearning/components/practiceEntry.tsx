@@ -202,7 +202,7 @@ export function EnglishPracticeEntry({
 		const tip = tooltip ?? entryLabel;
 		if (tip) {
 			return (
-				<Tooltip content={tip} side="left" disableHoverableContent>
+				<Tooltip content={tip} side="top" disableHoverableContent>
 					{iconButton}
 				</Tooltip>
 			);

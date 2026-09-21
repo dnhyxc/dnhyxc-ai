@@ -2,20 +2,16 @@
  * 今日记词 — 认读 / 四选一 / 反馈会话
  */
 import { Button, Spinner } from '@ui/index';
-import { Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { recordEnglishDailyMemorizeAttempts } from '@/service';
+import { FavoriteToggleButton } from '../../components/FavoriteToggleButton';
+import { SessionHeader } from '../../components/SessionHeader';
 import { DictationPlayButton } from '../../practice/components/prompt/DictationPrompt';
 import { SessionPromptPanel } from '../../practice/components/session/SessionPromptPanel';
-import { SessionStageHeader } from '../../practice/components/session/SessionStageHeader';
-import { PracticeCard } from '../../practice/components/shell';
-import {
-	PRACTICE_PAGE_CONTENT_CLASS,
-	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-	SESSION_CARD_H,
-} from '../../practice/constants';
+import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../practice/constants';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
 import { QUIZ_OPTION_CLASS } from '../constants';
 import { useDailyPlayback } from '../hooks/useDailyPlayback';
@@ -24,6 +20,7 @@ import type { DailyCardStep, DailyQuizOption, DailyVocabCard } from '../types';
 import { buildQuizOptions } from '../utils/buildQuizOptions';
 import { recordStarterMemorizeResult } from '../utils/localSrs';
 import { DailyFeedback } from './DailyFeedback';
+import { DailyPlayIconButton } from './DailyPlayIconButton';
 import { DailyQuizWordBar } from './DailyQuizWordBar';
 import { DailyWordHero } from './DailyWordHero';
 
@@ -157,37 +154,58 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 			: t('englishLearning.daily.feedbackWrong');
 	}, [lastCorrect, t]);
 
-	const progressBadge = (
-		<span className="inline-flex h-6 items-center justify-center rounded-sm bg-teal-500/15 px-2 text-xs font-semibold leading-none tabular-nums text-teal-600 dark:text-teal-400">
-			{index + 1}/{cards.length}
-		</span>
-	);
-
 	if (!card) {
 		return (
 			<div className="flex flex-1 items-center justify-center py-12">
-				<Spinner />
+				<Spinner className="text-textcolor" />
 			</div>
 		);
 	}
 
 	return (
-		<div className={cn(PRACTICE_PAGE_CONTENT_CLASS, 'flex flex-col gap-4')}>
-			<PracticeCard
-				className={cn(
-					'border-theme/10 flex flex-col overflow-hidden p-0 shadow-sm',
-					SESSION_CARD_H,
-				)}
+		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
+			<SessionHeader
+				className="px-3.5"
+				trailing={
+					step === 'feedback' ? (
+						<>
+							<span
+								className={cn(
+									'flex min-w-0 items-center gap-1.5 pr-1.5 text-sm font-medium',
+									lastCorrect
+										? 'text-emerald-600 dark:text-lime-400'
+										: 'text-destructive',
+								)}
+								role="status"
+								aria-live="polite"
+							>
+								{lastCorrect ? (
+									<CheckCircle2 className="size-4 shrink-0" aria-hidden />
+								) : (
+									<XCircle className="size-4 shrink-0" aria-hidden />
+								)}
+								<span className="truncate">{feedbackText}</span>
+							</span>
+							<FavoriteToggleButton kind="vocab" item={card} />
+							<DailyPlayIconButton
+								playing={playing}
+								playLabel={playLabel}
+								onPlay={() => void playWord()}
+							/>
+						</>
+					) : null
+				}
 			>
-				<SessionStageHeader
-					icon={
-						<Sparkles className="size-4 text-teal-600 dark:text-teal-400" />
-					}
-					title={t('englishLearning.daily.sessionTitleLibrary')}
-					trailing={progressBadge}
-				/>
+				<span className="min-w-0 truncate">
+					{t('englishLearning.daily.sectionLabel')}
+				</span>
+				<span className="shrink-0 tabular-nums">
+					{index + 1}/{cards.length}
+				</span>
+			</SessionHeader>
 
-				<div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5">
+			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 					{step === 'study' ? (
 						<div className="flex min-h-0 flex-1 flex-col gap-3">
 							<SessionPromptPanel
@@ -250,40 +268,34 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 					{step === 'feedback' ? (
 						<DailyFeedback
 							variant={lastCorrect ? 'correct' : 'wrong'}
-							feedbackText={feedbackText}
 							card={card}
-							playing={playing}
-							playLabel={playLabel}
-							onPlay={() => void playWord()}
 							t={t}
 						/>
 					) : null}
 				</div>
 
 				{step === 'study' || step === 'feedback' ? (
-					<div className="border-theme/10 shrink-0 border-t px-2.5 py-2">
-						<Button
-							type="button"
-							className={cn(
-								'h-10 w-full gap-2',
-								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-							)}
-							disabled={step === 'feedback' && submitting}
-							onClick={step === 'study' ? onStartQuiz : () => void onContinue()}
-						>
-							{step === 'study' ? (
-								t('englishLearning.daily.startQuiz')
-							) : submitting ? (
-								<Spinner className="size-4 text-white" />
-							) : index >= cards.length - 1 ? (
-								t('englishLearning.daily.finish')
-							) : (
-								t('englishLearning.daily.nextWord')
-							)}
-						</Button>
-					</div>
+					<Button
+						type="button"
+						className={cn(
+							'mx-auto h-10 w-full max-w-4xl shrink-0 gap-2',
+							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+						)}
+						disabled={step === 'feedback' && submitting}
+						onClick={step === 'study' ? onStartQuiz : () => void onContinue()}
+					>
+						{step === 'study' ? (
+							t('englishLearning.daily.startQuiz')
+						) : submitting ? (
+							<Spinner className="size-4 text-white" />
+						) : index >= cards.length - 1 ? (
+							t('englishLearning.daily.finish')
+						) : (
+							t('englishLearning.daily.nextWord')
+						)}
+					</Button>
 				) : null}
-			</PracticeCard>
+			</div>
 		</div>
 	);
 }

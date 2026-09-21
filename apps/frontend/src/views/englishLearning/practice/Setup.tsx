@@ -1,26 +1,15 @@
 /**
- * 练习设置面板
+ * 练习设置：模式 / 题量 / 顺序卡片；卡内顶栏说明 + 底栏短要点
  */
-import { Button, Spinner, Toast } from '@ui/index';
+import { Button, RadioGroup, RadioGroupItem, Spinner, Toast } from '@ui/index';
 import {
-	BookMarked,
-	CalendarClock,
-	ClipboardList,
+	Check,
 	Headphones,
 	Languages,
-	Library,
-	Package,
-	Radio,
-	Sparkles,
+	ListOrdered,
+	Shuffle,
 } from 'lucide-react';
-import {
-	type ReactNode,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import EnglishPackStore from '@/store/englishPack';
@@ -28,55 +17,95 @@ import {
 	getEnglishPracticePoolTotal,
 	resolveEnglishPracticePoolKey,
 } from '@/store/englishPracticePool';
-import { PracticeCard, PracticeSegmented } from './components/shell';
-import {
-	PRACTICE_PAGE_CONTENT_CLASS,
-	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-} from './constants';
+import { SessionHeader } from '../components/SessionHeader';
+import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from './constants';
 import type {
 	PracticeCountOption,
 	PracticeMode,
 	PracticeOrder,
 	PracticeSetupConfig,
-	PracticeSource,
 	SetupProps,
 } from './types';
 import { fetchPracticeSessionQueue } from './utils/fetchWords';
 import { resolvePracticeSourceTitle } from './utils/resolveTitle';
 
-const COUNT_OPTIONS: PracticeCountOption[] = [10, 20, 30, 40, 50];
+const COUNT_OPTIONS: PracticeCountOption[] = [
+	10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+];
 
-const SETUP_SEGMENTED_PANEL_CLASS =
-	'border-theme/10 bg-theme-background rounded-lg border p-1 shadow-sm [&_[role=tab]]:h-9 [&_[role=tab]]:min-h-9 [&_[role=tab]]:py-0';
+const FIELD_LABEL = 'text-textcolor shrink-0 text-sm font-semibold';
 
-const SETUP_SEGMENTED_INNER_CLASS = 'border-0 bg-transparent p-0 shadow-none';
+/** 不用 @ui Label：其默认 items-center/leading-none 会打乱竖排说明 */
+const PICK =
+	'relative flex h-full min-h-0 cursor-pointer flex-col rounded-md border p-4 text-left transition-colors';
+const PICK_ON = 'border-teal-500/40 bg-teal-500/15';
+const PICK_OFF =
+	'border-theme/10 bg-theme/5 hover:border-teal-500/35 hover:bg-teal-500/10';
 
-function SetupSection({
-	label,
-	children,
-	className,
-}: {
-	label: string;
-	children: ReactNode;
-	className?: string;
-}) {
+const ICON_BOX = 'flex size-9 shrink-0 items-center justify-center rounded-md';
+const ICON_BOX_ON = 'bg-teal-500/20 text-textcolor/70';
+const ICON_BOX_OFF = 'bg-theme/10 text-textcolor/45';
+
+type SetupPick = {
+	id: string;
+	active: boolean;
+	/** 做法说明（单行） */
+	desc: string;
+	/** 适用场景（单行，贴底） */
+	tip: string;
+	title: string;
+	Icon: typeof Headphones;
+	value: string;
+};
+
+function SetupPickCard({
+	id,
+	active,
+	title,
+	desc,
+	tip,
+	Icon,
+	value,
+}: SetupPick) {
 	return (
-		<div className={cn('flex flex-col gap-2', className)}>
-			<span className="text-textcolor text-sm font-semibold">{label}</span>
-			{children}
-		</div>
+		<label htmlFor={id} className={cn(PICK, active ? PICK_ON : PICK_OFF)}>
+			<RadioGroupItem value={value} id={id} className="sr-only" />
+			{/* 标题行 */}
+			<span className="flex items-center gap-2.5">
+				<span
+					className={cn(ICON_BOX, active ? ICON_BOX_ON : ICON_BOX_OFF)}
+					aria-hidden
+				>
+					<Icon className="size-4" />
+				</span>
+				<span className="text-textcolor min-w-0 truncate text-base font-semibold">
+					{title}
+				</span>
+			</span>
+			{/* 做法：尽量单行 */}
+			<p
+				className="text-textcolor/55 mt-3 truncate text-sm leading-none whitespace-nowrap"
+				title={desc}
+			>
+				{desc}
+			</p>
+			{/* 适用：贴底，尽量单行；右侧留给选中勾 */}
+			<p
+				className="border-theme/10 text-textcolor/40 mt-auto truncate border-t pt-3 pr-8 text-sm leading-none whitespace-nowrap"
+				title={tip}
+			>
+				{tip}
+			</p>
+			{active ? (
+				<span
+					className="bg-teal-600 absolute right-3 bottom-3 flex size-5 items-center justify-center rounded-full text-white"
+					aria-hidden
+				>
+					<Check className="size-3" strokeWidth={2.5} />
+				</span>
+			) : null}
+		</label>
 	);
-}
-
-function SourceIcon({ source }: { source: PracticeSource }) {
-	const className = 'text-teal-500 size-5.5';
-	if (source === 'library') return <Library className={className} />;
-	if (source === 'pack') return <Package className={className} />;
-	if (source === 'live') return <Radio className={className} />;
-	if (source === 'mistakes') return <ClipboardList className={className} />;
-	if (source === 'dailyMemorize') return <Sparkles className={className} />;
-	if (source === 'review') return <CalendarClock className={className} />;
-	return <BookMarked className={className} />;
 }
 
 export function Setup({
@@ -87,6 +116,7 @@ export function Setup({
 	initialStreamId,
 	initialSourceTitle,
 	initialPoolTotal,
+	headerExtra,
 	onStarted,
 }: SetupProps) {
 	const { t } = useI18n();
@@ -99,18 +129,6 @@ export function Setup({
 		() => initialSourceTitle?.trim() || null,
 	);
 	const startInFlightRef = useRef(false);
-
-	const sourceLocked = useMemo(
-		() =>
-			initialSource === 'library' ||
-			initialSource === 'pack' ||
-			initialSource === 'live' ||
-			initialSource === 'mistakes' ||
-			initialSource === 'dailyMemorize' ||
-			initialSource === 'review',
-		[initialSource],
-	);
-
 	const hideOrderPicker = source === 'review';
 
 	const poolTotalDisplay = useMemo(() => {
@@ -143,28 +161,59 @@ export function Setup({
 		initialStreamId,
 	]);
 
-	const sourceHeaderBody = (
-		<div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-			<div className="min-w-0 flex-1">
-				<p className="text-textcolor/50 text-xs font-medium">
-					{t('englishLearning.practice.sourceLabel')}
-				</p>
-				<p className="text-textcolor truncate text-sm mt-1 font-semibold">
-					{sourceDisplayTitle ?? t('englishLearning.practice.sourceResolving')}
-				</p>
-			</div>
-			{poolTotalDisplay != null ? (
-				<span className="text-textcolor/75 shrink-0 text-sm font-medium tabular-nums">
-					{initialContentKind === 'classic'
-						? t('englishLearning.classic.historySentences', {
-								count: poolTotalDisplay,
-							})
-						: t('englishLearning.vocab.historyWords', {
-								count: poolTotalDisplay,
-							})}
-				</span>
-			) : null}
-		</div>
+	const poolCountLabel =
+		poolTotalDisplay == null
+			? null
+			: initialContentKind === 'classic'
+				? t('englishLearning.classic.historySentences', {
+						count: poolTotalDisplay,
+					})
+				: t('englishLearning.vocab.historyWords', {
+						count: poolTotalDisplay,
+					});
+
+	const modes = useMemo(() => {
+		const isClassic = initialContentKind === 'classic';
+		return [
+			{
+				value: 'dictation' as const,
+				title: isClassic
+					? t('englishLearning.practice.modeDictationClassic')
+					: t('englishLearning.practice.modeDictationVocab'),
+				desc: t('englishLearning.practice.setupModeDictationHint'),
+				tip: t('englishLearning.practice.modeDictationFit'),
+				Icon: Headphones,
+			},
+			{
+				value: 'spelling' as const,
+				title: isClassic
+					? t('englishLearning.practice.modeSpellingClassic')
+					: t('englishLearning.practice.modeSpellingVocab'),
+				desc: t('englishLearning.practice.setupModeSpellingHint'),
+				tip: t('englishLearning.practice.modeSpellingFit'),
+				Icon: Languages,
+			},
+		];
+	}, [initialContentKind, t]);
+
+	const orders = useMemo(
+		() => [
+			{
+				value: 'random' as const,
+				title: t('englishLearning.practice.orderRandom'),
+				desc: t('englishLearning.practice.orderRandomHint'),
+				tip: t('englishLearning.practice.orderRandomFit'),
+				Icon: Shuffle,
+			},
+			{
+				value: 'sequential' as const,
+				title: t('englishLearning.practice.orderSequential'),
+				desc: t('englishLearning.practice.orderSequentialHint'),
+				tip: t('englishLearning.practice.orderSequentialFit'),
+				Icon: ListOrdered,
+			},
+		],
+		[t],
 	);
 
 	useEffect(() => {
@@ -206,6 +255,7 @@ export function Setup({
 				libraryId: initialLibraryId,
 				streamId: initialStreamId,
 				poolTotal: initialPoolTotal,
+				sourceTitle: sourceDisplayTitle?.trim() || undefined,
 			};
 			const { items, cursor } = await fetchPracticeSessionQueue({
 				contentKind: initialContentKind,
@@ -244,6 +294,7 @@ export function Setup({
 		initialPoolTotal,
 		initialStreamId,
 		mode,
+		sourceDisplayTitle,
 		onStarted,
 		order,
 		source,
@@ -251,133 +302,126 @@ export function Setup({
 	]);
 
 	return (
-		<div className={PRACTICE_PAGE_CONTENT_CLASS}>
-			<PracticeCard className="border-theme/10 overflow-hidden p-0 shadow-sm">
-				{sourceLocked ? (
-					<div className="border-theme/10 bg-teal-500/10 flex items-center gap-3 border-b p-2.5">
-						<div className="bg-teal-500/15 flex size-10 shrink-0 items-center justify-center rounded-md">
-							<SourceIcon source={source} />
-						</div>
-						{sourceHeaderBody}
-					</div>
-				) : (
-					<div className="border-theme/10 bg-teal-500/6 flex items-center gap-3 border-b p-2.5">
-						<div className="bg-teal-500/15 flex size-9 shrink-0 items-center justify-center rounded-md">
-							<SourceIcon source={source} />
-						</div>
-						{sourceHeaderBody}
-					</div>
-				)}
+		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
+			<SessionHeader className="pl-3.5 pr-1.5" trailing={headerExtra}>
+				<span className="min-w-0 truncate">
+					{sourceDisplayTitle ?? t('englishLearning.practice.sourceResolving')}
+				</span>
+				{poolCountLabel ? (
+					<span className="text-textcolor/45 shrink-0 text-sm font-normal tabular-nums">
+						{poolCountLabel}
+					</span>
+				) : null}
+			</SessionHeader>
 
-				<div className="flex flex-col gap-5 px-2.5 py-3">
-					<div className="flex flex-col gap-2">
-						<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-							<span className="text-textcolor shrink-0 text-sm font-semibold">
-								{t('englishLearning.practice.modeLabel')}
-							</span>
-							<p className="text-textcolor/50 flex min-w-0 items-center gap-1.5 text-xs">
-								{mode === 'dictation' ? (
-									<>
-										<Headphones className="size-3.5 shrink-0 text-teal-600/80 dark:text-teal-400/80" />
-										<span className="min-w-0 leading-snug">
-											{t('englishLearning.practice.dictationHint')}
-										</span>
-									</>
-								) : (
-									<>
-										<Languages className="size-3.5 shrink-0 text-teal-600/80 dark:text-teal-400/80" />
-										<span className="min-w-0 leading-snug">
-											{t('englishLearning.practice.spellingPrompt')}
-										</span>
-									</>
-								)}
-							</p>
-						</div>
-						<div className={SETUP_SEGMENTED_PANEL_CLASS}>
-							<PracticeSegmented
-								className={SETUP_SEGMENTED_INNER_CLASS}
-								value={mode}
-								options={[
-									{
-										value: 'dictation',
-										label: t('englishLearning.practice.modeDictation'),
-									},
-									{
-										value: 'spelling',
-										label: t('englishLearning.practice.modeSpelling'),
-									},
-								]}
-								onChange={setMode}
-							/>
-						</div>
-					</div>
-
-					<div
-						className={cn(
-							'grid gap-5',
-							hideOrderPicker ? undefined : 'sm:grid-cols-2',
-						)}
-					>
-						<SetupSection label={t('englishLearning.practice.countLabel')}>
-							<div className={SETUP_SEGMENTED_PANEL_CLASS}>
-								<PracticeSegmented
-									className={SETUP_SEGMENTED_INNER_CLASS}
-									value={String(count)}
-									options={COUNT_OPTIONS.map((n) => ({
-										value: String(n),
-										label: String(n),
-									}))}
-									onChange={(v) => setCount(Number(v) as PracticeCountOption)}
-								/>
-							</div>
-						</SetupSection>
-						{hideOrderPicker ? null : (
-							<SetupSection label={t('englishLearning.practice.orderLabel')}>
-								<div className={SETUP_SEGMENTED_PANEL_CLASS}>
-									<PracticeSegmented
-										className={SETUP_SEGMENTED_INNER_CLASS}
-										value={order}
-										options={[
-											{
-												value: 'random',
-												label: t('englishLearning.practice.orderRandom'),
-											},
-											{
-												value: 'sequential',
-												label: t('englishLearning.practice.orderSequential'),
-											},
-										]}
-										onChange={setOrder}
-									/>
-								</div>
-							</SetupSection>
-						)}
-					</div>
-				</div>
-
-				<div className="border-theme/10 border-t px-2.5 py-2">
-					<div className={SETUP_SEGMENTED_PANEL_CLASS}>
-						<Button
-							type="button"
-							className={cn(
-								'h-10 w-full gap-2',
-								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-							)}
-							disabled={loading}
-							onClick={() => void onStart()}
+			<div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-4">
+				{/* max-h-[56rem] 与 max-w-4xl（56rem）对齐 */}
+				<div className="mx-auto flex h-full min-h-0 w-full max-w-4xl max-h-128 flex-col gap-4">
+					<section className="flex min-h-0 flex-1 flex-col gap-4">
+						<h2 className={FIELD_LABEL}>
+							{t('englishLearning.practice.setupPickMode')}
+						</h2>
+						<RadioGroup
+							value={mode}
+							onValueChange={(v) => setMode(v as PracticeMode)}
+							className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2"
 						>
-							{loading ? (
-								<>
-									<Spinner className="size-4 text-white" />
-									{t('englishLearning.practice.loadingWords')}
-								</>
-							) : (
-								t('englishLearning.practice.start')
-							)}
-						</Button>
-					</div>
+							{modes.map(({ value, title, desc, tip, Icon }) => (
+								<SetupPickCard
+									key={value}
+									id={`el-setup-mode-${value}`}
+									value={value}
+									active={mode === value}
+									title={title}
+									desc={desc}
+									tip={tip}
+									Icon={Icon}
+								/>
+							))}
+						</RadioGroup>
+					</section>
+
+					<section className="flex shrink-0 flex-col gap-4">
+						<h2 className={FIELD_LABEL}>
+							{t('englishLearning.practice.countLabel')}
+						</h2>
+						<RadioGroup
+							value={String(count)}
+							onValueChange={(v) => setCount(Number(v) as PracticeCountOption)}
+							className="grid grid-cols-10 gap-4"
+						>
+							{COUNT_OPTIONS.map((n) => {
+								const active = count === n;
+								const id = `el-setup-count-${n}`;
+								return (
+									<label
+										key={n}
+										htmlFor={id}
+										className={cn(
+											'flex h-10 min-w-0 cursor-pointer items-center justify-center rounded-md border text-base font-semibold tabular-nums transition-colors',
+											active
+												? 'border-teal-500/40 bg-teal-500/15 text-textcolor'
+												: 'border-theme/10 bg-theme/5 text-textcolor hover:border-teal-500/35 hover:bg-teal-500/10',
+										)}
+									>
+										<RadioGroupItem
+											value={String(n)}
+											id={id}
+											className="sr-only"
+										/>
+										{n}
+									</label>
+								);
+							})}
+						</RadioGroup>
+					</section>
+
+					{hideOrderPicker ? null : (
+						<section className="flex min-h-0 flex-1 flex-col gap-4">
+							<h2 className={FIELD_LABEL}>
+								{t('englishLearning.practice.orderLabel')}
+							</h2>
+							<RadioGroup
+								value={order}
+								onValueChange={(v) => setOrder(v as PracticeOrder)}
+								className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2"
+							>
+								{orders.map(({ value, title, desc, tip, Icon }) => (
+									<SetupPickCard
+										key={value}
+										id={`el-setup-order-${value}`}
+										value={value}
+										active={order === value}
+										title={title}
+										desc={desc}
+										tip={tip}
+										Icon={Icon}
+									/>
+								))}
+							</RadioGroup>
+						</section>
+					)}
+
+					<Button
+						type="button"
+						className={cn(
+							'h-10 w-full shrink-0 gap-2 mt-1',
+							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+						)}
+						disabled={loading}
+						onClick={() => void onStart()}
+					>
+						{loading ? (
+							<>
+								<Spinner className="size-4 text-white" />
+								{t('englishLearning.practice.loadingWords')}
+							</>
+						) : (
+							t('englishLearning.practice.start')
+						)}
+					</Button>
 				</div>
-			</PracticeCard>
+			</div>
 		</div>
 	);
 }

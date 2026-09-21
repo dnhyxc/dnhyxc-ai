@@ -216,7 +216,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 										onClick={(e) => onSendEmail(e, 'old')}
 									>
 										{sendOldLoading ? (
-											<Spinner />
+											<Spinner className="text-textcolor" />
 										) : oldTimeLeft > 0 && oldTimeLeft < DEFAULT_TIME ? (
 											`${formatTime(oldTimeLeft)}`
 										) : (
@@ -282,7 +282,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 											onClick={(e) => onSendEmail(e, 'new')}
 										>
 											{sendNewLoading ? (
-												<Spinner />
+												<Spinner className="text-textcolor" />
 											) : newTimeLeft > 0 && newTimeLeft < DEFAULT_TIME ? (
 												`${formatTime(newTimeLeft)}`
 											) : (

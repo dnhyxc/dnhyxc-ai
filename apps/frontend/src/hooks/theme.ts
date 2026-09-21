@@ -165,6 +165,14 @@ export function accentBadgeFg(hex: string): '#fff' | '#1a1a1a' {
 	return (r * 299 + g * 587 + b * 114) / 1000 < 160 ? '#fff' : '#1a1a1a';
 }
 
+/** 主题强调色徽章底+字色（设置页 / 词性标签共用） */
+export function accentBadgeStyle(hex: string): {
+	backgroundColor: string;
+	color: '#fff' | '#1a1a1a';
+} {
+	return { backgroundColor: hex, color: accentBadgeFg(hex) };
+}
+
 export type AccentId = (typeof ACCENT_COLORS)[number]['id'];
 
 const DEFAULT_ACCENT_ID: AccentId = 'teal';

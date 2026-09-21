@@ -5,6 +5,7 @@ import { observer } from 'mobx-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import { ClassicSourceAnnotateControl } from '../components/ClassicSourceAnnotateControl';
 import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
 import { EnglishPracticeEntry } from '../components/practiceEntry';
 import { MasterWebSearchResultsBar } from '../components/WebSearchResultsBar';
@@ -91,6 +92,15 @@ function EnglishLearningPackStreamPageInner() {
 									<MasterWebSearchResultsBar
 										items={masterSearchOrganic}
 										t={t}
+									/>
+								) : null}
+								{kind === 'classic' && historyStreamId ? (
+									<ClassicSourceAnnotateControl
+										variant="text"
+										source="pack"
+										streamId={historyStreamId}
+										title={topic?.trim() || undefined}
+										quoteCount={total > 0 ? total : undefined}
 									/>
 								) : null}
 								{practiceParams ? (

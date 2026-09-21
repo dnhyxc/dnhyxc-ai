@@ -34,10 +34,25 @@ import {
 	hydrateElResumeOffset,
 	resolveElResumeOffset,
 } from '@/store/englishLearningResume';
+import { ClassicExportButton } from '../../components/ClassicExportButton';
+import { ClassicSourceAnnotateControl } from '../../components/ClassicSourceAnnotateControl';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
 import { LibraryEditDialog } from './LibraryEditDialog';
+
+/** 与知识库列表一致：hover 时标题右侧预留（索引 = 可见操作按钮数） */
+const ROW_HOVER_PR = [
+	'',
+	'group-hover:pr-8',
+	'group-hover:pr-14',
+	'group-hover:pr-22',
+	'group-hover:pr-30',
+	'group-hover:pr-38',
+] as const;
+
+const ROW_ACTIONS_CLASS =
+	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
 
 export type LibraryListPanelProps = {
 	kind: LibraryKind;
@@ -350,7 +365,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 					{t('englishLearning.library.goImport')}
 				</div>
 			</div>
-			<ScrollArea className="min-h-0 flex-1 pb-4" onScroll={onViewportScroll}>
+			<ScrollArea className="min-h-0 flex-1 py-4" onScroll={onViewportScroll}>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
 						<Loading text={t('englishLearning.library.listLoading')} />
@@ -373,23 +388,24 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 							const showEdit = lib.isPublic
 								? isSuperAdmin
 								: lib.isOwned !== false;
+							// classic：标注 + 练习；vocab：仅练习
+							const practiceActions = showPracticeEntry
+								? kind === 'classic'
+									? 2
+									: 1
+								: 0;
 							const actionCount =
-								(showPracticeEntry ? 1 : 0) +
+								practiceActions +
+								(kind === 'classic' ? 1 : 0) +
 								(showEdit ? 1 : 0) +
 								(canDelete ? 1 : 0);
-							const titleRightMargin =
-								actionCount >= 3
-									? 'mr-[4.75rem]'
-									: actionCount === 2
-										? 'mr-14'
-										: actionCount === 1
-											? 'mr-8'
-											: '';
+							const hoverPr =
+								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
 								<div
 									key={lib.id}
 									className={cn(
-										'group relative bg-theme/5 border border-theme/5 flex min-w-0 items-stretch gap-1 overflow-hidden rounded-md transition-colors',
+										'group relative bg-theme/5 border border-theme/5 flex min-w-0 flex-col gap-1 overflow-hidden rounded-md p-2 transition-colors',
 										active
 											? 'border-theme/10 bg-theme/15'
 											: 'hover:border-theme/12 hover:bg-theme/12',
@@ -398,20 +414,21 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 									<button
 										type="button"
 										onClick={() => onSelect(lib)}
-										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1.5 px-3 py-2 text-left"
+										className="flex min-w-0 w-full cursor-pointer flex-col gap-1.5 text-left"
 									>
+										{/* 非 hover 标题占满；操作区 absolute 不占位 */}
 										<div
 											className={cn(
-												'flex min-w-0 items-center gap-1.5',
-												titleRightMargin,
+												'flex min-w-0 w-full items-center gap-1.5 pr-0',
+												hoverPr,
 											)}
 										>
 											{lib.isPublic ? (
-												<span className="mt-0.5 shrink-0 rounded bg-teal-500/15 px-1.5 py-1 text-xs font-medium leading-none text-teal-500">
+												<span className="shrink-0 rounded bg-teal-500/15 px-1.5 py-1 text-xs font-medium leading-none text-teal-500">
 													{t('englishLearning.library.publicBadge')}
 												</span>
 											) : null}
-											<span className="text-textcolor line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug">
+											<span className="text-textcolor min-w-0 truncate text-sm font-medium">
 												{lib.title || '—'}
 											</span>
 										</div>
@@ -430,93 +447,129 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 											</span>
 										</div>
 									</button>
-									<div className="absolute top-0 right-0 mt-1 mr-1 items-center gap-0.5 hidden group-hover:flex">
-										{showPracticeEntry && vocabLib ? (
-											<EnglishPracticeEntry
-												variant="icon"
-												practice={{
-													source: 'library',
-													libraryId: vocabLib.id,
-													sourceTitle: vocabLib.title?.trim() || undefined,
-													poolTotal:
-														vocabLib.wordCount != null && vocabLib.wordCount > 0
-															? vocabLib.wordCount
-															: undefined,
-												}}
-												className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
-												onBeforeNavigate={(
-													e: MouseEvent<HTMLButtonElement>,
-												) => {
-													e.stopPropagation();
-												}}
-											/>
-										) : null}
-										{showPracticeEntry && classicLib ? (
-											<EnglishPracticeEntry
-												variant="icon"
-												practice={{
-													contentKind: 'classic',
-													source: 'library',
-													libraryId: classicLib.id,
-													sourceTitle: classicLib.title?.trim() || undefined,
-													poolTotal:
+									{actionCount > 0 ? (
+										<div className={ROW_ACTIONS_CLASS}>
+											{showPracticeEntry && vocabLib ? (
+												<EnglishPracticeEntry
+													variant="icon"
+													practice={{
+														source: 'library',
+														libraryId: vocabLib.id,
+														sourceTitle: vocabLib.title?.trim() || undefined,
+														poolTotal:
+															vocabLib.wordCount != null &&
+															vocabLib.wordCount > 0
+																? vocabLib.wordCount
+																: undefined,
+													}}
+													className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
+													onBeforeNavigate={(
+														e: MouseEvent<HTMLButtonElement>,
+													) => {
+														e.stopPropagation();
+													}}
+												/>
+											) : null}
+											{showPracticeEntry && classicLib ? (
+												<>
+													<ClassicSourceAnnotateControl
+														source="library"
+														libraryId={classicLib.id}
+														title={classicLib.title?.trim() || undefined}
+														quoteCount={
+															classicLib.quoteCount != null &&
+															classicLib.quoteCount > 0
+																? classicLib.quoteCount
+																: undefined
+														}
+														onBeforeClick={(e) => {
+															e.stopPropagation();
+														}}
+													/>
+													<EnglishPracticeEntry
+														variant="icon"
+														practice={{
+															contentKind: 'classic',
+															source: 'library',
+															libraryId: classicLib.id,
+															sourceTitle:
+																classicLib.title?.trim() || undefined,
+															poolTotal:
+																classicLib.quoteCount != null &&
+																classicLib.quoteCount > 0
+																	? classicLib.quoteCount
+																	: undefined,
+														}}
+														className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
+														onBeforeNavigate={(
+															e: MouseEvent<HTMLButtonElement>,
+														) => {
+															e.stopPropagation();
+														}}
+													/>
+												</>
+											) : null}
+											{kind === 'classic' && classicLib ? (
+												<ClassicExportButton
+													source="library"
+													libraryId={classicLib.id}
+													title={classicLib.title?.trim() || undefined}
+													quoteCount={
 														classicLib.quoteCount != null &&
 														classicLib.quoteCount > 0
 															? classicLib.quoteCount
-															: undefined,
-												}}
-												className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
-												onBeforeNavigate={(
-													e: MouseEvent<HTMLButtonElement>,
-												) => {
-													e.stopPropagation();
-												}}
-											/>
-										) : null}
-										{showEdit ? (
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={(e) => {
-													e.stopPropagation();
-													requestEditLibrary(lib);
-												}}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-													'text-textcolor/65 hover:border hover:border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-500',
-												)}
-												aria-label={
-													kind === 'vocab'
-														? t('englishLearning.library.editAction')
-														: t('englishLearning.library.editActionClassic')
-												}
-											>
-												<SquarePen className="size-3.5 mt-0.5" />
-											</Button>
-										) : null}
-										{canDelete ? (
-											<Button
-												variant="ghost"
-												size="sm"
-												disabled={deleting}
-												onClick={(e) => {
-													e.stopPropagation();
-													requestDeleteLibrary(lib);
-												}}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-													'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
-												)}
-												aria-label={
-													kind === 'vocab'
-														? t('englishLearning.library.deleteAction')
-														: t('englishLearning.library.deleteActionClassic')
-												}
-											>
-												<Trash2 className="size-3.5" />
-											</Button>
-										) : null}
-									</div>
+															: undefined
+													}
+													onBeforeClick={(e) => {
+														e.stopPropagation();
+													}}
+												/>
+											) : null}
+											{showEdit ? (
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={(e) => {
+														e.stopPropagation();
+														requestEditLibrary(lib);
+													}}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+														'text-textcolor/65 hover:border hover:border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-500',
+													)}
+													aria-label={
+														kind === 'vocab'
+															? t('englishLearning.library.editAction')
+															: t('englishLearning.library.editActionClassic')
+													}
+												>
+													<SquarePen className="size-3.5 mt-0.5" />
+												</Button>
+											) : null}
+											{canDelete ? (
+												<Button
+													variant="ghost"
+													size="sm"
+													disabled={deleting}
+													onClick={(e) => {
+														e.stopPropagation();
+														requestDeleteLibrary(lib);
+													}}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+														'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
+													)}
+													aria-label={
+														kind === 'vocab'
+															? t('englishLearning.library.deleteAction')
+															: t('englishLearning.library.deleteActionClassic')
+													}
+												>
+													<Trash2 className="size-3.5" />
+												</Button>
+											) : null}
+										</div>
+									) : null}
 								</div>
 							);
 						})}

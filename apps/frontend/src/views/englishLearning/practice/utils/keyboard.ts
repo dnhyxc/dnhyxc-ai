@@ -11,3 +11,17 @@ export function isPracticeSpacePlayShortcut(e: KeyboardEvent): boolean {
 		e.code === 'Space' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
 	);
 }
+
+/** 经典词槽：Ctrl+Shift+P 切换词性（不用 Alt，避免 macOS Option 死键写入） */
+export function isPracticeTogglePosShortcut(e: KeyboardEvent): boolean {
+	return (
+		e.code === 'KeyP' && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey
+	);
+}
+
+/** 经典词槽：Ctrl+Shift+I 切换音标 */
+export function isPracticeToggleIpaShortcut(e: KeyboardEvent): boolean {
+	return (
+		e.code === 'KeyI' && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey
+	);
+}

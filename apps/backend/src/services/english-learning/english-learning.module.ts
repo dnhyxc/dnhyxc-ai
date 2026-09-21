@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KnowledgeEmbeddingModule } from '../knowledge-embedding/knowledge-embedding.module';
 import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
+import { AnnotateSourceTaskService } from './annotate-source-task.service';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
+import { EnglishAnnotateSourceTask } from './entity/english-annotate-source-task.entity';
 import { EnglishClassicQuotePackBatch } from './entity/english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './entity/english-classic-quote-favorite.entity';
 import { EnglishClassicQuoteMistake } from './entity/english-classic-quote-mistake.entity';
@@ -17,6 +19,7 @@ import { EnglishLearningResumeModuleSetting } from './entity/english-learning-re
 import { EnglishLibraryItemsResume } from './entity/english-library-items-resume.entity';
 import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
+import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
@@ -49,10 +52,16 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishClassicQuotesLibraryItem,
 			EnglishLibraryItemsResume,
 			EnglishLearningResumeModuleSetting,
+			EnglishSentenceWordAnnotationCache,
+			EnglishAnnotateSourceTask,
 		]),
 	],
 	controllers: [EnglishLearningController],
-	providers: [EnglishLearningService, EnglishLearningStreamAbortRegistry],
+	providers: [
+		EnglishLearningService,
+		EnglishLearningStreamAbortRegistry,
+		AnnotateSourceTaskService,
+	],
 	exports: [EnglishLearningService],
 })
 export class EnglishLearningModule {}

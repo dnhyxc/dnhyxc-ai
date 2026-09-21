@@ -434,6 +434,13 @@ export const saveFileWithPicker = async (options: {
 	content: string;
 	file_name: string;
 }): Promise<{ success: boolean; message?: string }> => {
+	const ext = options.file_name.includes('.')
+		? (options.file_name.split('.').pop() ?? '').toLowerCase()
+		: 'txt';
+	const isJson = ext === 'json';
+	const mime = isJson
+		? 'application/json;charset=utf-8'
+		: 'text/plain;charset=utf-8';
 	try {
 		if (!isTauriRuntime()) {
 			try {
@@ -442,13 +449,27 @@ export const saveFileWithPicker = async (options: {
 						window as unknown as {
 							showSaveFilePicker: (opts: {
 								suggestedName?: string;
+								types?: Array<{
+									description: string;
+									accept: Record<string, string[]>;
+								}>;
 							}) => Promise<FileSystemFileHandle>;
 						}
 					).showSaveFilePicker({
 						suggestedName: options.file_name,
+						...(isJson
+							? {
+									types: [
+										{
+											description: 'JSON',
+											accept: { 'application/json': ['.json'] },
+										},
+									],
+								}
+							: {}),
 					});
 					const writable = await handle.createWritable();
-					await writable.write(options.content);
+					await writable.write(new Blob([options.content], { type: mime }));
 					await writable.close();
 					Toast({
 						type: 'success',
@@ -459,9 +480,7 @@ export const saveFileWithPicker = async (options: {
 			} catch {
 				// 用户取消或 API 不可用，走 Blob 回退
 			}
-			const blob = new Blob([options.content], {
-				type: 'text/plain;charset=utf-8',
-			});
+			const blob = new Blob([options.content], { type: mime });
 			const objectUrl = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = objectUrl;
@@ -477,22 +496,35 @@ export const saveFileWithPicker = async (options: {
 			return { success: true };
 		}
 		const { invoke } = await import('@tauri-apps/api/core');
-		const result = (await invoke('save_file_with_picker', { options })) as {
-			success: boolean;
+		// Tauri SaveFileOptions：default_name + filters（不是 file_name）
+		const result = (await invoke('save_file_with_picker', {
+			options: {
+				content: options.content,
+				default_name: options.file_name,
+				filters: isJson ? [{ name: 'JSON', extensions: ['json'] }] : undefined,
+			},
+		})) as {
+			success?: string;
+			filePath?: string | null;
+			file_path?: string | null;
 			message?: string;
 		};
-		if (result.success) {
+		const savedPath = result.filePath ?? result.file_path;
+		if (savedPath) {
 			Toast({
 				type: 'success',
 				title: '文件保存成功',
 			});
-		} else {
-			Toast({
-				type: 'error',
-				title: '文件保存失败',
-			});
+			return { success: true, message: result.message };
 		}
-		return result as { success: boolean; message?: string; file_path?: string };
+		if (result.message?.includes('取消')) {
+			return { success: false, message: result.message };
+		}
+		Toast({
+			type: 'error',
+			title: '文件保存失败',
+		});
+		return { success: false, message: result.message };
 	} catch (error) {
 		Toast({
 			type: 'error',

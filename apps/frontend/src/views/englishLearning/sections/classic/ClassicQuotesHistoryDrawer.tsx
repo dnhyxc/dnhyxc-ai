@@ -11,7 +11,21 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
+import { ClassicExportButton } from '../../components/ClassicExportButton';
+import { ClassicSourceAnnotateControl } from '../../components/ClassicSourceAnnotateControl';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
+
+/** 与知识库列表一致：hover 时标题右侧预留 */
+const ROW_HOVER_PR = [
+	'',
+	'group-hover:pr-8',
+	'group-hover:pr-14',
+	'group-hover:pr-22',
+	'group-hover:pr-30',
+] as const;
+
+const ROW_ACTIONS_CLASS =
+	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
 
 export type ClassicQuotesHistoryDrawerProps = {
 	open: boolean;
@@ -83,11 +97,14 @@ function ClassicQuotesHistoryDrawerInner({
 								EnglishPackStore.classicLoading &&
 								EnglishPackStore.classicActiveStreamId === h.streamId;
 							const showPracticeEntry = h.quoteCount > 0;
+							const actionCount = (showPracticeEntry ? 2 : 0) + 2;
+							const hoverPr =
+								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
 								<div
 									key={h.streamId}
 									className={cn(
-										'group relative flex min-w-0 items-stretch overflow-hidden rounded-md',
+										'group relative flex min-w-0 flex-col gap-0.5 overflow-hidden rounded-md p-2',
 										active ? 'bg-theme/10' : 'hover:bg-theme/10',
 									)}
 								>
@@ -95,15 +112,17 @@ function ClassicQuotesHistoryDrawerInner({
 										type="button"
 										disabled={busy || deleting}
 										onClick={() => void onSelectEntry(h.streamId)}
-										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+										className="flex min-w-0 w-full cursor-pointer flex-col gap-0.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 									>
 										<div
 											className={cn(
-												'text-textcolor line-clamp-2 w-full min-w-0 max-w-full text-sm font-medium wrap-anywhere leading-snug mb-1',
-												showPracticeEntry && 'mr-14',
+												'mb-1 min-w-0 w-full pr-0',
+												!isStreaming && hoverPr,
 											)}
 										>
-											{h.topic || '—'}
+											<span className="text-textcolor block min-w-0 truncate text-sm font-medium">
+												{h.topic || '—'}
+											</span>
 										</div>
 										<div className="text-textcolor/50 flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
 											<span>
@@ -132,43 +151,69 @@ function ClassicQuotesHistoryDrawerInner({
 									{isStreaming ? (
 										<div
 											role="status"
-											className="absolute top-0 right-0 my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+											className="absolute top-2 right-2 flex h-7 w-7 shrink-0 items-center justify-center"
 											aria-label={t('englishLearning.classic.historyStreaming')}
 										>
 											<Spinner className="size-4 shrink-0 text-teal-600 dark:text-teal-400" />
 										</div>
 									) : (
-										<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
+										<div className={ROW_ACTIONS_CLASS}>
 											{showPracticeEntry ? (
-												<EnglishPracticeEntry
-													variant="icon"
-													disabled={busy || deleting}
-													practice={{
-														contentKind: 'classic',
-														source: 'pack',
-														streamId: h.streamId,
-														sourceTitle: h.topic?.trim() || undefined,
-														poolTotal:
-															h.quoteCount > 0 ? h.quoteCount : undefined,
-														returnTo:
-															practiceReturnTo === 'home' ? 'home' : undefined,
-														returnStreamId:
-															practiceReturnTo === 'home'
-																? undefined
-																: (() => {
-																		const backId = loadedStreamId?.trim();
-																		return backId && backId !== h.streamId
-																			? backId
-																			: undefined;
-																	})(),
-													}}
-													onBeforeNavigate={(
-														e: MouseEvent<HTMLButtonElement>,
-													) => {
-														e.stopPropagation();
-													}}
-												/>
+												<>
+													<ClassicSourceAnnotateControl
+														source="pack"
+														streamId={h.streamId}
+														title={h.topic?.trim() || undefined}
+														quoteCount={
+															h.quoteCount > 0 ? h.quoteCount : undefined
+														}
+														disabled={busy || deleting}
+														onBeforeClick={(e) => {
+															e.stopPropagation();
+														}}
+													/>
+													<EnglishPracticeEntry
+														variant="icon"
+														disabled={busy || deleting}
+														practice={{
+															contentKind: 'classic',
+															source: 'pack',
+															streamId: h.streamId,
+															sourceTitle: h.topic?.trim() || undefined,
+															poolTotal:
+																h.quoteCount > 0 ? h.quoteCount : undefined,
+															returnTo:
+																practiceReturnTo === 'home'
+																	? 'home'
+																	: undefined,
+															returnStreamId:
+																practiceReturnTo === 'home'
+																	? undefined
+																	: (() => {
+																			const backId = loadedStreamId?.trim();
+																			return backId && backId !== h.streamId
+																				? backId
+																				: undefined;
+																		})(),
+														}}
+														onBeforeNavigate={(
+															e: MouseEvent<HTMLButtonElement>,
+														) => {
+															e.stopPropagation();
+														}}
+													/>
+												</>
 											) : null}
+											<ClassicExportButton
+												source="pack"
+												streamId={h.streamId}
+												title={h.topic?.trim() || undefined}
+												quoteCount={h.quoteCount > 0 ? h.quoteCount : undefined}
+												disabled={busy || deleting}
+												onBeforeClick={(e) => {
+													e.stopPropagation();
+												}}
+											/>
 											<Button
 												type="button"
 												variant="ghost"

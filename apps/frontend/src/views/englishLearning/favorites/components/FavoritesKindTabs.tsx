@@ -1,6 +1,21 @@
 /**
- * 收藏页顶栏：单词 / 语句分类切换（右侧并排）
+ * 收藏页顶栏：单词 / 语句下拉切换
  */
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
+import { Button } from '@ui/index';
+import {
+	Check,
+	Layers,
+	Layers2,
+	PanelTopClose,
+	PanelTopOpen,
+} from 'lucide-react';
+import { useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
@@ -16,38 +31,71 @@ export function FavoritesKindTabs({
 	onSelectKind,
 }: FavoritesKindTabsProps) {
 	const { t } = useI18n();
+	const [open, setOpen] = useState(false);
 
-	const items: { id: FavoritesKind; label: string }[] = [
-		{ id: 'vocab', label: t('englishLearning.favorites.vocab.nav') },
-		{ id: 'classic', label: t('englishLearning.favorites.classic.nav') },
+	const items: {
+		id: FavoritesKind;
+		label: string;
+		Icon: typeof Layers;
+	}[] = [
+		{
+			id: 'vocab',
+			label: t('englishLearning.favorites.vocab.nav'),
+			Icon: Layers,
+		},
+		{
+			id: 'classic',
+			label: t('englishLearning.favorites.classic.nav'),
+			Icon: Layers2,
+		},
 	];
 
+	const current = items.find((item) => item.id === kind) ?? items[0]!;
+	const TriggerIcon = open ? PanelTopClose : PanelTopOpen;
+
 	return (
-		<div
-			className="flex shrink-0 items-center gap-2 rounded-md border box-border border-theme/10 bg-theme/5 p-0.5 mt-0.5"
-			role="tablist"
-			aria-label={t('englishLearning.favorites.sidebarTitle')}
-		>
-			{items.map((item) => {
-				const active = kind === item.id;
-				return (
-					<button
-						key={item.id}
-						type="button"
-						role="tab"
-						aria-selected={active}
-						onClick={() => onSelectKind(item.id)}
-						className={cn(
-							'w-23.5 cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap',
-							active
-								? 'bg-theme-background text-textcolor shadow-sm'
-								: 'text-textcolor/65 hover:text-textcolor hover:bg-theme/10',
-						)}
-					>
-						{item.label}
-					</button>
-				);
-			})}
-		</div>
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<DropdownMenuTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					aria-label={t('englishLearning.favorites.sidebarTitle')}
+					aria-expanded={open}
+					className={cn(
+						'h-auto gap-1.5 px-0! py-0 text-sm font-medium text-teal-500 shadow-none',
+						'has-[>svg]:px-0!',
+						'hover:bg-transparent hover:text-teal-400',
+						'data-[state=open]:bg-transparent data-[state=open]:text-teal-400',
+					)}
+				>
+					<TriggerIcon className="size-4 shrink-0 opacity-90" aria-hidden />
+					<span className="max-w-28 truncate">{current.label}</span>
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" sideOffset={6} className="min-w-36">
+				{items.map((item) => {
+					const active = kind === item.id;
+					const Icon = item.Icon;
+					return (
+						<DropdownMenuItem
+							key={item.id}
+							className="gap-2"
+							onSelect={() => onSelectKind(item.id)}
+						>
+							<Icon className="size-4 shrink-0 opacity-90" aria-hidden />
+							<span className="min-w-0 flex-1 truncate">{item.label}</span>
+							<Check
+								className={cn(
+									'size-3.5 shrink-0',
+									active ? 'opacity-100' : 'opacity-0',
+								)}
+								aria-hidden
+							/>
+						</DropdownMenuItem>
+					);
+				})}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

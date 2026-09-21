@@ -8,6 +8,7 @@ import {
 	MaxLength,
 	ValidateNested,
 } from 'class-validator';
+import { ENGLISH_PRACTICE_SESSION_MAX } from '../constant';
 import { VocabularyFavoriteBodyDto } from './vocabulary-favorite.dto';
 
 export class VocabularyMistakeBatchItemDto extends VocabularyFavoriteBodyDto {
@@ -20,7 +21,7 @@ export class VocabularyMistakeBatchItemDto extends VocabularyFavoriteBodyDto {
 /** 结算页批量加入错题集（已存在词形：错拼不同则更新 lastUserInput） */
 export class VocabularyMistakeBatchDto {
 	@IsArray()
-	@ArrayMaxSize(50)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => VocabularyMistakeBatchItemDto)
 	items!: VocabularyMistakeBatchItemDto[];

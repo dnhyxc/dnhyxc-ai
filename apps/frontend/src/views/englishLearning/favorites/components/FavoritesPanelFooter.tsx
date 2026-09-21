@@ -1,18 +1,19 @@
 /**
- * 收藏列表面板底部：全选已加载、已选数量、批量移除、导出 Docx
+ * 收藏列表顶栏操作：全选、移除、听写/拼写、导出（图二：图标+文字链接）
  */
 import { Checkbox } from '@ui/checkbox';
-import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
+import { FileDown, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks';
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { PracticeContentKind } from '../../practice/types';
 
+const LINK_CLASS =
+	'flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-teal-500 hover:text-teal-400 disabled:cursor-not-allowed disabled:opacity-50';
+
 export type FavoritesPanelFooterProps = {
-	/** 全选 Checkbox 的 id，需与 Label htmlFor 一致 */
 	selectAllId: string;
-	/** 是否展示全选与已选计数（有条目且非首屏 loading） */
 	showSelection: boolean;
 	selectAllCheckboxState: boolean | 'indeterminate';
 	selectionDisabled: boolean;
@@ -24,13 +25,10 @@ export type FavoritesPanelFooterProps = {
 	exportDisabled: boolean;
 	exportingDocx: boolean;
 	onExportDocx: () => void;
-	/** 导出按钮文案（单词 / 经典句 i18n 由父组件传入） */
 	exportLabel: string;
-	/** 收藏页：进入听写/拼写练习 */
 	showPracticeEntry?: boolean;
 	practiceContentKind?: PracticeContentKind;
 	practiceDisabled?: boolean;
-	/** 收藏总数，写入练习页 URL 供分页拉词 */
 	practicePoolTotal?: number;
 };
 
@@ -56,85 +54,75 @@ export function FavoritesPanelFooter({
 	const { t } = useI18n();
 
 	return (
-		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-4">
-			<div className="flex items-center gap-2">
-				{showSelection ? (
-					<div className="flex shrink-0 flex-wrap items-center gap-3">
-						<div className="flex items-center gap-2">
-							<Checkbox
-								id={selectAllId}
-								checked={selectAllCheckboxState}
-								disabled={selectionDisabled}
-								onCheckedChange={(v) => onToggleSelectAll(v)}
-							/>
-							<Label
-								htmlFor={selectAllId}
-								className="cursor-pointer text-sm text-textcolor/85"
-							>
-								{t('englishLearning.favoritesDrawer.selectAllLoaded')}
-							</Label>
-						</div>
-						<span className="text-textcolor/60 text-sm">
-							{t('englishLearning.favoritesDrawer.selectedCount', {
+		<div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
+			{showSelection ? (
+				<div className="flex shrink-0 items-center gap-2">
+					<Checkbox
+						id={selectAllId}
+						checked={selectAllCheckboxState}
+						disabled={selectionDisabled}
+						onCheckedChange={(v) => onToggleSelectAll(v)}
+					/>
+					<Label
+						htmlFor={selectAllId}
+						className="cursor-pointer text-sm font-medium whitespace-nowrap text-teal-500 hover:text-teal-400"
+					>
+						{t('englishLearning.favoritesDrawer.selectAllLoaded')}
+					</Label>
+				</div>
+			) : null}
+			<button
+				type="button"
+				disabled={removeDisabled}
+				className={LINK_CLASS}
+				onClick={onRequestRemove}
+			>
+				{batchRemoving ? (
+					<Spinner className="size-4 shrink-0 text-teal-500" />
+				) : (
+					<Trash2 className="size-4 shrink-0 opacity-90" aria-hidden />
+				)}
+				<span>
+					{batchRemoving
+						? t('englishLearning.favoritesDrawer.removing')
+						: t('englishLearning.favoritesDrawer.removeSelected', {
 								count: selectedCount,
 							})}
-						</span>
-					</div>
-				) : null}
-			</div>
-			<div className="flex flex-wrap items-center justify-end gap-2">
-				<Button
-					type="button"
-					size="sm"
-					disabled={removeDisabled}
-					className="w-24 shrink-0 pb-1 text-white bg-rose-700 hover:bg-rose-800"
-					onClick={onRequestRemove}
-				>
-					{batchRemoving ? (
-						<>
-							<Spinner className="h-4 w-4" />
-							{t('englishLearning.favoritesDrawer.removing')}
-						</>
-					) : (
-						t('englishLearning.favoritesDrawer.removeSelected')
-					)}
-				</Button>
-				{showPracticeEntry ? (
-					<EnglishPracticeEntry
-						variant="button"
-						showIcon={false}
-						disabled={practiceDisabled}
-						practice={{
-							contentKind: practiceContentKind,
-							source: 'favorites',
-							sourceTitle:
-								practiceContentKind === 'classic'
-									? t('englishLearning.practice.sourceClassicFavorites')
-									: t('englishLearning.practice.sourceFavorites'),
-							poolTotal:
-								practicePoolTotal != null && practicePoolTotal > 0
-									? practicePoolTotal
-									: undefined,
-						}}
-					/>
-				) : null}
-				<Button
-					type="button"
-					size="sm"
-					disabled={exportDisabled}
-					className="flex w-24 shrink-0 items-center"
-					onClick={() => void onExportDocx()}
-				>
-					{exportingDocx ? (
-						<>
-							<Spinner className="h-4 w-4" />
-							{t('common.downloading')}
-						</>
-					) : (
-						exportLabel
-					)}
-				</Button>
-			</div>
-		</footer>
+				</span>
+			</button>
+			{showPracticeEntry ? (
+				<EnglishPracticeEntry
+					variant="text"
+					showIcon
+					disabled={practiceDisabled}
+					className="shrink-0 gap-1.5 whitespace-nowrap font-medium"
+					practice={{
+						contentKind: practiceContentKind,
+						source: 'favorites',
+						sourceTitle:
+							practiceContentKind === 'classic'
+								? t('englishLearning.practice.sourceClassicFavorites')
+								: t('englishLearning.practice.sourceFavorites'),
+						poolTotal:
+							practicePoolTotal != null && practicePoolTotal > 0
+								? practicePoolTotal
+								: undefined,
+					}}
+				/>
+			) : null}
+			<button
+				type="button"
+				disabled={exportDisabled}
+				className={LINK_CLASS}
+				onClick={() => void onExportDocx()}
+			>
+				{exportingDocx ? (
+					<Spinner className="size-4 shrink-0 text-teal-500" />
+				) : (
+					<FileDown className="size-4 shrink-0 opacity-90" aria-hidden />
+				)}
+				<span>{exportingDocx ? t('common.downloading') : exportLabel}</span>
+			</button>
+		</div>
 	);
 }

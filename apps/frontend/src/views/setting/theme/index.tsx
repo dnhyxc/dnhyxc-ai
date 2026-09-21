@@ -3,7 +3,7 @@ import { CircleCheckBig } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
 	ACCENT_COLORS,
-	accentBadgeFg,
+	accentBadgeStyle,
 	THEMES,
 	useI18n,
 	useTheme,
@@ -115,11 +115,8 @@ const Theme = () => {
 											{t(item.labelKey) ?? item.label}
 										</span>
 										<span
-											className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium text-textcolor/90"
-											style={{
-												backgroundColor: item.hex,
-												color: accentBadgeFg(item.hex),
-											}}
+											className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-medium text-textcolor/90"
+											style={accentBadgeStyle(item.hex)}
 										>
 											{item.hex}
 										</span>

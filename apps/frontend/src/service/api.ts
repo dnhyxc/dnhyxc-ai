@@ -217,12 +217,38 @@ export const ENGLISH_LEARNING_PRACTICE_REVIEW =
 	'/english-learning/practice/review';
 export const ENGLISH_LEARNING_PRACTICE_DAILY =
 	'/english-learning/practice/daily';
+/** 经典句看中写：句内词性 / IPA / 释义标注 */
+export const ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS =
+	'/english-learning/practice/annotate-sentence-words';
+export const ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH =
+	'/english-learning/practice/annotate-sentence-words/batch';
+/** 手动导入词标注 JSON（无 LLM，cache_key upsert） */
+export const ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_IMPORT =
+	'/english-learning/practice/annotate-sentence-words/import';
+/** 语句库整集词标注预热（SSE） */
+export const ENGLISH_LEARNING_CLASSIC_LIBRARY_ANNOTATE_SENTENCE_WORDS_STREAM =
+	'/english-learning/classic-quotes-libraries/annotate-sentence-words/stream';
+/** Pack 整集词标注预热（SSE） */
+export const ENGLISH_LEARNING_CLASSIC_PACK_ANNOTATE_SENTENCE_WORDS_STREAM =
+	'/english-learning/classic-quotes-history/annotate-sentence-words/stream';
+/** 整集标注任务（持久化 / 暂停续跑） */
+export const ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS =
+	'/english-learning/annotate-source-tasks';
 /** 单词错题集：批量加入、分页列表、删除 */
 export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
 	'/english-learning/vocabulary-mistakes';
+/** 导出当前用户单词错题为 Word（DOCX） */
+export const ENGLISH_LEARNING_VOCABULARY_MISTAKES_EXPORT_DOCX =
+	'/english-learning/vocabulary-mistakes/export-docx';
 /** 语句错题集：批量加入、分页列表、删除 */
 export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES =
 	'/english-learning/classic-quote-mistakes';
+/** 导出当前用户经典句错题为 Word（DOCX） */
+export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES_EXPORT_DOCX =
+	'/english-learning/classic-quote-mistakes/export-docx';
+/** 导出今日待复习为 Word（?contentKind=vocab|classic） */
+export const ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX =
+	'/english-learning/practice/review/export-docx';
 /** 各模块列表续读开关（按用户） */
 export const ENGLISH_LEARNING_ITEMS_RESUME_MODULES =
 	'/english-learning/items-resume/modules';

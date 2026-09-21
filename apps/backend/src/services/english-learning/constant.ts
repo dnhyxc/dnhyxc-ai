@@ -110,3 +110,42 @@ export const ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE =
 
 export const ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE =
 	/\b(latest|headlines?|news)\b/i;
+
+/**
+ * 句内词标注落库缓存 schema 版本。
+ * 变更 SENTENCE_WORDS_ANNOTATE_SYSTEM 输出约定或字段语义时递增；
+ * 升版后首次标注请求会删掉 schema_version ≠ 当前值的旧行。
+ * v3：拒绝缺词垫空 / 空 IPA·释义的脏验收（v2 进度虚高）。
+ */
+export const SENTENCE_WORD_ANNOTATION_CACHE_VERSION = 'v3';
+
+/** 单场练习题量 / 结算批量上限（与前端 PRACTICE_MAX_WORDS 对齐） */
+export const ENGLISH_PRACTICE_SESSION_MAX = 100;
+
+/** 批量标注时，单次模型请求最多覆盖的句子数（超出则切多段，仍远少于逐句） */
+export const SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK = 12;
+
+/** 整集预热：超过生成上限时内部读库每批条数 */
+export const ANNOTATE_SOURCE_DB_CHUNK = 1000;
+
+/** 整集预热：绝对硬顶，超过则拒绝（防恶意撑爆） */
+export const ANNOTATE_SOURCE_HARD_MAX = 20_000;
+
+/**
+ * 整集预热：自适应 LLM 初始批大小。
+ * ponytail: 24 句×逐词 JSON 极易空 words/截断；从 CHUNK 起跳，失败再减半。
+ */
+export const ANNOTATE_SOURCE_LLM_INITIAL_CHUNK =
+	SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK;
+
+/** 同一批窗口内最多续写轮数（含首轮） */
+export const ANNOTATE_SOURCE_LLM_MAX_RESUME_ROUNDS = 4;
+
+/** 整次预热最多 LLM 轮次（防失控） */
+export const ANNOTATE_SOURCE_LLM_MAX_TOTAL_ROUNDS = 80;
+
+/**
+ * 批量标注入参：词数 ≥ 该值时附带 english，减轻多义词语境不足；
+ * 短句仅传 id+words，省 input token（功能契约不变）。
+ */
+export const ANNOTATE_LLM_ATTACH_ENGLISH_MIN_WORDS = 12;

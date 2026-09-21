@@ -5,11 +5,21 @@ import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	downloadEnglishPracticeReviewDueDocx,
+	downloadEnglishVocabularyMistakesDocx,
 	type EnglishVocabularyMistakeListEntry,
+	listEnglishPracticeReviewVocabDue,
 	listEnglishVocabularyMistakes,
 	removeEnglishVocabularyMistakesBatch,
 } from '@/service';
@@ -20,7 +30,9 @@ import {
 	resolveElFixedListResume,
 	setElFixedListResume,
 } from '@/store/englishLearningResume';
+import { isTauriRuntime } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
 import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
@@ -32,10 +44,12 @@ import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
+import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 
+export type VocabMistakesListMode = 'mistakes' | 'review';
+
 const LIST_SCOPE = 'vocab-mistakes' as const;
-const LIST_RESUME_ID = elFixedListResumeId(LIST_SCOPE);
 
 export type MistakesListCounts = {
 	loaded: number;
@@ -45,30 +59,48 @@ export type MistakesListCounts = {
 export type VocabularyMistakesPanelProps = {
 	active?: boolean;
 	onCountsChange?: (counts: MistakesListCounts) => void;
+	/** mistakes=全量错题；review=今日待复习 */
+	listMode?: VocabMistakesListMode;
+	headerTitle: ReactNode;
+	headerTrailing?: ReactNode;
 };
 
 export function VocabularyMistakesPanel({
 	active = true,
 	onCountsChange,
+	listMode = 'mistakes',
+	headerTitle,
+	headerTrailing,
 }: VocabularyMistakesPanelProps) {
 	const { t } = useI18n();
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const [gridReady, setGridReady] = useState(false);
+	const isReview = listMode === 'review';
+	const LIST_RESUME_ID = isReview
+		? '__el-vocab-review__'
+		: elFixedListResumeId(LIST_SCOPE);
 
 	const handleResumeOffsetChange = useCallback(
 		(_id: string, offset: number) => {
+			if (isReview) return;
 			setElFixedListResume(LIST_SCOPE, offset);
 		},
-		[],
+		[isReview],
 	);
 
 	const fetchMistakesPage = useCallback(
 		async (_id: string, limit: number, offset: number) => {
-			const res = await listEnglishVocabularyMistakes({
-				limit,
-				offset,
-				silent: true,
-			});
+			const res = isReview
+				? await listEnglishPracticeReviewVocabDue({
+						limit,
+						offset,
+						silent: true,
+					})
+				: await listEnglishVocabularyMistakes({
+						limit,
+						offset,
+						silent: true,
+					});
 			if (!res.data) {
 				throw new Error('empty mistakes response');
 			}
@@ -77,7 +109,7 @@ export function VocabularyMistakesPanel({
 				totalCount: res.data.totalCount,
 			};
 		},
-		[],
+		[isReview],
 	);
 
 	const {
@@ -91,12 +123,14 @@ export function VocabularyMistakesPanel({
 		reloadFromStart,
 	} = useEnglishLearningList<EnglishVocabularyMistakeListEntry, null>({
 		libraryId: active ? LIST_RESUME_ID : null,
-		cacheNamespace: 'vocab-mistakes',
-		initialResumeOffset: resolveElFixedListResume(LIST_SCOPE),
-		resolveInitialResume: () => resolveElFixedListInitialResume(LIST_SCOPE),
+		cacheNamespace: isReview ? 'vocab-review' : 'vocab-mistakes',
+		initialResumeOffset: isReview ? 0 : resolveElFixedListResume(LIST_SCOPE),
+		resolveInitialResume: isReview
+			? undefined
+			: () => resolveElFixedListInitialResume(LIST_SCOPE),
 		refetchOnEnter: true,
-		onResumeOffsetChange: handleResumeOffsetChange,
-		resumeModuleKey: 'mistakes',
+		onResumeOffsetChange: isReview ? undefined : handleResumeOffsetChange,
+		resumeModuleKey: isReview ? undefined : 'mistakes',
 		viewportRef: scrollViewportRef,
 		fetchPage: fetchMistakesPage,
 	});
@@ -106,11 +140,11 @@ export function VocabularyMistakesPanel({
 	}, [active]);
 
 	useEffect(() => {
-		if (!active) return;
+		if (!active || isReview) return;
 		return () => {
 			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
 		};
-	}, [active]);
+	}, [active, isReview]);
 
 	const handleGridReady = useCallback(() => {
 		setGridReady(true);
@@ -119,6 +153,7 @@ export function VocabularyMistakesPanel({
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
+	const [exportingDocx, setExportingDocx] = useState(false);
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
@@ -134,6 +169,8 @@ export function VocabularyMistakesPanel({
 			entries.length > 0,
 		);
 	const practiceDisabled = loading || totalCount === 0;
+	const exportDisabled =
+		exportingDocx || loading || (!loading && entries.length === 0);
 
 	useEffect(() => {
 		onCountsChange?.({ loaded: entries.length, total: totalCount });
@@ -225,6 +262,7 @@ export function VocabularyMistakesPanel({
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
 			setSingleRemoveTarget(null);
+			if (isReview) dispatchEnglishReviewSummaryRefresh();
 			Toast({
 				type: 'success',
 				title: t('englishLearning.mistakes.removeBatchSuccess'),
@@ -241,7 +279,7 @@ export function VocabularyMistakesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, reloadFromStart, selectedIds, t]);
+	}, [entries, isReview, reloadFromStart, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -260,6 +298,7 @@ export function VocabularyMistakesPanel({
 			});
 			setSingleRemoveTarget(null);
 			setSingleRemoveConfirmOpen(false);
+			if (isReview) dispatchEnglishReviewSummaryRefresh();
 			Toast({
 				type: 'success',
 				title: t('englishLearning.mistakes.removeSuccess'),
@@ -276,7 +315,7 @@ export function VocabularyMistakesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [reloadFromStart, singleRemoveTarget, t]);
+	}, [isReview, reloadFromStart, singleRemoveTarget, t]);
 
 	const onTogglePlayWord = useCallback(
 		async (word: string, key: string) => {
@@ -304,6 +343,45 @@ export function VocabularyMistakesPanel({
 	const selectionDisabled = loading || batchRemoving;
 	const removeDisabled =
 		batchRemoving || selectedIds.size === 0 || entries.length === 0;
+
+	const handleExportDocx = async () => {
+		if (entries.length === 0 && !loading) {
+			Toast({
+				type: 'info',
+				title: t(
+					isReview
+						? 'englishLearning.review.exportDocxEmpty'
+						: 'englishLearning.mistakes.exportDocxEmpty',
+				),
+			});
+			return;
+		}
+		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+		setExportingDocx(true);
+		try {
+			if (isReview) {
+				await downloadEnglishPracticeReviewDueDocx('vocab', ids);
+			} else {
+				await downloadEnglishVocabularyMistakesDocx(ids);
+			}
+			if (!isTauriRuntime()) {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.vocab.exportDocxSuccess'),
+				});
+			}
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title:
+					e instanceof Error
+						? e.message
+						: t('englishLearning.vocab.exportDocxFail'),
+			});
+		} finally {
+			setExportingDocx(false);
+		}
+	};
 
 	return (
 		<>
@@ -343,6 +421,35 @@ export function VocabularyMistakesPanel({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
+				<EnglishLearningPanelHeader
+					titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+					title={headerTitle}
+					actions={
+						<MistakesPanelFooter
+							selectAllId={
+								isReview ? 'review-vocab-select-all' : 'mistakes-select-all'
+							}
+							showSelection={!showInitialLoading && entries.length > 0}
+							selectAllCheckboxState={selectAllCheckboxState}
+							selectionDisabled={selectionDisabled}
+							onToggleSelectAll={toggleSelectAllLoaded}
+							selectedCount={selectedIds.size}
+							removeDisabled={removeDisabled}
+							batchRemoving={batchRemoving}
+							onRequestRemove={requestRemoveConfirm}
+							exportDisabled={exportDisabled}
+							exportingDocx={exportingDocx}
+							onExportDocx={handleExportDocx}
+							exportLabel={t('englishLearning.vocab.exportDocx')}
+							showPracticeEntry
+							practiceContentKind="vocab"
+							practiceSource={isReview ? 'review' : 'mistakes'}
+							practiceDisabled={practiceDisabled}
+							practicePoolTotal={totalCount}
+						/>
+					}
+					trailing={headerTrailing}
+				/>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
 						<Loading text={t('common.loading')} />
@@ -356,7 +463,7 @@ export function VocabularyMistakesPanel({
 						) : null}
 						<ScrollArea
 							ref={scrollViewportRef}
-							className="relative min-h-0 h-full px-4"
+							className="relative min-h-0 h-full p-4"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 							onScroll={composeViewportScroll(
 								onViewportScroll,
@@ -365,7 +472,11 @@ export function VocabularyMistakesPanel({
 						>
 							{showEmpty ? (
 								<div className="text-textcolor/60 py-12 text-center text-sm">
-									{t('englishLearning.mistakes.empty')}
+									{t(
+										isReview
+											? 'englishLearning.review.empty'
+											: 'englishLearning.mistakes.empty',
+									)}
 								</div>
 							) : (
 								<div className="relative w-full">
@@ -441,21 +552,6 @@ export function VocabularyMistakesPanel({
 						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
 					</div>
 				)}
-				<MistakesPanelFooter
-					selectAllId="mistakes-select-all"
-					showSelection={!showInitialLoading && entries.length > 0}
-					selectAllCheckboxState={selectAllCheckboxState}
-					selectionDisabled={selectionDisabled}
-					onToggleSelectAll={toggleSelectAllLoaded}
-					selectedCount={selectedIds.size}
-					removeDisabled={removeDisabled}
-					batchRemoving={batchRemoving}
-					onRequestRemove={requestRemoveConfirm}
-					showPracticeEntry
-					practiceContentKind="vocab"
-					practiceDisabled={practiceDisabled}
-					practicePoolTotal={totalCount}
-				/>
 			</div>
 		</>
 	);

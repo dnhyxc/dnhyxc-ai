@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	isPlaybackAvailable,
 	playPreferred,
+	prefetchCloudTts,
 	stopAllPlayback,
+	type TtsSentencePrefetch,
 } from '@/utils/speech';
 import { DICTATION_PLAY_COUNT, DICTATION_PLAY_GAP_MS } from '../constants';
 import type { PracticeMode } from '../types';
@@ -29,6 +31,7 @@ export type PlayWordFn = (options?: PlayWordOptions) => Promise<void>;
  * 1. 暴露 playing 播放态、副作用停止方法、playWord 主调用方法等。
  * 2. 保证异步播放可被主动终止（如用户再试、换题、点击暂停等）。
  * 3. 播放/暂停按钮文案自动随状态切换。
+ * 4. 换题时预取当前句云端音频（与标注预拉同节奏），点击播放可命中缓存。
  */
 export function usePracticePlayback(args: {
 	mode: PracticeMode;
@@ -39,6 +42,18 @@ export function usePracticePlayback(args: {
 	const [playing, setPlaying] = useState(false);
 	// 用于保证多轮异步播放时，若 runId 变化则中止后续音频
 	const dictationPlayRunRef = useRef(0);
+	/** 当前句云端 TTS 预取；与 playPreferred(cloudSingleUtterance) 对齐 */
+	const prefetchedCloudRef = useRef<Promise<TtsSentencePrefetch> | null>(null);
+
+	// 进题 / 换句：提前拉云端 MP3（失败由播放时回退现场请求）
+	useEffect(() => {
+		const text = answerText.trim();
+		if (!text) {
+			prefetchedCloudRef.current = null;
+			return;
+		}
+		prefetchedCloudRef.current = prefetchCloudTts(text, { whole: true });
+	}, [answerText]);
 
 	/**
 	 * 主动取消当前所有 English TTS 播放，并递增 runId 阻断异步流
@@ -57,7 +72,11 @@ export function usePracticePlayback(args: {
 			for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
 				// 若 runId 早于当前，立即中断
 				if (dictationPlayRunRef.current !== runId) return;
-				await playPreferred(answerText, { cloudSingleUtterance: true });
+				await playPreferred(answerText, {
+					cloudSingleUtterance: true,
+					// 仅首轮吃预取；后续轮次走 speech 内 LRU / inflight
+					prefetchedCloud: i === 0 ? prefetchedCloudRef.current : null,
+				});
 				if (dictationPlayRunRef.current !== runId) return;
 				// 非最后一次播放则等待间隔
 				if (i < DICTATION_PLAY_COUNT - 1) {
@@ -102,7 +121,10 @@ export function usePracticePlayback(args: {
 				if (useDictationSequence) {
 					await playDictationSequence(runId);
 				} else {
-					await playPreferred(answerText, { cloudSingleUtterance: true });
+					await playPreferred(answerText, {
+						cloudSingleUtterance: true,
+						prefetchedCloud: prefetchedCloudRef.current,
+					});
 				}
 			} catch {
 				// 支持突然变不可用、或系统错误

@@ -40,7 +40,17 @@ export type PracticeClassicItem = EnglishClassicQuoteItem & {
 
 export type PracticeItem = PracticeVocabItem | PracticeClassicItem;
 
-export type PracticeCountOption = 10 | 20 | 30 | 40 | 50;
+export type PracticeCountOption =
+	| 10
+	| 20
+	| 30
+	| 40
+	| 50
+	| 60
+	| 70
+	| 80
+	| 90
+	| 100;
 
 /** 分页拉词进度：顺序模式记下一页；随机模式记录已用过的页码 */
 export type PracticeSessionCursor = {
@@ -63,6 +73,8 @@ export type PracticeSetupConfig = {
 	streamId?: string;
 	/** 词表总量（URL 或会话内传递，用于分页） */
 	poolTotal?: number;
+	/** 与 Setup 顶栏一致的来源标题（词库名 / 收藏等） */
+	sourceTitle?: string;
 };
 
 export type PracticeAttemptResult = {
@@ -137,16 +149,20 @@ export type PracticePageShellProps = {
 	children: ReactNode;
 	/** fill：内容顶对齐并占满剩余高度（结算页错题列表等） */
 	contentLayout?: 'center' | 'fill';
+	/** 作答页：隐藏壳顶栏、内容无内边距，由 Session 铺满白色区域 */
+	flush?: boolean;
 };
 
 export type PracticeShortcutsMenuProps = {
 	/** 进行中练习模式；未传时展示完整说明（含听写 ←） */
 	practiceMode?: PracticeMode;
+	/** 经典词槽：展示词性/音标快捷键 */
+	slotBoard?: boolean;
 };
 
 export type PracticeSegmentOption<T extends string> = {
 	value: T;
-	label: string;
+	label: ReactNode;
 };
 
 export type PracticeSegmentedProps<T extends string> = {
@@ -171,6 +187,7 @@ export type SetupProps = {
 	initialStreamId?: string;
 	initialSourceTitle?: string;
 	initialPoolTotal?: number;
+	headerExtra?: ReactNode;
 	onStarted: (
 		queue: PracticeItem[],
 		config: PracticeSetupConfig,
@@ -181,6 +198,8 @@ export type SetupProps = {
 export type SessionProps = {
 	mode: PracticeMode;
 	item: PracticeItem;
+	/** 与 Setup 顶栏一致的来源标题 */
+	sourceTitle?: string;
 	/** 当前题为本轮最后一题（答错揭示后按钮文案为「查看练习结果」） */
 	isLastQuestion?: boolean;
 	/** 是否可回到上一题（非本轮第一题） */
@@ -188,6 +207,9 @@ export type SessionProps = {
 	/** 从错题态切回上一题（由父级递减 index 并截断 results） */
 	onGoPrevious?: () => void;
 	onStepComplete: (result: PracticeAttemptResult) => void;
+	/** 铺满页壳时的进度文案，如「第 1 / 20 题」 */
+	progressLabel?: string;
+	headerExtra?: ReactNode;
 };
 
 export type SummaryProps = {
@@ -249,7 +271,12 @@ export type SummaryActionsProps = {
 
 // —— 单题 Session 子组件 ——
 
-export type PracticeItemPhase = 'prompt' | 'soft_wrong' | 'revealed';
+export type PracticeItemPhase =
+	| 'prompt'
+	| 'soft_wrong'
+	| 'revealed'
+	/** 经典句看中写：全对后的中间展示态（自动展开词性/音标/释义） */
+	| 'correct_reveal';
 
 export type DictationStepProgressProps = {
 	stepListen: string;
@@ -275,12 +302,6 @@ export type DictationPromptBodyProps = {
 	stepListen: string;
 	stepSpell: string;
 	spellStepActive: boolean;
-};
-
-export type SessionStageHeaderProps = {
-	icon: ReactNode;
-	title: string;
-	trailing?: ReactNode;
 };
 
 export type SessionPromptPanelProps = {

@@ -1,7 +1,3 @@
-/** 与 intro / done / 练习 Setup 底栏一致的按钮外框 */
-export const DAILY_FOOTER_PANEL_CLASS =
-	'border-theme/10 bg-theme-background rounded-lg border p-1 shadow-sm';
-
 /** 与侧栏「今日记词」按钮一致的 emerald·teal 预设按钮底样式 */
 export const DAILY_COUNT_PRESET_BTN_CLASS =
 	'flex-1 rounded-md border bg-emerald-500/15 px-0 py-1 text-xs font-medium transition-colors hover:bg-emerald-500/20';

@@ -1,4 +1,4 @@
-import { type RefObject, useEffect } from 'react';
+import { useEffect } from 'react';
 import type { PracticeMode } from '../types';
 import type { PlayWordFn } from './usePracticePlayback';
 
@@ -9,8 +9,9 @@ export function usePracticeItemReset(args: {
 	cancelDictationPlay: () => void;
 	setPlaying: (playing: boolean) => void;
 	resetState: () => void;
-	playWordRef: RefObject<PlayWordFn>;
-	inputRef: RefObject<HTMLInputElement | null>;
+	playWordRef: { current: PlayWordFn };
+	/** 整词输入框；词槽模式可不传（由词槽自行聚焦） */
+	inputRef?: { current: HTMLInputElement | null };
 }) {
 	const {
 		itemKey,
@@ -29,7 +30,7 @@ export function usePracticeItemReset(args: {
 		if (mode === 'dictation') {
 			void playWordRef.current({ force: true, sequence: true });
 		}
-		requestAnimationFrame(() => inputRef.current?.focus());
+		requestAnimationFrame(() => inputRef?.current?.focus());
 	}, [
 		itemKey,
 		mode,

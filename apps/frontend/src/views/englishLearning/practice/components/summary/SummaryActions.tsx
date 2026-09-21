@@ -84,7 +84,7 @@ export function SummaryActions({
 				onClick={onContinuePractice}
 			>
 				{continueLoading ? (
-					<Spinner className="size-4 shrink-0" />
+					<Spinner className="size-4 shrink-0 text-teal-500" />
 				) : (
 					<ListPlus className="size-3.5 shrink-0" aria-hidden />
 				)}
@@ -108,7 +108,7 @@ export function SummaryActions({
 					onClick={() => void onSaveMistakes()}
 				>
 					{saveMistakesLoading ? (
-						<Spinner className="size-4 shrink-0" />
+						<Spinner className="size-4 shrink-0 text-amber-600" />
 					) : (
 						<BookmarkPlus className="size-3.5 shrink-0" aria-hidden />
 					)}

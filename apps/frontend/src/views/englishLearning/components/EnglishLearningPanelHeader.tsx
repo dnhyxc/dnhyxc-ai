@@ -6,36 +6,41 @@ export type EnglishLearningPanelHeaderProps = {
 	title: ReactNode;
 	/** 标题容器额外 class（如收藏页标题行内 flex） */
 	titleClassName?: string;
-	/** 右侧操作区：练习入口、分类 Tab、自定义按钮等 */
+	/** 标题右侧、trailing 左侧：全选 / 移除 / 练习等操作 */
+	actions?: ReactNode;
+	/** 最右侧：分类 Tab 等 */
 	trailing?: ReactNode;
 	className?: string;
 };
 
 /**
- * 英语学习内嵌面板顶栏：固定高度、左右分布，左侧标题 + 右侧 trailing。
- * 用于收藏、错题集等同构「圆角卡片 + 列表」页面。
+ * 英语学习内嵌面板顶栏：左侧标题，右侧 actions + trailing。
  */
 export function EnglishLearningPanelHeader({
 	title,
 	titleClassName,
+	actions,
 	trailing,
 	className,
 }: EnglishLearningPanelHeaderProps) {
 	return (
 		<header
 			className={cn(
-				'h-12 flex shrink-0 items-center justify-between gap-4 px-4 py-2',
+				'flex h-12 shrink-0 items-center gap-3 border-b border-theme/8 px-4',
 				className,
 			)}
 		>
 			<h2
 				className={cn(
-					'text-textcolor min-w-0 overflow-hidden text-base font-semibold',
+					'text-textcolor min-w-0 flex-1 overflow-hidden text-base font-semibold',
 					titleClassName,
 				)}
 			>
 				{title}
 			</h2>
+			{actions != null ? (
+				<div className="flex shrink-0 items-center">{actions}</div>
+			) : null}
 			{trailing != null ? (
 				<div className="flex shrink-0 items-center gap-2">{trailing}</div>
 			) : null}

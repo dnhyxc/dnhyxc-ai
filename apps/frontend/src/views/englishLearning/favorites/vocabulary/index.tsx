@@ -5,7 +5,14 @@ import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -27,6 +34,7 @@ import {
 } from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
 import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
 import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
@@ -52,11 +60,15 @@ export type FavoritesListCounts = {
 export type VocabularyFavoritesSectionProps = {
 	active: boolean;
 	onCountsChange?: (counts: FavoritesListCounts) => void;
+	headerTitle: ReactNode;
+	headerTrailing?: ReactNode;
 };
 
 export function VocabularyFavoritesSection({
 	active,
 	onCountsChange,
+	headerTitle,
+	headerTrailing,
 }: VocabularyFavoritesSectionProps) {
 	const { t } = useI18n();
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -330,9 +342,10 @@ export function VocabularyFavoritesSection({
 			});
 			return;
 		}
+		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
 		setExportingDocx(true);
 		try {
-			await downloadEnglishVocabularyFavoritesDocx();
+			await downloadEnglishVocabularyFavoritesDocx(ids);
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',
@@ -394,6 +407,32 @@ export function VocabularyFavoritesSection({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
+				<EnglishLearningPanelHeader
+					titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+					title={headerTitle}
+					actions={
+						<FavoritesPanelFooter
+							selectAllId="vocab-fav-select-all"
+							showSelection={!showInitialLoading && entries.length > 0}
+							selectAllCheckboxState={selectAllCheckboxState}
+							selectionDisabled={selectionDisabled}
+							onToggleSelectAll={toggleSelectAllLoaded}
+							selectedCount={selectedIds.size}
+							removeDisabled={removeDisabled}
+							batchRemoving={batchRemoving}
+							onRequestRemove={requestRemoveConfirm}
+							exportDisabled={exportDisabled}
+							exportingDocx={exportingDocx}
+							onExportDocx={handleExportDocx}
+							exportLabel={t('englishLearning.vocab.exportDocx')}
+							showPracticeEntry
+							practiceContentKind="vocab"
+							practiceDisabled={exportDisabled}
+							practicePoolTotal={totalCount}
+						/>
+					}
+					trailing={headerTrailing}
+				/>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
 						<Loading text={t('englishLearning.vocab.favoritesLoading')} />
@@ -407,7 +446,7 @@ export function VocabularyFavoritesSection({
 						) : null}
 						<ScrollArea
 							ref={scrollViewportRef}
-							className="relative min-h-0 h-full px-4"
+							className="relative min-h-0 h-full p-4"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 							onScroll={composeViewportScroll(
 								onViewportScroll,
@@ -483,25 +522,6 @@ export function VocabularyFavoritesSection({
 						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
 					</div>
 				)}
-				<FavoritesPanelFooter
-					selectAllId="vocab-fav-select-all"
-					showSelection={!showInitialLoading && entries.length > 0}
-					selectAllCheckboxState={selectAllCheckboxState}
-					selectionDisabled={selectionDisabled}
-					onToggleSelectAll={toggleSelectAllLoaded}
-					selectedCount={selectedIds.size}
-					removeDisabled={removeDisabled}
-					batchRemoving={batchRemoving}
-					onRequestRemove={requestRemoveConfirm}
-					exportDisabled={exportDisabled}
-					exportingDocx={exportingDocx}
-					onExportDocx={handleExportDocx}
-					exportLabel={t('englishLearning.vocab.exportDocx')}
-					showPracticeEntry
-					practiceContentKind="vocab"
-					practiceDisabled={exportDisabled}
-					practicePoolTotal={totalCount}
-				/>
 			</div>
 		</>
 	);

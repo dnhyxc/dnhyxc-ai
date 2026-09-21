@@ -43,7 +43,7 @@ import type {
 } from '../types';
 import { toPracticeClassicItem, toPracticeVocabItem } from './item';
 
-export const PRACTICE_MAX_WORDS = 50;
+export const PRACTICE_MAX_WORDS = 100;
 
 function vocabFavoriteToItem(
 	row: EnglishVocabularyFavoriteListEntry,
@@ -631,6 +631,7 @@ async function fetchPack(
 async function fetchReview(
 	contentKind: PracticeContentKind,
 	count: number,
+	order: PracticeOrder,
 	excludeKeys: readonly string[],
 ): Promise<PracticeSessionFetchResult> {
 	const res = await getEnglishPracticeReviewQueue({
@@ -639,7 +640,7 @@ async function fetchReview(
 		excludeKeys: [...excludeKeys],
 	});
 	const raw = res.data?.items ?? [];
-	const items = dedupeItems(
+	let items = dedupeItems(
 		raw.map((row) =>
 			row.contentKind === 'classic'
 				? toPracticeClassicItem({
@@ -658,6 +659,15 @@ async function fetchReview(
 					}),
 		),
 	);
+	// 顺序：保持复习队列到期序；随机：打乱本轮题目
+	if (order === 'random' && items.length > 1) {
+		const shuffled = [...items];
+		for (let i = shuffled.length - 1; i > 0; i -= 1) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+		}
+		items = shuffled;
+	}
 	return { items, cursor: emptyCursor() };
 }
 
@@ -756,7 +766,7 @@ function runSessionFetch(
 				excludeKeys,
 			);
 		case 'review':
-			return fetchReview(params.contentKind, count, excludeKeys);
+			return fetchReview(params.contentKind, count, params.order, excludeKeys);
 		default:
 			return Promise.resolve({ items: [], cursor: emptyCursor() });
 	}

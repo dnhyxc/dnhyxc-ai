@@ -267,7 +267,7 @@ export default function EnglishLearningDailyRecordsPage() {
 								) : null}
 								<ScrollArea
 									ref={scrollViewportRef}
-									className="relative min-h-0 h-full px-4 pb-4"
+									className="relative min-h-0 h-full p-4"
 									viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
 									onScroll={composeViewportScroll(
 										onViewportScroll,

@@ -376,7 +376,7 @@ export default function CategoryManageDialog({
 								onClick={() => void onAdd()}
 							>
 								{adding ? (
-									<Spinner className="size-3.5" aria-hidden />
+									<Spinner className="size-3.5 text-textcolor" aria-hidden />
 								) : (
 									<Plus className="size-3.5" aria-hidden />
 								)}

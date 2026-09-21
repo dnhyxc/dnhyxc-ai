@@ -75,15 +75,21 @@ import {
 	EBOOK_THOUGHTS,
 	EBOOK_TITLE,
 	EBOOK_UPLOAD,
+	ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS,
 	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
+	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
+	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
+	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH,
+	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_IMPORT,
 	ENGLISH_LEARNING_PRACTICE_DAILY,
 	ENGLISH_LEARNING_PRACTICE_REVIEW,
+	ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX,
 	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
@@ -92,6 +98,7 @@ import {
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_VOCABULARY_MISTAKES,
+	ENGLISH_LEARNING_VOCABULARY_MISTAKES_EXPORT_DOCX,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
 	GET_SESSION_LIST,
@@ -1610,6 +1617,207 @@ export const getEnglishPracticeReviewSummary = async (options?: {
 	);
 };
 
+export type EnglishSentenceWordAnnotation = {
+	word: string;
+	posZh: string;
+	ipa: string;
+	meaningZh: string;
+};
+
+/** 经典句看中写：按分词生成词性 / IPA / 释义 */
+export const annotateEnglishSentenceWords = async (params: {
+	english: string;
+	words: string[];
+	silent?: boolean;
+}) => {
+	return await http.post<{ words: EnglishSentenceWordAnnotation[] }>(
+		ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
+		{
+			english: params.english,
+			words: params.words,
+		},
+		{ silent: params.silent },
+	);
+};
+
+/** 练习开局批量标注（后端先查库；cacheOnly 时不调模型） */
+export const annotateEnglishSentenceWordsBatch = async (params: {
+	items: { english: string; words: string[] }[];
+	cacheOnly?: boolean;
+	silent?: boolean;
+}) => {
+	return await http.post<{
+		items: {
+			english: string;
+			words: EnglishSentenceWordAnnotation[];
+			cacheHit: boolean;
+		}[];
+	}>(
+		ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH,
+		{
+			items: params.items,
+			...(params.cacheOnly ? { cacheOnly: true } : {}),
+		},
+		{ silent: params.silent },
+	);
+};
+
+/** 手动导入词标注：无 LLM，同 cache_key 覆盖；items 可为源句集子集 */
+export const importEnglishSentenceWordAnnotations = async (params: {
+	source: 'library' | 'pack';
+	libraryId?: string;
+	streamId?: string;
+	items: Array<{
+		english: string;
+		words: EnglishSentenceWordAnnotation[];
+	}>;
+	silent?: boolean;
+}) => {
+	return await http.post<{
+		accepted: number;
+		skipped: number;
+		overwritten: number;
+	}>(
+		ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_IMPORT,
+		{
+			source: params.source,
+			...(params.libraryId ? { libraryId: params.libraryId } : {}),
+			...(params.streamId ? { streamId: params.streamId } : {}),
+			items: params.items,
+		},
+		{ silent: params.silent },
+	);
+};
+
+export type EnglishAnnotateSourceTaskDto = {
+	id: string;
+	source: 'library' | 'pack';
+	libraryId?: string;
+	streamId?: string;
+	title: string;
+	status: 'running' | 'paused' | 'done' | 'error';
+	progress: {
+		total: number;
+		hit: number;
+		miss: number;
+		annotated: number;
+		failed: number;
+		remaining: number;
+		tokensPrompt: number;
+		tokensCompletion: number;
+		tokensTotal: number;
+	} | null;
+	errorMessage?: string;
+	startedAt: number;
+	updatedAt: number;
+	finishedAt?: number;
+};
+
+export const listEnglishAnnotateSourceTasks = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<{ items: EnglishAnnotateSourceTaskDto[] }>(
+		ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS,
+		{ silent: options?.silent },
+	);
+};
+
+export const createEnglishAnnotateSourceTask = async (params: {
+	source: 'library' | 'pack';
+	libraryId?: string;
+	streamId?: string;
+	title: string;
+	silent?: boolean;
+}) => {
+	return await http.post<{
+		task: EnglishAnnotateSourceTaskDto;
+		reused: boolean;
+	}>(
+		ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS,
+		{
+			source: params.source,
+			libraryId: params.libraryId,
+			streamId: params.streamId,
+			title: params.title,
+		},
+		{ silent: params.silent },
+	);
+};
+
+export const pauseEnglishAnnotateSourceTask = async (
+	taskId: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.post<{ task: EnglishAnnotateSourceTaskDto }>(
+		`${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/${encodeURIComponent(taskId)}/pause`,
+		{},
+		{ silent: options?.silent },
+	);
+};
+
+/** 资源库「查看进度」：刷新服务端 updatedAt，进度列表顶前可跨刷新 */
+export const bumpEnglishAnnotateSourceTask = async (
+	taskId: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.post<{ task: EnglishAnnotateSourceTaskDto }>(
+		`${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/${encodeURIComponent(taskId)}/bump`,
+		{},
+		{ silent: options?.silent },
+	);
+};
+
+/** 刷新/关闭页：keepalive 调暂停（async POST 会被浏览器掐断） */
+export function keepPauseEnglishAnnotateSourceTask(taskId: string): void {
+	if (typeof window === 'undefined') return;
+	const id = taskId.trim();
+	if (!id) return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	void fetch(
+		`${BASE_URL}${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/${encodeURIComponent(id)}/pause`,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: '{}',
+			keepalive: true,
+		},
+	);
+}
+
+export const resumeEnglishAnnotateSourceTask = async (
+	taskId: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.post<{ task: EnglishAnnotateSourceTaskDto }>(
+		`${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/${encodeURIComponent(taskId)}/resume`,
+		{},
+		{ silent: options?.silent },
+	);
+};
+
+export const dismissEnglishAnnotateSourceTask = async (
+	taskId: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.delete(
+		`${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/${encodeURIComponent(taskId)}`,
+		{ silent: options?.silent },
+	);
+};
+
+export const dismissFinishedEnglishAnnotateSourceTasks = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.delete<{ removed: number }>(
+		`${ENGLISH_LEARNING_ANNOTATE_SOURCE_TASKS}/finished`,
+		{ silent: options?.silent },
+	);
+};
+
 export const getEnglishPracticeReviewQueue = async (options: {
 	contentKind: 'vocab' | 'classic';
 	count?: number;
@@ -1626,6 +1834,43 @@ export const getEnglishPracticeReviewQueue = async (options: {
 				...(excludeKeys.length > 0
 					? { excludeKeys: excludeKeys.join(',') }
 					: {}),
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+/** 今日待复习分页列表（字段与错题集列表同构） */
+export const listEnglishPracticeReviewVocabDue = async (options?: {
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishVocabularyMistakesPage>(
+		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/items`,
+		{
+			querys: {
+				contentKind: 'vocab',
+				limit: options?.limit ?? 50,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+export const listEnglishPracticeReviewClassicDue = async (options?: {
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishClassicQuoteMistakesPage>(
+		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/items`,
+		{
+			querys: {
+				contentKind: 'classic',
+				limit: options?.limit ?? 50,
+				offset: options?.offset ?? 0,
 			},
 			silent: options?.silent,
 		},
@@ -2246,13 +2491,17 @@ export function patchElListResume(
 }
 
 /**
- * 带鉴权拉取收藏导出 DOCX：`http.get` 取 `ArrayBuffer` 后统一走 {@link downloadBlob}（Web 为 `<a download>`，Tauri 为 `download_blob`）。
+ * 带鉴权拉取英语学习导出 DOCX：`http.post` 取 `ArrayBuffer` 后统一走 {@link downloadBlob}。
+ * body.ids 非空时仅导出这些条目；否则全量（至多 3000）。
  */
-async function downloadEnglishFavoritesAuthorizedDocx(
+async function downloadEnglishAuthorizedDocx(
 	path: string,
 	filename: string,
+	body?: Record<string, unknown>,
 ): Promise<void> {
-	const { data } = await http.get<ArrayBuffer>(path, { silent: true });
+	const { data } = await http.post<ArrayBuffer>(path, body ?? {}, {
+		silent: true,
+	});
 	if (!(data instanceof ArrayBuffer)) {
 		throw new Error('导出文件无效');
 	}
@@ -2262,13 +2511,13 @@ async function downloadEnglishFavoritesAuthorizedDocx(
 	const result = await downloadBlob(
 		{
 			file_name: filename,
-			id: `english-favorites-${Date.now()}`,
+			id: `english-docx-${Date.now()}`,
 			overwrite: true,
 		},
 		blob,
 	);
 	if (result.success !== 'success') {
-		// Tauri：`downloadBlob` 内已 Toast；Web：无内置 Toast，抛错由抽屉提示
+		// Tauri：`downloadBlob` 内已 Toast；Web：无内置 Toast，抛错由调用方提示
 		if (isTauriRuntime()) {
 			return;
 		}
@@ -2276,19 +2525,63 @@ async function downloadEnglishFavoritesAuthorizedDocx(
 	}
 }
 
-/** 下载当前用户单词收藏 Word（服务端至多导出 3000 条） */
-export async function downloadEnglishVocabularyFavoritesDocx(): Promise<void> {
-	await downloadEnglishFavoritesAuthorizedDocx(
+function exportDocxBody(ids?: string[]): { ids?: string[] } {
+	return ids && ids.length > 0 ? { ids } : {};
+}
+
+/** 下载当前用户单词收藏 Word（有 ids 仅导出所选，否则全量至多 3000） */
+export async function downloadEnglishVocabularyFavoritesDocx(
+	ids?: string[],
+): Promise<void> {
+	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
 		`vocabulary-${Date.now()}.docx`,
+		exportDocxBody(ids),
 	);
 }
 
-/** 下载当前用户经典句收藏 Word（服务端至多导出 3000 条） */
-export async function downloadEnglishClassicQuoteFavoritesDocx(): Promise<void> {
-	await downloadEnglishFavoritesAuthorizedDocx(
+/** 下载当前用户经典句收藏 Word */
+export async function downloadEnglishClassicQuoteFavoritesDocx(
+	ids?: string[],
+): Promise<void> {
+	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 		`classic-quote-${Date.now()}.docx`,
+		exportDocxBody(ids),
+	);
+}
+
+/** 下载当前用户单词错题 Word */
+export async function downloadEnglishVocabularyMistakesDocx(
+	ids?: string[],
+): Promise<void> {
+	await downloadEnglishAuthorizedDocx(
+		ENGLISH_LEARNING_VOCABULARY_MISTAKES_EXPORT_DOCX,
+		`vocabulary-mistakes-${Date.now()}.docx`,
+		exportDocxBody(ids),
+	);
+}
+
+/** 下载当前用户经典句错题 Word */
+export async function downloadEnglishClassicQuoteMistakesDocx(
+	ids?: string[],
+): Promise<void> {
+	await downloadEnglishAuthorizedDocx(
+		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES_EXPORT_DOCX,
+		`classic-quote-mistakes-${Date.now()}.docx`,
+		exportDocxBody(ids),
+	);
+}
+
+/** 下载今日待复习 Word */
+export async function downloadEnglishPracticeReviewDueDocx(
+	contentKind: 'vocab' | 'classic',
+	ids?: string[],
+): Promise<void> {
+	await downloadEnglishAuthorizedDocx(
+		ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX,
+		`review-${contentKind}-${Date.now()}.docx`,
+		{ contentKind, ...exportDocxBody(ids) },
 	);
 }
 

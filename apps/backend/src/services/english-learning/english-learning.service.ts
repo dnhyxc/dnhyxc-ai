@@ -8,6 +8,7 @@ import {
 } from '@langchain/core/messages';
 import { Cache } from '@nestjs/cache-manager';
 import {
+	BadGatewayException,
 	BadRequestException,
 	ForbiddenException,
 	HttpException,
@@ -47,11 +48,18 @@ import {
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { UserService } from '../user/user.service';
 import {
+	ANNOTATE_LLM_ATTACH_ENGLISH_MIN_WORDS,
+	ANNOTATE_SOURCE_DB_CHUNK,
+	ANNOTATE_SOURCE_HARD_MAX,
+	ANNOTATE_SOURCE_LLM_INITIAL_CHUNK,
+	ANNOTATE_SOURCE_LLM_MAX_RESUME_ROUNDS,
+	ANNOTATE_SOURCE_LLM_MAX_TOTAL_ROUNDS,
 	ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP,
 	ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE,
 	ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES,
 	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE,
 	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE,
+	ENGLISH_PRACTICE_SESSION_MAX,
 	PACK_AGENT_THREAD_MAX_MESSAGES,
 	PACK_GENERATION_DB_EXCLUDE_MAX_KEYS,
 	PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT,
@@ -64,6 +72,8 @@ import {
 	PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
 	PACK_TOPIC_VECTOR_MATCH_MAX_LABELS,
 	PACK_TOPIC_VECTOR_SIMILARITY_MIN,
+	SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK,
+	SENTENCE_WORD_ANNOTATION_CACHE_VERSION,
 	TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS,
 	TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS,
 	TOPIC_PACK_EXCLUDE_PROMPT_MAX_CHARS,
@@ -137,6 +147,7 @@ import {
 	type EnglishPackWebSearchRoundJson,
 } from './entity/english-pack-web-search.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
+import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
@@ -151,8 +162,15 @@ import {
 	AGENT_SYSTEM_PROMPT,
 	CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC,
 	ENGLISH_PACK_LEARNER_CONTEXT_HINT,
+	SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM,
+	SENTENCE_WORDS_ANNOTATE_SYSTEM,
 	VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC,
 } from './prompt';
+import { segmentEnglishSentenceWords } from './sentence-segment.util';
+import {
+	buildSentenceWordAnnotationCacheKey,
+	isUsableSentenceWordAnnotations,
+} from './sentence-word-annotation-cache.util';
 /** 同主题匹配索引：一次生成内复用，避免重复调 embedding */
 export type PackTopicMatchIndex = {
 	isRelated: (sourceLabel: string) => boolean;
@@ -164,6 +182,50 @@ export type ClassicQuoteItemDto = {
 	source: string;
 	noteZh: string;
 };
+
+/** 句内词标注（看中写词槽元数据） */
+export type SentenceWordAnnotationDto = {
+	word: string;
+	posZh: string;
+	ipa: string;
+	meaningZh: string;
+};
+
+/** 整集预热 SSE / 回调进度 */
+export type AnnotateSourceSseEvent =
+	| {
+			type: 'annotate.start';
+			total: number;
+			hit: number;
+			miss: number;
+	  }
+	| {
+			type: 'annotate.progress';
+			total: number;
+			hit: number;
+			miss: number;
+			annotated: number;
+			failed: number;
+			remaining: number;
+			/** 累计 prompt tokens（本任务） */
+			tokensPrompt?: number;
+			/** 累计 completion tokens（本任务） */
+			tokensCompletion?: number;
+			/** 累计 total = prompt + completion */
+			tokensTotal?: number;
+			heartbeat?: boolean;
+	  }
+	| {
+			type: 'annotate.complete';
+			total: number;
+			hit: number;
+			annotated: number;
+			failed: number;
+			tokensPrompt?: number;
+			tokensCompletion?: number;
+			tokensTotal?: number;
+	  }
+	| { type: 'annotate.error'; message: string };
 
 export type ClassicQuoteGenerationProgress = {
 	collected: number;
@@ -277,6 +339,13 @@ export type VocabularyHistoryListItem = {
 @Injectable()
 export class EnglishLearningService {
 	private readonly libraryCache: EnglishLearningLibraryCache;
+	/** 同进程同 cacheKey 标注请求单飞，避免并发双打模型 */
+	private readonly annotateSentenceInflight = new Map<
+		string,
+		Promise<{ words: SentenceWordAnnotationDto[] }>
+	>();
+	/** version 升版后清旧行；进程内只跑一次 */
+	private annotationCacheStalePurged = false;
 
 	constructor(
 		private readonly dataSource: DataSource,
@@ -322,6 +391,8 @@ export class EnglishLearningService {
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
 		@InjectRepository(EnglishDailyMemorizeRecord)
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
+		@InjectRepository(EnglishSentenceWordAnnotationCache)
+		private readonly sentenceWordAnnotationCacheRepo: Repository<EnglishSentenceWordAnnotationCache>,
 		private readonly userService: UserService,
 	) {
 		this.libraryCache = new EnglishLearningLibraryCache(cache, this.logger);
@@ -336,6 +407,15 @@ export class EnglishLearningService {
 			if (o.code === 'ABORT_ERR') return true;
 		}
 		return false;
+	}
+
+	/** 开发者可见：大模型已停止（终端 console + nest logger） */
+	private logLlmCallStopped(reason: string, detail?: string) {
+		const msg = `[EnglishLearning] ★ 大模型已停止调用 ★ reason=${reason}${
+			detail ? ` | ${detail}` : ''
+		}`;
+		this.logger.warn(msg);
+		console.warn(`\n${'='.repeat(56)}\n${msg}\n${'='.repeat(56)}\n`);
 	}
 
 	/** 主 Agent 最终要点：trim + 仅在超过后备上限时截断并告警（正常应由模型自行压缩） */
@@ -3397,6 +3477,17 @@ ${existingHintBlock}
 		priorThread?: BaseMessage[];
 		/** 与 SSE / 显式 cancel 联动，中止子模型 HTTP 请求 */
 		signal?: AbortSignal;
+		/**
+		 * 复用已创建的客户端（整集标注多轮续标用，避免每轮 createLlm）。
+		 * 传入时不再按 maxTokens 重建；调用方应一次建好足够大的 maxTokens。
+		 */
+		llm?: Awaited<ReturnType<typeof createLlm>>;
+		/** 本轮调用的 token 用量（若供应商/封装返回 usage） */
+		onUsage?: (u: {
+			promptTokens: number;
+			completionTokens: number;
+			totalTokens: number;
+		}) => void;
 	}): Promise<string> {
 		if (params.signal?.aborted) {
 			const err = new Error('Aborted');
@@ -3407,24 +3498,26 @@ ${existingHintBlock}
 			32768,
 			Math.max(4096, Math.floor(params.maxTokens)),
 		);
-		const llm = await createLlm(
-			this.configService,
-			{
-				preset: 'englishLearning',
-				userId: params.userId,
-				streaming: false,
-				temperature: 0.35,
-				defaultTemperature: 0.35,
-				maxTokens: capped,
-				maxTokensPolicy: 'default',
-				abortSignal: params.signal,
-				// 设定 LLM 输出格式为 JSON（json_object）：避免自然语言混杂/生成结构可信度更高
-				modelKwargs: {
-					response_format: { type: 'json_object' },
+		const llm =
+			params.llm ??
+			(await createLlm(
+				this.configService,
+				{
+					preset: 'englishLearning',
+					userId: params.userId,
+					streaming: false,
+					temperature: 0.35,
+					defaultTemperature: 0.35,
+					maxTokens: capped,
+					maxTokensPolicy: 'default',
+					abortSignal: params.signal,
+					// 设定 LLM 输出格式为 JSON（json_object）：避免自然语言混杂/生成结构可信度更高
+					modelKwargs: {
+						response_format: { type: 'json_object' },
+					},
 				},
-			},
-			this.llmConfigService,
-		);
+				this.llmConfigService,
+			));
 		const msgs: BaseMessage[] = [new SystemMessage(params.system)];
 		if (params.priorThread?.length) {
 			msgs.push(
@@ -3450,6 +3543,10 @@ ${existingHintBlock}
 			throw err;
 		}
 		const res = await llm.invoke(msgs, { signal: params.signal });
+		const usage = this.readLlmTokenUsage(res);
+		if (usage) {
+			params.onUsage?.(usage);
+		}
 		return typeof res.content === 'string'
 			? res.content
 			: Array.isArray(res.content)
@@ -3464,6 +3561,83 @@ ${existingHintBlock}
 						)
 						.join('')
 				: '';
+	}
+
+	/** 从 LangChain / OpenAI 兼容响应中读 token 用量；无则 null */
+	private readLlmTokenUsage(res: unknown): {
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+	} | null {
+		if (!res || typeof res !== 'object') return null;
+		const msg = res as {
+			usage_metadata?: {
+				input_tokens?: number;
+				output_tokens?: number;
+				total_tokens?: number;
+			};
+			response_metadata?: {
+				usage?: {
+					prompt_tokens?: number;
+					completion_tokens?: number;
+					total_tokens?: number;
+				};
+				tokenUsage?: {
+					promptTokens?: number;
+					completionTokens?: number;
+					totalTokens?: number;
+				};
+			};
+		};
+		const um = msg.usage_metadata;
+		if (
+			um &&
+			(typeof um.input_tokens === 'number' ||
+				typeof um.output_tokens === 'number')
+		) {
+			const promptTokens = Math.max(0, Math.floor(um.input_tokens ?? 0));
+			const completionTokens = Math.max(0, Math.floor(um.output_tokens ?? 0));
+			const totalTokens = Math.max(
+				0,
+				Math.floor(um.total_tokens ?? promptTokens + completionTokens),
+			);
+			return { promptTokens, completionTokens, totalTokens };
+		}
+		const u = msg.response_metadata?.usage;
+		if (
+			u &&
+			(typeof u.prompt_tokens === 'number' ||
+				typeof u.completion_tokens === 'number')
+		) {
+			const promptTokens = Math.max(0, Math.floor(u.prompt_tokens ?? 0));
+			const completionTokens = Math.max(
+				0,
+				Math.floor(u.completion_tokens ?? 0),
+			);
+			const totalTokens = Math.max(
+				0,
+				Math.floor(u.total_tokens ?? promptTokens + completionTokens),
+			);
+			return { promptTokens, completionTokens, totalTokens };
+		}
+		const tu = msg.response_metadata?.tokenUsage;
+		if (
+			tu &&
+			(typeof tu.promptTokens === 'number' ||
+				typeof tu.completionTokens === 'number')
+		) {
+			const promptTokens = Math.max(0, Math.floor(tu.promptTokens ?? 0));
+			const completionTokens = Math.max(
+				0,
+				Math.floor(tu.completionTokens ?? 0),
+			);
+			const totalTokens = Math.max(
+				0,
+				Math.floor(tu.totalTokens ?? promptTokens + completionTokens),
+			);
+			return { promptTokens, completionTokens, totalTokens };
+		}
+		return null;
 	}
 
 	/**
@@ -4772,12 +4946,26 @@ ${existingHintBlock}
 	/** 导出收藏为 DOCX 时单次最多行数，避免超大文档占用内存 */
 	private static readonly FAVORITES_DOCX_EXPORT_MAX = 3000;
 
-	/** 当前用户单词收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条，按收藏时间倒序） */
-	async exportVocabularyFavoritesDocxBuffer(userId: number): Promise<Buffer> {
+	/** 去重并截断导出 ids；空则返回 undefined 表示全量 */
+	private clipExportDocxIds(ids?: string[] | null): string[] | undefined {
+		if (!ids?.length) return undefined;
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) return undefined;
+		return unique.slice(0, EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX);
+	}
+
+	/** 当前用户单词收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	async exportVocabularyFavoritesDocxBuffer(
+		userId: number,
+		ids?: string[] | null,
+	): Promise<Buffer> {
+		const idFilter = this.clipExportDocxIds(ids);
 		const rows = await this.vocabFavoriteRepo.find({
-			where: { userId },
+			where: idFilter ? { userId, id: In(idFilter) } : { userId },
 			order: { createdAt: 'DESC' },
-			take: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+			take: idFilter
+				? undefined
+				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
 		});
 		const list = rows.map((r) => ({
 			word: r.word,
@@ -4787,15 +4975,29 @@ ${existingHintBlock}
 			translationZh: r.translationZh ?? '',
 			example: r.example ?? '',
 		}));
-		return buildVocabularyFavoritesDocxBuffer(list);
+		return buildVocabularyFavoritesDocxBuffer(
+			list,
+			idFilter
+				? {
+						title: '英语单词收藏',
+						subtitle: `共 ${list.length} 条（已选）`,
+					}
+				: undefined,
+		);
 	}
 
-	/** 当前用户经典句收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条，按收藏时间倒序） */
-	async exportClassicQuoteFavoritesDocxBuffer(userId: number): Promise<Buffer> {
+	/** 当前用户经典句收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	async exportClassicQuoteFavoritesDocxBuffer(
+		userId: number,
+		ids?: string[] | null,
+	): Promise<Buffer> {
+		const idFilter = this.clipExportDocxIds(ids);
 		const rows = await this.classicQuoteFavoriteRepo.find({
-			where: { userId },
+			where: idFilter ? { userId, id: In(idFilter) } : { userId },
 			order: { createdAt: 'DESC' },
-			take: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+			take: idFilter
+				? undefined
+				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
 		});
 		const list = rows.map((r) => ({
 			english: r.english,
@@ -4803,7 +5005,158 @@ ${existingHintBlock}
 			source: r.source ?? '',
 			noteZh: r.noteZh ?? '',
 		}));
-		return buildClassicQuoteFavoritesDocxBuffer(list);
+		return buildClassicQuoteFavoritesDocxBuffer(
+			list,
+			idFilter
+				? {
+						title: '英语经典句收藏',
+						subtitle: `共 ${list.length} 条（已选）`,
+					}
+				: undefined,
+		);
+	}
+
+	/** 当前用户单词错题导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	async exportVocabularyMistakesDocxBuffer(
+		userId: number,
+		ids?: string[] | null,
+	): Promise<Buffer> {
+		const idFilter = this.clipExportDocxIds(ids);
+		const rows = await this.vocabMistakeRepo.find({
+			where: idFilter ? { userId, id: In(idFilter) } : { userId },
+			order: { createdAt: 'DESC' },
+			take: idFilter
+				? undefined
+				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+		});
+		return buildVocabularyFavoritesDocxBuffer(
+			rows.map((r) => ({
+				word: r.word,
+				ipa: r.ipa ?? '',
+				pos: r.pos ?? '',
+				segmentation: r.segmentation ?? '',
+				translationZh: r.translationZh ?? '',
+				example: r.example ?? '',
+			})),
+			{
+				title: '英语单词错题',
+				subtitle: idFilter
+					? `共 ${rows.length} 条（已选）`
+					: `共 ${rows.length} 条（按加入时间倒序）`,
+			},
+		);
+	}
+
+	/** 当前用户经典句错题导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	async exportClassicQuoteMistakesDocxBuffer(
+		userId: number,
+		ids?: string[] | null,
+	): Promise<Buffer> {
+		const idFilter = this.clipExportDocxIds(ids);
+		const rows = await this.classicQuoteMistakeRepo.find({
+			where: idFilter ? { userId, id: In(idFilter) } : { userId },
+			order: { createdAt: 'DESC' },
+			take: idFilter
+				? undefined
+				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+		});
+		return buildClassicQuoteFavoritesDocxBuffer(
+			rows.map((r) => ({
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
+			})),
+			{
+				title: '英语经典句错题',
+				subtitle: idFilter
+					? `共 ${rows.length} 条（已选）`
+					: `共 ${rows.length} 条（按加入时间倒序）`,
+			},
+		);
+	}
+
+	/** 今日待复习导出为 Word（到期且错题仍在；有 ids 则仅导出这些错题行） */
+	async exportPracticeReviewDueDocxBuffer(
+		userId: number,
+		contentKind: 'vocab' | 'classic',
+		ids?: string[] | null,
+	): Promise<Buffer> {
+		const idFilter = this.clipExportDocxIds(ids);
+		if (idFilter) {
+			if (contentKind === 'vocab') {
+				const rows = await this.vocabMistakeRepo.find({
+					where: { userId, id: In(idFilter) },
+					order: { createdAt: 'DESC' },
+				});
+				const list = rows.map((r) => ({
+					word: r.word,
+					ipa: r.ipa ?? '',
+					pos: r.pos ?? '',
+					segmentation: r.segmentation ?? '',
+					translationZh: r.translationZh ?? '',
+					example: r.example ?? '',
+				}));
+				return buildVocabularyFavoritesDocxBuffer(list, {
+					title: '今日复习 · 单词',
+					subtitle: `共 ${list.length} 条（已选）`,
+				});
+			}
+			const rows = await this.classicQuoteMistakeRepo.find({
+				where: { userId, id: In(idFilter) },
+				order: { createdAt: 'DESC' },
+			});
+			const list = rows.map((r) => ({
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
+			}));
+			return buildClassicQuoteFavoritesDocxBuffer(list, {
+				title: '今日复习 · 经典句',
+				subtitle: `共 ${list.length} 条（已选）`,
+			});
+		}
+
+		const { items } = await this.listPracticeReviewDuePage(userId, {
+			contentKind,
+			limit: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+			offset: 0,
+		});
+		if (contentKind === 'vocab') {
+			const list = items
+				.filter(
+					(r): r is Extract<(typeof items)[number], { word: string }> =>
+						'word' in r,
+				)
+				.map((r) => ({
+					word: r.word,
+					ipa: r.ipa ?? '',
+					pos: r.pos ?? '',
+					segmentation: r.segmentation ?? '',
+					translationZh: r.translationZh ?? '',
+					example: r.example ?? '',
+				}));
+			return buildVocabularyFavoritesDocxBuffer(list, {
+				title: '今日复习 · 单词',
+				subtitle: `共 ${list.length} 条（按到期时间升序）`,
+			});
+		}
+		const list = items
+			.filter(
+				(r): r is Extract<(typeof items)[number], { english: string }> =>
+					'english' in r,
+			)
+			.map((r) => ({
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
+			}));
+		return buildClassicQuoteFavoritesDocxBuffer(list, {
+			title: '今日复习 · 经典句',
+			subtitle: `共 ${list.length} 条（按到期时间升序）`,
+		});
 	}
 
 	/**
@@ -5220,6 +5573,132 @@ ${existingHintBlock}
 		return { vocabDue, classicDue };
 	}
 
+	/**
+	 * 今日待复习分页列表：review_state ⋈ 错题，按到期时间升序。
+	 * 返回字段与错题集列表同构，便于前端复用卡片与移除接口。
+	 */
+	async listPracticeReviewDuePage(
+		userId: number,
+		opts: {
+			contentKind: 'vocab' | 'classic';
+			limit: number;
+			offset: number;
+		},
+	): Promise<{
+		items: Array<
+			| {
+					id: string;
+					word: string;
+					ipa: string;
+					pos: string;
+					segmentation: string;
+					translationZh: string;
+					example: string;
+					lastUserInput: string;
+					createdAt: string;
+					favoriteId: string | null;
+			  }
+			| {
+					id: string;
+					english: string;
+					translationZh: string;
+					source: string;
+					noteZh: string;
+					lastUserInput: string;
+					createdAt: string;
+			  }
+		>;
+		totalCount: number;
+	}> {
+		const now = new Date();
+		const totalCount = await this.countDueReviewJoined(
+			userId,
+			opts.contentKind,
+			now,
+		);
+		if (totalCount === 0 || opts.offset >= totalCount) {
+			return { items: [], totalCount };
+		}
+
+		const qb = this.practiceReviewStateRepo
+			.createQueryBuilder('rs')
+			.where('rs.userId = :userId', { userId })
+			.andWhere('rs.contentKind = :contentKind', {
+				contentKind: opts.contentKind,
+			})
+			.andWhere('rs.nextReviewAt <= :now', { now })
+			.orderBy('rs.nextReviewAt', 'ASC')
+			.skip(opts.offset)
+			.take(opts.limit);
+
+		if (opts.contentKind === 'vocab') {
+			qb.innerJoin(
+				EnglishVocabularyMistake,
+				'm',
+				'm.userId = rs.userId AND m.wordKey = rs.itemKey',
+			);
+		} else {
+			qb.innerJoin(
+				EnglishClassicQuoteMistake,
+				'm',
+				'm.userId = rs.userId AND m.contentKey = rs.itemKey',
+			);
+		}
+
+		const states = await qb.getMany();
+		if (states.length === 0) {
+			return { items: [], totalCount };
+		}
+		const keys = states.map((s) => s.itemKey);
+
+		if (opts.contentKind === 'vocab') {
+			const rows = await this.vocabMistakeRepo.find({
+				where: { userId, wordKey: In(keys) },
+			});
+			const byKey = new Map(rows.map((r) => [r.wordKey, r] as const));
+			const ordered = keys
+				.map((k) => byKey.get(k))
+				.filter((r): r is NonNullable<typeof r> => r != null);
+			return {
+				totalCount,
+				items: await this.attachVocabularyFavoriteIdsByWord(
+					userId,
+					ordered.map((r) => ({
+						id: r.id,
+						word: r.word,
+						ipa: r.ipa ?? '',
+						pos: r.pos ?? '',
+						segmentation: r.segmentation ?? '',
+						translationZh: r.translationZh ?? '',
+						example: r.example ?? '',
+						lastUserInput: r.lastUserInput ?? '',
+						createdAt: r.createdAt.toISOString(),
+					})),
+				),
+			};
+		}
+
+		const rows = await this.classicQuoteMistakeRepo.find({
+			where: { userId, contentKey: In(keys) },
+		});
+		const byKey = new Map(rows.map((r) => [r.contentKey, r] as const));
+		const ordered = keys
+			.map((k) => byKey.get(k))
+			.filter((r): r is NonNullable<typeof r> => r != null);
+		return {
+			totalCount,
+			items: ordered.map((r) => ({
+				id: r.id,
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
+				lastUserInput: r.lastUserInput ?? '',
+				createdAt: r.createdAt.toISOString(),
+			})),
+		};
+	}
+
 	private async countDueReviewJoined(
 		userId: number,
 		contentKind: 'vocab' | 'classic',
@@ -5282,7 +5761,9 @@ ${existingHintBlock}
 		const exclude = new Set(
 			(opts.excludeKeys ?? []).map((k) => k.trim()).filter(Boolean),
 		);
-		const take = Math.min(50, Math.max(1, opts.count)) + exclude.size;
+		const take =
+			Math.min(ENGLISH_PRACTICE_SESSION_MAX, Math.max(1, opts.count)) +
+			exclude.size;
 
 		const states = await this.practiceReviewStateRepo.find({
 			where: {
@@ -5297,7 +5778,10 @@ ${existingHintBlock}
 
 		const picked = states
 			.filter((s) => !exclude.has(s.itemKey))
-			.slice(0, Math.min(50, Math.max(1, opts.count)));
+			.slice(
+				0,
+				Math.min(ENGLISH_PRACTICE_SESSION_MAX, Math.max(1, opts.count)),
+			);
 
 		if (picked.length === 0) {
 			return { items: [] };
@@ -5631,7 +6115,7 @@ ${existingHintBlock}
 			this.countLibraryMemorizeCandidates(userId),
 			this.dailyMemorizeRecordRepo.count({ where: { userId } }),
 		]);
-		const todayCount = Math.min(50, libraryCount);
+		const todayCount = Math.min(ENGLISH_PRACTICE_SESSION_MAX, libraryCount);
 
 		return {
 			todayCount,
@@ -5761,7 +6245,10 @@ ${existingHintBlock}
 		const exclude = new Set(
 			(opts.excludeKeys ?? []).map((k) => k.trim()).filter(Boolean),
 		);
-		const limit = Math.min(50, Math.max(1, opts.count));
+		const limit = Math.min(
+			ENGLISH_PRACTICE_SESSION_MAX,
+			Math.max(1, opts.count),
+		);
 		const usedKeys = new Set<string>();
 		const items = await this.pickLibraryMemorizeItems(
 			userId,
@@ -5775,5 +6262,1254 @@ ${existingHintBlock}
 		);
 
 		return { items: itemsWithFavorite };
+	}
+
+	/** version 升版后删掉旧 schema_version 行；进程内只跑一次 */
+	private async purgeStaleSentenceWordAnnotationCache(): Promise<void> {
+		if (this.annotationCacheStalePurged) return;
+		this.annotationCacheStalePurged = true;
+		try {
+			const result = await this.sentenceWordAnnotationCacheRepo.delete({
+				schemaVersion: Not(SENTENCE_WORD_ANNOTATION_CACHE_VERSION),
+			});
+			const n = result.affected ?? 0;
+			if (n > 0) {
+				this.logger.log(
+					`[EnglishLearning] purged ${n} stale sentence-word annotation cache rows (version≠${SENTENCE_WORD_ANNOTATION_CACHE_VERSION})`,
+				);
+			}
+		} catch (e) {
+			this.annotationCacheStalePurged = false;
+			this.logger.warn(
+				'[EnglishLearning] purge stale sentence-word annotation cache failed',
+				{
+					message: e instanceof Error ? e.message.slice(0, 200) : String(e),
+				},
+			);
+		}
+	}
+
+	/**
+	 * 语句库整集词标注预热（可 SSE 进度）。
+	 */
+	async annotateClassicLibrarySource(params: {
+		userId: number;
+		libraryId: string;
+		signal?: AbortSignal;
+		onEvent?: (ev: AnnotateSourceSseEvent) => void;
+	}): Promise<{
+		total: number;
+		hit: number;
+		annotated: number;
+		failed: number;
+		tokensPrompt: number;
+		tokensCompletion: number;
+		tokensTotal: number;
+	}> {
+		await this.purgeStaleSentenceWordAnnotationCache();
+		await this.assertClassicQuotesLibraryReadable(
+			params.userId,
+			params.libraryId,
+		);
+		const englishes = await this.loadAllEnglishesForLibrary(params.libraryId);
+		return this.annotateClassicEnglishesWarmup(params.userId, englishes, {
+			signal: params.signal,
+			onEvent: params.onEvent,
+		});
+	}
+
+	/**
+	 * Pack 会话整集词标注预热（可 SSE 进度）。
+	 */
+	async annotateClassicPackSource(params: {
+		userId: number;
+		streamId: string;
+		signal?: AbortSignal;
+		onEvent?: (ev: AnnotateSourceSseEvent) => void;
+	}): Promise<{
+		total: number;
+		hit: number;
+		annotated: number;
+		failed: number;
+		tokensPrompt: number;
+		tokensCompletion: number;
+		tokensTotal: number;
+	}> {
+		await this.purgeStaleSentenceWordAnnotationCache();
+		const streamId = params.streamId.trim();
+		if (!streamId) {
+			throw new BadRequestException('streamId 不能为空');
+		}
+		const session = await this.classicPackSessionRepo.findOne({
+			where: { userId: params.userId, streamId },
+		});
+		if (!session) {
+			throw new NotFoundException('拉取记录不存在或无权访问');
+		}
+		const englishes = await this.loadAllEnglishesForPack(
+			params.userId,
+			streamId,
+		);
+		return this.annotateClassicEnglishesWarmup(params.userId, englishes, {
+			signal: params.signal,
+			onEvent: params.onEvent,
+		});
+	}
+
+	/**
+	 * 手动导入词标注 JSON：无 LLM；分词与文件 words[].word 全等才 upsert。
+	 * 同 cache_key 覆盖；文件外旧行保留。
+	 * 允许部分导入：items 可为当前 library/pack 句集的子集，
+	 * 不以源总句数 / quoteCount 判定成败；source id 只鉴权。
+	 */
+	async importSentenceWordAnnotations(params: {
+		userId: number;
+		source: 'library' | 'pack';
+		libraryId?: string;
+		streamId?: string;
+		items: Array<{
+			english: string;
+			words: Array<{
+				word: string;
+				posZh: string;
+				ipa: string;
+				meaningZh: string;
+			}>;
+		}>;
+	}): Promise<{ accepted: number; skipped: number; overwritten: number }> {
+		if (params.source === 'library') {
+			const libraryId = params.libraryId?.trim() ?? '';
+			if (!libraryId) throw new BadRequestException('libraryId 不能为空');
+			await this.assertClassicQuotesLibraryReadable(params.userId, libraryId);
+		} else {
+			const streamId = params.streamId?.trim() ?? '';
+			if (!streamId) throw new BadRequestException('streamId 不能为空');
+			const session = await this.classicPackSessionRepo.findOne({
+				where: { userId: params.userId, streamId },
+			});
+			if (!session) {
+				throw new NotFoundException('拉取记录不存在或无权访问');
+			}
+		}
+
+		type Row = {
+			cacheKey: string;
+			schemaVersion: string;
+			english: string;
+			words: string[];
+			annotations: SentenceWordAnnotationDto[];
+		};
+		const byKey = new Map<string, Row>();
+		let skipped = 0;
+
+		for (const raw of params.items) {
+			const english = raw.english?.trim() ?? '';
+			const annotations: SentenceWordAnnotationDto[] = (raw.words ?? []).map(
+				(w) => ({
+					word: (w.word ?? '').trim(),
+					posZh: (w.posZh ?? '').trim(),
+					ipa: (w.ipa ?? '').trim(),
+					meaningZh: (w.meaningZh ?? '').trim(),
+				}),
+			);
+			const tokenWords = annotations.map((a) => a.word);
+			if (!english || tokenWords.length === 0 || tokenWords.some((w) => !w)) {
+				skipped += 1;
+				continue;
+			}
+			const segmented = segmentEnglishSentenceWords(english);
+			if (
+				tokenWords.length !== segmented.length ||
+				!tokenWords.every((w, i) => w === segmented[i])
+			) {
+				skipped += 1;
+				continue;
+			}
+			if (!isUsableSentenceWordAnnotations(annotations, tokenWords.length)) {
+				skipped += 1;
+				continue;
+			}
+			const englishNorm = english.toLowerCase();
+			const cacheKey = buildSentenceWordAnnotationCacheKey(
+				englishNorm,
+				tokenWords,
+			);
+			byKey.set(cacheKey, {
+				cacheKey,
+				schemaVersion: SENTENCE_WORD_ANNOTATION_CACHE_VERSION,
+				english: englishNorm,
+				words: tokenWords,
+				annotations,
+			});
+		}
+
+		const rows = [...byKey.values()];
+		if (rows.length === 0) {
+			return { accepted: 0, skipped, overwritten: 0 };
+		}
+
+		const existing = await this.sentenceWordAnnotationCacheRepo.find({
+			where: { cacheKey: In(rows.map((r) => r.cacheKey)) },
+			select: ['cacheKey'],
+		});
+		const overwritten = existing.length;
+
+		await this.sentenceWordAnnotationCacheRepo.upsert(rows, ['cacheKey']);
+		return { accepted: rows.length, skipped, overwritten };
+	}
+
+	/** ≤生成上限一次 find；>上限且 ≤硬顶分批拼齐；超过硬顶拒绝 */
+	private async loadAllEnglishesForLibrary(
+		libraryId: string,
+	): Promise<string[]> {
+		const count = await this.classicQuotesLibraryItemRepo.count({
+			where: { libraryId },
+		});
+		if (count > ANNOTATE_SOURCE_HARD_MAX) {
+			throw new BadRequestException(
+				`语句过多（>${ANNOTATE_SOURCE_HARD_MAX}），请拆库后再标注`,
+			);
+		}
+		if (count <= ENGLISH_CLASSIC_QUOTES_GENERATION_MAX) {
+			const rows = await this.classicQuotesLibraryItemRepo.find({
+				where: { libraryId },
+				select: ['english'],
+				order: { sortOrder: 'ASC' },
+			});
+			return rows.map((r) => r.english);
+		}
+		const out: string[] = [];
+		for (let offset = 0; offset < count; offset += ANNOTATE_SOURCE_DB_CHUNK) {
+			const rows = await this.classicQuotesLibraryItemRepo.find({
+				where: { libraryId },
+				select: ['english'],
+				order: { sortOrder: 'ASC' },
+				take: ANNOTATE_SOURCE_DB_CHUNK,
+				skip: offset,
+			});
+			if (rows.length === 0) break;
+			for (const r of rows) out.push(r.english);
+		}
+		return out;
+	}
+
+	private async loadAllEnglishesForPack(
+		userId: number,
+		streamId: string,
+	): Promise<string[]> {
+		const count = await this.classicPackItemRepo.count({
+			where: { userId, streamId },
+		});
+		if (count > ANNOTATE_SOURCE_HARD_MAX) {
+			throw new BadRequestException(
+				`语句过多（>${ANNOTATE_SOURCE_HARD_MAX}），无法整集标注`,
+			);
+		}
+		if (count <= ENGLISH_CLASSIC_QUOTES_GENERATION_MAX) {
+			const rows = await this.classicPackItemRepo.find({
+				where: { userId, streamId },
+				select: ['english'],
+				order: { sortOrder: 'ASC' },
+			});
+			return rows.map((r) => r.english);
+		}
+		const out: string[] = [];
+		for (let offset = 0; offset < count; offset += ANNOTATE_SOURCE_DB_CHUNK) {
+			const rows = await this.classicPackItemRepo.find({
+				where: { userId, streamId },
+				select: ['english'],
+				order: { sortOrder: 'ASC' },
+				take: ANNOTATE_SOURCE_DB_CHUNK,
+				skip: offset,
+			});
+			if (rows.length === 0) break;
+			for (const r of rows) out.push(r.english);
+		}
+		return out;
+	}
+
+	private async annotateClassicEnglishesWarmup(
+		userId: number,
+		englishes: string[],
+		opts?: {
+			signal?: AbortSignal;
+			onEvent?: (ev: AnnotateSourceSseEvent) => void;
+		},
+	): Promise<{
+		total: number;
+		hit: number;
+		annotated: number;
+		failed: number;
+		tokensPrompt: number;
+		tokensCompletion: number;
+		tokensTotal: number;
+	}> {
+		type WorkItem = {
+			cacheKey: string;
+			english: string;
+			englishNorm: string;
+			words: string[];
+		};
+
+		const byKey = new Map<string, WorkItem>();
+		for (const raw of englishes) {
+			const english = raw?.trim() ?? '';
+			if (!english) continue;
+			const words = segmentEnglishSentenceWords(english);
+			if (words.length === 0 || words.length > 80) continue;
+			const englishNorm = english.toLowerCase();
+			const cacheKey = buildSentenceWordAnnotationCacheKey(englishNorm, words);
+			if (!byKey.has(cacheKey)) {
+				byKey.set(cacheKey, { cacheKey, english, englishNorm, words });
+			}
+		}
+
+		const items = [...byKey.values()];
+		const total = items.length;
+		if (total === 0) {
+			const empty = {
+				total: 0,
+				hit: 0,
+				annotated: 0,
+				failed: 0,
+				tokensPrompt: 0,
+				tokensCompletion: 0,
+				tokensTotal: 0,
+			};
+			opts?.onEvent?.({ type: 'annotate.start', total: 0, hit: 0, miss: 0 });
+			opts?.onEvent?.({ type: 'annotate.complete', ...empty });
+			return empty;
+		}
+
+		const cachedRows = await this.sentenceWordAnnotationCacheRepo.find({
+			where: { cacheKey: In(items.map((i) => i.cacheKey)) },
+		});
+		const lenByKey = new Map(items.map((i) => [i.cacheKey, i.words.length]));
+		const hitKeys = new Set(
+			cachedRows
+				.filter((r) =>
+					isUsableSentenceWordAnnotations(
+						r.annotations,
+						lenByKey.get(r.cacheKey) ?? -1,
+					),
+				)
+				.map((r) => r.cacheKey),
+		);
+
+		const misses = items.filter((it) => !hitKeys.has(it.cacheKey));
+		const hit = total - misses.length;
+		const miss = misses.length;
+		opts?.onEvent?.({ type: 'annotate.start', total, hit, miss });
+
+		if (misses.length === 0) {
+			const done = {
+				total,
+				hit,
+				annotated: 0,
+				failed: 0,
+				tokensPrompt: 0,
+				tokensCompletion: 0,
+				tokensTotal: 0,
+			};
+			opts?.onEvent?.({ type: 'annotate.complete', ...done });
+			return done;
+		}
+
+		const { annotated, failed, tokensPrompt, tokensCompletion, tokensTotal } =
+			await this.annotateMissesAdaptive(userId, misses, {
+				signal: opts?.signal,
+				onProgress: (p) => {
+					opts?.onEvent?.({
+						type: 'annotate.progress',
+						total,
+						hit,
+						miss,
+						annotated: p.annotated,
+						failed: p.failed,
+						remaining: p.remaining,
+						tokensPrompt: p.tokensPrompt,
+						tokensCompletion: p.tokensCompletion,
+						tokensTotal: p.tokensTotal,
+					});
+				},
+			});
+		const done = {
+			total,
+			hit,
+			annotated,
+			failed,
+			tokensPrompt,
+			tokensCompletion,
+			tokensTotal,
+		};
+		opts?.onEvent?.({ type: 'annotate.complete', ...done });
+		return done;
+	}
+
+	/**
+	 * 标注多轮线程：AI 侧只记已验收 english 节选，降低 priorThread token。
+	 */
+	private buildAnnotateThreadAssistantSnapshot(englishes: string[]): string {
+		const prefixes = englishes.map((e) =>
+			e.trim().replace(/\s+/g, ' ').slice(0, 96),
+		);
+		return `【上轮已验收句节选（勿再输出；下一条回复仍须仅为 JSON 对象）】\n${JSON.stringify({ accepted_english_prefixes: prefixes })}`;
+	}
+
+	/**
+	 * 批量标注入参：默认 id+words；长句附 english 保多义词语境。
+	 * 出参由模型省略 word，解析侧回填 —— 不改变落库 DTO。
+	 */
+	private buildAnnotateLlmPayloadItems(
+		items: { english: string; words: string[] }[],
+	): { id: number; words: string[]; english?: string }[] {
+		return items.map((it, i) => {
+			const row: { id: number; words: string[]; english?: string } = {
+				id: i,
+				words: it.words,
+			};
+			if (it.words.length >= ANNOTATE_LLM_ATTACH_ENGLISH_MIN_WORDS) {
+				row.english = it.english;
+			}
+			return row;
+		});
+	}
+
+	/**
+	 * miss 同会话多轮续标：priorThread 连续对话；按 id 验收写库；硬失败熔断。
+	 * ponytail: 不幻想单轮标完整库；截断则同线程只要 missing，不逐句重开。
+	 * token: 跨批清空 thread；仅窗口内 resume 保留短对话。
+	 */
+	private async annotateMissesAdaptive(
+		userId: number,
+		misses: {
+			cacheKey: string;
+			english: string;
+			englishNorm: string;
+			words: string[];
+		}[],
+		opts?: {
+			signal?: AbortSignal;
+			onProgress?: (p: {
+				annotated: number;
+				failed: number;
+				remaining: number;
+				tokensPrompt: number;
+				tokensCompletion: number;
+				tokensTotal: number;
+			}) => void;
+		},
+	): Promise<{
+		annotated: number;
+		failed: number;
+		tokensPrompt: number;
+		tokensCompletion: number;
+		tokensTotal: number;
+	}> {
+		type Work = (typeof misses)[number];
+		let remaining: Work[] = [...misses];
+		let batchSize = Math.max(1, ANNOTATE_SOURCE_LLM_INITIAL_CHUNK);
+		let annotated = 0;
+		let failed = 0;
+		let zeroStreak = 0;
+		let totalRounds = 0;
+		let tokensPrompt = 0;
+		let tokensCompletion = 0;
+		const thread: BaseMessage[] = [];
+
+		// 整次预热只建一次客户端；多轮续标复用 llm.invoke + priorThread
+		const llm = await createLlm(
+			this.configService,
+			{
+				preset: 'englishLearning',
+				userId,
+				streaming: false,
+				temperature: 0.35,
+				defaultTemperature: 0.35,
+				maxTokens: 32768,
+				maxTokensPolicy: 'default',
+				modelKwargs: {
+					response_format: { type: 'json_object' },
+				},
+			},
+			this.llmConfigService,
+		);
+
+		const emit = () => {
+			opts?.onProgress?.({
+				annotated,
+				failed,
+				remaining: remaining.length,
+				tokensPrompt,
+				tokensCompletion,
+				tokensTotal: tokensPrompt + tokensCompletion,
+			});
+		};
+
+		const tripCircuit = (reason: string) => {
+			this.logger.warn(
+				`[EnglishLearning] annotateMissesAdaptive circuit open: ${reason} (drop remaining=${remaining.length})`,
+			);
+			failed += remaining.length;
+			remaining = [];
+			emit();
+		};
+
+		const upsertAccepted = async (
+			item: Work,
+			ann: SentenceWordAnnotationDto[],
+		): Promise<boolean> => {
+			try {
+				await this.sentenceWordAnnotationCacheRepo.upsert(
+					{
+						cacheKey: item.cacheKey,
+						schemaVersion: SENTENCE_WORD_ANNOTATION_CACHE_VERSION,
+						english: item.englishNorm,
+						words: item.words,
+						annotations: ann,
+					},
+					['cacheKey'],
+				);
+				return true;
+			} catch (e) {
+				this.logger.warn(
+					`[EnglishLearning] annotate upsert failed: ${
+						e instanceof Error ? e.message.slice(0, 200) : String(e)
+					}`,
+				);
+				return false;
+			}
+		};
+
+		const throwIfAborted = () => {
+			if (!opts?.signal?.aborted) return;
+			this.logLlmCallStopped(
+				'annotateMissesAdaptive_signal',
+				`annotated=${annotated} failed=${failed} remaining=${remaining.length} rounds=${totalRounds}`,
+			);
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		};
+
+		while (remaining.length > 0) {
+			throwIfAborted();
+			if (totalRounds >= ANNOTATE_SOURCE_LLM_MAX_TOTAL_ROUNDS) {
+				tripCircuit('max total llm rounds');
+				break;
+			}
+
+			let pending = remaining.slice(0, batchSize);
+			let hardFail = false;
+			let acceptedInWindow = 0;
+			// 跨批不保留 priorThread：避免整次预热叠 Human JSON；窗内 resume 仍用 thread
+			thread.length = 0;
+
+			for (
+				let resume = 0;
+				resume < ANNOTATE_SOURCE_LLM_MAX_RESUME_ROUNDS && pending.length > 0;
+				resume += 1
+			) {
+				throwIfAborted();
+				if (totalRounds >= ANNOTATE_SOURCE_LLM_MAX_TOTAL_ROUNDS) {
+					hardFail = true;
+					break;
+				}
+				totalRounds += 1;
+
+				const payloadItems = this.buildAnnotateLlmPayloadItems(pending);
+				const user =
+					resume === 0
+						? JSON.stringify({ items: payloadItems })
+						: JSON.stringify({
+								continue: true,
+								note: '只标注下列尚未验收的 id；勿重复已验收句。',
+								items: payloadItems,
+							});
+				// 省 token 可观测：对比改前「threadMsgs 随批累加、userChars 含 english」；改后跨批 threadMsgs≈0
+				this.logger.log(
+					`[EnglishLearning] annotateMissesAdaptive invoke round=${totalRounds} resume=${resume} pending=${pending.length} threadMsgs=${thread.length} userChars=${user.length} withEnglish=${payloadItems.filter((p) => p.english).length} tokensTotal=${tokensPrompt + tokensCompletion}`,
+				);
+
+				let text: string;
+				try {
+					text = await this.invokeEnglishPackSubModelJson({
+						system: SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM,
+						user,
+						maxTokens: 32768,
+						userId,
+						priorThread: thread,
+						signal: opts?.signal,
+						llm,
+						onUsage: (u) => {
+							tokensPrompt += u.promptTokens;
+							tokensCompletion += u.completionTokens;
+						},
+					});
+				} catch (e) {
+					if (
+						opts?.signal?.aborted ||
+						(e instanceof Error && e.name === 'AbortError')
+					) {
+						this.logLlmCallStopped(
+							'annotateMissesAdaptive_invoke_aborted',
+							`annotated=${annotated} failed=${failed} remaining=${remaining.length} rounds=${totalRounds}`,
+						);
+						const err = new Error('Aborted');
+						err.name = 'AbortError';
+						throw err;
+					}
+					this.logger.warn(
+						`[EnglishLearning] annotateMissesAdaptive invoke failed: ${
+							e instanceof Error ? e.message.slice(0, 300) : String(e)
+						} (resume=${resume}, pending=${pending.length})`,
+					);
+					hardFail = true;
+					break;
+				}
+				// 每轮 invoke 后立刻推 token，不等验收
+				emit();
+
+				let parsed: unknown = {};
+				try {
+					parsed = this.extractJsonObject(text);
+				} catch {
+					this.logger.warn(
+						`[EnglishLearning] annotateMissesAdaptive JSON parse fail (resume=${resume}, textPrefix=${text.slice(0, 160).replace(/\s+/g, ' ')})`,
+					);
+				}
+
+				const byId = this.extractSentenceWordAnnotationsBatchLoose(
+					parsed,
+					pending.map((p) => p.words),
+				);
+
+				const acceptedEnglishes: string[] = [];
+				const acceptedKeys = new Set<string>();
+				for (let i = 0; i < pending.length; i += 1) {
+					const item = pending[i]!;
+					const ann = byId.get(i);
+					if (!isUsableSentenceWordAnnotations(ann, item.words.length))
+						continue;
+					if (!(await upsertAccepted(item, ann!))) continue;
+					acceptedKeys.add(item.cacheKey);
+					acceptedEnglishes.push(item.english);
+				}
+
+				const snap =
+					acceptedEnglishes.length > 0
+						? this.buildAnnotateThreadAssistantSnapshot(acceptedEnglishes)
+						: text.trim().slice(0, 2000) || ' ';
+				thread.push(new HumanMessage(user), new AIMessage(snap));
+				const trimmed = this.trimPackAgentThread(
+					thread,
+					PACK_AGENT_THREAD_MAX_MESSAGES,
+				);
+				thread.splice(0, thread.length, ...trimmed);
+
+				if (acceptedKeys.size === 0) {
+					break;
+				}
+
+				acceptedInWindow += acceptedKeys.size;
+				annotated += acceptedKeys.size;
+				pending = pending.filter((p) => !acceptedKeys.has(p.cacheKey));
+				remaining = remaining.filter((r) => !acceptedKeys.has(r.cacheKey));
+				emit();
+			}
+
+			if (hardFail) {
+				tripCircuit('llm invoke hard-fail');
+				break;
+			}
+
+			if (pending.length === 0) {
+				zeroStreak = 0;
+				continue;
+			}
+
+			zeroStreak += 1;
+			if (acceptedInWindow === 0 && batchSize > 1) {
+				batchSize = Math.max(1, Math.floor(batchSize / 2));
+				if (zeroStreak >= 3) {
+					tripCircuit(`zero-accept streak=${zeroStreak} while shrinking`);
+					break;
+				}
+				continue;
+			}
+
+			if (acceptedInWindow === 0 && batchSize === 1) {
+				failed += 1;
+				remaining = remaining.slice(1);
+				emit();
+				if (zeroStreak >= 3) {
+					tripCircuit(`zero-accept streak=${zeroStreak} at batchSize=1`);
+					break;
+				}
+				continue;
+			}
+
+			if (batchSize > 1) {
+				batchSize = Math.max(1, Math.floor(batchSize / 2));
+			}
+			if (zeroStreak >= 4) {
+				tripCircuit(`stale pending after resumes streak=${zeroStreak}`);
+				break;
+			}
+		}
+
+		return {
+			annotated,
+			failed,
+			tokensPrompt,
+			tokensCompletion,
+			tokensTotal: tokensPrompt + tokensCompletion,
+		};
+	}
+
+	/**
+	 * 经典句看中写：对已分词列表生成逐词 posZh / IPA / meaningZh。
+	 * 先查全局落库缓存，miss 再调子模型；同 key 进程内单飞。
+	 */
+	async annotateSentenceWords(params: {
+		userId: number;
+		english: string;
+		words: string[];
+	}): Promise<{ words: SentenceWordAnnotationDto[] }> {
+		await this.purgeStaleSentenceWordAnnotationCache();
+
+		const english = params.english.trim();
+		const words = params.words.map((w) => w.trim()).filter(Boolean);
+		if (!english || words.length === 0) {
+			throw new BadRequestException('english 与 words 不能为空');
+		}
+		if (words.length > 80) {
+			throw new BadRequestException('words 过多');
+		}
+
+		const englishNorm = english.toLowerCase();
+		const cacheKey = buildSentenceWordAnnotationCacheKey(englishNorm, words);
+
+		const hit = await this.sentenceWordAnnotationCacheRepo.findOne({
+			where: { cacheKey },
+		});
+		if (isUsableSentenceWordAnnotations(hit?.annotations, words.length)) {
+			return { words: hit!.annotations };
+		}
+
+		const inflight = this.annotateSentenceInflight.get(cacheKey);
+		if (inflight) return inflight;
+
+		const run = this.annotateSentenceWordsViaLlmAndCache({
+			userId: params.userId,
+			english,
+			englishNorm,
+			words,
+			cacheKey,
+		}).finally(() => {
+			this.annotateSentenceInflight.delete(cacheKey);
+		});
+		this.annotateSentenceInflight.set(cacheKey, run);
+		return run;
+	}
+
+	/**
+	 * 练习开局批量标注：先 In 查库命中直接返回；
+	 * cacheOnly 时 miss 不调模型；否则 miss 按段一次多句调模型写库。
+	 * 返回顺序与入参 items 对齐。
+	 */
+	async annotateSentenceWordsBatch(params: {
+		userId: number;
+		items: { english: string; words: string[] }[];
+		cacheOnly?: boolean;
+	}): Promise<{
+		items: {
+			english: string;
+			words: SentenceWordAnnotationDto[];
+			cacheHit: boolean;
+		}[];
+	}> {
+		await this.purgeStaleSentenceWordAnnotationCache();
+
+		if (params.items.length === 0) {
+			throw new BadRequestException('items 不能为空');
+		}
+		if (params.items.length > ENGLISH_PRACTICE_SESSION_MAX) {
+			throw new BadRequestException('items 过多');
+		}
+
+		type NormItem = {
+			index: number;
+			english: string;
+			englishNorm: string;
+			words: string[];
+			cacheKey: string;
+		};
+
+		const normalized: NormItem[] = params.items.map((raw, index) => {
+			const english = raw.english.trim();
+			const words = raw.words.map((w) => w.trim()).filter(Boolean);
+			if (!english || words.length === 0) {
+				throw new BadRequestException(
+					`items[${index}] english 与 words 不能为空`,
+				);
+			}
+			if (words.length > 80) {
+				throw new BadRequestException(`items[${index}] words 过多`);
+			}
+			const englishNorm = english.toLowerCase();
+			return {
+				index,
+				english,
+				englishNorm,
+				words,
+				cacheKey: buildSentenceWordAnnotationCacheKey(englishNorm, words),
+			};
+		});
+
+		const uniqueKeys = [...new Set(normalized.map((n) => n.cacheKey))];
+		const cachedRows =
+			uniqueKeys.length === 0
+				? []
+				: await this.sentenceWordAnnotationCacheRepo.find({
+						where: { cacheKey: In(uniqueKeys) },
+					});
+		const cachedByKey = new Map(
+			cachedRows
+				.filter((r) => Array.isArray(r.annotations) && r.annotations.length > 0)
+				.map((r) => [r.cacheKey, r] as const),
+		);
+
+		const out: {
+			english: string;
+			words: SentenceWordAnnotationDto[];
+			cacheHit: boolean;
+		}[] = new Array(normalized.length);
+
+		const misses: NormItem[] = [];
+		for (const item of normalized) {
+			const hit = cachedByKey.get(item.cacheKey);
+			if (
+				hit &&
+				isUsableSentenceWordAnnotations(hit.annotations, item.words.length)
+			) {
+				out[item.index] = {
+					english: item.english,
+					words: hit.annotations,
+					cacheHit: true,
+				};
+			} else {
+				misses.push(item);
+			}
+		}
+
+		// 开局只读：命中立刻返回，miss 占位，由前端再异步补模型
+		if (params.cacheOnly) {
+			for (const m of misses) {
+				out[m.index] = {
+					english: m.english,
+					words: [],
+					cacheHit: false,
+				};
+			}
+			return { items: out };
+		}
+
+		// 同 cacheKey 去重后，按段一次多句调模型（远少于逐句）
+		const missByKey = new Map<string, NormItem[]>();
+		for (const m of misses) {
+			const list = missByKey.get(m.cacheKey) ?? [];
+			list.push(m);
+			missByKey.set(m.cacheKey, list);
+		}
+		const uniqueMisses = [...missByKey.values()].map((g) => g[0]!);
+
+		if (uniqueMisses.length > 0) {
+			try {
+				const annotatedByKey =
+					await this.annotateSentenceWordsMultiViaLlmAndCache({
+						userId: params.userId,
+						items: uniqueMisses.map((m) => ({
+							cacheKey: m.cacheKey,
+							english: m.english,
+							englishNorm: m.englishNorm,
+							words: m.words,
+						})),
+					});
+				for (const [cacheKey, words] of annotatedByKey) {
+					for (const g of missByKey.get(cacheKey) ?? []) {
+						out[g.index] = {
+							english: g.english,
+							words,
+							cacheHit: false,
+						};
+					}
+				}
+			} catch (e) {
+				this.logger.warn(
+					'[EnglishLearning] annotateSentenceWordsBatch multi llm failed',
+					{
+						message: e instanceof Error ? e.message.slice(0, 200) : String(e),
+					},
+				);
+				for (const m of misses) {
+					if (!out[m.index]) {
+						out[m.index] = {
+							english: m.english,
+							words: [],
+							cacheHit: false,
+						};
+					}
+				}
+			}
+		}
+
+		// 多句模型未覆盖到的 miss 仍占位
+		for (const m of misses) {
+			if (!out[m.index]) {
+				out[m.index] = {
+					english: m.english,
+					words: [],
+					cacheHit: false,
+				};
+			}
+		}
+
+		return { items: out };
+	}
+
+	/**
+	 * 多句一次（或按 CHUNK 切段）调模型并写库。
+	 * ponytail: 单次过多句易截断；CHUNK=12，升级可改为流式/更大上下文。
+	 */
+	private async annotateSentenceWordsMultiViaLlmAndCache(params: {
+		userId: number;
+		items: {
+			cacheKey: string;
+			english: string;
+			englishNorm: string;
+			words: string[];
+		}[];
+		/** 缺省用 SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK */
+		chunkSize?: number;
+		signal?: AbortSignal;
+	}): Promise<Map<string, SentenceWordAnnotationDto[]>> {
+		const result = new Map<string, SentenceWordAnnotationDto[]>();
+		const chunkSize = Math.max(
+			1,
+			params.chunkSize ?? SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK,
+		);
+		for (let offset = 0; offset < params.items.length; offset += chunkSize) {
+			const chunk = params.items.slice(offset, offset + chunkSize);
+			const payload = {
+				items: this.buildAnnotateLlmPayloadItems(chunk),
+			};
+			let text: string;
+			try {
+				text = await this.invokeEnglishPackSubModelJson({
+					system: SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM,
+					user: JSON.stringify(payload),
+					maxTokens: 32768,
+					userId: params.userId,
+					signal: params.signal,
+				});
+			} catch (e) {
+				const raw = e instanceof Error ? e.message : String(e);
+				this.logger.warn(
+					`[EnglishLearning] annotateSentenceWords multi llm failed: ${raw.slice(0, 300)}`,
+				);
+				const authFail =
+					/401|authentication|api key|invalid/i.test(raw) ||
+					raw.includes('MODEL_AUTHENTICATION');
+				throw new BadGatewayException(
+					authFail
+						? '词标注模型鉴权失败，请检查 API Key 配置'
+						: '批量词标注暂时失败，请稍后重试',
+				);
+			}
+
+			let parsed: unknown;
+			try {
+				parsed = this.extractJsonObject(text);
+			} catch {
+				throw new BadGatewayException('批量句内词标注解析失败');
+			}
+
+			const byId = this.extractSentenceWordAnnotationsBatchLoose(
+				parsed,
+				chunk.map((c) => c.words),
+			);
+
+			if (byId.size === 0) {
+				const top =
+					parsed && typeof parsed === 'object'
+						? Object.keys(parsed as object)
+								.slice(0, 8)
+								.join(',')
+						: typeof parsed;
+				this.logger.warn(
+					`[EnglishLearning] annotate multi empty parse (chunk=${chunk.length}, keys=${top}, textPrefix=${text.slice(0, 180).replace(/\s+/g, ' ')})`,
+				);
+			}
+
+			for (let i = 0; i < chunk.length; i += 1) {
+				const item = chunk[i]!;
+				const annotated = byId.get(i) ?? [];
+				if (!isUsableSentenceWordAnnotations(annotated, item.words.length)) {
+					this.logger.warn(
+						`[EnglishLearning] annotate multi reject expect=${item.words.length} got=${annotated.length} english=${item.english.slice(0, 60)}`,
+					);
+					continue;
+				}
+				result.set(item.cacheKey, annotated);
+				try {
+					await this.sentenceWordAnnotationCacheRepo.upsert(
+						{
+							cacheKey: item.cacheKey,
+							schemaVersion: SENTENCE_WORD_ANNOTATION_CACHE_VERSION,
+							english: item.englishNorm,
+							words: item.words,
+							annotations: annotated,
+						},
+						['cacheKey'],
+					);
+				} catch (e) {
+					this.logger.warn(
+						'[EnglishLearning] annotate multi cache upsert failed',
+						{
+							message: e instanceof Error ? e.message.slice(0, 200) : String(e),
+						},
+					);
+					result.delete(item.cacheKey);
+				}
+			}
+		}
+		return result;
+	}
+
+	/** 解析批量标注 JSON；按 id 对齐，缺失句不入 map */
+	private extractSentenceWordAnnotationsBatchLoose(
+		data: unknown,
+		expectedWordsById: string[][],
+	): Map<number, SentenceWordAnnotationDto[]> {
+		const map = new Map<number, SentenceWordAnnotationDto[]>();
+		if (!data || typeof data !== 'object') return map;
+
+		const root = data as Record<string, unknown>;
+		// 单句格式误用于 batch：仅 chunk=1 时收下
+		if (
+			expectedWordsById.length === 1 &&
+			Array.isArray(root.words) &&
+			!Array.isArray(root.items)
+		) {
+			const annotated = this.extractSentenceWordAnnotationsLoose(
+				root,
+				expectedWordsById[0]!,
+			);
+			if (
+				isUsableSentenceWordAnnotations(annotated, expectedWordsById[0]!.length)
+			) {
+				map.set(0, annotated);
+			}
+			return map;
+		}
+
+		const rowsRaw = root.items ?? root.results ?? root.sentences ?? root.data;
+		const rows = Array.isArray(rowsRaw)
+			? rowsRaw
+			: Array.isArray(data)
+				? data
+				: null;
+		if (!rows) return map;
+
+		for (let index = 0; index < rows.length; index += 1) {
+			const row = rows[index];
+			if (!row || typeof row !== 'object') continue;
+			const r = row as Record<string, unknown>;
+			const idRaw = r.id;
+			let id =
+				typeof idRaw === 'number'
+					? idRaw
+					: typeof idRaw === 'string'
+						? Number(idRaw)
+						: Number.NaN;
+			// 模型漏 id 时按数组下标对齐
+			if (!Number.isInteger(id)) id = index;
+			if (id < 0 || id >= expectedWordsById.length) continue;
+			const expected = expectedWordsById[id]!;
+			const annotated = this.extractSentenceWordAnnotationsLoose(r, expected);
+			if (isUsableSentenceWordAnnotations(annotated, expected.length)) {
+				map.set(id, annotated);
+			}
+		}
+		return map;
+	}
+
+	private async annotateSentenceWordsViaLlmAndCache(params: {
+		userId: number;
+		english: string;
+		englishNorm: string;
+		words: string[];
+		cacheKey: string;
+	}): Promise<{ words: SentenceWordAnnotationDto[] }> {
+		const { userId, english, englishNorm, words, cacheKey } = params;
+		const userPayload = JSON.stringify({ english, words });
+		let text: string;
+		try {
+			text = await this.invokeEnglishPackSubModelJson({
+				system: SENTENCE_WORDS_ANNOTATE_SYSTEM,
+				user: userPayload,
+				maxTokens: 8192,
+				userId,
+			});
+		} catch (e) {
+			const raw = e instanceof Error ? e.message : String(e);
+			this.logger.warn(
+				`[EnglishLearning] annotateSentenceWords llm failed: ${raw.slice(0, 300)}`,
+			);
+			const authFail =
+				/401|authentication|api key|invalid/i.test(raw) ||
+				raw.includes('MODEL_AUTHENTICATION');
+			throw new BadGatewayException(
+				authFail
+					? '词标注模型鉴权失败，请检查 API Key 配置'
+					: '词标注暂时失败，请稍后重试',
+			);
+		}
+
+		let parsed: unknown;
+		try {
+			parsed = this.extractJsonObject(text);
+		} catch {
+			throw new BadGatewayException('句内词标注解析失败');
+		}
+
+		const annotated = this.extractSentenceWordAnnotationsLoose(parsed, words);
+		if (!isUsableSentenceWordAnnotations(annotated, words.length)) {
+			throw new BadGatewayException('句内词标注不完整或条数与分词不一致');
+		}
+
+		try {
+			await this.sentenceWordAnnotationCacheRepo.upsert(
+				{
+					cacheKey,
+					schemaVersion: SENTENCE_WORD_ANNOTATION_CACHE_VERSION,
+					english: englishNorm,
+					words,
+					annotations: annotated,
+				},
+				['cacheKey'],
+			);
+		} catch (e) {
+			// ponytail: 写库失败不挡返回；下次仍可能 miss 再打模型
+			this.logger.warn(
+				'[EnglishLearning] annotateSentenceWords cache upsert failed',
+				{
+					message: e instanceof Error ? e.message.slice(0, 200) : String(e),
+				},
+			);
+		}
+
+		return { words: annotated };
+	}
+
+	/** 提取 words[]；词数必须与输入完全一致，禁止缺词垫空 */
+	private extractSentenceWordAnnotationsLoose(
+		data: unknown,
+		expectedWords: string[],
+	): SentenceWordAnnotationDto[] {
+		if (!data || typeof data !== 'object') {
+			return [];
+		}
+		const root = data as Record<string, unknown>;
+		const rows = root.words ?? root.annotations ?? root.tokens;
+		if (!Array.isArray(rows) || rows.length !== expectedWords.length) {
+			return [];
+		}
+
+		const byIndex: SentenceWordAnnotationDto[] = [];
+		for (let i = 0; i < expectedWords.length; i += 1) {
+			const expect = expectedWords[i]!;
+			const row = rows[i];
+			if (!row || typeof row !== 'object') {
+				return [];
+			}
+			const r = row as Record<string, unknown>;
+			const word =
+				typeof r.word === 'string' && r.word.trim() ? r.word.trim() : expect;
+			const posZhRaw =
+				typeof r.posZh === 'string'
+					? r.posZh.trim()
+					: typeof r.pos === 'string'
+						? r.pos.trim()
+						: '';
+			const ipa =
+				typeof r.ipa === 'string' ? r.ipa.trim().replace(/^\/+|\/+$/g, '') : '';
+			const meaningZh =
+				typeof r.meaningZh === 'string'
+					? r.meaningZh.trim()
+					: typeof r.translationZh === 'string'
+						? r.translationZh.trim()
+						: '';
+			byIndex.push({
+				word,
+				posZh: this.normalizePosZhLabel(posZhRaw),
+				ipa,
+				meaningZh: meaningZh.slice(0, 64),
+			});
+		}
+		return isUsableSentenceWordAnnotations(byIndex, expectedWords.length)
+			? byIndex
+			: [];
+	}
+
+	/** 把英文缩写或别名归一成 UI 用的中文词性 */
+	private normalizePosZhLabel(raw: string): string {
+		const s = raw.trim();
+		if (!s) return '';
+		const allowed = new Set([
+			'冠词',
+			'限定词',
+			'名词',
+			'动词',
+			'助动词',
+			'形容词',
+			'副词',
+			'介词',
+			'代词',
+			'连词',
+			'数词',
+			'感叹词',
+			'短语',
+		]);
+		if (allowed.has(s)) return s;
+		const p = s.toLowerCase().replace(/\.$/, '');
+		const map: Record<string, string> = {
+			n: '名词',
+			noun: '名词',
+			v: '动词',
+			verb: '动词',
+			adj: '形容词',
+			adjective: '形容词',
+			adv: '副词',
+			adverb: '副词',
+			prep: '介词',
+			preposition: '介词',
+			conj: '连词',
+			conjunction: '连词',
+			pron: '代词',
+			pronoun: '代词',
+			det: '限定词',
+			determiner: '限定词',
+			art: '冠词',
+			article: '冠词',
+			aux: '助动词',
+			auxiliary: '助动词',
+			num: '数词',
+			int: '感叹词',
+			interj: '感叹词',
+			phr: '短语',
+		};
+		return map[p] ?? s.slice(0, 12);
 	}
 }

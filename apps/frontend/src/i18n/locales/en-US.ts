@@ -1108,6 +1108,7 @@ export const enUS = {
 	'route.englishLearning.daily.title': 'Daily words',
 	'route.englishLearning.review.title': "Today's review",
 	'route.englishLearning.stream.title': 'Fetch results',
+	'route.englishLearning.annotate.title': 'Annotation progress',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
 	'route.englishLearning.practice.title': 'Practice dictation & spelling',
@@ -1116,13 +1117,18 @@ export const enUS = {
 
 	'englishLearning.practice.entry': 'Practice',
 	'englishLearning.practice.setupTitle': 'Word practice',
+	'englishLearning.practice.setupPickMode': 'How to practice',
+	'englishLearning.practice.setupRoundOptions': 'This round',
 	'englishLearning.practice.classicSetupTitle': 'Sentence practice',
 	'englishLearning.practice.classicDictationHint':
-		'Listen and type the full sentence below',
+		'Listen and fill in the English word by word below',
 	'englishLearning.practice.classicSpellingPrompt':
-		'Read the Chinese meaning and type the full English sentence',
+		'Read the Chinese meaning and fill in the English word by word',
 	'englishLearning.practice.classicInputPlaceholder':
 		'Type the English sentence',
+	'englishLearning.practice.togglePos': 'Part of speech (Ctrl+Shift+P)',
+	'englishLearning.practice.toggleIpa': 'Phonetics / IPA (Ctrl+Shift+I)',
+	'englishLearning.practice.slotCheck': 'Submit',
 	'englishLearning.practice.sourceClassicFavorites': 'Classic quote favorites',
 	'englishLearning.practice.sourceClassicMistakes': 'Sentence mistake book',
 	'englishLearning.practice.sourceClassicLibrary': 'Current quote library',
@@ -1132,9 +1138,17 @@ export const enUS = {
 	'englishLearning.practice.modeDictation': 'Dictation',
 	'englishLearning.practice.modeDictationVocab': 'Word dictation',
 	'englishLearning.practice.modeDictationClassic': 'Sentence dictation',
+	'englishLearning.practice.modeDictationFit':
+		'Best for listening skills and spelling speed',
 	'englishLearning.practice.modeSpelling': 'Spelling',
 	'englishLearning.practice.modeSpellingVocab': 'Word spelling',
 	'englishLearning.practice.modeSpellingClassic': 'Sentence spelling',
+	'englishLearning.practice.modeSpellingFit':
+		'Best for meaning-to-English recall and accuracy',
+	'englishLearning.practice.setupModeDictationHint':
+		'Listen, then type English word by word; replay anytime while answering',
+	'englishLearning.practice.setupModeSpellingHint':
+		'Read the Chinese meaning and type English; no audio during answering',
 	'englishLearning.practice.shortcuts.triggerAria':
 		'View practice keyboard shortcuts',
 	'englishLearning.practice.shortcuts.title': 'Keyboard shortcuts',
@@ -1143,15 +1157,19 @@ export const enUS = {
 	'englishLearning.practice.shortcuts.sectionRevealed': 'After reveal',
 	'englishLearning.practice.shortcuts.check': 'Check answer',
 	'englishLearning.practice.shortcuts.play': 'Play / stop',
+	'englishLearning.practice.shortcuts.togglePos': 'Show / hide part of speech',
+	'englishLearning.practice.shortcuts.toggleIpa': 'Show / hide phonetics',
 	'englishLearning.practice.shortcuts.showAnswer': 'Show answer',
 	'englishLearning.practice.shortcuts.previous': 'Previous question',
 	'englishLearning.practice.shortcuts.retry': 'Try again',
 	'englishLearning.practice.shortcuts.next': 'Next question',
 	'englishLearning.practice.shortcuts.footnote':
-		'After first mistake or reveal: arrow keys are ignored while focus is in the input; ↑ previous only when not on the first question. Shift + Space plays or stops anytime while answering.',
+		'After first mistake or reveal: arrow keys are ignored while focus is in the input; ↑ previous only when not on the first question. Shift + Space plays or stops in all phases. On classic sentences, Ctrl+Shift+P / Ctrl+Shift+I toggle POS and IPA.',
 	'englishLearning.practice.shortcuts.keyEnter': 'Enter key',
 	'englishLearning.practice.shortcuts.keyShiftSpace': 'Shift + Space',
 	'englishLearning.practice.shortcuts.keySpace': 'Space',
+	'englishLearning.practice.shortcuts.keyCtrlShiftP': 'Ctrl + Shift + P',
+	'englishLearning.practice.shortcuts.keyCtrlShiftI': 'Ctrl + Shift + I',
 	'englishLearning.practice.shortcuts.keyLeft': 'Left arrow key',
 	'englishLearning.practice.shortcuts.keyRight': 'Right arrow key',
 	'englishLearning.practice.shortcuts.keyUp': 'Up arrow key',
@@ -1166,17 +1184,25 @@ export const enUS = {
 	'englishLearning.practice.countLabel': 'Number of words',
 	'englishLearning.practice.orderLabel': 'Order',
 	'englishLearning.practice.orderRandom': 'Random',
+	'englishLearning.practice.orderRandomHint':
+		'Draw from a shuffled list; reshuffles every time you start',
+	'englishLearning.practice.orderRandomFit':
+		'Good for spotting gaps without relying on fixed order',
 	'englishLearning.practice.orderSequential': 'In order',
+	'englishLearning.practice.orderSequentialHint':
+		'Follow the source list order; stays stable across rounds',
+	'englishLearning.practice.orderSequentialFit':
+		'Good for chapter-by-chapter runs through the list',
 	'englishLearning.practice.start': 'Start',
 	'englishLearning.practice.loadingWords': 'Loading words…',
 	'englishLearning.practice.emptyPool':
 		'Select a library/favorites/history record first.',
 	'englishLearning.practice.emptyTitle': 'No words available',
 	'englishLearning.practice.loadFailed': 'Failed to load words',
-	'englishLearning.practice.progress': '{current} / {total}',
+	'englishLearning.practice.progress': '{current}/{total}',
 	'englishLearning.practice.exit': 'Exit practice',
 	'englishLearning.practice.dictationHint':
-		'Listen and type the word in English',
+		'Listen and fill in the English word by word below',
 	'englishLearning.practice.dictationStepListen': 'Listen',
 	'englishLearning.practice.dictationStepSpell': 'Type',
 	'englishLearning.practice.playAgain': 'Play again',
@@ -1193,6 +1219,7 @@ export const enUS = {
 	'englishLearning.practice.next': 'Next',
 	'englishLearning.practice.viewResults': 'View practice results',
 	'englishLearning.practice.incorrect': 'Spelling error',
+	'englishLearning.practice.correct': 'Correct',
 	'englishLearning.practice.hintShow': 'Expand hint',
 	'englishLearning.practice.hintHide': 'Hide hint',
 	'englishLearning.practice.hintUnavailable': 'No extra hints for this word',
@@ -1240,6 +1267,7 @@ export const enUS = {
 		'Failed to save review progress. Try again later.',
 
 	'englishLearning.daily.loading': 'Preparing today’s cards…',
+	'englishLearning.daily.pendingCount': 'Words to learn {count}',
 	'englishLearning.daily.sidebarDesc': 'Listen & pick — about {count} words',
 	'englishLearning.daily.sidebarDescSplit':
 		'Review {dueCount} · Library {libraryCount}',
@@ -1303,6 +1331,10 @@ export const enUS = {
 	'englishLearning.review.loadingDue': 'Loading due count…',
 	'englishLearning.review.vocabNav': 'Vocabulary ({count})',
 	'englishLearning.review.classicNav': 'Sentences ({count})',
+	'englishLearning.review.vocabTab': 'Vocabulary review',
+	'englishLearning.review.classicTab': 'Sentence review',
+	'englishLearning.review.empty': 'Nothing due for review today',
+	'englishLearning.review.exportDocxEmpty': 'Nothing due to export',
 
 	'englishLearning.mistakes.desc':
 		'Words you misspelled in practice — review with dictation or spelling',
@@ -1326,8 +1358,8 @@ export const enUS = {
 		'Remove “{word}” from your mistake book?',
 	'englishLearning.mistakes.removeSuccess': 'Removed from mistake book',
 	'englishLearning.mistakes.selectAllLoaded': 'Select all',
-	'englishLearning.mistakes.selectedCount': '{count} selected',
-	'englishLearning.mistakes.removeSelected': 'Remove selected',
+	'englishLearning.mistakes.exportDocxEmpty': 'Nothing to export',
+	'englishLearning.mistakes.removeSelected': 'Delete {count} selected',
 	'englishLearning.mistakes.removing': 'Removing...',
 	'englishLearning.mistakes.removeBatchSuccess': 'Removed selected mistakes',
 	'englishLearning.mistakes.removeFail': 'Remove failed. Please try again.',
@@ -1426,6 +1458,76 @@ export const enUS = {
 	'englishLearning.library.listEmptyClassic': 'No quotes libraries yet',
 	'englishLearning.library.deleteAction': 'Delete library',
 	'englishLearning.library.deleteActionClassic': 'Delete quotes library',
+	'englishLearning.annotateSource.action': 'Annotate',
+	'englishLearning.annotateSource.menuOnline': 'Online annotate',
+	'englishLearning.annotateSource.menuImport': 'Import JSON',
+	'englishLearning.annotateSource.importBlockedRunning':
+		'Online annotation is running — pause or stop it before importing',
+	'englishLearning.annotateSource.importSuccess':
+		'Imported {{accepted}} (partial OK); skipped {{skipped}}, overwritten {{overwritten}}',
+	'englishLearning.annotateSource.importAllSkipped':
+		'Nothing imported (skipped {{skipped}})',
+	'englishLearning.annotateSource.importClassicFile':
+		'This is a quotes file, not annotations',
+	'englishLearning.annotateSource.importEmpty': 'No valid annotations in file',
+	'englishLearning.annotateSource.importInvalid': 'Invalid annotation file',
+	'englishLearning.annotateSource.importFailed':
+		'Import failed. Please try again.',
+	'englishLearning.annotateSource.confirmTitle': 'Warm up word annotations',
+	'englishLearning.annotateSource.confirmDesc':
+		'Missing sentences will be sent to the model for POS / IPA / gloss and cached. This may take a while. Continue?',
+	'englishLearning.annotateSource.confirmDescCount':
+		'About {{count}} sentences: uncached ones will be annotated and stored. This may take a while. Continue?',
+	'englishLearning.annotateSource.confirmAction': 'Start',
+	'englishLearning.annotateSource.running': 'Annotating…',
+	'englishLearning.annotateSource.preparing': 'Connecting and checking cache…',
+	'englishLearning.annotateSource.cancelRunning': 'Stop',
+	'englishLearning.annotateSource.progress':
+		'Cached {{hit}} · New {{annotated}}/{{miss}} · Left {{remaining}}',
+	'englishLearning.annotateSource.aborted': 'Stopped (partial results kept)',
+	'englishLearning.annotateSource.failed':
+		'Annotation failed. Please try again.',
+	'englishLearning.annotateSource.success':
+		'Done: {{total}} total, {{hit}} cached, {{annotated}} new, {{failed}} failed',
+	'englishLearning.annotateTasks.pageTitle': 'Annotation progress',
+	'englishLearning.annotateTasks.back': 'Back',
+	'englishLearning.annotateTasks.pageRunningHint':
+		'{{count}} annotation task(s) running — you can stop anytime',
+	'englishLearning.annotateTasks.pageIdleHint':
+		'Recent tasks below; leaving the page keeps them running — after refresh use Resume',
+	'englishLearning.annotateTasks.empty': 'No annotation tasks yet',
+	'englishLearning.annotateTasks.clearFinished': 'Clear finished',
+	'englishLearning.annotateTasks.dismiss': 'Dismiss',
+	'englishLearning.annotateTasks.statusRunning': 'Running',
+	'englishLearning.annotateTasks.statusDone': 'Done',
+	'englishLearning.annotateTasks.statusPaused': 'Paused',
+	'englishLearning.annotateTasks.statusAborted': 'Stopped',
+	'englishLearning.annotateTasks.statusError': 'Failed',
+	'englishLearning.annotateTasks.statusPartialFailed': 'Partially failed',
+	'englishLearning.annotateTasks.resume': 'Resume',
+	'englishLearning.annotateTasks.sourceLibrary': 'Quotes library',
+	'englishLearning.annotateTasks.sourcePack': 'Pack session',
+	'englishLearning.annotateTasks.metricTotal': 'Unique sentences',
+	'englishLearning.annotateTasks.metricHit': 'Cached',
+	'englishLearning.annotateTasks.metricAnnotated': 'Newly written',
+	'englishLearning.annotateTasks.metricFailed': 'Failed',
+	'englishLearning.annotateTasks.metricTokens': 'Tokens used',
+	'englishLearning.annotateTasks.metricTokensValue':
+		'{{total}} (in {{prompt}} · out {{completion}})',
+	'englishLearning.annotateTasks.metricTokensDetail':
+		'Task total: prompt {{prompt}} + completion {{completion}}',
+	'englishLearning.annotateTasks.openPage': 'Open progress',
+	'englishLearning.annotateTasks.viewProgress': 'View progress',
+	'englishLearning.annotateTasks.liveSummary':
+		'{{count}} annotating · {{title}}',
+	'englishLearning.annotateTasks.liveFinished':
+		'{{count}} recent annotation task(s)',
+	'englishLearning.annotateTasks.alreadyRunning':
+		'Already annotating — opened the progress page',
+	'englishLearning.annotateTasks.alreadyActive':
+		'This collection already has a task; open progress to resume if paused',
+	'englishLearning.annotateTasks.untitledLibrary': 'Untitled library',
+	'englishLearning.annotateTasks.untitledPack': 'Untitled pack',
 	'englishLearning.library.deleteConfirmTitle': 'Delete this library?',
 	'englishLearning.library.deleteConfirmTitleClassic':
 		'Delete this quotes library?',
@@ -1578,8 +1680,7 @@ export const enUS = {
 	'englishLearning.packHistory.deleteSuccess': 'Run deleted',
 
 	'englishLearning.favoritesDrawer.selectAllLoaded': 'Select all',
-	'englishLearning.favoritesDrawer.selectedCount': '{count} selected',
-	'englishLearning.favoritesDrawer.removeSelected': 'Remove selected',
+	'englishLearning.favoritesDrawer.removeSelected': 'Delete {count} selected',
 	'englishLearning.favoritesDrawer.removing': 'Removing...',
 	'englishLearning.favoritesDrawer.removeSuccess': 'Removed selected favorites',
 	'englishLearning.favoritesDrawer.removeFail':
@@ -1642,7 +1743,7 @@ export const enUS = {
 	'englishLearning.vocab.favoritesTitle': 'Saved vocabulary',
 	'englishLearning.vocab.favoritesLoading': 'Loading saved…',
 	'englishLearning.vocab.favoritesEmpty': 'No saved words yet',
-	'englishLearning.vocab.exportDocx': 'Export DOCX',
+	'englishLearning.vocab.exportDocx': 'Export',
 	'englishLearning.vocab.exportDocxEmpty': 'Nothing to export',
 	'englishLearning.vocab.exportDocxSuccess': 'Download successful',
 	'englishLearning.vocab.exportDocxFail': 'Export failed—try again later',
@@ -1690,10 +1791,14 @@ export const enUS = {
 	'englishLearning.classic.favoritesTitle': 'Saved quotes',
 	'englishLearning.classic.favoritesLoading': 'Loading saved…',
 	'englishLearning.classic.favoritesEmpty': 'No saved quotes yet',
-	'englishLearning.classic.exportDocx': 'Export DOCX',
+	'englishLearning.classic.exportDocx': 'Export',
 	'englishLearning.classic.exportDocxEmpty': 'Nothing to export',
 	'englishLearning.classic.exportDocxSuccess': 'Download started',
 	'englishLearning.classic.exportDocxFail': 'Export failed—try again later',
+	'englishLearning.classic.exportJson': 'Export JSON',
+	'englishLearning.classic.exportEmpty': 'No sentences to export',
+	'englishLearning.classic.exportFailed': 'Export failed—try again later',
+	'englishLearning.classic.exportFileFallback': 'quotes',
 	'englishLearning.classic.favoritesLoaded': 'Loaded into quote list',
 	'englishLearning.classic.historyEmpty': 'No records yet',
 	'englishLearning.classic.historyQuotes': '{count} lines',
