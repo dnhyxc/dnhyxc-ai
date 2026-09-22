@@ -3,7 +3,7 @@
  */
 import { Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { stopAllPlayback } from '@/utils/speech';
 import { PracticePageShell } from './components/shell';
@@ -55,7 +55,6 @@ function mergePracticedKeys(prev: string[], items: PracticeItem[]): string[] {
 
 export default function EnglishLearningPracticePage() {
 	const { t } = useI18n();
-	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
 
 	const initialContentKind = useMemo(
@@ -77,9 +76,6 @@ export default function EnglishLearningPracticePage() {
 		() => parsePracticePoolTotal(searchParams.get('poolTotal')),
 		[searchParams],
 	);
-	const initialReturnStreamId =
-		searchParams.get('returnStreamId')?.trim() || undefined;
-	const returnToHome = searchParams.get('returnTo') === 'home';
 
 	const [phase, setPhase] = useState<PracticePhase>('setup');
 	const [config, setConfig] = useState<PracticeSetupConfig | null>(null);
@@ -94,64 +90,6 @@ export default function EnglishLearningPracticePage() {
 	useEffect(() => {
 		return () => stopAllPlayback();
 	}, []);
-
-	const onExit = useCallback(() => {
-		stopAllPlayback();
-		if (returnToHome) {
-			navigate('/english-learning');
-			return;
-		}
-		const kind = initialContentKind;
-		if (initialSource === 'favorites') {
-			navigate(
-				`/english-learning/favorites?kind=${kind === 'classic' ? 'classic' : 'vocab'}`,
-			);
-			return;
-		}
-		if (initialSource === 'library') {
-			navigate(
-				`/english-learning/library?kind=${kind === 'classic' ? 'classic' : 'vocab'}`,
-			);
-			return;
-		}
-		if (initialSource === 'mistakes') {
-			navigate(
-				kind === 'classic'
-					? '/english-learning/mistakes?kind=classic'
-					: '/english-learning/mistakes?kind=vocab',
-			);
-			return;
-		}
-		if (initialSource === 'dailyMemorize') {
-			navigate('/english-learning/daily/records');
-			return;
-		}
-		if (initialSource === 'review') {
-			navigate(
-				kind === 'classic'
-					? '/english-learning/review?kind=classic'
-					: '/english-learning/review?kind=vocab',
-			);
-			return;
-		}
-		if (initialSource === 'pack') {
-			const backStreamId = initialReturnStreamId || initialStreamId;
-			if (backStreamId) {
-				navigate(
-					`/english-learning/stream?kind=${kind === 'classic' ? 'classic' : 'vocab'}&streamId=${encodeURIComponent(backStreamId)}`,
-				);
-				return;
-			}
-		}
-		navigate('/english-learning');
-	}, [
-		initialContentKind,
-		initialReturnStreamId,
-		initialSource,
-		initialStreamId,
-		navigate,
-		returnToHome,
-	]);
 
 	const skipRunResetRef = useRef(false);
 
@@ -233,6 +171,7 @@ export default function EnglishLearningPracticePage() {
 				...config,
 				contentKind: config.contentKind,
 				count,
+				isRetryWrong: true,
 			};
 			setConfig(nextConfig);
 			setPracticedKeys((prev) => mergePracticedKeys(prev, wrongQueue));
@@ -284,6 +223,10 @@ export default function EnglishLearningPracticePage() {
 			setQueue(items);
 			setIndex(0);
 			setResults([]);
+			// 继续练习是新一轮词，不再带「重练错题」标题后缀
+			if (config.isRetryWrong) {
+				setConfig({ ...config, isRetryWrong: false });
+			}
 			setPhase('running');
 			const classicItems = items.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
@@ -380,8 +323,6 @@ export default function EnglishLearningPracticePage() {
 					: 'center'
 			}
 			flush={phase === 'running' || phase === 'setup'}
-			onBack={phase === 'summary' ? onExit : undefined}
-			backLabel={t('englishLearning.practice.back')}
 			headerRight={
 				phase === 'summary' ? (
 					<PracticeShortcutsMenu practiceMode={undefined} slotBoard={false} />

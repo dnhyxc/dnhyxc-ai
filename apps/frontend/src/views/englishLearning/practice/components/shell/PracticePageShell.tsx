@@ -17,20 +17,31 @@ export function PracticePageShell({
 	flush = false,
 }: PracticePageShellProps) {
 	const contentFill = contentLayout === 'fill' || flush;
+	const showHeader =
+		!flush &&
+		(onBack != null ||
+			headerRight != null ||
+			title != null ||
+			subtitle != null);
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
-					{flush ? null : (
+					{showHeader ? (
 						<SessionHeader
+							className="px-4"
 							onBack={onBack}
 							backLabel={backLabel}
 							trailing={headerRight}
 							trailingClassName="gap-2"
 						>
-							<span className="min-w-0 truncate">{subtitle || title}</span>
+							{typeof (subtitle ?? title) === 'string' ? (
+								<span className="min-w-0 truncate">{subtitle ?? title}</span>
+							) : (
+								(subtitle ?? title)
+							)}
 						</SessionHeader>
-					)}
+					) : null}
 					<ScrollArea
 						className="min-h-0 flex-1"
 						viewportClassName={cn(

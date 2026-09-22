@@ -66,6 +66,11 @@ import {
 } from './dto/generate-vocabulary.dto';
 import { ImportSentenceWordAnnotationsDto } from './dto/import-sentence-word-annotations.dto';
 import {
+	CreatePracticeReportDto,
+	PracticeReportListQueryDto,
+	PracticeReportRemoveBatchDto,
+} from './dto/practice-report.dto';
+import {
 	PracticeDailyQueueQueryDto,
 	PracticeDailyRecordDto,
 	PracticeReviewDueListQueryDto,
@@ -1549,6 +1554,72 @@ export class EnglishLearningController {
 		const data = await this.englishLearningService.recordPracticeReviewAttempts(
 			userId,
 			dto.attempts,
+		);
+		return { success: true, data };
+	}
+
+	@Post('practice/reports')
+	async createPracticeReport(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreatePracticeReportDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.createPracticeReport(
+			userId,
+			dto,
+		);
+		return { success: true, data };
+	}
+
+	@Get('practice/reports')
+	async listPracticeReports(
+		@Req() req: AuthedRequest,
+		@Query() query: PracticeReportListQueryDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.listPracticeReports(userId, {
+			contentKind: query.contentKind,
+			limit: query.limit,
+			offset: query.offset,
+		});
+		return { success: true, data };
+	}
+
+	@Post('practice/reports/remove-batch')
+	async removePracticeReportsBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: PracticeReportRemoveBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.removePracticeReportsBatch(
+			userId,
+			dto.ids,
+		);
+		return { success: true, data };
+	}
+
+	@Get('practice/reports/:id')
+	async getPracticeReport(@Req() req: AuthedRequest, @Param('id') id: string) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const reportId = id?.trim();
+		if (!reportId) {
+			throw new BadRequestException('缺少报告 id');
+		}
+		const data = await this.englishLearningService.getPracticeReport(
+			userId,
+			reportId,
 		);
 		return { success: true, data };
 	}

@@ -88,6 +88,7 @@ import {
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_IMPORT,
 	ENGLISH_LEARNING_PRACTICE_DAILY,
+	ENGLISH_LEARNING_PRACTICE_REPORTS,
 	ENGLISH_LEARNING_PRACTICE_REVIEW,
 	ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX,
 	ENGLISH_LEARNING_STREAM_CANCEL,
@@ -1883,6 +1884,100 @@ export const recordEnglishPracticeReviewAttempts = async (
 	return await http.post<{ updated: number }>(
 		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/record`,
 		{ attempts },
+	);
+};
+
+export type EnglishPracticeReportItem = {
+	itemKey: string;
+	contentKind: 'vocab' | 'classic';
+	userInput: string;
+	correct: boolean;
+	answerText: string;
+	translationZh: string;
+	ipa?: string;
+	pos?: string;
+};
+
+export type EnglishPracticeReportListEntry = {
+	id: string;
+	title: string;
+	contentKind: 'vocab' | 'classic';
+	mode: 'dictation' | 'spelling';
+	source: string;
+	sourceTitle: string;
+	correctCount: number;
+	totalCount: number;
+	isRetryWrong: boolean;
+	saveMode: 'manual' | 'auto';
+	createdAt: string;
+};
+
+export type EnglishPracticeReportDetail = EnglishPracticeReportListEntry & {
+	order: 'random' | 'sequential';
+	count: number;
+	items: EnglishPracticeReportItem[];
+};
+
+export type CreateEnglishPracticeReportPayload = {
+	reportId: string;
+	contentKind: 'vocab' | 'classic';
+	mode: 'dictation' | 'spelling';
+	source: string;
+	order: 'random' | 'sequential';
+	count: number;
+	sourceTitle?: string;
+	title: string;
+	isRetryWrong?: boolean;
+	saveMode?: 'manual' | 'auto';
+	items: EnglishPracticeReportItem[];
+};
+
+export const createEnglishPracticeReport = async (
+	payload: CreateEnglishPracticeReportPayload,
+) => {
+	return await http.post<{
+		id: string;
+		title: string;
+		correctCount: number;
+		totalCount: number;
+		createdAt: string;
+		created: boolean;
+	}>(ENGLISH_LEARNING_PRACTICE_REPORTS, payload);
+};
+
+export const listEnglishPracticeReports = async (options?: {
+	contentKind?: 'vocab' | 'classic';
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<{
+		totalCount: number;
+		items: EnglishPracticeReportListEntry[];
+	}>(ENGLISH_LEARNING_PRACTICE_REPORTS, {
+		querys: {
+			...(options?.contentKind ? { contentKind: options.contentKind } : {}),
+			...(options?.limit != null ? { limit: options.limit } : {}),
+			...(options?.offset != null ? { offset: options.offset } : {}),
+		},
+		silent: options?.silent,
+	});
+};
+
+export const getEnglishPracticeReport = async (
+	id: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.get<EnglishPracticeReportDetail>(
+		`${ENGLISH_LEARNING_PRACTICE_REPORTS}/${encodeURIComponent(id)}`,
+		{ silent: options?.silent },
+	);
+};
+
+export const removeEnglishPracticeReportsBatch = async (ids: string[]) => {
+	return await http.post<{ removedCount: number }>(
+		`${ENGLISH_LEARNING_PRACTICE_REPORTS}/remove-batch`,
+		{ ids },
 	);
 };
 

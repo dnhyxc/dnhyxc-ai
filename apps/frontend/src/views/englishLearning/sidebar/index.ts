@@ -4,6 +4,7 @@ export { FavoriteSession } from './components/FavoriteSession';
 export type { QuickIntentInputSyncPayload } from './components/LearningToolbar';
 export { EnglishLearningToolbar } from './components/LearningToolbar';
 export { MistakeBookSession } from './components/MistakeBookSession';
+export { PracticeReportSession } from './components/PracticeReportSession';
 export { ReviewSession } from './components/ReviewSession';
 export { EnglishLearningSidebar } from './EnglishLearningSidebar';
 export {

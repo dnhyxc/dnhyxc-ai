@@ -18,6 +18,7 @@ import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-reco
 import { EnglishLearningResumeModuleSetting } from './entity/english-learning-resume-module-setting.entity';
 import { EnglishLibraryItemsResume } from './entity/english-library-items-resume.entity';
 import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.entity';
+import { EnglishPracticeReport } from './entity/english-practice-report.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
@@ -43,6 +44,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishVocabularyFavorite,
 			EnglishVocabularyMistake,
 			EnglishPracticeReviewState,
+			EnglishPracticeReport,
 			EnglishDailyMemorizeRecord,
 			EnglishClassicQuoteFavorite,
 			EnglishClassicQuoteMistake,

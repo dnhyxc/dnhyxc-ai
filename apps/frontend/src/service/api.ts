@@ -215,6 +215,8 @@ export const ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX =
 /** 间隔复习：今日待复习统计、拉题、结算上报 */
 export const ENGLISH_LEARNING_PRACTICE_REVIEW =
 	'/english-learning/practice/review';
+export const ENGLISH_LEARNING_PRACTICE_REPORTS =
+	'/english-learning/practice/reports';
 export const ENGLISH_LEARNING_PRACTICE_DAILY =
 	'/english-learning/practice/daily';
 /** 经典句看中写：句内词性 / IPA / 释义标注 */

@@ -3,10 +3,12 @@
  */
 import { ScrollArea, Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import {
 	batchAddEnglishClassicQuoteMistakes,
 	batchAddEnglishVocabularyMistakes,
+	createEnglishPracticeReport,
 	recordEnglishPracticeReviewAttempts,
 } from '@/service';
 import {
@@ -21,9 +23,15 @@ import {
 	SummaryStatsPanel,
 	WrongListItem,
 } from './components/summary';
+import { practiceRoundListGridClass } from './constants';
 import type { SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
-import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
+import {
+	getPracticeAnswerText,
+	isPracticeClassicItem,
+	isPracticeVocabItem,
+} from './utils/item';
+import { buildPracticeReportTitle } from './utils/reportTitle';
 
 export function Summary({
 	results,
@@ -35,23 +43,36 @@ export function Summary({
 	onBackToSetup,
 }: SummaryProps) {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 	const correctCount = results.filter((r) => r.correct).length;
 	const wrongCount = results.length - correctCount;
-	const wrongItems = useMemo(
-		() => results.filter((r) => !r.correct).map((r) => r.item),
+	const wrongResults = useMemo(
+		() => results.filter((r) => !r.correct),
 		[results],
 	);
-	const correctItems = useMemo(
-		() => results.filter((r) => r.correct).map((r) => r.item),
+	const correctResults = useMemo(
+		() => results.filter((r) => r.correct),
 		[results],
+	);
+	const wrongItems = useMemo(
+		() => wrongResults.map((r) => r.item),
+		[wrongResults],
 	);
 	const accuracyPct =
 		results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
-	const hasWrongList = wrongItems.length > 0;
-	const hasWordList = wrongItems.length > 0 || correctItems.length > 0;
+	const hasWrongList = wrongResults.length > 0;
+	const hasWordList = wrongResults.length > 0 || correctResults.length > 0;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [saveMistakesLoading, setSaveMistakesLoading] = useState(false);
+
+	const reportSaveMode = config.reportSaveMode === 'auto' ? 'auto' : 'manual';
+	const [reportSaveState, setReportSaveState] = useState<
+		'idle' | 'saving' | 'saved'
+	>(() => (reportSaveMode === 'auto' ? 'saving' : 'idle'));
+	const reportIdRef = useRef<string | null>(null);
+	const reportSavedRef = useRef(false);
+	const reportSavingRef = useRef(false);
 
 	const isReviewSession = config.source === 'review';
 	const mistakesPath =
@@ -59,6 +80,65 @@ export function Summary({
 			? '/english-learning/mistakes?kind=classic'
 			: '/english-learning/mistakes?kind=vocab';
 	const reviewRecordedRef = useRef<string | null>(null);
+
+	const savePracticeReportOnce = useCallback(async () => {
+		if (
+			results.length === 0 ||
+			reportSavedRef.current ||
+			reportSavingRef.current
+		) {
+			return;
+		}
+		reportSavingRef.current = true;
+		setReportSaveState('saving');
+		try {
+			if (!reportIdRef.current) {
+				reportIdRef.current = crypto.randomUUID();
+			}
+			const title = buildPracticeReportTitle(config, t);
+			await createEnglishPracticeReport({
+				reportId: reportIdRef.current,
+				contentKind: config.contentKind,
+				mode: config.mode,
+				source: config.source,
+				order: config.order,
+				count: config.count,
+				sourceTitle: config.sourceTitle,
+				title,
+				isRetryWrong: Boolean(config.isRetryWrong),
+				saveMode: reportSaveMode,
+				items: results.map((r) => ({
+					itemKey: r.item.key,
+					contentKind: r.item.contentKind,
+					userInput: r.userInput,
+					correct: r.correct,
+					answerText: getPracticeAnswerText(r.item),
+					translationZh: r.item.translationZh ?? '',
+					...(isPracticeVocabItem(r.item) && r.item.ipa?.trim()
+						? { ipa: r.item.ipa.trim() }
+						: {}),
+					...(isPracticeVocabItem(r.item) && r.item.pos?.trim()
+						? { pos: r.item.pos.trim() }
+						: {}),
+				})),
+			});
+			reportSavedRef.current = true;
+			setReportSaveState('saved');
+		} catch {
+			setReportSaveState('idle');
+			Toast({
+				type: 'warning',
+				title: t('englishLearning.practice.saveReportFailed'),
+			});
+		} finally {
+			reportSavingRef.current = false;
+		}
+	}, [config, reportSaveMode, results, t]);
+
+	useEffect(() => {
+		if (reportSaveMode !== 'auto' || results.length === 0) return;
+		void savePracticeReportOnce();
+	}, [reportSaveMode, results.length, savePracticeReportOnce]);
 
 	const handleSaveMistakes = useCallback(async () => {
 		if (isReviewSession || wrongItems.length === 0) return;
@@ -238,15 +318,19 @@ export function Summary({
 							className="min-h-0 flex-1"
 							viewportClassName="max-h-full"
 						>
-							<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-2.5 p-2">
-								{wrongItems.map((item) => (
+							<div className={practiceRoundListGridClass(config.contentKind)}>
+								{wrongResults.map((r) => (
 									<WrongListItem
-										key={item.key}
-										item={item}
+										key={r.item.key}
+										item={r.item}
 										variant="wrong"
-										playing={playingKey === item.key}
+										userInput={r.userInput}
+										playing={playingKey === r.item.key}
 										onTogglePlay={() =>
-											void toggleWordPlay(getPracticeAnswerText(item), item.key)
+											void toggleWordPlay(
+												getPracticeAnswerText(r.item),
+												r.item.key,
+											)
 										}
 										playLabel={
 											config.contentKind === 'classic'
@@ -256,14 +340,18 @@ export function Summary({
 										stopLabel={t('englishLearning.tts.stop')}
 									/>
 								))}
-								{correctItems.map((item) => (
+								{correctResults.map((r) => (
 									<WrongListItem
-										key={item.key}
-										item={item}
+										key={r.item.key}
+										item={r.item}
 										variant="correct"
-										playing={playingKey === item.key}
+										userInput={r.userInput}
+										playing={playingKey === r.item.key}
 										onTogglePlay={() =>
-											void toggleWordPlay(getPracticeAnswerText(item), item.key)
+											void toggleWordPlay(
+												getPracticeAnswerText(r.item),
+												r.item.key,
+											)
 										}
 										playLabel={
 											config.contentKind === 'classic'
@@ -283,6 +371,7 @@ export function Summary({
 						hasWrongItems={hasWrongList}
 						continueLoading={continueLoading}
 						saveMistakesLoading={saveMistakesLoading}
+						reportSaveState={results.length === 0 ? 'hidden' : reportSaveState}
 						labels={{
 							retryWrong: t('englishLearning.practice.retryWrong'),
 							practiceAgain: t('englishLearning.practice.practiceAgain'),
@@ -294,6 +383,9 @@ export function Summary({
 									? t('englishLearning.mistakes.classicNav')
 									: t('englishLearning.mistakes.vocabNav'),
 							saveMistakes: t('englishLearning.practice.saveMistakes'),
+							saveReport: t('englishLearning.practice.saveReport'),
+							reportSaved: t('englishLearning.practice.reportSaved'),
+							viewReports: t('englishLearning.practice.viewReports'),
 						}}
 						onRetryWrong={() =>
 							onRetryWrong(
@@ -307,6 +399,12 @@ export function Summary({
 						mistakesPath={mistakesPath}
 						onSaveMistakes={
 							isReviewSession ? undefined : () => void handleSaveMistakes()
+						}
+						onSaveReport={() => void savePracticeReportOnce()}
+						onViewReports={() =>
+							navigate(
+								`/english-learning/practice/reports?kind=${config.contentKind}`,
+							)
 						}
 					/>
 				</div>

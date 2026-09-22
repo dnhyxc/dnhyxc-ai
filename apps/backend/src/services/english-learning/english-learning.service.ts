@@ -91,6 +91,7 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import type { CreatePracticeReportDto } from './dto/practice-report.dto';
 import type {
 	PracticeDailyRecordDto,
 	PracticeReviewRecordItemDto,
@@ -146,6 +147,10 @@ import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
 } from './entity/english-pack-web-search.entity';
+import {
+	EnglishPracticeReport,
+	type PracticeReportItemSnapshot,
+} from './entity/english-practice-report.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import {
@@ -389,6 +394,8 @@ export class EnglishLearningService {
 		private readonly resumeModuleSettingRepo: Repository<EnglishLearningResumeModuleSetting>,
 		@InjectRepository(EnglishPracticeReviewState)
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
+		@InjectRepository(EnglishPracticeReport)
+		private readonly practiceReportRepo: Repository<EnglishPracticeReport>,
 		@InjectRepository(EnglishDailyMemorizeRecord)
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
 		@InjectRepository(EnglishSentenceWordAnnotationCache)
@@ -6033,6 +6040,220 @@ ${existingHintBlock}
 			updated += 1;
 		}
 		return { updated };
+	}
+
+	/** 练习报告：按 reportId 幂等插入一场 */
+	async createPracticeReport(
+		userId: number,
+		dto: CreatePracticeReportDto,
+	): Promise<{
+		id: string;
+		title: string;
+		correctCount: number;
+		totalCount: number;
+		createdAt: string;
+		created: boolean;
+	}> {
+		const existing = await this.practiceReportRepo.findOne({
+			where: { id: dto.reportId, userId },
+		});
+		if (existing) {
+			return {
+				id: existing.id,
+				title: existing.title,
+				correctCount: existing.correctCount,
+				totalCount: existing.totalCount,
+				createdAt: existing.createdAt.toISOString(),
+				created: false,
+			};
+		}
+
+		const items: PracticeReportItemSnapshot[] = dto.items.map((it) => ({
+			itemKey: it.itemKey.trim(),
+			contentKind: it.contentKind,
+			userInput: it.userInput,
+			correct: it.correct,
+			answerText: it.answerText,
+			translationZh: it.translationZh,
+			...(it.ipa?.trim() ? { ipa: it.ipa.trim() } : {}),
+			...(it.pos?.trim() ? { pos: it.pos.trim() } : {}),
+		}));
+		if (items.some((it) => !it.itemKey || !it.answerText.trim())) {
+			throw new BadRequestException('报告条目缺少 itemKey 或 answerText');
+		}
+		if (items.length > ENGLISH_PRACTICE_SESSION_MAX) {
+			throw new BadRequestException('报告条目过多');
+		}
+
+		const correctCount = items.filter((it) => it.correct).length;
+		const totalCount = items.length;
+		const row = this.practiceReportRepo.create({
+			id: dto.reportId,
+			userId,
+			contentKind: dto.contentKind,
+			mode: dto.mode,
+			source: dto.source.trim().slice(0, 32),
+			order: dto.order,
+			count: dto.count,
+			sourceTitle: (dto.sourceTitle ?? '').trim().slice(0, 200),
+			title: dto.title.trim().slice(0, 240) || '练习报告',
+			correctCount,
+			totalCount,
+			items,
+			isRetryWrong: Boolean(dto.isRetryWrong),
+			saveMode: dto.saveMode === 'auto' ? 'auto' : 'manual',
+		});
+		try {
+			await this.practiceReportRepo.save(row);
+		} catch (e) {
+			// 并发同 id：再读一次当作幂等成功
+			const raced = await this.practiceReportRepo.findOne({
+				where: { id: dto.reportId, userId },
+			});
+			if (raced) {
+				return {
+					id: raced.id,
+					title: raced.title,
+					correctCount: raced.correctCount,
+					totalCount: raced.totalCount,
+					createdAt: raced.createdAt.toISOString(),
+					created: false,
+				};
+			}
+			throw e;
+		}
+		return {
+			id: row.id,
+			title: row.title,
+			correctCount: row.correctCount,
+			totalCount: row.totalCount,
+			createdAt: row.createdAt.toISOString(),
+			created: true,
+		};
+	}
+
+	async listPracticeReports(
+		userId: number,
+		opts: {
+			contentKind?: 'vocab' | 'classic';
+			limit?: number;
+			offset?: number;
+		},
+	): Promise<{
+		totalCount: number;
+		items: Array<{
+			id: string;
+			title: string;
+			contentKind: 'vocab' | 'classic';
+			mode: 'dictation' | 'spelling';
+			source: string;
+			sourceTitle: string;
+			correctCount: number;
+			totalCount: number;
+			isRetryWrong: boolean;
+			saveMode: 'manual' | 'auto';
+			createdAt: string;
+		}>;
+	}> {
+		const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+		const offset = Math.max(0, opts.offset ?? 0);
+		const where = {
+			userId,
+			...(opts.contentKind ? { contentKind: opts.contentKind } : {}),
+		};
+		const [rows, totalCount] = await this.practiceReportRepo.findAndCount({
+			where,
+			order: { createdAt: 'DESC' },
+			take: limit,
+			skip: offset,
+			select: [
+				'id',
+				'title',
+				'contentKind',
+				'mode',
+				'source',
+				'sourceTitle',
+				'correctCount',
+				'totalCount',
+				'isRetryWrong',
+				'saveMode',
+				'createdAt',
+			],
+		});
+		return {
+			totalCount,
+			items: rows.map((r) => ({
+				id: r.id,
+				title: r.title,
+				contentKind: r.contentKind,
+				mode: r.mode,
+				source: r.source,
+				sourceTitle: r.sourceTitle,
+				correctCount: r.correctCount,
+				totalCount: r.totalCount,
+				isRetryWrong: r.isRetryWrong,
+				saveMode: r.saveMode,
+				createdAt: r.createdAt.toISOString(),
+			})),
+		};
+	}
+
+	async getPracticeReport(
+		userId: number,
+		id: string,
+	): Promise<{
+		id: string;
+		title: string;
+		contentKind: 'vocab' | 'classic';
+		mode: 'dictation' | 'spelling';
+		source: string;
+		order: 'random' | 'sequential';
+		count: number;
+		sourceTitle: string;
+		correctCount: number;
+		totalCount: number;
+		isRetryWrong: boolean;
+		saveMode: 'manual' | 'auto';
+		items: PracticeReportItemSnapshot[];
+		createdAt: string;
+	}> {
+		const row = await this.practiceReportRepo.findOne({
+			where: { id, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('报告不存在');
+		}
+		return {
+			id: row.id,
+			title: row.title,
+			contentKind: row.contentKind,
+			mode: row.mode,
+			source: row.source,
+			order: row.order,
+			count: row.count,
+			sourceTitle: row.sourceTitle,
+			correctCount: row.correctCount,
+			totalCount: row.totalCount,
+			isRetryWrong: row.isRetryWrong,
+			saveMode: row.saveMode,
+			items: row.items ?? [],
+			createdAt: row.createdAt.toISOString(),
+		};
+	}
+
+	async removePracticeReportsBatch(
+		userId: number,
+		ids: string[],
+	): Promise<{ removedCount: number }> {
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) {
+			return { removedCount: 0 };
+		}
+		const r = await this.practiceReportRepo.delete({
+			userId,
+			id: In(unique),
+		});
+		return { removedCount: r.affected ?? 0 };
 	}
 
 	private mapVocabLibraryItemToDailyItem(row: EnglishVocabularyLibraryItem) {

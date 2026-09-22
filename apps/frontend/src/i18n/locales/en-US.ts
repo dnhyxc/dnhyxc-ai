@@ -1117,7 +1117,7 @@ export const enUS = {
 
 	'englishLearning.practice.entry': 'Practice',
 	'englishLearning.practice.setupTitle': 'Word practice',
-	'englishLearning.practice.setupPickMode': 'How to practice',
+	'englishLearning.practice.setupPickMode': 'Practice mode',
 	'englishLearning.practice.setupRoundOptions': 'This round',
 	'englishLearning.practice.classicSetupTitle': 'Sentence practice',
 	'englishLearning.practice.classicDictationHint':
@@ -1139,16 +1139,16 @@ export const enUS = {
 	'englishLearning.practice.modeDictationVocab': 'Word dictation',
 	'englishLearning.practice.modeDictationClassic': 'Sentence dictation',
 	'englishLearning.practice.modeDictationFit':
-		'Best for listening skills and spelling speed',
+		'Best for listening skills and spelling reaction speed',
 	'englishLearning.practice.modeSpelling': 'Spelling',
 	'englishLearning.practice.modeSpellingVocab': 'Word spelling',
 	'englishLearning.practice.modeSpellingClassic': 'Sentence spelling',
 	'englishLearning.practice.modeSpellingFit':
-		'Best for meaning-to-English recall and accuracy',
+		'Best for Chinese–English recall and spelling accuracy',
 	'englishLearning.practice.setupModeDictationHint':
-		'Listen, then type English word by word; replay anytime while answering',
+		'Listen, then type; replay three times automatically while answering',
 	'englishLearning.practice.setupModeSpellingHint':
-		'Read the Chinese meaning and type English; no audio during answering',
+		'Read Chinese meaning and type; no audio while answering; can play manually',
 	'englishLearning.practice.shortcuts.triggerAria':
 		'View practice keyboard shortcuts',
 	'englishLearning.practice.shortcuts.title': 'Keyboard shortcuts',
@@ -1185,14 +1185,13 @@ export const enUS = {
 	'englishLearning.practice.orderLabel': 'Order',
 	'englishLearning.practice.orderRandom': 'Random',
 	'englishLearning.practice.orderRandomHint':
-		'Draw from a shuffled list; reshuffles every time you start',
-	'englishLearning.practice.orderRandomFit':
-		'Good for spotting gaps without relying on fixed order',
+		'Draw from a shuffled list each start',
+	'englishLearning.practice.orderRandomFit': 'Good for spotting gaps',
 	'englishLearning.practice.orderSequential': 'In order',
 	'englishLearning.practice.orderSequentialHint':
-		'Follow the source list order; stays stable across rounds',
+		'Follow list order; stable across rounds',
 	'englishLearning.practice.orderSequentialFit':
-		'Good for chapter-by-chapter runs through the list',
+		'Good for chapter-by-chapter runs',
 	'englishLearning.practice.start': 'Start',
 	'englishLearning.practice.loadingWords': 'Loading words…',
 	'englishLearning.practice.emptyPool':
@@ -1265,6 +1264,63 @@ export const enUS = {
 		'No more items due for review today',
 	'englishLearning.practice.reviewRecordFailed':
 		'Failed to save review progress. Try again later.',
+	'englishLearning.practice.reportSaveLabel': 'Save report',
+	'englishLearning.practice.startLabel':
+		'Click「Start practice」after confirming settings to begin practice',
+	'englishLearning.practice.reportSaveManual': 'Manual',
+	'englishLearning.practice.reportSaveManualHint':
+		'Save on summary; skip to discard',
+	'englishLearning.practice.reportSaveManualFit':
+		'Skip if you don’t want every session archived',
+	'englishLearning.practice.reportSaveAuto': 'Automatic',
+	'englishLearning.practice.reportSaveAutoHint':
+		'Saves as soon as you reach summary',
+	'englishLearning.practice.reportSaveAutoFit':
+		'Best for keeping a review history',
+	'englishLearning.practice.saveReport': 'Save report',
+	'englishLearning.practice.reportSaved': 'Saved',
+	'englishLearning.practice.saveReportFailed':
+		'Couldn’t save the report. Try again.',
+	'englishLearning.practice.viewReports': 'View reports',
+	'englishLearning.practice.reportsTitle': 'Practice reports',
+	'englishLearning.practice.reportsHomeDesc':
+		'Browse vocab and sentence practice reports',
+	'englishLearning.practice.reportsVocabNav': 'Vocab reports',
+	'englishLearning.practice.reportsClassicNav': 'Sentence reports',
+	'englishLearning.practice.reportsEmpty': 'No saved practice reports yet',
+	'englishLearning.practice.reportsLoadFailed': 'Failed to load reports',
+	'englishLearning.practice.reportsLoadMore': 'Load more',
+	'englishLearning.practice.reportsLoadingMore': 'Loading…',
+	'englishLearning.practice.reportsPctSuffix': '%',
+	'englishLearning.practice.reportDetailLoadFailed': 'Failed to load report',
+	'englishLearning.practice.reportDetailMissing': 'Report not found',
+	'englishLearning.practice.reportsSelectAll': 'Select all',
+	'englishLearning.practice.reportsRemoveSelected': 'Delete {count} selected',
+	'englishLearning.practice.reportsRemoving': 'Deleting…',
+	'englishLearning.practice.reportsRemoveNoneHint':
+		'Select reports to delete first',
+	'englishLearning.practice.reportsRemoveBatchConfirmTitle':
+		'Delete selected reports?',
+	'englishLearning.practice.reportsRemoveBatchConfirmDesc':
+		'This will permanently delete {count} practice report(s).',
+	'englishLearning.practice.reportsRemoveConfirmTitle': 'Delete report',
+	'englishLearning.practice.reportsRemoveConfirmDesc':
+		'Delete “{title}”? This cannot be undone.',
+	'englishLearning.practice.reportsRemoveConfirmAction': 'Delete',
+	'englishLearning.practice.reportsRemoveBatchSuccess':
+		'Selected reports deleted',
+	'englishLearning.practice.reportsRemoveSuccess': 'Report deleted',
+	'englishLearning.practice.reportsRemoveFail':
+		'Couldn’t delete. Try again later.',
+	'englishLearning.practice.reportsRemoveAction': 'Delete report',
+	'englishLearning.practice.reportsToggleRow': 'Select this report',
+	'englishLearning.practice.reportKindVocab': 'Vocab',
+	'englishLearning.practice.reportKindClassic': 'Quotes',
+	'englishLearning.practice.reportModeDictation': ' dictation',
+	'englishLearning.practice.reportModeSpelling': ' spelling',
+	'englishLearning.practice.reportSourceFallback': 'Practice',
+	'englishLearning.practice.reportRetrySuffix': 'Retry mistakes',
+	'route.englishLearning.practice.reportsTitle': 'Practice reports',
 
 	'englishLearning.daily.loading': 'Preparing today’s cards…',
 	'englishLearning.daily.pendingCount': 'Words to learn {count}',

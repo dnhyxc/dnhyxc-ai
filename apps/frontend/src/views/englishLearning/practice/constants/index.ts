@@ -1,6 +1,7 @@
 export {
 	PRACTICE_PAGE_CONTENT_CLASS,
 	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+	practiceRoundListGridClass,
 } from './layout';
 export {
 	DICTATION_PLAY_COUNT,

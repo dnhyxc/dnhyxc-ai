@@ -3,6 +3,7 @@
  */
 import { Button } from '@ui/index';
 import { Square, Volume2 } from 'lucide-react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
 import type { WrongListItemProps } from '../../types';
@@ -15,10 +16,13 @@ export function WrongListItem({
 	playLabel,
 	stopLabel,
 	variant = 'wrong',
+	userInput,
 }: WrongListItemProps) {
+	const { t } = useI18n();
 	const isCorrect = variant === 'correct';
 	const pos = isPracticeVocabItem(item) ? item.pos?.trim() : '';
 	const ipa = isPracticeVocabItem(item) ? item.ipa?.trim() : '';
+	const input = userInput?.trim() ?? '';
 	return (
 		<div
 			className={cn(
@@ -52,6 +56,18 @@ export function WrongListItem({
 						)}
 					>
 						{item.translationZh}
+					</p>
+				) : null}
+				{input ? (
+					<p
+						className={cn(
+							'mt-1.5 line-clamp-2 text-sm leading-snug',
+							isCorrect
+								? 'text-teal-500/85 dark:text-teal-400/85'
+								: 'text-rose-500/85',
+						)}
+					>
+						{t('englishLearning.practice.yourAnswer', { answer: input })}
 					</p>
 				) : null}
 			</div>

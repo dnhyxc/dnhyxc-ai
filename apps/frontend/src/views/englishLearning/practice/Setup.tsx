@@ -4,9 +4,11 @@
 import { Button, RadioGroup, RadioGroupItem, Spinner, Toast } from '@ui/index';
 import {
 	Check,
+	CloudUpload,
 	Headphones,
 	Languages,
 	ListOrdered,
+	Save,
 	Shuffle,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,6 +25,7 @@ import type {
 	PracticeCountOption,
 	PracticeMode,
 	PracticeOrder,
+	PracticeReportSaveMode,
 	PracticeSetupConfig,
 	SetupProps,
 } from './types';
@@ -37,27 +40,28 @@ const FIELD_LABEL = 'text-textcolor shrink-0 text-sm font-semibold';
 
 /** 不用 @ui Label：其默认 items-center/leading-none 会打乱竖排说明 */
 const PICK =
-	'relative flex h-full min-h-0 cursor-pointer flex-col rounded-md border p-4 text-left transition-colors';
+	'relative flex max-h-35 cursor-pointer flex-col rounded-md border p-3 text-left transition-colors';
 const PICK_ON = 'border-teal-500/40 bg-teal-500/15';
 const PICK_OFF =
 	'border-theme/10 bg-theme/5 hover:border-teal-500/35 hover:bg-teal-500/10';
 
-const ICON_BOX = 'flex size-9 shrink-0 items-center justify-center rounded-md';
+const ICON_BOX = 'flex size-8 shrink-0 items-center justify-center rounded-md';
 const ICON_BOX_ON = 'bg-teal-500/20 text-textcolor/70';
 const ICON_BOX_OFF = 'bg-theme/10 text-textcolor/45';
 
 type SetupPick = {
 	id: string;
 	active: boolean;
-	/** 做法说明（单行） */
+	/** 做法说明 */
 	desc: string;
-	/** 适用场景（单行，贴底） */
+	/** 适用场景（分隔线下方） */
 	tip: string;
 	title: string;
 	Icon: typeof Headphones;
 	value: string;
 };
 
+/** 图2 结构：图标+标题 → 做法 → 分隔线 → 适用；高度跟内容，不超过 max-h-32 */
 function SetupPickCard({
 	id,
 	active,
@@ -70,8 +74,7 @@ function SetupPickCard({
 	return (
 		<label htmlFor={id} className={cn(PICK, active ? PICK_ON : PICK_OFF)}>
 			<RadioGroupItem value={value} id={id} className="sr-only" />
-			{/* 标题行 */}
-			<span className="flex items-center gap-2.5">
+			<span className="flex shrink-0 items-center gap-2.5 pr-8">
 				<span
 					className={cn(ICON_BOX, active ? ICON_BOX_ON : ICON_BOX_OFF)}
 					aria-hidden
@@ -82,23 +85,21 @@ function SetupPickCard({
 					{title}
 				</span>
 			</span>
-			{/* 做法：尽量单行 */}
 			<p
-				className="text-textcolor/55 mt-3 truncate text-sm leading-none whitespace-nowrap"
+				className="text-textcolor/65 mt-2.5 truncate text-xs leading-snug whitespace-nowrap"
 				title={desc}
 			>
 				{desc}
 			</p>
-			{/* 适用：贴底，尽量单行；右侧留给选中勾 */}
 			<p
-				className="border-theme/10 text-textcolor/40 mt-auto truncate border-t pt-3 pr-8 text-sm leading-none whitespace-nowrap"
+				className="border-theme/10 text-textcolor/65 mt-2.5 truncate border-t pt-2.5 text-xs leading-snug whitespace-nowrap"
 				title={tip}
 			>
 				{tip}
 			</p>
 			{active ? (
 				<span
-					className="bg-teal-600 absolute right-3 bottom-3 flex size-5 items-center justify-center rounded-full text-white"
+					className="bg-teal-600 absolute top-3 right-3 flex size-5 items-center justify-center rounded-full text-white"
 					aria-hidden
 				>
 					<Check className="size-3" strokeWidth={2.5} />
@@ -124,6 +125,8 @@ export function Setup({
 	const source = initialSource;
 	const [order, setOrder] = useState<PracticeOrder>('random');
 	const [count, setCount] = useState<PracticeCountOption>(20);
+	const [reportSaveMode, setReportSaveMode] =
+		useState<PracticeReportSaveMode>('manual');
 	const [loading, setLoading] = useState(false);
 	const [sourceDisplayTitle, setSourceDisplayTitle] = useState<string | null>(
 		() => initialSourceTitle?.trim() || null,
@@ -216,6 +219,26 @@ export function Setup({
 		[t],
 	);
 
+	const reportSaveModes = useMemo(
+		() => [
+			{
+				value: 'manual' as const,
+				title: t('englishLearning.practice.reportSaveManual'),
+				desc: t('englishLearning.practice.reportSaveManualHint'),
+				tip: t('englishLearning.practice.reportSaveManualFit'),
+				Icon: Save,
+			},
+			{
+				value: 'auto' as const,
+				title: t('englishLearning.practice.reportSaveAuto'),
+				desc: t('englishLearning.practice.reportSaveAutoHint'),
+				tip: t('englishLearning.practice.reportSaveAutoFit'),
+				Icon: CloudUpload,
+			},
+		],
+		[t],
+	);
+
 	useEffect(() => {
 		let cancelled = false;
 		void (async () => {
@@ -256,6 +279,7 @@ export function Setup({
 				streamId: initialStreamId,
 				poolTotal: initialPoolTotal,
 				sourceTitle: sourceDisplayTitle?.trim() || undefined,
+				reportSaveMode,
 			};
 			const { items, cursor } = await fetchPracticeSessionQueue({
 				contentKind: initialContentKind,
@@ -297,6 +321,7 @@ export function Setup({
 		sourceDisplayTitle,
 		onStarted,
 		order,
+		reportSaveMode,
 		source,
 		t,
 	]);
@@ -314,17 +339,17 @@ export function Setup({
 				) : null}
 			</SessionHeader>
 
-			<div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-4">
-				{/* max-h-[56rem] 与 max-w-4xl（56rem）对齐 */}
-				<div className="mx-auto flex h-full min-h-0 w-full max-w-4xl max-h-128 flex-col gap-4">
-					<section className="flex min-h-0 flex-1 flex-col gap-4">
+			<div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden p-4">
+				{/* 卡片按内容高度（max-h-33），多余空间由底部弹性区吸收，一屏无滚动 */}
+				<div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-5">
+					<section className="flex shrink-0 flex-col gap-3">
 						<h2 className={FIELD_LABEL}>
 							{t('englishLearning.practice.setupPickMode')}
 						</h2>
 						<RadioGroup
 							value={mode}
 							onValueChange={(v) => setMode(v as PracticeMode)}
-							className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2"
+							className="grid grid-cols-1 gap-4 sm:grid-cols-2"
 						>
 							{modes.map(({ value, title, desc, tip, Icon }) => (
 								<SetupPickCard
@@ -341,7 +366,7 @@ export function Setup({
 						</RadioGroup>
 					</section>
 
-					<section className="flex shrink-0 flex-col gap-4">
+					<section className="flex shrink-0 flex-col gap-3">
 						<h2 className={FIELD_LABEL}>
 							{t('englishLearning.practice.countLabel')}
 						</h2>
@@ -376,22 +401,56 @@ export function Setup({
 						</RadioGroup>
 					</section>
 
-					{hideOrderPicker ? null : (
-						<section className="flex min-h-0 flex-1 flex-col gap-4">
+					{/* 出题顺序 | 报告保存：同一行，共四张卡 */}
+					<div
+						className={cn(
+							'grid shrink-0 gap-4',
+							hideOrderPicker ? 'grid-cols-1' : 'grid-cols-2',
+						)}
+					>
+						{hideOrderPicker ? null : (
+							<section className="flex flex-col gap-3">
+								<h2 className={FIELD_LABEL}>
+									{t('englishLearning.practice.orderLabel')}
+								</h2>
+								<RadioGroup
+									value={order}
+									onValueChange={(v) => setOrder(v as PracticeOrder)}
+									className="grid grid-cols-2 gap-4"
+								>
+									{orders.map(({ value, title, desc, tip, Icon }) => (
+										<SetupPickCard
+											key={value}
+											id={`el-setup-order-${value}`}
+											value={value}
+											active={order === value}
+											title={title}
+											desc={desc}
+											tip={tip}
+											Icon={Icon}
+										/>
+									))}
+								</RadioGroup>
+							</section>
+						)}
+
+						<section className="flex flex-col gap-3">
 							<h2 className={FIELD_LABEL}>
-								{t('englishLearning.practice.orderLabel')}
+								{t('englishLearning.practice.reportSaveLabel')}
 							</h2>
 							<RadioGroup
-								value={order}
-								onValueChange={(v) => setOrder(v as PracticeOrder)}
-								className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2"
+								value={reportSaveMode}
+								onValueChange={(v) =>
+									setReportSaveMode(v as PracticeReportSaveMode)
+								}
+								className="grid grid-cols-2 gap-4"
 							>
-								{orders.map(({ value, title, desc, tip, Icon }) => (
+								{reportSaveModes.map(({ value, title, desc, tip, Icon }) => (
 									<SetupPickCard
 										key={value}
-										id={`el-setup-order-${value}`}
+										id={`el-setup-report-save-${value}`}
 										value={value}
-										active={order === value}
+										active={reportSaveMode === value}
 										title={title}
 										desc={desc}
 										tip={tip}
@@ -400,12 +459,16 @@ export function Setup({
 								))}
 							</RadioGroup>
 						</section>
-					)}
-
+					</div>
+				</div>
+				<div className="flex-1 w-full flex gap-3 flex-col justify-end">
+					<h2 className={FIELD_LABEL}>
+						{t('englishLearning.practice.startLabel')}
+					</h2>
 					<Button
 						type="button"
 						className={cn(
-							'h-10 w-full shrink-0 gap-2 mt-1',
+							'h-10 w-full shrink-0 gap-2',
 							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 						)}
 						disabled={loading}

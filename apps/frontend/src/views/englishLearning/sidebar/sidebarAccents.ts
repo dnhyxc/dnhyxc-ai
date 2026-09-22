@@ -5,7 +5,7 @@
  * - 上区冷色：lime / cyan·blue / indigo·blue / teal·cyan / violet·indigo
  * - 今日记词：emerald·teal（与词包区色相相邻）
  * - 今日复习：玫瑰金（粉金渐变，侧栏唯一）
- * - 下区暖色：橙→黄(收藏)、玫→橙(错题)
+ * - 下区暖色：橙→黄(收藏)、玫→橙(错题)、紫→品红(报告)
  *
  * 今日记词 / 单词资料 的 teal 端用固定 hex（Tailwind 默认 teal-400/500/600），
  * 不跟随全局主题色（--brand-accent 会覆盖 text-teal-*）。须写死完整 class，勿模板拼接。
@@ -20,6 +20,7 @@ export const ENGLISH_SIDEBAR_ICON_GRADIENT = {
 	review: 'bg-linear-to-r from-[#9a5c66] to-[#b8874f]',
 	favorites: 'bg-linear-to-r from-orange-500 to-yellow-500',
 	mistakes: 'bg-linear-to-r from-rose-500 to-orange-500',
+	reports: 'bg-linear-to-r from-violet-500 to-fuchsia-500',
 	notes: 'bg-linear-to-r from-sky-500 to-indigo-600',
 } as const;
 
@@ -42,6 +43,8 @@ export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 		'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
 	mistakes:
 		'bg-linear-to-r from-rose-500 to-orange-500 hover:bg-linear-to-r hover:from-rose-400 hover:to-orange-500',
+	reports:
+		'bg-linear-to-r from-violet-500 to-fuchsia-500 hover:bg-linear-to-r hover:from-violet-400 hover:to-fuchsia-500',
 	notes:
 		'bg-linear-to-r from-sky-500 to-indigo-600 hover:bg-linear-to-r hover:from-sky-400 hover:to-indigo-500',
 } as const;

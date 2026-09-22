@@ -22,6 +22,9 @@ export type PracticeSource =
 
 export type PracticeOrder = 'random' | 'sequential';
 
+/** 报告保存方式：手动点按钮 / 进入结算自动写 */
+export type PracticeReportSaveMode = 'manual' | 'auto';
+
 export type PracticeVocabItem = EnglishVocabularyItem & {
 	contentKind: 'vocab';
 	/** 去重键，与收藏 wordKey 一致 */
@@ -75,6 +78,10 @@ export type PracticeSetupConfig = {
 	poolTotal?: number;
 	/** 与 Setup 顶栏一致的来源标题（词库名 / 收藏等） */
 	sourceTitle?: string;
+	/** 报告保存方式；缺省按 manual */
+	reportSaveMode?: PracticeReportSaveMode;
+	/** 本场是否由「重练错题」进入 */
+	isRetryWrong?: boolean;
 };
 
 export type PracticeAttemptResult = {
@@ -141,8 +148,8 @@ export type ResolvePracticeSourceTitleParams = {
 // —— 页面壳 / 通用 UI ——
 
 export type PracticePageShellProps = {
-	title: string;
-	subtitle?: string;
+	title?: ReactNode;
+	subtitle?: ReactNode;
 	onBack?: () => void;
 	backLabel?: string;
 	headerRight?: ReactNode;
@@ -249,6 +256,8 @@ export type WrongListItemProps = {
 	stopLabel: string;
 	/** 错题红左边框；正确绿左边框 */
 	variant?: SummaryWordListVariant;
+	/** 作答明细：用户当次输入（有内容才展示） */
+	userInput?: string;
 };
 
 export type SummaryActionsProps = {
@@ -256,17 +265,24 @@ export type SummaryActionsProps = {
 	continueLoading: boolean;
 	saveMistakesLoading?: boolean;
 	mistakesPath?: string;
+	/** 保存报告：idle 可点；saving 转圈；saved 禁用示已保存；hidden 不展示按钮 */
+	reportSaveState?: 'idle' | 'saving' | 'saved' | 'hidden';
 	labels: {
 		retryWrong: string;
 		practiceAgain: string;
 		continuePractice: string;
 		openMistakes: string;
 		saveMistakes: string;
+		saveReport: string;
+		reportSaved: string;
+		viewReports: string;
 	};
 	onRetryWrong: () => void;
 	onBackToSetup: () => void;
 	onContinuePractice: () => void;
 	onSaveMistakes?: () => void;
+	onSaveReport?: () => void;
+	onViewReports?: () => void;
 };
 
 // —— 单题 Session 子组件 ——

@@ -213,6 +213,35 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			}
 		}
 
+		// 练习报告列表 / 详情：英语学习 > 练习报告[ > 报告标题]（kind 只在页面子标题切换）
+		const reportsListHit = pathMatches(
+			'/english-learning/practice/reports',
+			location.pathname,
+		);
+		const reportsDetailHit =
+			matchPath(
+				{ path: '/english-learning/practice/reports/:id', end: true },
+				location.pathname,
+			) != null;
+		if ((reportsListHit || reportsDetailHit) && trail.length > 0) {
+			const params = new URLSearchParams(location.search);
+			const kind = params.get('kind') === 'classic' ? 'classic' : 'vocab';
+			const listPath = `/english-learning/practice/reports?kind=${kind}`;
+			trail[trail.length - 1] = {
+				label: t('englishLearning.practice.reportsTitle'),
+				path: listPath,
+			};
+			if (reportsDetailHit) {
+				const detailLabel =
+					params.get('title')?.trim() ||
+					t('englishLearning.practice.reportsTitle');
+				trail.push({
+					label: detailLabel,
+					path: `${location.pathname}${location.search}`,
+				});
+			}
+		}
+
 		if (
 			location.pathname === '/english-learning/daily' &&
 			trail.length > 0 &&

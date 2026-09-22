@@ -64,6 +64,12 @@ const EnglishLearningAnnotatePage = lazy(
 const EnglishLearningPracticePage = lazy(
 	() => import('@/views/englishLearning/practice'),
 );
+const EnglishLearningPracticeReportsPage = lazy(
+	() => import('@/views/englishLearning/practice/reports'),
+);
+const EnglishLearningPracticeReportDetailPage = lazy(
+	() => import('@/views/englishLearning/practice/reports/Detail'),
+);
 const EnglishGrammarReferencePage = lazy(
 	() => import('@/views/englishLearning/reference/grammar'),
 );
@@ -296,6 +302,20 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningPracticePage,
 						meta: {
 							titleKey: 'route.englishLearning.practice.title',
+						},
+					},
+					{
+						path: 'practice/reports',
+						Component: EnglishLearningPracticeReportsPage,
+						meta: {
+							titleKey: 'route.englishLearning.practice.reportsTitle',
+						},
+					},
+					{
+						path: 'practice/reports/:id',
+						Component: EnglishLearningPracticeReportDetailPage,
+						meta: {
+							titleKey: 'route.englishLearning.practice.reportsTitle',
 						},
 					},
 					{
