@@ -7,6 +7,7 @@ import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 import { MinimaxTtsUserConfig } from './minimax-tts-user-config.entity';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
 import { SpeechTranscriptionController } from './speech-transcription.controller';
+import { TtsAudioCacheService } from './tts-audio-cache.service';
 import { XfyunTtsService } from './xfyun-tts.service';
 
 /**
@@ -16,6 +17,7 @@ import { XfyunTtsService } from './xfyun-tts.service';
 	imports: [TypeOrmModule.forFeature([MinimaxTtsUserConfig])],
 	controllers: [SpeechTranscriptionController, MinimaxTtsPrefsController],
 	providers: [
+		TtsAudioCacheService,
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
 		XfyunTtsService,
@@ -23,6 +25,7 @@ import { XfyunTtsService } from './xfyun-tts.service';
 		MinimaxTtsPrefsService,
 	],
 	exports: [
+		TtsAudioCacheService,
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
 		XfyunTtsService,

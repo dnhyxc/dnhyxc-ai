@@ -38,6 +38,17 @@ export const appConfig = () => ({
 		REDIS_URL: Joi.string().uri(),
 		REDIS_PASSWORD: Joi.string(),
 		REDIS_USERNAME: Joi.string(),
+		// TTS L2（可选；默认关；固定 TTL）
+		TTS_CACHE_L2_ENABLED: Joi.alternatives()
+			.try(Joi.boolean(), Joi.string().valid('true', 'false', '1', '0'))
+			.optional(),
+		TTS_CACHE_TTL_SEC: Joi.number().optional(),
+		TTS_CACHE_MAX_VALUE_BYTES: Joi.number().optional(),
+		TTS_CACHE_REDIS_SOFT_MB: Joi.number().optional(),
+		TTS_CACHE_GET_TIMEOUT_MS: Joi.number().optional(),
+		TTS_CACHE_SET_TIMEOUT_MS: Joi.number().optional(),
+		TTS_CACHE_CIRCUIT_FAILS: Joi.number().optional(),
+		TTS_CACHE_CIRCUIT_OPEN_MS: Joi.number().optional(),
 		// Stripe（可选，未配置时创建 Checkout 会返回服务不可用）
 		STRIPE_SECRET_KEY: Joi.string().optional().allow(''),
 		STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),

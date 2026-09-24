@@ -1,6 +1,8 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
+import { buildTtsRedisKey, normalizeTtsText } from './tts-audio-cache.keys';
+import { TtsAudioCacheService } from './tts-audio-cache.service';
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'FunAudioLLM/SenseVoiceSmall';
 const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
@@ -42,7 +44,10 @@ export class SiliconflowTranscriptionService {
 	/** 文本 + 模型/音色参数 → MP3，避免 CosyVoice 每次合成发音漂移 */
 	private readonly ttsSpeechCache = new Map<string, Buffer>();
 
-	constructor(private readonly config: ConfigService) {}
+	constructor(
+		private readonly config: ConfigService,
+		private readonly ttsCache: TtsAudioCacheService,
+	) {}
 
 	private buildTtsSpeechCacheKey(plain: string): string {
 		return [
@@ -52,6 +57,14 @@ export class SiliconflowTranscriptionService {
 			'0',
 			plain,
 		].join('\u0001');
+	}
+
+	private buildL2Key(plain: string): string {
+		return buildTtsRedisKey({
+			provider: 'siliconflow',
+			paramParts: [this.resolveTtsModel(), this.resolveTtsVoice(), '1', '0'],
+			normalizedText: normalizeTtsText(plain),
+		});
 	}
 
 	private getTtsSpeechFromCache(key: string): Buffer | null {
@@ -125,7 +138,15 @@ export class SiliconflowTranscriptionService {
 		const cacheKey = this.buildTtsSpeechCacheKey(plain);
 		const cached = this.getTtsSpeechFromCache(cacheKey);
 		if (cached) {
+			this.ttsCache.noteL1Hit();
 			return Buffer.from(cached);
+		}
+
+		const l2Key = this.buildL2Key(plain);
+		const fromL2 = await this.ttsCache.get(l2Key);
+		if (fromL2?.length) {
+			this.setTtsSpeechCache(cacheKey, fromL2);
+			return Buffer.from(fromL2);
 		}
 
 		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
@@ -142,6 +163,7 @@ export class SiliconflowTranscriptionService {
 		).replace(/\/$/, '');
 		const url = `${baseUrl}/audio/speech`;
 
+		this.ttsCache.noteVendorCall();
 		const res = await fetch(url, {
 			method: 'POST',
 			headers: {
@@ -170,6 +192,7 @@ export class SiliconflowTranscriptionService {
 
 		const buffer = Buffer.from(await res.arrayBuffer());
 		this.setTtsSpeechCache(cacheKey, buffer);
+		await this.ttsCache.set(l2Key, buffer);
 		return buffer;
 	}
 

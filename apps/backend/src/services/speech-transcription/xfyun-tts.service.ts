@@ -5,6 +5,12 @@ import WebSocket from 'ws';
 import { DEFAULT_XFYUN_TTS_VCN, XfyunEnum } from '../../enum/config.enum';
 import type { XfyunTtsDto } from './dto/xfyun-tts.dto';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
+import {
+	buildTtsRedisKey,
+	normalizeTtsText,
+	userIdPart,
+} from './tts-audio-cache.keys';
+import { TtsAudioCacheService } from './tts-audio-cache.service';
 
 // https://console.xfyun.cn/services/tts
 const TTS_WS_URL = 'wss://tts-api.xfyun.cn/v2/tts';
@@ -47,6 +53,7 @@ export class XfyunTtsService {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prefsService: MinimaxTtsPrefsService,
+		private readonly ttsCache: TtsAudioCacheService,
 	) {}
 
 	isConfigured(): boolean {
@@ -134,6 +141,25 @@ export class XfyunTtsService {
 			String(resolved.pitch),
 			resolved.text,
 		].join('\u0001');
+	}
+
+	private buildL2Key(
+		resolved: XfyunTtsResolved,
+		userId: number | undefined,
+		credTag: string,
+	): string {
+		return buildTtsRedisKey({
+			provider: 'xfyun',
+			paramParts: [
+				userIdPart(userId),
+				credTag,
+				resolved.vcn,
+				String(resolved.speed),
+				String(resolved.volume),
+				String(resolved.pitch),
+			],
+			normalizedText: normalizeTtsText(resolved.text),
+		});
 	}
 
 	private getFromCache(key: string): Buffer | null {
@@ -309,11 +335,105 @@ export class XfyunTtsService {
 		const credentials = await this.resolveCredentials(userId);
 		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
-		if (cached) return Buffer.from(cached);
+		if (cached) {
+			this.ttsCache.noteL1Hit();
+			return Buffer.from(cached);
+		}
 
+		const l2Key = this.buildL2Key(resolved, userId, credentials.credTag);
+		const fromL2 = await this.ttsCache.get(l2Key);
+		if (fromL2?.length) {
+			this.setCache(cacheKey, fromL2);
+			return Buffer.from(fromL2);
+		}
+
+		this.ttsCache.noteVendorCall();
 		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		this.setCache(cacheKey, buffer);
+		await this.ttsCache.set(l2Key, buffer);
 		return buffer;
+	}
+
+	async synthesizeSpeechBatch(
+		voice: Omit<XfyunTtsDto, 'text'>,
+		texts: string[],
+		userId?: number,
+	): Promise<Array<{ text: string; buffer?: Buffer; error?: string }>> {
+		const credentials = await this.resolveCredentials(userId);
+		type Slot = {
+			text: string;
+			resolved?: XfyunTtsResolved;
+			l1Key?: string;
+			l2Key?: string;
+			buffer?: Buffer;
+			error?: string;
+		};
+		const slots: Slot[] = texts.map((raw) => {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) return { text: raw ?? '', error: 'EMPTY' };
+			try {
+				const resolved = this.resolveOptions({ ...voice, text });
+				return {
+					text,
+					resolved,
+					l1Key: this.buildCacheKey(resolved, userId, credentials.credTag),
+					l2Key: this.buildL2Key(resolved, userId, credentials.credTag),
+				};
+			} catch (err) {
+				return {
+					text,
+					error: err instanceof Error ? err.message : 'TTS_FAILED',
+				};
+			}
+		});
+
+		const needL2: number[] = [];
+		for (let i = 0; i < slots.length; i++) {
+			const s = slots[i];
+			if (s.error || !s.l1Key) continue;
+			const hit = this.getFromCache(s.l1Key);
+			if (hit) {
+				this.ttsCache.noteL1Hit();
+				s.buffer = Buffer.from(hit);
+				continue;
+			}
+			needL2.push(i);
+		}
+
+		if (needL2.length && this.ttsCache.isEnabled()) {
+			const rows = await this.ttsCache.mget(needL2.map((i) => slots[i].l2Key!));
+			for (let j = 0; j < needL2.length; j++) {
+				const buf = rows[j];
+				if (!buf?.length) continue;
+				const i = needL2[j];
+				this.setCache(slots[i].l1Key!, buf);
+				slots[i].buffer = Buffer.from(buf);
+			}
+		}
+
+		const toWrite: Array<{ key: string; audio: Buffer }> = [];
+		for (const s of slots) {
+			if (s.error || s.buffer || !s.resolved || !s.l1Key || !s.l2Key) continue;
+			try {
+				this.ttsCache.noteVendorCall();
+				const buffer = await this.synthesizeViaWebSocket(
+					s.resolved,
+					credentials,
+				);
+				this.setCache(s.l1Key, buffer);
+				s.buffer = Buffer.from(buffer);
+				toWrite.push({ key: s.l2Key, audio: buffer });
+			} catch (err) {
+				s.error = err instanceof Error ? err.message : 'TTS_FAILED';
+			}
+		}
+		if (toWrite.length) await this.ttsCache.setMany(toWrite);
+
+		return slots.map((s) =>
+			s.error
+				? { text: s.text, error: s.error }
+				: { text: s.text, buffer: s.buffer },
+		);
 	}
 
 	async *streamSpeech(
@@ -325,13 +445,24 @@ export class XfyunTtsService {
 		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
+			this.ttsCache.noteL1Hit();
 			yield cached;
 			return;
 		}
 
+		const l2Key = this.buildL2Key(resolved, userId, credentials.credTag);
+		const fromL2 = await this.ttsCache.get(l2Key);
+		if (fromL2?.length) {
+			this.setCache(cacheKey, fromL2);
+			yield fromL2;
+			return;
+		}
+
+		this.ttsCache.noteVendorCall();
 		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		if (buffer.length) {
 			this.setCache(cacheKey, buffer);
+			await this.ttsCache.set(l2Key, buffer);
 			yield buffer;
 		}
 	}

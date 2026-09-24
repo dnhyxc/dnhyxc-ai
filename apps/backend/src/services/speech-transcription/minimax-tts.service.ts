@@ -4,6 +4,12 @@ import { MinimaxEnum } from '../../enum/config.enum';
 import type { MinimaxTtsDto } from './dto/minimax-tts.dto';
 import { DEFAULT_MINIMAX_TTS_MODEL } from './minimax-tts-models';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
+import {
+	buildTtsRedisKey,
+	normalizeTtsText,
+	userIdPart,
+} from './tts-audio-cache.keys';
+import { TtsAudioCacheService } from './tts-audio-cache.service';
 
 const TTS_INPUT_MAX_CHARS = 10_000;
 const TTS_SPEECH_CACHE_MAX = 128;
@@ -81,6 +87,7 @@ export class MinimaxTtsService {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prefsService: MinimaxTtsPrefsService,
+		private readonly ttsCache: TtsAudioCacheService,
 	) {}
 
 	/**
@@ -178,6 +185,27 @@ export class MinimaxTtsService {
 			resolved.languageBoost ?? '',
 			resolved.text,
 		].join('\u0001'); // 使用不可打印分隔符避免歧义
+	}
+
+	private buildL2Key(resolved: MinimaxTtsResolved, userId?: number): string {
+		return buildTtsRedisKey({
+			provider: 'minimax',
+			paramParts: [
+				userIdPart(userId),
+				resolved.model,
+				resolved.voiceId,
+				String(resolved.speed),
+				String(resolved.vol),
+				String(resolved.pitch),
+				resolved.emotion ?? '',
+				String(resolved.sampleRate),
+				String(resolved.bitrate),
+				resolved.format,
+				String(resolved.channel),
+				resolved.languageBoost ?? '',
+			],
+			normalizedText: normalizeTtsText(resolved.text),
+		});
 	}
 
 	/**
@@ -410,8 +438,19 @@ export class MinimaxTtsService {
 		const resolved = this.resolveOptions(dto);
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
-		if (cached) return Buffer.from(cached);
+		if (cached) {
+			this.ttsCache.noteL1Hit();
+			return Buffer.from(cached);
+		}
 
+		const l2Key = this.buildL2Key(resolved, userId);
+		const fromL2 = await this.ttsCache.get(l2Key);
+		if (fromL2?.length) {
+			this.setCache(cacheKey, fromL2);
+			return Buffer.from(fromL2);
+		}
+
+		this.ttsCache.noteVendorCall();
 		const res = await this.requestMiniMax(resolved, false, userId);
 		const raw = await res.text();
 		if (!res.ok) {
@@ -433,7 +472,6 @@ export class MinimaxTtsService {
 			);
 		}
 
-		// 支持数组和单对象
 		const chunks = Array.isArray(json) ? json : [json];
 		const parts: Buffer[] = [];
 		for (const item of chunks) {
@@ -447,16 +485,122 @@ export class MinimaxTtsService {
 				HttpStatus.BAD_GATEWAY,
 			);
 		}
-		const buffer = Buffer.concat(parts); // 合并所有音频片段
+		const buffer = Buffer.concat(parts);
 		this.setCache(cacheKey, buffer);
+		await this.ttsCache.set(l2Key, buffer);
 		return buffer;
 	}
 
-	/**
-	 * 以流式方式合成语音，将每个 chunk buffer 逐个 yield，适配 HTTP chunked
-	 * 命中缓存则只 yield 一次全部音频（保持接口一致性）
-	 * @param dto 入口参数
-	 */
+	async synthesizeSpeechBatch(
+		voice: Omit<MinimaxTtsDto, 'text'>,
+		texts: string[],
+		userId?: number,
+	): Promise<Array<{ text: string; buffer?: Buffer; error?: string }>> {
+		type Slot = {
+			text: string;
+			resolved?: MinimaxTtsResolved;
+			l1Key?: string;
+			l2Key?: string;
+			buffer?: Buffer;
+			error?: string;
+		};
+		const slots: Slot[] = texts.map((raw) => {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) return { text: raw ?? '', error: 'EMPTY' };
+			try {
+				const resolved = this.resolveOptions({ ...voice, text });
+				return {
+					text,
+					resolved,
+					l1Key: this.buildCacheKey(resolved, userId),
+					l2Key: this.buildL2Key(resolved, userId),
+				};
+			} catch (err) {
+				return {
+					text,
+					error: err instanceof Error ? err.message : 'TTS_FAILED',
+				};
+			}
+		});
+
+		const needL2: number[] = [];
+		for (let i = 0; i < slots.length; i++) {
+			const s = slots[i];
+			if (s.error || !s.l1Key) continue;
+			const hit = this.getFromCache(s.l1Key);
+			if (hit) {
+				this.ttsCache.noteL1Hit();
+				s.buffer = Buffer.from(hit);
+				continue;
+			}
+			needL2.push(i);
+		}
+
+		if (needL2.length && this.ttsCache.isEnabled()) {
+			const rows = await this.ttsCache.mget(needL2.map((i) => slots[i].l2Key!));
+			for (let j = 0; j < needL2.length; j++) {
+				const buf = rows[j];
+				if (!buf?.length) continue;
+				const i = needL2[j];
+				this.setCache(slots[i].l1Key!, buf);
+				slots[i].buffer = Buffer.from(buf);
+			}
+		}
+
+		const toWrite: Array<{ key: string; audio: Buffer }> = [];
+		for (const s of slots) {
+			if (s.error || s.buffer || !s.resolved || !s.l1Key || !s.l2Key) continue;
+			try {
+				this.ttsCache.noteVendorCall();
+				const res = await this.requestMiniMax(s.resolved, false, userId);
+				const raw = await res.text();
+				if (!res.ok) {
+					throw new HttpException(
+						`MiniMax 语音合成失败（${res.status}）：${raw.slice(0, 500)}`,
+						res.status >= 400 && res.status < 600
+							? res.status
+							: HttpStatus.BAD_GATEWAY,
+					);
+				}
+				let json: MinimaxT2aChunk | MinimaxT2aChunk[];
+				try {
+					json = JSON.parse(raw) as MinimaxT2aChunk | MinimaxT2aChunk[];
+				} catch {
+					throw new HttpException(
+						'MiniMax 语音合成返回非 JSON',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+				const chunks = Array.isArray(json) ? json : [json];
+				const parts: Buffer[] = [];
+				for (const item of chunks) {
+					this.assertMiniMaxOk(item, 'MiniMax 语音合成');
+					const audio = this.decodeHexAudio(item.data?.audio);
+					if (audio?.length) parts.push(audio);
+				}
+				if (!parts.length) {
+					throw new HttpException(
+						'MiniMax 语音合成未返回音频',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+				const buffer = Buffer.concat(parts);
+				this.setCache(s.l1Key, buffer);
+				s.buffer = Buffer.from(buffer);
+				toWrite.push({ key: s.l2Key, audio: buffer });
+			} catch (err) {
+				s.error = err instanceof Error ? err.message : 'TTS_FAILED';
+			}
+		}
+		if (toWrite.length) await this.ttsCache.setMany(toWrite);
+
+		return slots.map((s) =>
+			s.error
+				? { text: s.text, error: s.error }
+				: { text: s.text, buffer: s.buffer },
+		);
+	}
+
 	async *streamSpeech(
 		dto: MinimaxTtsDto,
 		userId?: number,
@@ -465,10 +609,20 @@ export class MinimaxTtsService {
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
+			this.ttsCache.noteL1Hit();
 			yield cached;
 			return;
 		}
 
+		const l2Key = this.buildL2Key(resolved, userId);
+		const fromL2 = await this.ttsCache.get(l2Key);
+		if (fromL2?.length) {
+			this.setCache(cacheKey, fromL2);
+			yield fromL2;
+			return;
+		}
+
+		this.ttsCache.noteVendorCall();
 		const res = await this.requestMiniMax(resolved, true, userId);
 		if (!res.ok) {
 			const raw = await res.text();
@@ -490,7 +644,9 @@ export class MinimaxTtsService {
 			}
 		}
 		if (parts.length > 0) {
-			this.setCache(cacheKey, Buffer.concat(parts));
+			const buffer = Buffer.concat(parts);
+			this.setCache(cacheKey, buffer);
+			await this.ttsCache.set(l2Key, buffer);
 		}
 	}
 
