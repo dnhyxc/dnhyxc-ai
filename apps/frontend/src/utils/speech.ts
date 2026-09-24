@@ -9,8 +9,11 @@ import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
+	SPEECH_EDGE_TTS_BATCH,
 	SPEECH_EDGE_TTS_STREAM,
+	SPEECH_MINIMAX_TTS_BATCH,
 	SPEECH_MINIMAX_TTS_STREAM,
+	SPEECH_XFYUN_TTS_BATCH,
 	SPEECH_XFYUN_TTS_STREAM,
 } from '@/service/api';
 import {
@@ -1198,21 +1201,46 @@ type CloudPlaybackSource = 'cloud' | 'xfyun' | 'edge';
 let sessionCloudSourceOverride: CloudPlaybackSource | null = null;
 
 const CLOUD_TTS_CACHE_MAX = 64;
+/** 练习场会话可临时抬高上限（百题硬顶），避免 LRU=64 挤掉未播预取 */
+let cloudTtsCacheMaxOverride: number | null = null;
 /** 规范化文本 → MP3 ArrayBuffer（LRU：重复 get 时移到末尾） */
 const cloudTtsAudioCache = new Map<string, ArrayBuffer>();
 /** 同一 cacheKey 进行中的请求合并，避免听书首包+预取打出重复 stream */
 const inflightCloudTts = new Map<string, Promise<CloudTtsReady>>();
+
+function effectiveCloudTtsCacheMax(): number {
+	return cloudTtsCacheMaxOverride ?? CLOUD_TTS_CACHE_MAX;
+}
+
+function trimCloudTtsCacheToMax(): void {
+	const max = effectiveCloudTtsCacheMax();
+	while (cloudTtsAudioCache.size > max) {
+		const oldest = cloudTtsAudioCache.keys().next().value;
+		if (oldest === undefined) break;
+		cloudTtsAudioCache.delete(oldest);
+	}
+}
 
 function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
 	if (cloudTtsAudioCache.has(key)) {
 		cloudTtsAudioCache.delete(key);
 	}
 	cloudTtsAudioCache.set(key, audio);
-	while (cloudTtsAudioCache.size > CLOUD_TTS_CACHE_MAX) {
-		const oldest = cloudTtsAudioCache.keys().next().value;
-		if (oldest === undefined) break;
-		cloudTtsAudioCache.delete(oldest);
-	}
+	trimCloudTtsCacheToMax();
+}
+
+/**
+ * 练习会话：抬高云端 TTS LRU 上限（建议 ≥ 题量硬顶 100）。
+ * 离场须 endPracticeCloudTtsCacheSession。
+ */
+export function beginPracticeCloudTtsCacheSession(maxEntries = 100): void {
+	cloudTtsCacheMaxOverride = Math.max(CLOUD_TTS_CACHE_MAX, maxEntries);
+}
+
+/** 结束练习会话缓存扩容，并裁回默认 LRU */
+export function endPracticeCloudTtsCacheSession(): void {
+	cloudTtsCacheMaxOverride = null;
+	trimCloudTtsCacheToMax();
 }
 
 function getCloudTtsFromCache(plain: string): Blob | null {
@@ -1555,6 +1583,116 @@ export function prefetchCloudTts(
 		plain: chunkPlain,
 		ready,
 	}));
+}
+
+const TTS_PREFETCH_BATCH_MAX = 8;
+
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+	const bin = atob(b64);
+	const bytes = new Uint8Array(bin.length);
+	for (let i = 0; i < bin.length; i += 1) {
+		bytes[i] = bin.charCodeAt(i);
+	}
+	return bytes.buffer;
+}
+
+/**
+ * 练习预取：多句一次 HTTP（texts[]），写入 LRU；单条失败不影响其余。
+ * 厂商仍按句合成，但浏览器只打 1 次接口 / 批。
+ */
+export async function prefetchCloudTtsBatch(
+	rawTexts: readonly string[],
+	options?: Pick<PlayPreferredOptions, 'preferLocal'>,
+): Promise<void> {
+	if (!shouldUseCloudTts(options)) return;
+	await ensureMinimaxTtsUserPrefsLoaded();
+
+	const need: string[] = [];
+	const seen = new Set<string>();
+	for (const raw of rawTexts) {
+		const plain = stripMarkdownForTts(raw);
+		if (!plain || seen.has(plain)) continue;
+		if (!cloudPlainWithinSingleLimit(plain)) continue;
+		seen.add(plain);
+		if (getCloudTtsFromCache(plain)) continue;
+		need.push(plain);
+	}
+	if (need.length === 0) return;
+
+	const token = readToken();
+	if (!token) throw new Error('NO_TOKEN');
+
+	const platformFetch = await getPlatformFetch();
+	const source = effectiveCloudPlaybackSource();
+	const endpoint =
+		source === 'xfyun'
+			? SPEECH_XFYUN_TTS_BATCH
+			: source === 'edge'
+				? SPEECH_EDGE_TTS_BATCH
+				: SPEECH_MINIMAX_TTS_BATCH;
+	const bodyExtras =
+		source === 'xfyun'
+			? buildXfyunTtsRequestExtras()
+			: source === 'edge'
+				? buildEdgeTtsRequestExtras()
+				: buildMinimaxTtsRequestExtras();
+
+	for (let offset = 0; offset < need.length; offset += TTS_PREFETCH_BATCH_MAX) {
+		const chunk = need.slice(offset, offset + TTS_PREFETCH_BATCH_MAX);
+		const keys = chunk.map((p) => buildCloudTtsCacheKey(p));
+
+		const pending = (async (): Promise<void> => {
+			try {
+				const res = await platformFetch(BASE_URL + endpoint, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ texts: chunk, ...bodyExtras }),
+				});
+				if (!res.ok) {
+					throw new Error(`TTS_BATCH_HTTP_${res.status}`);
+				}
+				const data = (await res.json()) as {
+					items?: Array<{
+						text?: string;
+						audioBase64?: string;
+						error?: string;
+					}>;
+				};
+				for (const item of data.items ?? []) {
+					const plain = (item.text ?? '').trim();
+					const b64 = item.audioBase64;
+					if (!plain || !b64 || item.error) continue;
+					const buf = base64ToArrayBuffer(b64);
+					if (!buf.byteLength) continue;
+					touchCloudTtsCache(buildCloudTtsCacheKey(plain), buf);
+				}
+			} finally {
+				for (const key of keys) {
+					inflightCloudTts.delete(key);
+				}
+			}
+		})();
+
+		for (let i = 0; i < chunk.length; i += 1) {
+			const plain = chunk[i]!;
+			const key = keys[i]!;
+			inflightCloudTts.set(
+				key,
+				pending.then((): CloudTtsReady => {
+					const hit = getCloudTtsFromCache(plain);
+					if (!hit) {
+						throw new Error('TTS_BATCH_ITEM_MISSING');
+					}
+					return { kind: 'cached', blob: hit, cacheKey: key };
+				}),
+			);
+		}
+
+		await pending;
+	}
 }
 
 /** 发起云端 TTS 请求；命中 LRU / 进行中请求则复用，避免同文案并发多条 stream */

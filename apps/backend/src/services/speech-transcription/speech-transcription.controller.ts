@@ -16,14 +16,23 @@ import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { EdgeTtsDto } from './dto/edge-tts.dto';
+import { EdgeTtsBatchDto } from './dto/edge-tts-batch.dto';
 import { MinimaxTtsDto } from './dto/minimax-tts.dto';
+import { MinimaxTtsBatchDto } from './dto/minimax-tts-batch.dto';
 import { XfyunTtsDto } from './dto/xfyun-tts.dto';
+import { XfyunTtsBatchDto } from './dto/xfyun-tts-batch.dto';
 import { EdgeTtsService } from './edge-tts.service';
 import { MinimaxTtsService } from './minimax-tts.service';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
 import { XfyunTtsService } from './xfyun-tts.service';
 
 type AuthedRequest = Request & { user?: { userId?: number } };
+
+type TtsBatchItemResult = {
+	text: string;
+	audioBase64?: string;
+	error?: string;
+};
 
 /**
  * 语音转文字 HTTP 接口（与 Chat / Knowledge 等业务解耦，仅做上传与 ASR）。
@@ -211,5 +220,98 @@ export class SpeechTranscriptionController {
 	async edgeSpeechTimed(@Body() body: EdgeTtsDto, @Req() req: AuthedRequest) {
 		const userId = req.user?.userId;
 		return this.edgeTtsService.synthesizeSpeechTimed(body, userId);
+	}
+
+	/**
+	 * 练习预取：多句一次 HTTP，服务端逐条合成（命中进程内 LRU），返回 base64 MP3。
+	 */
+	@Post('minimax/speech/batch')
+	async minimaxSpeechBatch(
+		@Body() body: MinimaxTtsBatchDto,
+		@Req() req: AuthedRequest,
+	): Promise<{ items: TtsBatchItemResult[] }> {
+		const userId = req.user?.userId;
+		const { texts, ...voice } = body;
+		const items: TtsBatchItemResult[] = [];
+		for (const raw of texts) {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) {
+				items.push({ text: raw ?? '', error: 'EMPTY' });
+				continue;
+			}
+			try {
+				const buf = await this.minimaxTtsService.synthesizeSpeech(
+					{ ...voice, text },
+					userId,
+				);
+				items.push({ text, audioBase64: buf.toString('base64') });
+			} catch (err) {
+				items.push({
+					text,
+					error: err instanceof Error ? err.message : 'TTS_FAILED',
+				});
+			}
+		}
+		return { items };
+	}
+
+	@Post('xfyun/speech/batch')
+	async xfyunSpeechBatch(
+		@Body() body: XfyunTtsBatchDto,
+		@Req() req: AuthedRequest,
+	): Promise<{ items: TtsBatchItemResult[] }> {
+		const userId = req.user?.userId;
+		const { texts, ...voice } = body;
+		const items: TtsBatchItemResult[] = [];
+		for (const raw of texts) {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) {
+				items.push({ text: raw ?? '', error: 'EMPTY' });
+				continue;
+			}
+			try {
+				const buf = await this.xfyunTtsService.synthesizeSpeech(
+					{ ...voice, text },
+					userId,
+				);
+				items.push({ text, audioBase64: buf.toString('base64') });
+			} catch (err) {
+				items.push({
+					text,
+					error: err instanceof Error ? err.message : 'TTS_FAILED',
+				});
+			}
+		}
+		return { items };
+	}
+
+	@Post('edge/speech/batch')
+	async edgeSpeechBatch(
+		@Body() body: EdgeTtsBatchDto,
+		@Req() req: AuthedRequest,
+	): Promise<{ items: TtsBatchItemResult[] }> {
+		const userId = req.user?.userId;
+		const { texts, ...voice } = body;
+		const items: TtsBatchItemResult[] = [];
+		for (const raw of texts) {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) {
+				items.push({ text: raw ?? '', error: 'EMPTY' });
+				continue;
+			}
+			try {
+				const buf = await this.edgeTtsService.synthesizeSpeech(
+					{ ...voice, text },
+					userId,
+				);
+				items.push({ text, audioBase64: buf.toString('base64') });
+			} catch (err) {
+				items.push({
+					text,
+					error: err instanceof Error ? err.message : 'TTS_FAILED',
+				});
+			}
+		}
+		return { items };
 	}
 }

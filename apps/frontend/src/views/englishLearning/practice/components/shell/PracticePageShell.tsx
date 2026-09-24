@@ -30,7 +30,7 @@ export function PracticePageShell({
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 					{showHeader ? (
 						<Head
-							className="pl-4 pr-2"
+							className="px-4"
 							onBack={onBack}
 							backLabel={backLabel}
 							trailing={headerRight}

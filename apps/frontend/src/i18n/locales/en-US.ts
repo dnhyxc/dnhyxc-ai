@@ -1553,9 +1553,9 @@ export const enUS = {
 	'englishLearning.annotateSource.importBlockedRunning':
 		'Online annotation is running — pause or stop it before importing',
 	'englishLearning.annotateSource.importSuccess':
-		'Imported {{accepted}} (partial OK); skipped {{skipped}}, overwritten {{overwritten}}',
+		'Imported {accepted} (partial OK); skipped {skipped}, overwritten {overwritten}',
 	'englishLearning.annotateSource.importAllSkipped':
-		'Nothing imported (skipped {{skipped}})',
+		'Nothing imported (skipped {skipped})',
 	'englishLearning.annotateSource.importClassicFile':
 		'This is a quotes file, not annotations',
 	'englishLearning.annotateSource.importEmpty': 'No valid annotations in file',
@@ -1566,22 +1566,22 @@ export const enUS = {
 	'englishLearning.annotateSource.confirmDesc':
 		'Missing sentences will be sent to the model for POS / IPA / gloss and cached. This may take a while. Continue?',
 	'englishLearning.annotateSource.confirmDescCount':
-		'About {{count}} sentences: uncached ones will be annotated and stored. This may take a while. Continue?',
+		'About {count} sentences: uncached ones will be annotated and stored. This may take a while. Continue?',
 	'englishLearning.annotateSource.confirmAction': 'Start',
 	'englishLearning.annotateSource.running': 'Annotating…',
 	'englishLearning.annotateSource.preparing': 'Connecting and checking cache…',
 	'englishLearning.annotateSource.cancelRunning': 'Stop',
 	'englishLearning.annotateSource.progress':
-		'Cached {{hit}} · New {{annotated}}/{{miss}} · Left {{remaining}}',
+		'Cached {hit} · New {annotated}/{miss} · Left {remaining}',
 	'englishLearning.annotateSource.aborted': 'Stopped (partial results kept)',
 	'englishLearning.annotateSource.failed':
 		'Annotation failed. Please try again.',
 	'englishLearning.annotateSource.success':
-		'Done: {{total}} total, {{hit}} cached, {{annotated}} new, {{failed}} failed',
+		'Done: {total} total, {hit} cached, {annotated} new, {failed} failed',
 	'englishLearning.annotateTasks.pageTitle': 'Annotation progress',
 	'englishLearning.annotateTasks.back': 'Back',
 	'englishLearning.annotateTasks.pageRunningHint':
-		'{{count}} annotation task(s) running — you can stop anytime',
+		'{count} annotation task(s) running — you can stop anytime',
 	'englishLearning.annotateTasks.pageIdleHint':
 		'Recent tasks below; leaving the page keeps them running — after refresh use Resume',
 	'englishLearning.annotateTasks.empty': 'No annotation tasks yet',
@@ -1602,15 +1602,14 @@ export const enUS = {
 	'englishLearning.annotateTasks.metricFailed': 'Failed',
 	'englishLearning.annotateTasks.metricTokens': 'Tokens used',
 	'englishLearning.annotateTasks.metricTokensValue':
-		'{{total}} (in {{prompt}} · out {{completion}})',
+		'{total} (in {prompt} · out {completion})',
 	'englishLearning.annotateTasks.metricTokensDetail':
-		'Task total: prompt {{prompt}} + completion {{completion}}',
+		'Task total: prompt {prompt} + completion {completion}',
 	'englishLearning.annotateTasks.openPage': 'Open progress',
 	'englishLearning.annotateTasks.viewProgress': 'View progress',
-	'englishLearning.annotateTasks.liveSummary':
-		'{{count}} annotating · {{title}}',
+	'englishLearning.annotateTasks.liveSummary': '{count} annotating · {title}',
 	'englishLearning.annotateTasks.liveFinished':
-		'{{count}} recent annotation task(s)',
+		'{count} recent annotation task(s)',
 	'englishLearning.annotateTasks.alreadyRunning':
 		'Already annotating — opened the progress page',
 	'englishLearning.annotateTasks.alreadyActive':

@@ -74,15 +74,23 @@ export const SPEECH_TTS = '/speech-transcription/speech';
 /** MiniMax T2A 流式 TTS（speech-2.8-turbo，需 MINIMAX_API_KEY） */
 export const SPEECH_MINIMAX_TTS_STREAM =
 	'/speech-transcription/minimax/speech/stream';
+/** MiniMax 批量合成（练习预取：texts[] → base64 MP3） */
+export const SPEECH_MINIMAX_TTS_BATCH =
+	'/speech-transcription/minimax/speech/batch';
 /** 讯飞在线语音合成（WebSocket 代理 → MP3，需 XFYUN_* 环境变量） */
 export const SPEECH_XFYUN_TTS_STREAM =
 	'/speech-transcription/xfyun/speech/stream';
+/** 讯飞批量合成（练习预取） */
+export const SPEECH_XFYUN_TTS_BATCH =
+	'/speech-transcription/xfyun/speech/batch';
 /** Microsoft Edge 在线语音合成（edge-tts-universal，免费无需 API Key） */
 export const SPEECH_EDGE_TTS = '/speech-transcription/edge/speech';
 /** Edge TTS + WordBoundary 时间戳（JSON：audioBase64 + boundaries） */
 export const SPEECH_EDGE_TTS_TIMED = '/speech-transcription/edge/speech/timed';
 export const SPEECH_EDGE_TTS_STREAM =
 	'/speech-transcription/edge/speech/stream';
+/** Edge 批量合成（练习预取） */
+export const SPEECH_EDGE_TTS_BATCH = '/speech-transcription/edge/speech/batch';
 /** MiniMax T2A 非流式 TTS */
 export const SPEECH_MINIMAX_TTS = '/speech-transcription/minimax/speech';
 

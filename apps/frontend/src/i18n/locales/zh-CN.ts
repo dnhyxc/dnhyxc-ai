@@ -1409,9 +1409,9 @@ export const zhCN = {
 	'englishLearning.annotateSource.importBlockedRunning':
 		'在线标注进行中，请先暂停或停止后再手动导入',
 	'englishLearning.annotateSource.importSuccess':
-		'已导入 {{accepted}} 句（可为部分标注）；跳过 {{skipped}}，覆盖 {{overwritten}}',
+		'已导入 {accepted} 句（可为部分标注）；跳过 {skipped}，覆盖 {overwritten}',
 	'englishLearning.annotateSource.importAllSkipped':
-		'没有可写入的标注（跳过 {{skipped}}）',
+		'没有可写入的标注（跳过 {skipped}）',
 	'englishLearning.annotateSource.importClassicFile':
 		'这是语句文件，不是标注文件',
 	'englishLearning.annotateSource.importEmpty': '文件中没有有效标注',
@@ -1421,21 +1421,21 @@ export const zhCN = {
 	'englishLearning.annotateSource.confirmDesc':
 		'将为本集合中尚未缓存的句子调用模型生成词性 / 音标 / 释义并写入缓存，可能较久，确认继续？',
 	'englishLearning.annotateSource.confirmDescCount':
-		'约 {{count}} 条句子：尚未缓存的将调用模型生成词性 / 音标 / 释义并写入缓存，可能较久，确认继续？',
+		'约 {count} 条句子：尚未缓存的将调用模型生成词性 / 音标 / 释义并写入缓存，可能较久，确认继续？',
 	'englishLearning.annotateSource.confirmAction': '开始标注',
 	'englishLearning.annotateSource.running': '标注中…',
 	'englishLearning.annotateSource.preparing': '正在连接并筛缓存…',
 	'englishLearning.annotateSource.cancelRunning': '停止',
 	'englishLearning.annotateSource.progress':
-		'已缓存 {{hit}} · 新标 {{annotated}}/{{miss}} · 剩余 {{remaining}}',
+		'已缓存 {hit} · 新标 {annotated}/{miss} · 剩余 {remaining}',
 	'englishLearning.annotateSource.aborted': '已停止标注（已完成部分仍保留）',
 	'englishLearning.annotateSource.failed': '标注失败，请稍后重试',
 	'englishLearning.annotateSource.success':
-		'标注完成：共 {{total}}，已有 {{hit}}，新写 {{annotated}}，失败 {{failed}}',
+		'标注完成：共 {total}，已有 {hit}，新写 {annotated}，失败 {failed}',
 	'englishLearning.annotateTasks.pageTitle': '标注进度',
 	'englishLearning.annotateTasks.back': '返回',
 	'englishLearning.annotateTasks.pageRunningHint':
-		'正在进行 {{count}} 个标注任务，可随时停止',
+		'正在进行 {count} 个标注任务，可随时停止',
 	'englishLearning.annotateTasks.pageIdleHint':
 		'下方为最近标注任务；离开本页仍继续，刷新后可点「继续」',
 	'englishLearning.annotateTasks.empty': '暂无标注任务',
@@ -1456,14 +1456,13 @@ export const zhCN = {
 	'englishLearning.annotateTasks.metricFailed': '失败',
 	'englishLearning.annotateTasks.metricTokens': 'Token 消耗',
 	'englishLearning.annotateTasks.metricTokensValue':
-		'{{total}}（入 {{prompt}} · 出 {{completion}}）',
+		'{total}（入 {prompt} · 出 {completion}）',
 	'englishLearning.annotateTasks.metricTokensDetail':
-		'本任务累计：prompt {{prompt}} + completion {{completion}}',
+		'本任务累计：prompt {prompt} + completion {completion}',
 	'englishLearning.annotateTasks.openPage': '打开标注进度',
 	'englishLearning.annotateTasks.viewProgress': '查看进度',
-	'englishLearning.annotateTasks.liveSummary':
-		'{{count}} 个标注进行中 · {{title}}',
-	'englishLearning.annotateTasks.liveFinished': '最近 {{count}} 个标注任务',
+	'englishLearning.annotateTasks.liveSummary': '{count} 个标注进行中 · {title}',
+	'englishLearning.annotateTasks.liveFinished': '最近 {count} 个标注任务',
 	'englishLearning.annotateTasks.alreadyRunning':
 		'该集合已在标注，已打开进度页',
 	'englishLearning.annotateTasks.alreadyActive':

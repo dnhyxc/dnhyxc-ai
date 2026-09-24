@@ -6,7 +6,13 @@ import { Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
-import { stopAllPlayback } from '@/utils/speech';
+import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
+import {
+	beginPracticeCloudTtsCacheSession,
+	endPracticeCloudTtsCacheSession,
+	prefetchCloudTts,
+	stopAllPlayback,
+} from '@/utils/speech';
 import { PracticePageShell } from './components/shell';
 import { PracticeShortcutsMenu } from './components/shell/PracticeShortcutsMenu';
 import { Session } from './Session';
@@ -24,8 +30,16 @@ import type {
 	PracticeSource,
 } from './types';
 import { fetchPracticeContinueQueue } from './utils/fetchWords';
-import { isPracticeClassicItem, parsePracticeContentKind } from './utils/item';
+import {
+	getPracticeAnswerText,
+	isPracticeClassicItem,
+	parsePracticeContentKind,
+} from './utils/item';
 import { parsePracticePoolTotal } from './utils/paths';
+import {
+	createPracticeTtsPrefetchPipe,
+	type PracticeTtsPrefetchPipe,
+} from './utils/practiceTtsPrefetchPipe';
 import type { PracticeResumeState } from './utils/resumeFromReport';
 import { segmentEnglishSentence } from './utils/segmentSentence';
 import { prefetchSentenceWordAnnotationsBatch } from './utils/sentenceWordAnnotationCache';
@@ -471,6 +485,45 @@ export default function EnglishLearningPracticePage() {
 
 	const currentItem = queue[index];
 
+	const queueAnswerTexts = useMemo(
+		() => queue.map((it) => getPracticeAnswerText(it).trim()),
+		[queue],
+	);
+
+	const ttsPipeRef = useRef<PracticeTtsPrefetchPipe | null>(null);
+
+	// 进场：会话缓存扩容 + PrefetchPipe；离场 / 换 queue 取消并裁回 LRU
+	useEffect(() => {
+		if (phase !== 'running' || queueAnswerTexts.length === 0) {
+			ttsPipeRef.current?.cancel();
+			ttsPipeRef.current = null;
+			endPracticeCloudTtsCacheSession();
+			return;
+		}
+		beginPracticeCloudTtsCacheSession(100);
+		ttsPipeRef.current?.cancel();
+		ttsPipeRef.current = createPracticeTtsPrefetchPipe(queueAnswerTexts, {
+			ahead: 5,
+		});
+		return () => {
+			ttsPipeRef.current?.cancel();
+			ttsPipeRef.current = null;
+			endPracticeCloudTtsCacheSession();
+		};
+	}, [phase, queueAnswerTexts]);
+
+	const onTtsPipelineKick = useCallback((cursorIndex: number) => {
+		ttsPipeRef.current?.kick(cursorIndex);
+	}, []);
+
+	// 进场即预热 TTS 偏好 + 首题音频（后续题由出声后 Pipe 分批预取）
+	useEffect(() => {
+		if (phase !== 'running' || !currentItem) return;
+		prefetchMinimaxTtsUserPrefs();
+		const first = getPracticeAnswerText(currentItem).trim();
+		if (first) prefetchCloudTts(first, { whole: true });
+	}, [phase, currentItem]);
+
 	const shellTitle = useMemo(() => {
 		if (resumeLoading) {
 			return initialContentKind === 'classic'
@@ -538,7 +591,9 @@ export default function EnglishLearningPracticePage() {
 				<Session
 					mode={config.mode}
 					item={currentItem}
+					itemIndex={index}
 					sourceTitle={config.sourceTitle}
+					onTtsPipelineKick={onTtsPipelineKick}
 					isLastQuestion={index >= queue.length - 1}
 					canGoPrevious={index > 0}
 					onGoPrevious={onGoPrevious}

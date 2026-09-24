@@ -254,9 +254,7 @@ class EnglishAnnotateSourceStore {
 						// 兼容旧数据：done 但仍有 failed → 可继续
 						if (t.status === 'done' && (t.progress?.failed ?? 0) > 0) {
 							t.status = 'error';
-							t.errorMessage =
-								t.errorMessage ||
-								`有 ${t.progress!.failed} 句标注失败，可点继续重试`;
+							t.errorMessage = undefined;
 							if (t.progress && t.progress.remaining < t.progress.failed) {
 								t.progress = {
 									...t.progress,
@@ -488,7 +486,7 @@ class EnglishAnnotateSourceStore {
 					t.result = result;
 					if (failed > 0) {
 						t.status = 'error';
-						t.errorMessage = `有 ${failed} 句标注失败，可点继续重试`;
+						t.errorMessage = undefined;
 						t.finishedAt = Date.now();
 						return;
 					}

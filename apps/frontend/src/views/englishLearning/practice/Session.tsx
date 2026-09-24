@@ -57,7 +57,9 @@ const STAGE_ICON_BTN =
 export function Session({
 	mode,
 	item,
+	itemIndex,
 	sourceTitle,
+	onTtsPipelineKick,
 	isLastQuestion = false,
 	canGoPrevious = false,
 	onGoPrevious,
@@ -131,7 +133,13 @@ export function Session({
 		playWord,
 		playWordRef,
 		cancelDictationPlay,
-	} = usePracticePlayback({ mode, answerText, t });
+	} = usePracticePlayback({
+		mode,
+		answerText,
+		itemIndex,
+		onPipelineKick: onTtsPipelineKick,
+		t,
+	});
 
 	const resetItemState = useCallback(() => {
 		setPhase('prompt');

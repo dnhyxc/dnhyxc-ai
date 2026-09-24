@@ -1,13 +1,11 @@
 /**
- * 经典句整集标注进度页：列出全部任务 + 进度条与明细。
+ * 经典句整集标注进度页：列表布局对齐练习报告，指标对齐侧栏统计格。
  */
 import { Button, Spinner } from '@ui/index';
 import { Toast } from '@ui/sonner';
-import { ArrowLeft, Play, Trash2, X } from 'lucide-react';
+import { Play, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Progress } from '@/components/ui/progress';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import EnglishAnnotateSource, {
@@ -15,6 +13,16 @@ import EnglishAnnotateSource, {
 	annotateTaskPercent,
 } from '@/store/englishAnnotateSource';
 import { getRequestErrorMessage } from '@/utils/fetch';
+import { PracticePageShell } from '../practice/components/shell';
+
+const LINK_CLASS =
+	'flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-teal-500 hover:text-teal-400 disabled:cursor-not-allowed disabled:opacity-50';
+
+const CARD_SHELL =
+	'border-theme/10 bg-theme/5 hover:border-teal-500/35 hover:bg-teal-500/10 flex min-w-0 flex-col gap-2 rounded-md border px-3 py-3 transition-colors';
+
+const ICON_BTN =
+	'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors border-destructive/20 bg-destructive/10 text-destructive/55 hover:border-destructive/35 hover:bg-destructive/20 hover:text-destructive';
 
 function statusLabel(
 	task: AnnotateTask,
@@ -34,6 +42,83 @@ function statusLabel(
 	}
 }
 
+type TaskTone = 'running' | 'done' | 'warn' | 'error';
+
+function taskTone(
+	task: AnnotateTask,
+	streaming: boolean,
+	partialFailed: boolean,
+): TaskTone {
+	if (task.status === 'done') return 'done';
+	if (task.status === 'error' && !partialFailed) return 'error';
+	if (
+		task.status === 'paused' ||
+		(task.status === 'running' && !streaming) ||
+		partialFailed
+	) {
+		return 'warn';
+	}
+	return 'running';
+}
+
+const TONE = {
+	running: {
+		shell: 'border-teal-500/25 bg-linear-to-r from-teal-500/12 to-cyan-600/10',
+		bar: 'bg-teal-500/85',
+		status: 'text-teal-600 dark:text-teal-400',
+	},
+	done: {
+		shell: '',
+		bar: 'bg-emerald-500/80',
+		status: 'text-emerald-600 dark:text-emerald-400',
+	},
+	warn: {
+		shell:
+			'border-amber-500/25 bg-linear-to-r from-amber-500/12 to-orange-500/10',
+		bar: 'bg-amber-500/80',
+		status: 'text-amber-600 dark:text-amber-400',
+	},
+	error: {
+		shell: 'border-rose-500/25 bg-linear-to-r from-rose-500/12 to-rose-600/10',
+		bar: 'bg-rose-500/80',
+		status: 'text-rose-600 dark:text-rose-400',
+	},
+} as const;
+
+/** 对齐侧栏 DailySession 统计格 */
+function StatCell({
+	label,
+	value,
+	shell,
+	valueClass,
+}: {
+	label: string;
+	value: string | number;
+	shell: string;
+	valueClass: string;
+}) {
+	return (
+		<div
+			className={cn(
+				'flex min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 pt-1.5 pb-2',
+				shell,
+			)}
+		>
+			<span className="shrink-0 text-sm font-medium text-textcolor/55">
+				{label}
+			</span>
+			<span
+				className={cn(
+					'min-w-0 truncate text-lg font-semibold tabular-nums leading-none',
+					valueClass,
+				)}
+			>
+				{value}
+			</span>
+		</div>
+	);
+}
+
 const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 	const { t } = useI18n();
 	const [busy, setBusy] = useState(false);
@@ -42,10 +127,17 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 	const streaming = EnglishAnnotateSource.hasOpenStream(task.id);
 	const partialFailed =
 		task.status === 'error' && (task.progress?.failed ?? 0) > 0;
+	const toneKey = taskTone(task, streaming, partialFailed);
+	const tone = TONE[toneKey];
 	const sourceLabel =
 		task.source === 'library'
 			? t('englishLearning.annotateTasks.sourceLibrary')
 			: t('englishLearning.annotateTasks.sourcePack');
+	const displayStatus =
+		task.status === 'running' && !streaming
+			? t('englishLearning.annotateTasks.statusPaused')
+			: statusLabel(task, t);
+	const showLiveSummary = !p || task.status !== 'done';
 
 	const onResume = async () => {
 		if (busy) return;
@@ -63,54 +155,19 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 	};
 
 	return (
-		<article
-			className={cn(
-				'rounded-lg border border-theme/10 bg-theme-secondary/30 px-4 py-3.5 space-y-3',
-				task.status === 'running' && streaming && 'border-teal-500/20',
-				(task.status === 'paused' ||
-					(task.status === 'running' && !streaming) ||
-					partialFailed) &&
-					'border-amber-500/20',
-				task.status === 'error' && !partialFailed && 'border-rose-500/20',
-			)}
-		>
-			<div className="flex items-start justify-between gap-3">
-				<div className="min-w-0 space-y-1">
-					<h2 className="truncate text-sm font-medium text-textcolor">
-						{task.title}
-					</h2>
-					<p className="text-xs text-textcolor/55">
-						{sourceLabel}
-						{' · '}
-						<span
-							className={cn(
-								task.status === 'running' &&
-									streaming &&
-									'text-teal-600 dark:text-teal-400',
-								task.status === 'done' &&
-									'text-emerald-600 dark:text-emerald-400',
-								task.status === 'error' &&
-									!partialFailed &&
-									'text-rose-600 dark:text-rose-400',
-								(task.status === 'paused' ||
-									(task.status === 'running' && !streaming) ||
-									partialFailed) &&
-									'text-amber-600 dark:text-amber-400',
-							)}
-						>
-							{task.status === 'running' && !streaming
-								? t('englishLearning.annotateTasks.statusPaused')
-								: statusLabel(task, t)}
-						</span>
-					</p>
-				</div>
+		<article className={cn(CARD_SHELL, tone.shell)}>
+			{/* 顶行：仅标题 + 操作 */}
+			<div className="flex min-w-0 items-center gap-2">
+				<h2 className="min-w-0 flex-1 truncate text-base font-semibold text-textcolor sm:text-lg">
+					{task.title}
+				</h2>
 				<div className="flex shrink-0 items-center gap-1.5">
 					{task.status === 'running' && streaming ? (
 						<Button
 							type="button"
 							size="sm"
 							variant="outline"
-							className="h-8 gap-1.5 border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/15 dark:text-rose-400"
+							className="h-7 gap-1.5 border-rose-500/25 bg-rose-500/10 text-rose-600 hover:bg-rose-500/15 dark:text-rose-400"
 							onClick={() => EnglishAnnotateSource.abort(task.id)}
 						>
 							<Spinner className="size-3.5 text-rose-500" />
@@ -125,11 +182,11 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 							size="sm"
 							variant="outline"
 							disabled={busy}
-							className="h-8 gap-1.5 border-teal-500/25 bg-teal-500/10 text-teal-600 hover:bg-teal-500/15 dark:text-teal-300"
+							className="h-7 gap-1.5 border-teal-500/30 bg-teal-500/10 text-teal-600 hover:border-teal-500/45 hover:bg-teal-500/15 dark:text-teal-400"
 							onClick={() => void onResume()}
 						>
 							{busy ? (
-								<Spinner className="size-3.5 text-rose-500" />
+								<Spinner className="size-3.5 text-teal-500" />
 							) : (
 								<Play className="size-3.5" />
 							)}
@@ -139,21 +196,37 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 					{task.status !== 'running' || !streaming ? (
 						<Button
 							type="button"
-							size="sm"
 							variant="ghost"
-							className="h-8 w-8 p-0 text-textcolor/50 hover:text-textcolor"
+							size="sm"
+							className={ICON_BTN}
 							aria-label={t('englishLearning.annotateTasks.dismiss')}
 							onClick={() => EnglishAnnotateSource.dismiss(task.id)}
 						>
-							<X className="size-3.5" />
+							<Trash2 className="size-3.5" />
 						</Button>
 					) : null}
 				</div>
 			</div>
 
-			<div className="space-y-2">
-				<div className="flex items-center justify-between gap-2 text-xs tabular-nums text-textcolor/70">
-					<span>
+			{/* title 以下统一 gap-3；title 与正文间距仍由 CARD_SHELL gap-2 控制 */}
+			<div className="flex flex-col gap-3">
+				<p className="flex min-w-0 flex-nowrap items-center gap-x-1.5 overflow-x-auto text-sm whitespace-nowrap tabular-nums">
+					<span className="text-textcolor/50 shrink-0">{sourceLabel}</span>
+					<span className="text-textcolor/35 shrink-0" aria-hidden>
+						·
+					</span>
+					<span className={cn('shrink-0 font-medium', tone.status)}>
+						{displayStatus}
+					</span>
+					<span className="text-textcolor/35 shrink-0" aria-hidden>
+						·
+					</span>
+					<span className={cn('shrink-0 font-semibold', tone.status)}>
+						{percent}%
+					</span>
+				</p>
+				{showLiveSummary ? (
+					<p className="text-textcolor/60 text-sm leading-snug">
 						{p
 							? t('englishLearning.annotateSource.progress', {
 									hit: p.hit,
@@ -162,73 +235,78 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 									remaining: p.remaining,
 								})
 							: t('englishLearning.annotateSource.preparing')}
-					</span>
-					<span className="shrink-0 font-medium text-textcolor/80">
-						{percent}%
-					</span>
+					</p>
+				) : null}
+				<div className="h-1.5 w-full overflow-hidden rounded-md bg-theme/10">
+					<div
+						className={cn(
+							'h-full rounded-md transition-[width] duration-300 ease-out',
+							tone.bar,
+						)}
+						style={{ width: `${percent}%` }}
+					/>
 				</div>
-				<Progress value={percent} className="h-2" />
-			</div>
 
-			{p ? (
-				<dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
-					<div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-						<dt className="text-textcolor/45">
-							{t('englishLearning.annotateTasks.metricTotal')}
-						</dt>
-						<dd className="tabular-nums text-textcolor/80">{p.total}</dd>
-					</div>
-					<div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-						<dt className="text-textcolor/45">
-							{t('englishLearning.annotateTasks.metricHit')}
-						</dt>
-						<dd className="tabular-nums text-textcolor/80">{p.hit}</dd>
-					</div>
-					<div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-						<dt className="text-textcolor/45">
-							{t('englishLearning.annotateTasks.metricAnnotated')}
-						</dt>
-						<dd className="tabular-nums text-textcolor/80">{p.annotated}</dd>
-					</div>
-					<div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-						<dt className="text-textcolor/45">
-							{t('englishLearning.annotateTasks.metricFailed')}
-						</dt>
-						<dd className="tabular-nums text-textcolor/80">{p.failed}</dd>
-					</div>
-					<div className="flex justify-between gap-2 sm:col-span-2 sm:flex-col sm:justify-start">
-						<dt className="text-textcolor/45">
-							{t('englishLearning.annotateTasks.metricTokens')}
-						</dt>
-						<dd
-							className="tabular-nums text-textcolor/80"
+				{p ? (
+					<div className="flex flex-col gap-3">
+						<div className="grid grid-cols-2 gap-3">
+							<StatCell
+								label={t('englishLearning.annotateTasks.metricTotal')}
+								value={p.total}
+								shell="border-sky-500/20 bg-linear-to-r from-sky-400/10 to-cyan-500/10"
+								valueClass="text-sky-700 dark:text-cyan-400"
+							/>
+							<StatCell
+								label={t('englishLearning.annotateTasks.metricHit')}
+								value={p.hit}
+								shell="border-emerald-500/20 bg-linear-to-r from-emerald-400/10 to-teal-500/10"
+								valueClass="text-emerald-600 dark:text-emerald-400"
+							/>
+							<StatCell
+								label={t('englishLearning.annotateTasks.metricAnnotated')}
+								value={p.annotated}
+								shell="border-teal-500/20 bg-linear-to-r from-teal-400/10 to-cyan-500/10"
+								valueClass="text-teal-700 dark:text-teal-400"
+							/>
+							<StatCell
+								label={t('englishLearning.annotateTasks.metricFailed')}
+								value={p.failed}
+								shell={
+									p.failed > 0
+										? 'border-rose-500/20 bg-linear-to-r from-rose-400/10 to-rose-600/10'
+										: 'border-theme/10 bg-theme/5'
+								}
+								valueClass={
+									p.failed > 0
+										? 'text-rose-600 dark:text-rose-400'
+										: 'text-textcolor/70'
+								}
+							/>
+						</div>
+						<p
+							className="text-textcolor/50 truncate text-sm tabular-nums"
 							title={t('englishLearning.annotateTasks.metricTokensDetail', {
 								prompt: p.tokensPrompt ?? 0,
 								completion: p.tokensCompletion ?? 0,
 							})}
 						>
+							{t('englishLearning.annotateTasks.metricTokens')}
+							{' · '}
 							{t('englishLearning.annotateTasks.metricTokensValue', {
 								total: p.tokensTotal ?? 0,
 								prompt: p.tokensPrompt ?? 0,
 								completion: p.tokensCompletion ?? 0,
 							})}
-						</dd>
+						</p>
 					</div>
-				</dl>
-			) : null}
-
-			{task.errorMessage ? (
-				<p className="text-xs text-rose-600 dark:text-rose-400">
-					{task.errorMessage}
-				</p>
-			) : null}
+				) : null}
+			</div>
 		</article>
 	);
 });
 
 function AnnotateTasksPageInner() {
 	const { t } = useI18n();
-	const navigate = useNavigate();
 	const tasks = EnglishAnnotateSource.orderedTasks;
 	const running = EnglishAnnotateSource.runningCount;
 	const hasFinished = tasks.some(
@@ -240,56 +318,48 @@ function AnnotateTasksPageInner() {
 	}, []);
 
 	return (
-		<div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col px-4 py-5 sm:px-6">
-			<header className="mb-5 flex shrink-0 items-start justify-between gap-3">
-				<div className="min-w-0 space-y-1">
-					<div className="flex items-center gap-2">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							className="h-8 w-8 shrink-0 p-0"
-							aria-label={t('englishLearning.annotateTasks.back')}
-							onClick={() => navigate(-1)}
-						>
-							<ArrowLeft className="size-4" />
-						</Button>
-						<h1 className="truncate text-lg font-semibold text-textcolor">
-							{t('englishLearning.annotateTasks.pageTitle')}
-						</h1>
-					</div>
-					<p className="pl-10 text-xs text-textcolor/55">
-						{running > 0
-							? t('englishLearning.annotateTasks.pageRunningHint', {
-									count: running,
-								})
-							: t('englishLearning.annotateTasks.pageIdleHint')}
-					</p>
-				</div>
-				{hasFinished ? (
-					<Button
+		<PracticePageShell
+			title={
+				<span className="min-w-0 truncate font-semibold">
+					{t('englishLearning.annotateTasks.pageTitle')}
+				</span>
+			}
+			contentLayout="start"
+			headerRight={
+				hasFinished ? (
+					<button
 						type="button"
-						variant="ghost"
-						size="sm"
-						className="h-8 shrink-0 gap-1.5 text-textcolor/60"
+						className={LINK_CLASS}
 						onClick={() => EnglishAnnotateSource.dismissFinished()}
 					>
-						<Trash2 className="size-3.5" />
-						{t('englishLearning.annotateTasks.clearFinished')}
-					</Button>
-				) : null}
-			</header>
+						<Trash2 className="size-4 shrink-0 opacity-90" aria-hidden />
+						<span>{t('englishLearning.annotateTasks.clearFinished')}</span>
+					</button>
+				) : null
+			}
+		>
+			<div className="flex w-full flex-col gap-3">
+				<p className="text-textcolor/55 text-base">
+					{running > 0
+						? t('englishLearning.annotateTasks.pageRunningHint', {
+								count: running,
+							})
+						: t('englishLearning.annotateTasks.pageIdleHint')}
+				</p>
 
-			<div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-8">
 				{tasks.length === 0 ? (
-					<p className="rounded-lg border border-dashed border-theme/15 px-4 py-10 text-center text-sm text-textcolor/50">
+					<p className="text-textcolor/55 py-16 text-center text-base">
 						{t('englishLearning.annotateTasks.empty')}
 					</p>
 				) : (
-					tasks.map((task) => <TaskCard key={task.id} task={task} />)
+					<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4 pb-4">
+						{tasks.map((task) => (
+							<TaskCard key={task.id} task={task} />
+						))}
+					</div>
 				)}
 			</div>
-		</div>
+		</PracticePageShell>
 	);
 }
 
