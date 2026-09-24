@@ -6,7 +6,7 @@ import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { FileDown, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Entry } from '../../components/entry';
 import type { PracticeContentKind } from '../../practice/types';
 
 const LINK_CLASS =
@@ -26,7 +26,7 @@ export type FavoritesPanelFooterProps = {
 	exportingDocx: boolean;
 	onExportDocx: () => void;
 	exportLabel: string;
-	showPracticeEntry?: boolean;
+	showEntry?: boolean;
 	practiceContentKind?: PracticeContentKind;
 	practiceDisabled?: boolean;
 	practicePoolTotal?: number;
@@ -46,7 +46,7 @@ export function FavoritesPanelFooter({
 	exportingDocx,
 	onExportDocx,
 	exportLabel,
-	showPracticeEntry = false,
+	showEntry = false,
 	practiceContentKind = 'vocab',
 	practiceDisabled = false,
 	practicePoolTotal,
@@ -90,8 +90,8 @@ export function FavoritesPanelFooter({
 							})}
 				</span>
 			</button>
-			{showPracticeEntry ? (
-				<EnglishPracticeEntry
+			{showEntry ? (
+				<Entry
 					variant="text"
 					showIcon
 					disabled={practiceDisabled}

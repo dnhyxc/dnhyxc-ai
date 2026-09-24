@@ -9,6 +9,10 @@ type DailyPlayIconButtonProps = {
 	onPlay: () => void;
 };
 
+/** 与练习 Session 顶栏 STAGE_ICON_BTN 同尺寸，保证间距观感一致 */
+const PLAY_ICON_BTN =
+	'h-8 w-8 shrink-0 cursor-pointer rounded-md border-0 p-0 shadow-none transition-colors focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none';
+
 export function DailyPlayIconButton({
 	playing,
 	playLabel,
@@ -20,13 +24,16 @@ export function DailyPlayIconButton({
 				type="button"
 				variant="link"
 				size="sm"
-				onClick={onPlay}
+				tabIndex={-1}
+				onClick={(e) => {
+					onPlay();
+					e.currentTarget.blur();
+				}}
 				aria-label={playLabel}
+				aria-pressed={playing}
 				className={cn(
-					'cursor-pointer px-0! flex shrink-0 items-center justify-center rounded outline-none transition-colors focus-visible:ring-0 focus-visible:shadow-none',
-					playing
-						? 'text-teal-600 dark:text-teal-400'
-						: 'text-teal-500 hover:text-teal-600 dark:hover:text-teal-400',
+					PLAY_ICON_BTN,
+					playing ? 'text-teal-500' : 'text-textcolor/55',
 				)}
 			>
 				{playing ? (

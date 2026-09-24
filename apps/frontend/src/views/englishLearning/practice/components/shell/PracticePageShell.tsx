@@ -3,7 +3,7 @@
  */
 import { ScrollArea } from '@ui/index';
 import { cn } from '@/lib/utils';
-import { SessionHeader } from '../../../components/SessionHeader';
+import { Head } from '../../../components/shell';
 import type { PracticePageShellProps } from '../../types';
 
 export function PracticePageShell({
@@ -17,6 +17,7 @@ export function PracticePageShell({
 	flush = false,
 }: PracticePageShellProps) {
 	const contentFill = contentLayout === 'fill' || flush;
+	const contentStart = contentLayout === 'start';
 	const showHeader =
 		!flush &&
 		(onBack != null ||
@@ -28,8 +29,8 @@ export function PracticePageShell({
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 					{showHeader ? (
-						<SessionHeader
-							className="px-4"
+						<Head
+							className="pl-4 pr-2"
 							onBack={onBack}
 							backLabel={backLabel}
 							trailing={headerRight}
@@ -40,21 +41,26 @@ export function PracticePageShell({
 							) : (
 								(subtitle ?? title)
 							)}
-						</SessionHeader>
+						</Head>
 					) : null}
+					{/* p-4 在 Root：右侧留白给滚动条贴边；fill 时内容仍占满视口 */}
 					<ScrollArea
-						className="min-h-0 flex-1"
+						className={cn('min-h-0 flex-1', !flush && 'p-4')}
 						viewportClassName={cn(
-							'flex h-full min-h-0 flex-col',
 							contentFill &&
-								'[&>div]:flex! [&>div]:h-full! [&>div]:min-h-full! [&>div]:flex-col',
+								'flex h-full min-h-0 flex-col [&>div]:flex! [&>div]:h-full! [&>div]:min-h-full! [&>div]:flex-col',
+							contentStart &&
+								'h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!',
 						)}
+						scrollbarClassName={!flush ? '!top-4 !bottom-4 h-auto' : undefined}
 					>
 						<div
 							className={cn(
-								'flex min-h-full flex-1 flex-col',
-								flush ? 'min-h-0 p-0' : 'p-4',
-								contentFill ? 'min-h-0 justify-start' : 'justify-center',
+								'flex flex-1 flex-col',
+								flush && 'min-h-0',
+								contentFill && 'h-full min-h-0 justify-start',
+								contentStart && 'justify-start',
+								!contentFill && !contentStart && 'min-h-full justify-center',
 							)}
 						>
 							{children}

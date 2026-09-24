@@ -26,14 +26,14 @@ import {
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Card } from '../../components/classic';
+import { Entry } from '../../components/entry';
+import { CornerFab } from '../../components/list';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -234,12 +234,11 @@ export function ClassicQuotesLibrarySection({
 		],
 	);
 
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			items.length,
-			Boolean(libraryId) && items.length > 0,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		items.length,
+		Boolean(libraryId) && items.length > 0,
+	);
 
 	if (!libraryId) {
 		return (
@@ -275,7 +274,7 @@ export function ClassicQuotesLibrarySection({
 					</span>
 				</div>
 				<div className="flex shrink-0 flex-nowrap items-center gap-3">
-					<EnglishPracticeEntry
+					<Entry
 						variant="text"
 						disabled={total <= 0}
 						practice={{
@@ -313,10 +312,7 @@ export function ClassicQuotesLibrarySection({
 						ref={scrollViewportRef}
 						className="relative min-h-0 h-full p-4"
 						viewportClassName="[overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-						onScroll={composeViewportScroll(
-							onViewportScroll,
-							onScrollCornerFab,
-						)}
+						onScroll={composeViewportScroll(onViewportScroll, onCornerFab)}
 					>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -351,7 +347,7 @@ export function ClassicQuotesLibrarySection({
 										const favBusy = favoriteActionKey === contentKey;
 										return (
 											<div data-library-item-id={item.id} className="h-full">
-												<ClassicQuoteCard
+												<Card
 													variant="library"
 													data={{
 														english: item.english,
@@ -412,7 +408,7 @@ export function ClassicQuotesLibrarySection({
 							</div>
 						)}
 					</ScrollArea>
-					<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+					<CornerFab mode={mode} onClick={onCornerFabClick} />
 				</div>
 			)}
 		</div>

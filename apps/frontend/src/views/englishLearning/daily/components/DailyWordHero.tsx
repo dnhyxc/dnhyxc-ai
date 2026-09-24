@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import { SegmentationLine } from '../../components/SegmentationLine';
+import { Segment } from '../../components/vocab';
 
 type DailyWordHeroProps = {
 	word: string;
@@ -83,7 +83,7 @@ export function DailyWordHero({
 				</p>
 			) : null}
 			{segmentationText ? (
-				<SegmentationLine
+				<Segment
 					segmentation={segmentationText}
 					className="text-textcolor/55 text-sm leading-snug"
 				/>

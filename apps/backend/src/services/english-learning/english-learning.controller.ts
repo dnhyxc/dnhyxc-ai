@@ -1867,6 +1867,7 @@ export class EnglishLearningController {
 		const data = await this.englishLearningService.batchAddVocabularyMistakes(
 			userId,
 			dto.items ?? [],
+			dto.source,
 		);
 		return { success: true, data };
 	}

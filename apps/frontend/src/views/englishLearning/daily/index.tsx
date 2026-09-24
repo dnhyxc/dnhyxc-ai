@@ -4,11 +4,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import type { PracticeReportSaveMode } from '../practice/types';
+import { shufflePracticeItems } from '../practice/utils/grading';
 import { DailyCardSession } from './components/DailyCardSession';
 import { DailyDonePanel } from './components/DailyDonePanel';
 import { DailyIntroPanel } from './components/DailyIntroPanel';
 import { DailyPageLayout } from './components/DailyPageLayout';
-import type { DailyVocabCard } from './types';
+import type {
+	DailyMemorizeMode,
+	DailySessionRound,
+	DailySessionSummary,
+	DailyVocabCard,
+} from './types';
 import { loadDailyCards } from './utils/loadDailyCards';
 
 type PagePhase = 'intro' | 'session' | 'done';
@@ -19,7 +26,15 @@ export default function EnglishLearningDailyPage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [phase, setPhase] = useState<PagePhase>('intro');
 	const [starting, setStarting] = useState(false);
+	const [continueLoading, setContinueLoading] = useState(false);
 	const [cards, setCards] = useState<DailyVocabCard[]>([]);
+	const [mode, setMode] = useState<DailyMemorizeMode>('recognition');
+	const [reportSaveMode, setReportSaveMode] =
+		useState<PracticeReportSaveMode>('manual');
+	const [summary, setSummary] = useState<DailySessionSummary | null>(null);
+	const [sessionRounds, setSessionRounds] = useState<DailySessionRound[]>([]);
+	const [isRetryWrong, setIsRetryWrong] = useState(false);
+	const practicedKeysRef = useRef<string[]>([]);
 	const skipRunResetRef = useRef(false);
 
 	const backHome = useCallback(() => {
@@ -53,30 +68,125 @@ export default function EnglishLearningDailyPage() {
 	const resetToIntro = useCallback(() => {
 		setPhase('intro');
 		setCards([]);
+		setSummary(null);
+		setSessionRounds([]);
+		setIsRetryWrong(false);
+		practicedKeysRef.current = [];
 	}, []);
 
-	const onStart = useCallback(async () => {
-		setStarting(true);
-		try {
-			const loaded = await loadDailyCards();
-			if (loaded.length === 0) {
-				setCards([]);
-				clearDailyRunning();
-				setPhase('done');
-				return;
-			}
-			setCards(loaded);
+	const beginSession = useCallback(
+		(
+			nextCards: DailyVocabCard[],
+			nextMode: DailyMemorizeMode,
+			retry: boolean,
+		) => {
+			setMode(nextMode);
+			setCards(nextCards);
+			setSummary(null);
+			setIsRetryWrong(retry);
+			practicedKeysRef.current = mergeKeys(
+				practicedKeysRef.current,
+				nextCards.map((c) => c.key),
+			);
 			markDailyRunning();
 			setPhase('session');
-		} finally {
-			setStarting(false);
-		}
-	}, [clearDailyRunning, markDailyRunning]);
+		},
+		[markDailyRunning],
+	);
 
-	const onComplete = useCallback(() => {
-		clearDailyRunning();
-		setPhase('done');
-	}, [clearDailyRunning]);
+	const onStart = useCallback(
+		async (
+			nextMode: DailyMemorizeMode,
+			nextReportSaveMode: PracticeReportSaveMode,
+		) => {
+			setStarting(true);
+			setIsRetryWrong(false);
+			practicedKeysRef.current = [];
+			setSummary(null);
+			setSessionRounds([]);
+			setReportSaveMode(nextReportSaveMode);
+			try {
+				const loaded = await loadDailyCards();
+				if (loaded.length === 0) {
+					setCards([]);
+					clearDailyRunning();
+					setPhase('done');
+					return;
+				}
+				beginSession(loaded, nextMode, false);
+			} finally {
+				setStarting(false);
+			}
+		},
+		[beginSession, clearDailyRunning],
+	);
+
+	const onComplete = useCallback(
+		(next: DailySessionSummary) => {
+			if (isRetryWrong) {
+				// 重练不追加轮次：改对的词从历轮 wrong 挪到 correct，提升总正确率
+				const correctKeys = new Set(next.correctCards.map((c) => c.key));
+				setSessionRounds((prev) =>
+					prev.map((round) => {
+						const moved: DailyVocabCard[] = [];
+						const stillWrong: DailyVocabCard[] = [];
+						for (const card of round.wrongCards) {
+							if (correctKeys.has(card.key)) moved.push(card);
+							else stillWrong.push(card);
+						}
+						if (moved.length === 0) return round;
+						return {
+							...round,
+							wrongCards: stillWrong,
+							correctCards: [...round.correctCards, ...moved],
+						};
+					}),
+				);
+				setIsRetryWrong(false);
+			} else {
+				setSessionRounds((prev) => {
+					const maxIdx = prev.reduce((m, r) => Math.max(m, r.roundIndex), 0);
+					return [
+						...prev,
+						{
+							roundIndex: maxIdx + 1,
+							wrongCards: next.wrongCards,
+							correctCards: next.correctCards,
+							completedAt: new Date().toISOString(),
+						},
+					];
+				});
+			}
+			setSummary(next);
+			clearDailyRunning();
+			setPhase('done');
+		},
+		[clearDailyRunning, isRetryWrong],
+	);
+
+	const onContinuePractice = useCallback(async () => {
+		setContinueLoading(true);
+		try {
+			const loaded = await loadDailyCards(practicedKeysRef.current);
+			if (loaded.length === 0) {
+				return;
+			}
+			beginSession(loaded, mode, false);
+		} finally {
+			setContinueLoading(false);
+		}
+	}, [beginSession, mode]);
+
+	const onRetryWrong = useCallback(() => {
+		const wrong = new Map<string, DailyVocabCard>();
+		for (const round of sessionRounds) {
+			for (const card of round.wrongCards) {
+				if (!wrong.has(card.key)) wrong.set(card.key, card);
+			}
+		}
+		if (wrong.size === 0) return;
+		beginSession(shufflePracticeItems([...wrong.values()]), mode, true);
+	}, [beginSession, mode, sessionRounds]);
 
 	useEffect(() => {
 		if (searchParams.get('run') === '1') {
@@ -100,20 +210,37 @@ export default function EnglishLearningDailyPage() {
 		>
 			{phase === 'intro' ? (
 				<DailyIntroPanel
-					onBack={backHome}
-					backLabel={backLabel}
 					starting={starting}
-					onStart={() => void onStart()}
+					onStart={(nextMode, nextReportSaveMode) =>
+						void onStart(nextMode, nextReportSaveMode)
+					}
 				/>
 			) : null}
 
 			{phase === 'session' && cards.length > 0 ? (
-				<DailyCardSession cards={cards} onComplete={onComplete} />
+				<DailyCardSession cards={cards} mode={mode} onComplete={onComplete} />
 			) : null}
 
 			{phase === 'done' ? (
-				<DailyDonePanel title={title} onBackHome={backHome} />
+				<DailyDonePanel
+					mode={mode}
+					summary={summary}
+					rounds={sessionRounds}
+					reportSaveMode={reportSaveMode}
+					isRetryWrong={isRetryWrong}
+					continueLoading={continueLoading}
+					onBackHome={backHome}
+					onContinuePractice={() => void onContinuePractice()}
+					onRetryWrong={onRetryWrong}
+					onBackToSetup={resetToIntro}
+				/>
 			) : null}
 		</DailyPageLayout>
 	);
+}
+
+function mergeKeys(prev: string[], next: string[]): string[] {
+	const set = new Set(prev);
+	for (const k of next) set.add(k);
+	return [...set];
 }

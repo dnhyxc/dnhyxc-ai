@@ -1,7 +1,7 @@
 /**
- * 练习结算页
+ * 练习结算页（支持多轮：新→旧，轮内错→对）
  */
-import { ScrollArea, Toast } from '@ui/index';
+import { Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
@@ -12,31 +12,28 @@ import {
 	recordEnglishPracticeReviewAttempts,
 } from '@/service';
 import {
-	isPlaybackAvailable,
-	playPreferred,
-	stopAllPlayback,
-} from '@/utils/speech';
+	Actions,
+	Board,
+	BoardMeta,
+	type BoardRound,
+} from '../components/result';
 import { dispatchEnglishReviewSummaryRefresh } from '../sidebar';
-import { PracticeCard } from './components/shell';
-import {
-	SummaryActions,
-	SummaryStatsPanel,
-	WrongListItem,
-} from './components/summary';
-import { practiceRoundListGridClass } from './constants';
-import type { SummaryProps } from './types';
+import type { PracticeAttemptResult, SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
+import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
 import {
-	getPracticeAnswerText,
-	isPracticeClassicItem,
-	isPracticeVocabItem,
-} from './utils/item';
-import { buildPracticeReportTitle } from './utils/reportTitle';
+	buildPracticeReportTitle,
+	practiceModeShortLabel,
+	practiceOrderShortLabel,
+} from './utils/reportTitle';
+import { serializeSessionRounds } from './utils/serializeRounds';
 
 export function Summary({
-	results,
+	rounds,
 	practicedTotal,
 	config,
+	sessionReportId,
+	onSessionReportId,
 	continueLoading = false,
 	onRetryWrong,
 	onContinuePractice,
@@ -44,35 +41,78 @@ export function Summary({
 }: SummaryProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
-	const correctCount = results.filter((r) => r.correct).length;
-	const wrongCount = results.length - correctCount;
-	const wrongResults = useMemo(
-		() => results.filter((r) => !r.correct),
-		[results],
+
+	const displayRounds = useMemo(
+		() => [...rounds].sort((a, b) => b.roundIndex - a.roundIndex),
+		[rounds],
 	);
-	const correctResults = useMemo(
-		() => results.filter((r) => r.correct),
-		[results],
-	);
-	const wrongItems = useMemo(
-		() => wrongResults.map((r) => r.item),
-		[wrongResults],
-	);
+	const latestResults = displayRounds[0]?.results ?? [];
+	const allResults = useMemo(() => rounds.flatMap((r) => r.results), [rounds]);
+
+	const correctCount = latestResults.filter((r) => r.correct).length;
+	const wrongCount = latestResults.length - correctCount;
 	const accuracyPct =
-		results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
-	const hasWrongList = wrongResults.length > 0;
-	const hasWordList = wrongResults.length > 0 || correctResults.length > 0;
+		latestResults.length > 0
+			? Math.round((correctCount / latestResults.length) * 100)
+			: 0;
+	const overallAccuracyPct =
+		rounds.length > 1 && allResults.length > 0
+			? Math.round(
+					(allResults.filter((r) => r.correct).length / allResults.length) *
+						100,
+				)
+			: undefined;
 
-	const [playingKey, setPlayingKey] = useState<string | null>(null);
+	const allWrongResults = useMemo(
+		() => allResults.filter((r) => !r.correct),
+		[allResults],
+	);
+	const wrongItems = useMemo(() => {
+		const seen = new Set<string>();
+		const out: PracticeAttemptResult[] = [];
+		for (const r of allWrongResults) {
+			if (seen.has(r.item.key)) continue;
+			seen.add(r.item.key);
+			out.push(r);
+		}
+		return out;
+	}, [allWrongResults]);
+
+	const hasWrongList = wrongItems.length > 0;
+
+	const boardRounds: BoardRound[] = useMemo(
+		() =>
+			displayRounds.map((round) => ({
+				roundIndex: round.roundIndex,
+				entries: round.results.map((r) => ({
+					key: r.item.key,
+					item: r.item,
+					correct: r.correct,
+					userInput: r.userInput,
+					playText: getPracticeAnswerText(r.item),
+				})),
+			})),
+		[displayRounds],
+	);
+
 	const [saveMistakesLoading, setSaveMistakesLoading] = useState(false);
-
 	const reportSaveMode = config.reportSaveMode === 'auto' ? 'auto' : 'manual';
 	const [reportSaveState, setReportSaveState] = useState<
 		'idle' | 'saving' | 'saved'
 	>(() => (reportSaveMode === 'auto' ? 'saving' : 'idle'));
-	const reportIdRef = useRef<string | null>(null);
-	const reportSavedRef = useRef(false);
 	const reportSavingRef = useRef(false);
+	const lastSavedSigRef = useRef('');
+	/** 轮次数或就地改对都会变，用于触发自动/手动保存态 */
+	const roundsSaveSig = useMemo(
+		() =>
+			rounds
+				.map(
+					(r) =>
+						`${r.roundIndex}:${r.results.map((x) => (x.correct ? '1' : '0')).join('')}`,
+				)
+				.join('|'),
+		[rounds],
+	);
 
 	const isReviewSession = config.source === 'review';
 	const mistakesPath =
@@ -81,23 +121,24 @@ export function Summary({
 			: '/english-learning/mistakes?kind=vocab';
 	const reviewRecordedRef = useRef<string | null>(null);
 
-	const savePracticeReportOnce = useCallback(async () => {
-		if (
-			results.length === 0 ||
-			reportSavedRef.current ||
-			reportSavingRef.current
-		) {
-			return;
+	useEffect(() => {
+		if (roundsSaveSig !== lastSavedSigRef.current) {
+			setReportSaveState(reportSaveMode === 'auto' ? 'saving' : 'idle');
 		}
+	}, [reportSaveMode, roundsSaveSig]);
+
+	const savePracticeReportOnce = useCallback(async () => {
+		if (allResults.length === 0 || reportSavingRef.current) return;
 		reportSavingRef.current = true;
 		setReportSaveState('saving');
+		const savingSig = roundsSaveSig;
 		try {
-			if (!reportIdRef.current) {
-				reportIdRef.current = crypto.randomUUID();
-			}
+			const reportId = sessionReportId ?? crypto.randomUUID();
+			if (!sessionReportId) onSessionReportId(reportId);
 			const title = buildPracticeReportTitle(config, t);
+			const { rounds: reportRounds, items } = serializeSessionRounds(rounds);
 			await createEnglishPracticeReport({
-				reportId: reportIdRef.current,
+				reportId,
 				contentKind: config.contentKind,
 				mode: config.mode,
 				source: config.source,
@@ -107,22 +148,17 @@ export function Summary({
 				title,
 				isRetryWrong: Boolean(config.isRetryWrong),
 				saveMode: reportSaveMode,
-				items: results.map((r) => ({
-					itemKey: r.item.key,
-					contentKind: r.item.contentKind,
-					userInput: r.userInput,
-					correct: r.correct,
-					answerText: getPracticeAnswerText(r.item),
-					translationZh: r.item.translationZh ?? '',
-					...(isPracticeVocabItem(r.item) && r.item.ipa?.trim()
-						? { ipa: r.item.ipa.trim() }
+				items,
+				rounds: reportRounds,
+				sourceMeta: {
+					...(config.libraryId ? { libraryId: config.libraryId } : {}),
+					...(config.streamId ? { streamId: config.streamId } : {}),
+					...(config.poolTotal != null && config.poolTotal > 0
+						? { poolTotal: config.poolTotal }
 						: {}),
-					...(isPracticeVocabItem(r.item) && r.item.pos?.trim()
-						? { pos: r.item.pos.trim() }
-						: {}),
-				})),
+				},
 			});
-			reportSavedRef.current = true;
+			lastSavedSigRef.current = savingSig;
 			setReportSaveState('saved');
 		} catch {
 			setReportSaveState('idle');
@@ -133,22 +169,36 @@ export function Summary({
 		} finally {
 			reportSavingRef.current = false;
 		}
-	}, [config, reportSaveMode, results, t]);
+	}, [
+		allResults.length,
+		config,
+		onSessionReportId,
+		reportSaveMode,
+		rounds,
+		roundsSaveSig,
+		sessionReportId,
+		t,
+	]);
 
 	useEffect(() => {
-		if (reportSaveMode !== 'auto' || results.length === 0) return;
+		if (reportSaveMode !== 'auto' || allResults.length === 0) return;
+		if (roundsSaveSig === lastSavedSigRef.current) return;
 		void savePracticeReportOnce();
-	}, [reportSaveMode, results.length, savePracticeReportOnce]);
+	}, [
+		allResults.length,
+		reportSaveMode,
+		roundsSaveSig,
+		savePracticeReportOnce,
+	]);
 
 	const handleSaveMistakes = useCallback(async () => {
 		if (isReviewSession || wrongItems.length === 0) return;
 		setSaveMistakesLoading(true);
 		try {
-			const wrongResults = results.filter((r) => !r.correct);
 			const res =
 				config.contentKind === 'classic'
 					? await batchAddEnglishClassicQuoteMistakes(
-							wrongResults.map((r) => {
+							wrongItems.map((r) => {
 								if (!isPracticeClassicItem(r.item)) {
 									throw new Error('invalid classic practice item');
 								}
@@ -162,7 +212,7 @@ export function Summary({
 							}),
 						)
 					: await batchAddEnglishVocabularyMistakes(
-							wrongResults.map((r) => {
+							wrongItems.map((r) => {
 								if (r.item.contentKind !== 'vocab') {
 									throw new Error('invalid vocab practice item');
 								}
@@ -176,6 +226,7 @@ export function Summary({
 									lastUserInput: r.userInput,
 								};
 							}),
+							{ source: 'practice' },
 						);
 			const added = res.data?.added ?? 0;
 			const updated = res.data?.updated ?? 0;
@@ -199,11 +250,11 @@ export function Summary({
 		} finally {
 			setSaveMistakesLoading(false);
 		}
-	}, [config.contentKind, isReviewSession, results, t, wrongItems.length]);
+	}, [config.contentKind, isReviewSession, t, wrongItems]);
 
 	useEffect(() => {
-		if (!isReviewSession || results.length === 0) return;
-		const signature = results
+		if (!isReviewSession || allResults.length === 0) return;
+		const signature = allResults
 			.map((r) => `${r.item.key}:${r.correct ? 1 : 0}`)
 			.join('|');
 		if (reviewRecordedRef.current === signature) return;
@@ -213,7 +264,7 @@ export function Summary({
 		void (async () => {
 			try {
 				await recordEnglishPracticeReviewAttempts(
-					results.map((r) => ({
+					allResults.map((r) => ({
 						contentKind: r.item.contentKind,
 						itemKey: r.item.key,
 						correct: r.correct,
@@ -234,144 +285,37 @@ export function Summary({
 		return () => {
 			cancelled = true;
 		};
-	}, [isReviewSession, results, t]);
-
-	const toggleWordPlay = useCallback(
-		async (word: string, key: string) => {
-			if (playingKey === key) {
-				stopAllPlayback();
-				setPlayingKey(null);
-				return;
-			}
-			if (!isPlaybackAvailable()) {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-				return;
-			}
-			stopAllPlayback();
-			setPlayingKey(key);
-			try {
-				await playPreferred(word, { cloudSingleUtterance: true });
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-			} finally {
-				setPlayingKey((k) => (k === key ? null : k));
-			}
-		},
-		[playingKey, t],
-	);
-
-	useEffect(() => {
-		return () => stopAllPlayback();
-	}, []);
-
-	const statLabels = {
-		accuracy: t('englishLearning.practice.summaryAccuracy'),
-		correct: t('englishLearning.practice.summaryStatCorrect'),
-		wrong: t('englishLearning.practice.summaryStatWrong'),
-		roundTotal: t('englishLearning.practice.summaryStatTotal'),
-		practiced: t('englishLearning.practice.summaryStatPracticed'),
-	};
+	}, [allResults, isReviewSession, t]);
 
 	return (
 		<div className="mx-auto flex h-full min-h-0 w-full flex-1 flex-col">
-			<PracticeCard className="border-theme/10 flex h-full min-h-0 flex-1 flex-col overflow-hidden p-0 shadow-sm">
-				<SummaryStatsPanel
-					compact={hasWordList}
-					accuracyPct={accuracyPct}
-					correctCount={correctCount}
-					wrongCount={wrongCount}
-					roundTotal={results.length}
-					practicedTotal={practicedTotal}
-					labels={statLabels}
-				/>
-
-				{hasWordList ? (
-					<div className="flex min-h-0 flex-1 flex-col">
-						<div className="border-theme/10 bg-theme/5 flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
-							<p className="text-textcolor text-xs font-semibold sm:text-sm">
-								{t('englishLearning.practice.roundWordListTitle')}
-							</p>
-							<div className="flex shrink-0 items-center gap-1.5">
-								{wrongCount > 0 ? (
-									<span className="bg-rose-600/15 text-rose-500/80 rounded-md px-2 pt-0.5 pb-1 mt-0.5 text-xs font-semibold tabular-nums">
-										{t('englishLearning.practice.roundWordListWrongCount', {
-											count: wrongCount,
-										})}
-									</span>
-								) : null}
-								{correctCount > 0 ? (
-									<span className="bg-teal-500/15 text-teal-500/85 rounded-sm px-2 pt-0.5 pb-1 text-xs font-semibold tabular-nums dark:text-teal-400">
-										{t('englishLearning.practice.roundWordListCorrectCount', {
-											count: correctCount,
-										})}
-									</span>
-								) : null}
-							</div>
-						</div>
-						<ScrollArea
-							className="min-h-0 flex-1"
-							viewportClassName="max-h-full"
-						>
-							<div className={practiceRoundListGridClass(config.contentKind)}>
-								{wrongResults.map((r) => (
-									<WrongListItem
-										key={r.item.key}
-										item={r.item}
-										variant="wrong"
-										userInput={r.userInput}
-										playing={playingKey === r.item.key}
-										onTogglePlay={() =>
-											void toggleWordPlay(
-												getPracticeAnswerText(r.item),
-												r.item.key,
-											)
-										}
-										playLabel={
-											config.contentKind === 'classic'
-												? t('englishLearning.classic.playQuote')
-												: t('englishLearning.vocab.playWord')
-										}
-										stopLabel={t('englishLearning.tts.stop')}
-									/>
-								))}
-								{correctResults.map((r) => (
-									<WrongListItem
-										key={r.item.key}
-										item={r.item}
-										variant="correct"
-										userInput={r.userInput}
-										playing={playingKey === r.item.key}
-										onTogglePlay={() =>
-											void toggleWordPlay(
-												getPracticeAnswerText(r.item),
-												r.item.key,
-											)
-										}
-										playLabel={
-											config.contentKind === 'classic'
-												? t('englishLearning.classic.playQuote')
-												: t('englishLearning.vocab.playWord')
-										}
-										stopLabel={t('englishLearning.tts.stop')}
-									/>
-								))}
-							</div>
-						</ScrollArea>
-					</div>
-				) : null}
-
-				<div className="border-theme/10 mt-auto flex h-16.5 w-full shrink-0 items-center justify-between border-t bg-theme/5 p-2.5">
-					<SummaryActions
+			<Board
+				contentKind={config.contentKind}
+				accuracyPct={accuracyPct}
+				overallAccuracyPct={overallAccuracyPct}
+				correctCount={correctCount}
+				wrongCount={wrongCount}
+				roundTotal={latestResults.length}
+				practicedTotal={practicedTotal}
+				poolTotal={config.poolTotal}
+				meta={
+					<BoardMeta
+						parts={[
+							practiceModeShortLabel(config.mode, t),
+							practiceOrderShortLabel(config.order, t),
+						]}
+					/>
+				}
+				rounds={boardRounds}
+				footer={
+					<Actions
 						hasWrongItems={hasWrongList}
 						continueLoading={continueLoading}
 						saveMistakesLoading={saveMistakesLoading}
-						reportSaveState={results.length === 0 ? 'hidden' : reportSaveState}
+						mistakesPath={mistakesPath}
+						reportSaveState={
+							allResults.length === 0 ? 'hidden' : reportSaveState
+						}
 						labels={{
 							retryWrong: t('englishLearning.practice.retryWrong'),
 							practiceAgain: t('englishLearning.practice.practiceAgain'),
@@ -387,16 +331,14 @@ export function Summary({
 							reportSaved: t('englishLearning.practice.reportSaved'),
 							viewReports: t('englishLearning.practice.viewReports'),
 						}}
-						onRetryWrong={() =>
+						onRetryWrong={() => {
+							const items = wrongItems.map((r) => r.item);
 							onRetryWrong(
-								config.order === 'random'
-									? shufflePracticeItems(wrongItems)
-									: wrongItems,
-							)
-						}
+								config.order === 'random' ? shufflePracticeItems(items) : items,
+							);
+						}}
 						onBackToSetup={onBackToSetup}
 						onContinuePractice={onContinuePractice}
-						mistakesPath={mistakesPath}
 						onSaveMistakes={
 							isReviewSession ? undefined : () => void handleSaveMistakes()
 						}
@@ -407,8 +349,8 @@ export function Summary({
 							)
 						}
 					/>
-				</div>
-			</PracticeCard>
+				}
+			/>
 		</div>
 	);
 }

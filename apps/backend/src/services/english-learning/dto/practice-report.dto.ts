@@ -16,6 +16,9 @@ import {
 } from 'class-validator';
 import { ENGLISH_PRACTICE_SESSION_MAX } from '../constant';
 
+/** 多轮合计软顶：单场硬顶 × 20 轮 */
+const PRACTICE_REPORT_ITEMS_MAX = ENGLISH_PRACTICE_SESSION_MAX * 20;
+
 export class PracticeReportItemDto {
 	@IsString()
 	@MaxLength(200)
@@ -50,6 +53,45 @@ export class PracticeReportItemDto {
 	pos?: string;
 }
 
+export class PracticeReportRoundDto {
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	roundIndex!: number;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(40)
+	completedAt?: string;
+
+	@IsArray()
+	@ArrayMinSize(1)
+	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
+	@ValidateNested({ each: true })
+	@Type(() => PracticeReportItemDto)
+	items!: PracticeReportItemDto[];
+}
+
+export class PracticeReportSourceMetaDto {
+	@IsOptional()
+	@IsString()
+	@MaxLength(64)
+	libraryId?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(64)
+	streamId?: string;
+
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(1_000_000)
+	poolTotal?: number;
+}
+
 export class CreatePracticeReportDto {
 	@IsUUID('4')
 	reportId!: string;
@@ -57,8 +99,8 @@ export class CreatePracticeReportDto {
 	@IsIn(['vocab', 'classic'])
 	contentKind!: 'vocab' | 'classic';
 
-	@IsIn(['dictation', 'spelling'])
-	mode!: 'dictation' | 'spelling';
+	@IsIn(['dictation', 'spelling', 'recognition'])
+	mode!: 'dictation' | 'spelling' | 'recognition';
 
 	@IsString()
 	@MaxLength(32)
@@ -92,10 +134,22 @@ export class CreatePracticeReportDto {
 
 	@IsArray()
 	@ArrayMinSize(1)
-	@ArrayMaxSize(ENGLISH_PRACTICE_SESSION_MAX)
+	@ArrayMaxSize(PRACTICE_REPORT_ITEMS_MAX)
 	@ValidateNested({ each: true })
 	@Type(() => PracticeReportItemDto)
 	items!: PracticeReportItemDto[];
+
+	@IsOptional()
+	@IsArray()
+	@ArrayMaxSize(20)
+	@ValidateNested({ each: true })
+	@Type(() => PracticeReportRoundDto)
+	rounds?: PracticeReportRoundDto[];
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => PracticeReportSourceMetaDto)
+	sourceMeta?: PracticeReportSourceMetaDto;
 }
 
 export class PracticeReportListQueryDto {

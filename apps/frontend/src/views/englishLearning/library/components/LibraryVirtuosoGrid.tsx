@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import {
 	LIBRARY_LIST_AT_BOTTOM_THRESHOLD_PX,
 	shouldBlockLibraryListEndReached,
-} from '../../hooks/useListScrollCornerFab';
+} from '../../hooks/useListCornerFab';
 import { registerLibraryVirtuosoScrollParent } from '../../utils/libraryVirtuosoScrollRegistry';
 import {
 	type LibraryGridColumnMode,
@@ -158,7 +158,7 @@ export function LibraryVirtuosoGrid<T>({
 			overscan={{ main: 400, reverse: 400 }}
 			increaseViewportBy={{ top: 400, bottom: 400 }}
 			minOverscanItemCount={{ top: 2, bottom: 2 }}
-			// 距底部 200px 内视为触底，触发加载更多（与 useListScrollCornerFab 阈值对齐）
+			// 距底部 200px 内视为触底，触发加载更多（与 useListCornerFab 阈值对齐）
 			atBottomThreshold={LIBRARY_LIST_AT_BOTTOM_THRESHOLD_PX}
 			endReached={() => {
 				const vp = viewportRef.current;
@@ -166,22 +166,22 @@ export function LibraryVirtuosoGrid<T>({
 				if (vp && shouldBlockLibraryListEndReached(vp)) return;
 				onEndReached();
 			}}
-			itemContent={(_index, row) => (
-				<div>
-					<div className={rowGridClassName} style={rowGridStyle}>
-						{row.items.map((item, col) => {
-							const dataIndex = row.startIndex + col;
-							return (
-								<div
-									key={getItemKey(item, dataIndex)}
-									className={cn('min-w-0', itemClassName)}
-								>
-									{itemContent(item, dataIndex)}
-								</div>
-							);
-						})}
-					</div>
-					<div className="h-4 shrink-0" aria-hidden />
+			itemContent={(index, row) => (
+				<div
+					className={cn(rowGridClassName, index < rows.length - 1 && 'pb-4')}
+					style={rowGridStyle}
+				>
+					{row.items.map((item, col) => {
+						const dataIndex = row.startIndex + col;
+						return (
+							<div
+								key={getItemKey(item, dataIndex)}
+								className={cn('min-w-0', itemClassName)}
+							>
+								{itemContent(item, dataIndex)}
+							</div>
+						);
+					})}
 				</div>
 			)}
 		/>

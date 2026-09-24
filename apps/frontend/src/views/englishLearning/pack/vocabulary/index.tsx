@@ -24,12 +24,12 @@ import {
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
-import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import { CornerFab } from '../../components/list';
+import { Card } from '../../components/vocab';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useVocabularyPackHistoryList } from '../hooks/useVocabularyPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -239,12 +239,11 @@ function VocabularyPackSectionInner({
 			: EnglishPackStore.vocabItems;
 	const isHistoryMode = useHistoryPagination && history.active;
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			listItems.length,
-			listItems.length > 0 && !showPageLoading,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		listItems.length,
+		listItems.length > 0 && !showPageLoading,
+	);
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
@@ -331,7 +330,7 @@ function VocabularyPackSectionInner({
 				className="min-h-0 h-full py-4"
 				onScroll={composeViewportScroll(
 					snapshot.onHistoryViewportScroll,
-					onScrollCornerFab,
+					onCornerFab,
 				)}
 			>
 				<div className="space-y-5 px-4">
@@ -356,7 +355,7 @@ function VocabularyPackSectionInner({
 											: `${item.pos}.`
 										: null;
 									return (
-										<VocabularyWordCard
+										<Card
 											key={key}
 											variant="library"
 											className="mb-0"
@@ -421,7 +420,7 @@ function VocabularyPackSectionInner({
 					) : null}
 				</div>
 			</ScrollArea>
-			<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+			<CornerFab mode={mode} onClick={onCornerFabClick} />
 		</div>
 	);
 }

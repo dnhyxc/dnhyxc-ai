@@ -24,12 +24,12 @@ import {
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
+import { Card } from '../../components/classic';
+import { CornerFab } from '../../components/list';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useClassicQuotesPackHistoryList } from '../hooks/useClassicQuotesPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -240,12 +240,11 @@ function ClassicQuotesPackSectionInner({
 			: EnglishPackStore.classicItems;
 	const isHistoryMode = useHistoryPagination && history.active;
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			listItems.length,
-			listItems.length > 0 && !showPageLoading,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		listItems.length,
+		listItems.length > 0 && !showPageLoading,
+	);
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const {
@@ -332,7 +331,7 @@ function ClassicQuotesPackSectionInner({
 				className="min-h-0 h-full py-4"
 				onScroll={composeViewportScroll(
 					snapshot.onHistoryViewportScroll,
-					onScrollCornerFab,
+					onCornerFab,
 				)}
 			>
 				<div className="space-y-5 px-4">
@@ -357,7 +356,7 @@ function ClassicQuotesPackSectionInner({
 										? `history-${i}-${contentKey || item.english.slice(0, 48)}`
 										: `${i}-${contentKey || item.english.slice(0, 48)}`;
 									return (
-										<ClassicQuoteCard
+										<Card
 											key={cardKey}
 											variant="library"
 											forceNote
@@ -428,7 +427,7 @@ function ClassicQuotesPackSectionInner({
 					) : null}
 				</div>
 			</ScrollArea>
-			<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+			<CornerFab mode={mode} onClick={onCornerFabClick} />
 		</div>
 	);
 }

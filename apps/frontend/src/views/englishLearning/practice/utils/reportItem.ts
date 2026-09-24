@@ -1,5 +1,5 @@
 /**
- * 报告快照 → WrongListItem 可用的 PracticeItem（仅展示字段）
+ * 报告快照 → Entry 可用的 PracticeItem（仅展示字段）
  */
 import type { EnglishPracticeReportItem } from '@/service';
 import type { PracticeItem } from '../types';

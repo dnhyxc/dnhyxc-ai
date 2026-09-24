@@ -185,12 +185,17 @@ function ShortcutSection({
 export function PracticeShortcutsMenu({
 	practiceMode: _practiceMode,
 	slotBoard = false,
+	sections: sectionsProp,
+	triggerAria,
 }: PracticeShortcutsMenuProps) {
 	const { t } = useI18n();
 
 	type ShortcutRowDef = { label: string; keys: PracticeShortcutKey[] };
 
-	const sections = useMemo((): { title: string; rows: ShortcutRowDef[] }[] => {
+	const defaultSections = useMemo((): {
+		title: string;
+		rows: ShortcutRowDef[];
+	}[] => {
 		const playKeys: PracticeShortcutKey[] = ['shiftSpace'];
 
 		const promptRows: ShortcutRowDef[] = [
@@ -270,6 +275,8 @@ export function PracticeShortcutsMenu({
 		];
 	}, [slotBoard, t]);
 
+	const sections = sectionsProp ?? defaultSections;
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -279,7 +286,9 @@ export function PracticeShortcutsMenu({
 						'text-textcolor/80 hover:text-textcolor flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none',
 						'focus-visible:ring-2 focus-visible:ring-teal-500/40',
 					)}
-					aria-label={t('englishLearning.practice.shortcuts.triggerAria')}
+					aria-label={
+						triggerAria ?? t('englishLearning.practice.shortcuts.triggerAria')
+					}
 				>
 					<CircleQuestionMark className="size-4" aria-hidden />
 				</button>

@@ -80,7 +80,7 @@ export type PracticeSetupConfig = {
 	sourceTitle?: string;
 	/** 报告保存方式；缺省按 manual */
 	reportSaveMode?: PracticeReportSaveMode;
-	/** 本场是否由「重练错题」进入 */
+	/** 本场是否由「重练错题」进入；完成后就地改对历轮，不追加轮次 */
 	isRetryWrong?: boolean;
 };
 
@@ -88,6 +88,13 @@ export type PracticeAttemptResult = {
 	item: PracticeItem;
 	userInput: string;
 	correct: boolean;
+};
+
+/** 会话内已完成的一轮（仅「继续练习」追加；重练错题就地改对） */
+export type PracticeSessionRound = {
+	roundIndex: number;
+	results: PracticeAttemptResult[];
+	completedAt: string;
 };
 
 export type PracticePhase = 'setup' | 'running' | 'summary';
@@ -154,8 +161,8 @@ export type PracticePageShellProps = {
 	backLabel?: string;
 	headerRight?: ReactNode;
 	children: ReactNode;
-	/** fill：内容顶对齐并占满剩余高度（结算页错题列表等） */
-	contentLayout?: 'center' | 'fill';
+	/** fill：占满剩余高度（结算板）；start：顶对齐可滚动列表；center：垂直居中 */
+	contentLayout?: 'center' | 'fill' | 'start';
 	/** 作答页：隐藏壳顶栏、内容无内边距，由 Session 铺满白色区域 */
 	flush?: boolean;
 };
@@ -165,6 +172,26 @@ export type PracticeShortcutsMenuProps = {
 	practiceMode?: PracticeMode;
 	/** 经典词槽：展示词性/音标快捷键 */
 	slotBoard?: boolean;
+	/** 传入则覆盖默认练习分区（今日记词等复用 UI） */
+	sections?: Array<{
+		title: string;
+		rows: Array<{
+			label: string;
+			keys: Array<
+				| 'enter'
+				| 'shiftSpace'
+				| 'space'
+				| 'ctrlShiftP'
+				| 'ctrlShiftI'
+				| 'left'
+				| 'right'
+				| 'up'
+				| 'down'
+			>;
+		}>;
+	}>;
+	/** 触发按钮 aria-label；默认练习文案 */
+	triggerAria?: string;
 };
 
 export type PracticeSegmentOption<T extends string> = {
@@ -220,69 +247,18 @@ export type SessionProps = {
 };
 
 export type SummaryProps = {
-	results: PracticeAttemptResult[];
+	/** 已完成轮次（含最新一轮）；展示时新→旧 */
+	rounds: PracticeSessionRound[];
 	/** 本会话累计已练词数（含继续练习、重练错题） */
 	practicedTotal: number;
 	config: PracticeSetupConfig;
+	/** 同会话跨轮次共用，便于覆盖更新同一报告 */
+	sessionReportId: string | null;
+	onSessionReportId: (id: string) => void;
 	continueLoading?: boolean;
 	onRetryWrong: (queue: PracticeAttemptResult['item'][]) => void;
 	onContinuePractice: () => void;
 	onBackToSetup: () => void;
-};
-
-// —— 结算页子组件 ——
-
-export type SummaryMetricTone =
-	| 'accent'
-	| 'correct'
-	| 'wrong'
-	| 'total'
-	| 'practiced';
-
-export type SummaryMetricProps = {
-	label: string;
-	value: string | number;
-	tone: SummaryMetricTone;
-	compact?: boolean;
-};
-
-export type SummaryWordListVariant = 'wrong' | 'correct';
-
-export type WrongListItemProps = {
-	item: PracticeItem;
-	playing: boolean;
-	onTogglePlay: () => void;
-	playLabel: string;
-	stopLabel: string;
-	/** 错题红左边框；正确绿左边框 */
-	variant?: SummaryWordListVariant;
-	/** 作答明细：用户当次输入（有内容才展示） */
-	userInput?: string;
-};
-
-export type SummaryActionsProps = {
-	hasWrongItems: boolean;
-	continueLoading: boolean;
-	saveMistakesLoading?: boolean;
-	mistakesPath?: string;
-	/** 保存报告：idle 可点；saving 转圈；saved 禁用示已保存；hidden 不展示按钮 */
-	reportSaveState?: 'idle' | 'saving' | 'saved' | 'hidden';
-	labels: {
-		retryWrong: string;
-		practiceAgain: string;
-		continuePractice: string;
-		openMistakes: string;
-		saveMistakes: string;
-		saveReport: string;
-		reportSaved: string;
-		viewReports: string;
-	};
-	onRetryWrong: () => void;
-	onBackToSetup: () => void;
-	onContinuePractice: () => void;
-	onSaveMistakes?: () => void;
-	onSaveReport?: () => void;
-	onViewReports?: () => void;
 };
 
 // —— 单题 Session 子组件 ——

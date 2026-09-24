@@ -11,9 +11,8 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import { ClassicExportButton } from '../../components/ClassicExportButton';
-import { ClassicSourceAnnotateControl } from '../../components/ClassicSourceAnnotateControl';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Annotate, Export } from '../../components/classic';
+import { Entry } from '../../components/entry';
 
 /** 与知识库列表一致：hover 时标题右侧预留 */
 const ROW_HOVER_PR = [
@@ -96,8 +95,8 @@ function ClassicQuotesHistoryDrawerInner({
 							const isStreaming =
 								EnglishPackStore.classicLoading &&
 								EnglishPackStore.classicActiveStreamId === h.streamId;
-							const showPracticeEntry = h.quoteCount > 0;
-							const actionCount = (showPracticeEntry ? 2 : 0) + 2;
+							const showEntry = h.quoteCount > 0;
+							const actionCount = (showEntry ? 2 : 0) + 2;
 							const hoverPr =
 								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
@@ -158,9 +157,9 @@ function ClassicQuotesHistoryDrawerInner({
 										</div>
 									) : (
 										<div className={ROW_ACTIONS_CLASS}>
-											{showPracticeEntry ? (
+											{showEntry ? (
 												<>
-													<ClassicSourceAnnotateControl
+													<Annotate
 														source="pack"
 														streamId={h.streamId}
 														title={h.topic?.trim() || undefined}
@@ -172,7 +171,7 @@ function ClassicQuotesHistoryDrawerInner({
 															e.stopPropagation();
 														}}
 													/>
-													<EnglishPracticeEntry
+													<Entry
 														variant="icon"
 														disabled={busy || deleting}
 														practice={{
@@ -204,7 +203,7 @@ function ClassicQuotesHistoryDrawerInner({
 													/>
 												</>
 											) : null}
-											<ClassicExportButton
+											<Export
 												source="pack"
 												streamId={h.streamId}
 												title={h.topic?.trim() || undefined}

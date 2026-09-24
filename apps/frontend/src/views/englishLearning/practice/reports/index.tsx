@@ -290,7 +290,7 @@ export default function PracticeReportsListPage() {
 			/>
 			<PracticePageShell
 				title={<span className="min-w-0 truncate">{title}</span>}
-				contentLayout="fill"
+				contentLayout="start"
 				headerRight={
 					<div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
 						{showSelection ? (

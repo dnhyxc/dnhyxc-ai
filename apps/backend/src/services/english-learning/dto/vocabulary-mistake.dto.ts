@@ -25,6 +25,12 @@ export class VocabularyMistakeBatchDto {
 	@ValidateNested({ each: true })
 	@Type(() => VocabularyMistakeBatchItemDto)
 	items!: VocabularyMistakeBatchItemDto[];
+
+	/** 错题来源标记；新建行写入，已存在行不覆盖 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(32)
+	source?: string;
 }
 
 export class VocabularyMistakeRemoveDto {

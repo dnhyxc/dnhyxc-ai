@@ -4,7 +4,7 @@ import {
 	type EnglishVocabularyItem,
 	normalizeEnglishVocabWordKey,
 } from '@/service';
-import type { FavoriteToggleButtonProps } from '../../components/FavoriteToggleButton';
+import type { ToggleProps } from '../../components/favorite';
 import type {
 	PracticeClassicItem,
 	PracticeContentKind,
@@ -59,9 +59,7 @@ export function parsePracticeContentKind(
 	return raw === 'classic' ? 'classic' : 'vocab';
 }
 
-export function practiceFavoriteToggleProps(
-	item: PracticeItem,
-): FavoriteToggleButtonProps {
+export function practiceToggleProps(item: PracticeItem): ToggleProps {
 	return item.contentKind === 'vocab'
 		? { kind: 'vocab', item }
 		: { kind: 'classic', item };

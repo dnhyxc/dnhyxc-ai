@@ -198,7 +198,7 @@ const Share: React.FC<ShareProps> = ({
 							disabled={loading}
 							onClick={onCreateShare}
 						>
-							{loading ? <Spinner className="text-textcolor" /> : null}
+							{loading ? <Spinner className="text-white" /> : null}
 							{tt('share.modal.createAndCopy') ?? '创建并复制链接'}
 						</Button>
 					</div>

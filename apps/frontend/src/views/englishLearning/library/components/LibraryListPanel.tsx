@@ -34,9 +34,8 @@ import {
 	hydrateElResumeOffset,
 	resolveElResumeOffset,
 } from '@/store/englishLearningResume';
-import { ClassicExportButton } from '../../components/ClassicExportButton';
-import { ClassicSourceAnnotateControl } from '../../components/ClassicSourceAnnotateControl';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Annotate, Export } from '../../components/classic';
+import { Entry } from '../../components/entry';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
 import { LibraryEditDialog } from './LibraryEditDialog';
@@ -383,13 +382,13 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 									? (lib as EnglishClassicQuotesLibraryListItem)
 									: null;
 							const itemCount = getLibraryItemCount(lib, kind);
-							const showPracticeEntry = itemCount > 0;
+							const showEntry = itemCount > 0;
 							const canDelete = lib.isOwned !== false;
 							const showEdit = lib.isPublic
 								? isSuperAdmin
 								: lib.isOwned !== false;
 							// classic：标注 + 练习；vocab：仅练习
-							const practiceActions = showPracticeEntry
+							const practiceActions = showEntry
 								? kind === 'classic'
 									? 2
 									: 1
@@ -449,8 +448,8 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 									</button>
 									{actionCount > 0 ? (
 										<div className={ROW_ACTIONS_CLASS}>
-											{showPracticeEntry && vocabLib ? (
-												<EnglishPracticeEntry
+											{showEntry && vocabLib ? (
+												<Entry
 													variant="icon"
 													practice={{
 														source: 'library',
@@ -470,9 +469,9 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 													}}
 												/>
 											) : null}
-											{showPracticeEntry && classicLib ? (
+											{showEntry && classicLib ? (
 												<>
-													<ClassicSourceAnnotateControl
+													<Annotate
 														source="library"
 														libraryId={classicLib.id}
 														title={classicLib.title?.trim() || undefined}
@@ -486,7 +485,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 															e.stopPropagation();
 														}}
 													/>
-													<EnglishPracticeEntry
+													<Entry
 														variant="icon"
 														practice={{
 															contentKind: 'classic',
@@ -510,7 +509,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 												</>
 											) : null}
 											{kind === 'classic' && classicLib ? (
-												<ClassicExportButton
+												<Export
 													source="library"
 													libraryId={classicLib.id}
 													title={classicLib.title?.trim() || undefined}

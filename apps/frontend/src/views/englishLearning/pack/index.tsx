@@ -5,10 +5,10 @@ import { observer } from 'mobx-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
-import { ClassicSourceAnnotateControl } from '../components/ClassicSourceAnnotateControl';
-import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
-import { EnglishPracticeEntry } from '../components/practiceEntry';
-import { MasterWebSearchResultsBar } from '../components/WebSearchResultsBar';
+import { Annotate } from '../components/classic';
+import { Entry } from '../components/entry';
+import { Bar } from '../components/search';
+import { Panel } from '../components/shell';
 import { ClassicQuotesPackSection } from './classic';
 import { PackStreamHistoryDrawerTrigger } from './components/PackStreamHistoryDrawerTrigger';
 import type { PackStreamKind, PackStreamSectionSnapshot } from './types';
@@ -60,7 +60,7 @@ function EnglishLearningPackStreamPageInner() {
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
-					<EnglishLearningPanelHeader
+					<Panel
 						titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
 						title={
 							<>
@@ -89,13 +89,10 @@ function EnglishLearningPackStreamPageInner() {
 						trailing={
 							<div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
 								{masterSearchOrganic.length > 0 ? (
-									<MasterWebSearchResultsBar
-										items={masterSearchOrganic}
-										t={t}
-									/>
+									<Bar items={masterSearchOrganic} t={t} />
 								) : null}
 								{kind === 'classic' && historyStreamId ? (
-									<ClassicSourceAnnotateControl
+									<Annotate
 										variant="text"
 										source="pack"
 										streamId={historyStreamId}
@@ -104,7 +101,7 @@ function EnglishLearningPackStreamPageInner() {
 									/>
 								) : null}
 								{practiceParams ? (
-									<EnglishPracticeEntry
+									<Entry
 										variant="text"
 										className="shrink-0 gap-1.5 whitespace-nowrap font-medium"
 										practice={practiceParams}

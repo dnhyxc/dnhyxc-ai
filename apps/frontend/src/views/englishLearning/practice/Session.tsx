@@ -13,8 +13,8 @@ import {
 import Tooltip from '@/components/design/Tooltip';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { FavoriteToggleButton } from '../components/FavoriteToggleButton';
-import { SessionHeader } from '../components/SessionHeader';
+import { Toggle } from '../components/favorite';
+import { Head } from '../components/shell';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
 import { SessionWrongActions } from './components/session/SessionWrongActions';
 import { ClassicSpellingBoard } from './components/slots';
@@ -33,7 +33,7 @@ import {
 	getPracticeAnswerText,
 	isPracticeClassicItem,
 	isPracticeVocabItem,
-	practiceFavoriteToggleProps,
+	practiceToggleProps,
 } from './utils/item';
 import {
 	gradeSentenceSlots,
@@ -368,8 +368,8 @@ export function Session({
 					className="flex min-h-0 flex-1 flex-col overflow-hidden"
 					role={showWrongActions || showCorrectActions ? 'status' : undefined}
 				>
-					<SessionHeader
-						className="pl-3.5 pr-1.5"
+					<Head
+						className="pl-4 pr-2"
 						trailing={
 							<>
 								{phase === 'correct_reveal' ? (
@@ -464,8 +464,8 @@ export function Session({
 										</Tooltip>
 									</>
 								) : null}
-								<FavoriteToggleButton
-									{...practiceFavoriteToggleProps(item)}
+								<Toggle
+									{...practiceToggleProps(item)}
 									className={STAGE_ICON_BTN}
 									tabIndex={-1}
 								/>
@@ -480,7 +480,7 @@ export function Session({
 						{progressLabel ? (
 							<span className="shrink-0 tabular-nums">{progressLabel}</span>
 						) : null}
-					</SessionHeader>
+					</Head>
 					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
 						<div className="grid min-h-0 flex-1 w-full transition-none *:col-start-1 *:row-start-1 *:h-full *:min-h-0">
 							<SessionPromptPanel

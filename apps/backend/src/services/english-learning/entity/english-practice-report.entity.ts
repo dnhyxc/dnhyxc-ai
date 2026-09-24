@@ -17,6 +17,18 @@ export type PracticeReportItemSnapshot = {
 	pos?: string;
 };
 
+export type PracticeReportRoundSnapshot = {
+	roundIndex: number;
+	completedAt?: string;
+	items: PracticeReportItemSnapshot[];
+};
+
+export type PracticeReportSourceMeta = {
+	libraryId?: string;
+	streamId?: string;
+	poolTotal?: number;
+};
+
 /** 单场练习报告（抬头列 + items 快照；主键由客户端 reportId 提供以实现幂等） */
 @Entity('english_practice_report')
 @Index('IDX_epr_user_created', ['userId', 'createdAt'])
@@ -32,7 +44,7 @@ export class EnglishPracticeReport {
 	contentKind!: 'vocab' | 'classic';
 
 	@Column({ type: 'varchar', length: 16 })
-	mode!: 'dictation' | 'spelling';
+	mode!: 'dictation' | 'spelling' | 'recognition';
 
 	@Column({ type: 'varchar', length: 32 })
 	source!: string;
@@ -57,6 +69,14 @@ export class EnglishPracticeReport {
 
 	@Column({ type: 'json' })
 	items!: PracticeReportItemSnapshot[];
+
+	/** 多轮明细；旧行可为空，读取时用 items 包单轮 */
+	@Column({ type: 'json', nullable: true })
+	rounds!: PracticeReportRoundSnapshot[] | null;
+
+	/** 续练用：libraryId / streamId / poolTotal */
+	@Column({ name: 'source_meta', type: 'json', nullable: true })
+	sourceMeta!: PracticeReportSourceMeta | null;
 
 	@Column({ name: 'is_retry_wrong', type: 'boolean', default: false })
 	isRetryWrong!: boolean;

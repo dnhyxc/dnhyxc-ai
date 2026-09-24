@@ -39,6 +39,13 @@ export class EnglishVocabularyMistake {
 	@Column({ type: 'text' })
 	example!: string;
 
+	/**
+	 * 错题来源：dailyMemorize（今日记词）/ practice（练习）等。
+	 * 重置记词仅清除 source=dailyMemorize 的条目。
+	 */
+	@Column({ type: 'varchar', length: 32, default: '' })
+	source!: string;
+
 	/** 入库时的错误拼写 */
 	@Column({
 		name: 'last_user_input',

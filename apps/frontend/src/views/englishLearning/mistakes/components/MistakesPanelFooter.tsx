@@ -6,7 +6,7 @@ import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { FileDown, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Entry } from '../../components/entry';
 import type { PracticeContentKind, PracticeSource } from '../../practice/types';
 
 const LINK_CLASS =
@@ -26,7 +26,7 @@ export type MistakesPanelFooterProps = {
 	exportingDocx: boolean;
 	onExportDocx: () => void;
 	exportLabel: string;
-	showPracticeEntry?: boolean;
+	showEntry?: boolean;
 	practiceContentKind?: PracticeContentKind;
 	practiceSource?: Extract<PracticeSource, 'mistakes' | 'review'>;
 	practiceSourceTitle?: string;
@@ -48,7 +48,7 @@ export function MistakesPanelFooter({
 	exportingDocx,
 	onExportDocx,
 	exportLabel,
-	showPracticeEntry = false,
+	showEntry = false,
 	practiceContentKind = 'vocab',
 	practiceSource = 'mistakes',
 	practiceSourceTitle,
@@ -104,8 +104,8 @@ export function MistakesPanelFooter({
 							})}
 				</span>
 			</button>
-			{showPracticeEntry ? (
-				<EnglishPracticeEntry
+			{showEntry ? (
+				<Entry
 					variant="text"
 					showIcon
 					disabled={practiceDisabled}

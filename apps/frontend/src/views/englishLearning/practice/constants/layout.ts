@@ -5,11 +5,11 @@ export const PRACTICE_PAGE_CONTENT_CLASS = 'mx-auto w-full max-w-3xl';
 export const PRACTICE_PRIMARY_ACTION_BTN_CLASS =
 	'bg-teal-600 text-white shadow-none hover:bg-teal-500 disabled:opacity-50 [&_[role=status]]:text-white';
 
-/** 作答明细网格：单词默认约三列；语句保持较宽卡 */
+/** 作答明细网格：单词默认约三列；语句保持较宽卡（外层自行加 padding） */
 export function practiceRoundListGridClass(
 	contentKind: 'vocab' | 'classic',
 ): string {
 	return contentKind === 'classic'
-		? 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-2.5 p-2.5'
-		: 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-2.5 p-2.5';
+		? 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-2.5'
+		: 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-2.5';
 }

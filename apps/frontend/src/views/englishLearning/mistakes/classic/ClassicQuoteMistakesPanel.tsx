@@ -40,14 +40,14 @@ import {
 	playPreferred,
 	stopAllPlayback,
 } from '@/utils/speech';
-import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
-import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
+import { Card } from '../../components/classic';
+import { CornerFab } from '../../components/list';
+import { Panel } from '../../components/shell';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -169,12 +169,11 @@ export function ClassicQuoteMistakesPanel({
 	const showInitialLoading = loading && entries.length === 0;
 	const awaitingGrid = entries.length > 0 && !gridReady;
 	const showEmpty = !loading && entries.length === 0;
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			entries.length,
-			entries.length > 0,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		entries.length,
+		entries.length > 0,
+	);
 	const practiceDisabled = loading || totalCount === 0;
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
@@ -452,7 +451,7 @@ export function ClassicQuoteMistakesPanel({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
-				<EnglishLearningPanelHeader
+				<Panel
 					titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
 					title={headerTitle}
 					actions={
@@ -474,7 +473,7 @@ export function ClassicQuoteMistakesPanel({
 							exportingDocx={exportingDocx}
 							onExportDocx={handleExportDocx}
 							exportLabel={t('englishLearning.classic.exportDocx')}
-							showPracticeEntry
+							showEntry
 							practiceContentKind="classic"
 							practiceSource={isReview ? 'review' : 'mistakes'}
 							practiceDisabled={practiceDisabled}
@@ -498,10 +497,7 @@ export function ClassicQuoteMistakesPanel({
 							ref={scrollViewportRef}
 							className="relative min-h-0 h-full p-4"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-							onScroll={composeViewportScroll(
-								onViewportScroll,
-								onScrollCornerFab,
-							)}
+							onScroll={composeViewportScroll(onViewportScroll, onCornerFab)}
 						>
 							{showEmpty ? (
 								<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -526,7 +522,7 @@ export function ClassicQuoteMistakesPanel({
 											const playKey = `classic-mistake-${row.id}`;
 											const playing = playingKey === playKey;
 											return (
-												<ClassicQuoteCard
+												<Card
 													variant="selectable"
 													forceNote
 													data={{
@@ -588,7 +584,7 @@ export function ClassicQuoteMistakesPanel({
 								</div>
 							)}
 						</ScrollArea>
-						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+						<CornerFab mode={mode} onClick={onCornerFabClick} />
 					</div>
 				)}
 			</div>

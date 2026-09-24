@@ -1234,12 +1234,15 @@ export const enUS = {
 	'englishLearning.practice.summaryTitle': 'Practice report',
 	'englishLearning.practice.summaryScore': '{correct} / {total} correct',
 	'englishLearning.practice.summaryAccuracy': 'Accuracy',
+	'englishLearning.practice.summaryAccuracyRound': 'Round accuracy',
+	'englishLearning.practice.summaryAccuracyOverall': 'Overall accuracy',
 	'englishLearning.practice.summaryStatCorrect': 'Correct',
 	'englishLearning.practice.summaryStatWrong': 'Wrong',
-	'englishLearning.practice.summaryStatTotal': 'This round',
-	'englishLearning.practice.summaryStatPracticed': 'Practiced',
+	'englishLearning.practice.summaryStatTotal': 'Round count',
+	'englishLearning.practice.summaryStatPracticed': 'Practiced count',
 	'englishLearning.practice.wrongListTitle': 'Mistakes',
 	'englishLearning.practice.roundWordListTitle': 'Answer breakdown',
+	'englishLearning.practice.sessionRoundLabel': 'Round {n}',
 	'englishLearning.practice.roundWordListWrongCount': 'Wrong {count}',
 	'englishLearning.practice.roundWordListCorrectCount': 'Correct {count}',
 	'englishLearning.practice.retryWrong': 'Retry mistakes',
@@ -1328,9 +1331,12 @@ export const enUS = {
 	'englishLearning.daily.sidebarDescSplit':
 		'Review {dueCount} · Library {libraryCount}',
 	'englishLearning.daily.sidebarDescLibrary':
-		'{poolCount} unlearned in library · {sessionCount} per round',
+		'A few minutes a day, words stick',
 	'englishLearning.daily.sidebarDescLibraryEmpty':
 		'No new words in your libraries',
+	'englishLearning.daily.sidebarStatsLabel': 'Progress',
+	'englishLearning.daily.sidebarStatMemorized': 'Memorized',
+	'englishLearning.daily.sidebarStatPending': 'To learn',
 	'englishLearning.daily.wordsPerRoundTrigger': 'Words per round',
 	'englishLearning.daily.wordsPerRoundTitle': 'Words per round',
 	'englishLearning.daily.wordsPerRoundDesc':
@@ -1339,7 +1345,7 @@ export const enUS = {
 	'englishLearning.daily.resetting': 'Resetting…',
 	'englishLearning.daily.resetConfirmTitle': 'Reset library memorization?',
 	'englishLearning.daily.resetConfirmDesc':
-		'This clears {count} word log entries and removes those words from your mistake book and review schedule, so they can be picked from the library again.',
+		'This clears {count} word log entries and their review schedule, and removes only mistake-book entries that came from Daily memorize. Mistakes from practice and other sources are kept. Words can then be picked from the library again.',
 	'englishLearning.daily.resetConfirmAction': 'Reset',
 	'englishLearning.daily.resetSuccess': 'Reset {count} word log entries',
 	'englishLearning.daily.resetSuccessGuest':
@@ -1355,11 +1361,28 @@ export const enUS = {
 	'englishLearning.daily.startShort': 'Start {count} words',
 	'englishLearning.daily.introTitle': 'A few minutes a day, words stick',
 	'englishLearning.daily.introDesc':
-		'About {count} words today — listen, read the meaning, pick one answer.',
+		'~{count} words: listen, read meaning, pick one',
+	'englishLearning.daily.introDescDictation':
+		'~{count} words: listen, then spell English',
+	'englishLearning.daily.introDescSpelling':
+		'~{count} words: spell from Chinese meaning',
 	'englishLearning.daily.introDescSplit':
 		'Review {dueCount} due · Library random {libraryCount}',
 	'englishLearning.daily.introHint':
-		'Recognition only — no spelling. Use Today’s review for dictation later.',
+		'No spelling; consolidate in Today’s review',
+	'englishLearning.daily.introHintDictation':
+		'Listen & spell; counts toward progress',
+	'englishLearning.daily.introHintSpelling':
+		'Spell from meaning; counts toward progress',
+	'englishLearning.daily.modeRecognition': 'Read',
+	'englishLearning.daily.modeDictation': 'Dictation',
+	'englishLearning.daily.modeSpelling': 'Write from meaning',
+	'englishLearning.daily.studyHintDictation': 'Listen to the word first',
+	'englishLearning.daily.studyHintSpelling':
+		'Read the Chinese meaning, then get ready to spell',
+	'englishLearning.daily.spellHintDictation':
+		'Spell the English word from audio',
+	'englishLearning.daily.startSpell': 'Start spelling',
 	'englishLearning.daily.sessionTitle': 'Daily words',
 	'englishLearning.daily.sessionTitleReview': 'Due review',
 	'englishLearning.daily.sessionTitleLibrary': 'Read & memorize',
@@ -1370,6 +1393,8 @@ export const enUS = {
 	'englishLearning.daily.start': 'Start {count} words',
 	'englishLearning.daily.startReview': 'Review due ({count})',
 	'englishLearning.daily.startLibrary': 'Start memorizing',
+	'englishLearning.daily.startDictation': 'Start dictation',
+	'englishLearning.daily.startSpelling': 'Start write-from-meaning',
 	'englishLearning.daily.guestHint':
 		'Built-in high-frequency words when signed out; sign in to sync favorites and review.',
 	'englishLearning.daily.startQuiz': 'Quiz me',
@@ -1381,7 +1406,15 @@ export const enUS = {
 	'englishLearning.daily.doneTitle': 'That’s enough for today',
 	'englishLearning.daily.doneDesc':
 		'When due, practice dictation under Today’s review — we handle the schedule.',
+	'englishLearning.daily.doneAllCorrect': 'All correct this round — nice work!',
+	'englishLearning.daily.doneWrongTitle': 'Missed words ({count})',
 	'englishLearning.daily.backHome': 'Back to English',
+	'englishLearning.daily.shortcuts.triggerAria': 'View daily shortcuts',
+	'englishLearning.daily.shortcuts.sectionStudy': 'Study',
+	'englishLearning.daily.shortcuts.sectionQuiz': 'Quiz',
+	'englishLearning.daily.shortcuts.sectionFeedback': 'After feedback',
+	'englishLearning.daily.shortcuts.startQuiz': 'Start quiz',
+	'englishLearning.daily.shortcuts.next': 'Next word / finish',
 
 	'englishLearning.review.homeDesc': '{count} due for review today',
 	'englishLearning.review.loadingDue': 'Loading due count…',

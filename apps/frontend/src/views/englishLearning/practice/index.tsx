@@ -1,9 +1,10 @@
 /**
  * 单词听写 / 拼写练习 — 路由页（index）
  */
+import Loading from '@design/Loading';
 import { Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { stopAllPlayback } from '@/utils/speech';
 import { PracticePageShell } from './components/shell';
@@ -18,12 +19,14 @@ import type {
 	PracticeMode,
 	PracticePhase,
 	PracticeSessionCursor,
+	PracticeSessionRound,
 	PracticeSetupConfig,
 	PracticeSource,
 } from './types';
 import { fetchPracticeContinueQueue } from './utils/fetchWords';
 import { isPracticeClassicItem, parsePracticeContentKind } from './utils/item';
 import { parsePracticePoolTotal } from './utils/paths';
+import type { PracticeResumeState } from './utils/resumeFromReport';
 import { segmentEnglishSentence } from './utils/segmentSentence';
 import { prefetchSentenceWordAnnotationsBatch } from './utils/sentenceWordAnnotationCache';
 
@@ -53,8 +56,38 @@ function mergePracticedKeys(prev: string[], items: PracticeItem[]): string[] {
 	return [...set];
 }
 
+function emptyCursor(): PracticeSessionCursor {
+	return { nextSequentialPageIndex: 0, usedRandomPageIndices: [] };
+}
+
+/** 重练做对的词：历轮 wrong → correct（不追加轮次） */
+function applyRetryCorrections(
+	rounds: PracticeSessionRound[],
+	retryResults: PracticeAttemptResult[],
+): PracticeSessionRound[] {
+	const byKey = new Map(
+		retryResults.filter((r) => r.correct).map((r) => [r.item.key, r]),
+	);
+	if (byKey.size === 0) return rounds;
+	return rounds.map((round) => ({
+		...round,
+		results: round.results.map((r) => {
+			if (r.correct) return r;
+			const hit = byKey.get(r.item.key);
+			if (!hit) return r;
+			return { ...r, correct: true, userInput: hit.userInput };
+		}),
+	}));
+}
+
+function peekPracticeResume(state: unknown): PracticeResumeState | undefined {
+	return (state as { practiceResume?: PracticeResumeState } | null)
+		?.practiceResume;
+}
+
 export default function EnglishLearningPracticePage() {
 	const { t } = useI18n();
+	const location = useLocation();
 	const [searchParams, setSearchParams] = useSearchParams();
 
 	const initialContentKind = useMemo(
@@ -77,21 +110,33 @@ export default function EnglishLearningPracticePage() {
 		[searchParams],
 	);
 
+	// 报告续练：首帧就挡住 Setup，避免闪配置页
+	const bootResumeRef = useRef(peekPracticeResume(location.state));
+	const [resumeLoading, setResumeLoading] = useState(() => {
+		const r = bootResumeRef.current;
+		return Boolean(r && r.intent !== 'setup');
+	});
+
 	const [phase, setPhase] = useState<PracticePhase>('setup');
 	const [config, setConfig] = useState<PracticeSetupConfig | null>(null);
 	const [queue, setQueue] = useState<PracticeItem[]>([]);
 	const [index, setIndex] = useState(0);
-	const [results, setResults] = useState<PracticeAttemptResult[]>([]);
+	const [, setResults] = useState<PracticeAttemptResult[]>([]);
+	const [sessionRounds, setSessionRounds] = useState<PracticeSessionRound[]>(
+		[],
+	);
 	const [sessionCursor, setSessionCursor] =
 		useState<PracticeSessionCursor | null>(null);
 	const [practicedKeys, setPracticedKeys] = useState<string[]>([]);
 	const [continueLoading, setContinueLoading] = useState(false);
+	const [sessionReportId, setSessionReportId] = useState<string | null>(null);
 
 	useEffect(() => {
 		return () => stopAllPlayback();
 	}, []);
 
 	const skipRunResetRef = useRef(false);
+	const resumeHandledRef = useRef(false);
 
 	const markPracticeRunning = useCallback(
 		(mode: PracticeMode) => {
@@ -128,15 +173,18 @@ export default function EnglishLearningPracticePage() {
 		setQueue([]);
 		setIndex(0);
 		setResults([]);
+		setSessionRounds([]);
 		setSessionCursor(null);
 		setPracticedKeys([]);
+		setSessionReportId(null);
 	}, []);
 
-	const onStarted = useCallback(
+	const startRunning = useCallback(
 		(
 			items: PracticeItem[],
 			setup: PracticeSetupConfig,
 			cursor: PracticeSessionCursor,
+			opts?: { clearRounds?: boolean },
 		) => {
 			setConfig(setup);
 			setSessionCursor(cursor);
@@ -144,21 +192,34 @@ export default function EnglishLearningPracticePage() {
 			setQueue(items);
 			setIndex(0);
 			setResults([]);
+			if (opts?.clearRounds !== false) {
+				setSessionRounds([]);
+				setSessionReportId(null);
+			}
 			markPracticeRunning(setup.mode);
 			setPhase('running');
-
-			// 经典句：开局先 cacheOnly 灌内存，miss 再异步补模型
 			const classicItems = items.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
 				prefetchSentenceWordAnnotationsBatch(
 					classicItems.map((it) => ({
 						english: it.english,
-						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
 				);
 			}
 		},
 		[markPracticeRunning],
+	);
+
+	const onStarted = useCallback(
+		(
+			items: PracticeItem[],
+			setup: PracticeSetupConfig,
+			cursor: PracticeSessionCursor,
+		) => {
+			startRunning(items, setup, cursor, { clearRounds: true });
+		},
+		[startRunning],
 	);
 
 	const onRetryWrong = useCallback(
@@ -167,25 +228,24 @@ export default function EnglishLearningPracticePage() {
 			const n = wrongQueue.length;
 			const stepped = Math.ceil(n / 10) * 10;
 			const count = Math.min(100, Math.max(10, stepped)) as PracticeCountOption;
-			const nextConfig: PracticeSetupConfig = {
+			setConfig({
 				...config,
 				contentKind: config.contentKind,
 				count,
 				isRetryWrong: true,
-			};
-			setConfig(nextConfig);
-			setPracticedKeys((prev) => mergePracticedKeys(prev, wrongQueue));
+			});
 			setQueue(wrongQueue);
 			setIndex(0);
 			setResults([]);
+			// 保留 sessionRounds / sessionReportId / practicedKeys / cursor
+			markPracticeRunning(config.mode);
 			setPhase('running');
-			markPracticeRunning(nextConfig.mode);
 			const classicItems = wrongQueue.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
 				prefetchSentenceWordAnnotationsBatch(
 					classicItems.map((it) => ({
 						english: it.english,
-						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
 				);
 			}
@@ -223,7 +283,7 @@ export default function EnglishLearningPracticePage() {
 			setQueue(items);
 			setIndex(0);
 			setResults([]);
-			// 继续练习是新一轮词，不再带「重练错题」标题后缀
+			// 保留 sessionRounds / sessionReportId
 			if (config.isRetryWrong) {
 				setConfig({ ...config, isRetryWrong: false });
 			}
@@ -233,7 +293,7 @@ export default function EnglishLearningPracticePage() {
 				prefetchSentenceWordAnnotationsBatch(
 					classicItems.map((it) => ({
 						english: it.english,
-						words: segmentEnglishSentence(it.english).map((t) => t.raw),
+						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
 				);
 			}
@@ -264,19 +324,140 @@ export default function EnglishLearningPracticePage() {
 		resetToSetup();
 	}, [phase, resetToSetup, searchParams]);
 
-	const onStepComplete = useCallback((result: PracticeAttemptResult) => {
-		setResults((prev) => [...prev, result]);
-		setIndex((prevIndex) => {
-			const nextIndex = prevIndex + 1;
-			setQueue((q) => {
-				if (nextIndex >= q.length) {
-					setPhase('summary');
+	// 报告详情续练：location.state 注入
+	useEffect(() => {
+		if (resumeHandledRef.current) return;
+		const resume = peekPracticeResume(location.state);
+		if (!resume) return;
+		resumeHandledRef.current = true;
+		void (async () => {
+			try {
+				if (resume.intent === 'setup') {
+					resetToSetup();
+					clearPracticeRunning();
+					return;
 				}
-				return q;
+				if (resume.intent === 'retryWrong' && resume.retryItems?.length) {
+					setConfig({ ...resume.config, isRetryWrong: true });
+					setSessionCursor(emptyCursor());
+					setPracticedKeys(resume.excludeKeys);
+					setQueue(resume.retryItems);
+					setIndex(0);
+					setResults([]);
+					setSessionRounds(resume.priorRounds ?? []);
+					setSessionReportId(resume.reportId ?? null);
+					markPracticeRunning(resume.config.mode);
+					setPhase('running');
+					const classicItems = resume.retryItems.filter(isPracticeClassicItem);
+					if (classicItems.length > 0) {
+						prefetchSentenceWordAnnotationsBatch(
+							classicItems.map((it) => ({
+								english: it.english,
+								words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
+							})),
+						);
+					}
+					return;
+				}
+				if (resume.intent === 'continue') {
+					setContinueLoading(true);
+					try {
+						const { items, cursor } = await fetchPracticeContinueQueue({
+							contentKind: resume.config.contentKind,
+							source: resume.config.source,
+							count: resume.config.count,
+							order: resume.config.order,
+							libraryId: resume.config.libraryId,
+							streamId: resume.config.streamId,
+							poolTotal: resume.config.poolTotal,
+							cursor: emptyCursor(),
+							excludeKeys: resume.excludeKeys,
+						});
+						if (items.length === 0) {
+							Toast({
+								type: 'warning',
+								title: t('englishLearning.practice.continueEmpty'),
+							});
+							resetToSetup();
+							return;
+						}
+						setConfig({ ...resume.config, isRetryWrong: false });
+						setSessionCursor(cursor);
+						setPracticedKeys(mergePracticedKeys(resume.excludeKeys, items));
+						setQueue(items);
+						setIndex(0);
+						setResults([]);
+						// 带入报告历轮 + 原 reportId，本轮完成后接第 N+1 轮并覆盖保存
+						setSessionRounds(resume.priorRounds ?? []);
+						setSessionReportId(resume.reportId ?? null);
+						markPracticeRunning(resume.config.mode);
+						setPhase('running');
+					} catch (e) {
+						Toast({
+							type: 'error',
+							title:
+								e instanceof Error
+									? e.message
+									: t('englishLearning.practice.loadFailed'),
+						});
+						resetToSetup();
+					} finally {
+						setContinueLoading(false);
+					}
+				}
+			} finally {
+				setResumeLoading(false);
+			}
+		})();
+	}, [
+		clearPracticeRunning,
+		location.state,
+		markPracticeRunning,
+		resetToSetup,
+		t,
+	]);
+
+	const onStepComplete = useCallback(
+		(result: PracticeAttemptResult) => {
+			const retryPass = Boolean(config?.isRetryWrong);
+			setResults((prev) => {
+				const next = [...prev, result];
+				setIndex((prevIndex) => {
+					const nextIndex = prevIndex + 1;
+					setQueue((q) => {
+						if (nextIndex >= q.length) {
+							if (retryPass) {
+								setSessionRounds((rounds) =>
+									applyRetryCorrections(rounds, next),
+								);
+								setConfig((c) => (c ? { ...c, isRetryWrong: false } : c));
+							} else {
+								setSessionRounds((rounds) => {
+									const maxIdx = rounds.reduce(
+										(m, r) => Math.max(m, r.roundIndex),
+										0,
+									);
+									return [
+										...rounds,
+										{
+											roundIndex: maxIdx + 1,
+											results: next,
+											completedAt: new Date().toISOString(),
+										},
+									];
+								});
+							}
+							setPhase('summary');
+						}
+						return q;
+					});
+					return nextIndex;
+				});
+				return next;
 			});
-			return nextIndex;
-		});
-	}, []);
+		},
+		[config?.isRetryWrong],
+	);
 
 	const onGoPrevious = useCallback(() => {
 		stopAllPlayback();
@@ -291,6 +472,11 @@ export default function EnglishLearningPracticePage() {
 	const currentItem = queue[index];
 
 	const shellTitle = useMemo(() => {
+		if (resumeLoading) {
+			return initialContentKind === 'classic'
+				? t('route.englishLearning.practice.classicTitle')
+				: t('route.englishLearning.practice.title');
+		}
 		if (phase === 'setup') {
 			if (initialSource === 'review') {
 				return t('route.englishLearning.review.title');
@@ -303,7 +489,7 @@ export default function EnglishLearningPracticePage() {
 		return initialContentKind === 'classic'
 			? t('route.englishLearning.practice.classicTitle')
 			: t('route.englishLearning.practice.title');
-	}, [initialContentKind, initialSource, phase, t]);
+	}, [initialContentKind, initialSource, phase, resumeLoading, t]);
 
 	const shellSubtitle = useMemo(() => {
 		if (phase !== 'running' || !config) return undefined;
@@ -329,7 +515,11 @@ export default function EnglishLearningPracticePage() {
 				) : undefined
 			}
 		>
-			{phase === 'setup' ? (
+			{resumeLoading ? (
+				<div className="flex flex-1 items-center justify-center py-16">
+					<Loading />
+				</div>
+			) : phase === 'setup' ? (
 				<Setup
 					initialContentKind={initialContentKind}
 					initialSource={initialSource}
@@ -344,7 +534,7 @@ export default function EnglishLearningPracticePage() {
 					onStarted={onStarted}
 				/>
 			) : null}
-			{phase === 'running' && config && currentItem ? (
+			{!resumeLoading && phase === 'running' && config && currentItem ? (
 				<Session
 					mode={config.mode}
 					item={currentItem}
@@ -359,11 +549,16 @@ export default function EnglishLearningPracticePage() {
 					}
 				/>
 			) : null}
-			{phase === 'summary' && config ? (
+			{!resumeLoading &&
+			phase === 'summary' &&
+			config &&
+			sessionRounds.length > 0 ? (
 				<Summary
-					results={results}
+					rounds={sessionRounds}
 					practicedTotal={practicedKeys.length}
 					config={config}
+					sessionReportId={sessionReportId}
+					onSessionReportId={setSessionReportId}
 					continueLoading={continueLoading}
 					onRetryWrong={onRetryWrong}
 					onContinuePractice={() => void onContinuePractice()}

@@ -27,14 +27,14 @@ import {
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
-import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import { Entry } from '../../components/entry';
+import { CornerFab } from '../../components/list';
+import { Card } from '../../components/vocab';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -235,12 +235,11 @@ export function VocabularyLibrarySection({
 		],
 	);
 
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			items.length,
-			Boolean(libraryId) && items.length > 0,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		items.length,
+		Boolean(libraryId) && items.length > 0,
+	);
 
 	if (!libraryId) {
 		return (
@@ -276,7 +275,7 @@ export function VocabularyLibrarySection({
 					</span>
 				</div>
 				<div className="flex shrink-0 flex-nowrap items-center gap-3">
-					<EnglishPracticeEntry
+					<Entry
 						variant="text"
 						disabled={total <= 0}
 						practice={{
@@ -313,10 +312,7 @@ export function VocabularyLibrarySection({
 						ref={scrollViewportRef}
 						className="relative min-h-0 h-full p-4"
 						viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-						onScroll={composeViewportScroll(
-							onViewportScroll,
-							onScrollCornerFab,
-						)}
+						onScroll={composeViewportScroll(onViewportScroll, onCornerFab)}
 					>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -344,7 +340,7 @@ export function VocabularyLibrarySection({
 										const favBusy = favoriteActionKey === wordKey;
 										return (
 											<div data-library-item-id={item.id} className="h-full">
-												<VocabularyWordCard
+												<Card
 													variant="library"
 													data={item}
 													playing={playing}
@@ -400,7 +396,7 @@ export function VocabularyLibrarySection({
 							</div>
 						)}
 					</ScrollArea>
-					<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+					<CornerFab mode={mode} onClick={onCornerFabClick} />
 				</div>
 			)}
 		</div>

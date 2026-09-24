@@ -10,7 +10,8 @@
 | `session/` | 单题卡：字段网格、叠层壳、软揭示、错题底栏、紧凑布局 |
 | `prompt/` | 作答题干：听写 `DictationPromptBody`、拼写 `SpellingPromptBody`、共享播放控件 |
 | `reveal/` | 完整揭示：`RevealedPanelInner`、`revealedDetailRows` |
-| `summary/` | 结算统计、错题列表、操作按钮 |
+
+共用结算板见上级：`../components/result`（`Board` / `Actions` / `Stats` 等）。
 
 ## 单题三阶段
 
@@ -24,4 +25,4 @@
 - 壳组件：`'./components/shell'`
 - 作答题干：`'./components/prompt'`
 - 揭示：`'./components/reveal'`
-- 结算：`'./components/summary'`
+- 结算：`'../components/result'`

@@ -1510,10 +1510,14 @@ export type EnglishVocabularyMistakeBatchItem = EnglishVocabularyItem & {
 
 export const batchAddEnglishVocabularyMistakes = async (
 	items: EnglishVocabularyMistakeBatchItem[],
+	options?: { source?: string },
 ) => {
 	return await http.post<{ added: number; updated: number; skipped: number }>(
 		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/batch`,
-		{ items },
+		{
+			items,
+			...(options?.source ? { source: options.source } : {}),
+		},
 	);
 };
 
@@ -1898,11 +1902,23 @@ export type EnglishPracticeReportItem = {
 	pos?: string;
 };
 
+export type EnglishPracticeReportRound = {
+	roundIndex: number;
+	completedAt?: string;
+	items: EnglishPracticeReportItem[];
+};
+
+export type EnglishPracticeReportSourceMeta = {
+	libraryId?: string;
+	streamId?: string;
+	poolTotal?: number;
+};
+
 export type EnglishPracticeReportListEntry = {
 	id: string;
 	title: string;
 	contentKind: 'vocab' | 'classic';
-	mode: 'dictation' | 'spelling';
+	mode: 'dictation' | 'spelling' | 'recognition';
 	source: string;
 	sourceTitle: string;
 	correctCount: number;
@@ -1916,12 +1932,14 @@ export type EnglishPracticeReportDetail = EnglishPracticeReportListEntry & {
 	order: 'random' | 'sequential';
 	count: number;
 	items: EnglishPracticeReportItem[];
+	rounds?: EnglishPracticeReportRound[];
+	sourceMeta?: EnglishPracticeReportSourceMeta | null;
 };
 
 export type CreateEnglishPracticeReportPayload = {
 	reportId: string;
 	contentKind: 'vocab' | 'classic';
-	mode: 'dictation' | 'spelling';
+	mode: 'dictation' | 'spelling' | 'recognition';
 	source: string;
 	order: 'random' | 'sequential';
 	count: number;
@@ -1930,6 +1948,8 @@ export type CreateEnglishPracticeReportPayload = {
 	isRetryWrong?: boolean;
 	saveMode?: 'manual' | 'auto';
 	items: EnglishPracticeReportItem[];
+	rounds?: EnglishPracticeReportRound[];
+	sourceMeta?: EnglishPracticeReportSourceMeta;
 };
 
 export const createEnglishPracticeReport = async (

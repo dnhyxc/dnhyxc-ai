@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import { SegmentationLine } from '../../components/SegmentationLine';
+import { Segment } from '../../components/vocab';
 import { practicePanelBodyClass } from '../../practice/components/session/PanelLayout';
 import { FieldCells } from '../../practice/components/session/PracticeFieldGrid';
 import type { DailyVocabCard } from '../types';
@@ -68,7 +68,7 @@ export function buildDailyFeedbackDetailRows(
 				key="seg"
 				label={t('englishLearning.practice.hintLabelSegmentation')}
 			>
-				<SegmentationLine segmentation={segmentationText} />
+				<Segment segmentation={segmentationText} />
 			</FieldCells>,
 		);
 	}

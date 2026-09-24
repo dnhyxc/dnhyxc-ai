@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { isPracticeSpacePlayShortcut } from '../../practice/utils/keyboard';
+import {
+	isPracticeShiftSpacePlayShortcut,
+	isPracticeSpacePlayShortcut,
+	isPracticeToggleIpaShortcut,
+	isPracticeTogglePosShortcut,
+} from '../../practice/utils/keyboard';
 import type { DailyCardStep } from '../types';
 
 function isKeyboardTargetInField(target: EventTarget | null): boolean {
@@ -11,25 +16,74 @@ function isKeyboardTargetInField(target: EventTarget | null): boolean {
 	return Boolean(el.closest('[contenteditable="true"]'));
 }
 
-export function useDailySessionKeyboard(args: {
+export type DailySessionKeyboardArgs = {
 	step: DailyCardStep;
 	submitting?: boolean;
+	/** 听写/看中写词槽：Shift+空格播报、Ctrl+Shift+P/I 切换词性/音标 */
+	spellBoard?: boolean;
+	canToggleMeta?: boolean;
 	playWord: (options?: { force?: boolean }) => Promise<void>;
 	onStartQuiz: () => void;
 	onContinue: () => void | Promise<void>;
-}) {
-	const { step, submitting = false, playWord, onStartQuiz, onContinue } = args;
+	onTogglePos?: () => void;
+	onToggleIpa?: () => void;
+};
+
+export function useDailySessionKeyboard(args: DailySessionKeyboardArgs) {
+	const {
+		step,
+		submitting = false,
+		spellBoard = false,
+		canToggleMeta = false,
+		playWord,
+		onStartQuiz,
+		onContinue,
+		onTogglePos,
+		onToggleIpa,
+	} = args;
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.repeat) return;
 			const inField = isKeyboardTargetInField(e.target);
 
+			if (
+				spellBoard &&
+				step === 'quiz' &&
+				isPracticeShiftSpacePlayShortcut(e)
+			) {
+				e.preventDefault();
+				void playWord();
+				return;
+			}
+
 			if (isPracticeSpacePlayShortcut(e) && !inField) {
 				if (step === 'study' || step === 'quiz' || step === 'feedback') {
 					e.preventDefault();
 					void playWord();
 				}
+				return;
+			}
+
+			if (
+				spellBoard &&
+				step === 'quiz' &&
+				canToggleMeta &&
+				isPracticeTogglePosShortcut(e)
+			) {
+				e.preventDefault();
+				onTogglePos?.();
+				return;
+			}
+
+			if (
+				spellBoard &&
+				step === 'quiz' &&
+				canToggleMeta &&
+				isPracticeToggleIpaShortcut(e)
+			) {
+				e.preventDefault();
+				onToggleIpa?.();
 				return;
 			}
 
@@ -64,5 +118,15 @@ export function useDailySessionKeyboard(args: {
 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [step, submitting, playWord, onStartQuiz, onContinue]);
+	}, [
+		canToggleMeta,
+		onContinue,
+		onStartQuiz,
+		onToggleIpa,
+		onTogglePos,
+		playWord,
+		spellBoard,
+		step,
+		submitting,
+	]);
 }

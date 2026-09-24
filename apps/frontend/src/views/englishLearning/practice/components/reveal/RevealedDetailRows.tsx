@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import { SegmentationLine } from '../../../components/SegmentationLine';
+import { Segment } from '../../../components/vocab';
 import type { PracticeClassicItem, PracticeItem } from '../../types';
 import { posAbbrToZh } from '../../utils/wordMeta';
 import { practicePanelBodyClass } from '../session/PanelLayout';
@@ -66,7 +66,7 @@ export function buildVocabRevealedDetailRows(
 				key="seg"
 				label={t('englishLearning.practice.hintLabelSegmentation')}
 			>
-				<SegmentationLine segmentation={item.segmentation} />
+				<Segment segmentation={item.segmentation} />
 			</FieldCells>,
 		);
 	}

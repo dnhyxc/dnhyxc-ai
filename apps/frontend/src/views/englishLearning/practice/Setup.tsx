@@ -19,7 +19,7 @@ import {
 	getEnglishPracticePoolTotal,
 	resolveEnglishPracticePoolKey,
 } from '@/store/englishPracticePool';
-import { SessionHeader } from '../components/SessionHeader';
+import { Head } from '../components/shell';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from './constants';
 import type {
 	PracticeCountOption,
@@ -328,7 +328,7 @@ export function Setup({
 
 	return (
 		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
-			<SessionHeader className="pl-3.5 pr-1.5" trailing={headerExtra}>
+			<Head className="pl-4 pr-2" trailing={headerExtra}>
 				<span className="min-w-0 truncate">
 					{sourceDisplayTitle ?? t('englishLearning.practice.sourceResolving')}
 				</span>
@@ -337,7 +337,7 @@ export function Setup({
 						{poolCountLabel}
 					</span>
 				) : null}
-			</SessionHeader>
+			</Head>
 
 			<div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden p-4">
 				{/* 卡片按内容高度（max-h-33），多余空间由底部弹性区吸收，一屏无滚动 */}

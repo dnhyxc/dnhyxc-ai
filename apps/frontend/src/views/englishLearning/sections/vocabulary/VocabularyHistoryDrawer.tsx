@@ -11,7 +11,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { Entry } from '../../components/entry';
 
 /** 与知识库列表一致：hover 时标题右侧预留 */
 const ROW_HOVER_PR = [
@@ -94,8 +94,8 @@ function VocabularyHistoryDrawerInner({
 							const isStreaming =
 								EnglishPackStore.vocabLoading &&
 								EnglishPackStore.vocabActiveStreamId === h.streamId;
-							const showPracticeEntry = h.wordCount > 0;
-							const actionCount = (showPracticeEntry ? 1 : 0) + 1;
+							const showEntry = h.wordCount > 0;
+							const actionCount = (showEntry ? 1 : 0) + 1;
 							const hoverPr =
 								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
@@ -156,8 +156,8 @@ function VocabularyHistoryDrawerInner({
 										</div>
 									) : (
 										<div className={ROW_ACTIONS_CLASS}>
-											{showPracticeEntry ? (
-												<EnglishPracticeEntry
+											{showEntry ? (
+												<Entry
 													variant="icon"
 													disabled={busy || deleting}
 													practice={{

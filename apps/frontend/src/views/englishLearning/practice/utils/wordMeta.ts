@@ -53,6 +53,9 @@ const POS_TONES: readonly PosTone[] = [
 export function posTone(posZh: string): PosTone {
 	const direct = POS_TONE[posZh];
 	if (direct) return direct;
+	// 名词/动词 → 取首段色调
+	const head = posZh.split('/')[0]?.trim() ?? '';
+	if (head && POS_TONE[head]) return POS_TONE[head]!;
 	if (posZh.endsWith('短语')) {
 		return POS_TONE[posZh.slice(0, -2)] ?? 'other';
 	}
@@ -100,7 +103,7 @@ function posParts(pos: string): string[] {
 	return pos
 		.trim()
 		.toLowerCase()
-		.split('.')
+		.split(/[./]+/)
 		.map((s) => s.trim())
 		.filter(Boolean);
 }
@@ -122,7 +125,9 @@ export function splitPhraseIpa(
 
 /**
  * 英文词性缩写 → 中文。
- * 单词性走表；phr.n. / n.phr. 这类合成标记变成「名词短语」，色调跟核心词性。
+ * - 单词性走表
+ * - phr.n. / n.phr. →「名词短语」
+ * - n./v. / adj./n. →「名词/动词」（多词性用 / 拼接）
  */
 export function posAbbrToZh(pos: string): string {
 	const raw = pos.trim();
@@ -136,6 +141,10 @@ export function posAbbrToZh(pos: string): string {
 		const zh = POS_ZH[cores[0]!];
 		if (zh && zh !== '短语') return `${zh}短语`;
 		return '短语';
+	}
+	if (cores.length > 1) {
+		const zhs = cores.map((c) => POS_ZH[c]);
+		if (zhs.every((z): z is string => Boolean(z))) return zhs.join('/');
 	}
 	return raw;
 }

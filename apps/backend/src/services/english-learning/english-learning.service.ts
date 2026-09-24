@@ -150,7 +150,10 @@ import {
 import {
 	EnglishPracticeReport,
 	type PracticeReportItemSnapshot,
+	type PracticeReportRoundSnapshot,
+	type PracticeReportSourceMeta,
 } from './entity/english-practice-report.entity';
+
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import {
@@ -5168,14 +5171,19 @@ ${existingHintBlock}
 
 	/**
 	 * 批量加入错题集：新词形插入；已存在且本轮错拼不同则更新 lastUserInput；错拼相同则跳过。
+	 * source 仅写入新建行，不覆盖已有来源。
 	 */
 	async batchAddVocabularyMistakes(
 		userId: number,
 		items: VocabularyMistakeBatchItemDto[],
+		source?: string,
 	): Promise<{ added: number; updated: number; skipped: number }> {
 		if (!items.length) {
 			return { added: 0, updated: 0, skipped: 0 };
 		}
+
+		const sourceTag =
+			typeof source === 'string' ? source.trim().slice(0, 32) : '';
 
 		const byKey = new Map<string, VocabularyMistakeBatchItemDto>();
 		for (const item of items) {
@@ -5231,6 +5239,7 @@ ${existingHintBlock}
 							: '',
 					translationZh: item.translationZh ?? '',
 					example: item.example ?? '',
+					source: sourceTag,
 					lastUserInput: this.normalizeMistakeLastUserInput(
 						item.lastUserInput,
 						500,
@@ -5269,15 +5278,31 @@ ${existingHintBlock}
 			where: { userId, id },
 			select: ['wordKey'],
 		});
-		const r = await this.vocabMistakeRepo.delete({ userId, id });
-		if ((r.affected ?? 0) > 0 && row?.wordKey) {
-			await this.practiceReviewStateRepo.delete({
-				userId,
-				contentKind: 'vocab',
-				itemKey: row.wordKey,
-			});
+		if (row) {
+			const r = await this.vocabMistakeRepo.delete({ userId, id });
+			if ((r.affected ?? 0) > 0 && row.wordKey) {
+				await this.practiceReviewStateRepo.delete({
+					userId,
+					contentKind: 'vocab',
+					itemKey: row.wordKey,
+				});
+			}
+			return { removed: (r.affected ?? 0) > 0 };
 		}
-		return { removed: (r.affected ?? 0) > 0 };
+		// 今日复习列表可能展示记词快照 id：仅移出复习调度，不删记词记录
+		const daily = await this.dailyMemorizeRecordRepo.findOne({
+			where: { userId, id },
+			select: ['wordKey'],
+		});
+		if (!daily?.wordKey) {
+			return { removed: false };
+		}
+		const rs = await this.practiceReviewStateRepo.delete({
+			userId,
+			contentKind: 'vocab',
+			itemKey: daily.wordKey,
+		});
+		return { removed: (rs.affected ?? 0) > 0 };
 	}
 
 	async removeVocabularyMistakesBatch(
@@ -5290,21 +5315,35 @@ ${existingHintBlock}
 		}
 		const rows = await this.vocabMistakeRepo.find({
 			where: { userId, id: In(unique) },
-			select: ['wordKey'],
+			select: ['id', 'wordKey'],
 		});
+		const mistakeIds = new Set(rows.map((row) => row.id));
 		const r = await this.vocabMistakeRepo.delete({
 			userId,
 			id: In(unique),
 		});
-		const wordKeys = rows.map((row) => row.wordKey).filter(Boolean);
-		if (wordKeys.length > 0) {
+		const wordKeys = new Set(rows.map((row) => row.wordKey).filter(Boolean));
+		const leftoverIds = unique.filter((id) => !mistakeIds.has(id));
+		let dailyDismissed = 0;
+		if (leftoverIds.length > 0) {
+			const dailyRows = await this.dailyMemorizeRecordRepo.find({
+				where: { userId, id: In(leftoverIds) },
+				select: ['wordKey'],
+			});
+			for (const d of dailyRows) {
+				if (!d.wordKey) continue;
+				wordKeys.add(d.wordKey);
+				dailyDismissed += 1;
+			}
+		}
+		if (wordKeys.size > 0) {
 			await this.practiceReviewStateRepo.delete({
 				userId,
 				contentKind: 'vocab',
-				itemKey: In(wordKeys),
+				itemKey: In([...wordKeys]),
 			});
 		}
-		return { removedCount: r.affected ?? 0 };
+		return { removedCount: (r.affected ?? 0) + dailyDismissed };
 	}
 
 	async listVocabularyMistakesPage(
@@ -5529,7 +5568,7 @@ ${existingHintBlock}
 		};
 	}
 
-	/** 错题新入库 / 错拼更新：标记为今日待复习（不触碰仅跳过的旧错题） */
+	/** 错题新入库 / 错拼更新：标记为今日待复习，并重置间隔（当作新错） */
 	private async markMistakesDueForReview(
 		userId: number,
 		contentKind: 'vocab' | 'classic',
@@ -5567,7 +5606,42 @@ ${existingHintBlock}
 		}
 	}
 
-	/** 今日待复习数量：仅统计已到期且错题仍存在的条目 */
+	/** 仅把 nextReviewAt 拨到现在（保留 SRS 进度），用于今日记词整场入「今日复习」 */
+	private async markReviewDueNow(
+		userId: number,
+		contentKind: 'vocab' | 'classic',
+		itemKeys: string[],
+	): Promise<void> {
+		const unique = [...new Set(itemKeys.map((k) => k.trim()).filter(Boolean))];
+		if (unique.length === 0) return;
+
+		const now = new Date();
+		const defaults = defaultReviewStateForNewMistake();
+
+		for (const itemKey of unique) {
+			let state = await this.practiceReviewStateRepo.findOne({
+				where: { userId, contentKind, itemKey },
+			});
+			if (!state) {
+				state = this.practiceReviewStateRepo.create({
+					userId,
+					contentKind,
+					itemKey,
+					nextReviewAt: now,
+					intervalDays: defaults.intervalDays,
+					repetitions: defaults.repetitions,
+					easeFactor: defaults.easeFactor.toFixed(2),
+					lastResult: 'wrong',
+					lastPracticedAt: null,
+				});
+			} else {
+				state.nextReviewAt = now;
+			}
+			await this.practiceReviewStateRepo.save(state);
+		}
+	}
+
+	/** 今日待复习数量：到期且仍有内容可练（错题或记词快照） */
 	async getPracticeReviewSummary(userId: number): Promise<{
 		vocabDue: number;
 		classicDue: number;
@@ -5581,8 +5655,8 @@ ${existingHintBlock}
 	}
 
 	/**
-	 * 今日待复习分页列表：review_state ⋈ 错题，按到期时间升序。
-	 * 返回字段与错题集列表同构，便于前端复用卡片与移除接口。
+	 * 今日待复习分页列表：review_state ⋈ 内容源，按到期时间升序。
+	 * 词汇：优先错题快照，否则今日记词快照。返回字段与错题集列表同构。
 	 */
 	async listPracticeReviewDuePage(
 		userId: number,
@@ -5639,11 +5713,7 @@ ${existingHintBlock}
 			.take(opts.limit);
 
 		if (opts.contentKind === 'vocab') {
-			qb.innerJoin(
-				EnglishVocabularyMistake,
-				'm',
-				'm.userId = rs.userId AND m.wordKey = rs.itemKey',
-			);
+			this.joinVocabReviewContent(qb);
 		} else {
 			qb.innerJoin(
 				EnglishClassicQuoteMistake,
@@ -5659,10 +5729,7 @@ ${existingHintBlock}
 		const keys = states.map((s) => s.itemKey);
 
 		if (opts.contentKind === 'vocab') {
-			const rows = await this.vocabMistakeRepo.find({
-				where: { userId, wordKey: In(keys) },
-			});
-			const byKey = new Map(rows.map((r) => [r.wordKey, r] as const));
+			const byKey = await this.loadVocabReviewSnapshots(userId, keys);
 			const ordered = keys
 				.map((k) => byKey.get(k))
 				.filter((r): r is NonNullable<typeof r> => r != null);
@@ -5673,12 +5740,12 @@ ${existingHintBlock}
 					ordered.map((r) => ({
 						id: r.id,
 						word: r.word,
-						ipa: r.ipa ?? '',
-						pos: r.pos ?? '',
-						segmentation: r.segmentation ?? '',
-						translationZh: r.translationZh ?? '',
-						example: r.example ?? '',
-						lastUserInput: r.lastUserInput ?? '',
+						ipa: r.ipa,
+						pos: r.pos,
+						segmentation: r.segmentation,
+						translationZh: r.translationZh,
+						example: r.example,
+						lastUserInput: r.lastUserInput,
 						createdAt: r.createdAt.toISOString(),
 					})),
 				),
@@ -5706,6 +5773,97 @@ ${existingHintBlock}
 		};
 	}
 
+	/** 词汇复习内容：错题 ∪ 今日记词快照（至少一侧有行） */
+	private joinVocabReviewContent(
+		qb: SelectQueryBuilder<EnglishPracticeReviewState>,
+	): void {
+		qb.leftJoin(
+			EnglishVocabularyMistake,
+			'm',
+			'm.userId = rs.userId AND m.wordKey = rs.itemKey',
+		)
+			.leftJoin(
+				EnglishDailyMemorizeRecord,
+				'd',
+				'd.userId = rs.userId AND d.wordKey = rs.itemKey',
+			)
+			.andWhere('(m.id IS NOT NULL OR d.id IS NOT NULL)');
+	}
+
+	/** 优先错题快照，否则记词快照（id 用于列表移除） */
+	private async loadVocabReviewSnapshots(
+		userId: number,
+		keys: string[],
+	): Promise<
+		Map<
+			string,
+			{
+				id: string;
+				word: string;
+				ipa: string;
+				pos: string;
+				segmentation: string;
+				translationZh: string;
+				example: string;
+				lastUserInput: string;
+				createdAt: Date;
+			}
+		>
+	> {
+		const unique = [...new Set(keys.map((k) => k.trim()).filter(Boolean))];
+		const out = new Map<
+			string,
+			{
+				id: string;
+				word: string;
+				ipa: string;
+				pos: string;
+				segmentation: string;
+				translationZh: string;
+				example: string;
+				lastUserInput: string;
+				createdAt: Date;
+			}
+		>();
+		if (unique.length === 0) return out;
+
+		const [dailies, mistakes] = await Promise.all([
+			this.dailyMemorizeRecordRepo.find({
+				where: { userId, wordKey: In(unique) },
+			}),
+			this.vocabMistakeRepo.find({
+				where: { userId, wordKey: In(unique) },
+			}),
+		]);
+		for (const d of dailies) {
+			out.set(d.wordKey, {
+				id: d.id,
+				word: d.word,
+				ipa: d.ipa ?? '',
+				pos: d.pos ?? '',
+				segmentation: d.segmentation ?? '',
+				translationZh: d.translationZh ?? '',
+				example: d.example ?? '',
+				lastUserInput: '',
+				createdAt: d.practicedAt ?? d.createdAt,
+			});
+		}
+		for (const m of mistakes) {
+			out.set(m.wordKey, {
+				id: m.id,
+				word: m.word,
+				ipa: m.ipa ?? '',
+				pos: m.pos ?? '',
+				segmentation: m.segmentation ?? '',
+				translationZh: m.translationZh ?? '',
+				example: m.example ?? '',
+				lastUserInput: m.lastUserInput ?? '',
+				createdAt: m.createdAt,
+			});
+		}
+		return out;
+	}
+
 	private async countDueReviewJoined(
 		userId: number,
 		contentKind: 'vocab' | 'classic',
@@ -5718,11 +5876,7 @@ ${existingHintBlock}
 			.andWhere('rs.nextReviewAt <= :now', { now });
 
 		if (contentKind === 'vocab') {
-			qb.innerJoin(
-				EnglishVocabularyMistake,
-				'm',
-				'm.userId = rs.userId AND m.wordKey = rs.itemKey',
-			);
+			this.joinVocabReviewContent(qb);
 		} else {
 			qb.innerJoin(
 				EnglishClassicQuoteMistake,
@@ -5768,39 +5922,36 @@ ${existingHintBlock}
 		const exclude = new Set(
 			(opts.excludeKeys ?? []).map((k) => k.trim()).filter(Boolean),
 		);
-		const take =
-			Math.min(ENGLISH_PRACTICE_SESSION_MAX, Math.max(1, opts.count)) +
-			exclude.size;
-
-		const states = await this.practiceReviewStateRepo.find({
-			where: {
-				userId,
-				contentKind: opts.contentKind,
-				nextReviewAt: LessThanOrEqual(now),
-				...(exclude.size > 0 ? { itemKey: Not(In([...exclude])) } : {}),
-			},
-			order: { nextReviewAt: 'ASC' },
-			take,
-		});
-
-		const picked = states
-			.filter((s) => !exclude.has(s.itemKey))
-			.slice(
-				0,
-				Math.min(ENGLISH_PRACTICE_SESSION_MAX, Math.max(1, opts.count)),
-			);
-
-		if (picked.length === 0) {
-			return { items: [] };
-		}
-
-		const keys = picked.map((s) => s.itemKey);
+		const want = Math.min(
+			ENGLISH_PRACTICE_SESSION_MAX,
+			Math.max(1, opts.count),
+		);
 
 		if (opts.contentKind === 'vocab') {
-			const rows = await this.vocabMistakeRepo.find({
-				where: { userId, wordKey: In(keys) },
-			});
-			const byKey = new Map(rows.map((r) => [r.wordKey, r] as const));
+			const qb = this.practiceReviewStateRepo
+				.createQueryBuilder('rs')
+				.where('rs.userId = :userId', { userId })
+				.andWhere('rs.contentKind = :contentKind', { contentKind: 'vocab' })
+				.andWhere('rs.nextReviewAt <= :now', { now })
+				.orderBy('rs.nextReviewAt', 'ASC')
+				.take(want + exclude.size);
+			if (exclude.size > 0) {
+				qb.andWhere('rs.itemKey NOT IN (:...excludeKeys)', {
+					excludeKeys: [...exclude],
+				});
+			}
+			this.joinVocabReviewContent(qb);
+			const states = await qb.getMany();
+			const picked = states
+				.filter((s) => !exclude.has(s.itemKey))
+				.slice(0, want);
+			if (picked.length === 0) {
+				return { items: [] };
+			}
+			const byKey = await this.loadVocabReviewSnapshots(
+				userId,
+				picked.map((s) => s.itemKey),
+			);
 			const items: Array<{
 				contentKind: 'vocab';
 				key: string;
@@ -5817,13 +5968,13 @@ ${existingHintBlock}
 				if (!row) continue;
 				items.push({
 					contentKind: 'vocab',
-					key: row.wordKey,
+					key: s.itemKey,
 					word: row.word,
-					ipa: row.ipa ?? '',
-					pos: row.pos ?? '',
-					segmentation: row.segmentation ?? '',
-					translationZh: row.translationZh ?? '',
-					example: row.example ?? '',
+					ipa: row.ipa,
+					pos: row.pos,
+					segmentation: row.segmentation,
+					translationZh: row.translationZh,
+					example: row.example,
 					favoriteId: null,
 				});
 			}
@@ -5832,6 +5983,25 @@ ${existingHintBlock}
 			};
 		}
 
+		const take = want + exclude.size;
+		const states = await this.practiceReviewStateRepo.find({
+			where: {
+				userId,
+				contentKind: 'classic',
+				nextReviewAt: LessThanOrEqual(now),
+				...(exclude.size > 0 ? { itemKey: Not(In([...exclude])) } : {}),
+			},
+			order: { nextReviewAt: 'ASC' },
+			take,
+		});
+
+		const picked = states.filter((s) => !exclude.has(s.itemKey)).slice(0, want);
+
+		if (picked.length === 0) {
+			return { items: [] };
+		}
+
+		const keys = picked.map((s) => s.itemKey);
 		const rows = await this.classicQuoteMistakeRepo.find({
 			where: { userId, contentKey: In(keys) },
 		});
@@ -5860,8 +6030,8 @@ ${existingHintBlock}
 	}
 
 	/**
-	 * 今日记词场次结算。
-	 * 词汇库随机练完：写入错题集（供「今日复习」听写/拼写）、记词记录与 SRS
+	 * 今日记词场次结算：写入记词记录与 SRS；本场练过的词全部进入今日复习。
+	 * 错题集由结算页「加入错题集」手动写入，此处不自动加入。
 	 */
 	async recordDailyMemorizeAttempts(
 		userId: number,
@@ -5871,12 +6041,7 @@ ${existingHintBlock}
 		mistakeAdded: number;
 		mistakeSkipped: number;
 	}> {
-		let mistakeAdded = 0;
-		let mistakeSkipped = 0;
 		if (dto.vocabItems?.length) {
-			const res = await this.batchAddVocabularyMistakes(userId, dto.vocabItems);
-			mistakeAdded = res.added;
-			mistakeSkipped = res.skipped;
 			await this.upsertDailyMemorizeRecords(
 				userId,
 				dto.vocabItems,
@@ -5887,7 +6052,12 @@ ${existingHintBlock}
 			userId,
 			dto.attempts,
 		);
-		return { updated, mistakeAdded, mistakeSkipped };
+		const vocabKeys = dto.attempts
+			.filter((a) => a.contentKind === 'vocab')
+			.map((a) => a.itemKey?.trim())
+			.filter((k): k is string => Boolean(k));
+		await this.markReviewDueNow(userId, 'vocab', vocabKeys);
+		return { updated, mistakeAdded: 0, mistakeSkipped: 0 };
 	}
 
 	private async upsertDailyMemorizeRecords(
@@ -6042,7 +6212,7 @@ ${existingHintBlock}
 		return { updated };
 	}
 
-	/** 练习报告：按 reportId 幂等插入一场 */
+	/** 练习报告：按 reportId 幂等插入；已存在则覆盖更新（多轮续写） */
 	async createPracticeReport(
 		userId: number,
 		dto: CreatePracticeReportDto,
@@ -6054,21 +6224,9 @@ ${existingHintBlock}
 		createdAt: string;
 		created: boolean;
 	}> {
-		const existing = await this.practiceReportRepo.findOne({
-			where: { id: dto.reportId, userId },
-		});
-		if (existing) {
-			return {
-				id: existing.id,
-				title: existing.title,
-				correctCount: existing.correctCount,
-				totalCount: existing.totalCount,
-				createdAt: existing.createdAt.toISOString(),
-				created: false,
-			};
-		}
-
-		const items: PracticeReportItemSnapshot[] = dto.items.map((it) => ({
+		const mapItem = (
+			it: CreatePracticeReportDto['items'][number],
+		): PracticeReportItemSnapshot => ({
 			itemKey: it.itemKey.trim(),
 			contentKind: it.contentKind,
 			userInput: it.userInput,
@@ -6077,36 +6235,111 @@ ${existingHintBlock}
 			translationZh: it.translationZh,
 			...(it.ipa?.trim() ? { ipa: it.ipa.trim() } : {}),
 			...(it.pos?.trim() ? { pos: it.pos.trim() } : {}),
-		}));
+		});
+
+		const items: PracticeReportItemSnapshot[] = dto.items.map(mapItem);
 		if (items.some((it) => !it.itemKey || !it.answerText.trim())) {
 			throw new BadRequestException('报告条目缺少 itemKey 或 answerText');
 		}
-		if (items.length > ENGLISH_PRACTICE_SESSION_MAX) {
+		const maxItems = ENGLISH_PRACTICE_SESSION_MAX * 20;
+		if (items.length > maxItems) {
 			throw new BadRequestException('报告条目过多');
 		}
 
+		const rounds =
+			dto.rounds && dto.rounds.length > 0
+				? dto.rounds.map((r) => ({
+						roundIndex: r.roundIndex,
+						...(r.completedAt ? { completedAt: r.completedAt } : {}),
+						items: r.items.map(mapItem),
+					}))
+				: [
+						{
+							roundIndex: 1,
+							items,
+						},
+					];
+
+		const sourceMeta = dto.sourceMeta
+			? {
+					...(dto.sourceMeta.libraryId?.trim()
+						? { libraryId: dto.sourceMeta.libraryId.trim() }
+						: {}),
+					...(dto.sourceMeta.streamId?.trim()
+						? { streamId: dto.sourceMeta.streamId.trim() }
+						: {}),
+					...(dto.sourceMeta.poolTotal != null && dto.sourceMeta.poolTotal > 0
+						? { poolTotal: dto.sourceMeta.poolTotal }
+						: {}),
+				}
+			: null;
+		const metaOrNull =
+			sourceMeta && Object.keys(sourceMeta).length > 0 ? sourceMeta : null;
+
 		const correctCount = items.filter((it) => it.correct).length;
 		const totalCount = items.length;
+		const title = dto.title.trim().slice(0, 240) || '练习报告';
+		const sourceTitle = (dto.sourceTitle ?? '').trim().slice(0, 200);
+		const source = dto.source.trim().slice(0, 32);
+		const isRetryWrong = Boolean(dto.isRetryWrong);
+		const saveMode = dto.saveMode === 'auto' ? 'auto' : 'manual';
+
+		const existing = await this.practiceReportRepo.findOne({
+			where: { id: dto.reportId, userId },
+		});
+		if (existing) {
+			existing.contentKind = dto.contentKind;
+			existing.mode = dto.mode;
+			existing.source = source;
+			existing.order = dto.order;
+			existing.count = dto.count;
+			existing.sourceTitle = sourceTitle;
+			existing.title = title;
+			existing.correctCount = correctCount;
+			existing.totalCount = totalCount;
+			existing.items = items;
+			existing.rounds = rounds;
+			existing.sourceMeta = metaOrNull;
+			existing.isRetryWrong = isRetryWrong;
+			existing.saveMode = saveMode;
+			await this.practiceReportRepo.save(existing);
+			// ponytail: CreateDateColumn 不会被 save 改掉；续练覆盖时刷新为最近保存时间
+			const now = new Date();
+			await this.practiceReportRepo.update(
+				{ id: existing.id, userId },
+				{ createdAt: now },
+			);
+			return {
+				id: existing.id,
+				title: existing.title,
+				correctCount: existing.correctCount,
+				totalCount: existing.totalCount,
+				createdAt: now.toISOString(),
+				created: false,
+			};
+		}
+
 		const row = this.practiceReportRepo.create({
 			id: dto.reportId,
 			userId,
 			contentKind: dto.contentKind,
 			mode: dto.mode,
-			source: dto.source.trim().slice(0, 32),
+			source,
 			order: dto.order,
 			count: dto.count,
-			sourceTitle: (dto.sourceTitle ?? '').trim().slice(0, 200),
-			title: dto.title.trim().slice(0, 240) || '练习报告',
+			sourceTitle,
+			title,
 			correctCount,
 			totalCount,
 			items,
-			isRetryWrong: Boolean(dto.isRetryWrong),
-			saveMode: dto.saveMode === 'auto' ? 'auto' : 'manual',
+			rounds,
+			sourceMeta: metaOrNull,
+			isRetryWrong,
+			saveMode,
 		});
 		try {
 			await this.practiceReportRepo.save(row);
 		} catch (e) {
-			// 并发同 id：再读一次当作幂等成功
 			const raced = await this.practiceReportRepo.findOne({
 				where: { id: dto.reportId, userId },
 			});
@@ -6145,7 +6378,7 @@ ${existingHintBlock}
 			id: string;
 			title: string;
 			contentKind: 'vocab' | 'classic';
-			mode: 'dictation' | 'spelling';
+			mode: 'dictation' | 'spelling' | 'recognition';
 			source: string;
 			sourceTitle: string;
 			correctCount: number;
@@ -6205,7 +6438,7 @@ ${existingHintBlock}
 		id: string;
 		title: string;
 		contentKind: 'vocab' | 'classic';
-		mode: 'dictation' | 'spelling';
+		mode: 'dictation' | 'spelling' | 'recognition';
 		source: string;
 		order: 'random' | 'sequential';
 		count: number;
@@ -6215,6 +6448,8 @@ ${existingHintBlock}
 		isRetryWrong: boolean;
 		saveMode: 'manual' | 'auto';
 		items: PracticeReportItemSnapshot[];
+		rounds: PracticeReportRoundSnapshot[] | null;
+		sourceMeta: PracticeReportSourceMeta | null;
 		createdAt: string;
 	}> {
 		const row = await this.practiceReportRepo.findOne({
@@ -6237,6 +6472,8 @@ ${existingHintBlock}
 			isRetryWrong: row.isRetryWrong,
 			saveMode: row.saveMode,
 			items: row.items ?? [],
+			rounds: row.rounds ?? null,
+			sourceMeta: row.sourceMeta ?? null,
 			createdAt: row.createdAt.toISOString(),
 		};
 	}
@@ -6348,8 +6585,8 @@ ${existingHintBlock}
 	}
 
 	/**
-	 * 重置词汇库记词进度：清空记词记录，并移除对应词的错题集与间隔复习状态，
-	 * 使这些词可再次进入词汇库随机池。
+	 * 重置词汇库记词进度：清空记词记录与对应复习状态；
+	 * 错题集仅移除来源为今日记词（source=dailyMemorize）的条目。
 	 */
 	async resetDailyMemorizeLibraryProgress(userId: number): Promise<{
 		recordsRemoved: number;
@@ -6380,6 +6617,7 @@ ${existingHintBlock}
 			const mistakeResult = await this.vocabMistakeRepo.delete({
 				userId,
 				wordKey: In(wordKeys),
+				source: 'dailyMemorize',
 			});
 			mistakesRemoved = mistakeResult.affected ?? 0;
 		}

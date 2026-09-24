@@ -17,7 +17,7 @@ const PANEL_CLASS: Record<DailyFeedbackVariant, string> = {
 	wrong: 'border-rose-500/20 bg-linear-to-b from-rose-500/10 to-transparent',
 };
 
-/** 反馈详情卡（对错文案与收藏/播放已上移到 SessionHeader） */
+/** 反馈详情卡（对错文案与收藏/播放已上移到 Session） */
 export function DailyFeedback({ variant, card, t }: DailyFeedbackProps) {
 	const draftRows = buildDailyFeedbackDetailRows(card, t, false);
 	const compact = isPracticePanelCompact(draftRows.length);

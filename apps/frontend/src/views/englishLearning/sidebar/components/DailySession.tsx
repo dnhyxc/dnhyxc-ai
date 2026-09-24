@@ -12,8 +12,6 @@ import {
 	resetEnglishDailyMemorizeLibrary,
 } from '@/service';
 import englishDailyStore from '@/store/englishDaily';
-import { DailyWordsPerRoundPicker } from '../../daily/components/DailyWordsPerRoundPicker';
-import { useDailyWordCount } from '../../daily/hooks/useDailyWordCount';
 import {
 	countStarterLibraryEligible,
 	countStarterMemorized,
@@ -37,7 +35,6 @@ export const DailySession = observer(function DailySession() {
 	const [memorizedCount, setMemorizedCount] = useState(0);
 	const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 	const [resetting, setResetting] = useState(false);
-	const [wordsPerRound] = useDailyWordCount();
 
 	const libraryCount = englishDailyStore.libraryCount ?? 0;
 
@@ -48,13 +45,17 @@ export const DailySession = observer(function DailySession() {
 			if (hasValidAuthToken()) {
 				const res = await getEnglishDailyMemorizeSummary({ silent: true });
 				englishDailyStore.setLibraryCount(res.data?.libraryCount ?? 0);
+				englishDailyStore.setMemorizedCount(res.data?.memorizedCount ?? 0);
 				setMemorizedCount(res.data?.memorizedCount ?? 0);
 			} else {
 				englishDailyStore.setLibraryCount(countStarterLibraryEligible());
-				setMemorizedCount(countStarterMemorized());
+				const n = countStarterMemorized();
+				englishDailyStore.setMemorizedCount(n);
+				setMemorizedCount(n);
 			}
 		} catch {
 			englishDailyStore.setLibraryCount(0);
+			englishDailyStore.setMemorizedCount(0);
 			setMemorizedCount(0);
 		} finally {
 			setLoading(false);
@@ -71,8 +72,8 @@ export const DailySession = observer(function DailySession() {
 	}, [loadSummary]);
 
 	const isLoggedIn = hasValidAuthToken();
-	const libraryPickCount = Math.min(wordsPerRound, libraryCount);
 	const canReset = !loading && memorizedCount > 0;
+	const canStart = !loading && (!isLoggedIn || libraryCount > 0);
 
 	const onConfirmReset = useCallback(async () => {
 		setResetting(true);
@@ -133,20 +134,15 @@ export const DailySession = observer(function DailySession() {
 						<Spinner className="size-3 text-textcolor/50 mt-0.5" />
 						{t('englishLearning.daily.loading')}
 					</span>
-				) : libraryCount <= 0 ? (
-					t('englishLearning.daily.sidebarDescLibraryEmpty')
 				) : (
-					t('englishLearning.daily.sidebarDescLibrary', {
-						poolCount: libraryCount,
-						sessionCount: libraryPickCount,
-					})
+					t('englishLearning.daily.sidebarDescLibrary')
 				)
 			}
 			actions={[
 				{
 					label: t('englishLearning.daily.startLibrary'),
 					onClick: () => navigate('/english-learning/daily'),
-					disabled: loading || (isLoggedIn && libraryPickCount <= 0),
+					disabled: !canStart,
 					gradientKey: 'daily',
 				},
 				{
@@ -156,9 +152,11 @@ export const DailySession = observer(function DailySession() {
 				},
 			]}
 		>
-			<DailyWordsPerRoundPicker
-				className="mt-3"
-				headerRight={
+			<div className="mt-2 min-w-0">
+				<div className="flex items-center justify-between gap-2">
+					<p className="text-textcolor/45 text-sm font-medium tracking-wide">
+						{t('englishLearning.daily.sidebarStatsLabel')}
+					</p>
 					<button
 						type="button"
 						disabled={!canReset || resetting || loading}
@@ -177,8 +175,36 @@ export const DailySession = observer(function DailySession() {
 							? t('englishLearning.daily.resetting')
 							: t('englishLearning.daily.resetLibrary')}
 					</button>
-				}
-			/>
+				</div>
+				<div className="mt-2 grid grid-cols-2 gap-3">
+					<div
+						className={cn(
+							'flex min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 pt-1.5 pb-2',
+							'border-emerald-500/20 bg-linear-to-r from-emerald-400/10 to-teal-500/10',
+						)}
+					>
+						<span className="text-textcolor/55 shrink-0 text-xs font-medium">
+							{t('englishLearning.daily.sidebarStatMemorized')}
+						</span>
+						<span className="text-emerald-600 dark:text-emerald-400 min-w-0 truncate text-base font-semibold tabular-nums leading-none">
+							{loading ? '…' : memorizedCount}
+						</span>
+					</div>
+					<div
+						className={cn(
+							'flex min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 pt-1.5 pb-2',
+							'border-sky-500/20 bg-linear-to-r from-sky-400/10 to-cyan-500/10',
+						)}
+					>
+						<span className="text-textcolor/55 shrink-0 text-xs font-medium">
+							{t('englishLearning.daily.sidebarStatPending')}
+						</span>
+						<span className="text-sky-700 dark:text-cyan-400 min-w-0 truncate text-base font-semibold tabular-nums leading-none">
+							{loading ? '…' : libraryCount}
+						</span>
+					</div>
+				</div>
+			</div>
 		</EnglishSidebarCard>
 	);
 });

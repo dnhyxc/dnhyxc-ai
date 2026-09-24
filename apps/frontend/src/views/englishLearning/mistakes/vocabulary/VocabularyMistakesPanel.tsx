@@ -32,14 +32,14 @@ import {
 } from '@/store/englishLearningResume';
 import { isTauriRuntime } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { EnglishLearningPanelHeader } from '../../components/EnglishLearningPanelHeader';
-import { ListScrollCornerFab } from '../../components/ListScrollCornerFab';
-import { VocabularyWordCard } from '../../components/VocabularyWordCard';
+import { CornerFab } from '../../components/list';
+import { Panel } from '../../components/shell';
+import { Card } from '../../components/vocab';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
-	useListScrollCornerFab,
-} from '../../hooks/useListScrollCornerFab';
+	useListCornerFab,
+} from '../../hooks/useListCornerFab';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -162,12 +162,11 @@ export function VocabularyMistakesPanel({
 	const showInitialLoading = loading && entries.length === 0;
 	const awaitingGrid = entries.length > 0 && !gridReady;
 	const showEmpty = !loading && entries.length === 0;
-	const { mode, onScrollCornerFab, onScrollCornerFabClick } =
-		useListScrollCornerFab(
-			scrollViewportRef,
-			entries.length,
-			entries.length > 0,
-		);
+	const { mode, onCornerFab, onCornerFabClick } = useListCornerFab(
+		scrollViewportRef,
+		entries.length,
+		entries.length > 0,
+	);
 	const practiceDisabled = loading || totalCount === 0;
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
@@ -421,7 +420,7 @@ export function VocabularyMistakesPanel({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<div className="flex h-full min-h-0 flex-col">
-				<EnglishLearningPanelHeader
+				<Panel
 					titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
 					title={headerTitle}
 					actions={
@@ -441,7 +440,7 @@ export function VocabularyMistakesPanel({
 							exportingDocx={exportingDocx}
 							onExportDocx={handleExportDocx}
 							exportLabel={t('englishLearning.vocab.exportDocx')}
-							showPracticeEntry
+							showEntry
 							practiceContentKind="vocab"
 							practiceSource={isReview ? 'review' : 'mistakes'}
 							practiceDisabled={practiceDisabled}
@@ -465,10 +464,7 @@ export function VocabularyMistakesPanel({
 							ref={scrollViewportRef}
 							className="relative min-h-0 h-full p-4"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!"
-							onScroll={composeViewportScroll(
-								onViewportScroll,
-								onScrollCornerFab,
-							)}
+							onScroll={composeViewportScroll(onViewportScroll, onCornerFab)}
 						>
 							{showEmpty ? (
 								<div className="text-textcolor/60 py-12 text-center text-sm">
@@ -493,7 +489,7 @@ export function VocabularyMistakesPanel({
 											const playKey = `mistake-${row.id}`;
 											const playing = playingKey === playKey;
 											return (
-												<VocabularyWordCard
+												<Card
 													variant="selectable"
 													data={row}
 													selection={{
@@ -549,7 +545,7 @@ export function VocabularyMistakesPanel({
 								</div>
 							)}
 						</ScrollArea>
-						<ListScrollCornerFab mode={mode} onClick={onScrollCornerFabClick} />
+						<CornerFab mode={mode} onClick={onCornerFabClick} />
 					</div>
 				)}
 			</div>
