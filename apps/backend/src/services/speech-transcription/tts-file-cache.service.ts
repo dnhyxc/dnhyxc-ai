@@ -33,8 +33,8 @@ const GC_MIN_INTERVAL_MS = 60_000;
 const GC_BATCH = 32;
 /** 写盘后至少再留这么多可用空间 */
 const DISK_HEADROOM_BYTES = 64 * 1024 * 1024;
-/** 配额计数 TTL：与文件缓存同量级，到期可再扫盘校准 */
-const BYTES_KEY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** 配额计数 TTL：与文件缓存同量级（默认 30 天），到期可再扫盘校准 */
+const BYTES_KEY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * 盘存 MP3；路径索引 + 配额计数走全局 CACHE_MANAGER（与验证码同一条 Redis，不单开连接）。
@@ -46,8 +46,8 @@ export class TtsFileCacheService implements OnModuleInit {
 	private static readonly CTX = TtsFileCacheService.name;
 	private ready = false;
 	private enabled = false;
-	private ttlSec = 604_800;
-	private ttlMs = 604_800_000;
+	private ttlSec = 2_592_000;
+	private ttlMs = 2_592_000_000;
 	/** ≤0 表示不限制体积 */
 	private maxBytes = 2048 * 1024 * 1024;
 	private ttsDir = '';
@@ -87,7 +87,7 @@ export class TtsFileCacheService implements OnModuleInit {
 
 		this.ttlSec = this.parseNum(
 			env[TtsFileCacheEnum.TTS_FILE_CACHE_TTL_SEC],
-			604_800,
+			2_592_000,
 		);
 		this.ttlMs = this.ttlSec * 1000;
 		const maxMb = this.parseNum(

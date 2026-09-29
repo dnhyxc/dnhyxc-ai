@@ -3,7 +3,7 @@ export enum TtsFileCacheEnum {
 	TTS_FILE_CACHE_ENABLED = 'TTS_FILE_CACHE_ENABLED',
 	/**
 	 * tts 文件缓存过期时间（秒）。
-	 * 0 = 不限制 TTL；默认 7 天。
+	 * 0 = 不限制 TTL；默认 30 天（2_592_000）。
 	 */
 	TTS_FILE_CACHE_TTL_SEC = 'TTS_FILE_CACHE_TTL_SEC',
 	/**

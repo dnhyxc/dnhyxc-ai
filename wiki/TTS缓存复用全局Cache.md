@@ -1,8 +1,9 @@
 # TTS 缓存复用全局 Cache（去专用 Redis）
 
 > **文档角色**：已落地实现归档（相对「专用 ioredis + ZSET」中间方案的演进定稿）。  
+> **修订（2026-09-29）**：默认 `TTS_FILE_CACHE_TTL_SEC` **7 天 → 30 天**（`2592000`）；配额 `bytes` key TTL 同步 30 天。  
 > **本仓 wiki 姊妹篇**：[练习请求作用域与预热.md](./练习请求作用域与预热.md)、[词库Cache超时旁路.md](./词库Cache超时旁路.md)、[句内词标注断连取消.md](./句内词标注断连取消.md)。  
-> **remote-docs 补充**：`micro-apps/remote-docs/wiki/english/TTS文件缓存L2持久化.md`（首版 L2，ZSET 已过时）、规划态 `…/wiki/ideas/english/练习听写请求防阻塞.md` §14、`…/wiki/ideas/tts/TTS本地文件缓存.md`。
+> **remote-docs 补充**：`micro-apps/remote-docs/wiki/english/TTS文件缓存L2持久化.md`（首版 L2，ZSET 已过时）、规划态 `…/wiki/ideas/english/练习听写请求防阻塞.md` §14、`…/wiki/ideas/tts/TTS本地文件缓存.md` §0.1。
 
 ## 1. 背景与目标
 
@@ -20,13 +21,21 @@
 | 目标 | 做法 |
 |------|------|
 | 不再单开 Redis | 路径索引 + 配额字节 **只走** Nest 全局 `CACHE_MANAGER`（与验证码同连接） |
-| 过期仍能删 | Keyv 无 ZSET → **磁盘 `mtime` + 游标分批 GC** |
+| 过期仍能删 | Keyv 无 ZSET → **磁盘 `mtime` + 游标分批 GC**；**默认 TTL 30 天** |
 | 配额仍有效 | Cache key `tts:file:v1:bytes` + 进程内存镜像；超预算 / 磁盘不足 **只跳过落盘不删旧** |
 | 不挡音频 | Cache 超时 / 失败 fail-open；响应仍可带内存 Buffer |
 | 不伤 Bull / 验证码 | **不改**全局 Keyv / Bull 连接语义；旁路超时只在业务 `cacheOp` / `getSafe` |
 
 相对 **git HEAD**：`tts-file-cache.*` 为**纯新增**；相对 L2 专题中的 ZSET 方案为**删专用连接、改 GC**。厂商接入（Edge 等）相对 HEAD 为「L1 后插入 L2 get/set」。
 
+### 1.3 TTL 默认修订（2026-09-29）
+
+| 项 | 旧默认 | 新默认 | 代码落点 |
+|----|--------|--------|----------|
+| `TTS_FILE_CACHE_TTL_SEC` | `604800`（7 天） | **`2592000`（30 天 / 一个月）** | `tts-file-cache.service.ts` 字段默认与 `parseNum` 回退；`tts-file-cache.enum.ts` 注释 |
+| 配额 `BYTES_KEY_TTL_MS` | 7 天 | **30 天** | 同文件常量，与文件 TTL 同量级 |
+
+未设 env 时用新默认；`.env` 若已写 `TTS_FILE_CACHE_TTL_SEC` 则以 env 为准。重启 backend 后 `ensureReady` 生效。过期判据仍是盘文件 **mtime**（命中索引不刷新 mtime）。
 ## 2. 改动范围
 
 | 路径 | 说明 |
@@ -571,6 +580,7 @@ export function buildTtsFileIds(input: {
 |----|------|
 | 开关 | `TTS_FILE_CACHE_ENABLED` 默认关；关则与仅 L1 行为一致 |
 | 连接数 | 不再占专用 Redis client；只多几个 KV key |
+| **默认 TTL** | **`2592000` 秒（30 天）**；路径索引与盘 mtime GC、配额 bytes key 同量级；可用 env 覆盖 |
 | 过期 | 看文件 mtime，不是 ZSET score；命中索引**不**刷新 mtime |
 | 配额满 | 仍只跳过新写入 |
 | 多副本 | 共享盘或同 NFS 时 L2 可复用；仅 Cache 索引跨进程 |
@@ -579,7 +589,7 @@ export function buildTtsFileIds(input: {
 
 1. 开启缓存，首合成落盘，二次同参命中（可不打厂商）。
 2. Redis 打满/慢：合成仍返回；日志可有 `TTS cache … skip`。
-3. `TTL_SEC=30` + `touch` 拨旧 mtime → 再 TTS → 日志 GC 删除且文件消失。
+3. 验证默认 TTL：未设 env 时日志应见 `ttlSec=2592000`；或临时 `TTL_SEC=30` + `touch` 拨旧 mtime → 再 TTS → 日志 GC 删除且文件消失。
 4. `MAX_MB` 极小 → `over_budget_*` skip，音频仍正常。
 5. 练习切题：batch 后续句因 `req.aborted` 停止；前端无 abort Toast。
 6. 验证码收发、Bull 队列启动：无 offlineQueue / maxclients 雪崩。
