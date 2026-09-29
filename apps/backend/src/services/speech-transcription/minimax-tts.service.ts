@@ -1,9 +1,22 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+	type LoggerService,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { MinimaxEnum } from '../../enum/config.enum';
 import type { MinimaxTtsDto } from './dto/minimax-tts.dto';
 import { DEFAULT_MINIMAX_TTS_MODEL } from './minimax-tts-models';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
+import {
+	buildTtsFileIds,
+	normalizeTtsText,
+	userIdPart,
+} from './tts-file-cache.keys';
+import { TtsFileCacheService } from './tts-file-cache.service';
 
 const TTS_INPUT_MAX_CHARS = 10_000;
 const TTS_SPEECH_CACHE_MAX = 128;
@@ -69,9 +82,6 @@ type MinimaxT2aChunk = {
  */
 @Injectable()
 export class MinimaxTtsService {
-	// 日志实例，标记当前服务名
-	private readonly logger = new Logger(MinimaxTtsService.name);
-
 	// 简单 LRU（最近最少使用）缓存，缓存的 key 为参数组合，value 为 Buffer 音频
 	private readonly speechCache = new Map<string, Buffer>();
 
@@ -81,6 +91,9 @@ export class MinimaxTtsService {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prefsService: MinimaxTtsPrefsService,
+		private readonly fileCache: TtsFileCacheService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	/**
@@ -400,6 +413,27 @@ export class MinimaxTtsService {
 		});
 	}
 
+	private fileIds(resolved: MinimaxTtsResolved, userId?: number) {
+		return buildTtsFileIds({
+			provider: 'minimax',
+			paramParts: [
+				userIdPart(userId),
+				resolved.model,
+				resolved.voiceId,
+				String(resolved.speed),
+				String(resolved.vol),
+				String(resolved.pitch),
+				resolved.emotion ?? '',
+				String(resolved.sampleRate),
+				String(resolved.bitrate),
+				resolved.format,
+				String(resolved.channel),
+				resolved.languageBoost ?? '',
+			],
+			normalizedText: normalizeTtsText(resolved.text),
+		});
+	}
+
 	/**
 	 * 以非流式方式合成语音，整体返回 Buffer，具备 LRU 缓存
 	 * 命中缓存优先返回缓存，未命中则请求 MiniMax，再缓存结果
@@ -410,7 +444,20 @@ export class MinimaxTtsService {
 		const resolved = this.resolveOptions(dto);
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
-		if (cached) return Buffer.from(cached);
+		if (cached) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				MinimaxTtsService.name,
+			);
+			return Buffer.from(cached);
+		}
+
+		const ids = this.fileIds(resolved, userId);
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			this.setCache(cacheKey, fileHit);
+			return Buffer.from(fileHit);
+		}
 
 		const res = await this.requestMiniMax(resolved, false, userId);
 		const raw = await res.text();
@@ -449,6 +496,7 @@ export class MinimaxTtsService {
 		}
 		const buffer = Buffer.concat(parts); // 合并所有音频片段
 		this.setCache(cacheKey, buffer);
+		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
 		return buffer;
 	}
 
@@ -465,7 +513,19 @@ export class MinimaxTtsService {
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				MinimaxTtsService.name,
+			);
 			yield cached;
+			return;
+		}
+
+		const ids = this.fileIds(resolved, userId);
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			this.setCache(cacheKey, fileHit);
+			yield fileHit;
 			return;
 		}
 
@@ -490,7 +550,9 @@ export class MinimaxTtsService {
 			}
 		}
 		if (parts.length > 0) {
-			this.setCache(cacheKey, Buffer.concat(parts));
+			const buffer = Buffer.concat(parts);
+			this.setCache(cacheKey, buffer);
+			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
 		}
 	}
 

@@ -461,7 +461,7 @@ export function Setup({
 						</section>
 					</div>
 				</div>
-				<div className="flex-1 w-full flex gap-3 flex-col justify-end">
+				<div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-end gap-3">
 					<h2 className={FIELD_LABEL}>
 						{t('englishLearning.practice.startLabel')}
 					</h2>

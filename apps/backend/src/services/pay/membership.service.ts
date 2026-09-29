@@ -1,7 +1,8 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { QueryFailedError, Repository } from 'typeorm';
 
 import { UserService } from '../user/user.service';
@@ -16,13 +17,13 @@ const GRANT_CACHE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class MembershipService {
-	private readonly logger = new Logger(MembershipService.name);
-
 	constructor(
 		private readonly userService: UserService,
 		@InjectRepository(MembershipPaymentGrant)
 		private readonly grantRepo: Repository<MembershipPaymentGrant>,
 		@Inject(CACHE_MANAGER) private readonly cache: Cache,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	private grantCacheKey(grantId: string): string {

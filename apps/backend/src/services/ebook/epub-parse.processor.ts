@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Inject, type LoggerService } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { EbookService } from './ebook.service';
 import { EPUB_PARSE_QUEUE } from './epub-parse.constants';
 
@@ -9,9 +10,11 @@ export type EpubParseJobData = { bookId: string };
 /** ponytail: concurrency=1 避免多本大 EPUB 占满事件循环 */
 @Processor(EPUB_PARSE_QUEUE, { concurrency: 1 })
 export class EpubParseProcessor extends WorkerHost {
-	private readonly logger = new Logger(EpubParseProcessor.name);
-
-	constructor(private readonly ebookService: EbookService) {
+	constructor(
+		private readonly ebookService: EbookService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
+	) {
 		super();
 	}
 

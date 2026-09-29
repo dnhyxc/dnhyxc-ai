@@ -137,6 +137,9 @@ importers:
       install:
         specifier: ^0.13.0
         version: 0.13.0
+      ioredis:
+        specifier: 5.10.0
+        version: 5.10.0
       joi:
         specifier: ^18.0.2
         version: 18.0.2
@@ -11117,8 +11120,7 @@ snapshots:
 
   '@ioredis/commands@1.5.0': {}
 
-  '@ioredis/commands@1.5.1':
-    optional: true
+  '@ioredis/commands@1.5.1': {}
 
   '@isaacs/balanced-match@4.0.1': {}
 
@@ -16249,7 +16251,6 @@ snapshots:
       standard-as-callback: 2.1.0
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   ioredis@5.9.3:
     dependencies:

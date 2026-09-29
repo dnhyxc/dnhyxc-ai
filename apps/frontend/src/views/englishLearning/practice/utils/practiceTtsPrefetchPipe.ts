@@ -1,17 +1,21 @@
 /**
  * 练习听写/拼写：出声后滑动窗口批量预取云端 TTS。
  * 每次 kick 最多拉 ahead 条「尚未预取」的题，合并为一次 HTTP。
+ * cancel / bindSignal 会 abort 在途 batch。
  */
 import { prefetchCloudTtsBatch } from '@/utils/speech';
 
 export type PracticeTtsPipeOptions = {
 	/** 每次 kick 最多新预取条数（单次 batch 目标） */
 	ahead?: number;
+	/** 会话世代 AbortSignal；切题时由 bindSignal 换新 */
+	signal?: AbortSignal;
 };
 
 export type PracticeTtsPrefetchPipe = {
 	kick: (cursorIndex: number) => void;
 	cancel: () => void;
+	bindSignal: (signal: AbortSignal) => void;
 };
 
 /**
@@ -39,6 +43,17 @@ export function planPrefetchBatch(args: {
 	return want;
 }
 
+function linkAbort(parent: AbortSignal | undefined): AbortController {
+	const ac = new AbortController();
+	if (!parent) return ac;
+	if (parent.aborted) {
+		ac.abort();
+		return ac;
+	}
+	parent.addEventListener('abort', () => ac.abort(), { once: true });
+	return ac;
+}
+
 /**
  * 创建管道：每次 kick 至多一次 batch HTTP（最多 ahead 句）。
  */
@@ -53,6 +68,8 @@ export function createPracticeTtsPrefetchPipe(
 	let pumping = false;
 	let pendingKick = false;
 	const started = new Set<number>();
+	let parentSignal = options?.signal;
+	let fetchAc = linkAbort(parentSignal);
 
 	const pump = async () => {
 		if (pumping || cancelled) return;
@@ -74,14 +91,16 @@ export function createPracticeTtsPrefetchPipe(
 					.filter((t): t is string => Boolean(t));
 				if (payload.length === 0) break;
 				try {
-					if (!cancelled) {
-						await prefetchCloudTtsBatch(payload);
+					if (!cancelled && !fetchAc.signal.aborted) {
+						await prefetchCloudTtsBatch(payload, {
+							signal: fetchAc.signal,
+						});
 					}
 				} catch {
-					// 整批失败：播放路径再单条拉
+					// 整批失败 / abort：播放路径再单条拉
 				}
 				// kick 在 await 期间又来：用最新 cursor 再补一轮
-			} while (pendingKick && !cancelled);
+			} while (pendingKick && !cancelled && !fetchAc.signal.aborted);
 		} finally {
 			pumping = false;
 		}
@@ -100,8 +119,14 @@ export function createPracticeTtsPrefetchPipe(
 			}
 			void pump();
 		},
+		bindSignal(signal: AbortSignal) {
+			parentSignal = signal;
+			if (!fetchAc.signal.aborted) fetchAc.abort();
+			fetchAc = linkAbort(parentSignal);
+		},
 		cancel() {
 			cancelled = true;
+			if (!fetchAc.signal.aborted) fetchAc.abort();
 		},
 	};
 }

@@ -6,7 +6,8 @@ import {
 	annotateEnglishSentenceWordsBatch,
 	type EnglishSentenceWordAnnotation,
 } from '@/service';
-import type { SentenceWordMeta } from '../utils/wordMeta';
+import { isPracticeAbortError } from './practiceRequestScope';
+import type { SentenceWordMeta } from './wordMeta';
 
 const cache = new Map<string, SentenceWordMeta[]>();
 /** 同 key 并发只打一次单句接口（开局 miss 补全与 hook 抢首题） */
@@ -59,11 +60,32 @@ function writeAlignedCache(
 	return aligned;
 }
 
-/** 单句标注：内存命中直接返回；同 key 共享 inflight */
+function abortReject(signal: AbortSignal): Promise<never> {
+	return new Promise((_, reject) => {
+		if (signal.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			reject(err);
+			return;
+		}
+		signal.addEventListener(
+			'abort',
+			() => {
+				const err = new Error('Aborted');
+				err.name = 'AbortError';
+				reject(err);
+			},
+			{ once: true },
+		);
+	});
+}
+
+/** 单句标注：内存命中直接返回；同 key 共享 inflight；signal abort 不写缓存 */
 export function ensureSentenceWordAnnotation(params: {
 	english: string;
 	words: string[];
 	silent?: boolean;
+	signal?: AbortSignal;
 }): Promise<SentenceWordMeta[]> {
 	const english = params.english.trim();
 	const words = params.words.map((w) => w.trim()).filter(Boolean);
@@ -71,15 +93,31 @@ export function ensureSentenceWordAnnotation(params: {
 	const hit = cache.get(key);
 	if (hit) return Promise.resolve(hit);
 
+	if (params.signal?.aborted) {
+		const err = new Error('Aborted');
+		err.name = 'AbortError';
+		return Promise.reject(err);
+	}
+
 	const pending = inflight.get(key);
-	if (pending) return pending;
+	if (pending) {
+		return params.signal
+			? Promise.race([pending, abortReject(params.signal)])
+			: pending;
+	}
 
 	const run = annotateEnglishSentenceWords({
 		english,
 		words,
 		silent: params.silent,
+		signal: params.signal,
 	})
 		.then((res) => {
+			if (params.signal?.aborted) {
+				const err = new Error('Aborted');
+				err.name = 'AbortError';
+				throw err;
+			}
 			const aligned =
 				writeAlignedCache(english, words, res.data?.words ?? []) ??
 				words.map(() => ({ posZh: '', ipa: '', meaningZh: '' }));
@@ -100,8 +138,9 @@ function itemKey(it: { english: string; words: string[] }): string {
 function fillMissesWithLlm(
 	misses: { english: string; words: string[] }[],
 	preferFirst: { english: string; words: string[] } | undefined,
+	signal?: AbortSignal,
 ): void {
-	if (misses.length === 0) return;
+	if (misses.length === 0 || signal?.aborted) return;
 
 	// 队列首题若 miss：Session hook 已单句请求，这里跳过避免双打
 	const preferKey = preferFirst ? itemKey(preferFirst) : '';
@@ -110,8 +149,13 @@ function fillMissesWithLlm(
 		: misses;
 	if (rest.length === 0) return;
 
-	void annotateEnglishSentenceWordsBatch({ items: rest, silent: true })
+	void annotateEnglishSentenceWordsBatch({
+		items: rest,
+		silent: true,
+		signal,
+	})
 		.then((res) => {
+			if (signal?.aborted) return;
 			const rows = res.data?.items ?? [];
 			rest.forEach((req, i) => {
 				const row = rows[i];
@@ -119,7 +163,8 @@ function fillMissesWithLlm(
 				writeAlignedCache(req.english, req.words, row.words);
 			});
 		})
-		.catch(() => {
+		.catch((err) => {
+			if (isPracticeAbortError(err)) return;
 			// silent
 		});
 }
@@ -131,14 +176,16 @@ function fillMissesWithLlm(
  */
 export function prefetchSentenceWordAnnotationsBatch(
 	items: { english: string; words: string[] }[],
+	opts?: { signal?: AbortSignal },
 ): void {
+	const signal = opts?.signal;
 	const cleaned = items
 		.map((it) => ({
 			english: it.english.trim(),
 			words: it.words.map((w) => w.trim()).filter(Boolean),
 		}))
 		.filter((it) => it.english && it.words.length > 0);
-	if (cleaned.length === 0) return;
+	if (cleaned.length === 0 || signal?.aborted) return;
 
 	const first = cleaned[0];
 
@@ -146,8 +193,10 @@ export function prefetchSentenceWordAnnotationsBatch(
 		items: cleaned,
 		cacheOnly: true,
 		silent: true,
+		signal,
 	})
 		.then((res) => {
+			if (signal?.aborted) return;
 			const rows = res.data?.items ?? [];
 			const misses: { english: string; words: string[] }[] = [];
 			cleaned.forEach((req, i) => {
@@ -158,10 +207,11 @@ export function prefetchSentenceWordAnnotationsBatch(
 					misses.push(req);
 				}
 			});
-			fillMissesWithLlm(misses, first);
+			fillMissesWithLlm(misses, first, signal);
 		})
-		.catch(() => {
+		.catch((err) => {
+			if (isPracticeAbortError(err) || signal?.aborted) return;
 			// 只读失败：整队走 miss 补全（仍静默）
-			fillMissesWithLlm(cleaned, first);
+			fillMissesWithLlm(cleaned, first, signal);
 		});
 }

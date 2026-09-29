@@ -380,3 +380,51 @@ export function useIncrementalVocabFavoriteStatus(
 		clearVocabularyFavorite,
 	};
 }
+
+/** 练习开局：整队一次写入会话收藏缓存，避免逐题 Toggle 打 status */
+export async function warmVocabFavoriteStatusSession(
+	items: ReadonlyArray<VocabFavoriteListItem>,
+): Promise<void> {
+	if (items.length === 0) return;
+
+	if (itemsEmbedFavoriteId(items)) {
+		for (const item of items) {
+			const wk = normalizeEnglishVocabWordKey(item.word);
+			if (!wk || !('favoriteId' in item)) continue;
+			sessionQueriedWordKeys.add(wk);
+			if (item.favoriteId) {
+				sessionFavoriteIdByWordKey.set(wk, item.favoriteId);
+			} else {
+				sessionFavoriteIdByWordKey.delete(wk);
+			}
+		}
+		bumpVocabFavoriteSession();
+		return;
+	}
+
+	const need: string[] = [];
+	for (const item of items) {
+		const wk = normalizeEnglishVocabWordKey(item.word);
+		if (!wk || sessionQueriedWordKeys.has(wk)) continue;
+		sessionQueriedWordKeys.add(wk);
+		need.push(item.word);
+	}
+	if (need.length === 0) return;
+
+	try {
+		await fetchEnglishVocabularyFavoriteStatus(need, {
+			onPartial: (refs) => {
+				for (const r of refs) {
+					sessionFavoriteIdByWordKey.set(r.wordKey, r.id);
+				}
+				bumpVocabFavoriteSession();
+			},
+		});
+		bumpVocabFavoriteSession();
+	} catch {
+		for (const word of need) {
+			const wk = normalizeEnglishVocabWordKey(word);
+			if (wk) sessionQueriedWordKeys.delete(wk);
+		}
+	}
+}

@@ -1,6 +1,15 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+	type LoggerService,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
+import { buildTtsFileIds, normalizeTtsText } from './tts-file-cache.keys';
+import { TtsFileCacheService } from './tts-file-cache.service';
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'FunAudioLLM/SenseVoiceSmall';
 const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
@@ -38,11 +47,15 @@ function normalizeAsrPlainText(raw: string): string {
  */
 @Injectable()
 export class SiliconflowTranscriptionService {
-	private readonly logger = new Logger(SiliconflowTranscriptionService.name);
 	/** 文本 + 模型/音色参数 → MP3，避免 CosyVoice 每次合成发音漂移 */
 	private readonly ttsSpeechCache = new Map<string, Buffer>();
 
-	constructor(private readonly config: ConfigService) {}
+	constructor(
+		private readonly config: ConfigService,
+		private readonly fileCache: TtsFileCacheService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
+	) {}
 
 	private buildTtsSpeechCacheKey(plain: string): string {
 		return [
@@ -125,7 +138,24 @@ export class SiliconflowTranscriptionService {
 		const cacheKey = this.buildTtsSpeechCacheKey(plain);
 		const cached = this.getTtsSpeechFromCache(cacheKey);
 		if (cached) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				SiliconflowTranscriptionService.name,
+			);
 			return Buffer.from(cached);
+		}
+
+		const model = this.resolveTtsModel();
+		const voice = this.resolveTtsVoice();
+		const ids = buildTtsFileIds({
+			provider: 'siliconflow',
+			paramParts: [model, voice, '1', '0'],
+			normalizedText: normalizeTtsText(plain),
+		});
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			this.setTtsSpeechCache(cacheKey, fileHit);
+			return Buffer.from(fileHit);
 		}
 
 		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
@@ -149,9 +179,9 @@ export class SiliconflowTranscriptionService {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				model: this.resolveTtsModel(),
+				model,
 				input: plain,
-				voice: this.resolveTtsVoice(),
+				voice,
 				response_format: 'mp3',
 				speed: 1,
 				gain: 0,
@@ -170,6 +200,7 @@ export class SiliconflowTranscriptionService {
 
 		const buffer = Buffer.from(await res.arrayBuffer());
 		this.setTtsSpeechCache(cacheKey, buffer);
+		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
 		return buffer;
 	}
 

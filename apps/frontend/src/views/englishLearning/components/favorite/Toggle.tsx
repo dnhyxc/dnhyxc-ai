@@ -45,14 +45,23 @@ function useToggleBindings(props: ToggleProps) {
 	const vocabItem = kind === 'vocab' ? props.item : null;
 	const classicItem = kind === 'classic' ? props.item : null;
 
-	const vocabCardItems = useMemo(
-		() => (vocabItem ? [{ word: vocabItem.word }] : []),
-		[vocabItem?.word],
-	);
-	const classicCardItems = useMemo(
-		() => (classicItem ? [{ english: classicItem.english }] : []),
-		[classicItem?.english],
-	);
+	const vocabCardItems = useMemo(() => {
+		if (!vocabItem) return [];
+		return 'favoriteId' in vocabItem
+			? [{ word: vocabItem.word, favoriteId: vocabItem.favoriteId }]
+			: [{ word: vocabItem.word }];
+	}, [vocabItem]);
+	const classicCardItems = useMemo(() => {
+		if (!classicItem) return [];
+		return 'favoriteId' in classicItem
+			? [
+					{
+						english: classicItem.english,
+						favoriteId: classicItem.favoriteId,
+					},
+				]
+			: [{ english: classicItem.english }];
+	}, [classicItem]);
 
 	const vocabStatus = useIncrementalVocabFavoriteStatus(vocabCardItems);
 	const classicStatus =

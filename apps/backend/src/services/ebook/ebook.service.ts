@@ -5,13 +5,15 @@ import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
+	Inject,
 	Injectable,
-	Logger,
+	type LoggerService,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import type { Response } from 'express';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Brackets, In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
 import { normalizeUploadPublicPath } from '../../utils/upload-paths';
@@ -253,8 +255,6 @@ const DEFAULT_CATEGORY_NAMES: Record<'zh-CN' | 'en-US', string[]> = {
 
 @Injectable()
 export class EbookService {
-	private readonly logger = new Logger(EbookService.name);
-
 	/** ponytail: 大 EPUB 解析可达 60s+，请求侧等待而非立刻 409 */
 	private static readonly PARSE_WAIT_MS = 120_000;
 	private static readonly MAX_PARSE_ATTEMPTS = 3;
@@ -282,6 +282,8 @@ export class EbookService {
 		@InjectQueue(EPUB_PARSE_QUEUE)
 		private readonly epubParseQueue: Queue,
 		private readonly epubParseQueueEvents: EpubParseQueueEvents,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	private toBookDto(book: EbookBook): EbookBookDto {

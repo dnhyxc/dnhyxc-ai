@@ -243,6 +243,21 @@ function wireEnglishLearningSseAbort(
 	};
 }
 
+/** 普通 HTTP：客户端断开时 abort，供 LLM / batch 循环检查 */
+function clientDisconnectSignal(req: Request): AbortSignal {
+	const ac = new AbortController();
+	const onDisconnect = () => {
+		if (!ac.signal.aborted) ac.abort();
+	};
+	if (req.aborted) {
+		queueMicrotask(onDisconnect);
+	} else {
+		req.once('close', onDisconnect);
+		req.once('aborted', onDisconnect);
+	}
+	return ac.signal;
+}
+
 function annotateProgressSnapshot(p: Record<string, unknown>) {
 	const n = (k: string) => {
 		const v = Number(p[k]);
@@ -1061,10 +1076,12 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
+		const signal = clientDisconnectSignal(req);
 		const data = await this.englishLearningService.annotateSentenceWords({
 			userId,
 			english: dto.english,
 			words: dto.words,
+			signal,
 		});
 		return { success: true, data };
 	}
@@ -1079,10 +1096,12 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
+		const signal = clientDisconnectSignal(req);
 		const data = await this.englishLearningService.annotateSentenceWordsBatch({
 			userId,
 			items: dto.items,
 			cacheOnly: dto.cacheOnly === true,
+			signal,
 		});
 		return { success: true, data };
 	}

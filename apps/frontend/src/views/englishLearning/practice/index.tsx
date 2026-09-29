@@ -37,12 +37,17 @@ import {
 } from './utils/item';
 import { parsePracticePoolTotal } from './utils/paths';
 import {
+	createPracticeRequestScope,
+	type PracticeRequestScope,
+} from './utils/practiceRequestScope';
+import {
 	createPracticeTtsPrefetchPipe,
 	type PracticeTtsPrefetchPipe,
 } from './utils/practiceTtsPrefetchPipe';
 import type { PracticeResumeState } from './utils/resumeFromReport';
 import { segmentEnglishSentence } from './utils/segmentSentence';
 import { prefetchSentenceWordAnnotationsBatch } from './utils/sentenceWordAnnotationCache';
+import { warmPracticeFavoriteStatus } from './utils/warmFavoriteStatus';
 
 function parseSource(raw: string | null): PracticeSource {
 	if (
@@ -145,8 +150,26 @@ export default function EnglishLearningPracticePage() {
 	const [continueLoading, setContinueLoading] = useState(false);
 	const [sessionReportId, setSessionReportId] = useState<string | null>(null);
 
+	const ttsPipeRef = useRef<PracticeTtsPrefetchPipe | null>(null);
+	const requestScopeRef = useRef<PracticeRequestScope>(
+		createPracticeRequestScope(),
+	);
+	const [requestSignal, setRequestSignal] = useState<AbortSignal>(
+		() => requestScopeRef.current.signal,
+	);
+
+	const bumpRequestScope = useCallback(() => {
+		const signal = requestScopeRef.current.bump();
+		setRequestSignal(signal);
+		ttsPipeRef.current?.bindSignal(signal);
+		return signal;
+	}, []);
+
 	useEffect(() => {
-		return () => stopAllPlayback();
+		return () => {
+			stopAllPlayback();
+			requestScopeRef.current.dispose();
+		};
 	}, []);
 
 	const skipRunResetRef = useRef(false);
@@ -182,6 +205,9 @@ export default function EnglishLearningPracticePage() {
 
 	const resetToSetup = useCallback(() => {
 		stopAllPlayback();
+		requestScopeRef.current.dispose();
+		ttsPipeRef.current?.cancel();
+		ttsPipeRef.current = null;
 		setPhase('setup');
 		setConfig(null);
 		setQueue([]);
@@ -200,6 +226,7 @@ export default function EnglishLearningPracticePage() {
 			cursor: PracticeSessionCursor,
 			opts?: { clearRounds?: boolean },
 		) => {
+			const signal = bumpRequestScope();
 			setConfig(setup);
 			setSessionCursor(cursor);
 			setPracticedKeys(items.map((i) => i.key).filter(Boolean));
@@ -212,6 +239,7 @@ export default function EnglishLearningPracticePage() {
 			}
 			markPracticeRunning(setup.mode);
 			setPhase('running');
+			warmPracticeFavoriteStatus(items);
 			const classicItems = items.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
 				prefetchSentenceWordAnnotationsBatch(
@@ -219,10 +247,11 @@ export default function EnglishLearningPracticePage() {
 						english: it.english,
 						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
+					{ signal },
 				);
 			}
 		},
-		[markPracticeRunning],
+		[bumpRequestScope, markPracticeRunning],
 	);
 
 	const onStarted = useCallback(
@@ -242,6 +271,7 @@ export default function EnglishLearningPracticePage() {
 			const n = wrongQueue.length;
 			const stepped = Math.ceil(n / 10) * 10;
 			const count = Math.min(100, Math.max(10, stepped)) as PracticeCountOption;
+			const signal = bumpRequestScope();
 			setConfig({
 				...config,
 				contentKind: config.contentKind,
@@ -254,6 +284,7 @@ export default function EnglishLearningPracticePage() {
 			// 保留 sessionRounds / sessionReportId / practicedKeys / cursor
 			markPracticeRunning(config.mode);
 			setPhase('running');
+			warmPracticeFavoriteStatus(wrongQueue);
 			const classicItems = wrongQueue.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
 				prefetchSentenceWordAnnotationsBatch(
@@ -261,16 +292,23 @@ export default function EnglishLearningPracticePage() {
 						english: it.english,
 						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
+					{ signal },
 				);
 			}
 		},
-		[config, markPracticeRunning],
+		[bumpRequestScope, config, markPracticeRunning],
 	);
 
 	const onContinuePractice = useCallback(async () => {
 		if (!config || !sessionCursor) return;
 		setContinueLoading(true);
 		try {
+			const excludeKeys = (() => {
+				const fromRounds = sessionRounds.flatMap((r) =>
+					r.results.map((x) => x.item.key).filter(Boolean),
+				);
+				return [...new Set([...practicedKeys, ...fromRounds])];
+			})();
 			const { items, cursor } = await fetchPracticeContinueQueue({
 				contentKind: config.contentKind,
 				source: config.source,
@@ -280,20 +318,32 @@ export default function EnglishLearningPracticePage() {
 				streamId: config.streamId,
 				poolTotal: config.poolTotal ?? initialPoolTotal,
 				cursor: sessionCursor,
-				excludeKeys: practicedKeys,
+				excludeKeys,
 			});
 			if (items.length === 0) {
+				// 分母按行、去重后已练完：收齐 poolTotal，避免 49/51 假剩余
+				const practiced = excludeKeys.length;
+				if (
+					config.poolTotal != null &&
+					practiced > 0 &&
+					practiced < config.poolTotal
+				) {
+					setConfig({ ...config, poolTotal: practiced });
+				}
 				Toast({
 					type: 'warning',
 					title:
 						config.source === 'review'
 							? t('englishLearning.practice.continueReviewEmpty')
-							: t('englishLearning.practice.continueEmpty'),
+							: config.contentKind === 'classic'
+								? t('englishLearning.practice.continueEmptyClassic')
+								: t('englishLearning.practice.continueEmpty'),
 				});
 				return;
 			}
 			setSessionCursor(cursor);
 			setPracticedKeys((prev) => mergePracticedKeys(prev, items));
+			const signal = bumpRequestScope();
 			setQueue(items);
 			setIndex(0);
 			setResults([]);
@@ -302,6 +352,7 @@ export default function EnglishLearningPracticePage() {
 				setConfig({ ...config, isRetryWrong: false });
 			}
 			setPhase('running');
+			warmPracticeFavoriteStatus(items);
 			const classicItems = items.filter(isPracticeClassicItem);
 			if (classicItems.length > 0) {
 				prefetchSentenceWordAnnotationsBatch(
@@ -309,6 +360,7 @@ export default function EnglishLearningPracticePage() {
 						english: it.english,
 						words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 					})),
+					{ signal },
 				);
 			}
 		} catch (e) {
@@ -322,7 +374,15 @@ export default function EnglishLearningPracticePage() {
 		} finally {
 			setContinueLoading(false);
 		}
-	}, [config, initialPoolTotal, practicedKeys, sessionCursor, t]);
+	}, [
+		bumpRequestScope,
+		config,
+		initialPoolTotal,
+		practicedKeys,
+		sessionCursor,
+		sessionRounds,
+		t,
+	]);
 
 	const onBackToSetup = useCallback(() => {
 		resetToSetup();
@@ -352,6 +412,7 @@ export default function EnglishLearningPracticePage() {
 					return;
 				}
 				if (resume.intent === 'retryWrong' && resume.retryItems?.length) {
+					const signal = bumpRequestScope();
 					setConfig({ ...resume.config, isRetryWrong: true });
 					setSessionCursor(emptyCursor());
 					setPracticedKeys(resume.excludeKeys);
@@ -362,6 +423,7 @@ export default function EnglishLearningPracticePage() {
 					setSessionReportId(resume.reportId ?? null);
 					markPracticeRunning(resume.config.mode);
 					setPhase('running');
+					warmPracticeFavoriteStatus(resume.retryItems);
 					const classicItems = resume.retryItems.filter(isPracticeClassicItem);
 					if (classicItems.length > 0) {
 						prefetchSentenceWordAnnotationsBatch(
@@ -369,6 +431,7 @@ export default function EnglishLearningPracticePage() {
 								english: it.english,
 								words: segmentEnglishSentence(it.english).map((tok) => tok.raw),
 							})),
+							{ signal },
 						);
 					}
 					return;
@@ -376,28 +439,43 @@ export default function EnglishLearningPracticePage() {
 				if (resume.intent === 'continue') {
 					setContinueLoading(true);
 					try {
+						const urlLibraryId = searchParams.get('libraryId') ?? undefined;
+						const urlStreamId = searchParams.get('streamId') ?? undefined;
+						const urlPoolTotal = parsePracticePoolTotal(
+							searchParams.get('poolTotal'),
+						);
 						const { items, cursor } = await fetchPracticeContinueQueue({
 							contentKind: resume.config.contentKind,
 							source: resume.config.source,
 							count: resume.config.count,
 							order: resume.config.order,
-							libraryId: resume.config.libraryId,
-							streamId: resume.config.streamId,
-							poolTotal: resume.config.poolTotal,
+							libraryId: resume.config.libraryId ?? urlLibraryId,
+							streamId: resume.config.streamId ?? urlStreamId,
+							poolTotal: resume.config.poolTotal ?? urlPoolTotal,
 							cursor: emptyCursor(),
 							excludeKeys: resume.excludeKeys,
 						});
 						if (items.length === 0) {
 							Toast({
 								type: 'warning',
-								title: t('englishLearning.practice.continueEmpty'),
+								title:
+									resume.config.contentKind === 'classic'
+										? t('englishLearning.practice.continueEmptyClassic')
+										: t('englishLearning.practice.continueEmpty'),
 							});
 							resetToSetup();
 							return;
 						}
-						setConfig({ ...resume.config, isRetryWrong: false });
+						setConfig({
+							...resume.config,
+							libraryId: resume.config.libraryId ?? urlLibraryId,
+							streamId: resume.config.streamId ?? urlStreamId,
+							poolTotal: resume.config.poolTotal ?? urlPoolTotal,
+							isRetryWrong: false,
+						});
 						setSessionCursor(cursor);
 						setPracticedKeys(mergePracticedKeys(resume.excludeKeys, items));
+						const signal = bumpRequestScope();
 						setQueue(items);
 						setIndex(0);
 						setResults([]);
@@ -406,6 +484,19 @@ export default function EnglishLearningPracticePage() {
 						setSessionReportId(resume.reportId ?? null);
 						markPracticeRunning(resume.config.mode);
 						setPhase('running');
+						warmPracticeFavoriteStatus(items);
+						const classicItems = items.filter(isPracticeClassicItem);
+						if (classicItems.length > 0) {
+							prefetchSentenceWordAnnotationsBatch(
+								classicItems.map((it) => ({
+									english: it.english,
+									words: segmentEnglishSentence(it.english).map(
+										(tok) => tok.raw,
+									),
+								})),
+								{ signal },
+							);
+						}
 					} catch (e) {
 						Toast({
 							type: 'error',
@@ -424,10 +515,12 @@ export default function EnglishLearningPracticePage() {
 			}
 		})();
 	}, [
+		bumpRequestScope,
 		clearPracticeRunning,
 		location.state,
 		markPracticeRunning,
 		resetToSetup,
+		searchParams,
 		t,
 	]);
 
@@ -461,7 +554,10 @@ export default function EnglishLearningPracticePage() {
 									];
 								});
 							}
+							requestScopeRef.current.dispose();
 							setPhase('summary');
+						} else {
+							bumpRequestScope();
 						}
 						return q;
 					});
@@ -470,7 +566,7 @@ export default function EnglishLearningPracticePage() {
 				return next;
 			});
 		},
-		[config?.isRetryWrong],
+		[bumpRequestScope, config?.isRetryWrong],
 	);
 
 	const onGoPrevious = useCallback(() => {
@@ -478,10 +574,11 @@ export default function EnglishLearningPracticePage() {
 		setIndex((i) => {
 			if (i <= 0) return 0;
 			const prev = i - 1;
+			bumpRequestScope();
 			setResults((r) => r.slice(0, prev));
 			return prev;
 		});
-	}, []);
+	}, [bumpRequestScope]);
 
 	const currentItem = queue[index];
 
@@ -489,8 +586,6 @@ export default function EnglishLearningPracticePage() {
 		() => queue.map((it) => getPracticeAnswerText(it).trim()),
 		[queue],
 	);
-
-	const ttsPipeRef = useRef<PracticeTtsPrefetchPipe | null>(null);
 
 	// 进场：会话缓存扩容 + PrefetchPipe；离场 / 换 queue 取消并裁回 LRU
 	useEffect(() => {
@@ -504,6 +599,7 @@ export default function EnglishLearningPracticePage() {
 		ttsPipeRef.current?.cancel();
 		ttsPipeRef.current = createPracticeTtsPrefetchPipe(queueAnswerTexts, {
 			ahead: 5,
+			signal: requestScopeRef.current.signal,
 		});
 		return () => {
 			ttsPipeRef.current?.cancel();
@@ -521,8 +617,10 @@ export default function EnglishLearningPracticePage() {
 		if (phase !== 'running' || !currentItem) return;
 		prefetchMinimaxTtsUserPrefs();
 		const first = getPracticeAnswerText(currentItem).trim();
-		if (first) prefetchCloudTts(first, { whole: true });
-	}, [phase, currentItem]);
+		if (first) {
+			prefetchCloudTts(first, { whole: true, signal: requestSignal });
+		}
+	}, [phase, currentItem, requestSignal]);
 
 	const shellTitle = useMemo(() => {
 		if (resumeLoading) {
@@ -594,6 +692,7 @@ export default function EnglishLearningPracticePage() {
 					itemIndex={index}
 					sourceTitle={config.sourceTitle}
 					onTtsPipelineKick={onTtsPipelineKick}
+					requestSignal={requestSignal}
 					isLastQuestion={index >= queue.length - 1}
 					canGoPrevious={index > 0}
 					onGoPrevious={onGoPrevious}

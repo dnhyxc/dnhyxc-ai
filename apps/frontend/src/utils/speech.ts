@@ -1570,6 +1570,7 @@ export function prefetchCloudTts(
 	rawText: string,
 	options?: Pick<PlayPreferredOptions, 'preferLocal'> & {
 		whole?: boolean;
+		signal?: AbortSignal;
 	},
 ): Promise<TtsSentencePrefetch> | null {
 	if (!shouldUseCloudTts(options)) return null;
@@ -1579,7 +1580,7 @@ export function prefetchCloudTts(
 		options?.whole && cloudPlainWithinSingleLimit(plain)
 			? plain
 			: firstCloudTtsChunkPlain(plain);
-	return startCloudTts(chunkPlain).then((ready) => ({
+	return startCloudTts(chunkPlain, options?.signal).then((ready) => ({
 		plain: chunkPlain,
 		ready,
 	}));
@@ -1599,12 +1600,20 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
 /**
  * 练习预取：多句一次 HTTP（texts[]），写入 LRU；单条失败不影响其余。
  * 厂商仍按句合成，但浏览器只打 1 次接口 / 批。
+ * signal abort 后不写入 LRU。
  */
 export async function prefetchCloudTtsBatch(
 	rawTexts: readonly string[],
-	options?: Pick<PlayPreferredOptions, 'preferLocal'>,
+	options?: Pick<PlayPreferredOptions, 'preferLocal'> & {
+		signal?: AbortSignal;
+	},
 ): Promise<void> {
 	if (!shouldUseCloudTts(options)) return;
+	if (options?.signal?.aborted) {
+		const err = new Error('Aborted');
+		err.name = 'AbortError';
+		throw err;
+	}
 	await ensureMinimaxTtsUserPrefsLoaded();
 
 	const need: string[] = [];
@@ -1638,6 +1647,11 @@ export async function prefetchCloudTtsBatch(
 				: buildMinimaxTtsRequestExtras();
 
 	for (let offset = 0; offset < need.length; offset += TTS_PREFETCH_BATCH_MAX) {
+		if (options?.signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
 		const chunk = need.slice(offset, offset + TTS_PREFETCH_BATCH_MAX);
 		const keys = chunk.map((p) => buildCloudTtsCacheKey(p));
 
@@ -1650,7 +1664,9 @@ export async function prefetchCloudTtsBatch(
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({ texts: chunk, ...bodyExtras }),
+					signal: options?.signal,
 				});
+				if (options?.signal?.aborted) return;
 				if (!res.ok) {
 					throw new Error(`TTS_BATCH_HTTP_${res.status}`);
 				}
@@ -1661,6 +1677,7 @@ export async function prefetchCloudTtsBatch(
 						error?: string;
 					}>;
 				};
+				if (options?.signal?.aborted) return;
 				for (const item of data.items ?? []) {
 					const plain = (item.text ?? '').trim();
 					const b64 = item.audioBase64;
@@ -1696,7 +1713,10 @@ export async function prefetchCloudTtsBatch(
 }
 
 /** 发起云端 TTS 请求；命中 LRU / 进行中请求则复用，避免同文案并发多条 stream */
-async function startCloudTts(plain: string): Promise<CloudTtsReady> {
+async function startCloudTts(
+	plain: string,
+	signal?: AbortSignal,
+): Promise<CloudTtsReady> {
 	await ensureMinimaxTtsUserPrefsLoaded();
 	const cacheKey = buildCloudTtsCacheKey(plain);
 	const cached = getCloudTtsFromCache(plain);
@@ -1704,8 +1724,28 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		return { kind: 'cached', blob: cached, cacheKey };
 	}
 
+	if (signal?.aborted) {
+		const err = new Error('Aborted');
+		err.name = 'AbortError';
+		throw err;
+	}
+
 	const inflight = inflightCloudTts.get(cacheKey);
-	if (inflight) return inflight;
+	if (inflight) {
+		if (!signal) return inflight;
+		return Promise.race([
+			inflight,
+			new Promise<never>((_, reject) => {
+				const onAbort = () => {
+					const err = new Error('Aborted');
+					err.name = 'AbortError';
+					reject(err);
+				};
+				if (signal.aborted) onAbort();
+				else signal.addEventListener('abort', onAbort, { once: true });
+			}),
+		]);
+	}
 
 	const pending = (async (): Promise<CloudTtsReady> => {
 		try {
@@ -1736,7 +1776,14 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 				method: 'POST',
 				headers,
 				body: JSON.stringify({ text: plain, ...bodyExtras }),
+				signal,
 			});
+
+			if (signal?.aborted) {
+				const err = new Error('Aborted');
+				err.name = 'AbortError';
+				throw err;
+			}
 
 			if (!res.ok) {
 				throw new Error(`TTS_HTTP_${res.status}`);
@@ -1744,6 +1791,11 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 
 			// 收齐后再共享：Response body 只能读一次，合并请求必须进缓存
 			const buf = await readResponseBodyAsArrayBuffer(res);
+			if (signal?.aborted) {
+				const err = new Error('Aborted');
+				err.name = 'AbortError';
+				throw err;
+			}
 			if (!buf.byteLength) {
 				throw new Error('TTS_EMPTY_AUDIO');
 			}

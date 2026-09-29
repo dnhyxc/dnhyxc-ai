@@ -1,9 +1,10 @@
 /**
  * 练习词表拉取
  *
- * - **随机**：按 store 总数与题量划分页码（offset = 页码 × 题量）；若命中页不足题量（如最后一页），继续拉其它页补足。
- * - **顺序**：从 offset=0 起，每页步长等于题量。
- * - **继续练习**：顺序拉下一页；随机拉未使用过的页码；均排除已练 wordKey。
+ * - 页大小 = 所选每轮题量；末页可不足一页，仍作为一轮返回
+ * - **顺序**：第 1 轮第 0 页，继续练习第 1 页，以此类推
+ * - **随机**：每轮从未用过的页码中抽一页；页内可再打乱
+ * - 续练排除已练 key；若当前页滤空则跳过再试后续/其它未用页
  */
 import {
 	type EnglishClassicQuoteFavoriteListEntry,
@@ -41,6 +42,7 @@ import type {
 	PracticeSessionParams,
 	PracticeSource,
 } from '../types';
+import { shufflePracticeItems } from './grading';
 import { toPracticeClassicItem, toPracticeVocabItem } from './item';
 
 export const PRACTICE_MAX_WORDS = 100;
@@ -87,7 +89,7 @@ function vocabDailyMemorizeToItem(
 function vocabLibraryRowToItem(
 	row: EnglishVocabularyLibraryItemRow,
 ): PracticeItem {
-	return toPracticeVocabItem(row.word, {
+	const item = toPracticeVocabItem(row.word, {
 		ipa: row.ipa,
 		pos: row.pos,
 		segmentation: row.segmentation,
@@ -95,6 +97,8 @@ function vocabLibraryRowToItem(
 		example: row.example,
 		favoriteId: row.favoriteId ?? null,
 	});
+	// 库内按行练习：与 wordCount 对齐，避免同词多行被 contentKey 合并
+	return { ...item, key: row.id };
 }
 
 function classicFavoriteToItem(
@@ -123,13 +127,15 @@ function classicMistakeToItem(
 function classicLibraryRowToItem(
 	row: EnglishClassicQuotesLibraryItemRow,
 ): PracticeItem {
-	return toPracticeClassicItem({
+	const item = toPracticeClassicItem({
 		english: row.english,
 		translationZh: row.translationZh,
 		source: row.source,
 		noteZh: row.noteZh,
 		favoriteId: row.favoriteId ?? null,
 	});
+	// 库内按行练习：与 quoteCount 对齐，避免同句多行被 contentKey 合并丢题
+	return { ...item, key: row.id };
 }
 
 function dedupeItems(items: PracticeItem[]): PracticeItem[] {
@@ -165,120 +171,22 @@ function pageLimit(pageIndex: number, pageSize: number, total: number): number {
 	);
 }
 
-function pickRandomPageIndex(total: number, pageSize: number): number {
-	const pageCount = getPageCount(total, pageSize);
-	if (pageCount <= 1) return 0;
-	return Math.floor(Math.random() * pageCount);
-}
-
-function pickRandomPageIndexExcluding(
+/** 随机：优先抽一页，其余未用页作后备（命中页滤空时再用） */
+function buildRandomPageTryOrder(
 	total: number,
 	pageSize: number,
-	used: number[],
-): number | null {
-	const pageCount = getPageCount(total, pageSize);
-	if (pageCount <= 1) return 0;
-	const usedSet = new Set(used);
-	const available: number[] = [];
-	for (let i = 0; i < pageCount; i += 1) {
-		if (!usedSet.has(i)) available.push(i);
-	}
-	if (available.length === 0) return null;
-	return available[Math.floor(Math.random() * available.length)]!;
-}
-
-function cursorAfterPages(
-	order: PracticeOrder,
-	hitPageIndices: readonly number[],
-	prev: PracticeSessionCursor,
-): PracticeSessionCursor {
-	if (hitPageIndices.length === 0) return prev;
-	if (order === 'sequential') {
-		const maxPage = Math.max(...hitPageIndices);
-		return {
-			nextSequentialPageIndex: maxPage + 1,
-			usedRandomPageIndices: prev.usedRandomPageIndices,
-		};
-	}
-	const used = new Set(prev.usedRandomPageIndices);
-	for (const pageIndex of hitPageIndices) used.add(pageIndex);
-	return {
-		nextSequentialPageIndex: prev.nextSequentialPageIndex,
-		usedRandomPageIndices: [...used],
-	};
-}
-
-function buildRandomPageTryOrder(total: number, pageSize: number): number[] {
-	const pageCount = getPageCount(total, pageSize);
-	const first = pickRandomPageIndex(total, pageSize);
-	const order: number[] = [first];
-	for (let i = 0; i < pageCount; i += 1) {
-		if (i !== first) order.push(i);
-	}
-	return order;
-}
-
-function buildSequentialPageTryOrder(pageCount: number): number[] {
-	return Array.from({ length: pageCount }, (_, i) => i);
-}
-
-function buildContinueRandomPageTryOrder(
-	total: number,
-	pageSize: number,
-	cursor: PracticeSessionCursor,
+	usedPageIndices: ReadonlySet<number> = new Set(),
 ): number[] {
 	const pageCount = getPageCount(total, pageSize);
-	const freshPage = pickRandomPageIndexExcluding(
-		total,
-		pageSize,
-		cursor.usedRandomPageIndices,
-	);
-	const tryOrder: number[] = [];
-	if (freshPage != null) tryOrder.push(freshPage);
+	const unused: number[] = [];
 	for (let i = 0; i < pageCount; i += 1) {
-		if (!tryOrder.includes(i)) tryOrder.push(i);
+		if (!usedPageIndices.has(i)) unused.push(i);
 	}
-	return tryOrder;
-}
-
-async function collectSessionFromPaginatedPages(
-	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
-	total: number,
-	pageSize: number,
-	pageIndices: readonly number[],
-	order: PracticeOrder,
-	cursor: PracticeSessionCursor,
-	excludeKeys: ReadonlySet<string>,
-): Promise<PracticeSessionFetchResult | null> {
-	const acc: PracticeItem[] = [];
-	const hitPages: number[] = [];
-
-	for (const pageIndex of pageIndices) {
-		if (acc.length >= pageSize) break;
-		const page = await fetchPage(
-			pageOffset(pageIndex, pageSize),
-			pageLimit(pageIndex, pageSize, total),
-		);
-		const exclude = new Set(excludeKeys);
-		for (const item of acc) {
-			if (item.key) exclude.add(item.key);
-		}
-		const chunk = filterUnpracticed(
-			dedupeItems(page.items),
-			exclude,
-			pageSize - acc.length,
-		);
-		if (chunk.length > 0) {
-			hitPages.push(pageIndex);
-			acc.push(...chunk);
-		}
-	}
-
-	if (acc.length === 0 || hitPages.length === 0) return null;
-	return {
-		items: acc.slice(0, pageSize),
-		cursor: cursorAfterPages(order, hitPages, cursor),
-	};
+	if (unused.length === 0) return [];
+	const firstIdx = Math.floor(Math.random() * unused.length);
+	const first = unused[firstIdx]!;
+	const rest = unused.filter((_, i) => i !== firstIdx);
+	return [first, ...rest];
 }
 
 function filterUnpracticed(
@@ -295,6 +203,20 @@ function filterUnpracticed(
 		if (out.length >= count) break;
 	}
 	return out;
+}
+
+/** 拉一页并按已练 key 过滤；不足 pageSize 的末页原样返回 */
+async function fetchRoundPage(
+	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
+	total: number,
+	pageSize: number,
+	pageIndex: number,
+	excludeKeys: ReadonlySet<string>,
+): Promise<PracticeItem[]> {
+	const limit = pageLimit(pageIndex, pageSize, total);
+	if (limit <= 0) return [];
+	const page = await fetchPage(pageOffset(pageIndex, pageSize), limit);
+	return filterUnpracticed(dedupeItems(page.items), excludeKeys, pageSize);
 }
 
 function resolvePoolTotal(
@@ -344,6 +266,11 @@ function buildLivePool(contentKind: PracticeContentKind): PracticeItem[] {
 	);
 }
 
+function emptyCursor(): PracticeSessionCursor {
+	return { nextSequentialPageIndex: 0, usedRandomPageIndices: [] };
+}
+
+/** 首轮：顺序 = 第 0 页；随机 = 抽一未用页 */
 async function fetchInitialFromPaginated(
 	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
 	total: number,
@@ -351,23 +278,50 @@ async function fetchInitialFromPaginated(
 	order: PracticeOrder,
 ): Promise<PracticeSessionFetchResult> {
 	const pageSize = sessionPageSize(count, total);
-	const pageCount = getPageCount(total, pageSize);
-	const pageIndices =
-		order === 'random'
-			? buildRandomPageTryOrder(total, pageSize)
-			: buildSequentialPageTryOrder(pageCount);
-	const result = await collectSessionFromPaginatedPages(
-		fetchPage,
-		total,
-		pageSize,
-		pageIndices,
-		order,
-		emptyCursor(),
-		new Set(),
-	);
-	return result ?? { items: [], cursor: emptyCursor() };
+	if (pageSize <= 0) return { items: [], cursor: emptyCursor() };
+
+	if (order === 'sequential') {
+		const items = await fetchRoundPage(
+			fetchPage,
+			total,
+			pageSize,
+			0,
+			new Set(),
+		);
+		return {
+			items,
+			cursor: {
+				nextSequentialPageIndex: 1,
+				usedRandomPageIndices: [],
+			},
+		};
+	}
+
+	const tryOrder = buildRandomPageTryOrder(total, pageSize);
+	for (const pageIndex of tryOrder) {
+		const items = await fetchRoundPage(
+			fetchPage,
+			total,
+			pageSize,
+			pageIndex,
+			new Set(),
+		);
+		if (items.length === 0) continue;
+		return {
+			items: shufflePracticeItems(items),
+			cursor: {
+				nextSequentialPageIndex: 0,
+				usedRandomPageIndices: [pageIndex],
+			},
+		};
+	}
+	return { items: [], cursor: emptyCursor() };
 }
 
+/**
+ * 续练：顺序下一页；随机抽未用页。
+ * 末页不足每轮题量仍返回；当前页滤空则跳过再试。
+ */
 async function fetchContinueFromPaginated(
 	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
 	total: number,
@@ -378,30 +332,57 @@ async function fetchContinueFromPaginated(
 ): Promise<PracticeSessionFetchResult> {
 	const pageSize = sessionPageSize(count, total);
 	const pageCount = getPageCount(total, pageSize);
+	if (pageSize <= 0 || pageCount <= 0) return { items: [], cursor };
+
 	const exclude = new Set(excludeKeys);
 
-	const pageIndices =
-		order === 'sequential'
-			? Array.from(
-					{ length: Math.max(0, pageCount - cursor.nextSequentialPageIndex) },
-					(_, i) => cursor.nextSequentialPageIndex + i,
-				)
-			: buildContinueRandomPageTryOrder(total, pageSize, cursor);
+	if (order === 'sequential') {
+		let pageIndex = Math.max(0, cursor.nextSequentialPageIndex);
+		while (pageIndex < pageCount) {
+			const items = await fetchRoundPage(
+				fetchPage,
+				total,
+				pageSize,
+				pageIndex,
+				exclude,
+			);
+			const nextCursor: PracticeSessionCursor = {
+				nextSequentialPageIndex: pageIndex + 1,
+				usedRandomPageIndices: cursor.usedRandomPageIndices,
+			};
+			if (items.length > 0) return { items, cursor: nextCursor };
+			pageIndex += 1;
+		}
+		return { items: [], cursor };
+	}
 
-	const result = await collectSessionFromPaginatedPages(
-		fetchPage,
-		total,
-		pageSize,
-		pageIndices,
-		order,
-		cursor,
-		exclude,
-	);
-	return result ?? { items: [], cursor };
-}
-
-function emptyCursor(): PracticeSessionCursor {
-	return { nextSequentialPageIndex: 0, usedRandomPageIndices: [] };
+	const used = new Set(cursor.usedRandomPageIndices);
+	const tryOrder = buildRandomPageTryOrder(total, pageSize, used);
+	for (const pageIndex of tryOrder) {
+		const items = await fetchRoundPage(
+			fetchPage,
+			total,
+			pageSize,
+			pageIndex,
+			exclude,
+		);
+		used.add(pageIndex);
+		if (items.length === 0) continue;
+		return {
+			items: shufflePracticeItems(items),
+			cursor: {
+				nextSequentialPageIndex: cursor.nextSequentialPageIndex,
+				usedRandomPageIndices: [...used],
+			},
+		};
+	}
+	return {
+		items: [],
+		cursor: {
+			nextSequentialPageIndex: cursor.nextSequentialPageIndex,
+			usedRandomPageIndices: [...used],
+		},
+	};
 }
 
 async function fetchFavorites(
@@ -535,9 +516,6 @@ async function fetchLibrary(
 	const libraryId = ctx.libraryId?.trim();
 	if (!libraryId) return { items: [], cursor: emptyCursor() };
 
-	const total = resolvePoolTotal(ctx, poolTotal);
-	if (total == null) return { items: [], cursor: emptyCursor() };
-
 	const fetchPage = async (offset: number, limit: number) => {
 		if (ctx.contentKind === 'classic') {
 			const res = await listEnglishClassicQuotesLibraryItems(libraryId, {
@@ -545,19 +523,41 @@ async function fetchLibrary(
 				offset,
 				silent: true,
 			});
-			return { items: (res.data?.items ?? []).map(classicLibraryRowToItem) };
+			return {
+				items: (res.data?.items ?? []).map(classicLibraryRowToItem),
+				poolSize: res.data?.library?.quoteCount,
+			};
 		}
 		const res = await listEnglishVocabularyLibraryItems(libraryId, {
 			limit,
 			offset,
 			silent: true,
 		});
-		return { items: (res.data?.items ?? []).map(vocabLibraryRowToItem) };
+		return {
+			items: (res.data?.items ?? []).map(vocabLibraryRowToItem),
+			poolSize: res.data?.library?.wordCount,
+		};
+	};
+
+	let total = resolvePoolTotal(ctx, poolTotal);
+	if (total == null) {
+		const probe = await fetchPage(0, 1);
+		total =
+			typeof probe.poolSize === 'number' && probe.poolSize > 0
+				? probe.poolSize
+				: undefined;
+		if (total != null) resolvePoolTotal(ctx, total);
+	}
+	if (total == null) return { items: [], cursor: emptyCursor() };
+
+	const pageFetch = async (offset: number, limit: number) => {
+		const page = await fetchPage(offset, limit);
+		return { items: page.items };
 	};
 
 	if (cursor) {
 		return fetchContinueFromPaginated(
-			fetchPage,
+			pageFetch,
 			total,
 			count,
 			order,
@@ -565,7 +565,7 @@ async function fetchLibrary(
 			excludeKeys,
 		);
 	}
-	return fetchInitialFromPaginated(fetchPage, total, count, order);
+	return fetchInitialFromPaginated(pageFetch, total, count, order);
 }
 
 async function fetchPack(
@@ -811,4 +811,40 @@ export async function fetchPracticeWordPool(params: {
 		streamId: params.streamId,
 	});
 	return items;
+}
+
+/**
+ * ponytail: 顺序续练按页递进；末页不足每轮题量仍返回。
+ * total=51, count=20 → 页 0/1/2，第 3 轮应拿到 11 条。
+ * 库内同句多行必须用 row.id 作 key，否则 10 条会变成 9 条。
+ */
+export function selfCheckSequentialPageRounds(): void {
+	const total = 51;
+	const count = 20;
+	const pageSize = sessionPageSize(count, total);
+	const pageCount = getPageCount(total, pageSize);
+	if (pageSize !== 20 || pageCount !== 3) {
+		throw new Error(
+			`selfCheckSequentialPageRounds: pageSize=${pageSize} pageCount=${pageCount}`,
+		);
+	}
+	const last = pageLimit(2, pageSize, total);
+	if (last !== 11) {
+		throw new Error(`selfCheckSequentialPageRounds: last page=${last}`);
+	}
+	const tryOrder = buildRandomPageTryOrder(total, pageSize, new Set([0, 2]));
+	if (tryOrder.length !== 1 || tryOrder[0] !== 1) {
+		throw new Error(
+			`selfCheckSequentialPageRounds: random unused=${tryOrder.join(',')}`,
+		);
+	}
+	// 同 content 两行：若共用 contentKey，Set 会少 1
+	const rowKeys = ['id-a', 'id-b'];
+	const contentKeys = ['same', 'same'];
+	if (new Set(contentKeys).size !== 1) {
+		throw new Error('selfCheckSequentialPageRounds: content dup fixture');
+	}
+	if (new Set(rowKeys).size !== 2) {
+		throw new Error('selfCheckSequentialPageRounds: row id must stay unique');
+	}
 }

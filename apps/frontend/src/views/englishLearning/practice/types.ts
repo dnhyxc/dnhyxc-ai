@@ -119,7 +119,10 @@ export type BuildEnglishPracticeSearchParamsInput = {
 
 // —— 词表拉取 ——
 
-export type PracticePaginatedPage = { items: PracticeItem[] };
+export type PracticePaginatedPage = {
+	items: PracticeItem[];
+	totalCount?: number;
+};
 
 export type PracticeFetchContext = {
 	contentKind: PracticeContentKind;
@@ -238,6 +241,8 @@ export type SessionProps = {
 	sourceTitle?: string;
 	/** 当前句出声后触发后续题分批预取 */
 	onTtsPipelineKick?: (cursorIndex: number) => void;
+	/** 练习请求世代 AbortSignal */
+	requestSignal?: AbortSignal;
 	/** 当前题为本轮最后一题（答错揭示后按钮文案为「查看练习结果」） */
 	isLastQuestion?: boolean;
 	/** 是否可回到上一题（非本轮第一题） */

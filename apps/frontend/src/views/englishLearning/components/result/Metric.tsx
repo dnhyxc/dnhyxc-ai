@@ -32,12 +32,7 @@ export function Metric({ label, value, tone, compact = false }: MetricProps) {
 			</span>
 			<span
 				className={cn(
-					'text-center font-bold tabular-nums leading-none',
-					typeof value === 'string' && value.includes('/')
-						? compact
-							? 'text-xl'
-							: 'text-2xl'
-						: 'text-3xl',
+					'text-center text-3xl font-bold tabular-nums leading-none',
 					styles.value,
 				)}
 			>

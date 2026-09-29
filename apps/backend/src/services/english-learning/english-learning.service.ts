@@ -7434,6 +7434,7 @@ ${existingHintBlock}
 		userId: number;
 		english: string;
 		words: string[];
+		signal?: AbortSignal;
 	}): Promise<{ words: SentenceWordAnnotationDto[] }> {
 		await this.purgeStaleSentenceWordAnnotationCache();
 
@@ -7456,6 +7457,13 @@ ${existingHintBlock}
 			return { words: hit!.annotations };
 		}
 
+		if (params.signal?.aborted) {
+			this.logger.warn('[EnglishLearning] annotateSentenceWords aborted');
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+
 		const inflight = this.annotateSentenceInflight.get(cacheKey);
 		if (inflight) return inflight;
 
@@ -7465,6 +7473,7 @@ ${existingHintBlock}
 			englishNorm,
 			words,
 			cacheKey,
+			signal: params.signal,
 		}).finally(() => {
 			this.annotateSentenceInflight.delete(cacheKey);
 		});
@@ -7481,6 +7490,7 @@ ${existingHintBlock}
 		userId: number;
 		items: { english: string; words: string[] }[];
 		cacheOnly?: boolean;
+		signal?: AbortSignal;
 	}): Promise<{
 		items: {
 			english: string;
@@ -7574,6 +7584,18 @@ ${existingHintBlock}
 			return { items: out };
 		}
 
+		if (params.signal?.aborted) {
+			this.logger.warn('[EnglishLearning] annotateSentenceWordsBatch aborted');
+			for (const m of misses) {
+				out[m.index] = {
+					english: m.english,
+					words: [],
+					cacheHit: false,
+				};
+			}
+			return { items: out };
+		}
+
 		// 同 cacheKey 去重后，按段一次多句调模型（远少于逐句）
 		const missByKey = new Map<string, NormItem[]>();
 		for (const m of misses) {
@@ -7594,6 +7616,7 @@ ${existingHintBlock}
 							englishNorm: m.englishNorm,
 							words: m.words,
 						})),
+						signal: params.signal,
 					});
 				for (const [cacheKey, words] of annotatedByKey) {
 					for (const g of missByKey.get(cacheKey) ?? []) {
@@ -7605,12 +7628,21 @@ ${existingHintBlock}
 					}
 				}
 			} catch (e) {
-				this.logger.warn(
-					'[EnglishLearning] annotateSentenceWordsBatch multi llm failed',
-					{
-						message: e instanceof Error ? e.message.slice(0, 200) : String(e),
-					},
-				);
+				if (
+					params.signal?.aborted ||
+					(e instanceof Error && e.name === 'AbortError')
+				) {
+					this.logger.warn(
+						'[EnglishLearning] annotateSentenceWordsBatch aborted mid-llm',
+					);
+				} else {
+					this.logger.warn(
+						'[EnglishLearning] annotateSentenceWordsBatch multi llm failed',
+						{
+							message: e instanceof Error ? e.message.slice(0, 200) : String(e),
+						},
+					);
+				}
 				for (const m of misses) {
 					if (!out[m.index]) {
 						out[m.index] = {
@@ -7659,6 +7691,12 @@ ${existingHintBlock}
 			params.chunkSize ?? SENTENCE_WORD_ANNOTATION_BATCH_LLM_CHUNK,
 		);
 		for (let offset = 0; offset < params.items.length; offset += chunkSize) {
+			if (params.signal?.aborted) {
+				this.logger.warn(
+					'[EnglishLearning] annotate multi aborted between chunks',
+				);
+				break;
+			}
 			const chunk = params.items.slice(offset, offset + chunkSize);
 			const payload = {
 				items: this.buildAnnotateLlmPayloadItems(chunk),
@@ -7673,6 +7711,13 @@ ${existingHintBlock}
 					signal: params.signal,
 				});
 			} catch (e) {
+				if (
+					params.signal?.aborted ||
+					(e instanceof Error && e.name === 'AbortError')
+				) {
+					this.logger.warn('[EnglishLearning] annotate multi llm aborted');
+					break;
+				}
 				const raw = e instanceof Error ? e.message : String(e);
 				this.logger.warn(
 					`[EnglishLearning] annotateSentenceWords multi llm failed: ${raw.slice(0, 300)}`,
@@ -7810,8 +7855,14 @@ ${existingHintBlock}
 		englishNorm: string;
 		words: string[];
 		cacheKey: string;
+		signal?: AbortSignal;
 	}): Promise<{ words: SentenceWordAnnotationDto[] }> {
-		const { userId, english, englishNorm, words, cacheKey } = params;
+		const { userId, english, englishNorm, words, cacheKey, signal } = params;
+		if (signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
 		const userPayload = JSON.stringify({ english, words });
 		let text: string;
 		try {
@@ -7820,8 +7871,15 @@ ${existingHintBlock}
 				user: userPayload,
 				maxTokens: 8192,
 				userId,
+				signal,
 			});
 		} catch (e) {
+			if (signal?.aborted || (e instanceof Error && e.name === 'AbortError')) {
+				this.logger.warn('[EnglishLearning] annotateSentenceWords llm aborted');
+				const err = new Error('Aborted');
+				err.name = 'AbortError';
+				throw err;
+			}
 			const raw = e instanceof Error ? e.message : String(e);
 			this.logger.warn(
 				`[EnglishLearning] annotateSentenceWords llm failed: ${raw.slice(0, 300)}`,

@@ -234,6 +234,7 @@ export class SpeechTranscriptionController {
 		const { texts, ...voice } = body;
 		const items: TtsBatchItemResult[] = [];
 		for (const raw of texts) {
+			if (req.aborted) break;
 			const text = typeof raw === 'string' ? raw.trim() : '';
 			if (!text) {
 				items.push({ text: raw ?? '', error: 'EMPTY' });
@@ -264,6 +265,7 @@ export class SpeechTranscriptionController {
 		const { texts, ...voice } = body;
 		const items: TtsBatchItemResult[] = [];
 		for (const raw of texts) {
+			if (req.aborted) break;
 			const text = typeof raw === 'string' ? raw.trim() : '';
 			if (!text) {
 				items.push({ text: raw ?? '', error: 'EMPTY' });
@@ -294,6 +296,7 @@ export class SpeechTranscriptionController {
 		const { texts, ...voice } = body;
 		const items: TtsBatchItemResult[] = [];
 		for (const raw of texts) {
+			if (req.aborted) break;
 			const text = typeof raw === 'string' ? raw.trim() : '';
 			if (!text) {
 				items.push({ text: raw ?? '', error: 'EMPTY' });

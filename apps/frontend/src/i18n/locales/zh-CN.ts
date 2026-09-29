@@ -1142,6 +1142,7 @@ export const zhCN = {
 	'englishLearning.practice.practiceAgain': '重新设置',
 	'englishLearning.practice.continuePractice': '继续练习',
 	'englishLearning.practice.continueEmpty': '没有更多未练过的单词了',
+	'englishLearning.practice.continueEmptyClassic': '没有更多未练过的语句了',
 	'englishLearning.practice.back': '返回',
 	'englishLearning.practice.saveMistakes': '加入错题集',
 	'englishLearning.practice.saveMistakesSuccessTitle': '保存错题集成功',

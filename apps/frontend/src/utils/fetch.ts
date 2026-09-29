@@ -66,12 +66,22 @@ export async function getPlatformFetch(): Promise<typeof globalThis.fetch> {
 	return cachedPlatformFetch;
 }
 
+function isAbortError(error: unknown): boolean {
+	if (!error || typeof error !== 'object') return false;
+	const name = (error as { name?: string }).name;
+	if (name === 'AbortError') return true;
+	const msg = String((error as { message?: unknown }).message ?? '');
+	return /aborted|AbortError/i.test(msg);
+}
+
 // 定义自定义的 HTTP 选项类型
 interface CustomHttpOptions {
 	method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 	headers?: Record<string, string>;
 	body?: string | FormData | Blob | ArrayBuffer | URLSearchParams;
 	timeout?: number;
+	/** 练习切题等：取消在途请求 */
+	signal?: AbortSignal;
 }
 
 // 请求配置接口
@@ -91,6 +101,8 @@ export interface RequestConfig
 	 * 仅当未收到 HTTP response（`canRetry` 内 `!response`）时重试，与 GET 同理。
 	 */
 	retries?: number;
+	/** 传给 fetch；abort 时不 Toast、不重试 */
+	signal?: AbortSignal;
 }
 
 // 响应数据接口
@@ -492,7 +504,14 @@ class HttpClient {
 			headers: finalConfig.headers,
 			timeout: finalConfig.timeout,
 			body: method === 'GET' || method === 'HEAD' ? undefined : body,
+			signal: finalConfig.signal,
 		};
+
+		if (finalConfig.signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
 
 		// ponytail: 线上 Tauri 远程 HTTPS 对所有方法均可能 `error sending request`；canRetry 要求 !response 才重试
 		const defaultRetries = isTauriRuntime() ? 2 : 0;
@@ -536,6 +555,12 @@ class HttpClient {
 					message: '请求成功',
 				};
 			} catch (error) {
+				if (isAbortError(error) || finalConfig.signal?.aborted) {
+					const err = new Error('Aborted');
+					err.name = 'AbortError';
+					throw err;
+				}
+
 				let requestError: RequestError;
 
 				if (

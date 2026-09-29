@@ -36,9 +36,11 @@ export function usePracticePlayback(args: {
 	itemIndex: number;
 	/** 出声后 / 拼写延迟：通知父级 Pipe.kick(cursor) */
 	onPipelineKick?: (cursorIndex: number) => void;
+	/** 会话世代 signal；切题 abort 当前句预取 */
+	signal?: AbortSignal;
 	t: (key: string) => string;
 }) {
-	const { mode, answerText, itemIndex, onPipelineKick, t } = args;
+	const { mode, answerText, itemIndex, onPipelineKick, signal, t } = args;
 	const [playing, setPlaying] = useState(false);
 	const dictationPlayRunRef = useRef(0);
 	const prefetchedCloudRef = useRef<Promise<TtsSentencePrefetch> | null>(null);
@@ -58,13 +60,16 @@ export function usePracticePlayback(args: {
 			prefetchedCloudRef.current = null;
 			return;
 		}
-		prefetchedCloudRef.current = prefetchCloudTts(text, { whole: true });
+		prefetchedCloudRef.current = prefetchCloudTts(text, {
+			whole: true,
+			signal,
+		});
 		// 拼写无自动播：短暂延迟后再 kick，避免与当前句首包抢带宽
 		if (mode !== 'dictation') {
 			const timer = window.setTimeout(() => kickPipeline(), 300);
 			return () => window.clearTimeout(timer);
 		}
-	}, [answerText, mode, kickPipeline]);
+	}, [answerText, mode, kickPipeline, signal]);
 
 	const cancelDictationPlay = useCallback(() => {
 		dictationPlayRunRef.current += 1;

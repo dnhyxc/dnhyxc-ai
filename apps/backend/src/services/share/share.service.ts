@@ -9,11 +9,13 @@ import { Cache } from '@nestjs/cache-manager';
 import {
 	HttpException,
 	HttpStatus,
+	Inject,
 	Injectable,
-	Logger,
+	type LoggerService,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Repository } from 'typeorm';
 import { AgentMessage } from '../agent/agent-message.entity';
 import { AgentSession } from '../agent/agent-session.entity';
@@ -46,7 +48,8 @@ export class ShareService {
 
 	constructor(
 		private cache: Cache,
-		private logger: Logger,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 		private readonly messageService: MessageService,
 		@InjectRepository(AssistantSession)
 		private readonly assistantSessionRepo: Repository<AssistantSession>,

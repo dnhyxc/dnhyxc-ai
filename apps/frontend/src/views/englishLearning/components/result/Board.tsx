@@ -223,8 +223,8 @@ export function Board({
 												<div
 													className={practiceRoundListGridClass(contentKind)}
 												>
-													{wrong.map((e) => {
-														const playKey = `w-${roundKey}-${e.key}`;
+													{wrong.map((e, ei) => {
+														const playKey = `w-${roundKey}-${ei}-${e.key}`;
 														return (
 															<Entry
 																key={playKey}
@@ -254,8 +254,8 @@ export function Board({
 												<div
 													className={practiceRoundListGridClass(contentKind)}
 												>
-													{correct.map((e) => {
-														const playKey = `c-${roundKey}-${e.key}`;
+													{correct.map((e, ei) => {
+														const playKey = `c-${roundKey}-${ei}-${e.key}`;
 														return (
 															<Entry
 																key={playKey}

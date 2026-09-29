@@ -1,5 +1,12 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+	type LoggerService,
+} from '@nestjs/common';
 import { EdgeTTS } from 'edge-tts-universal';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import type { EdgeTtsDto } from './dto/edge-tts.dto';
 import {
 	edgePitchFromPitch,
@@ -7,6 +14,8 @@ import {
 	edgeVolumeFromVol,
 } from './edge-tts-prosody';
 import { DEFAULT_EDGE_TTS_VOICE } from './edge-tts-voices';
+import { buildTtsFileIds, normalizeTtsText } from './tts-file-cache.keys';
+import { TtsFileCacheService } from './tts-file-cache.service';
 
 const TTS_INPUT_MAX_BYTES = 8000;
 const TTS_SPEECH_CACHE_MAX = 128;
@@ -45,6 +54,12 @@ type CachedSpeech = {
 @Injectable()
 export class EdgeTtsService {
 	private readonly speechCache = new Map<string, CachedSpeech>();
+
+	constructor(
+		private readonly fileCache: TtsFileCacheService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
+	) {}
 
 	resolveOptions(dto: EdgeTtsDto): EdgeTtsResolved {
 		const text = dto.text.trim();
@@ -130,6 +145,20 @@ export class EdgeTtsService {
 		}
 	}
 
+	/** L2 指纹：Edge 跨用户共享（不含 userId，与文档一致） */
+	private fileIds(resolved: EdgeTtsResolved) {
+		return buildTtsFileIds({
+			provider: 'edge',
+			paramParts: [
+				resolved.voice,
+				resolved.rate,
+				resolved.volume,
+				resolved.pitch,
+			],
+			normalizedText: normalizeTtsText(resolved.text),
+		});
+	}
+
 	private async synthesizeCached(
 		dto: EdgeTtsDto,
 		userId?: number,
@@ -138,14 +167,40 @@ export class EdgeTtsService {
 		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
 		if (cached) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				EdgeTtsService.name,
+			);
 			return {
 				buffer: Buffer.from(cached.buffer),
 				boundaries: cached.boundaries.map((b) => ({ ...b })),
 			};
 		}
 
+		const ids = this.fileIds(resolved);
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			const boundaries =
+				(await this.fileCache.getJson<EdgeTtsBoundaryDto[]>(
+					ids.redisKey,
+					ids.relativePath,
+				)) ?? [];
+			const entry: CachedSpeech = { buffer: fileHit, boundaries };
+			this.setCache(cacheKey, entry);
+			return {
+				buffer: Buffer.from(entry.buffer),
+				boundaries: entry.boundaries.map((b) => ({ ...b })),
+			};
+		}
+
 		const entry = await this.synthesize(resolved);
 		this.setCache(cacheKey, entry);
+		await this.fileCache.set(
+			ids.redisKey,
+			ids.relativePath,
+			entry.buffer,
+			entry.boundaries,
+		);
 		return {
 			buffer: Buffer.from(entry.buffer),
 			boundaries: entry.boundaries.map((b) => ({ ...b })),

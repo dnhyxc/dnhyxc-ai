@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
 import { sanitizeLogData } from './log-payload.util';
@@ -16,11 +17,11 @@ export type CreateOpLogInput = {
 
 @Injectable()
 export class LogsService {
-	private readonly logger = new Logger(LogsService.name);
-
 	constructor(
 		@InjectRepository(Logs)
 		private readonly logsRepository: Repository<Logs>,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	async create(input: CreateOpLogInput) {

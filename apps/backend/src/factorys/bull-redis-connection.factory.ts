@@ -5,6 +5,7 @@ import { RedisEnum } from '../enum/config.enum';
  * BullMQ / QueueEvents 共用的 Redis 连接选项。
  * 不显式设置 commandTimeout：BullMQ 依赖 XREAD BLOCK、BZPOPMIN 等阻塞命令，
  * ioredis 的 commandTimeout 会作用于整条命令等待时间，易在阻塞读正常等待时误判为超时并刷屏。
+ * maxRetriesPerRequest 须为 null（Bull 要求；显式写出避免 WARNING）。
  */
 export function createBullRedisConnectionOptions(configService: ConfigService) {
 	return {
@@ -13,6 +14,7 @@ export function createBullRedisConnectionOptions(configService: ConfigService) {
 		username: configService.get<string>(RedisEnum.REDIS_USERNAME),
 		password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
 		connectTimeout: 5000,
+		maxRetriesPerRequest: null,
 		socket: {
 			keepAlive: true,
 			keepAliveInitialDelay: 30000,

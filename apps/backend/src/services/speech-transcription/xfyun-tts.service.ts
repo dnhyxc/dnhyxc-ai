@@ -1,10 +1,23 @@
 import { createHmac } from 'node:crypto';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+	type LoggerService,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import WebSocket from 'ws';
 import { DEFAULT_XFYUN_TTS_VCN, XfyunEnum } from '../../enum/config.enum';
 import type { XfyunTtsDto } from './dto/xfyun-tts.dto';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
+import {
+	buildTtsFileIds,
+	normalizeTtsText,
+	userIdPart,
+} from './tts-file-cache.keys';
+import { TtsFileCacheService } from './tts-file-cache.service';
 
 // https://console.xfyun.cn/services/tts
 const TTS_WS_URL = 'wss://tts-api.xfyun.cn/v2/tts';
@@ -47,6 +60,9 @@ export class XfyunTtsService {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prefsService: MinimaxTtsPrefsService,
+		private readonly fileCache: TtsFileCacheService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	isConfigured(): boolean {
@@ -304,15 +320,48 @@ export class XfyunTtsService {
 		});
 	}
 
+	private fileIds(
+		resolved: XfyunTtsResolved,
+		userId: number | undefined,
+		credTag: string,
+	) {
+		return buildTtsFileIds({
+			provider: 'xfyun',
+			paramParts: [
+				userIdPart(userId),
+				credTag,
+				resolved.vcn,
+				String(resolved.speed),
+				String(resolved.volume),
+				String(resolved.pitch),
+			],
+			normalizedText: normalizeTtsText(resolved.text),
+		});
+	}
+
 	async synthesizeSpeech(dto: XfyunTtsDto, userId?: number): Promise<Buffer> {
 		const resolved = this.resolveOptions(dto);
 		const credentials = await this.resolveCredentials(userId);
 		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
-		if (cached) return Buffer.from(cached);
+		if (cached) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				XfyunTtsService.name,
+			);
+			return Buffer.from(cached);
+		}
+
+		const ids = this.fileIds(resolved, userId, credentials.credTag);
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			this.setCache(cacheKey, fileHit);
+			return Buffer.from(fileHit);
+		}
 
 		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		this.setCache(cacheKey, buffer);
+		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
 		return buffer;
 	}
 
@@ -325,13 +374,26 @@ export class XfyunTtsService {
 		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
+			this.logger.log(
+				'TTS 命中进程缓存(L1)，未查文件缓存',
+				XfyunTtsService.name,
+			);
 			yield cached;
+			return;
+		}
+
+		const ids = this.fileIds(resolved, userId, credentials.credTag);
+		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+		if (fileHit?.length) {
+			this.setCache(cacheKey, fileHit);
+			yield fileHit;
 			return;
 		}
 
 		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		if (buffer.length) {
 			this.setCache(cacheKey, buffer);
+			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
 			yield buffer;
 		}
 	}

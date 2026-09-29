@@ -1,5 +1,6 @@
 import type { Cache } from '@nestjs/cache-manager';
 import type { LoggerService } from '@nestjs/common';
+import { CACHE_COMMAND_TIMEOUT_MS } from '../../factorys/redis-config.factory';
 
 /** vocab = 单词库；classic = 经典语句库 */
 export type ElLibraryKind = 'vocab' | 'classic';
@@ -95,9 +96,27 @@ export class EnglishLearningLibraryCache {
 		private readonly logger: LoggerService,
 	) {}
 
+	private raceTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+		return new Promise<T>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				reject(new Error(`CACHE_TIMEOUT:${label}`));
+			}, CACHE_COMMAND_TIMEOUT_MS);
+			p.then(
+				(v) => {
+					clearTimeout(timer);
+					resolve(v);
+				},
+				(e) => {
+					clearTimeout(timer);
+					reject(e);
+				},
+			);
+		});
+	}
+
 	async getSafe<T>(key: string): Promise<T | undefined> {
 		try {
-			const v = await this.cache.get<T>(key);
+			const v = await this.raceTimeout(this.cache.get<T>(key), 'get');
 			return v === null || v === undefined ? undefined : v;
 		} catch (e) {
 			this.logger.warn?.(
@@ -109,7 +128,7 @@ export class EnglishLearningLibraryCache {
 
 	async setSafe(key: string, value: unknown, ttlMs: number): Promise<void> {
 		try {
-			await this.cache.set(key, value, ttlMs);
+			await this.raceTimeout(this.cache.set(key, value, ttlMs), 'set');
 		} catch (e) {
 			this.logger.warn?.(
 				`[el-lib-cache] set failed key=${key}: ${e instanceof Error ? e.message : e}`,

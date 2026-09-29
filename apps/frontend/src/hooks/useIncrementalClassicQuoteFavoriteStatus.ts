@@ -290,6 +290,8 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 				const ck = classicQuoteFavoriteContentKey(item.english);
 				if (!ck || queriedKeysRef.current.has(ck)) continue;
 				queriedKeysRef.current.add(ck);
+				// 与 vocab 一致：未收藏也记入会话，避免切题/重挂载重复打 status
+				sessionQueriedContentKeys.add(ck);
 				englishesToQuery.push(item.english);
 			}
 			if (englishesToQuery.length === 0) return;
@@ -304,7 +306,10 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 					if (!cancelled) {
 						for (const english of englishesToQuery) {
 							const ck = classicQuoteFavoriteContentKey(english);
-							if (ck) queriedKeysRef.current.delete(ck);
+							if (ck) {
+								queriedKeysRef.current.delete(ck);
+								sessionQueriedContentKeys.delete(ck);
+							}
 						}
 					}
 				}
@@ -368,4 +373,55 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 		setClassicQuoteFavoriteId,
 		clearClassicQuoteFavorite,
 	};
+}
+
+/**
+ * 练习开局：整队一次写入会话收藏缓存（有内嵌 favoriteId 则不打接口，否则一批 status）。
+ * Toggle 逐题挂载时即可命中会话，避免每切一句打一次 status。
+ */
+export async function warmClassicQuoteFavoriteStatusSession(
+	items: ReadonlyArray<ClassicFavoriteListItem>,
+): Promise<void> {
+	if (items.length === 0) return;
+
+	if (itemsEmbedFavoriteId(items)) {
+		for (const item of items) {
+			const ck = classicQuoteFavoriteContentKey(item.english);
+			if (!ck || !('favoriteId' in item)) continue;
+			sessionQueriedContentKeys.add(ck);
+			if (item.favoriteId) {
+				sessionFavoriteIdByContentKey.set(ck, item.favoriteId);
+			} else {
+				sessionFavoriteIdByContentKey.delete(ck);
+			}
+		}
+		bumpClassicFavoriteSession();
+		return;
+	}
+
+	const need: string[] = [];
+	for (const item of items) {
+		const ck = classicQuoteFavoriteContentKey(item.english);
+		if (!ck || sessionQueriedContentKeys.has(ck)) continue;
+		sessionQueriedContentKeys.add(ck);
+		need.push(item.english);
+	}
+	if (need.length === 0) return;
+
+	try {
+		await fetchEnglishClassicQuoteFavoriteStatus(need, {
+			onPartial: (refs) => {
+				for (const r of refs) {
+					sessionFavoriteIdByContentKey.set(r.contentKey, r.id);
+				}
+				bumpClassicFavoriteSession();
+			},
+		});
+		bumpClassicFavoriteSession();
+	} catch {
+		for (const english of need) {
+			const ck = classicQuoteFavoriteContentKey(english);
+			if (ck) sessionQueriedContentKeys.delete(ck);
+		}
+	}
 }

@@ -1634,6 +1634,7 @@ export const annotateEnglishSentenceWords = async (params: {
 	english: string;
 	words: string[];
 	silent?: boolean;
+	signal?: AbortSignal;
 }) => {
 	return await http.post<{ words: EnglishSentenceWordAnnotation[] }>(
 		ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
@@ -1641,7 +1642,7 @@ export const annotateEnglishSentenceWords = async (params: {
 			english: params.english,
 			words: params.words,
 		},
-		{ silent: params.silent },
+		{ silent: params.silent, signal: params.signal },
 	);
 };
 
@@ -1650,6 +1651,7 @@ export const annotateEnglishSentenceWordsBatch = async (params: {
 	items: { english: string; words: string[] }[];
 	cacheOnly?: boolean;
 	silent?: boolean;
+	signal?: AbortSignal;
 }) => {
 	return await http.post<{
 		items: {
@@ -1663,7 +1665,7 @@ export const annotateEnglishSentenceWordsBatch = async (params: {
 			items: params.items,
 			...(params.cacheOnly ? { cacheOnly: true } : {}),
 		},
-		{ silent: params.silent },
+		{ silent: params.silent, signal: params.signal },
 	);
 };
 

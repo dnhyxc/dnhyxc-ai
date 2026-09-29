@@ -96,6 +96,11 @@ export function getEbookFilesDir(fromDirname: string = __dirname): string {
 	return join(getUploadsRoot(fromDirname), 'ebooks');
 }
 
+/** TTS 合成缓存：uploads/tts/（API 内读盘，默认不公开静态） */
+export function getUploadTtsDir(fromDirname: string = __dirname): string {
+	return join(getUploadsRoot(fromDirname), 'tts');
+}
+
 /** 插件 registry 等远程配置：uploads/remotes/ */
 export function getUploadRemotesDir(fromDirname: string = __dirname): string {
 	return join(getUploadsRoot(fromDirname), 'remotes');

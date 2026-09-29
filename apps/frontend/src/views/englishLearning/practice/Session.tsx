@@ -60,6 +60,7 @@ export function Session({
 	itemIndex,
 	sourceTitle,
 	onTtsPipelineKick,
+	requestSignal,
 	isLastQuestion = false,
 	canGoPrevious = false,
 	onGoPrevious,
@@ -89,6 +90,7 @@ export function Session({
 		enabled: isClassic,
 		english: isClassic ? answerText : '',
 		tokens: isClassic ? tokens : EMPTY_TOKENS,
+		signal: requestSignal,
 	});
 
 	const vocabMetaByIndex = useMemo((): readonly (SentenceWordMeta | null)[] => {
@@ -138,6 +140,7 @@ export function Session({
 		answerText,
 		itemIndex,
 		onPipelineKick: onTtsPipelineKick,
+		signal: requestSignal,
 		t,
 	});
 
@@ -159,7 +162,8 @@ export function Session({
 	}, [tokens]);
 
 	usePracticeItemReset({
-		itemKey: item.key,
+		// 含 index：同 contentKey 相邻题也能触发换题重置
+		itemKey: `${itemIndex}:${item.key}`,
 		mode,
 		cancelDictationPlay,
 		setPlaying,

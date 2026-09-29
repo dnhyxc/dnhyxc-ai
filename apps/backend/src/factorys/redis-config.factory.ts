@@ -4,6 +4,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisEnum } from '../enum/config.enum';
 
+/**
+ * 仅供词库 getSafe / TTS cacheOp 等「单次 await 旁路」用，不改变 Keyv 连接参数。
+ * 验证码等仍走原 Cache 连接语义。
+ */
+export const CACHE_COMMAND_TIMEOUT_MS = 1500;
+
 @Injectable()
 export class RedisConfigFactory implements CacheOptionsFactory {
 	constructor(private readonly configService: ConfigService) {}
@@ -31,16 +37,6 @@ export class RedisConfigFactory implements CacheOptionsFactory {
 		store.on('error', (err) => {
 			console.error('Keyv Store Error:', err.message);
 		});
-
-		// 测试连接
-		// try {
-		// 	await store.set('test_connection', Date.now(), 10000);
-		// 	const testResult = await store.get('test_connection');
-		// 	console.log(`Redis 连接测试 ${testResult ? '✅ 成功' : '❌ 失败'}`);
-		// 	await store.delete('test_connection');
-		// } catch (error) {
-		// 	console.error('Redis连接测试失败:', error.message);
-		// }
 
 		return {
 			store,

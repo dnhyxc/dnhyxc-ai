@@ -1249,6 +1249,8 @@ export const enUS = {
 	'englishLearning.practice.practiceAgain': 'New session',
 	'englishLearning.practice.continuePractice': 'Continue practice',
 	'englishLearning.practice.continueEmpty': 'No more new words to practice',
+	'englishLearning.practice.continueEmptyClassic':
+		'No more new sentences to practice',
 	'englishLearning.practice.back': 'Back',
 	'englishLearning.practice.saveMistakes': 'Save to mistake book',
 	'englishLearning.practice.saveMistakesSuccessTitle':

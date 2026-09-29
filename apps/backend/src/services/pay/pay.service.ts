@@ -1,12 +1,14 @@
 import {
 	BadRequestException,
 	ForbiddenException,
+	Inject,
 	Injectable,
-	Logger,
+	type LoggerService,
 	ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import Stripe from 'stripe';
 
 import { StripeEnum } from '../../enum/config.enum';
@@ -20,7 +22,6 @@ import { MembershipService } from './membership.service';
 
 @Injectable()
 export class PayService {
-	private readonly logger = new Logger(PayService.name);
 	private readonly stripe: Stripe | null;
 	/** 密钥填错时的说明（例如把 pk_ 当成了 Secret） */
 	private readonly stripeConfigHint: string | null;
@@ -28,6 +29,8 @@ export class PayService {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly membershipService: MembershipService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {
 		const raw = this.config.get<string>(StripeEnum.STRIPE_SECRET_KEY);
 		const secret = raw?.trim();

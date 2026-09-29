@@ -308,7 +308,7 @@ export const DailyIntroPanel = observer(function DailyIntroPanel({
 					) : null}
 				</div>
 
-				<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-end gap-3">
+				<div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-end gap-3">
 					<h2 className={FIELD_LABEL}>
 						{t('englishLearning.practice.startLabel')}
 					</h2>
