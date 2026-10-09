@@ -20,7 +20,7 @@ import { buildRoutes } from './buildRoutes';
 const App = () => {
 	useInputsOnlyTab();
 	const [routeEpoch, setRouteEpoch] = useState(0);
-	/** false 时 catch-all 不渲染 404，等插件壳挂上后再决断 */
+	/** start 完成后才挂 Router：启动期 inject 不再反复 createBrowserRouter */
 	const [pluginsReady, setPluginsReady] = useState(false);
 
 	useEffect(() => {
@@ -29,21 +29,23 @@ const App = () => {
 				e.preventDefault();
 			});
 		}
+		let started = false;
 		const unsub = mf.onRoutesChange(() => {
-			setRouteEpoch((n) => n + 1);
+			if (started) setRouteEpoch((n) => n + 1);
 		});
 		void mf
 			.start()
 			.catch((e) => console.error('[federation] start failed', e))
 			.finally(() => {
+				started = true;
 				setPluginsReady(true);
-				setRouteEpoch((n) => n + 1);
 			});
 		return unsub;
 	}, []);
 
 	const router = useMemo(() => {
-		const r = createBrowserRouter(buildRoutes(pluginsReady) as RouteObject[]);
+		if (!pluginsReady) return null;
+		const r = createBrowserRouter(buildRoutes(true) as RouteObject[]);
 		mf.setNavigate((to) => {
 			void r.navigate(to);
 		});
@@ -51,6 +53,8 @@ const App = () => {
 	}, [routeEpoch, pluginsReady]);
 
 	useEffect(() => {
+		const detachPlainFieldClipboard = attachTauriPlainFieldClipboardShortcuts();
+		if (!router) return detachPlainFieldClipboard;
 		let cancelled = false;
 		const unlistenFns: Array<() => void> = [];
 
@@ -88,8 +92,6 @@ const App = () => {
 			}
 		})();
 
-		const detachPlainFieldClipboard = attachTauriPlainFieldClipboardShortcuts();
-
 		return () => {
 			cancelled = true;
 			detachPlainFieldClipboard();
@@ -113,7 +115,11 @@ const App = () => {
 					<Loading className="flex h-full items-center justify-center" />
 				}
 			>
-				<RouterProvider router={router} />
+				{router ? (
+					<RouterProvider router={router} />
+				) : (
+					<Loading className="flex h-full items-center justify-center" />
+				)}
 			</Suspense>
 		</div>
 	);
