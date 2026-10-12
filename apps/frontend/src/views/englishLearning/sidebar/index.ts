@@ -6,7 +6,7 @@ export { EnglishLearningToolbar } from './components/LearningToolbar';
 export { MistakeBookSession } from './components/MistakeBookSession';
 export { PracticeReportSession } from './components/PracticeReportSession';
 export { ReviewSession } from './components/ReviewSession';
-export { EnglishLearningSidebar } from './EnglishLearningSidebar';
+export { EnglishSidebar } from './EnglishSidebar';
 export {
 	dispatchEnglishReviewSummaryRefresh,
 	ENGLISH_REVIEW_SUMMARY_REFRESH,

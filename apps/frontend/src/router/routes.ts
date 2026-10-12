@@ -95,6 +95,11 @@ const ThemeSetting = lazy(() => import('@/views/setting/theme'));
 const Share = lazy(() => import('@/views/share'));
 const ChildWindow = lazy(() => import('@/views/win'));
 
+/** 嵌套阶段路由占位：父页按 pathname 渲染，子路由只匹配 URL */
+function EnglishLearningStageOutlet() {
+	return null;
+}
+
 export interface RouteMeta {
 	title?: string;
 	/** 多语言标题 key；优先于 title 渲染 */
@@ -303,6 +308,29 @@ const routes: RouteConfig[] = [
 						meta: {
 							titleKey: 'route.englishLearning.practice.title',
 						},
+						children: [
+							{
+								index: true,
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'route.englishLearning.practice.title',
+								},
+							},
+							{
+								path: 'session',
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'route.englishLearning.practice.title',
+								},
+							},
+							{
+								path: 'summary',
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'englishLearning.practice.summaryTitle',
+								},
+							},
+						],
 					},
 					{
 						path: 'practice/reports',
@@ -324,6 +352,29 @@ const routes: RouteConfig[] = [
 						meta: {
 							titleKey: 'route.englishLearning.daily.title',
 						},
+						children: [
+							{
+								index: true,
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'route.englishLearning.daily.title',
+								},
+							},
+							{
+								path: 'session',
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'englishLearning.daily.sessionTitle',
+								},
+							},
+							{
+								path: 'done',
+								Component: EnglishLearningStageOutlet,
+								meta: {
+									titleKey: 'englishLearning.practice.summaryTitle',
+								},
+							},
+						],
 					},
 					{
 						path: 'daily/records',

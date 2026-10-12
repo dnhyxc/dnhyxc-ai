@@ -216,6 +216,18 @@ export type PracticeCardProps = {
 
 // —— 各阶段页面 ——
 
+/** Setup 续练条：草稿配置回显；继续时可带入新模式 */
+export type SetupResumeInfo = {
+	sid: string;
+	description: string;
+	continueLabel: string;
+	discardLabel: string;
+	mode: PracticeMode;
+	order: PracticeOrder;
+	count: PracticeCountOption;
+	reportSaveMode: PracticeReportSaveMode;
+};
+
 export type SetupProps = {
 	initialContentKind: PracticeContentKind;
 	initialSource: PracticeSource;
@@ -225,6 +237,13 @@ export type SetupProps = {
 	initialSourceTitle?: string;
 	initialPoolTotal?: number;
 	headerExtra?: ReactNode;
+	/** 未完成会话续练条（含草稿 mode/order/count 基线） */
+	resume?: SetupResumeInfo | null;
+	/** 存在未完成草稿时，开始前需 Confirm 替换 */
+	replaceUnfinished?: boolean;
+	/** 续练：采用 Setup 当前模式写回后进 session/summary */
+	onContinueResume?: (mode: PracticeMode) => void;
+	onDiscardResume?: () => void;
 	onStarted: (
 		queue: PracticeItem[],
 		config: PracticeSetupConfig,

@@ -24,7 +24,11 @@ import {
 	type BoardRound,
 } from '../../components/result';
 import { PracticePageShell } from '../components/shell';
-import { englishPracticeUrl } from '../utils/paths';
+import {
+	buildEnglishPracticeSearchParams,
+	englishPracticeSessionUrl,
+	englishPracticeUrl,
+} from '../utils/paths';
 import { reportItemToPracticeItem } from '../utils/reportItem';
 import {
 	practiceModeShortLabel,
@@ -197,7 +201,7 @@ export default function PracticeReportDetailPage() {
 				return;
 			}
 			setContinueLoading(intent === 'continue');
-			const url = englishPracticeUrl({
+			const input = {
 				contentKind: resume.config.contentKind,
 				source: resume.config.source,
 				mode: resume.config.mode,
@@ -205,7 +209,12 @@ export default function PracticeReportDetailPage() {
 				streamId: resume.config.streamId,
 				sourceTitle: resume.config.sourceTitle,
 				poolTotal: resume.config.poolTotal,
-			});
+			};
+			const q = buildEnglishPracticeSearchParams(input);
+			const url =
+				intent === 'setup'
+					? englishPracticeUrl(input)
+					: englishPracticeSessionUrl(q);
 			navigate(url, { state: { practiceResume: resume } });
 		},
 		[navigate, report],

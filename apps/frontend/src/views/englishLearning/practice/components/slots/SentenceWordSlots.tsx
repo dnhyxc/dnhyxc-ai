@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
+import { markPracticeImeCompositionEnd } from '../../utils/keyboard';
 import type { SentenceWordToken } from '../../utils/segmentSentence';
 import { matchSlotInput } from '../../utils/segmentSentence';
 import {
@@ -156,8 +157,12 @@ function SlotWordInput({
 				composingRef.current = true;
 			}}
 			onCompositionEnd={(e) => {
-				composingRef.current = false;
+				// 先提交上屏内容；延一拍清组字标志，吞掉 IME 确认用的那记 Enter
+				markPracticeImeCompositionEnd();
 				commit(e.currentTarget.value);
+				setTimeout(() => {
+					composingRef.current = false;
+				}, 0);
 			}}
 			onChange={(e) => {
 				const next = e.target.value;
@@ -170,7 +175,11 @@ function SlotWordInput({
 				commit(next);
 			}}
 			onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-				if (composingRef.current || e.nativeEvent.isComposing) {
+				if (
+					composingRef.current ||
+					e.nativeEvent.isComposing ||
+					e.keyCode === 229
+				) {
 					return;
 				}
 				// Tab 在词槽内循环，避免焦点跑到顶栏/提交按钮

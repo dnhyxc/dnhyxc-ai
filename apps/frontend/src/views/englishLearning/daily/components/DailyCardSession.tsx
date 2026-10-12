@@ -36,6 +36,7 @@ import type {
 	DailyVocabCard,
 } from '../types';
 import { buildQuizOptions } from '../utils/buildQuizOptions';
+import type { DailyPendingRecord } from '../utils/dailySessionDraft';
 import {
 	countStarterMemorized,
 	recordStarterMemorizeResult,
@@ -47,12 +48,6 @@ import { DailyQuizWordBar } from './DailyQuizWordBar';
 import { DailyWordHero } from './DailyWordHero';
 import { ShortcutsMenu } from './ShortcutsMenu';
 
-type PendingRecord = {
-	key: string;
-	correct: boolean;
-	origin: DailyVocabCard['origin'];
-};
-
 const STAGE_ICON_BTN =
 	'h-8 w-8 shrink-0 cursor-pointer rounded-md border-0 p-0 shadow-none transition-colors focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none';
 
@@ -60,16 +55,30 @@ export type DailyCardSessionProps = {
 	cards: DailyVocabCard[];
 	mode: DailyMemorizeMode;
 	onComplete: (summary: DailySessionSummary) => void;
+	/** 刷新续档：恢复到第几卡 */
+	initialIndex?: number;
+	/** 刷新续档：本轮已答 */
+	initialPendingRecords?: DailyPendingRecord[];
+	/** 卡进度变化（落盘用） */
+	onProgress?: (progress: {
+		index: number;
+		pendingRecords: DailyPendingRecord[];
+	}) => void;
 };
 
 export function DailyCardSession({
 	cards,
 	mode,
 	onComplete,
+	initialIndex = 0,
+	initialPendingRecords,
+	onProgress,
 }: DailyCardSessionProps) {
 	const { t } = useI18n();
 	const isSpellMode = mode === 'dictation' || mode === 'spelling';
-	const [index, setIndex] = useState(0);
+	const [index, setIndex] = useState(() =>
+		Math.min(Math.max(0, initialIndex), Math.max(0, cards.length - 1)),
+	);
 	const [step, setStep] = useState<DailyCardStep>(
 		isSpellMode ? 'quiz' : 'study',
 	);
@@ -79,9 +88,12 @@ export function DailyCardSession({
 	const [showPos, setShowPos] = useState(false);
 	const [showIpa, setShowIpa] = useState(false);
 	const [lastCorrect, setLastCorrect] = useState(false);
-	const [pendingRecords, setPendingRecords] = useState<PendingRecord[]>([]);
+	const [pendingRecords, setPendingRecords] = useState<DailyPendingRecord[]>(
+		() => initialPendingRecords ?? [],
+	);
 	const [submitting, setSubmitting] = useState(false);
 	const usedDistractorLabelsRef = useRef(new Set<string>());
+	const resumeFeedbackAppliedRef = useRef(false);
 
 	const card = cards[index];
 	const tokens = useMemo(
@@ -118,11 +130,25 @@ export function DailyCardSession({
 	});
 
 	useEffect(() => {
+		onProgress?.({ index, pendingRecords });
+	}, [index, onProgress, pendingRecords]);
+
+	useEffect(() => {
 		usedDistractorLabelsRef.current.clear();
 	}, [cards]);
 
 	useEffect(() => {
 		if (!card) return;
+		// 续档：当前卡已作答则停在 feedback，避免重复记一次
+		if (!resumeFeedbackAppliedRef.current) {
+			resumeFeedbackAppliedRef.current = true;
+			const hit = pendingRecords.find((r) => r.key === card.key);
+			if (hit) {
+				setStep('feedback');
+				setLastCorrect(hit.correct);
+				return;
+			}
+		}
 		setQuizOptions([]);
 		setSlotValues(Array.from({ length: tokens.length }, () => ''));
 		setActiveSlot(0);

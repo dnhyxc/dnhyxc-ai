@@ -169,47 +169,40 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		const rawTrail =
 			findBreadcrumbTrail(routes, location.pathname, '', []) ?? [];
 		const trail = dedupeAdjacent(rawTrail);
-		if (
-			location.pathname === '/english-learning/practice' &&
-			trail.length > 0
-		) {
+		// 练习：配置页 英语学习 > 听写与拼写练习；作答/结算再加 练习中|练习报告
+		const practiceSetup = location.pathname === '/english-learning/practice';
+		const practiceSession =
+			location.pathname === '/english-learning/practice/session' ||
+			location.pathname === '/english-learning/practice/summary';
+		if ((practiceSetup || practiceSession) && trail.length > 0) {
 			const params = new URLSearchParams(location.search);
-			const kind = params.get('contentKind');
-			const setupLabel =
-				kind === 'classic'
-					? t('englishLearning.practice.classicSetupTitle')
-					: t('englishLearning.practice.setupTitle');
+			const practiceRootLabel =
+				params.get('contentKind') === 'classic'
+					? t('route.englishLearning.practice.classicTitle')
+					: t('route.englishLearning.practice.title');
 			const setupParams = new URLSearchParams(params);
 			setupParams.delete('run');
 			const setupQuery = setupParams.toString();
 			const setupPath = setupQuery
-				? `${location.pathname}?${setupQuery}`
-				: location.pathname;
-
-			if (params.get('run') === '1') {
-				const mode =
-					params.get('mode') === 'spelling' ? 'spelling' : 'dictation';
-				const modeLabel =
-					mode === 'dictation'
-						? kind === 'classic'
-							? t('englishLearning.practice.modeDictationClassic')
-							: t('englishLearning.practice.modeDictationVocab')
-						: kind === 'classic'
-							? t('englishLearning.practice.modeSpellingClassic')
-							: t('englishLearning.practice.modeSpellingVocab');
-				trail[trail.length - 1] = {
-					label: setupLabel,
-					path: setupPath,
-				};
+				? `/english-learning/practice?${setupQuery}`
+				: '/english-learning/practice';
+			while (
+				trail.length > 0 &&
+				(trail[trail.length - 1].path === '/english-learning/practice' ||
+					trail[trail.length - 1].path.startsWith(
+						'/english-learning/practice/',
+					))
+			) {
+				trail.pop();
+			}
+			trail.push({ label: practiceRootLabel, path: setupPath });
+			if (practiceSession) {
 				trail.push({
-					label: modeLabel,
+					label: location.pathname.endsWith('/summary')
+						? t('englishLearning.practice.summaryTitle')
+						: t('englishLearning.practice.sessionCrumb'),
 					path: `${location.pathname}${location.search}`,
 				});
-			} else {
-				trail[trail.length - 1] = {
-					...trail[trail.length - 1],
-					label: setupLabel,
-				};
 			}
 		}
 
@@ -242,19 +235,32 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			}
 		}
 
-		if (
-			location.pathname === '/english-learning/daily' &&
-			trail.length > 0 &&
-			new URLSearchParams(location.search).get('run') === '1'
-		) {
-			trail[trail.length - 1] = {
-				...trail[trail.length - 1],
-				path: location.pathname,
+		// 今日记词：配置页两级；作答/结算 今日记词 > 练习中|练习报告（不绑认读/复习等模式名）
+		const dailySetup = location.pathname === '/english-learning/daily';
+		const dailySession =
+			location.pathname === '/english-learning/daily/session' ||
+			location.pathname === '/english-learning/daily/done';
+		if ((dailySetup || dailySession) && trail.length > 0) {
+			const dailyRoot = {
+				label: t('route.englishLearning.daily.title'),
+				path: '/english-learning/daily',
 			};
-			trail.push({
-				label: t('englishLearning.daily.sessionTitleLibrary'),
-				path: `${location.pathname}${location.search}`,
-			});
+			while (
+				trail.length > 0 &&
+				(trail[trail.length - 1].path === '/english-learning/daily' ||
+					trail[trail.length - 1].path.startsWith('/english-learning/daily/'))
+			) {
+				trail.pop();
+			}
+			trail.push(dailyRoot);
+			if (dailySession) {
+				trail.push({
+					label: location.pathname.endsWith('/done')
+						? t('englishLearning.practice.summaryTitle')
+						: t('englishLearning.practice.sessionCrumb'),
+					path: `${location.pathname}${location.search}`,
+				});
+			}
 		}
 
 		if (trail.length >= 2) {

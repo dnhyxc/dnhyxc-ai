@@ -1,6 +1,7 @@
 /**
  * 练习设置：模式 / 题量 / 顺序卡片；卡内顶栏说明 + 底栏短要点
  */
+import Confirm from '@design/Confirm';
 import { Button, RadioGroup, RadioGroupItem, Spinner, Toast } from '@ui/index';
 import {
 	Check,
@@ -19,6 +20,7 @@ import {
 	getEnglishPracticePoolTotal,
 	resolveEnglishPracticePoolKey,
 } from '@/store/englishPracticePool';
+import { Banner as ResumeBanner } from '../components/resume';
 import { Head } from '../components/shell';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from './constants';
 import type {
@@ -118,21 +120,58 @@ export function Setup({
 	initialSourceTitle,
 	initialPoolTotal,
 	headerExtra,
+	resume = null,
+	replaceUnfinished = false,
+	onContinueResume,
+	onDiscardResume,
 	onStarted,
 }: SetupProps) {
 	const { t } = useI18n();
-	const [mode, setMode] = useState<PracticeMode>(initialMode);
 	const source = initialSource;
-	const [order, setOrder] = useState<PracticeOrder>('random');
-	const [count, setCount] = useState<PracticeCountOption>(20);
-	const [reportSaveMode, setReportSaveMode] =
-		useState<PracticeReportSaveMode>('manual');
+	const [mode, setMode] = useState<PracticeMode>(
+		() => resume?.mode ?? initialMode,
+	);
+	const [order, setOrder] = useState<PracticeOrder>(
+		() => resume?.order ?? 'random',
+	);
+	const [count, setCount] = useState<PracticeCountOption>(
+		() => resume?.count ?? 20,
+	);
+	const [reportSaveMode, setReportSaveMode] = useState<PracticeReportSaveMode>(
+		() => resume?.reportSaveMode ?? 'manual',
+	);
 	const [loading, setLoading] = useState(false);
+	const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false);
+	const [resumeQueueConfirmOpen, setResumeQueueConfirmOpen] = useState(false);
+	const [pendingQueueChange, setPendingQueueChange] = useState<
+		| { type: 'count'; value: PracticeCountOption }
+		| { type: 'order'; value: PracticeOrder }
+		| null
+	>(null);
 	const [sourceDisplayTitle, setSourceDisplayTitle] = useState<string | null>(
 		() => initialSourceTitle?.trim() || null,
 	);
 	const startInFlightRef = useRef(false);
+	const syncedResumeSidRef = useRef<string | null>(null);
 	const hideOrderPicker = source === 'review';
+
+	/** 有续练：进入/刷新回显草稿配置（按 sid 同步一次） */
+	useEffect(() => {
+		if (!resume) return;
+		if (syncedResumeSidRef.current === resume.sid) return;
+		syncedResumeSidRef.current = resume.sid;
+		setMode(resume.mode);
+		setOrder(resume.order);
+		setCount(resume.count);
+		setReportSaveMode(resume.reportSaveMode);
+	}, [resume]);
+
+	const resetSetupDefaults = useCallback(() => {
+		setMode(initialMode);
+		setOrder('random');
+		setCount(20);
+		setReportSaveMode('manual');
+	}, [initialMode]);
 
 	const poolTotalDisplay = useMemo(() => {
 		if (initialPoolTotal != null && initialPoolTotal > 0) {
@@ -264,7 +303,7 @@ export function Setup({
 		t,
 	]);
 
-	const onStart = useCallback(async () => {
+	const runStart = useCallback(async () => {
 		if (startInFlightRef.current) return;
 		startInFlightRef.current = true;
 		setLoading(true);
@@ -326,6 +365,62 @@ export function Setup({
 		t,
 	]);
 
+	const onStartClick = useCallback(() => {
+		if (replaceUnfinished) {
+			setReplaceConfirmOpen(true);
+			return;
+		}
+		void runStart();
+	}, [replaceUnfinished, runStart]);
+
+	const requestCountChange = useCallback(
+		(next: PracticeCountOption) => {
+			if (next === count) return;
+			if (resume) {
+				setPendingQueueChange({ type: 'count', value: next });
+				setResumeQueueConfirmOpen(true);
+				return;
+			}
+			setCount(next);
+		},
+		[count, resume],
+	);
+
+	const requestOrderChange = useCallback(
+		(next: PracticeOrder) => {
+			if (next === order) return;
+			if (resume) {
+				setPendingQueueChange({ type: 'order', value: next });
+				setResumeQueueConfirmOpen(true);
+				return;
+			}
+			setOrder(next);
+		},
+		[order, resume],
+	);
+
+	const onConfirmResumeQueueChange = useCallback(() => {
+		if (!pendingQueueChange) return;
+		if (pendingQueueChange.type === 'count') {
+			setCount(pendingQueueChange.value);
+		} else {
+			setOrder(pendingQueueChange.value);
+		}
+		setPendingQueueChange(null);
+		syncedResumeSidRef.current = null;
+		onDiscardResume?.();
+	}, [onDiscardResume, pendingQueueChange]);
+
+	const onDiscardClick = useCallback(() => {
+		syncedResumeSidRef.current = null;
+		resetSetupDefaults();
+		onDiscardResume?.();
+	}, [onDiscardResume, resetSetupDefaults]);
+
+	const onContinueClick = useCallback(() => {
+		onContinueResume?.(mode);
+	}, [mode, onContinueResume]);
+
 	return (
 		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
 			<Head className="pl-4 pr-2" trailing={headerExtra}>
@@ -372,7 +467,9 @@ export function Setup({
 						</h2>
 						<RadioGroup
 							value={String(count)}
-							onValueChange={(v) => setCount(Number(v) as PracticeCountOption)}
+							onValueChange={(v) =>
+								requestCountChange(Number(v) as PracticeCountOption)
+							}
 							className="grid grid-cols-10 gap-4"
 						>
 							{COUNT_OPTIONS.map((n) => {
@@ -415,7 +512,7 @@ export function Setup({
 								</h2>
 								<RadioGroup
 									value={order}
-									onValueChange={(v) => setOrder(v as PracticeOrder)}
+									onValueChange={(v) => requestOrderChange(v as PracticeOrder)}
 									className="grid grid-cols-2 gap-4"
 								>
 									{orders.map(({ value, title, desc, tip, Icon }) => (
@@ -461,30 +558,72 @@ export function Setup({
 						</section>
 					</div>
 				</div>
-				<div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-end gap-3">
-					<h2 className={FIELD_LABEL}>
-						{t('englishLearning.practice.startLabel')}
-					</h2>
-					<Button
-						type="button"
-						className={cn(
-							'h-10 w-full shrink-0 gap-2',
-							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-						)}
-						disabled={loading}
-						onClick={() => void onStart()}
-					>
-						{loading ? (
-							<>
-								<Spinner className="size-4 text-white" />
-								{t('englishLearning.practice.loadingWords')}
-							</>
-						) : (
-							t('englishLearning.practice.start')
-						)}
-					</Button>
+				<div className="mx-auto flex w-full max-w-5xl flex-1 items-end justify-end gap-4">
+					<div className="flex min-w-0 flex-1 flex-col gap-3">
+						<h2 className={FIELD_LABEL}>
+							{t('englishLearning.practice.startLabel')}
+						</h2>
+						<Button
+							type="button"
+							className={cn(
+								'h-10 w-full shrink-0 gap-2',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
+							disabled={loading}
+							onClick={onStartClick}
+						>
+							{loading ? (
+								<>
+									<Spinner className="size-4 text-white" />
+									{t('englishLearning.practice.loadingWords')}
+								</>
+							) : (
+								t('englishLearning.practice.start')
+							)}
+						</Button>
+					</div>
+					{resume ? (
+						<ResumeBanner
+							description={resume.description}
+							continueLabel={resume.continueLabel}
+							discardLabel={resume.discardLabel}
+							onContinue={onContinueClick}
+							onDiscard={onDiscardClick}
+						/>
+					) : null}
 				</div>
 			</div>
+			<Confirm
+				open={replaceConfirmOpen}
+				onOpenChange={setReplaceConfirmOpen}
+				title={t('englishLearning.sessionDraft.replacePracticeTitle')}
+				description={t('englishLearning.sessionDraft.replacePracticeDesc')}
+				confirmText={t('englishLearning.sessionDraft.replaceConfirm')}
+				cancelText={t('englishLearning.practice.back')}
+				confirmVariant="destructive"
+				onConfirm={() => void runStart()}
+			/>
+			<Confirm
+				open={resumeQueueConfirmOpen}
+				onOpenChange={(open) => {
+					setResumeQueueConfirmOpen(open);
+					if (!open) setPendingQueueChange(null);
+				}}
+				title={t(
+					pendingQueueChange?.type === 'order'
+						? 'englishLearning.sessionDraft.resumeOrderTitle'
+						: 'englishLearning.sessionDraft.resumeCountTitle',
+				)}
+				description={t(
+					pendingQueueChange?.type === 'order'
+						? 'englishLearning.sessionDraft.resumeOrderDesc'
+						: 'englishLearning.sessionDraft.resumeCountDesc',
+				)}
+				confirmText={t('englishLearning.sessionDraft.resumeQueueConfirm')}
+				cancelText={t('englishLearning.practice.back')}
+				confirmVariant="destructive"
+				onConfirm={onConfirmResumeQueueChange}
+			/>
 		</div>
 	);
 }

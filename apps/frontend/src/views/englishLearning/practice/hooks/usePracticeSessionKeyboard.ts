@@ -5,6 +5,7 @@ import type {
 	PracticeMode,
 } from '../types';
 import {
+	isPracticeImeKeyboardEvent,
 	isPracticeShiftSpacePlayShortcut,
 	isPracticeToggleIpaShortcut,
 	isPracticeTogglePosShortcut,
@@ -50,7 +51,7 @@ export function usePracticeSessionKeyboard(args: {
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.repeat) return;
+			if (e.repeat || isPracticeImeKeyboardEvent(e)) return;
 			const target = e.target as HTMLElement | null;
 			const tag = target?.tagName;
 			const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';

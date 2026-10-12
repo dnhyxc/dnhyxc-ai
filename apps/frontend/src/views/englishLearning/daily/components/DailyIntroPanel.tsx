@@ -1,6 +1,7 @@
 /**
  * 今日记词设置：模式 / 每轮词数 / 报告保存（布局对齐练习 Setup）
  */
+import Confirm from '@design/Confirm';
 import { Button, RadioGroup, RadioGroupItem, Spinner } from '@ui/index';
 import {
 	Check,
@@ -11,12 +12,13 @@ import {
 	Save,
 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken } from '@/router/authPaths';
 import { getEnglishDailyMemorizeSummary } from '@/service';
 import englishDailyStore from '@/store/englishDaily';
+import { Banner as ResumeBanner } from '../../components/resume';
 import { Head } from '../../components/shell';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../practice/constants';
 import type { PracticeReportSaveMode } from '../../practice/types';
@@ -31,8 +33,22 @@ import {
 	countStarterMemorized,
 } from '../utils/localSrs';
 
+type DailyIntroResumeInfo = {
+	sid: string;
+	description: string;
+	continueLabel: string;
+	discardLabel: string;
+	mode: DailyMemorizeMode;
+	reportSaveMode: PracticeReportSaveMode;
+	wordsPerRound: number;
+};
+
 type DailyIntroPanelProps = {
 	starting: boolean;
+	resume?: DailyIntroResumeInfo | null;
+	replaceUnfinished?: boolean;
+	onContinueResume?: (mode: DailyMemorizeMode) => void;
+	onDiscardResume?: () => void;
 	onStart: (
 		mode: DailyMemorizeMode,
 		reportSaveMode: PracticeReportSaveMode,
@@ -107,15 +123,43 @@ function SetupPickCard({
 
 export const DailyIntroPanel = observer(function DailyIntroPanel({
 	starting,
+	resume = null,
+	replaceUnfinished = false,
+	onContinueResume,
+	onDiscardResume,
 	onStart,
 }: DailyIntroPanelProps) {
 	const { t } = useI18n();
 	const isLoggedIn = hasValidAuthToken();
 	const [wordsPerRound, setWordsPerRound] = useDailyWordCount();
 	const pendingCount = englishDailyStore.libraryCount;
-	const [mode, setMode] = useState<DailyMemorizeMode>('recognition');
-	const [reportSaveMode, setReportSaveMode] =
-		useState<PracticeReportSaveMode>('manual');
+	const [mode, setMode] = useState<DailyMemorizeMode>(
+		() => resume?.mode ?? 'recognition',
+	);
+	const [reportSaveMode, setReportSaveMode] = useState<PracticeReportSaveMode>(
+		() => resume?.reportSaveMode ?? 'manual',
+	);
+	const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false);
+	const [resumeCountConfirmOpen, setResumeCountConfirmOpen] = useState(false);
+	const [pendingWordsPerRound, setPendingWordsPerRound] =
+		useState<DailyWordCount | null>(null);
+	const syncedResumeSidRef = useRef<string | null>(null);
+
+	/** 有续练：进入/刷新回显草稿 mode / 报告保存 / 每轮词数 */
+	useEffect(() => {
+		if (!resume) return;
+		if (syncedResumeSidRef.current === resume.sid) return;
+		syncedResumeSidRef.current = resume.sid;
+		setMode(resume.mode);
+		setReportSaveMode(resume.reportSaveMode);
+		if (
+			(DAILY_WORD_COUNT_OPTIONS as readonly number[]).includes(
+				resume.wordsPerRound,
+			)
+		) {
+			setWordsPerRound(resume.wordsPerRound as DailyWordCount);
+		}
+	}, [resume, setWordsPerRound]);
 
 	useEffect(() => {
 		if (
@@ -199,6 +243,47 @@ export const DailyIntroPanel = observer(function DailyIntroPanel({
 				? t('englishLearning.daily.startDictation')
 				: t('englishLearning.daily.startSpelling');
 
+	const runStart = () => onStart(mode, reportSaveMode);
+	const onStartClick = () => {
+		if (replaceUnfinished) {
+			setReplaceConfirmOpen(true);
+			return;
+		}
+		runStart();
+	};
+
+	const onContinueClick = useCallback(() => {
+		onContinueResume?.(mode);
+	}, [mode, onContinueResume]);
+
+	const requestWordsPerRoundChange = useCallback(
+		(next: DailyWordCount) => {
+			if (next === wordsPerRound) return;
+			if (resume) {
+				setPendingWordsPerRound(next);
+				setResumeCountConfirmOpen(true);
+				return;
+			}
+			setWordsPerRound(next);
+		},
+		[resume, setWordsPerRound, wordsPerRound],
+	);
+
+	const onConfirmResumeCountChange = useCallback(() => {
+		if (pendingWordsPerRound == null) return;
+		setWordsPerRound(pendingWordsPerRound);
+		setPendingWordsPerRound(null);
+		syncedResumeSidRef.current = null;
+		onDiscardResume?.();
+	}, [onDiscardResume, pendingWordsPerRound, setWordsPerRound]);
+
+	const onDiscardClick = useCallback(() => {
+		syncedResumeSidRef.current = null;
+		setMode('recognition');
+		setReportSaveMode('manual');
+		onDiscardResume?.();
+	}, [onDiscardResume]);
+
 	return (
 		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
 			<Head className="pl-4 pr-2">
@@ -245,7 +330,7 @@ export const DailyIntroPanel = observer(function DailyIntroPanel({
 						<RadioGroup
 							value={String(wordsPerRound)}
 							onValueChange={(v) =>
-								setWordsPerRound(Number(v) as DailyWordCount)
+								requestWordsPerRoundChange(Number(v) as DailyWordCount)
 							}
 							className="grid grid-cols-5 gap-4"
 						>
@@ -308,30 +393,64 @@ export const DailyIntroPanel = observer(function DailyIntroPanel({
 					) : null}
 				</div>
 
-				<div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-end gap-3">
-					<h2 className={FIELD_LABEL}>
-						{t('englishLearning.practice.startLabel')}
-					</h2>
-					<Button
-						type="button"
-						className={cn(
-							'h-10 w-full shrink-0 gap-2',
-							PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-						)}
-						disabled={starting}
-						onClick={() => onStart(mode, reportSaveMode)}
-					>
-						{starting ? (
-							<>
-								<Spinner className="size-4 text-white" />
-								{t('englishLearning.daily.loading')}
-							</>
-						) : (
-							startLabel
-						)}
-					</Button>
+				<div className="mx-auto flex w-full max-w-5xl flex-1 items-end justify-end gap-4">
+					<div className="flex min-w-0 flex-1 flex-col gap-3">
+						<h2 className={FIELD_LABEL}>
+							{t('englishLearning.practice.startLabel')}
+						</h2>
+						<Button
+							type="button"
+							className={cn(
+								'h-10 w-full shrink-0 gap-2',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
+							disabled={starting}
+							onClick={onStartClick}
+						>
+							{starting ? (
+								<>
+									<Spinner className="size-4 text-white" />
+									{t('englishLearning.daily.loading')}
+								</>
+							) : (
+								startLabel
+							)}
+						</Button>
+					</div>
+					{resume ? (
+						<ResumeBanner
+							description={resume.description}
+							continueLabel={resume.continueLabel}
+							discardLabel={resume.discardLabel}
+							onContinue={onContinueClick}
+							onDiscard={onDiscardClick}
+						/>
+					) : null}
 				</div>
 			</div>
+			<Confirm
+				open={replaceConfirmOpen}
+				onOpenChange={setReplaceConfirmOpen}
+				title={t('englishLearning.sessionDraft.replaceDailyTitle')}
+				description={t('englishLearning.sessionDraft.replaceDailyDesc')}
+				confirmText={t('englishLearning.sessionDraft.replaceConfirm')}
+				cancelText={t('englishLearning.practice.back')}
+				confirmVariant="destructive"
+				onConfirm={runStart}
+			/>
+			<Confirm
+				open={resumeCountConfirmOpen}
+				onOpenChange={(open) => {
+					setResumeCountConfirmOpen(open);
+					if (!open) setPendingWordsPerRound(null);
+				}}
+				title={t('englishLearning.sessionDraft.resumeDailyCountTitle')}
+				description={t('englishLearning.sessionDraft.resumeDailyCountDesc')}
+				confirmText={t('englishLearning.sessionDraft.resumeQueueConfirm')}
+				cancelText={t('englishLearning.practice.back')}
+				confirmVariant="destructive"
+				onConfirm={onConfirmResumeCountChange}
+			/>
 		</div>
 	);
 });

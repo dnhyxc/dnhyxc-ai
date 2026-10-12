@@ -1,5 +1,7 @@
 import { clearPluginEnabledPrefsCache } from '@/federation';
 import { clearMinimaxTtsUserPrefsCache } from '@/utils/minimaxTtsPrefs';
+import { clearAllDailyDrafts } from '@/views/englishLearning/daily/utils/dailySessionDraft';
+import { clearAllPracticeDrafts } from '@/views/englishLearning/practice/utils/practiceSessionDraft';
 import { resetElResumeModuleSettingsCache } from '@/views/englishLearning/utils/elResumeModule';
 import assistantStore from './assistant';
 import ebookStore from './ebook';
@@ -36,6 +38,8 @@ export function resetUserState(): void {
 		clearEnglishPracticePoolCache();
 		clearElResumeCache();
 		resetElResumeModuleSettingsCache();
+		clearAllPracticeDrafts();
+		clearAllDailyDrafts();
 		clearMinimaxTtsUserPrefsCache();
 		clearPluginEnabledPrefsCache();
 	} finally {

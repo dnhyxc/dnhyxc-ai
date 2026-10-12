@@ -18,10 +18,7 @@ import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllPlayback } from '@/utils/speech';
 import { AgentPanel } from './agent';
-import {
-	EnglishLearningSidebar,
-	type QuickIntentInputSyncPayload,
-} from './sidebar';
+import { EnglishSidebar, type QuickIntentInputSyncPayload } from './sidebar';
 
 const EnglishLearning = observer(function EnglishLearning() {
 	const { t } = useI18n();
@@ -123,7 +120,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 									scrollbarClassName="!top-4.5 !bottom-4.5 h-auto"
 								>
 									<div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
-										<EnglishLearningSidebar
+										<EnglishSidebar
 											onQuickIntentInputSync={onQuickIntentInputSync}
 										/>
 									</div>

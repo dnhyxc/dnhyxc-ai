@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import {
+	isPracticeImeKeyboardEvent,
 	isPracticeShiftSpacePlayShortcut,
 	isPracticeSpacePlayShortcut,
 	isPracticeToggleIpaShortcut,
@@ -44,7 +45,7 @@ export function useDailySessionKeyboard(args: DailySessionKeyboardArgs) {
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.repeat) return;
+			if (e.repeat || isPracticeImeKeyboardEvent(e)) return;
 			const inField = isKeyboardTargetInField(e.target);
 
 			if (

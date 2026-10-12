@@ -16,14 +16,14 @@ import { PracticeReportSession } from './components/PracticeReportSession';
 import { ReviewSession } from './components/ReviewSession';
 import { SIDEBAR_SECTION_STACK } from './tokens';
 
-type EnglishLearningSidebarProps = {
+type EnglishSidebarProps = {
 	onQuickIntentInputSync?: (payload: QuickIntentInputSyncPayload) => void;
 };
 
 /** 英语学习首页 — 左侧 ScrollArea 全部内容 */
-export function EnglishLearningSidebar({
+export function EnglishSidebar({
 	onQuickIntentInputSync,
-}: EnglishLearningSidebarProps) {
+}: EnglishSidebarProps) {
 	const { t } = useI18n();
 	const masonryRef = useRef<HTMLDivElement>(null);
 	useEnglishSidebarMasonry(masonryRef);
@@ -31,7 +31,6 @@ export function EnglishLearningSidebar({
 	return (
 		<div ref={masonryRef} className={SIDEBAR_SECTION_STACK}>
 			<DailySession />
-			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />
 			<EnglishSource
 				type="vocab"
 				title={t('englishLearning.library.vocab.title')}
@@ -42,12 +41,13 @@ export function EnglishLearningSidebar({
 				title={t('englishLearning.library.classic.title')}
 				description={t('englishLearning.library.classic.descShort')}
 			/>
+			<FavoriteSession />
+			<MistakeBookSession />
+			<ReviewSession />
+			<PracticeReportSession />
+			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />
 			<VocabularyPackSection />
 			<ClassicQuotesSection />
-			<FavoriteSession />
-			<ReviewSession />
-			<MistakeBookSession />
-			<PracticeReportSession />
 			<NotesSession />
 		</div>
 	);

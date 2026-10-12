@@ -1014,11 +1014,12 @@ export const zhCN = {
 	'route.englishLearning.annotate.title': '标注进度',
 	'route.englishLearning.morphology.title': '词根词缀大全',
 	'route.englishLearning.grammar.title': '英语语法大全',
-	'route.englishLearning.practice.title': '听写与拼写练习',
+	'route.englishLearning.practice.title': '单词听写与拼写',
 	'route.englishLearning.practice.classicTitle': '语句听写与拼写',
 
 	'englishLearning.practice.entry': '听写 / 拼写',
 	'englishLearning.practice.setupTitle': '单词练习',
+	'englishLearning.practice.sessionCrumb': '练习中',
 	'englishLearning.practice.setupPickMode': '练习模式',
 	'englishLearning.practice.setupRoundOptions': '本轮设置',
 	'englishLearning.practice.classicSetupTitle': '语句练习',
@@ -1140,6 +1141,32 @@ export const zhCN = {
 	'englishLearning.practice.roundWordListCorrectCount': '正确 {count}',
 	'englishLearning.practice.retryWrong': '重练错题',
 	'englishLearning.practice.practiceAgain': '重新设置',
+	'englishLearning.sessionDraft.continue': '继续上次',
+	'englishLearning.sessionDraft.discard': '放弃续练',
+	'englishLearning.sessionDraft.practiceRunning':
+		'未完成的练习 · {source} · 已做到第 {current}/{total} 题',
+	'englishLearning.sessionDraft.practiceSummary':
+		'有未查看的练习结果 · {source}',
+	'englishLearning.sessionDraft.dailyRunning':
+		'未完成的记词 · 已做到第 {current}/{total} 题',
+	'englishLearning.sessionDraft.dailyDone': '有未查看的记词结果',
+	'englishLearning.sessionDraft.replacePracticeTitle': '开始新的练习？',
+	'englishLearning.sessionDraft.replacePracticeDesc':
+		'将放弃未完成的练习进度，此操作不可恢复。',
+	'englishLearning.sessionDraft.replaceDailyTitle': '开始新的记词？',
+	'englishLearning.sessionDraft.replaceDailyDesc':
+		'将放弃未完成的记词进度，此操作不可恢复。',
+	'englishLearning.sessionDraft.replaceConfirm': '放弃并开始',
+	'englishLearning.sessionDraft.resumeCountTitle': '切换题目数量？',
+	'englishLearning.sessionDraft.resumeCountDesc':
+		'切换题目数量将放弃未完成的练习进度，此操作不可恢复。',
+	'englishLearning.sessionDraft.resumeOrderTitle': '切换出题顺序？',
+	'englishLearning.sessionDraft.resumeOrderDesc':
+		'切换出题顺序将放弃未完成的练习进度，此操作不可恢复。',
+	'englishLearning.sessionDraft.resumeQueueConfirm': '确认切换',
+	'englishLearning.sessionDraft.resumeDailyCountTitle': '切换每轮词数？',
+	'englishLearning.sessionDraft.resumeDailyCountDesc':
+		'切换每轮词数将放弃未完成的记词进度，此操作不可恢复。',
 	'englishLearning.practice.continuePractice': '继续练习',
 	'englishLearning.practice.continueEmpty': '没有更多未练过的单词了',
 	'englishLearning.practice.continueEmptyClassic': '没有更多未练过的语句了',

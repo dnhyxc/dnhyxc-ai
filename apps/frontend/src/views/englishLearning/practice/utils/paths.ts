@@ -8,6 +8,8 @@
 import type { BuildEnglishPracticeSearchParamsInput } from '../types';
 
 export const ENGLISH_PRACTICE_PATH = '/english-learning/practice';
+export const ENGLISH_PRACTICE_SESSION_PATH = `${ENGLISH_PRACTICE_PATH}/session`;
+export const ENGLISH_PRACTICE_SUMMARY_PATH = `${ENGLISH_PRACTICE_PATH}/summary`;
 
 export function parsePracticePoolTotal(raw: string | null): number | undefined {
 	if (!raw) return undefined;
@@ -77,4 +79,47 @@ export function englishPracticeUrl(
 ): string {
 	const q = buildEnglishPracticeSearchParams(input);
 	return `${ENGLISH_PRACTICE_PATH}?${q}`;
+}
+
+/** 合并/删除 query 参数后返回 search 字符串（无前导 ?） */
+export function mergePracticeSearch(
+	search: string | undefined,
+	patch: Record<string, string | null | undefined>,
+): string {
+	const p = new URLSearchParams(search?.replace(/^\?/, '') ?? '');
+	for (const [k, v] of Object.entries(patch)) {
+		if (v == null || v === '') p.delete(k);
+		else p.set(k, v);
+	}
+	return p.toString();
+}
+
+function pathWithSearch(path: string, search?: string): string {
+	const q = search?.replace(/^\?/, '');
+	return q ? `${path}?${q}` : path;
+}
+
+/** 作答页 URL（保留现有 query） */
+export function englishPracticeSessionUrl(search?: string): string {
+	return pathWithSearch(ENGLISH_PRACTICE_SESSION_PATH, search);
+}
+
+/** 结算页 URL（保留现有 query） */
+export function englishPracticeSummaryUrl(search?: string): string {
+	return pathWithSearch(ENGLISH_PRACTICE_SUMMARY_PATH, search);
+}
+
+/** 配置页 URL（保留现有 query） */
+export function englishPracticeSetupUrl(search?: string): string {
+	return pathWithSearch(ENGLISH_PRACTICE_PATH, search);
+}
+
+export type PracticeRoutePhase = 'setup' | 'running' | 'summary';
+
+export function practicePhaseFromPathname(
+	pathname: string,
+): PracticeRoutePhase {
+	if (pathname.endsWith('/summary')) return 'summary';
+	if (pathname.endsWith('/session')) return 'running';
+	return 'setup';
 }

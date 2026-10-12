@@ -1111,12 +1111,13 @@ export const enUS = {
 	'route.englishLearning.annotate.title': 'Annotation progress',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
-	'route.englishLearning.practice.title': 'Practice dictation & spelling',
+	'route.englishLearning.practice.title': 'Word dictation & spelling',
 	'route.englishLearning.practice.classicTitle':
 		'Sentence dictation & spelling',
 
 	'englishLearning.practice.entry': 'Practice',
 	'englishLearning.practice.setupTitle': 'Word practice',
+	'englishLearning.practice.sessionCrumb': 'In practice',
 	'englishLearning.practice.setupPickMode': 'Practice mode',
 	'englishLearning.practice.setupRoundOptions': 'This round',
 	'englishLearning.practice.classicSetupTitle': 'Sentence practice',
@@ -1247,6 +1248,35 @@ export const enUS = {
 	'englishLearning.practice.roundWordListCorrectCount': 'Correct {count}',
 	'englishLearning.practice.retryWrong': 'Retry mistakes',
 	'englishLearning.practice.practiceAgain': 'New session',
+	'englishLearning.sessionDraft.continue': 'Resume',
+	'englishLearning.sessionDraft.discard': 'Give up',
+	'englishLearning.sessionDraft.practiceRunning':
+		'Unfinished practice · {source} · item {current}/{total}',
+	'englishLearning.sessionDraft.practiceSummary':
+		'Unfinished practice summary · {source}',
+	'englishLearning.sessionDraft.dailyRunning':
+		'Unfinished daily words · item {current}/{total}',
+	'englishLearning.sessionDraft.dailyDone':
+		'You have an unfinished daily summary',
+	'englishLearning.sessionDraft.replacePracticeTitle': 'Start a new practice?',
+	'englishLearning.sessionDraft.replacePracticeDesc':
+		'This will discard your unfinished practice progress. This cannot be undone.',
+	'englishLearning.sessionDraft.replaceDailyTitle':
+		'Start a new daily session?',
+	'englishLearning.sessionDraft.replaceDailyDesc':
+		'This will discard your unfinished daily progress. This cannot be undone.',
+	'englishLearning.sessionDraft.replaceConfirm': 'Give up and start',
+	'englishLearning.sessionDraft.resumeCountTitle': 'Change question count?',
+	'englishLearning.sessionDraft.resumeCountDesc':
+		'Changing the question count will discard your unfinished practice progress. This cannot be undone.',
+	'englishLearning.sessionDraft.resumeOrderTitle': 'Change question order?',
+	'englishLearning.sessionDraft.resumeOrderDesc':
+		'Changing the question order will discard your unfinished practice progress. This cannot be undone.',
+	'englishLearning.sessionDraft.resumeQueueConfirm': 'Confirm change',
+	'englishLearning.sessionDraft.resumeDailyCountTitle':
+		'Change words per round?',
+	'englishLearning.sessionDraft.resumeDailyCountDesc':
+		'Changing words per round will discard your unfinished daily progress. This cannot be undone.',
 	'englishLearning.practice.continuePractice': 'Continue practice',
 	'englishLearning.practice.continueEmpty': 'No more new words to practice',
 	'englishLearning.practice.continueEmptyClassic':

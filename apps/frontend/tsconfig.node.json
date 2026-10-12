@@ -1,7 +1,6 @@
 {
 	"extends": "../../tsconfig.node.json",
 	"compilerOptions": {
-		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"],
 			"@ui/*": ["./src/components/ui/*"],
