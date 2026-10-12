@@ -876,14 +876,21 @@ export class AgentService {
 				// 构建Agent所需核心参数，包括主模型、工具集、系统提示与中间件
 				model: mainLlm, // 主聊天大模型，流式推理
 				tools, // 工具列表（如 Web 检索、RAG、当前日期等）
+				// 按 assistMode 选基础/英语学习/技能生成人设，再拼技能正文附录
 				systemPrompt: resolveAgentSystemPrompt(
+					// 本轮请求（含 assistMode）决定系统提示分支
 					dto,
+					// 把已加载 skill 标题与正文格式化后追加到 systemPrompt 末尾
 					formatSkillsSystemAppend(skillBodies),
 				),
+				// 摘要截断 + 工具调用上限（英语学习会额外限制 internet_search）
 				middleware: buildAgentLangchainMiddleware({
+					// 非流式副模型，仅供 summarizationMiddleware 压缩长上下文
 					summaryLlm: summaryLlm,
+					// 用 memory 侧同一套估算，与摘要 trigger.tokens 阈值一致
 					estimatePromptTokens: (msgs) =>
 						this.memory.estimatePromptTokens(msgs),
+					// english_learning 收紧本轮工具次数，避免搜穿 recursionLimit
 					profile: agentProfile,
 				}),
 			});
