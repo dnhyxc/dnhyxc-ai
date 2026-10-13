@@ -1,0 +1,35 @@
+/** en-US · skill */
+export const skill = {
+	'skill.applied.label': 'Applied skills',
+	'skill.chips.aria': 'Selected skills',
+	'skill.content.placeholder': 'Write skill / prompt body (Markdown)',
+	'skill.delete.confirmDesc': 'This cannot be undone.',
+	'skill.delete.confirmTitle': 'Delete skill?',
+	'skill.generate.applied': 'Written to the editor — review and save',
+	'skill.generate.applyToEditor': 'Write to editor',
+	'skill.generate.empty':
+		'Chat is tied to the current skill (new draft or saved). Draft from scratch or revise the editor content; tap “Write to editor” when ready, then review and save',
+	'skill.generate.emptyApply': 'Empty reply — nothing to write',
+	'skill.generate.parseFail':
+		'Could not parse title and body; ask for a # Title format',
+	'skill.generate.placeholder':
+		'Describe a new skill, or how to revise what’s in the editor…',
+	'skill.list.empty': 'No skills yet. Create one to get started.',
+	'skill.new': 'New',
+	'skill.panel.mode.generate': 'Generate',
+	'skill.panel.mode.try': 'Try',
+	'skill.save.unsaved': 'Save (unsaved changes)',
+	'skill.slash.add': 'Add skill',
+	'skill.slash.confirm': 'Confirm',
+	'skill.slash.empty': 'No matching skills',
+	'skill.slash.filtering': 'Filter: {q}',
+	'skill.slash.hint': 'Keep typing to filter; space closes',
+	'skill.slash.placeholder': 'Search skills…',
+	'skill.title.placeholder': 'Skill title',
+	'skill.toolbar.library': 'Skill library',
+	'skill.toolbar.libraryHide': 'Hide skill list',
+	'skill.toolbar.libraryShow': 'Show skill list',
+	'skill.try.empty': 'Try the current skill on the right',
+	'skill.try.placeholder': 'Try the current skill…',
+	'skill.try.saveFirst': 'Save the skill first, then try it here.',
+};

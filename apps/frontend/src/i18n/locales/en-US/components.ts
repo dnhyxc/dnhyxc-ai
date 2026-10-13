@@ -1,0 +1,86 @@
+/** en-US · components */
+export const components = {
+	'assistant.selection.copy': 'Copy',
+	'assistant.selection.dragBar': 'Drag control bar',
+	'assistant.selection.resetBar': 'Reset to default position',
+	'assistant.selection.resizeBar': 'Resize control bar',
+	'assistant.selection.speak': 'Read aloud',
+	'assistant.selection.speakBar': 'Read-aloud controls',
+	'assistant.selection.stopSpeak': 'Stop reading',
+	'assistant.tts.unsupported':
+		'Playback unavailable. Check login and cloud TTS, or use a browser with local speech.',
+	'dragUpload.tip.clickToSelect': 'click to select',
+	'dragUpload.tip.info': 'Supports JPEG, PNG, GIF, SVG, WebP. Max 5MB.',
+	'dragUpload.tip.prefix': 'Drag an image here or',
+	'image.loadFailed': 'Image failed to load',
+	'imagePreview.close': 'Close',
+	'imagePreview.mermaidTitle': 'Mermaid preview',
+	'imagePreview.next': 'Next',
+	'imagePreview.prev': 'Previous',
+	'imagePreview.reset': 'Reset',
+	'imagePreview.rotate': 'Rotate',
+	'imagePreview.title': 'Image preview',
+	'imagePreview.zoomIn': 'Zoom in',
+	'imagePreview.zoomOut': 'Zoom out',
+	'markdown.preview.empty': 'Nothing to preview',
+	'markdown.preview.loading': 'Loading preview…',
+	'mermaid.toolbar.code': 'Code',
+	'mermaid.toolbar.diagram': 'Diagram',
+	'mermaid.toolbar.preview': 'Preview',
+	'monaco.autoSaveInterval.minutes': '{m} min',
+	'monaco.autoSaveInterval.seconds': '{n} sec',
+	'monaco.bottomBar.aria.assistant': 'Toggle AI assistant panel',
+	'monaco.bottomBar.aria.autosave.off': 'Disable auto-save',
+	'monaco.bottomBar.aria.autosave.on': 'Enable auto-save',
+	'monaco.bottomBar.aria.autosaveInterval': 'Auto-save interval',
+	'monaco.bottomBar.aria.diff': 'Toggle split diff (Markdown)',
+	'monaco.bottomBar.aria.drag': 'Drag bottom bar position',
+	'monaco.bottomBar.aria.follow.bidirectional':
+		'Bidirectional scroll sync (editor ↔ preview)',
+	'monaco.bottomBar.aria.follow.editorFollowsPreview':
+		'Editor follows preview scrolling',
+	'monaco.bottomBar.aria.follow.previewFollowsEditor':
+		'Preview follows editor scrolling',
+	'monaco.bottomBar.aria.overwrite.off': 'Disable overwrite save',
+	'monaco.bottomBar.aria.overwrite.on': 'Enable overwrite save',
+	'monaco.bottomBar.aria.reset': 'Reset bottom bar position',
+	'monaco.bottomBar.aria.toolbar': 'Markdown bottom bar',
+	'monaco.bottomBar.aria.view': 'Markdown view',
+	'monaco.bottomBar.tip.assistant.close': 'Close AI assistant',
+	'monaco.bottomBar.tip.assistant.open': 'Open AI assistant',
+	'monaco.bottomBar.tip.autosave.disabled':
+		'Enable auto-save: save at intervals (may skip silently when needed)',
+	'monaco.bottomBar.tip.autosave.enabled':
+		'Auto-save enabled: save when modified at the selected interval',
+	'monaco.bottomBar.tip.diff.close':
+		'Close split diff: back to single-column editing',
+	'monaco.bottomBar.tip.diff.open':
+		'Split diff: edit left, read-only diff on right',
+	'monaco.bottomBar.tip.drag': 'Drag to reposition the bottom bar',
+	'monaco.bottomBar.tip.edit': 'Edit source',
+	'monaco.bottomBar.tip.follow.bidirectional':
+		'Bidirectional: sync scrolling between editor and preview',
+	'monaco.bottomBar.tip.follow.editorFollowsPreview':
+		'Editor follows preview: scrolling the preview scrolls the editor',
+	'monaco.bottomBar.tip.follow.previewFollowsEditor':
+		'Preview follows editor: scrolling the editor scrolls the preview',
+	'monaco.bottomBar.tip.overwrite.disabled':
+		'Enable overwrite save: overwrite same-name files without confirmation',
+	'monaco.bottomBar.tip.overwrite.enabled':
+		'Overwrite save enabled: same-name files will be overwritten',
+	'monaco.bottomBar.tip.preview': 'Preview',
+	'monaco.bottomBar.tip.reset': 'Reset bottom bar position',
+	'monaco.bottomBar.tip.split': 'Split: editor left, preview right',
+	'monaco.loading.diffEditor': 'Loading diff editor…',
+	'monaco.loading.editor': 'Loading editor…',
+	'monaco.placeholder': '# Start writing…',
+	'monaco.topBar.bottomBar': 'Bottom bar',
+	'monaco.topBar.bottomBar.collapse': 'Collapse Markdown bottom bar',
+	'monaco.topBar.bottomBar.expand': 'Expand Markdown bottom bar',
+	'upload.button': 'Upload file',
+	'upload.error.invalidType': 'Unsupported file type: {type}',
+	'upload.error.maxCount': 'You can upload up to {maxCount} files at a time',
+	'upload.error.maxSize': 'File size cannot exceed {maxSizeMb} MB',
+	'upload.tooltip.default': 'Only PDF, Word, and Excel files are supported',
+	'upload.uploading': 'Uploading...',
+};
