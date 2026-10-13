@@ -261,7 +261,7 @@ export default function PracticeReportsListPage() {
 					{ count: selectedIds.size },
 				)}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.practice.reportsRemoveConfirmAction')}
+				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -282,7 +282,7 @@ export default function PracticeReportsListPage() {
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.practice.reportsRemoveConfirmAction')}
+				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -305,7 +305,7 @@ export default function PracticeReportsListPage() {
 									htmlFor="practice-reports-select-all"
 									className="cursor-pointer text-sm font-medium whitespace-nowrap text-teal-500 hover:text-teal-400"
 								>
-									{t('englishLearning.practice.reportsSelectAll')}
+									{t('common.selectAll')}
 								</Label>
 							</div>
 						) : null}
@@ -323,8 +323,8 @@ export default function PracticeReportsListPage() {
 								)}
 								<span>
 									{batchRemoving
-										? t('englishLearning.practice.reportsRemoving')
-										: t('englishLearning.practice.reportsRemoveSelected', {
+										? t('englishLearning.library.deleting')
+										: t('englishLearning.mistakes.removeSelected', {
 												count: selectedIds.size,
 											})}
 								</span>
@@ -335,7 +335,7 @@ export default function PracticeReportsListPage() {
 							onSelectKind={onSelectKind}
 							vocabLabel={t('englishLearning.practice.reportsVocabNav')}
 							classicLabel={t('englishLearning.practice.reportsClassicNav')}
-							ariaLabel={t('route.englishLearning.practice.reportsTitle')}
+							ariaLabel={t('englishLearning.practice.reportsTitle')}
 						/>
 					</div>
 				}
@@ -421,7 +421,7 @@ export default function PracticeReportsListPage() {
 								onClick={() => void load(items.length, true)}
 							>
 								{loadingMore
-									? t('englishLearning.practice.reportsLoadingMore')
+									? t('common.loadingEllipsis')
 									: t('englishLearning.practice.reportsLoadMore')}
 							</Button>
 						) : null}

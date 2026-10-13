@@ -15,8 +15,8 @@ export function CornerFab({ mode, onClick }: CornerFabProps) {
 			mode={mode}
 			onClick={onClick}
 			variant="corner"
-			toBottomLabel={t('englishLearning.list.scrollToBottom')}
-			toTopLabel={t('englishLearning.list.scrollToTop')}
+			toBottomLabel={t('common.scrollToBottom')}
+			toTopLabel={t('common.scrollToTop')}
 		/>
 	);
 }

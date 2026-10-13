@@ -39,7 +39,7 @@ export function buildPdfContextMenuItems({
 		{
 			type: 'item',
 			id: 'zoomIn',
-			label: t('ebook.read.pdfZoomIn'),
+			label: t('imagePreview.zoomIn'),
 			shortcut: '+',
 			disabled: !canZoomIn,
 			onSelect: (event) => {
@@ -50,7 +50,7 @@ export function buildPdfContextMenuItems({
 		{
 			type: 'item',
 			id: 'zoomOut',
-			label: t('ebook.read.pdfZoomOut'),
+			label: t('imagePreview.zoomOut'),
 			shortcut: '−',
 			disabled: !canZoomOut,
 			onSelect: (event) => {

@@ -34,8 +34,9 @@ import {
 	hydrateElResumeOffset,
 	resolveElResumeOffset,
 } from '@/store/englishLearningResume';
-import { Annotate, Export } from '../../components/classic';
+import { Annotate } from '../../components/classic';
 import { Entry } from '../../components/entry';
+import { Export } from '../../components/export';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
 import { LibraryEditDialog } from './LibraryEditDialog';
@@ -336,7 +337,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.library.deleteConfirmAction')}
+				confirmText={t('common.delete')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -394,10 +395,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 									: 1
 								: 0;
 							const actionCount =
-								practiceActions +
-								(kind === 'classic' ? 1 : 0) +
-								(showEdit ? 1 : 0) +
-								(canDelete ? 1 : 0);
+								practiceActions + 1 + (showEdit ? 1 : 0) + (canDelete ? 1 : 0);
 							const hoverPr =
 								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
@@ -508,12 +506,29 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 													/>
 												</>
 											) : null}
+											{kind === 'vocab' && vocabLib ? (
+												<Export
+													kind="vocab"
+													source="library"
+													libraryId={vocabLib.id}
+													title={vocabLib.title?.trim() || undefined}
+													count={
+														vocabLib.wordCount != null && vocabLib.wordCount > 0
+															? vocabLib.wordCount
+															: undefined
+													}
+													onBeforeClick={(e) => {
+														e.stopPropagation();
+													}}
+												/>
+											) : null}
 											{kind === 'classic' && classicLib ? (
 												<Export
+													kind="classic"
 													source="library"
 													libraryId={classicLib.id}
 													title={classicLib.title?.trim() || undefined}
-													quoteCount={
+													count={
 														classicLib.quoteCount != null &&
 														classicLib.quoteCount > 0
 															? classicLib.quoteCount

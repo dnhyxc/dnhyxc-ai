@@ -4,7 +4,7 @@ import { LEGAL_PAGE_PATHS } from './legalPageUrls';
 
 const ServicePolicyPage = () => (
 	<LegalDocPage
-		titleKey="legal.servicePolicy.title"
+		titleKey="about.links.policy"
 		getSections={getServicePolicySections}
 		pathname={LEGAL_PAGE_PATHS.servicePolicy}
 	/>

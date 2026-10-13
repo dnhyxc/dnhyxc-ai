@@ -731,7 +731,7 @@ const CloudTtsSetting = observer(() => {
 									</div>
 									<PrefTextField
 										id="minimax-api-key"
-										label={t('setting.cloudTts.minimaxApiKey')}
+										label={t('setting.llm.apiKey')}
 										value={prefs.minimaxApiKey}
 										onChange={(minimaxApiKey) => patch({ minimaxApiKey })}
 										disabled={fieldsDisabled}
@@ -751,8 +751,8 @@ const CloudTtsSetting = observer(() => {
 												value={prefs.model}
 												onChange={(model) => patch({ model })}
 												options={minimaxModelOptions}
-												placeholder={t('setting.cloudTts.modelPlaceholder')}
-												presetsAriaLabel={t('setting.cloudTts.openPresets')}
+												placeholder={t('setting.llm.modelNamePlaceholder')}
+												presetsAriaLabel={t('setting.llm.openPresets')}
 												disabled={fieldsDisabled}
 												inputClassName={fieldInputClass}
 											/>
@@ -963,7 +963,7 @@ const CloudTtsSetting = observer(() => {
 									/>
 									<PrefSelectField
 										id="xfyun-tts-voice"
-										label={t('setting.cloudTts.xfyunVoice')}
+										label={t('setting.cloudTts.edgeVoice')}
 										value={xfyunVoiceId}
 										onValueChange={(vcn) => patch({ xfyunVoiceId: vcn })}
 										options={xfyunVoiceOptions}
@@ -973,7 +973,7 @@ const CloudTtsSetting = observer(() => {
 
 									<NumberField
 										id="xfyun-tts-speed"
-										label={t('setting.cloudTts.xfyunSpeed')}
+										label={t('setting.cloudTts.speed')}
 										value={prefs.xfyunSpeed}
 										min={0}
 										max={100}
@@ -984,7 +984,7 @@ const CloudTtsSetting = observer(() => {
 									/>
 									<NumberField
 										id="xfyun-tts-volume"
-										label={t('setting.cloudTts.xfyunVolume')}
+										label={t('setting.cloudTts.vol')}
 										value={prefs.xfyunVolume}
 										min={0}
 										max={100}
@@ -995,7 +995,7 @@ const CloudTtsSetting = observer(() => {
 									/>
 									<NumberField
 										id="xfyun-tts-pitch"
-										label={t('setting.cloudTts.xfyunPitch')}
+										label={t('setting.cloudTts.pitch')}
 										value={prefs.xfyunPitch}
 										min={0}
 										max={100}

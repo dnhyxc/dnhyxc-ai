@@ -44,7 +44,7 @@ function PackStreamProgressInner({ kind }: PackStreamProgressProps) {
 	const stopKey =
 		kind === 'vocab'
 			? 'englishLearning.vocab.stop'
-			: 'englishLearning.classic.stop';
+			: 'englishLearning.vocab.stop';
 
 	const onStop = () => {
 		if (kind === 'vocab') {

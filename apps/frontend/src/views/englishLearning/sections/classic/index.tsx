@@ -328,7 +328,7 @@ function ClassicQuotesSectionInner() {
 					EnglishPackStore.classicOnUserAbort(myGen);
 					Toast({
 						type: 'info',
-						title: t('englishLearning.classic.aborted'),
+						title: t('englishLearning.vocab.aborted'),
 					});
 				},
 				onIncomplete: () => {
@@ -336,7 +336,7 @@ function ClassicQuotesSectionInner() {
 					EnglishPackStore.classicOnIncomplete(myGen);
 					Toast({
 						type: 'warning',
-						title: t('englishLearning.classic.streamDisconnected'),
+						title: t('englishLearning.vocab.streamDisconnected'),
 					});
 				},
 			},
@@ -418,7 +418,7 @@ function ClassicQuotesSectionInner() {
 						id="english-classic-count"
 						autoComplete="off"
 						aria-describedby="english-classic-count-hint"
-						placeholder={t('englishLearning.classic.countPlaceholder')}
+						placeholder={t('englishLearning.vocab.countPlaceholder')}
 						value={countInput}
 						onChange={(e) =>
 							EnglishPackStore.setClassicCountInput(
@@ -479,7 +479,7 @@ function ClassicQuotesSectionInner() {
 							<div className="flex items-center gap-2">
 								<Spinner className="size-4 shrink-0 text-white" />
 								<span className="truncate">
-									{t('englishLearning.classic.stop')}
+									{t('englishLearning.vocab.stop')}
 								</span>
 							</div>
 						) : (
@@ -498,7 +498,7 @@ function ClassicQuotesSectionInner() {
 						)}
 					>
 						<span className="max-[380px]:sr-only truncate">
-							{t('englishLearning.classic.historyOpenDrawer')}
+							{t('englishLearning.vocab.historyOpenDrawer')}
 						</span>
 					</Button>
 				</div>

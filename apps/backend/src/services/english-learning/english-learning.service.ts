@@ -4953,30 +4953,229 @@ ${existingHintBlock}
 		};
 	}
 
-	/** 导出收藏为 DOCX 时单次最多行数，避免超大文档占用内存 */
-	private static readonly FAVORITES_DOCX_EXPORT_MAX = 3000;
+	/**
+	 * 收藏 / 错题 / 复习导出安全硬顶（明示截断）。
+	 * ponytail: 无生成上限须有天花板；更大集合再上异步 Job（见 ideas 收藏错题全量导出Word）。
+	 */
+	private static readonly DOCX_EXPORT_HARD_MAX = 20_000;
 
-	/** 去重并截断导出 ids；空则返回 undefined 表示全量 */
-	private clipExportDocxIds(ids?: string[] | null): string[] | undefined {
-		if (!ids?.length) return undefined;
+	/** 分页装载导出 rows（词库 / 收藏等同用；对齐 items API 上限） */
+	private static readonly LIBRARY_DOCX_PAGE_SIZE = 1000;
+
+	/** 去重导出 ids；空则 undefined=全量；超过硬顶则截断并标记 */
+	private normalizeExportDocxIds(ids?: string[] | null): {
+		ids?: string[];
+		idsTruncated: boolean;
+	} {
+		if (!ids?.length) return { idsTruncated: false };
 		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
-		if (unique.length === 0) return undefined;
-		return unique.slice(0, EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX);
+		if (unique.length === 0) return { idsTruncated: false };
+		const hardMax = EnglishLearningService.DOCX_EXPORT_HARD_MAX;
+		if (unique.length > hardMax) {
+			return { ids: unique.slice(0, hardMax), idsTruncated: true };
+		}
+		return { ids: unique, idsTruncated: false };
 	}
 
-	/** 当前用户单词收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	/** 按 skip/take 分页装载至硬顶；触顶且仍有下一行则 truncated */
+	private async loadDocxRowsPaged<T>(
+		fetchPage: (take: number, skip: number) => Promise<T[]>,
+	): Promise<{ rows: T[]; truncated: boolean }> {
+		const hardMax = EnglishLearningService.DOCX_EXPORT_HARD_MAX;
+		const pageSize = EnglishLearningService.LIBRARY_DOCX_PAGE_SIZE;
+		const rows: T[] = [];
+		let offset = 0;
+		while (rows.length < hardMax) {
+			const take = Math.min(pageSize, hardMax - rows.length);
+			const page = await fetchPage(take, offset);
+			if (!page.length) break;
+			rows.push(...page);
+			offset += page.length;
+			if (page.length < take) break;
+		}
+		let truncated = false;
+		if (rows.length >= hardMax) {
+			const more = await fetchPage(1, hardMax);
+			truncated = more.length > 0;
+		}
+		return { rows, truncated };
+	}
+
+	/** 按 ids 分批 In 查询（每批 ≤ pageSize），避免单次 IN 过大 */
+	private async loadDocxRowsByIdsBatched<T>(
+		ids: string[],
+		fetchChunk: (chunkIds: string[]) => Promise<T[]>,
+	): Promise<T[]> {
+		const pageSize = EnglishLearningService.LIBRARY_DOCX_PAGE_SIZE;
+		const rows: T[] = [];
+		for (let i = 0; i < ids.length; i += pageSize) {
+			const chunk = ids.slice(i, i + pageSize);
+			const page = await fetchChunk(chunk);
+			rows.push(...page);
+		}
+		return rows;
+	}
+
+	private formatDocxExportSubtitle(
+		count: number,
+		opts: {
+			selected?: boolean;
+			truncated?: boolean;
+			orderHint?: string;
+		},
+	): string {
+		const hardMax = EnglishLearningService.DOCX_EXPORT_HARD_MAX;
+		if (opts.selected) {
+			return opts.truncated
+				? `共 ${count} 条（已选，前 ${hardMax} 条）`
+				: `共 ${count} 条（已选）`;
+		}
+		if (opts.truncated) {
+			return opts.orderHint
+				? `共 ${count} 条（前 ${hardMax} 条 / ${opts.orderHint}）`
+				: `共 ${count} 条（前 ${hardMax} 条）`;
+		}
+		return opts.orderHint
+			? `共 ${count} 条（${opts.orderHint}）`
+			: `共 ${count} 条`;
+	}
+
+	/**
+	 * 单词库导出为 Word（可读即可；整库导出）。
+	 * ponytail: 同步 Packer 持有全文；硬顶 = 生成上限 12000，超则截断。若常 OOM/超时再上异步 Job。
+	 */
+	async exportVocabularyLibraryDocxBuffer(
+		userId: number,
+		libraryId: string,
+	): Promise<Buffer> {
+		const lib = await this.assertVocabularyLibraryReadable(userId, libraryId);
+		const hardMax = ENGLISH_VOCAB_GENERATION_MAX;
+		const total = Math.max(0, lib.wordCount ?? 0);
+		if (total === 0) {
+			throw new BadRequestException('无可导出词条');
+		}
+		const rows: Array<{
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+		}> = [];
+		const pageSize = EnglishLearningService.LIBRARY_DOCX_PAGE_SIZE;
+		let offset = 0;
+		while (rows.length < hardMax) {
+			const take = Math.min(pageSize, hardMax - rows.length);
+			const page = await this.vocabLibraryItemRepo.find({
+				where: { libraryId },
+				order: { sortOrder: 'ASC' },
+				take,
+				skip: offset,
+			});
+			if (!page.length) break;
+			for (const r of page) {
+				rows.push({
+					word: r.word,
+					ipa: r.ipa ?? '',
+					pos: r.pos ?? '',
+					segmentation: r.segmentation ?? '',
+					translationZh: r.translationZh ?? '',
+					example: r.example ?? '',
+				});
+			}
+			offset += page.length;
+			if (page.length < take) break;
+		}
+		if (!rows.length) {
+			throw new BadRequestException('无可导出词条');
+		}
+		return buildVocabularyFavoritesDocxBuffer(rows, {
+			title: lib.title?.trim() || '英语单词库',
+			subtitle: `共 ${rows.length} 条`,
+		});
+	}
+
+	/**
+	 * 语句库导出为 Word（可读即可；整库导出）。
+	 * ponytail: 同步 Packer；硬顶 = 生成上限 6000。若常 OOM/超时再上异步 Job。
+	 */
+	async exportClassicQuotesLibraryDocxBuffer(
+		userId: number,
+		libraryId: string,
+	): Promise<Buffer> {
+		const lib = await this.assertClassicQuotesLibraryReadable(
+			userId,
+			libraryId,
+		);
+		const hardMax = ENGLISH_CLASSIC_QUOTES_GENERATION_MAX;
+		const total = Math.max(0, lib.quoteCount ?? 0);
+		if (total === 0) {
+			throw new BadRequestException('无可导出语句');
+		}
+		const rows: Array<{
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+		}> = [];
+		const pageSize = EnglishLearningService.LIBRARY_DOCX_PAGE_SIZE;
+		let offset = 0;
+		while (rows.length < hardMax) {
+			const take = Math.min(pageSize, hardMax - rows.length);
+			const page = await this.classicQuotesLibraryItemRepo.find({
+				where: { libraryId },
+				order: { sortOrder: 'ASC' },
+				take,
+				skip: offset,
+			});
+			if (!page.length) break;
+			for (const r of page) {
+				rows.push({
+					english: r.english,
+					translationZh: r.translationZh ?? '',
+					source: r.source ?? '',
+					noteZh: r.noteZh ?? '',
+				});
+			}
+			offset += page.length;
+			if (page.length < take) break;
+		}
+		if (!rows.length) {
+			throw new BadRequestException('无可导出语句');
+		}
+		return buildClassicQuoteFavoritesDocxBuffer(rows, {
+			title: lib.title?.trim() || '英语语句库',
+			subtitle: `共 ${rows.length} 条`,
+		});
+	}
+
+	/** 当前用户单词收藏导出为 Word（分页全量；有 ids 则仅导出这些；触硬顶明示截断） */
 	async exportVocabularyFavoritesDocxBuffer(
 		userId: number,
 		ids?: string[] | null,
 	): Promise<Buffer> {
-		const idFilter = this.clipExportDocxIds(ids);
-		const rows = await this.vocabFavoriteRepo.find({
-			where: idFilter ? { userId, id: In(idFilter) } : { userId },
-			order: { createdAt: 'DESC' },
-			take: idFilter
-				? undefined
-				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
-		});
+		const { ids: idFilter, idsTruncated } = this.normalizeExportDocxIds(ids);
+		let truncated = idsTruncated;
+		let rows: Awaited<ReturnType<typeof this.vocabFavoriteRepo.find>>;
+		if (idFilter) {
+			rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+				this.vocabFavoriteRepo.find({
+					where: { userId, id: In(chunk) },
+					order: { createdAt: 'DESC' },
+				}),
+			);
+		} else {
+			const page = await this.loadDocxRowsPaged((take, skip) =>
+				this.vocabFavoriteRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take,
+					skip,
+				}),
+			);
+			rows = page.rows;
+			truncated = page.truncated;
+		}
 		const list = rows.map((r) => ({
 			word: r.word,
 			ipa: r.ipa ?? '',
@@ -4985,60 +5184,86 @@ ${existingHintBlock}
 			translationZh: r.translationZh ?? '',
 			example: r.example ?? '',
 		}));
-		return buildVocabularyFavoritesDocxBuffer(
-			list,
-			idFilter
-				? {
-						title: '英语单词收藏',
-						subtitle: `共 ${list.length} 条（已选）`,
-					}
-				: undefined,
-		);
+		return buildVocabularyFavoritesDocxBuffer(list, {
+			title: '英语单词收藏',
+			subtitle: this.formatDocxExportSubtitle(list.length, {
+				selected: Boolean(idFilter),
+				truncated,
+				orderHint: idFilter ? undefined : '按收藏时间倒序',
+			}),
+		});
 	}
 
-	/** 当前用户经典句收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	/** 当前用户经典句收藏导出为 Word（分页全量；有 ids 则仅导出这些；触硬顶明示截断） */
 	async exportClassicQuoteFavoritesDocxBuffer(
 		userId: number,
 		ids?: string[] | null,
 	): Promise<Buffer> {
-		const idFilter = this.clipExportDocxIds(ids);
-		const rows = await this.classicQuoteFavoriteRepo.find({
-			where: idFilter ? { userId, id: In(idFilter) } : { userId },
-			order: { createdAt: 'DESC' },
-			take: idFilter
-				? undefined
-				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
-		});
+		const { ids: idFilter, idsTruncated } = this.normalizeExportDocxIds(ids);
+		let truncated = idsTruncated;
+		let rows: Awaited<ReturnType<typeof this.classicQuoteFavoriteRepo.find>>;
+		if (idFilter) {
+			rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+				this.classicQuoteFavoriteRepo.find({
+					where: { userId, id: In(chunk) },
+					order: { createdAt: 'DESC' },
+				}),
+			);
+		} else {
+			const page = await this.loadDocxRowsPaged((take, skip) =>
+				this.classicQuoteFavoriteRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take,
+					skip,
+				}),
+			);
+			rows = page.rows;
+			truncated = page.truncated;
+		}
 		const list = rows.map((r) => ({
 			english: r.english,
 			translationZh: r.translationZh ?? '',
 			source: r.source ?? '',
 			noteZh: r.noteZh ?? '',
 		}));
-		return buildClassicQuoteFavoritesDocxBuffer(
-			list,
-			idFilter
-				? {
-						title: '英语经典句收藏',
-						subtitle: `共 ${list.length} 条（已选）`,
-					}
-				: undefined,
-		);
+		return buildClassicQuoteFavoritesDocxBuffer(list, {
+			title: '英语经典句收藏',
+			subtitle: this.formatDocxExportSubtitle(list.length, {
+				selected: Boolean(idFilter),
+				truncated,
+				orderHint: idFilter ? undefined : '按收藏时间倒序',
+			}),
+		});
 	}
 
-	/** 当前用户单词错题导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	/** 当前用户单词错题导出为 Word（分页全量；有 ids 则仅导出这些；触硬顶明示截断） */
 	async exportVocabularyMistakesDocxBuffer(
 		userId: number,
 		ids?: string[] | null,
 	): Promise<Buffer> {
-		const idFilter = this.clipExportDocxIds(ids);
-		const rows = await this.vocabMistakeRepo.find({
-			where: idFilter ? { userId, id: In(idFilter) } : { userId },
-			order: { createdAt: 'DESC' },
-			take: idFilter
-				? undefined
-				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
-		});
+		const { ids: idFilter, idsTruncated } = this.normalizeExportDocxIds(ids);
+		let truncated = idsTruncated;
+		let rows: Awaited<ReturnType<typeof this.vocabMistakeRepo.find>>;
+		if (idFilter) {
+			rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+				this.vocabMistakeRepo.find({
+					where: { userId, id: In(chunk) },
+					order: { createdAt: 'DESC' },
+				}),
+			);
+		} else {
+			const page = await this.loadDocxRowsPaged((take, skip) =>
+				this.vocabMistakeRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take,
+					skip,
+				}),
+			);
+			rows = page.rows;
+			truncated = page.truncated;
+		}
 		return buildVocabularyFavoritesDocxBuffer(
 			rows.map((r) => ({
 				word: r.word,
@@ -5050,26 +5275,42 @@ ${existingHintBlock}
 			})),
 			{
 				title: '英语单词错题',
-				subtitle: idFilter
-					? `共 ${rows.length} 条（已选）`
-					: `共 ${rows.length} 条（按加入时间倒序）`,
+				subtitle: this.formatDocxExportSubtitle(rows.length, {
+					selected: Boolean(idFilter),
+					truncated,
+					orderHint: idFilter ? undefined : '按加入时间倒序',
+				}),
 			},
 		);
 	}
 
-	/** 当前用户经典句错题导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条；有 ids 则仅导出这些） */
+	/** 当前用户经典句错题导出为 Word（分页全量；有 ids 则仅导出这些；触硬顶明示截断） */
 	async exportClassicQuoteMistakesDocxBuffer(
 		userId: number,
 		ids?: string[] | null,
 	): Promise<Buffer> {
-		const idFilter = this.clipExportDocxIds(ids);
-		const rows = await this.classicQuoteMistakeRepo.find({
-			where: idFilter ? { userId, id: In(idFilter) } : { userId },
-			order: { createdAt: 'DESC' },
-			take: idFilter
-				? undefined
-				: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
-		});
+		const { ids: idFilter, idsTruncated } = this.normalizeExportDocxIds(ids);
+		let truncated = idsTruncated;
+		let rows: Awaited<ReturnType<typeof this.classicQuoteMistakeRepo.find>>;
+		if (idFilter) {
+			rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+				this.classicQuoteMistakeRepo.find({
+					where: { userId, id: In(chunk) },
+					order: { createdAt: 'DESC' },
+				}),
+			);
+		} else {
+			const page = await this.loadDocxRowsPaged((take, skip) =>
+				this.classicQuoteMistakeRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take,
+					skip,
+				}),
+			);
+			rows = page.rows;
+			truncated = page.truncated;
+		}
 		return buildClassicQuoteFavoritesDocxBuffer(
 			rows.map((r) => ({
 				english: r.english,
@@ -5079,26 +5320,30 @@ ${existingHintBlock}
 			})),
 			{
 				title: '英语经典句错题',
-				subtitle: idFilter
-					? `共 ${rows.length} 条（已选）`
-					: `共 ${rows.length} 条（按加入时间倒序）`,
+				subtitle: this.formatDocxExportSubtitle(rows.length, {
+					selected: Boolean(idFilter),
+					truncated,
+					orderHint: idFilter ? undefined : '按加入时间倒序',
+				}),
 			},
 		);
 	}
 
-	/** 今日待复习导出为 Word（到期且错题仍在；有 ids 则仅导出这些错题行） */
+	/** 今日待复习导出为 Word（到期且错题仍在；有 ids 则仅导出这些错题行；分页全量） */
 	async exportPracticeReviewDueDocxBuffer(
 		userId: number,
 		contentKind: 'vocab' | 'classic',
 		ids?: string[] | null,
 	): Promise<Buffer> {
-		const idFilter = this.clipExportDocxIds(ids);
+		const { ids: idFilter, idsTruncated } = this.normalizeExportDocxIds(ids);
 		if (idFilter) {
 			if (contentKind === 'vocab') {
-				const rows = await this.vocabMistakeRepo.find({
-					where: { userId, id: In(idFilter) },
-					order: { createdAt: 'DESC' },
-				});
+				const rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+					this.vocabMistakeRepo.find({
+						where: { userId, id: In(chunk) },
+						order: { createdAt: 'DESC' },
+					}),
+				);
 				const list = rows.map((r) => ({
 					word: r.word,
 					ipa: r.ipa ?? '',
@@ -5109,13 +5354,18 @@ ${existingHintBlock}
 				}));
 				return buildVocabularyFavoritesDocxBuffer(list, {
 					title: '今日复习 · 单词',
-					subtitle: `共 ${list.length} 条（已选）`,
+					subtitle: this.formatDocxExportSubtitle(list.length, {
+						selected: true,
+						truncated: idsTruncated,
+					}),
 				});
 			}
-			const rows = await this.classicQuoteMistakeRepo.find({
-				where: { userId, id: In(idFilter) },
-				order: { createdAt: 'DESC' },
-			});
+			const rows = await this.loadDocxRowsByIdsBatched(idFilter, (chunk) =>
+				this.classicQuoteMistakeRepo.find({
+					where: { userId, id: In(chunk) },
+					order: { createdAt: 'DESC' },
+				}),
+			);
 			const list = rows.map((r) => ({
 				english: r.english,
 				translationZh: r.translationZh ?? '',
@@ -5124,15 +5374,36 @@ ${existingHintBlock}
 			}));
 			return buildClassicQuoteFavoritesDocxBuffer(list, {
 				title: '今日复习 · 经典句',
-				subtitle: `共 ${list.length} 条（已选）`,
+				subtitle: this.formatDocxExportSubtitle(list.length, {
+					selected: true,
+					truncated: idsTruncated,
+				}),
 			});
 		}
 
-		const { items } = await this.listPracticeReviewDuePage(userId, {
-			contentKind,
-			limit: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
-			offset: 0,
-		});
+		const hardMax = EnglishLearningService.DOCX_EXPORT_HARD_MAX;
+		const pageSize = EnglishLearningService.LIBRARY_DOCX_PAGE_SIZE;
+		type ReviewItem = Awaited<
+			ReturnType<EnglishLearningService['listPracticeReviewDuePage']>
+		>['items'][number];
+		const items: ReviewItem[] = [];
+		let offset = 0;
+		let totalCount = 0;
+		while (items.length < hardMax) {
+			const take = Math.min(pageSize, hardMax - items.length);
+			const page = await this.listPracticeReviewDuePage(userId, {
+				contentKind,
+				limit: take,
+				offset,
+			});
+			totalCount = page.totalCount;
+			if (!page.items.length) break;
+			items.push(...page.items);
+			offset += page.items.length;
+			if (page.items.length < take) break;
+		}
+		const truncated = totalCount > items.length;
+
 		if (contentKind === 'vocab') {
 			const list = items
 				.filter(
@@ -5149,7 +5420,10 @@ ${existingHintBlock}
 				}));
 			return buildVocabularyFavoritesDocxBuffer(list, {
 				title: '今日复习 · 单词',
-				subtitle: `共 ${list.length} 条（按到期时间升序）`,
+				subtitle: this.formatDocxExportSubtitle(list.length, {
+					truncated,
+					orderHint: '按到期时间升序',
+				}),
 			});
 		}
 		const list = items
@@ -5165,7 +5439,10 @@ ${existingHintBlock}
 			}));
 		return buildClassicQuoteFavoritesDocxBuffer(list, {
 			title: '今日复习 · 经典句',
-			subtitle: `共 ${list.length} 条（按到期时间升序）`,
+			subtitle: this.formatDocxExportSubtitle(list.length, {
+				truncated,
+				orderHint: '按到期时间升序',
+			}),
 		});
 	}
 

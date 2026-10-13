@@ -282,7 +282,7 @@ const SessionShare = () => {
 								{knowledgeData.title?.trim() || t('knowledge.common.untitled')}
 							</div>
 							<div className="text-xs text-textcolor/50 mb-3">
-								{t('share.knowledge.updatedAt', {
+								{t('knowledge.list.updatedAt', {
 									time: formatDate(String(knowledgeData.updatedAt ?? '')),
 								})}
 							</div>
@@ -375,12 +375,10 @@ const SessionShare = () => {
 				{canScroll ? (
 					<Button
 						title={
-							atBottom ? t('share.scroll.toTop') : t('share.scroll.toBottom')
+							atBottom ? t('share.scroll.toTop') : t('common.scrollToBottom')
 						}
 						aria-label={
-							atBottom
-								? t('share.scroll.ariaToTop')
-								: t('share.scroll.ariaToBottom')
+							atBottom ? t('common.scrollToTop') : t('common.scrollToBottom')
 						}
 						onClick={onScrollFabClick}
 						className={cn(

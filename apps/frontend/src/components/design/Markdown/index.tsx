@@ -502,8 +502,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				<Tooltip
 					content={
 						previewScrollFabMode === 'toBottom'
-							? (t?.('markdown.preview.scroll.toBottom') ?? '滚动到底部')
-							: (t?.('markdown.preview.scroll.toTop') ?? '滚动到顶部')
+							? (t?.('common.scrollToBottom') ?? '滚动到底部')
+							: (t?.('common.scrollToTop') ?? '滚动到顶部')
 					}
 				>
 					<button
@@ -515,8 +515,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						)}
 						aria-label={
 							previewScrollFabMode === 'toBottom'
-								? (t?.('markdown.preview.scroll.toBottom') ?? '滚动到底部')
-								: (t?.('markdown.preview.scroll.toTop') ?? '滚动到顶部')
+								? (t?.('common.scrollToBottom') ?? '滚动到底部')
+								: (t?.('common.scrollToTop') ?? '滚动到顶部')
 						}
 						onClick={onPreviewScrollCornerFabClick}
 					>

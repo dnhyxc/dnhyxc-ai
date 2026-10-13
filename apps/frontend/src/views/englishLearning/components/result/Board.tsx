@@ -127,7 +127,7 @@ export function Board({
 			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 				return;
 			}
@@ -141,7 +141,7 @@ export function Board({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));

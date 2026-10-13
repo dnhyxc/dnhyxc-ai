@@ -165,7 +165,7 @@ function ErrorActions({
 					onClick={() => navigate('/')}
 				>
 					<TreePalm className="size-4.5" />
-					{t('notFound.backHome')}
+					{t('common.backHome')}
 				</Button>
 			) : null}
 			<Button

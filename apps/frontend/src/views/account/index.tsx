@@ -133,7 +133,7 @@ const Account = () => {
 				),
 			},
 			{
-				label: t('account.fields.email'),
+				label: t('auth.email'),
 				key: 'email',
 				value: accountInfo.email || '-',
 				icon: (
@@ -145,7 +145,7 @@ const Account = () => {
 				),
 				component: (
 					<Input
-						placeholder={t('account.placeholders.email')}
+						placeholder={t('auth.email.placeholder')}
 						className="w-82"
 						value={accountInfo.email || ''}
 						onChange={(e) =>

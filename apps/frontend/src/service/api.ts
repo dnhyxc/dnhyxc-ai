@@ -205,6 +205,9 @@ export const ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD =
 /** 单词库（包）列表与库内词条分页 */
 export const ENGLISH_LEARNING_VOCABULARY_LIBRARIES =
 	'/english-learning/vocabulary-libraries';
+/** 导出单词库为 Word（DOCX）；路径后拼 `/:libraryId/export-docx` */
+export const ENGLISH_LEARNING_VOCABULARY_LIBRARY_EXPORT_DOCX =
+	'/english-learning/vocabulary-libraries';
 /** 将导入页解析后的经典语句包保存到「语句库」表 */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY =
 	'/english-learning/classic-quotes-library';
@@ -213,6 +216,9 @@ export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD =
 	'/english-learning/classic-quotes-library/upload';
 /** 经典语句库（包）列表与库内语句分页 */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES =
+	'/english-learning/classic-quotes-libraries';
+/** 导出语句库为 Word（DOCX）；路径后拼 `/:libraryId/export-docx` */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_EXPORT_DOCX =
 	'/english-learning/classic-quotes-libraries';
 /** 单词收藏：新增、取消、批量查询已收藏词形 */
 export const ENGLISH_LEARNING_VOCABULARY_FAVORITES =
@@ -259,6 +265,9 @@ export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES_EXPORT_DOCX =
 /** 导出今日待复习为 Word（?contentKind=vocab|classic） */
 export const ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX =
 	'/english-learning/practice/review/export-docx';
+/** 大集合 DOCX 异步导出任务 */
+export const ENGLISH_LEARNING_DOCX_EXPORT_JOBS =
+	'/english-learning/docx-export-jobs';
 /** 各模块列表续读开关（按用户） */
 export const ENGLISH_LEARNING_ITEMS_RESUME_MODULES =
 	'/english-learning/items-resume/modules';

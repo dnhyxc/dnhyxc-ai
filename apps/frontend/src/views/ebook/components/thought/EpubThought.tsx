@@ -100,7 +100,7 @@ export function EpubThought({
 									disabled={saving}
 									onClick={onClose}
 								>
-									{t('ebook.read.thought.cancel')}
+									{t('common.cancel')}
 								</Button>
 								<Button
 									type="button"
@@ -175,7 +175,7 @@ export function EpubThought({
 									disabled={saving}
 									onClick={() => void onDelete()}
 								>
-									{t('ebook.read.thought.delete')}
+									{t('common.delete')}
 								</Button>
 							) : null}
 							{onEdit ? (

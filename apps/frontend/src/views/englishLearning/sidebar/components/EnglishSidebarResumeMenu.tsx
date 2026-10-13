@@ -117,7 +117,7 @@ export function EnglishSidebarResumeMenu({
 					scrollable={false}
 				>
 					<DropdownMenuLabel className="text-textcolor px-[13px] py-1 text-sm font-medium opacity-60">
-						{t('englishLearning.resume.settingsLabel')}
+						{t('common.settings')}
 					</DropdownMenuLabel>
 					<DropdownMenuSeparator className="mx-0" />
 					<DropdownMenuItem

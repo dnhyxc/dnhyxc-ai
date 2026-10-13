@@ -92,7 +92,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			!isEditMode && (Boolean(loading) || Boolean(disableTextInput));
 
 		const placeholder =
-			placeholderProp ?? t?.('chat.textArea.placeholder') ?? '请输入您的问题';
+			placeholderProp ?? t?.('chat.entry.placeholder') ?? '请输入您的问题';
 
 		const scrollInputToBottom = () => {
 			const scroll = () => {
@@ -194,7 +194,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							}
 							disabled={loading}
 						>
-							{t?.('chat.textArea.send') ?? '发送'}
+							{t?.('common.send') ?? '发送'}
 						</Button>
 					</div>
 				)}

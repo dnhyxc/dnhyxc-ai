@@ -164,7 +164,7 @@ const SkillsPage = observer(function SkillsPage() {
 															<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
 																<button
 																	type="button"
-																	aria-label={t('skill.delete')}
+																	aria-label={t('common.delete')}
 																	className={cn(
 																		'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
 																		'hover:text-destructive hover:bg-destructive/10',
@@ -238,7 +238,7 @@ const SkillsPage = observer(function SkillsPage() {
 										aria-label={
 											skillStore.isDraftDirty
 												? t('skill.save.unsaved')
-												: t('skill.save')
+												: t('common.save')
 										}
 										onClick={onSave}
 									>
@@ -254,7 +254,7 @@ const SkillsPage = observer(function SkillsPage() {
 												/>
 											) : null}
 										</span>
-										<span>{t('skill.save')}</span>
+										<span>{t('common.save')}</span>
 									</Button>
 									<Button
 										variant="link"

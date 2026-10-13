@@ -544,7 +544,7 @@ const KnowledgeAssistantInner = observer(
 										}}
 									>
 										<CirclePlus />
-										{t('knowledge.assistant.newConversation')}
+										{t('common.newChat')}
 									</Button>
 								</div>
 							) : null}

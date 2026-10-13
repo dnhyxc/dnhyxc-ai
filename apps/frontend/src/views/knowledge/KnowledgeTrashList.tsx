@@ -306,7 +306,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 		const showEmptyHint =
 			!trashLoading && trashList.length === 0 && !trashLoadingMore;
 		const emptyHintText = searching
-			? t('knowledge.trash.empty.search')
+			? t('knowledge.list.empty.search')
 			: t('knowledge.trash.empty');
 
 		return (
@@ -333,7 +333,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 									? t('knowledge.trash.confirm.count', {
 											count: pendingDeleteIds.length,
 										})
-									: t('knowledge.trash.confirm.fileName', {
+									: t('knowledge.list.fileNameLabel', {
 											name:
 												pendingDeleteLabel || t('knowledge.common.untitled'),
 										})}
@@ -386,7 +386,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 										checked={
 											allChecked ? true : someChecked ? 'indeterminate' : false
 										}
-										aria-label={t('knowledge.trash.selectAll')}
+										aria-label={t('common.selectAll')}
 										onClick={(e) => e.stopPropagation()}
 										onCheckedChange={() => toggleAll()}
 									/>
@@ -395,7 +395,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 											allChecked ? 'text-textcolor' : 'text-textcolor/70'
 										}
 									>
-										{t('knowledge.trash.selectAll')}
+										{t('common.selectAll')}
 									</span>
 								</div>
 								<span className="text-xs text-textcolor/50">

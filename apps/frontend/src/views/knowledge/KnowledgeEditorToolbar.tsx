@@ -86,7 +86,7 @@ const KnowledgeEditorToolbar = (props: {
 					<span className={iconSlot}>
 						<FilePlus aria-hidden />
 					</span>
-					<span>{t('knowledge.toolbar.clear')}</span>
+					<span>{t('skill.new')}</span>
 				</Button>
 			</Tooltip>
 			<Tooltip
@@ -103,7 +103,7 @@ const KnowledgeEditorToolbar = (props: {
 					<span className={iconSlot}>
 						<SaveIcon aria-hidden />
 					</span>
-					<span>{t('knowledge.toolbar.save')}</span>
+					<span>{t('common.save')}</span>
 				</Button>
 			</Tooltip>
 			{isCloudLoggedIn && (
@@ -141,7 +141,7 @@ const KnowledgeEditorToolbar = (props: {
 						<span className={iconSlot}>
 							<Trash2 aria-hidden />
 						</span>
-						<span>{t('knowledge.toolbar.trash')}</span>
+						<span>{t('knowledge.trash.title')}</span>
 					</Button>
 				</Tooltip>
 			) : null}

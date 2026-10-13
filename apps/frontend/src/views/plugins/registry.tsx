@@ -162,9 +162,8 @@ export default function PluginRegistryEditorPage() {
 		} catch (e) {
 			Toast({
 				type: 'error',
-				title: t('plugins.registry.saveFail'),
-				message:
-					e instanceof Error ? e.message : t('plugins.registry.saveFail'),
+				title: t('knowledge.save.failed'),
+				message: e instanceof Error ? e.message : t('knowledge.save.failed'),
 			});
 		} finally {
 			setSaving(false);
@@ -411,7 +410,7 @@ export default function PluginRegistryEditorPage() {
 												<ListRestart className="size-4" aria-hidden />
 											)}
 										</span>
-										{t('plugins.registry.reload')}
+										{t('plugins.host.reload')}
 									</Button>
 								</div>
 							</div>

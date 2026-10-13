@@ -234,7 +234,7 @@ export function PracticeShortcutsMenu({
 						keys: playKeys,
 					},
 					{
-						label: t('englishLearning.practice.shortcuts.showAnswer'),
+						label: t('englishLearning.practice.showAnswer'),
 						keys: ['right'],
 					},
 					{
@@ -242,7 +242,7 @@ export function PracticeShortcutsMenu({
 						keys: ['up'],
 					},
 					{
-						label: t('englishLearning.practice.shortcuts.retry'),
+						label: t('englishLearning.practice.tryAgain'),
 						keys: ['left'],
 					},
 					{
@@ -263,7 +263,7 @@ export function PracticeShortcutsMenu({
 						keys: ['up'],
 					},
 					{
-						label: t('englishLearning.practice.shortcuts.retry'),
+						label: t('englishLearning.practice.tryAgain'),
 						keys: ['left'],
 					},
 					{

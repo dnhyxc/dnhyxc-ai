@@ -109,7 +109,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 					Toast({
 						type: 'error',
 						title:
-							t?.('dragUpload.error.invalidType', { type: file.type }) ??
+							t?.('upload.error.invalidType', { type: file.type }) ??
 							`不支持的文件类型: ${file.type}`,
 					});
 					return false;
@@ -119,7 +119,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 					Toast({
 						type: 'error',
 						title:
-							t?.('dragUpload.error.maxSize', {
+							t?.('upload.error.maxSize', {
 								maxSizeMb: maxSize || MAX_SIZE / 1024 / 1024,
 							}) ?? `文件大小不能超过 ${maxSize || MAX_SIZE / 1024 / 1024} MB`,
 					});

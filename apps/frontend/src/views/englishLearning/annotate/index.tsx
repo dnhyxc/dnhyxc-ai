@@ -131,7 +131,7 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 	const tone = TONE[toneKey];
 	const sourceLabel =
 		task.source === 'library'
-			? t('englishLearning.annotateTasks.sourceLibrary')
+			? t('englishLearning.library.classic.title')
 			: t('englishLearning.annotateTasks.sourcePack');
 	const displayStatus =
 		task.status === 'running' && !streaming
@@ -171,7 +171,7 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 							onClick={() => EnglishAnnotateSource.abort(task.id)}
 						>
 							<Spinner className="size-3.5 text-rose-500" />
-							{t('englishLearning.annotateSource.cancelRunning')}
+							{t('englishLearning.tts.stop')}
 						</Button>
 					) : null}
 					{task.status === 'paused' ||
@@ -190,7 +190,7 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 							) : (
 								<Play className="size-3.5" />
 							)}
-							{t('englishLearning.annotateTasks.resume')}
+							{t('ebook.read.listenBook.resume')}
 						</Button>
 					) : null}
 					{task.status !== 'running' || !streaming ? (
@@ -269,7 +269,7 @@ const TaskCard = observer(function TaskCard({ task }: { task: AnnotateTask }) {
 								valueClass="text-teal-700 dark:text-teal-400"
 							/>
 							<StatCell
-								label={t('englishLearning.annotateTasks.metricFailed')}
+								label={t('englishLearning.annotateTasks.statusError')}
 								value={p.failed}
 								shell={
 									p.failed > 0
@@ -321,7 +321,7 @@ function AnnotateTasksPageInner() {
 		<PracticePageShell
 			title={
 				<span className="min-w-0 truncate font-semibold">
-					{t('englishLearning.annotateTasks.pageTitle')}
+					{t('route.englishLearning.annotate.title')}
 				</span>
 			}
 			contentLayout="start"

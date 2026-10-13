@@ -174,7 +174,7 @@ const DesktopDownloadPage = () => {
 										{
 											id: 'linux' as const,
 											icon: Laptop,
-											label: t('downloadPage.platforms.linux'),
+											label: t('downloadPage.linux.cardTitle'),
 										},
 									] as const
 								).map(({ id, icon: Icon, label }) => {
@@ -319,7 +319,7 @@ const DesktopDownloadPage = () => {
 								<div className="inline-flex items-center gap-1.5 rounded-full bg-textcolor/5 px-3 py-1 text-[11px] text-textcolor/40">
 									<Clock className="size-3" />
 									{osTab === 'windows'
-										? t('downloadPage.windows.comingSoon')
+										? t('downloadPage.linux.comingSoon')
 										: t('downloadPage.linux.comingSoon')}
 								</div>
 								<p className="w-full text-sm text-textcolor/50">
@@ -340,7 +340,7 @@ const DesktopDownloadPage = () => {
 										void openExternalUrl(getUpdateInfoAbsoluteUrl(locale))
 									}
 								>
-									{t('downloadPage.links.releaseNotes')}
+									{t('about.links.updateInfo')}
 									<ArrowRight className="size-3" />
 								</button>
 								<button
@@ -350,7 +350,7 @@ const DesktopDownloadPage = () => {
 										void openExternalUrl(getProjectGuideAbsoluteUrl(locale))
 									}
 								>
-									{t('downloadPage.links.userGuide')}
+									{t('route.projectGuide.title')}
 									<ArrowRight className="size-3" />
 								</button>
 								<button

@@ -15,7 +15,7 @@ const NotFound = () => {
 			</div>
 			<div className="mt-5">
 				<Button className="cursor-pointer" onClick={() => navigate('/')}>
-					{t('notFound.backHome')}
+					{t('common.backHome')}
 				</Button>
 			</div>
 		</div>

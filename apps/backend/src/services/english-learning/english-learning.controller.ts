@@ -58,6 +58,7 @@ import {
 	ClassicQuoteMistakeRemoveBatchDto,
 	ClassicQuoteMistakeRemoveDto,
 } from './dto/classic-quote-mistake.dto';
+import { CreateEnglishDocxExportJobDto } from './dto/english-docx-export-job.dto';
 import {
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
@@ -96,6 +97,7 @@ import {
 	VocabularyMistakeRemoveBatchDto,
 	VocabularyMistakeRemoveDto,
 } from './dto/vocabulary-mistake.dto';
+import { EnglishDocxExportJobService } from './english-docx-export-job.service';
 import {
 	type EnglishLearningPackAgentToolEvent,
 	EnglishLearningService,
@@ -453,6 +455,7 @@ function classicQuoteHttpMessage(e: HttpException): string {
 export class EnglishLearningController {
 	constructor(
 		private readonly englishLearningService: EnglishLearningService,
+		private readonly docxExportJobService: EnglishDocxExportJobService,
 		private readonly annotateSourceTaskService: AnnotateSourceTaskService,
 		private readonly streamAbortRegistry: EnglishLearningStreamAbortRegistry,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -713,6 +716,34 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 导出单词库为 DOCX（可读即可；整库，至多生成上限） */
+	@Post('vocabulary-libraries/:libraryId/export-docx')
+	async exportVocabularyLibraryDocx(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportVocabularyLibraryDocxBuffer(
+				userId,
+				libraryId,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-vocabulary-library.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
+	}
+
 	/**
 	 * multipart 上传 JSON 文件（字段 `file` + `title`），服务端读取、解析、落库后删除临时文件。
 	 * 避免大 JSON 走 application/json 触达默认 body 大小限制。
@@ -934,6 +965,34 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 导出语句库为 DOCX（可读即可；整库，至多生成上限） */
+	@Post('classic-quotes-libraries/:libraryId/export-docx')
+	async exportClassicQuotesLibraryDocx(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportClassicQuotesLibraryDocxBuffer(
+				userId,
+				libraryId,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-classic-quotes-library.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
+	}
+
 	/**
 	 * multipart 上传 JSON 文件（字段 `file` + `title`），服务端读取、解析、落库后删除临时文件。
 	 */
@@ -1064,6 +1123,62 @@ export class EnglishLearningController {
 		);
 		res.setHeader('Content-Length', String(buf.length));
 		res.end(buf);
+	}
+
+	/** 大集合 DOCX 异步导出：创建任务（收藏/错题/复习） */
+	@Post('docx-export-jobs')
+	async createDocxExportJob(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateEnglishDocxExportJobDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = this.docxExportJobService.enqueue(userId, {
+			kind: dto.kind,
+			ids: dto.ids,
+			contentKind: dto.contentKind,
+		});
+		return { success: true, data };
+	}
+
+	/** 查询异步导出任务状态 */
+	@Get('docx-export-jobs/:jobId')
+	async getDocxExportJob(
+		@Req() req: AuthedRequest,
+		@Param('jobId') jobId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = this.docxExportJobService.getStatus(userId, jobId);
+		return { success: true, data };
+	}
+
+	/** 下载已完成的异步导出 DOCX */
+	@Get('docx-export-jobs/:jobId/download')
+	async downloadDocxExportJob(
+		@Req() req: AuthedRequest,
+		@Param('jobId') jobId: string,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const { buffer, filename } = await this.docxExportJobService.takeFile(
+			userId,
+			jobId,
+		);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Length', String(buffer.length));
+		res.end(buffer);
 	}
 
 	/** 经典句看中写：按分词标注词性 / IPA / 释义 */
@@ -1845,7 +1960,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户单词错题为 DOCX（可选 ids，至多 3000 条） */
+	/** 导出当前用户单词错题为 DOCX（可选 ids；全量分页，硬顶 20000） */
 	@Post('vocabulary-mistakes/export-docx')
 	async exportVocabularyMistakesDocx(
 		@Req() req: AuthedRequest,
@@ -1978,7 +2093,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户经典句错题为 DOCX（可选 ids，至多 3000 条） */
+	/** 导出当前用户经典句错题为 DOCX（可选 ids；全量分页，硬顶 20000） */
 	@Post('classic-quote-mistakes/export-docx')
 	async exportClassicQuoteMistakesDocx(
 		@Req() req: AuthedRequest,
@@ -2110,7 +2225,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户单词收藏为 DOCX（可选 ids，至多 3000 条） */
+	/** 导出当前用户单词收藏为 DOCX（可选 ids；全量分页，硬顶 20000） */
 	@Post('vocabulary-favorites/export-docx')
 	async exportVocabularyFavoritesDocx(
 		@Req() req: AuthedRequest,
@@ -2492,7 +2607,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 导出当前用户经典句收藏为 DOCX（可选 ids，至多 3000 条） */
+	/** 导出当前用户经典句收藏为 DOCX（可选 ids；全量分页，硬顶 20000） */
 	@Post('classic-quotes-favorites/export-docx')
 	async exportClassicQuoteFavoritesDocx(
 		@Req() req: AuthedRequest,

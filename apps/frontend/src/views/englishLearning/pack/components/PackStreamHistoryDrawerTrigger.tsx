@@ -80,7 +80,7 @@ function PackStreamHistoryDrawerTriggerInner({
 	const pageSize = isVocab ? VOCAB_HISTORY_PAGE_SIZE : HISTORY_PAGE_SIZE;
 	const openDrawerLabel = isVocab
 		? t('englishLearning.vocab.historyOpenDrawer')
-		: t('englishLearning.classic.historyOpenDrawer');
+		: t('englishLearning.vocab.historyOpenDrawer');
 
 	const fetchHistoryFirstPage = useCallback(async () => {
 		historyFetchingMoreRef.current = false;

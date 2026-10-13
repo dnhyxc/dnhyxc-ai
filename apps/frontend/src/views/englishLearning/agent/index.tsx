@@ -250,7 +250,7 @@ function EnglishAgentScrollShell({
 			<AssistantShell
 				t={t}
 				isLoading={isHydrating}
-				loadingText={t('englishLearning.loading')}
+				loadingText={t('common.loadingEllipsis')}
 				hasMessages={messageCount > 0}
 				maxWidth={AGENT_MAX_WIDTH}
 				emptyState={
@@ -319,8 +319,8 @@ function EnglishAgentScrollShell({
 						scrollFab={{
 							mode: scrollFabMode,
 							onClick: onScrollFabClick,
-							toBottomLabel: t('englishLearning.assistant.scrollToBottom'),
-							toTopLabel: t('englishLearning.assistant.scrollToTop'),
+							toBottomLabel: t('common.scrollToBottom'),
+							toTopLabel: t('common.scrollToTop'),
 							variant: 'panel',
 						}}
 						floatAbove={floatAbove}

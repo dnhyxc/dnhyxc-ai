@@ -154,7 +154,7 @@ const Share: React.FC<ShareProps> = ({
 			title={
 				shareType === 'knowledge'
 					? (tt('share.modal.title.knowledge') ?? '创建文章分享链接')
-					: (tt('share.modal.title.session') ?? '创建分享链接')
+					: (tt('chat.share.createLink') ?? '创建分享链接')
 			}
 			width="450px"
 			footer={null}
@@ -179,12 +179,12 @@ const Share: React.FC<ShareProps> = ({
 								{copied ? (
 									<>
 										<CheckCircle className="w-4 h-4 mr-1" />
-										{tt('share.modal.copied') ?? '已复制'}
+										{tt('common.copied') ?? '已复制'}
 									</>
 								) : (
 									<>
 										<Copy className="w-4 h-4 mr-1" />
-										{tt('share.modal.copy') ?? '复制'}
+										{tt('common.copy') ?? '复制'}
 									</>
 								)}
 							</Button>

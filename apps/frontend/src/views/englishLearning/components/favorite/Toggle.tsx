@@ -162,7 +162,7 @@ function useToggleBindings(props: ToggleProps) {
 	const unfavoriteLabel =
 		kind === 'vocab'
 			? t('englishLearning.vocab.unfavoriteWord')
-			: t('englishLearning.classic.unfavoriteQuote');
+			: t('englishLearning.vocab.unfavoriteWord');
 
 	const [favBusy, setFavBusy] = useState(false);
 

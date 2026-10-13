@@ -181,12 +181,12 @@ function KnowledgeCategoryAssign({
 				shadow
 				disableHoverableContent
 				disabled={open || busy}
-				content={t('knowledge.list.category.move')}
+				content={t('ebook.shelf.category.move')}
 			>
 				<PopoverTrigger asChild>
 					<button
 						type="button"
-						aria-label={t('knowledge.list.category.move')}
+						aria-label={t('ebook.shelf.category.move')}
 						aria-expanded={open}
 						disabled={busy}
 						className={cn(
@@ -212,7 +212,7 @@ function KnowledgeCategoryAssign({
 				onCloseAutoFocus={(e) => e.preventDefault()}
 			>
 				<p className="border-theme/10 text-textcolor border-b px-3 py-3.5 text-xs font-medium">
-					{t('knowledge.list.category.move')}
+					{t('ebook.shelf.category.move')}
 				</p>
 				<ScrollArea className="max-h-56 w-full">
 					<div className="flex min-w-0 flex-col gap-0.5 p-1 pb-2">
@@ -238,7 +238,7 @@ function KnowledgeCategoryAssign({
 							onClick={() => assign(null)}
 						>
 							<span className="min-w-0 truncate">
-								{t('knowledge.list.category.uncategorized')}
+								{t('ebook.shelf.category.uncategorized')}
 							</span>
 						</button>
 					</div>
@@ -1130,12 +1130,12 @@ const KnowledgeList: React.FC<IProps> = observer(
 							count: c.itemCount,
 						}))}
 						labels={{
-							title: t('knowledge.list.category.manage'),
-							add: t('knowledge.list.category.add'),
-							rename: t('knowledge.list.category.rename'),
-							delete: t('knowledge.list.category.delete'),
+							title: t('ebook.shelf.category.manage'),
+							add: t('ebook.shelf.category.add'),
+							rename: t('ebook.shelf.category.rename'),
+							delete: t('ebook.shelf.category.delete'),
 							deleteConfirm: t('knowledge.list.category.deleteConfirm'),
-							duplicateName: t('knowledge.list.category.duplicateName'),
+							duplicateName: t('ebook.shelf.category.duplicateName'),
 						}}
 						onCreate={async (name) => {
 							await knowledgeStore.createCategory(name);
@@ -1225,7 +1225,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				/>
 
 				<Drawer
-					title={t('route.knowledge.title')}
+					title={t('nav.knowledge')}
 					open={open}
 					onOpenChange={onOpenChange}
 				>
@@ -1324,7 +1324,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 										onClick={() => setCategoryManageOpen(true)}
 									>
 										<CircuitBoard className="size-4" aria-hidden />
-										{t('knowledge.list.category.manage')}
+										{t('ebook.shelf.category.manage')}
 									</Button>
 									<div
 										className={cn(
@@ -1332,13 +1332,13 @@ const KnowledgeList: React.FC<IProps> = observer(
 											'[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
 										)}
 										role="tablist"
-										aria-label={t('knowledge.list.category.all')}
+										aria-label={t('ebook.shelf.category.all')}
 									>
 										{(
 											[
 												{
 													key: { kind: 'all' } as KnowledgeCategoryKey,
-													label: t('knowledge.list.category.all'),
+													label: t('ebook.shelf.category.all'),
 													count: knowledgeStore.listAllCount,
 												},
 												...knowledgeStore.categories
@@ -1368,9 +1368,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 																key: {
 																	kind: 'uncategorized' as const,
 																},
-																label: t(
-																	'knowledge.list.category.uncategorized',
-																),
+																label: t('ebook.shelf.category.uncategorized'),
 																count: knowledgeStore.uncategorizedCount,
 															},
 														]

@@ -301,8 +301,8 @@ const SkillTryPanel = observer(function SkillTryPanel({
 						scrollFab={{
 							mode: scrollFabMode,
 							onClick: onScrollFabClick,
-							toBottomLabel: t('knowledge.assistant.scrollToBottom'),
-							toTopLabel: t('knowledge.assistant.scrollToTop'),
+							toBottomLabel: t('common.scrollToBottom'),
+							toTopLabel: t('common.scrollToTop'),
 							variant: 'panel',
 						}}
 						floatAbove={selectionSpeak.floatAbove}

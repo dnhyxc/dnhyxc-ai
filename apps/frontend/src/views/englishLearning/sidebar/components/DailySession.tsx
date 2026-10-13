@@ -135,7 +135,7 @@ export const DailySession = observer(function DailySession() {
 						{t('englishLearning.daily.loading')}
 					</span>
 				) : (
-					t('englishLearning.daily.sidebarDescLibrary')
+					t('englishLearning.daily.introTitle')
 				)
 			}
 			actions={[
@@ -146,7 +146,7 @@ export const DailySession = observer(function DailySession() {
 					gradientKey: 'daily',
 				},
 				{
-					label: t('englishLearning.daily.memorizedLink'),
+					label: t('englishLearning.daily.recordsTitle'),
 					onClick: () => navigate('/english-learning/daily/records'),
 					gradientKey: 'daily',
 				},

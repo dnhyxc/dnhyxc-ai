@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
 import { Entry } from '../../components/entry';
+import { Export } from '../../components/export';
 
 /** 与知识库列表一致：hover 时标题右侧预留 */
 const ROW_HOVER_PR = [
@@ -95,7 +96,7 @@ function VocabularyHistoryDrawerInner({
 								EnglishPackStore.vocabLoading &&
 								EnglishPackStore.vocabActiveStreamId === h.streamId;
 							const showEntry = h.wordCount > 0;
-							const actionCount = (showEntry ? 1 : 0) + 1;
+							const actionCount = (showEntry ? 1 : 0) + 2;
 							const hoverPr =
 								ROW_HOVER_PR[Math.min(actionCount, ROW_HOVER_PR.length - 1)];
 							return (
@@ -185,6 +186,17 @@ function VocabularyHistoryDrawerInner({
 													}}
 												/>
 											) : null}
+											<Export
+												kind="vocab"
+												source="pack"
+												streamId={h.streamId}
+												title={h.topic?.trim() || undefined}
+												count={h.wordCount > 0 ? h.wordCount : undefined}
+												disabled={busy || deleting}
+												onBeforeClick={(e) => {
+													e.stopPropagation();
+												}}
+											/>
 											<Button
 												type="button"
 												variant="ghost"

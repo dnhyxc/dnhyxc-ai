@@ -67,7 +67,7 @@ export function FavoritesPanelFooter({
 						htmlFor={selectAllId}
 						className="cursor-pointer text-sm font-medium whitespace-nowrap text-teal-500 hover:text-teal-400"
 					>
-						{t('englishLearning.favoritesDrawer.selectAllLoaded')}
+						{t('common.selectAll')}
 					</Label>
 				</div>
 			) : null}
@@ -84,8 +84,8 @@ export function FavoritesPanelFooter({
 				)}
 				<span>
 					{batchRemoving
-						? t('englishLearning.favoritesDrawer.removing')
-						: t('englishLearning.favoritesDrawer.removeSelected', {
+						? t('englishLearning.mistakes.removing')
+						: t('englishLearning.mistakes.removeSelected', {
 								count: selectedCount,
 							})}
 				</span>

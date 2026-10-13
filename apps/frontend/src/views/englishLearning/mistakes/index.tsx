@@ -100,7 +100,7 @@ export default function EnglishLearningMistakesPage() {
 			title:
 				kind === 'classic'
 					? t('englishLearning.practice.sourceClassicMistakes')
-					: t('englishLearning.practice.sourceMistakes'),
+					: t('route.englishLearning.mistakes.title'),
 		});
 	}, [counts.total, kind, t]);
 

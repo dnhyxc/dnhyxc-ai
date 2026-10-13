@@ -41,9 +41,9 @@ export async function resolvePracticeSourceTitle(
 		case 'mistakes':
 			return isClassic
 				? params.t('englishLearning.practice.sourceClassicMistakes')
-				: params.t('englishLearning.practice.sourceMistakes');
+				: params.t('route.englishLearning.mistakes.title');
 		case 'dailyMemorize':
-			return params.t('englishLearning.practice.sourceDailyMemorize');
+			return params.t('englishLearning.daily.recordsTitle');
 		case 'review':
 			return isClassic
 				? params.t('englishLearning.practice.sourceClassicReview')

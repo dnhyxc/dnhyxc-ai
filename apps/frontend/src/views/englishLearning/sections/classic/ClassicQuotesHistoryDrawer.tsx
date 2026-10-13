@@ -11,8 +11,9 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import { Annotate, Export } from '../../components/classic';
+import { Annotate } from '../../components/classic';
 import { Entry } from '../../components/entry';
+import { Export } from '../../components/export';
 
 /** 与知识库列表一致：hover 时标题右侧预留 */
 const ROW_HOVER_PR = [
@@ -85,7 +86,7 @@ function ClassicQuotesHistoryDrawerInner({
 					<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 						{showInitialLoading ? (
 							<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
-								<Loading text={t('englishLearning.classic.historyLoading')} />
+								<Loading text={t('englishLearning.vocab.historyLoading')} />
 							</div>
 						) : null}
 						{entries.map((h) => {
@@ -151,7 +152,7 @@ function ClassicQuotesHistoryDrawerInner({
 										<div
 											role="status"
 											className="absolute top-2 right-2 flex h-7 w-7 shrink-0 items-center justify-center"
-											aria-label={t('englishLearning.classic.historyStreaming')}
+											aria-label={t('englishLearning.vocab.historyStreaming')}
 										>
 											<Spinner className="size-4 shrink-0 text-teal-600 dark:text-teal-400" />
 										</div>
@@ -204,10 +205,11 @@ function ClassicQuotesHistoryDrawerInner({
 												</>
 											) : null}
 											<Export
+												kind="classic"
 												source="pack"
 												streamId={h.streamId}
 												title={h.topic?.trim() || undefined}
-												quoteCount={h.quoteCount > 0 ? h.quoteCount : undefined}
+												count={h.quoteCount > 0 ? h.quoteCount : undefined}
 												disabled={busy || deleting}
 												onBeforeClick={(e) => {
 													e.stopPropagation();

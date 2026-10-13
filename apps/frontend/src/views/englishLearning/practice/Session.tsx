@@ -344,7 +344,7 @@ export function Session({
 	}, [hintOpen, mode, phase, playWord]);
 
 	const dictationPromptHint = isClassic
-		? t('englishLearning.practice.classicDictationHint')
+		? t('englishLearning.practice.dictationHint')
 		: t('englishLearning.practice.dictationHint');
 
 	const renderBoard = (boardPhase: PracticeItemPhase) => (
@@ -486,8 +486,7 @@ export function Session({
 						}
 					>
 						<span className="truncate">
-							{sourceTitle?.trim() ||
-								t('englishLearning.practice.sourceResolving')}
+							{sourceTitle?.trim() || t('common.loadingEllipsis')}
 						</span>
 						{progressLabel ? (
 							<span className="shrink-0 tabular-nums">{progressLabel}</span>

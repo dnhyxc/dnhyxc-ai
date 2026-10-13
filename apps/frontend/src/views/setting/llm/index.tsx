@@ -1157,7 +1157,7 @@ const LlmSetting = observer(() => {
 												htmlFor="vector-api-key"
 												className={llmFormLabelClass}
 											>
-												{t('setting.llm.vectorApiKey')}
+												{t('setting.llm.apiKey')}
 											</Label>
 											<div className="min-w-0 flex-1">
 												<SecretInput

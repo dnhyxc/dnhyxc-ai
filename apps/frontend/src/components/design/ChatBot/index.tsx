@@ -201,7 +201,7 @@ const ChatBot = observer(
 				if (!content) {
 					Toast({
 						type: 'warning',
-						title: t('chat.bot.toast.noContent.title'),
+						title: t('ebook.read.thought.empty'),
 						message: t('chat.bot.toast.noContent.desc'),
 					});
 					return;

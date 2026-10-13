@@ -202,7 +202,7 @@ export function AssistantEntryToolbar({
 		<SessionNewConversationButton
 			layout={layout}
 			disabled={isSessionSwitcherLocked}
-			label={t('knowledge.assistant.newConversation')}
+			label={t('common.newChat')}
 			iconOnly={iconOnlyActions}
 			onClick={startNewConversation}
 		/>

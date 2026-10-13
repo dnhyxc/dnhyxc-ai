@@ -144,7 +144,7 @@ export default function EnglishLearningDailyRecordsPage() {
 		if (totalCount <= 0) return;
 		setEnglishPracticePoolMeta(englishPracticePoolKeys.dailyMemorize(), {
 			total: totalCount,
-			title: t('englishLearning.practice.sourceDailyMemorize'),
+			title: t('englishLearning.daily.recordsTitle'),
 		});
 	}, [totalCount, t]);
 
@@ -166,7 +166,7 @@ export default function EnglishLearningDailyRecordsPage() {
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));
@@ -244,9 +244,7 @@ export default function EnglishLearningDailyRecordsPage() {
 								disabled={totalCount <= 0}
 								practice={{
 									source: 'dailyMemorize',
-									sourceTitle: t(
-										'englishLearning.practice.sourceDailyMemorize',
-									),
+									sourceTitle: t('englishLearning.daily.recordsTitle'),
 									poolTotal: totalCount > 0 ? totalCount : undefined,
 								}}
 							/>

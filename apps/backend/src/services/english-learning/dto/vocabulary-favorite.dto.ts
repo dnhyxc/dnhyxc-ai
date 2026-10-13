@@ -53,11 +53,11 @@ export class VocabularyFavoriteRemoveBatchDto {
 	ids!: string[];
 }
 
-/** 导出 DOCX：可选 ids；省略或空数组则全量（至多 3000） */
+/** 导出 DOCX：可选 ids；省略或空数组则全量（服务端硬顶 20000，触顶明示截断） */
 export class EnglishExportDocxDto {
 	@IsOptional()
 	@IsArray()
-	@ArrayMaxSize(3000)
+	@ArrayMaxSize(20000)
 	@IsUUID('4', { each: true })
 	ids?: string[];
 }

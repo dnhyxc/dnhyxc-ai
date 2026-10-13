@@ -33,7 +33,7 @@ export function useDailyPlayback(args: {
 			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 				return;
 			}

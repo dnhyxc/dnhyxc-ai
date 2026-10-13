@@ -317,7 +317,7 @@ export default function PracticeReportDetailPage() {
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.practice.reportsRemoveConfirmAction')}
+				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -342,7 +342,7 @@ export default function PracticeReportDetailPage() {
 							)}
 							<span>
 								{removing
-									? t('englishLearning.practice.reportsRemoving')
+									? t('englishLearning.library.deleting')
 									: t('englishLearning.practice.reportsRemoveAction')}
 							</span>
 						</button>

@@ -163,7 +163,7 @@ const SessionItem = memo<SessionItemProps>(
 								__html: parser.render(
 									item?.title ||
 										item.messages?.[0]?.content ||
-										t('chat.newSession'),
+										t('common.newChat'),
 								),
 							}}
 						/>

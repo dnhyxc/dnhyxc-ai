@@ -98,7 +98,7 @@ const Profile = observer(() => {
 				value: u?.username?.trim() ? u.username : '—',
 			},
 			{
-				label: t('account.fields.email'),
+				label: t('auth.email'),
 				value: u?.email?.trim()
 					? isProtectedAccountUsername(u.username)
 						? maskEmail(u.email)

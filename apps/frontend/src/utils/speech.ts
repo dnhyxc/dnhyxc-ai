@@ -588,7 +588,7 @@ function notifyCloudTtsFallback(
 	Toast({
 		type: 'error',
 		title: translateSync(titleKey),
-		message: translateSync('englishLearning.tts.unsupported'),
+		message: translateSync('assistant.tts.unsupported'),
 	});
 }
 

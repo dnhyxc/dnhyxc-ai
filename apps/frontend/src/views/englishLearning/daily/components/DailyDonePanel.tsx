@@ -73,7 +73,7 @@ function buildDailyReportTitle(
 	const source = t('route.englishLearning.daily.title');
 	const base = `${kind}${modeLabel} · ${source}`;
 	if (isRetryWrong) {
-		return `${base} · ${t('englishLearning.practice.reportRetrySuffix')}`;
+		return `${base} · ${t('englishLearning.practice.retryWrong')}`;
 	}
 	return base;
 }
@@ -326,7 +326,7 @@ export function DailyDonePanel({
 				)}
 				onClick={() => navigate('/english-learning/daily/records')}
 			>
-				{t('englishLearning.daily.memorizedLink')}
+				{t('englishLearning.daily.recordsTitle')}
 			</Button>
 		</>
 	);

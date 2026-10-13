@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import {
 	downloadEnglishClassicQuoteFavoritesDocx,
 	type EnglishClassicQuoteFavoriteListEntry,
+	exportEnglishDocxSmart,
 	listEnglishClassicQuoteFavorites,
 	removeEnglishClassicQuoteFavoritesBatch,
 } from '@/service';
@@ -37,6 +38,7 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { Card } from '../../components/classic';
 import { CornerFab } from '../../components/list';
 import { Panel } from '../../components/shell';
+import { useDocxExportConfirm } from '../../hooks/useDocxExportConfirm';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
@@ -46,6 +48,7 @@ import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
+import { exportDocxFileName } from '../../utils/exportFileName';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import type { FavoritesListCounts } from '../vocabulary';
 
@@ -131,6 +134,8 @@ export function ClassicQuotesFavoritesSection({
 	}, []);
 
 	const [exportingDocx, setExportingDocx] = useState(false);
+	const { confirmAsync, confirmNode: docxAsyncConfirm } =
+		useDocxExportConfirm();
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
@@ -230,7 +235,7 @@ export function ClassicQuotesFavoritesSection({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));
@@ -334,14 +339,33 @@ export function ClassicQuotesFavoritesSection({
 		if (entries.length === 0 && !loading) {
 			Toast({
 				type: 'info',
-				title: t('englishLearning.classic.exportDocxEmpty'),
+				title: t('englishLearning.export.docxEmpty'),
 			});
 			return;
 		}
 		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+		const exportCount = ids?.length ?? totalCount;
+		const fileName = exportDocxFileName(
+			t('englishLearning.favorites.classic.nav'),
+		);
 		setExportingDocx(true);
 		try {
-			await downloadEnglishClassicQuoteFavoritesDocx(ids);
+			const mode = await exportEnglishDocxSmart({
+				exportCount,
+				confirmAsync,
+				syncDownload: () =>
+					downloadEnglishClassicQuoteFavoritesDocx(ids, fileName),
+				kind: 'classic-quote-favorites',
+				ids,
+				fileName,
+				onAsyncStart: () => {
+					Toast({
+						type: 'info',
+						title: t('englishLearning.export.asyncStarted'),
+					});
+				},
+			});
+			if (mode === 'cancelled') return;
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',
@@ -352,9 +376,7 @@ export function ClassicQuotesFavoritesSection({
 			Toast({
 				type: 'error',
 				title:
-					e instanceof Error
-						? e.message
-						: t('englishLearning.classic.exportDocxFail'),
+					e instanceof Error ? e.message : t('englishLearning.export.failed'),
 			});
 		} finally {
 			setExportingDocx(false);
@@ -367,6 +389,7 @@ export function ClassicQuotesFavoritesSection({
 
 	return (
 		<>
+			{docxAsyncConfirm}
 			<Confirm
 				open={removeConfirmOpen}
 				onOpenChange={setRemoveConfirmOpen}
@@ -375,7 +398,7 @@ export function ClassicQuotesFavoritesSection({
 					count: selectedEntries.length,
 				})}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -405,7 +428,7 @@ export function ClassicQuotesFavoritesSection({
 					)
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -433,20 +456,20 @@ export function ClassicQuotesFavoritesSection({
 							exportDisabled={exportDisabled}
 							exportingDocx={exportingDocx}
 							onExportDocx={handleExportDocx}
-							exportLabel={t('englishLearning.classic.exportDocx')}
+							exportLabel={t('englishLearning.export.docx')}
 						/>
 					}
 					trailing={headerTrailing}
 				/>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
-						<Loading text={t('englishLearning.classic.favoritesLoading')} />
+						<Loading text={t('englishLearning.vocab.favoritesLoading')} />
 					</div>
 				) : (
 					<div className="relative min-h-0 flex-1">
 						{awaitingGrid ? (
 							<div className="bg-theme-background absolute inset-0 z-10 flex items-center justify-center px-4">
-								<Loading text={t('englishLearning.classic.favoritesLoading')} />
+								<Loading text={t('englishLearning.vocab.favoritesLoading')} />
 							</div>
 						) : null}
 						<ScrollArea
@@ -489,7 +512,7 @@ export function ClassicQuotesFavoritesSection({
 														disabled: selectionDisabled,
 														onCheckedChange: (checked) =>
 															toggleRowSelected(row.id, checked),
-														ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`,
+														ariaLabel: `${t('englishLearning.mistakes.toggleRow')}: ${row.english.slice(0, 120)}`,
 													}}
 													playing={playing}
 													onTogglePlay={() =>

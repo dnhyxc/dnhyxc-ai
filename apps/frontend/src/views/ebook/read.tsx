@@ -1957,11 +1957,11 @@ function EbookReadPage() {
 
 	const selectionPopBarLabels = useMemo(
 		() => ({
-			copy: t('ebook.read.contextMenu.copy'),
-			copied: t('chat.codeToolbar.copied'),
+			copy: t('common.copy'),
+			copied: t('common.copied'),
 			underline: t('ebook.read.selectionPop.underline'),
 			removeUnderline: t('ebook.read.selectionPop.removeUnderline'),
-			writeThought: t('ebook.read.contextMenu.addThought'),
+			writeThought: t('ebook.read.thought.createTitle'),
 			share: t('ebook.read.selectionPop.share'),
 			askBook: t('ebook.read.selectionPop.askBook'),
 			listen: listenLabel('popbar', t('ebook.read.selectionPop.listen')),
@@ -2747,7 +2747,7 @@ function EbookReadPage() {
 					sideOffset={6}
 					delayDuration={200}
 					shadow
-					content={t('ebook.read.pdfZoomOut')}
+					content={t('imagePreview.zoomOut')}
 				>
 					<Button
 						type="button"
@@ -2755,7 +2755,7 @@ function EbookReadPage() {
 						size="icon-sm"
 						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfZoom <= PDF_ZOOM_MIN}
-						aria-label={t('ebook.read.pdfZoomOut')}
+						aria-label={t('imagePreview.zoomOut')}
 						onClick={() => patchPdfZoom(-PDF_ZOOM_STEP)}
 					>
 						<Minus className="size-4" />
@@ -2772,7 +2772,7 @@ function EbookReadPage() {
 					sideOffset={6}
 					delayDuration={200}
 					shadow
-					content={t('ebook.read.pdfZoomIn')}
+					content={t('imagePreview.zoomIn')}
 				>
 					<Button
 						type="button"
@@ -2780,7 +2780,7 @@ function EbookReadPage() {
 						size="icon-sm"
 						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfZoom >= PDF_ZOOM_MAX}
-						aria-label={t('ebook.read.pdfZoomIn')}
+						aria-label={t('imagePreview.zoomIn')}
 						onClick={() => patchPdfZoom(PDF_ZOOM_STEP)}
 					>
 						<Plus className="size-4" />

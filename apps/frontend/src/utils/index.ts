@@ -373,6 +373,21 @@ async function toDownloadBlobBytes(blobData: unknown): Promise<{
 }
 
 /**
+ * 原生保存对话框全局串行：macOS/rfd 与部分浏览器在并发 showSaveFilePicker
+ * / AsyncFileDialog 时，后开的会挂死直到刷新。网络拉取仍可并行，仅落盘选择排队。
+ */
+let saveDialogTail: Promise<unknown> = Promise.resolve();
+
+function enqueueSaveDialog<T>(task: () => Promise<T>): Promise<T> {
+	const next = saveDialogTail.then(task, task);
+	saveDialogTail = next.then(
+		() => undefined,
+		() => undefined,
+	);
+	return next;
+}
+
+/**
  * 下载Blob数据（Tauri 侧为 Vec<u8>，须传可序列化的字节数组）
  */
 export const downloadBlob = async (
@@ -401,17 +416,14 @@ export const downloadBlob = async (
 		}
 		const { bytes, contentType } = await toDownloadBlobBytes(blobData);
 		const { invoke } = await import('@tauri-apps/api/core');
-		const result: DownloadResult = await invoke('download_blob', {
-			options,
-			blobData: bytes,
-			contentType,
-		});
+		const result: DownloadResult = await enqueueSaveDialog(() =>
+			invoke('download_blob', {
+				options,
+				blobData: bytes,
+				contentType,
+			}),
+		);
 		if (result.success) {
-			Toast({
-				type: result.success as 'success' | 'error',
-				title: result.message,
-			});
-		} else {
 			Toast({
 				type: result.success,
 				title: result.message,
@@ -445,37 +457,39 @@ export const saveFileWithPicker = async (options: {
 		if (!isTauriRuntime()) {
 			try {
 				if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
-					const handle = await (
-						window as unknown as {
-							showSaveFilePicker: (opts: {
-								suggestedName?: string;
-								types?: Array<{
-									description: string;
-									accept: Record<string, string[]>;
-								}>;
-							}) => Promise<FileSystemFileHandle>;
-						}
-					).showSaveFilePicker({
-						suggestedName: options.file_name,
-						...(isJson
-							? {
-									types: [
-										{
-											description: 'JSON',
-											accept: { 'application/json': ['.json'] },
-										},
-									],
-								}
-							: {}),
+					return await enqueueSaveDialog(async () => {
+						const handle = await (
+							window as unknown as {
+								showSaveFilePicker: (opts: {
+									suggestedName?: string;
+									types?: Array<{
+										description: string;
+										accept: Record<string, string[]>;
+									}>;
+								}) => Promise<FileSystemFileHandle>;
+							}
+						).showSaveFilePicker({
+							suggestedName: options.file_name,
+							...(isJson
+								? {
+										types: [
+											{
+												description: 'JSON',
+												accept: { 'application/json': ['.json'] },
+											},
+										],
+									}
+								: {}),
+						});
+						const writable = await handle.createWritable();
+						await writable.write(new Blob([options.content], { type: mime }));
+						await writable.close();
+						Toast({
+							type: 'success',
+							title: '文件保存成功',
+						});
+						return { success: true };
 					});
-					const writable = await handle.createWritable();
-					await writable.write(new Blob([options.content], { type: mime }));
-					await writable.close();
-					Toast({
-						type: 'success',
-						title: '文件保存成功',
-					});
-					return { success: true };
 				}
 			} catch {
 				// 用户取消或 API 不可用，走 Blob 回退
@@ -497,13 +511,17 @@ export const saveFileWithPicker = async (options: {
 		}
 		const { invoke } = await import('@tauri-apps/api/core');
 		// Tauri SaveFileOptions：default_name + filters（不是 file_name）
-		const result = (await invoke('save_file_with_picker', {
-			options: {
-				content: options.content,
-				default_name: options.file_name,
-				filters: isJson ? [{ name: 'JSON', extensions: ['json'] }] : undefined,
-			},
-		})) as {
+		const result = (await enqueueSaveDialog(() =>
+			invoke('save_file_with_picker', {
+				options: {
+					content: options.content,
+					default_name: options.file_name,
+					filters: isJson
+						? [{ name: 'JSON', extensions: ['json'] }]
+						: undefined,
+				},
+			}),
+		)) as {
 			success?: string;
 			filePath?: string | null;
 			file_path?: string | null;
@@ -518,6 +536,10 @@ export const saveFileWithPicker = async (options: {
 			return { success: true, message: result.message };
 		}
 		if (result.message?.includes('取消')) {
+			Toast({
+				type: 'warning',
+				title: result.message,
+			});
 			return { success: false, message: result.message };
 		}
 		Toast({

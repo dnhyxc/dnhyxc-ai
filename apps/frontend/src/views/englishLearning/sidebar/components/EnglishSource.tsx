@@ -147,7 +147,7 @@ export function EnglishSource({
 						}
 					>
 						{isVocab
-							? t('englishLearning.source.morphologyLink')
+							? t('englishLearning.chip.morphology')
 							: t('englishLearning.source.grammarLink')}
 					</button>
 				</div>

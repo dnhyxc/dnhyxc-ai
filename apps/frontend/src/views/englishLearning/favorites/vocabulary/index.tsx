@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import {
 	downloadEnglishVocabularyFavoritesDocx,
 	type EnglishVocabularyFavoriteListEntry,
+	exportEnglishDocxSmart,
 	listEnglishVocabularyFavorites,
 	removeEnglishVocabularyFavoritesBatch,
 } from '@/service';
@@ -37,6 +38,7 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { CornerFab } from '../../components/list';
 import { Panel } from '../../components/shell';
 import { Card } from '../../components/vocab';
+import { useDocxExportConfirm } from '../../hooks/useDocxExportConfirm';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
@@ -46,6 +48,7 @@ import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
+import { exportDocxFileName } from '../../utils/exportFileName';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 
 const LIST_SCOPE = 'vocab-favorites' as const;
@@ -136,6 +139,8 @@ export function VocabularyFavoritesSection({
 	}, []);
 
 	const [exportingDocx, setExportingDocx] = useState(false);
+	const { confirmAsync, confirmNode: docxAsyncConfirm } =
+		useDocxExportConfirm();
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
@@ -235,7 +240,7 @@ export function VocabularyFavoritesSection({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));
@@ -337,14 +342,33 @@ export function VocabularyFavoritesSection({
 		if (entries.length === 0 && !loading) {
 			Toast({
 				type: 'info',
-				title: t('englishLearning.vocab.exportDocxEmpty'),
+				title: t('englishLearning.export.docxEmpty'),
 			});
 			return;
 		}
 		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+		const exportCount = ids?.length ?? totalCount;
+		const fileName = exportDocxFileName(
+			t('englishLearning.favorites.vocab.nav'),
+		);
 		setExportingDocx(true);
 		try {
-			await downloadEnglishVocabularyFavoritesDocx(ids);
+			const mode = await exportEnglishDocxSmart({
+				exportCount,
+				confirmAsync,
+				syncDownload: () =>
+					downloadEnglishVocabularyFavoritesDocx(ids, fileName),
+				kind: 'vocabulary-favorites',
+				ids,
+				fileName,
+				onAsyncStart: () => {
+					Toast({
+						type: 'info',
+						title: t('englishLearning.export.asyncStarted'),
+					});
+				},
+			});
+			if (mode === 'cancelled') return;
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',
@@ -355,9 +379,7 @@ export function VocabularyFavoritesSection({
 			Toast({
 				type: 'error',
 				title:
-					e instanceof Error
-						? e.message
-						: t('englishLearning.vocab.exportDocxFail'),
+					e instanceof Error ? e.message : t('englishLearning.export.failed'),
 			});
 		} finally {
 			setExportingDocx(false);
@@ -370,6 +392,7 @@ export function VocabularyFavoritesSection({
 
 	return (
 		<>
+			{docxAsyncConfirm}
 			<Confirm
 				open={removeConfirmOpen}
 				onOpenChange={setRemoveConfirmOpen}
@@ -378,7 +401,7 @@ export function VocabularyFavoritesSection({
 					count: selectedEntries.length,
 				})}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -399,7 +422,7 @@ export function VocabularyFavoritesSection({
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -423,7 +446,7 @@ export function VocabularyFavoritesSection({
 							exportDisabled={exportDisabled}
 							exportingDocx={exportingDocx}
 							onExportDocx={handleExportDocx}
-							exportLabel={t('englishLearning.vocab.exportDocx')}
+							exportLabel={t('englishLearning.export.docx')}
 							showEntry
 							practiceContentKind="vocab"
 							practiceDisabled={exportDisabled}
@@ -477,7 +500,7 @@ export function VocabularyFavoritesSection({
 														disabled: selectionDisabled,
 														onCheckedChange: (checked) =>
 															toggleRowSelected(row.id, checked),
-														ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`,
+														ariaLabel: `${t('englishLearning.mistakes.toggleRow')}: ${row.word}`,
 													}}
 													playing={playing}
 													onTogglePlay={() =>

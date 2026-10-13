@@ -10,7 +10,7 @@ export function formatEnglishLearningAgentToolLine(
 	}
 	const action =
 		e.name === 'internet_search'
-			? t('englishLearning.agentTool.internet')
+			? t('chat.entry.webSearch')
 			: e.name === 'knowledge_base_retrieval'
 				? t('englishLearning.agentTool.knowledge')
 				: e.name === 'get_current_date' || e.name === 'get_current_datetime'

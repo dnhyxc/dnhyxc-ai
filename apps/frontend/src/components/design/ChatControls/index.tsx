@@ -90,13 +90,13 @@ const ChatControls = ({
 						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
 						aria-label={
 							isAtBottom
-								? (t?.('chat.controls.scroll.toTop') ?? '滚动到顶部')
-								: (t?.('chat.controls.scroll.toBottom') ?? '滚动到底部')
+								? (t?.('common.scrollToTop') ?? '滚动到顶部')
+								: (t?.('common.scrollToBottom') ?? '滚动到底部')
 						}
 						title={
 							isAtBottom
-								? (t?.('chat.controls.scroll.toTop') ?? '滚动到顶部')
-								: (t?.('chat.controls.scroll.toBottom') ?? '滚动到底部')
+								? (t?.('common.scrollToTop') ?? '滚动到顶部')
+								: (t?.('common.scrollToBottom') ?? '滚动到底部')
 						}
 					>
 						{isAtBottom ? <ChevronUp /> : <ChevronDown />}

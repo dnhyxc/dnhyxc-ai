@@ -188,7 +188,7 @@ const Chat = observer(() => {
 								className="cursor-pointer border-textcolor/60"
 							/>
 							<Label htmlFor="terms" className="cursor-pointer ml-2 text-md">
-								{t('chat.share.selectAll')}
+								{t('common.selectAll')}
 							</Label>
 						</div>
 						<div className="border-l border-textcolor/50 h-3" />

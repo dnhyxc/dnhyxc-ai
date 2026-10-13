@@ -152,7 +152,7 @@ const SkillSlashPicker = observer(function SkillSlashPicker({
 			}}
 		>
 			<div className="flex items-center gap-3 px-2 py-3 mb-1 border-b border-theme/10">
-				<div className="text-sm text-textcolor">{t('route.skills.title')}</div>
+				<div className="text-sm text-textcolor">{t('nav.skills')}</div>
 				{filterQ ? (
 					<div className="shrink-0 truncate text-xs text-textcolor/55">
 						{t('skill.slash.filtering', { q: query.trim() })}

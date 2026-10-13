@@ -15,7 +15,7 @@ export function buildPracticeReportTitle(
 ): string {
 	const kind =
 		config.contentKind === 'classic'
-			? t('englishLearning.practice.reportKindClassic')
+			? t('englishLearning.stream.classic.nav')
 			: t('englishLearning.practice.reportKindVocab');
 	const mode =
 		config.mode === 'dictation'
@@ -26,7 +26,7 @@ export function buildPracticeReportTitle(
 		t('englishLearning.practice.reportSourceFallback');
 	const base = `${kind}${mode} · ${source}`;
 	if (config.isRetryWrong) {
-		return `${base} · ${t('englishLearning.practice.reportRetrySuffix')}`;
+		return `${base} · ${t('englishLearning.practice.retryWrong')}`;
 	}
 	return base;
 }
@@ -40,7 +40,7 @@ export function practiceModeShortLabel(
 		return t('englishLearning.daily.modeRecognition');
 	}
 	return mode === 'dictation'
-		? t('englishLearning.practice.modeDictation')
+		? t('englishLearning.daily.modeDictation')
 		: t('englishLearning.practice.modeSpelling');
 }
 

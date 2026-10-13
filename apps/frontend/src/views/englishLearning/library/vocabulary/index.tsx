@@ -166,7 +166,7 @@ export function VocabularyLibrarySection({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));

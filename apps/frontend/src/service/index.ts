@@ -82,7 +82,9 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_DOCX_EXPORT_JOBS,
 	ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH,
@@ -97,6 +99,7 @@ import {
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY,
+	ENGLISH_LEARNING_VOCABULARY_LIBRARY_EXPORT_DOCX,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_VOCABULARY_MISTAKES,
 	ENGLISH_LEARNING_VOCABULARY_MISTAKES_EXPORT_DOCX,
@@ -2607,17 +2610,136 @@ export function patchElListResume(
 	return patch(offset).then(() => undefined);
 }
 
+/** 英语学习大 DOCX 导出（收藏/错题/复习/词库）：生成较慢，拉长超时 */
+const ENGLISH_DOCX_TIMEOUT_MS = 180_000;
+
+/** 超过此条数走异步 Job（与后端 DOCX_EXPORT_SYNC_SOFT=10000 对齐） */
+export const ENGLISH_DOCX_SYNC_SOFT = 10_000;
+
+export type EnglishDocxExportJobKind =
+	| 'vocabulary-favorites'
+	| 'classic-quote-favorites'
+	| 'vocabulary-mistakes'
+	| 'classic-quote-mistakes'
+	| 'practice-review';
+
+type DocxExportJobStatus = 'pending' | 'running' | 'done' | 'failed';
+
+/** 创建大集合 DOCX 异步导出任务 */
+export async function enqueueEnglishDocxExportJob(input: {
+	kind: EnglishDocxExportJobKind;
+	ids?: string[];
+	contentKind?: 'vocab' | 'classic';
+}): Promise<string> {
+	const { data } = await http.post<{
+		jobId: string;
+		status: DocxExportJobStatus;
+	}>(ENGLISH_LEARNING_DOCX_EXPORT_JOBS, {
+		kind: input.kind,
+		ids: input.ids,
+		contentKind: input.contentKind,
+	});
+	const jobId = data?.jobId?.trim();
+	if (!jobId) throw new Error('创建导出任务失败');
+	return jobId;
+}
+
+/** 轮询异步导出任务直至完成，再下载文件 */
+export async function waitAndDownloadEnglishDocxExportJob(
+	jobId: string,
+	fileName?: string,
+): Promise<void> {
+	const id = jobId.trim();
+	if (!id) throw new Error('jobId required');
+	const deadline = Date.now() + ENGLISH_DOCX_TIMEOUT_MS;
+	const saveName = fileName?.trim() || `english-export-${Date.now()}.docx`;
+	while (Date.now() < deadline) {
+		const { data } = await http.get<{
+			jobId: string;
+			status: DocxExportJobStatus;
+			error?: string;
+		}>(`${ENGLISH_LEARNING_DOCX_EXPORT_JOBS}/${encodeURIComponent(id)}`, {
+			silent: true,
+		});
+		const status = data?.status;
+		if (status === 'done') {
+			const { data: file } = await http.get<ArrayBuffer>(
+				`${ENGLISH_LEARNING_DOCX_EXPORT_JOBS}/${encodeURIComponent(id)}/download`,
+				{ silent: true, timeout: ENGLISH_DOCX_TIMEOUT_MS },
+			);
+			if (!(file instanceof ArrayBuffer)) {
+				throw new Error('导出文件无效');
+			}
+			const blob = new Blob([file], {
+				type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			});
+			const result = await downloadBlob(
+				{
+					file_name: saveName,
+					id: `english-docx-job-${Date.now()}`,
+					overwrite: true,
+				},
+				blob,
+			);
+			if (result.success !== 'success') {
+				if (isTauriRuntime()) return;
+				throw new Error(result.message || '下载失败');
+			}
+			return;
+		}
+		if (status === 'failed') {
+			throw new Error(data?.error || '导出失败');
+		}
+		await new Promise((r) => setTimeout(r, 1000));
+	}
+	throw new Error('导出超时，请稍后重试');
+}
+
+/**
+ * 小集合同步下载；超过 {@link ENGLISH_DOCX_SYNC_SOFT} 则 Confirm 后异步生成再下载。
+ * `confirmAsync` 返回 false 表示用户取消。
+ */
+export async function exportEnglishDocxSmart(opts: {
+	exportCount: number;
+	confirmAsync: (count: number) => Promise<boolean>;
+	syncDownload: () => Promise<void>;
+	kind: EnglishDocxExportJobKind;
+	ids?: string[];
+	contentKind?: 'vocab' | 'classic';
+	/** 异步落盘建议文件名（同步路径由 syncDownload 自行指定） */
+	fileName?: string;
+	onAsyncStart?: () => void;
+}): Promise<'sync' | 'async' | 'cancelled'> {
+	const count = Math.max(0, opts.exportCount);
+	if (count <= ENGLISH_DOCX_SYNC_SOFT) {
+		await opts.syncDownload();
+		return 'sync';
+	}
+	const ok = await opts.confirmAsync(count);
+	if (!ok) return 'cancelled';
+	opts.onAsyncStart?.();
+	const jobId = await enqueueEnglishDocxExportJob({
+		kind: opts.kind,
+		ids: opts.ids,
+		contentKind: opts.contentKind,
+	});
+	await waitAndDownloadEnglishDocxExportJob(jobId, opts.fileName);
+	return 'async';
+}
+
 /**
  * 带鉴权拉取英语学习导出 DOCX：`http.post` 取 `ArrayBuffer` 后统一走 {@link downloadBlob}。
- * body.ids 非空时仅导出这些条目；否则全量（至多 3000）。
+ * body.ids 非空时仅导出这些条目；否则全量（服务端硬顶 20000）。
  */
 async function downloadEnglishAuthorizedDocx(
 	path: string,
 	filename: string,
 	body?: Record<string, unknown>,
+	opts?: { timeout?: number },
 ): Promise<void> {
 	const { data } = await http.post<ArrayBuffer>(path, body ?? {}, {
 		silent: true,
+		...(opts?.timeout != null ? { timeout: opts.timeout } : {}),
 	});
 	if (!(data instanceof ArrayBuffer)) {
 		throw new Error('导出文件无效');
@@ -2646,47 +2768,55 @@ function exportDocxBody(ids?: string[]): { ids?: string[] } {
 	return ids && ids.length > 0 ? { ids } : {};
 }
 
-/** 下载当前用户单词收藏 Word（有 ids 仅导出所选，否则全量至多 3000） */
+/** 下载当前用户单词收藏 Word（有 ids 仅导出所选，否则全量） */
 export async function downloadEnglishVocabularyFavoritesDocx(
 	ids?: string[],
+	fileName?: string,
 ): Promise<void> {
 	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
-		`vocabulary-${Date.now()}.docx`,
+		fileName?.trim() || `vocabulary-${Date.now()}.docx`,
 		exportDocxBody(ids),
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
 	);
 }
 
 /** 下载当前用户经典句收藏 Word */
 export async function downloadEnglishClassicQuoteFavoritesDocx(
 	ids?: string[],
+	fileName?: string,
 ): Promise<void> {
 	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
-		`classic-quote-${Date.now()}.docx`,
+		fileName?.trim() || `classic-quote-${Date.now()}.docx`,
 		exportDocxBody(ids),
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
 	);
 }
 
 /** 下载当前用户单词错题 Word */
 export async function downloadEnglishVocabularyMistakesDocx(
 	ids?: string[],
+	fileName?: string,
 ): Promise<void> {
 	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_VOCABULARY_MISTAKES_EXPORT_DOCX,
-		`vocabulary-mistakes-${Date.now()}.docx`,
+		fileName?.trim() || `vocabulary-mistakes-${Date.now()}.docx`,
 		exportDocxBody(ids),
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
 	);
 }
 
 /** 下载当前用户经典句错题 Word */
 export async function downloadEnglishClassicQuoteMistakesDocx(
 	ids?: string[],
+	fileName?: string,
 ): Promise<void> {
 	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES_EXPORT_DOCX,
-		`classic-quote-mistakes-${Date.now()}.docx`,
+		fileName?.trim() || `classic-quote-mistakes-${Date.now()}.docx`,
 		exportDocxBody(ids),
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
 	);
 }
 
@@ -2694,11 +2824,43 @@ export async function downloadEnglishClassicQuoteMistakesDocx(
 export async function downloadEnglishPracticeReviewDueDocx(
 	contentKind: 'vocab' | 'classic',
 	ids?: string[],
+	fileName?: string,
 ): Promise<void> {
 	await downloadEnglishAuthorizedDocx(
 		ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX,
-		`review-${contentKind}-${Date.now()}.docx`,
+		fileName?.trim() || `review-${contentKind}-${Date.now()}.docx`,
 		{ contentKind, ...exportDocxBody(ids) },
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
+	);
+}
+
+/** 下载单词库 Word（整库）；fileName 建议用库标题 */
+export async function downloadEnglishVocabularyLibraryDocx(
+	libraryId: string,
+	fileName?: string,
+): Promise<void> {
+	const id = libraryId.trim();
+	if (!id) throw new Error('libraryId required');
+	await downloadEnglishAuthorizedDocx(
+		`${ENGLISH_LEARNING_VOCABULARY_LIBRARY_EXPORT_DOCX}/${encodeURIComponent(id)}/export-docx`,
+		fileName?.trim() || `vocabulary-library-${Date.now()}.docx`,
+		{},
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
+	);
+}
+
+/** 下载语句库 Word（整库）；fileName 建议用库标题 */
+export async function downloadEnglishClassicQuotesLibraryDocx(
+	libraryId: string,
+	fileName?: string,
+): Promise<void> {
+	const id = libraryId.trim();
+	if (!id) throw new Error('libraryId required');
+	await downloadEnglishAuthorizedDocx(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_EXPORT_DOCX}/${encodeURIComponent(id)}/export-docx`,
+		fileName?.trim() || `classic-quotes-library-${Date.now()}.docx`,
+		{},
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
 	);
 }
 

@@ -209,7 +209,7 @@ function ClassicQuotesPackSectionInner({
 			masterSearchOrganic,
 			practiceParams,
 			showPageLoading,
-			historyLoadingText: t('englishLearning.classic.historyLoading'),
+			historyLoadingText: t('englishLearning.vocab.historyLoading'),
 			showEmpty,
 			emptyHint: t('englishLearning.stream.classic.empty'),
 			onHistoryViewportScroll: useHistoryPagination
@@ -271,7 +271,7 @@ function ClassicQuotesPackSectionInner({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));
@@ -394,7 +394,7 @@ function ClassicQuotesPackSectionInner({
 													aria-pressed={isFavorited}
 													aria-label={
 														isFavorited
-															? t('englishLearning.classic.unfavoriteQuote')
+															? t('englishLearning.vocab.unfavoriteWord')
 															: t('englishLearning.classic.favoriteQuote')
 													}
 												>

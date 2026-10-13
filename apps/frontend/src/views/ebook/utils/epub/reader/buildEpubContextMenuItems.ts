@@ -34,7 +34,7 @@ export function buildEpubContextMenuItems({
 		items.push({
 			type: 'item',
 			id: 'copy',
-			label: t('ebook.read.contextMenu.copy'),
+			label: t('common.copy'),
 			onSelect: () => actionsRef.current?.copy(),
 		});
 		items.push({
@@ -46,7 +46,7 @@ export function buildEpubContextMenuItems({
 		items.push({
 			type: 'item',
 			id: 'addThought',
-			label: t('ebook.read.contextMenu.addThought'),
+			label: t('ebook.read.thought.createTitle'),
 			onSelect: () => actionsRef.current?.addThought(),
 		});
 		items.push({ type: 'separator', id: 'sep-after-selection' });

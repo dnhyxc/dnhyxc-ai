@@ -378,7 +378,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								role="tab"
 								aria-selected={viewMode === 'edit'}
 								className={markdownBarIconBtnClass(viewMode === 'edit')}
-								aria-label={t?.('monaco.bottomBar.aria.edit') ?? '编辑源码'}
+								aria-label={t?.('monaco.bottomBar.tip.edit') ?? '编辑源码'}
 								onClick={() => {
 									setViewMode('edit');
 									queueMicrotask(focusEditor);
@@ -420,7 +420,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								role="tab"
 								aria-selected={viewMode === 'preview'}
 								className={markdownBarIconBtnClass(viewMode === 'preview')}
-								aria-label={t?.('monaco.bottomBar.aria.preview') ?? '预览渲染'}
+								aria-label={t?.('monaco.bottomBar.tip.preview') ?? '预览渲染'}
 								onClick={() => {
 									if (viewMode === 'preview') {
 										setViewMode('edit');
@@ -466,7 +466,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									viewMode === 'split' && !assistantRightPaneActive,
 								)}
 								aria-label={
-									t?.('monaco.bottomBar.aria.split') ?? '分屏：左编辑右预览'
+									t?.('monaco.bottomBar.tip.split') ?? '分屏：左编辑右预览'
 								}
 								onClick={() => {
 									// 需在关闭助手前判断：否则同一次点击内 assistant 仍为 true，会误判为「非纯分屏」
@@ -633,7 +633,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									className="sr-only"
 									htmlFor="markdown-auto-save-interval"
 								>
-									{t?.('monaco.bottomBar.label.autosaveInterval') ??
+									{t?.('monaco.bottomBar.aria.autosaveInterval') ??
 										'自动保存间隔'}
 								</label>
 								<select

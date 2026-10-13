@@ -862,7 +862,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										onClick={clearChat}
 									>
 										<CirclePlus className="w-4 h-4" />
-										{t?.('chat.entry.newChat') ?? '新对话'}
+										{t?.('common.newChat') ?? '新对话'}
 									</Button>
 								) : null}
 								{entryChildren && clearChat ? entryChildren : null}
@@ -932,7 +932,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								onStop={stopGenerating}
 								sendDisabled={sendDisabled}
 								onSend={handleSendOrVoicePrimary}
-								sendLabel={t?.('chat.entry.send') ?? '发送'}
+								sendLabel={t?.('common.send') ?? '发送'}
 								sendDisabledHint={
 									sendDisabled &&
 									!voiceUiActive &&

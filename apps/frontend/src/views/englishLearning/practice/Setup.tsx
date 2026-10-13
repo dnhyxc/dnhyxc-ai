@@ -425,7 +425,7 @@ export function Setup({
 		<div className="flex h-full min-h-0 w-full flex-1 flex-col">
 			<Head className="pl-4 pr-2" trailing={headerExtra}>
 				<span className="min-w-0 truncate">
-					{sourceDisplayTitle ?? t('englishLearning.practice.sourceResolving')}
+					{sourceDisplayTitle ?? t('common.loadingEllipsis')}
 				</span>
 				{poolCountLabel ? (
 					<span className="text-textcolor/45 shrink-0 text-sm font-normal tabular-nums">

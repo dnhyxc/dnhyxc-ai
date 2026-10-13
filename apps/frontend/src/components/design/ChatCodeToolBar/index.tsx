@@ -81,8 +81,8 @@ export default function ChatCodeToolbarFloating(props: { t?: ChatI18nT }) {
 					)}
 					<span className={copied ? 'text-teal-500' : ''}>
 						{copied
-							? (t?.('chat.codeToolbar.copied') ?? '已复制')
-							: (t?.('chat.codeToolbar.copy') ?? '复制')}
+							? (t?.('common.copied') ?? '已复制')
+							: (t?.('common.copy') ?? '复制')}
 					</span>
 				</Button>
 				<Button
@@ -91,7 +91,7 @@ export default function ChatCodeToolbarFloating(props: { t?: ChatI18nT }) {
 					onClick={onDownload}
 				>
 					<Download size={16} />
-					<span>{t?.('chat.codeToolbar.download') ?? '下载'}</span>
+					<span>{t?.('common.download') ?? '下载'}</span>
 				</Button>
 			</div>
 		</div>

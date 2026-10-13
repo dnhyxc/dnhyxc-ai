@@ -131,7 +131,7 @@ const routes: RouteConfig[] = [
 				path: '/chat',
 				Component: Chat,
 				meta: {
-					titleKey: 'route.chat.title',
+					titleKey: 'common.appTitle',
 				},
 				children: [
 					{
@@ -139,14 +139,14 @@ const routes: RouteConfig[] = [
 						// path: '/setting/system',
 						Component: NewChat,
 						meta: {
-							titleKey: 'route.chat.title',
+							titleKey: 'common.appTitle',
 						},
 					},
 					{
 						path: '/chat/c/:id?',
 						Component: Session,
 						meta: {
-							titleKey: 'route.chat.title',
+							titleKey: 'common.appTitle',
 						},
 					},
 				],
@@ -169,7 +169,7 @@ const routes: RouteConfig[] = [
 				path: '/download',
 				Component: Download,
 				meta: {
-					titleKey: 'route.download.title',
+					titleKey: 'route.downloadDesktop.title',
 				},
 			},
 			{
@@ -197,7 +197,7 @@ const routes: RouteConfig[] = [
 						path: 'pay',
 						Component: Pay,
 						meta: {
-							titleKey: 'route.pay.title',
+							titleKey: 'nav.pay',
 						},
 					},
 				],
@@ -206,14 +206,14 @@ const routes: RouteConfig[] = [
 				path: '/knowledge',
 				Component: Knowledge,
 				meta: {
-					titleKey: 'route.knowledge.title',
+					titleKey: 'nav.knowledge',
 				},
 			},
 			{
 				path: '/skills',
 				Component: Skills,
 				meta: {
-					titleKey: 'route.skills.title',
+					titleKey: 'nav.skills',
 				},
 			},
 			{
@@ -227,7 +227,7 @@ const routes: RouteConfig[] = [
 						index: true,
 						Component: Ebook,
 						meta: {
-							titleKey: 'route.ebook.shelf',
+							titleKey: 'ebook.shelf.title',
 						},
 					},
 					{
@@ -336,14 +336,14 @@ const routes: RouteConfig[] = [
 						path: 'practice/reports',
 						Component: EnglishLearningPracticeReportsPage,
 						meta: {
-							titleKey: 'route.englishLearning.practice.reportsTitle',
+							titleKey: 'englishLearning.practice.reportsTitle',
 						},
 					},
 					{
 						path: 'practice/reports/:id',
 						Component: EnglishLearningPracticeReportDetailPage,
 						meta: {
-							titleKey: 'route.englishLearning.practice.reportsTitle',
+							titleKey: 'englishLearning.practice.reportsTitle',
 						},
 					},
 					{
@@ -364,7 +364,7 @@ const routes: RouteConfig[] = [
 								path: 'session',
 								Component: EnglishLearningStageOutlet,
 								meta: {
-									titleKey: 'englishLearning.daily.sessionTitle',
+									titleKey: 'route.englishLearning.daily.title',
 								},
 							},
 							{
@@ -422,21 +422,21 @@ const routes: RouteConfig[] = [
 				path: '/plugins',
 				Component: PluginsLayout,
 				meta: {
-					titleKey: 'route.plugins.title',
+					titleKey: 'nav.plugins',
 				},
 				children: [
 					{
 						index: true,
 						Component: PluginsPage,
 						meta: {
-							titleKey: 'route.plugins.title',
+							titleKey: 'nav.plugins',
 						},
 					},
 					{
 						path: 'registry',
 						Component: PluginRegistryEditorPage,
 						meta: {
-							titleKey: 'route.plugins.registry.title',
+							titleKey: 'plugins.registry.title',
 						},
 					},
 				],
@@ -465,14 +465,14 @@ const routes: RouteConfig[] = [
 						path: '/setting/about',
 						Component: AboutApp,
 						meta: {
-							titleKey: 'route.setting.about',
+							titleKey: 'setting.menu.about',
 						},
 					},
 					{
 						path: '/setting/theme',
 						Component: ThemeSetting,
 						meta: {
-							titleKey: 'route.setting.theme',
+							titleKey: 'setting.menu.theme',
 						},
 					},
 					{
@@ -486,7 +486,7 @@ const routes: RouteConfig[] = [
 						path: '/setting/cloud-tts',
 						Component: CloudTtsSetting,
 						meta: {
-							titleKey: 'route.setting.cloudTts',
+							titleKey: 'setting.menu.cloudTts',
 						},
 					},
 				],
@@ -516,14 +516,14 @@ const routes: RouteConfig[] = [
 		path: '/service-policy',
 		Component: LegalServicePolicy,
 		meta: {
-			titleKey: 'route.legal.servicePolicy',
+			titleKey: 'about.links.policy',
 		},
 	},
 	{
 		path: '/user-agreement',
 		Component: LegalUserAgreement,
 		meta: {
-			titleKey: 'route.legal.userAgreement',
+			titleKey: 'legal.userAgreement.title',
 		},
 	},
 	// /update-info、/project-guide、/plugin-dev-guide → plugins-registry remoteDocs*

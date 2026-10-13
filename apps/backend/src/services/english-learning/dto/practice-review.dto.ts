@@ -61,7 +61,7 @@ export class PracticeReviewExportDocxDto {
 
 	@IsOptional()
 	@IsArray()
-	@ArrayMaxSize(3000)
+	@ArrayMaxSize(20000)
 	@IsUUID('4', { each: true })
 	ids?: string[];
 }

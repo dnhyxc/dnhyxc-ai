@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { KnowledgeEmbeddingModule } from '../knowledge-embedding/knowledge-embedding.module';
 import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
 import { AnnotateSourceTaskService } from './annotate-source-task.service';
+import { EnglishDocxExportJobService } from './english-docx-export-job.service';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
@@ -61,6 +62,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 	controllers: [EnglishLearningController],
 	providers: [
 		EnglishLearningService,
+		EnglishDocxExportJobService,
 		EnglishLearningStreamAbortRegistry,
 		AnnotateSourceTaskService,
 	],

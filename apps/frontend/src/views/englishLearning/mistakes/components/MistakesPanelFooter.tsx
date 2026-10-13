@@ -65,7 +65,7 @@ export function MistakesPanelFooter({
 				: t('englishLearning.practice.sourceReview')
 			: practiceContentKind === 'classic'
 				? t('englishLearning.practice.sourceClassicMistakes')
-				: t('englishLearning.practice.sourceMistakes'));
+				: t('route.englishLearning.mistakes.title'));
 
 	return (
 		<div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
@@ -81,7 +81,7 @@ export function MistakesPanelFooter({
 						htmlFor={selectAllId}
 						className="cursor-pointer text-sm font-medium whitespace-nowrap text-teal-500 hover:text-teal-400"
 					>
-						{t('englishLearning.mistakes.selectAllLoaded')}
+						{t('common.selectAll')}
 					</Label>
 				</div>
 			) : null}

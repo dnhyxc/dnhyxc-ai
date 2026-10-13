@@ -128,9 +128,9 @@ export function EbookTocDrawer({
 
 	const scrollLabel =
 		displayMode === 'bottom'
-			? t('ebook.read.tocScrollToBottom')
+			? t('common.scrollToBottom')
 			: displayMode === 'top'
-				? t('ebook.read.tocScrollToTop')
+				? t('common.scrollToTop')
 				: t('ebook.read.tocScrollToCurrent');
 
 	return (

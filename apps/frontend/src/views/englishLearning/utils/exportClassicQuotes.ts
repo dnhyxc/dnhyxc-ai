@@ -6,6 +6,7 @@ import {
 	listEnglishClassicQuotesPackItems,
 } from '@/service';
 import { saveFileWithPicker } from '@/utils';
+import { safeExportBaseName } from './exportFileName';
 
 export type ClassicExportSource =
 	| {
@@ -27,14 +28,6 @@ type QuoteRow = {
 	source?: string | null;
 	noteZh?: string | null;
 };
-
-function safeFileName(title: string): string {
-	const s = title
-		.trim()
-		.replace(/[\\/:*?"<>|]/g, '_')
-		.slice(0, 80);
-	return s || 'quotes';
-}
 
 async function fetchPage(
 	input: ClassicExportSource,
@@ -90,6 +83,6 @@ export async function exportClassicQuotesJson(
 	if (items.length === 0) throw new Error('empty');
 	await saveFileWithPicker({
 		content: JSON.stringify({ title: input.title, items }, null, 2),
-		file_name: `${safeFileName(input.title)}.json`,
+		file_name: `${safeExportBaseName(input.title, 'quotes')}.json`,
 	});
 }

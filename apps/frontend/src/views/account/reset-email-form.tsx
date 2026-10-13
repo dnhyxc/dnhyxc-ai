@@ -64,7 +64,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 			.string()
 			.trim()
 			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
-				message: t('account.validation.emailInvalid'),
+				message: t('auth.validation.emailInvalid'),
 			}),
 		oldVerifyCode: z
 			.string()
@@ -220,7 +220,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 										) : oldTimeLeft > 0 && oldTimeLeft < DEFAULT_TIME ? (
 											`${formatTime(oldTimeLeft)}`
 										) : (
-											t('account.actions.getVerifyCode')
+											t('auth.verifyCode.send')
 										)}
 									</Button>
 								</div>
@@ -286,7 +286,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 											) : newTimeLeft > 0 && newTimeLeft < DEFAULT_TIME ? (
 												`${formatTime(newTimeLeft)}`
 											) : (
-												t('account.actions.getVerifyCode')
+												t('auth.verifyCode.send')
 											)}
 										</Button>
 									</div>

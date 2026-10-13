@@ -239,8 +239,8 @@ export function MermaidFenceToolbarActions({
 						{copied ? <CheckCircle className="text-teal-500" /> : <Copy />}
 						<span className={cn(copied ? 'text-teal-500' : '', 'text-sm')}>
 							{copied
-								? (t?.('mermaid.toolbar.copied') ?? '已复制')
-								: (t?.('mermaid.toolbar.copy') ?? '复制')}
+								? (t?.('common.copied') ?? '已复制')
+								: (t?.('common.copy') ?? '复制')}
 						</span>
 					</Button>
 					<Button
@@ -264,9 +264,7 @@ export function MermaidFenceToolbarActions({
 						onClick={(e) => void onDownload(e)}
 					>
 						<Download size={16} />
-						<span className="text-sm">
-							{t?.('mermaid.toolbar.download') ?? '下载'}
-						</span>
+						<span className="text-sm">{t?.('common.download') ?? '下载'}</span>
 					</Button>
 				</div>
 			</MermaidFenceToolbar>

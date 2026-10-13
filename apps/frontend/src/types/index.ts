@@ -14,7 +14,7 @@ export interface DownloadProgress {
 }
 
 export interface DownloadResult {
-	success: 'success' | 'error' | 'start';
+	success: 'success' | 'error' | 'warning' | 'start';
 	message: string;
 	id?: string;
 	file_path?: string;

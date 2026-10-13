@@ -134,7 +134,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		syncWindowMenu: true,
 	},
 	{
-		labelKey: 'setting.system.shortcuts.item.file.about',
+		labelKey: 'setting.menu.about',
 		label: '关于应用',
 		key: FILE_SHORTCUT_KEYS.about,
 		id: 'shortcut',
@@ -146,7 +146,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		syncWindowMenu: true,
 	},
 	{
-		labelKey: 'setting.system.shortcuts.item.file.logout',
+		labelKey: 'auth.logout',
 		label: '退出登录',
 		key: FILE_SHORTCUT_KEYS.logout,
 		id: 'shortcut',

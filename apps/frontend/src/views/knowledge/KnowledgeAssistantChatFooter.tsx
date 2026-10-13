@@ -407,16 +407,16 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 			scrollFab={{
 				mode: scrollFabMode,
 				onClick: onScrollFabClick,
-				toBottomLabel: t('knowledge.assistant.scrollToBottom'),
-				toTopLabel: t('knowledge.assistant.scrollToTop'),
+				toBottomLabel: t('common.scrollToBottom'),
+				toTopLabel: t('common.scrollToTop'),
 			}}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
 				<AssistantShareBar
 					messages={[...aiMessages]}
 					checkboxId="knowledge-assistant-share-all"
-					selectAllLabelKey="knowledge.assistant.share.selectAll"
-					createLinkLabelKey="knowledge.assistant.share.createLink"
+					selectAllLabelKey="common.selectAll"
+					createLinkLabelKey="chat.share.createLink"
 					shareSelection={shareSelection}
 					shareFlow={shareFlow}
 					setShareModelVisible={setShareModelVisible}
@@ -434,7 +434,7 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 						isRagMode
 							? t('knowledge.assistant.placeholder.rag')
 							: editorHasBody
-								? t('knowledge.assistant.placeholder.ai')
+								? t('chat.entry.placeholder')
 								: t('knowledge.assistant.placeholder.aiNeedsBody')
 					}
 					disableTextInput={isRagMode ? false : !editorHasBody}

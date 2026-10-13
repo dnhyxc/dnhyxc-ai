@@ -527,7 +527,7 @@ const EnglishLearningImportPage = () => {
 											{kind === 'vocab' && vocabSaveLoading
 												? t('englishLearning.import.saveVocabLoading')
 												: kind === 'classic' && classicSaveLoading
-													? t('englishLearning.import.saveClassicLoading')
+													? t('englishLearning.import.saveVocabLoading')
 													: kind === 'vocab'
 														? t('englishLearning.import.saveToVocab')
 														: t('englishLearning.import.saveToClassic')}

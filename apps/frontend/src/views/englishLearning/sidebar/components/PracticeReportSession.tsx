@@ -17,7 +17,7 @@ export function PracticeReportSession() {
 			icon={Archive}
 			iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.reports}
 			headerClassName="mb-5.5"
-			title={t('route.englishLearning.practice.reportsTitle')}
+			title={t('englishLearning.practice.reportsTitle')}
 			description={t('englishLearning.practice.reportsHomeDesc')}
 			actions={[
 				{

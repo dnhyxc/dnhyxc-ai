@@ -2,7 +2,7 @@ import { Button, Checkbox } from '@ui/index';
 import { useI18n } from '@/hooks';
 import type { AssistantShareBarProps } from './types';
 
-const DEFAULT_SELECT_ALL_KEY = 'chat.share.selectAll';
+const DEFAULT_SELECT_ALL_KEY = 'common.selectAll';
 const DEFAULT_CREATE_LINK_KEY = 'chat.share.createLink';
 
 /**

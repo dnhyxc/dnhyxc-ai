@@ -231,9 +231,7 @@ export function EpubQuoteShareDialog({
 							<CheckCircle className="size-4" />
 						</span>
 					) : null}
-					{copied
-						? t('ebook.read.quoteShare.copied')
-						: t('ebook.read.quoteShare.copyImage')}
+					{copied ? t('common.copied') : t('ebook.read.quoteShare.copyImage')}
 				</Button>
 				<Button
 					type="button"

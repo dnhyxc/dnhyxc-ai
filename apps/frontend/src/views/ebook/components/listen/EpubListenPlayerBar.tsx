@@ -427,9 +427,9 @@ function VirtualSentenceMenuList({
 
 	const scrollLabel =
 		displayMode === 'bottom'
-			? t('ebook.read.tocScrollToBottom')
+			? t('common.scrollToBottom')
 			: displayMode === 'top'
-				? t('ebook.read.tocScrollToTop')
+				? t('common.scrollToTop')
 				: t('ebook.read.listenBook.scrollToCurrentSentence');
 
 	const onScrollFabClick = useCallback(() => {

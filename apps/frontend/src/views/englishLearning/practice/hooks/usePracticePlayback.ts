@@ -99,7 +99,7 @@ export function usePracticePlayback(args: {
 			if (!isPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 				return;
 			}
@@ -130,7 +130,7 @@ export function usePracticePlayback(args: {
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				if (dictationPlayRunRef.current === runId) {

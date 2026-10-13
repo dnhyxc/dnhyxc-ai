@@ -49,7 +49,7 @@ export function LibraryEditDialog({
 	const dialogTitle =
 		kind === 'vocab'
 			? t('englishLearning.library.visibilityDialogTitle')
-			: t('englishLearning.library.visibilityDialogTitleClassic');
+			: t('englishLearning.library.editActionClassic');
 
 	const librarySummary = useMemo(() => {
 		if (!library) return '';
@@ -241,10 +241,10 @@ export function LibraryEditDialog({
 						{saving ? (
 							<>
 								<Spinner className="size-3.5 text-white" aria-hidden />
-								{t('englishLearning.library.visibilitySaving')}
+								{t('plugins.registry.saving')}
 							</>
 						) : (
-							t('englishLearning.library.visibilitySaveAction')
+							t('common.save')
 						)}
 					</Button>
 				</div>

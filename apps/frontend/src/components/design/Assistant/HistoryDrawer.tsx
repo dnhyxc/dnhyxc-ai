@@ -53,7 +53,7 @@ export const AssistantHistoryDrawer = observer(function AssistantHistoryDrawer({
 	lockedToast,
 }: AssistantHistoryDrawerProps) {
 	const { t } = useI18n();
-	const title = drawerTitle ?? t('knowledge.assistant.history');
+	const title = drawerTitle ?? t('chat.sessionList.title');
 	const lockedMessage =
 		lockedToast ?? t('knowledge.assistant.sessionSavingViewHistory');
 	const canRename = typeof onRenameSession === 'function';
@@ -289,7 +289,7 @@ export const AssistantHistoryDrawer = observer(function AssistantHistoryDrawer({
 						) : null}
 						{showEmptyHint ? (
 							<div className="text-textcolor/60 py-8 text-center text-sm">
-								{t('knowledge.assistant.historyEmpty')}
+								{t('chat.sessionList.empty')}
 							</div>
 						) : null}
 					</div>

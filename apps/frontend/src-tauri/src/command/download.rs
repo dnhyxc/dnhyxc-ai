@@ -119,10 +119,10 @@ pub async fn download_file(
                 }
                 None => {
                     return Ok(DownloadFileResult {
-                        success: String::from("error"),
+                        success: String::from("warning"),
                         file_path: None,
                         file_name: String::new(),
-                        message: "已取消下载".to_string(),
+                        message: "下载已取消".to_string(),
                         file_size: None,
                         content_type: None,
                         id: options.id.clone(),
@@ -376,8 +376,13 @@ pub async fn download_blob(
     let save_path = match determine_save_path_for_blob(app_handle, &options).await {
         Ok(path) => path,
         Err(e) => {
+            let kind = if e.contains("取消") {
+                "warning"
+            } else {
+                "error"
+            };
             return Ok(DownloadFileResult {
-                success: String::from("error"),
+                success: String::from(kind),
                 file_path: None,
                 file_name: String::new(),
                 message: e,
@@ -475,9 +480,9 @@ pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileR
             }
         }
         None => Ok(SaveFileResult {
-            success: "success".to_string(),
+            success: "warning".to_string(),
             file_path: None,
-            message: "用户取消了下载".to_string(),
+            message: "下载已取消".to_string(),
         }),
     }
 }

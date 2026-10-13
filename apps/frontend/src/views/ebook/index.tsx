@@ -212,7 +212,7 @@ function EbookShelfPage() {
 	const uploading = ebookStore.busy;
 	const importHint = isTauri
 		? isMemberActive
-			? t('ebook.shelf.hintTauriMember')
+			? t('ebook.shelf.hintWebMember')
 			: t('ebook.shelf.hintTauri')
 		: isMemberActive
 			? t('ebook.shelf.hintWebMember')

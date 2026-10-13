@@ -19,6 +19,7 @@ import {
 	downloadEnglishPracticeReviewDueDocx,
 	downloadEnglishVocabularyMistakesDocx,
 	type EnglishVocabularyMistakeListEntry,
+	exportEnglishDocxSmart,
 	listEnglishPracticeReviewVocabDue,
 	listEnglishVocabularyMistakes,
 	removeEnglishVocabularyMistakesBatch,
@@ -35,6 +36,7 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { CornerFab } from '../../components/list';
 import { Panel } from '../../components/shell';
 import { Card } from '../../components/vocab';
+import { useDocxExportConfirm } from '../../hooks/useDocxExportConfirm';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
@@ -45,6 +47,7 @@ import {
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
+import { exportDocxFileName } from '../../utils/exportFileName';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 
 export type VocabMistakesListMode = 'mistakes' | 'review';
@@ -154,6 +157,8 @@ export function VocabularyMistakesPanel({
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
 	const [exportingDocx, setExportingDocx] = useState(false);
+	const { confirmAsync, confirmNode: docxAsyncConfirm } =
+		useDocxExportConfirm();
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
@@ -330,7 +335,7 @@ export function VocabularyMistakesPanel({
 			} catch {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
+					title: t('assistant.tts.unsupported'),
 				});
 			} finally {
 				setPlayingKey((k) => (k === key ? null : k));
@@ -356,13 +361,35 @@ export function VocabularyMistakesPanel({
 			return;
 		}
 		const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+		const exportCount = ids?.length ?? totalCount;
+		const fileName = exportDocxFileName(
+			t(
+				isReview
+					? 'englishLearning.review.vocabTab'
+					: 'englishLearning.mistakes.vocabNav',
+			),
+		);
 		setExportingDocx(true);
 		try {
-			if (isReview) {
-				await downloadEnglishPracticeReviewDueDocx('vocab', ids);
-			} else {
-				await downloadEnglishVocabularyMistakesDocx(ids);
-			}
+			const mode = await exportEnglishDocxSmart({
+				exportCount,
+				confirmAsync,
+				syncDownload: () =>
+					isReview
+						? downloadEnglishPracticeReviewDueDocx('vocab', ids, fileName)
+						: downloadEnglishVocabularyMistakesDocx(ids, fileName),
+				kind: isReview ? 'practice-review' : 'vocabulary-mistakes',
+				ids,
+				contentKind: isReview ? 'vocab' : undefined,
+				fileName,
+				onAsyncStart: () => {
+					Toast({
+						type: 'info',
+						title: t('englishLearning.export.asyncStarted'),
+					});
+				},
+			});
+			if (mode === 'cancelled') return;
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',
@@ -373,9 +400,7 @@ export function VocabularyMistakesPanel({
 			Toast({
 				type: 'error',
 				title:
-					e instanceof Error
-						? e.message
-						: t('englishLearning.vocab.exportDocxFail'),
+					e instanceof Error ? e.message : t('englishLearning.export.failed'),
 			});
 		} finally {
 			setExportingDocx(false);
@@ -384,6 +409,7 @@ export function VocabularyMistakesPanel({
 
 	return (
 		<>
+			{docxAsyncConfirm}
 			<Confirm
 				open={removeConfirmOpen}
 				onOpenChange={setRemoveConfirmOpen}
@@ -404,7 +430,7 @@ export function VocabularyMistakesPanel({
 					setSingleRemoveConfirmOpen(open);
 					if (!open) setSingleRemoveTarget(null);
 				}}
-				title={t('englishLearning.mistakes.removeConfirmTitle')}
+				title={t('englishLearning.mistakes.removeAction')}
 				description={
 					singleRemoveTarget
 						? t('englishLearning.mistakes.removeConfirmDesc', {
@@ -439,7 +465,7 @@ export function VocabularyMistakesPanel({
 							exportDisabled={exportDisabled}
 							exportingDocx={exportingDocx}
 							onExportDocx={handleExportDocx}
-							exportLabel={t('englishLearning.vocab.exportDocx')}
+							exportLabel={t('englishLearning.export.docx')}
 							showEntry
 							practiceContentKind="vocab"
 							practiceSource={isReview ? 'review' : 'mistakes'}
