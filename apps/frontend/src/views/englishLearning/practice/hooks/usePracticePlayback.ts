@@ -38,9 +38,22 @@ export function usePracticePlayback(args: {
 	onPipelineKick?: (cursorIndex: number) => void;
 	/** 会话世代 signal；切题 abort 当前句预取 */
 	signal?: AbortSignal;
+	/** 稳定落盘目录键 */
+	cacheFolder?: string;
+	/** 展示标题 → 后端 _meta */
+	cacheTitle?: string;
 	t: (key: string) => string;
 }) {
-	const { mode, answerText, itemIndex, onPipelineKick, signal, t } = args;
+	const {
+		mode,
+		answerText,
+		itemIndex,
+		onPipelineKick,
+		signal,
+		cacheFolder,
+		cacheTitle,
+		t,
+	} = args;
 	const [playing, setPlaying] = useState(false);
 	const dictationPlayRunRef = useRef(0);
 	const prefetchedCloudRef = useRef<Promise<TtsSentencePrefetch> | null>(null);
@@ -63,13 +76,16 @@ export function usePracticePlayback(args: {
 		prefetchedCloudRef.current = prefetchCloudTts(text, {
 			whole: true,
 			signal,
+			persistDisk: true,
+			cacheFolder,
+			cacheTitle,
 		});
 		// 拼写无自动播：短暂延迟后再 kick，避免与当前句首包抢带宽
 		if (mode !== 'dictation') {
 			const timer = window.setTimeout(() => kickPipeline(), 300);
 			return () => window.clearTimeout(timer);
 		}
-	}, [answerText, mode, kickPipeline, signal]);
+	}, [answerText, cacheFolder, cacheTitle, mode, kickPipeline, signal]);
 
 	const cancelDictationPlay = useCallback(() => {
 		dictationPlayRunRef.current += 1;
@@ -82,6 +98,9 @@ export function usePracticePlayback(args: {
 				if (dictationPlayRunRef.current !== runId) return;
 				await playPreferred(answerText, {
 					cloudSingleUtterance: true,
+					persistDisk: true,
+					cacheFolder,
+					cacheTitle,
 					prefetchedCloud: i === 0 ? prefetchedCloudRef.current : null,
 					onPlaybackStart: i === 0 ? kickPipeline : undefined,
 				});
@@ -91,7 +110,7 @@ export function usePracticePlayback(args: {
 				}
 			}
 		},
-		[answerText, kickPipeline],
+		[answerText, cacheFolder, cacheTitle, kickPipeline],
 	);
 
 	const playWord = useCallback<PlayWordFn>(
@@ -123,6 +142,9 @@ export function usePracticePlayback(args: {
 				} else {
 					await playPreferred(answerText, {
 						cloudSingleUtterance: true,
+						persistDisk: true,
+						cacheFolder,
+						cacheTitle,
 						prefetchedCloud: prefetchedCloudRef.current,
 						onPlaybackStart: kickPipeline,
 					});
@@ -140,6 +162,8 @@ export function usePracticePlayback(args: {
 		},
 		[
 			answerText,
+			cacheFolder,
+			cacheTitle,
 			cancelDictationPlay,
 			kickPipeline,
 			mode,

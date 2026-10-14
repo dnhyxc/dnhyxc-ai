@@ -10,6 +10,10 @@ export type PracticeTtsPipeOptions = {
 	ahead?: number;
 	/** 会话世代 AbortSignal；切题时由 bindSignal 换新 */
 	signal?: AbortSignal;
+	/** 稳定落盘目录键 */
+	cacheFolder?: string;
+	/** 展示标题 → 后端 _meta */
+	cacheTitle?: string;
 };
 
 export type PracticeTtsPrefetchPipe = {
@@ -62,6 +66,8 @@ export function createPracticeTtsPrefetchPipe(
 	options?: PracticeTtsPipeOptions,
 ): PracticeTtsPrefetchPipe {
 	const ahead = Math.max(1, Math.min(8, options?.ahead ?? 5));
+	const cacheFolder = options?.cacheFolder?.trim() || undefined;
+	const cacheTitle = options?.cacheTitle?.trim() || undefined;
 	const normalized = texts.map((t) => t.trim());
 	let cancelled = false;
 	let cursor = 0;
@@ -94,6 +100,9 @@ export function createPracticeTtsPrefetchPipe(
 					if (!cancelled && !fetchAc.signal.aborted) {
 						await prefetchCloudTtsBatch(payload, {
 							signal: fetchAc.signal,
+							persistDisk: true,
+							cacheFolder,
+							cacheTitle,
 						});
 					}
 				} catch {

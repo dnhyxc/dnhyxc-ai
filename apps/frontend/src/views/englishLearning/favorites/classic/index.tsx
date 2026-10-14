@@ -49,6 +49,7 @@ import {
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
 import { exportDocxFileName } from '../../utils/exportFileName';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import type { FavoritesListCounts } from '../vocabulary';
 
@@ -231,7 +232,11 @@ export function ClassicQuotesFavoritesSection({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(english, { cloudSingleUtterance: true });
+				await playPreferred(english, {
+					cloudSingleUtterance: true,
+					persistDisk: true,
+					cacheFolder: TTS_CACHE_FOLDER.favorites,
+				});
 			} catch {
 				Toast({
 					type: 'warning',

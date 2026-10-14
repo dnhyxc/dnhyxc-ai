@@ -48,6 +48,7 @@ import {
 } from '../../library/components/LibraryVirtuosoGrid';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
 import { exportDocxFileName } from '../../utils/exportFileName';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 
 export type VocabMistakesListMode = 'mistakes' | 'review';
@@ -331,7 +332,12 @@ export function VocabularyMistakesPanel({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, {
+					persistDisk: true,
+					cacheFolder: isReview
+						? TTS_CACHE_FOLDER.review
+						: TTS_CACHE_FOLDER.mistakes,
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -341,7 +347,7 @@ export function VocabularyMistakesPanel({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[isReview, playingKey, t],
 	);
 
 	const selectionDisabled = loading || batchRemoving;

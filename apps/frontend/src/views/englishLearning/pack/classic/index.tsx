@@ -30,6 +30,7 @@ import {
 	composeViewportScroll,
 	useListCornerFab,
 } from '../../hooks/useListCornerFab';
+import { ttsCacheScopePack } from '../../utils/ttsCacheFolder';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useClassicQuotesPackHistoryList } from '../hooks/useClassicQuotesPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -187,9 +188,12 @@ function ClassicQuotesPackSectionInner({
 				poolTotal: itemCount > 0 ? itemCount : undefined,
 			};
 		}
+		const liveStreamId =
+			EnglishPackStore.classicActiveStreamId?.trim() || undefined;
 		return {
 			contentKind: 'classic' as const,
 			source: 'live' as const,
+			...(liveStreamId ? { streamId: liveStreamId } : {}),
 			sourceTitle: practiceSourceTitle,
 			poolTotal: itemCount > 0 ? itemCount : undefined,
 		};
@@ -267,7 +271,17 @@ function ClassicQuotesPackSectionInner({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(text, { cloudSingleUtterance: true });
+				const streamId =
+					historyStreamId?.trim() ||
+					EnglishPackStore.classicActiveStreamId?.trim() ||
+					'';
+				const title = topic?.trim() || undefined;
+				await playPreferred(text, {
+					cloudSingleUtterance: true,
+					persistDisk: true,
+					...(streamId ? { cacheFolder: ttsCacheScopePack(streamId) } : {}),
+					...(title ? { cacheTitle: title } : {}),
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -277,7 +291,7 @@ function ClassicQuotesPackSectionInner({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[historyStreamId, playingKey, t, topic],
 	);
 
 	const toggleClassicQuoteFavorite = useCallback(

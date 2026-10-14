@@ -116,4 +116,24 @@ export class MinimaxTtsDto {
 	@IsOptional()
 	@IsBoolean()
 	textNormalization?: boolean;
+
+	/** 为 true 时写读 Redis/uploads/tts；默认 false（听书等不落盘） */
+	@IsOptional()
+	@IsBoolean()
+	persistDisk?: boolean;
+
+	/**
+	 * 稳定落盘目录键（如 vocab_<libraryId> / 收藏）；勿传可变库标题。
+	 * persistDisk 时落盘到 uploads/tts/<消毒后目录>/
+	 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(120)
+	cacheFolder?: string;
+
+	/** 当前展示标题；仅写 _meta.json，不进路径/Redis 指纹 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(200)
+	cacheTitle?: string;
 }

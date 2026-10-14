@@ -19,6 +19,7 @@ import {
 	prefetchCloudTts,
 	stopAllPlayback,
 } from '@/utils/speech';
+import { resolvePracticeTtsCache } from '../utils/ttsCacheFolder';
 import { PracticePageShell } from './components/shell';
 import { PracticeShortcutsMenu } from './components/shell/PracticeShortcutsMenu';
 import { Session } from './Session';
@@ -217,9 +218,21 @@ export default function EnglishLearningPracticePage() {
 
 	const unfinished = useMemo(() => {
 		if (phase !== 'setup') return null;
-		return peekPracticeUnfinished(initialContentKind);
+		return peekPracticeUnfinished({
+			contentKind: initialContentKind,
+			source: initialSource,
+			libraryId: initialLibraryId,
+			streamId: initialStreamId,
+		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- bannerEpoch 强制重读 sessionStorage
-	}, [bannerEpoch, initialContentKind, phase]);
+	}, [
+		bannerEpoch,
+		initialContentKind,
+		initialLibraryId,
+		initialSource,
+		initialStreamId,
+		phase,
+	]);
 
 	const ttsPipeRef = useRef<PracticeTtsPrefetchPipe | null>(null);
 	const requestScopeRef = useRef<PracticeRequestScope>(
@@ -862,6 +875,20 @@ export default function EnglishLearningPracticePage() {
 		[queue],
 	);
 
+	const practiceTtsDisk = useMemo(
+		() =>
+			config
+				? resolvePracticeTtsCache({
+						contentKind: config.contentKind,
+						source: config.source,
+						libraryId: config.libraryId,
+						streamId: config.streamId,
+						sourceTitle: config.sourceTitle,
+					})
+				: {},
+		[config],
+	);
+
 	useEffect(() => {
 		if (phase !== 'running' || queueAnswerTexts.length === 0) {
 			ttsPipeRef.current?.cancel();
@@ -874,13 +901,20 @@ export default function EnglishLearningPracticePage() {
 		ttsPipeRef.current = createPracticeTtsPrefetchPipe(queueAnswerTexts, {
 			ahead: 5,
 			signal: requestScopeRef.current.signal,
+			cacheFolder: practiceTtsDisk.cacheFolder,
+			cacheTitle: practiceTtsDisk.cacheTitle,
 		});
 		return () => {
 			ttsPipeRef.current?.cancel();
 			ttsPipeRef.current = null;
 			endPracticeCloudTtsCacheSession();
 		};
-	}, [phase, queueAnswerTexts]);
+	}, [
+		phase,
+		queueAnswerTexts,
+		practiceTtsDisk.cacheFolder,
+		practiceTtsDisk.cacheTitle,
+	]);
 
 	const onTtsPipelineKick = useCallback((cursorIndex: number) => {
 		ttsPipeRef.current?.kick(cursorIndex);
@@ -891,9 +925,21 @@ export default function EnglishLearningPracticePage() {
 		prefetchMinimaxTtsUserPrefs();
 		const first = getPracticeAnswerText(currentItem).trim();
 		if (first) {
-			prefetchCloudTts(first, { whole: true, signal: requestSignal });
+			prefetchCloudTts(first, {
+				whole: true,
+				signal: requestSignal,
+				persistDisk: true,
+				cacheFolder: practiceTtsDisk.cacheFolder,
+				cacheTitle: practiceTtsDisk.cacheTitle,
+			});
 		}
-	}, [phase, currentItem, requestSignal]);
+	}, [
+		phase,
+		currentItem,
+		requestSignal,
+		practiceTtsDisk.cacheFolder,
+		practiceTtsDisk.cacheTitle,
+	]);
 
 	const shellTitle = useMemo(() => {
 		if (resumeLoading) {
@@ -990,6 +1036,8 @@ export default function EnglishLearningPracticePage() {
 					item={currentItem}
 					itemIndex={index}
 					sourceTitle={config.sourceTitle}
+					cacheFolder={practiceTtsDisk.cacheFolder}
+					cacheTitle={practiceTtsDisk.cacheTitle}
 					onTtsPipelineKick={onTtsPipelineKick}
 					requestSignal={requestSignal}
 					isLastQuestion={index >= queue.length - 1}

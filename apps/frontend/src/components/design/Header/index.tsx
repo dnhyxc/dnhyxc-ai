@@ -176,10 +176,10 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			location.pathname === '/english-learning/practice/summary';
 		if ((practiceSetup || practiceSession) && trail.length > 0) {
 			const params = new URLSearchParams(location.search);
-			const practiceRootLabel =
-				params.get('contentKind') === 'classic'
-					? t('route.englishLearning.practice.classicTitle')
-					: t('route.englishLearning.practice.title');
+			const isClassic = params.get('contentKind') === 'classic';
+			const practiceRootLabel = isClassic
+				? t('route.englishLearning.practice.classicTitle')
+				: t('route.englishLearning.practice.title');
 			const setupParams = new URLSearchParams(params);
 			setupParams.delete('run');
 			const setupQuery = setupParams.toString();
@@ -194,6 +194,17 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					))
 			) {
 				trail.pop();
+			}
+			// 资源库入口：英语学习 > 资源库 > 听写与拼写 > …
+			if (params.get('source') === 'library') {
+				const libraryParams = new URLSearchParams();
+				libraryParams.set('kind', isClassic ? 'classic' : 'vocab');
+				const libraryId = params.get('libraryId')?.trim();
+				if (libraryId) libraryParams.set('library', libraryId);
+				trail.push({
+					label: t('route.englishLearning.library.title'),
+					path: `/english-learning/library?${libraryParams.toString()}`,
+				});
 			}
 			trail.push({ label: practiceRootLabel, path: setupPath });
 			if (practiceSession) {

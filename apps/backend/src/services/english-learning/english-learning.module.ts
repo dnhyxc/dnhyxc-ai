@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KnowledgeEmbeddingModule } from '../knowledge-embedding/knowledge-embedding.module';
 import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
+import { SpeechTranscriptionModule } from '../speech-transcription/speech-transcription.module';
 import { AnnotateSourceTaskService } from './annotate-source-task.service';
 import { EnglishDocxExportJobService } from './english-docx-export-job.service';
 import { EnglishLearningController } from './english-learning.controller';
@@ -34,6 +35,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 	imports: [
 		KnowledgeQaModule,
 		KnowledgeEmbeddingModule,
+		SpeechTranscriptionModule,
 		TypeOrmModule.forFeature([
 			EnglishVocabularyPackBatch,
 			EnglishVocabularyPackSession,

@@ -40,6 +40,7 @@ import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 
 const LIST_SCOPE = 'vocab-daily-memorize' as const;
 const LIST_RESUME_ID = elFixedListResumeId(LIST_SCOPE);
@@ -162,7 +163,10 @@ export default function EnglishLearningDailyRecordsPage() {
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, {
+					persistDisk: true,
+					cacheFolder: TTS_CACHE_FOLDER.daily,
+				});
 			} catch {
 				Toast({
 					type: 'warning',

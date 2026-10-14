@@ -8,7 +8,7 @@ import {
 	unlink,
 	writeFile,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
 	Inject,
@@ -27,14 +27,17 @@ import {
 	getUploadTtsDir,
 } from '../../utils/upload-paths';
 import { LogsService } from '../logs/logs.service';
-import { TTS_FILE_BYTES_KEY } from './tts-file-cache.keys';
+import {
+	sanitizeTtsCacheFolder,
+	TTS_FILE_BYTES_KEY,
+} from './tts-file-cache.keys';
 
 const GC_MIN_INTERVAL_MS = 60_000;
 const GC_BATCH = 32;
 /** 写盘后至少再留这么多可用空间 */
 const DISK_HEADROOM_BYTES = 64 * 1024 * 1024;
-/** 配额计数 TTL：与文件缓存同量级（默认 30 天），到期可再扫盘校准 */
-const BYTES_KEY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** 配额计数 TTL：与文件缓存同量级（默认 180 天），到期可再扫盘校准 */
+const BYTES_KEY_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 
 /**
  * 盘存 MP3；路径索引 + 配额计数走全局 CACHE_MANAGER（与验证码同一条 Redis，不单开连接）。
@@ -46,8 +49,8 @@ export class TtsFileCacheService implements OnModuleInit {
 	private static readonly CTX = TtsFileCacheService.name;
 	private ready = false;
 	private enabled = false;
-	private ttlSec = 2_592_000;
-	private ttlMs = 2_592_000_000;
+	private ttlSec = 15_552_000;
+	private ttlMs = 15_552_000_000;
 	/** ≤0 表示不限制体积 */
 	private maxBytes = 2048 * 1024 * 1024;
 	private ttsDir = '';
@@ -87,7 +90,7 @@ export class TtsFileCacheService implements OnModuleInit {
 
 		this.ttlSec = this.parseNum(
 			env[TtsFileCacheEnum.TTS_FILE_CACHE_TTL_SEC],
-			2_592_000,
+			15_552_000,
 		);
 		this.ttlMs = this.ttlSec * 1000;
 		const maxMb = this.parseNum(
@@ -130,12 +133,11 @@ export class TtsFileCacheService implements OnModuleInit {
 				return;
 			}
 
-			const names = await readdir(this.ttsDir);
+			const paths = await this.listCacheRelativePaths();
 			let total = 0;
-			for (const name of names) {
-				if (!name.endsWith('.mp3') && !name.endsWith('.json')) continue;
+			for (const relative of paths) {
 				try {
-					total += (await stat(join(this.ttsDir, name))).size;
+					total += (await stat(this.toAbsolute(relative))).size;
 				} catch {
 					// missing
 				}
@@ -234,7 +236,7 @@ export class TtsFileCacheService implements OnModuleInit {
 		const abs = this.toAbsolute(relativePath);
 		const tmp = `${abs}.${process.pid}.tmp`;
 		try {
-			ensureUploadDir(this.ttsDir);
+			ensureUploadDir(dirname(abs));
 			let oldBytes = 0;
 			try {
 				oldBytes = (await stat(abs)).size;
@@ -274,36 +276,68 @@ export class TtsFileCacheService implements OnModuleInit {
 		}
 	}
 
+	/**
+	 * 旁路写目录元数据（当前库标题等）；失败只打日志。
+	 * 不进音频 Redis 指纹；改名时调用即可，无需搬盘。
+	 */
+	async writeScopeMeta(
+		folderRaw: string,
+		meta: { title: string; kind?: string },
+	): Promise<void> {
+		this.ensureReady();
+		if (!this.enabled) return;
+		const title = meta.title.trim().slice(0, 200);
+		if (!title) return;
+		const folder = sanitizeTtsCacheFolder(folderRaw);
+		const relative = `tts/${folder}/_meta.json`;
+		try {
+			const abs = this.toAbsolute(relative);
+			ensureUploadDir(dirname(abs));
+			const body = JSON.stringify({
+				title,
+				kind: meta.kind?.trim() || undefined,
+				updatedAt: new Date().toISOString(),
+			});
+			await writeFile(abs, body, 'utf8');
+		} catch (err) {
+			this.logger.warn(
+				`TTS _meta.json 写入失败 folder=${folder}: ${err instanceof Error ? err.message : String(err)}`,
+				TtsFileCacheService.CTX,
+			);
+		}
+	}
+
 	/** 按 mtime 分批清理；游标轮询，不在请求热路径上 */
 	async gcExpired(limit = GC_BATCH): Promise<number> {
 		this.ensureReady();
 		if (!this.enabled) return 0;
 		const cutoff = Date.now() - this.ttlMs;
-		let names: string[];
+		let relatives: string[];
 		try {
-			names = (await readdir(this.ttsDir)).filter((n) => n.endsWith('.mp3'));
+			relatives = (await this.listCacheRelativePaths()).filter((p) =>
+				p.endsWith('.mp3'),
+			);
 		} catch {
 			return 0;
 		}
-		if (names.length === 0) return 0;
+		if (relatives.length === 0) return 0;
 
 		const expired: string[] = [];
-		const start = this.gcCursor % names.length;
+		const start = this.gcCursor % relatives.length;
 		let checked = 0;
-		while (expired.length < limit && checked < names.length) {
-			const name = names[(start + checked) % names.length]!;
+		while (expired.length < limit && checked < relatives.length) {
+			const relative = relatives[(start + checked) % relatives.length]!;
 			checked += 1;
-			const abs = join(this.ttsDir, name);
 			try {
-				const st = await stat(abs);
+				const st = await stat(this.toAbsolute(relative));
 				if (st.mtimeMs < cutoff) {
-					expired.push(`tts/${name}`);
+					expired.push(relative);
 				}
 			} catch {
 				// missing
 			}
 		}
-		this.gcCursor = (start + checked) % names.length;
+		this.gcCursor = (start + checked) % relatives.length;
 
 		const n = await this.unlinkPaths(expired);
 		if (n > 0) {
@@ -313,6 +347,34 @@ export class TtsFileCacheService implements OnModuleInit {
 			);
 		}
 		return n;
+	}
+
+	/** 顶层文件 + 一层子目录内文件（相对 uploads 的路径） */
+	private async listCacheRelativePaths(): Promise<string[]> {
+		const out: string[] = [];
+		const entries = await readdir(this.ttsDir, { withFileTypes: true });
+		for (const ent of entries) {
+			if (ent.isFile()) {
+				if (ent.name.endsWith('.mp3') || ent.name.endsWith('.json')) {
+					out.push(`tts/${ent.name}`);
+				}
+				continue;
+			}
+			if (!ent.isDirectory()) continue;
+			const subDir = join(this.ttsDir, ent.name);
+			let children: string[];
+			try {
+				children = await readdir(subDir);
+			} catch {
+				continue;
+			}
+			for (const name of children) {
+				if (name.endsWith('.mp3') || name.endsWith('.json')) {
+					out.push(`tts/${ent.name}/${name}`);
+				}
+			}
+		}
+		return out;
 	}
 
 	private async shouldSkipStore(
@@ -460,7 +522,13 @@ export class TtsFileCacheService implements OnModuleInit {
 
 	private toAbsolute(relativePath: string): string {
 		const cleaned = relativePath.replace(/^\/+/, '');
-		return join(this.uploadsRoot, cleaned);
+		const abs = resolve(join(this.uploadsRoot, cleaned));
+		const ttsRoot = resolve(this.ttsDir);
+		const prefix = ttsRoot.endsWith(sep) ? ttsRoot : `${ttsRoot}${sep}`;
+		if (abs !== ttsRoot && !abs.startsWith(prefix)) {
+			throw new Error(`TTS 路径越界: ${relativePath}`);
+		}
+		return abs;
 	}
 
 	private parseBool(v: unknown, fallback: boolean): boolean {

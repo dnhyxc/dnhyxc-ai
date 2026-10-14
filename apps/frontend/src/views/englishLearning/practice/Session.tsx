@@ -59,6 +59,8 @@ export function Session({
 	item,
 	itemIndex,
 	sourceTitle,
+	cacheFolder,
+	cacheTitle,
 	onTtsPipelineKick,
 	requestSignal,
 	isLastQuestion = false,
@@ -141,6 +143,8 @@ export function Session({
 		itemIndex,
 		onPipelineKick: onTtsPipelineKick,
 		signal: requestSignal,
+		cacheFolder,
+		cacheTitle: cacheTitle ?? (sourceTitle?.trim() || undefined),
 		t,
 	});
 

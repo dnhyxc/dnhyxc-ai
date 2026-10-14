@@ -35,6 +35,7 @@ import {
 	composeViewportScroll,
 	useListCornerFab,
 } from '../../hooks/useListCornerFab';
+import { ttsCacheScopeVocab } from '../../utils/ttsCacheFolder';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -162,7 +163,13 @@ export function VocabularyLibrarySection({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				const title =
+					(libraryMeta ?? resolvedLibrary)?.title?.trim() || undefined;
+				await playPreferred(word, {
+					persistDisk: true,
+					...(libraryId ? { cacheFolder: ttsCacheScopeVocab(libraryId) } : {}),
+					...(title ? { cacheTitle: title } : {}),
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -172,7 +179,7 @@ export function VocabularyLibrarySection({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[libraryId, libraryMeta, playingKey, resolvedLibrary, t],
 	);
 
 	const toggleVocabularyFavorite = useCallback(

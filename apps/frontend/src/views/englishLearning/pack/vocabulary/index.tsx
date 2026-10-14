@@ -30,6 +30,7 @@ import {
 	composeViewportScroll,
 	useListCornerFab,
 } from '../../hooks/useListCornerFab';
+import { ttsCacheScopePack } from '../../utils/ttsCacheFolder';
 import { PackStreamProgress } from '../components/PackStreamProgress';
 import { useVocabularyPackHistoryList } from '../hooks/useVocabularyPackHistoryList';
 import type { PackStreamSectionSnapshot } from '../types';
@@ -186,9 +187,12 @@ function VocabularyPackSectionInner({
 				poolTotal: itemCount > 0 ? itemCount : undefined,
 			};
 		}
+		const liveStreamId =
+			EnglishPackStore.vocabActiveStreamId?.trim() || undefined;
 		return {
 			contentKind: 'vocab' as const,
 			source: 'live' as const,
+			...(liveStreamId ? { streamId: liveStreamId } : {}),
 			sourceTitle: practiceSourceTitle,
 			poolTotal: itemCount > 0 ? itemCount : undefined,
 		};
@@ -266,7 +270,16 @@ function VocabularyPackSectionInner({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				const streamId =
+					historyStreamId?.trim() ||
+					EnglishPackStore.vocabActiveStreamId?.trim() ||
+					'';
+				const title = topic?.trim() || undefined;
+				await playPreferred(word, {
+					persistDisk: true,
+					...(streamId ? { cacheFolder: ttsCacheScopePack(streamId) } : {}),
+					...(title ? { cacheTitle: title } : {}),
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -276,7 +289,7 @@ function VocabularyPackSectionInner({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[historyStreamId, playingKey, t, topic],
 	);
 
 	const toggleVocabularyFavorite = useCallback(

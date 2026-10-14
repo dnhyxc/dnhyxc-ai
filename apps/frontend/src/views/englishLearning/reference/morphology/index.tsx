@@ -14,6 +14,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import { ReferencePageShell } from '../components/ReferencePageShell';
 import { referenceNavItemClass } from '../utils/referenceNavItemClass';
 import { useReferenceDetailScrollReset } from '../utils/useReferenceDetailScrollReset';
@@ -82,7 +83,10 @@ export default function EnglishMorphologyReferencePage() {
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, {
+					persistDisk: true,
+					cacheFolder: TTS_CACHE_FOLDER.morphology,
+				});
 			} catch {
 				Toast({
 					type: 'warning',

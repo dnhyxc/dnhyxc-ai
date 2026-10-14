@@ -8,16 +8,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
-import { buildTtsFileIds, normalizeTtsText } from './tts-file-cache.keys';
-import { TtsFileCacheService } from './tts-file-cache.service';
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'FunAudioLLM/SenseVoiceSmall';
 const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
 /** 硅基预置女声：claire（温柔女声） */
 const DEFAULT_TTS_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:claire';
 const TTS_INPUT_MAX_CHARS = 4096;
-/** 同文朗读缓存上限（CosyVoice2 无 seed，缓存保证重复播放读音一致） */
-const TTS_SPEECH_CACHE_MAX = 256;
 /** 硅基文档列出的转写模型（用于无自定义配置时的说明与校验参考） */
 const KNOWN_TRANSCRIPTION_MODELS = new Set<string>([
 	DEFAULT_TRANSCRIPTION_MODEL,
@@ -47,45 +43,11 @@ function normalizeAsrPlainText(raw: string): string {
  */
 @Injectable()
 export class SiliconflowTranscriptionService {
-	/** 文本 + 模型/音色参数 → MP3，避免 CosyVoice 每次合成发音漂移 */
-	private readonly ttsSpeechCache = new Map<string, Buffer>();
-
 	constructor(
 		private readonly config: ConfigService,
-		private readonly fileCache: TtsFileCacheService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
-
-	private buildTtsSpeechCacheKey(plain: string): string {
-		return [
-			this.resolveTtsModel(),
-			this.resolveTtsVoice(),
-			'1',
-			'0',
-			plain,
-		].join('\u0001');
-	}
-
-	private getTtsSpeechFromCache(key: string): Buffer | null {
-		const hit = this.ttsSpeechCache.get(key);
-		if (!hit) return null;
-		this.ttsSpeechCache.delete(key);
-		this.ttsSpeechCache.set(key, hit);
-		return hit;
-	}
-
-	private setTtsSpeechCache(key: string, buffer: Buffer): void {
-		if (this.ttsSpeechCache.has(key)) {
-			this.ttsSpeechCache.delete(key);
-		}
-		this.ttsSpeechCache.set(key, buffer);
-		while (this.ttsSpeechCache.size > TTS_SPEECH_CACHE_MAX) {
-			const oldest = this.ttsSpeechCache.keys().next().value;
-			if (oldest === undefined) break;
-			this.ttsSpeechCache.delete(oldest);
-		}
-	}
 
 	private resolveTranscriptionModel(): string {
 		const configured = this.config
@@ -135,28 +97,9 @@ export class SiliconflowTranscriptionService {
 			throw new HttpException('朗读文本为空', HttpStatus.BAD_REQUEST);
 		}
 
-		const cacheKey = this.buildTtsSpeechCacheKey(plain);
-		const cached = this.getTtsSpeechFromCache(cacheKey);
-		if (cached) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				SiliconflowTranscriptionService.name,
-			);
-			return Buffer.from(cached);
-		}
-
+		// ponytail: 硅基入口无 persistDisk；默认不落盘（与英语学习 opt-in 一致）
 		const model = this.resolveTtsModel();
 		const voice = this.resolveTtsVoice();
-		const ids = buildTtsFileIds({
-			provider: 'siliconflow',
-			paramParts: [model, voice, '1', '0'],
-			normalizedText: normalizeTtsText(plain),
-		});
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			this.setTtsSpeechCache(cacheKey, fileHit);
-			return Buffer.from(fileHit);
-		}
 
 		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
 		if (!apiKey?.trim()) {
@@ -198,10 +141,7 @@ export class SiliconflowTranscriptionService {
 			);
 		}
 
-		const buffer = Buffer.from(await res.arrayBuffer());
-		this.setTtsSpeechCache(cacheKey, buffer);
-		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
-		return buffer;
+		return Buffer.from(await res.arrayBuffer());
 	}
 
 	async transcribe(file: Express.Multer.File): Promise<{ text: string }> {

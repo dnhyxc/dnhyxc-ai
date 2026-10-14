@@ -15,6 +15,7 @@ import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 import {
 	buildTtsFileIds,
 	normalizeTtsText,
+	sanitizeTtsCacheFolder,
 	userIdPart,
 } from './tts-file-cache.keys';
 import { TtsFileCacheService } from './tts-file-cache.service';
@@ -138,11 +139,13 @@ export class XfyunTtsService {
 
 	private buildCacheKey(
 		resolved: XfyunTtsResolved,
-		userId?: number,
-		credTag = 'env',
+		userId: number | undefined,
+		credTag: string,
+		folder: string,
 	): string {
 		return [
 			userId != null && userId > 0 ? String(userId) : '0',
+			folder,
 			credTag,
 			resolved.vcn,
 			String(resolved.speed),
@@ -324,6 +327,7 @@ export class XfyunTtsService {
 		resolved: XfyunTtsResolved,
 		userId: number | undefined,
 		credTag: string,
+		folder: string,
 	) {
 		return buildTtsFileIds({
 			provider: 'xfyun',
@@ -336,33 +340,46 @@ export class XfyunTtsService {
 				String(resolved.pitch),
 			],
 			normalizedText: normalizeTtsText(resolved.text),
+			folder,
 		});
 	}
 
 	async synthesizeSpeech(dto: XfyunTtsDto, userId?: number): Promise<Buffer> {
 		const resolved = this.resolveOptions(dto);
 		const credentials = await this.resolveCredentials(userId);
-		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
-		const cached = this.getFromCache(cacheKey);
-		if (cached) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				XfyunTtsService.name,
+		const persist = dto.persistDisk === true;
+		if (persist) {
+			const folder = sanitizeTtsCacheFolder(dto.cacheFolder ?? '');
+			const cacheKey = this.buildCacheKey(
+				resolved,
+				userId,
+				credentials.credTag,
+				folder,
 			);
-			return Buffer.from(cached);
+			const cached = this.getFromCache(cacheKey);
+			if (cached) {
+				this.logger.log(
+					'TTS 命中进程缓存(L1)，未查文件缓存',
+					XfyunTtsService.name,
+				);
+				return Buffer.from(cached);
+			}
+			const ids = this.fileIds(resolved, userId, credentials.credTag, folder);
+			const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+			if (fileHit?.length) {
+				this.setCache(cacheKey, fileHit);
+				return Buffer.from(fileHit);
+			}
+			const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
+			this.setCache(cacheKey, buffer);
+			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
+			const cacheTitle = dto.cacheTitle?.trim();
+			if (cacheTitle) {
+				void this.fileCache.writeScopeMeta(folder, { title: cacheTitle });
+			}
+			return buffer;
 		}
-
-		const ids = this.fileIds(resolved, userId, credentials.credTag);
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			this.setCache(cacheKey, fileHit);
-			return Buffer.from(fileHit);
-		}
-
-		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
-		this.setCache(cacheKey, buffer);
-		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
-		return buffer;
+		return this.synthesizeViaWebSocket(resolved, credentials);
 	}
 
 	async *streamSpeech(
@@ -371,31 +388,45 @@ export class XfyunTtsService {
 	): AsyncGenerator<Buffer> {
 		const resolved = this.resolveOptions(dto);
 		const credentials = await this.resolveCredentials(userId);
-		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
-		const cached = this.getFromCache(cacheKey);
-		if (cached?.length) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				XfyunTtsService.name,
+		const persist = dto.persistDisk === true;
+		if (persist) {
+			const folder = sanitizeTtsCacheFolder(dto.cacheFolder ?? '');
+			const cacheKey = this.buildCacheKey(
+				resolved,
+				userId,
+				credentials.credTag,
+				folder,
 			);
-			yield cached;
+			const cached = this.getFromCache(cacheKey);
+			if (cached?.length) {
+				this.logger.log(
+					'TTS 命中进程缓存(L1)，未查文件缓存',
+					XfyunTtsService.name,
+				);
+				yield cached;
+				return;
+			}
+			const ids = this.fileIds(resolved, userId, credentials.credTag, folder);
+			const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+			if (fileHit?.length) {
+				this.setCache(cacheKey, fileHit);
+				yield fileHit;
+				return;
+			}
+			const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
+			if (buffer.length) {
+				this.setCache(cacheKey, buffer);
+				await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
+				const cacheTitle = dto.cacheTitle?.trim();
+				if (cacheTitle) {
+					void this.fileCache.writeScopeMeta(folder, { title: cacheTitle });
+				}
+				yield buffer;
+			}
 			return;
 		}
-
-		const ids = this.fileIds(resolved, userId, credentials.credTag);
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			this.setCache(cacheKey, fileHit);
-			yield fileHit;
-			return;
-		}
-
 		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
-		if (buffer.length) {
-			this.setCache(cacheKey, buffer);
-			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
-			yield buffer;
-		}
+		if (buffer.length) yield buffer;
 	}
 
 	resolveContentType(): string {

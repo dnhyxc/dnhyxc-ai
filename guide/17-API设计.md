@@ -351,11 +351,22 @@ Body:
   "voice_id": "Wise_Woman",
   "speed": 1.0,
   "format": "pcm",
-  "sample_rate": 24000
+  "sample_rate": 24000,
+  "persistDisk": true,
+  "cacheFolder": "vocab_<libraryId>",
+  "cacheTitle": "托福词汇"
 }
 
 → 二进制音频流（hex 编码逐块）
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `persistDisk` | 默认 false；`true` 时才走 L1/L2 读写并落盘 `uploads/tts/`（英语学习 opt-in） |
+| `cacheFolder` | 稳定目录键（如 `vocab_<uuid>` / `收藏`）；**勿传可变库标题** |
+| `cacheTitle` | 可选；仅写目录 `_meta.json`，不进路径 / Redis 指纹 |
+
+Edge / 讯飞同步与流式接口同样支持上述三字段。硅基 `POST …/speech` 英语链路不写 L2。详见 [09 §9.4.4](./09-英语学习.md)。
 
 ---
 

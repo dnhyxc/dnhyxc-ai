@@ -14,7 +14,11 @@ import {
 	edgeVolumeFromVol,
 } from './edge-tts-prosody';
 import { DEFAULT_EDGE_TTS_VOICE } from './edge-tts-voices';
-import { buildTtsFileIds, normalizeTtsText } from './tts-file-cache.keys';
+import {
+	buildTtsFileIds,
+	normalizeTtsText,
+	sanitizeTtsCacheFolder,
+} from './tts-file-cache.keys';
 import { TtsFileCacheService } from './tts-file-cache.service';
 
 const TTS_INPUT_MAX_BYTES = 8000;
@@ -89,9 +93,14 @@ export class EdgeTtsService {
 		};
 	}
 
-	private buildCacheKey(resolved: EdgeTtsResolved, userId?: number): string {
+	private buildCacheKey(
+		resolved: EdgeTtsResolved,
+		userId: number | undefined,
+		folder: string,
+	): string {
 		return [
 			userId != null && userId > 0 ? String(userId) : '0',
+			folder,
 			resolved.voice,
 			resolved.rate,
 			resolved.volume,
@@ -154,7 +163,7 @@ export class EdgeTtsService {
 	}
 
 	/** L2 指纹：Edge 跨用户共享（不含 userId，与文档一致） */
-	private fileIds(resolved: EdgeTtsResolved) {
+	private fileIds(resolved: EdgeTtsResolved, folder: string) {
 		return buildTtsFileIds({
 			provider: 'edge',
 			paramParts: [
@@ -164,6 +173,7 @@ export class EdgeTtsService {
 				resolved.pitch,
 			],
 			normalizedText: normalizeTtsText(resolved.text),
+			folder,
 		});
 	}
 
@@ -172,29 +182,50 @@ export class EdgeTtsService {
 		userId?: number,
 	): Promise<CachedSpeech> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
-		const cached = this.getFromCache(cacheKey);
-		if (cached) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				EdgeTtsService.name,
-			);
-			return {
-				buffer: Buffer.from(cached.buffer),
-				boundaries: cached.boundaries.map((b) => ({ ...b })),
-			};
-		}
+		const persist = dto.persistDisk === true;
+		if (persist) {
+			const folder = sanitizeTtsCacheFolder(dto.cacheFolder ?? '');
+			const cacheKey = this.buildCacheKey(resolved, userId, folder);
+			const cached = this.getFromCache(cacheKey);
+			if (cached) {
+				this.logger.log(
+					'TTS 命中进程缓存(L1)，未查文件缓存',
+					EdgeTtsService.name,
+				);
+				return {
+					buffer: Buffer.from(cached.buffer),
+					boundaries: cached.boundaries.map((b) => ({ ...b })),
+				};
+			}
 
-		const ids = this.fileIds(resolved);
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			const boundaries =
-				(await this.fileCache.getJson<EdgeTtsBoundaryDto[]>(
-					ids.redisKey,
-					ids.relativePath,
-				)) ?? [];
-			const entry: CachedSpeech = { buffer: fileHit, boundaries };
+			const ids = this.fileIds(resolved, folder);
+			const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+			if (fileHit?.length) {
+				const boundaries =
+					(await this.fileCache.getJson<EdgeTtsBoundaryDto[]>(
+						ids.redisKey,
+						ids.relativePath,
+					)) ?? [];
+				const entry: CachedSpeech = { buffer: fileHit, boundaries };
+				this.setCache(cacheKey, entry);
+				return {
+					buffer: Buffer.from(entry.buffer),
+					boundaries: entry.boundaries.map((b) => ({ ...b })),
+				};
+			}
+
+			const entry = await this.synthesize(resolved);
 			this.setCache(cacheKey, entry);
+			await this.fileCache.set(
+				ids.redisKey,
+				ids.relativePath,
+				entry.buffer,
+				entry.boundaries,
+			);
+			const cacheTitle = dto.cacheTitle?.trim();
+			if (cacheTitle) {
+				void this.fileCache.writeScopeMeta(folder, { title: cacheTitle });
+			}
 			return {
 				buffer: Buffer.from(entry.buffer),
 				boundaries: entry.boundaries.map((b) => ({ ...b })),
@@ -202,13 +233,6 @@ export class EdgeTtsService {
 		}
 
 		const entry = await this.synthesize(resolved);
-		this.setCache(cacheKey, entry);
-		await this.fileCache.set(
-			ids.redisKey,
-			ids.relativePath,
-			entry.buffer,
-			entry.boundaries,
-		);
 		return {
 			buffer: Buffer.from(entry.buffer),
 			boundaries: entry.boundaries.map((b) => ({ ...b })),

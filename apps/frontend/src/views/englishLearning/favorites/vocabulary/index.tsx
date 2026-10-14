@@ -49,6 +49,7 @@ import {
 	LibraryVirtuosoGrid,
 } from '../../library/components/LibraryVirtuosoGrid';
 import { exportDocxFileName } from '../../utils/exportFileName';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 
 const LIST_SCOPE = 'vocab-favorites' as const;
@@ -236,7 +237,10 @@ export function VocabularyFavoritesSection({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, {
+					persistDisk: true,
+					cacheFolder: TTS_CACHE_FOLDER.favorites,
+				});
 			} catch {
 				Toast({
 					type: 'warning',

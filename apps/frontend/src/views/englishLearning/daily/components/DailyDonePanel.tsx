@@ -23,6 +23,7 @@ import {
 	getPracticeAnswerText,
 	toPracticeVocabItem,
 } from '../../practice/utils/item';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import type {
 	DailyMemorizeMode,
 	DailySessionRound,
@@ -379,6 +380,7 @@ export function DailyDonePanel({
 						roundTotal={latestTotal}
 						practicedTotal={summary.practicedTotal}
 						poolTotal={summary.poolTotal}
+						cacheFolder={TTS_CACHE_FOLDER.daily}
 						meta={<BoardMeta parts={[dailyModeLabel(mode, t)]} />}
 						rounds={boardRounds}
 						cloudSingleUtterance={false}

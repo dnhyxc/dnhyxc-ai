@@ -14,6 +14,7 @@ import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 import {
 	buildTtsFileIds,
 	normalizeTtsText,
+	sanitizeTtsCacheFolder,
 	userIdPart,
 } from './tts-file-cache.keys';
 import { TtsFileCacheService } from './tts-file-cache.service';
@@ -175,9 +176,14 @@ export class MinimaxTtsService {
 	 * @param resolved TTS 参数
 	 * @param userId 登录用户 id，避免同设备多账号共用 LRU 条目
 	 */
-	private buildCacheKey(resolved: MinimaxTtsResolved, userId?: number): string {
+	private buildCacheKey(
+		resolved: MinimaxTtsResolved,
+		userId: number | undefined,
+		folder: string,
+	): string {
 		return [
 			userId != null && userId > 0 ? String(userId) : '0',
+			folder,
 			resolved.model,
 			resolved.voiceId,
 			String(resolved.speed),
@@ -413,7 +419,11 @@ export class MinimaxTtsService {
 		});
 	}
 
-	private fileIds(resolved: MinimaxTtsResolved, userId?: number) {
+	private fileIds(
+		resolved: MinimaxTtsResolved,
+		userId: number | undefined,
+		folder: string,
+	) {
 		return buildTtsFileIds({
 			provider: 'minimax',
 			paramParts: [
@@ -431,6 +441,7 @@ export class MinimaxTtsService {
 				resolved.languageBoost ?? '',
 			],
 			normalizedText: normalizeTtsText(resolved.text),
+			folder,
 		});
 	}
 
@@ -442,21 +453,26 @@ export class MinimaxTtsService {
 	 */
 	async synthesizeSpeech(dto: MinimaxTtsDto, userId?: number): Promise<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
-		const cached = this.getFromCache(cacheKey);
-		if (cached) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				MinimaxTtsService.name,
-			);
-			return Buffer.from(cached);
-		}
-
-		const ids = this.fileIds(resolved, userId);
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			this.setCache(cacheKey, fileHit);
-			return Buffer.from(fileHit);
+		const persist = dto.persistDisk === true;
+		const folder = persist ? sanitizeTtsCacheFolder(dto.cacheFolder ?? '') : '';
+		const cacheKey = persist
+			? this.buildCacheKey(resolved, userId, folder)
+			: '';
+		if (persist) {
+			const cached = this.getFromCache(cacheKey);
+			if (cached) {
+				this.logger.log(
+					'TTS 命中进程缓存(L1)，未查文件缓存',
+					MinimaxTtsService.name,
+				);
+				return Buffer.from(cached);
+			}
+			const ids = this.fileIds(resolved, userId, folder);
+			const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+			if (fileHit?.length) {
+				this.setCache(cacheKey, fileHit);
+				return Buffer.from(fileHit);
+			}
 		}
 
 		const res = await this.requestMiniMax(resolved, false, userId);
@@ -495,8 +511,15 @@ export class MinimaxTtsService {
 			);
 		}
 		const buffer = Buffer.concat(parts); // 合并所有音频片段
-		this.setCache(cacheKey, buffer);
-		await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
+		if (persist) {
+			const ids = this.fileIds(resolved, userId, folder);
+			this.setCache(cacheKey, buffer);
+			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
+			const cacheTitle = dto.cacheTitle?.trim();
+			if (cacheTitle) {
+				void this.fileCache.writeScopeMeta(folder, { title: cacheTitle });
+			}
+		}
 		return buffer;
 	}
 
@@ -510,23 +533,28 @@ export class MinimaxTtsService {
 		userId?: number,
 	): AsyncGenerator<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
-		const cached = this.getFromCache(cacheKey);
-		if (cached?.length) {
-			this.logger.log(
-				'TTS 命中进程缓存(L1)，未查文件缓存',
-				MinimaxTtsService.name,
-			);
-			yield cached;
-			return;
-		}
-
-		const ids = this.fileIds(resolved, userId);
-		const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
-		if (fileHit?.length) {
-			this.setCache(cacheKey, fileHit);
-			yield fileHit;
-			return;
+		const persist = dto.persistDisk === true;
+		const folder = persist ? sanitizeTtsCacheFolder(dto.cacheFolder ?? '') : '';
+		const cacheKey = persist
+			? this.buildCacheKey(resolved, userId, folder)
+			: '';
+		if (persist) {
+			const cached = this.getFromCache(cacheKey);
+			if (cached?.length) {
+				this.logger.log(
+					'TTS 命中进程缓存(L1)，未查文件缓存',
+					MinimaxTtsService.name,
+				);
+				yield cached;
+				return;
+			}
+			const ids = this.fileIds(resolved, userId, folder);
+			const fileHit = await this.fileCache.get(ids.redisKey, ids.relativePath);
+			if (fileHit?.length) {
+				this.setCache(cacheKey, fileHit);
+				yield fileHit;
+				return;
+			}
 		}
 
 		const res = await this.requestMiniMax(resolved, true, userId);
@@ -549,10 +577,15 @@ export class MinimaxTtsService {
 				yield audio;
 			}
 		}
-		if (parts.length > 0) {
+		if (persist && parts.length > 0) {
 			const buffer = Buffer.concat(parts);
+			const ids = this.fileIds(resolved, userId, folder);
 			this.setCache(cacheKey, buffer);
 			await this.fileCache.set(ids.redisKey, ids.relativePath, buffer);
+			const cacheTitle = dto.cacheTitle?.trim();
+			if (cacheTitle) {
+				void this.fileCache.writeScopeMeta(folder, { title: cacheTitle });
+			}
 		}
 	}
 

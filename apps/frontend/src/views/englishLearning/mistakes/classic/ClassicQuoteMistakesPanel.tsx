@@ -56,6 +56,7 @@ import {
 } from '../../library/components/LibraryVirtuosoGrid';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
 import { exportDocxFileName } from '../../utils/exportFileName';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 
 export type ClassicMistakesListMode = 'mistakes' | 'review';
@@ -358,7 +359,13 @@ export function ClassicQuoteMistakesPanel({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(english, { cloudSingleUtterance: true });
+				await playPreferred(english, {
+					cloudSingleUtterance: true,
+					persistDisk: true,
+					cacheFolder: isReview
+						? TTS_CACHE_FOLDER.review
+						: TTS_CACHE_FOLDER.mistakes,
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -368,7 +375,7 @@ export function ClassicQuoteMistakesPanel({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[isReview, playingKey, t],
 	);
 
 	useEffect(() => {

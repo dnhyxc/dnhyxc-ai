@@ -23,7 +23,9 @@ import {
 	BoardMeta,
 	type BoardRound,
 } from '../../components/result';
+import { resolvePracticeTtsCache } from '../../utils/ttsCacheFolder';
 import { PracticePageShell } from '../components/shell';
+import type { PracticeSource } from '../types';
 import {
 	buildEnglishPracticeSearchParams,
 	englishPracticeSessionUrl,
@@ -292,6 +294,19 @@ export default function PracticeReportDetailPage() {
 			? Math.round((allCorrectCount / allAttemptCount) * 100)
 			: undefined;
 	const contentKind = report?.contentKind ?? 'vocab';
+	const practiceTtsDisk = useMemo(
+		() =>
+			report
+				? resolvePracticeTtsCache({
+						contentKind: report.contentKind === 'classic' ? 'classic' : 'vocab',
+						source: report.source as PracticeSource,
+						libraryId: report.sourceMeta?.libraryId,
+						streamId: report.sourceMeta?.streamId,
+						sourceTitle: report.sourceTitle,
+					})
+				: {},
+		[report],
+	);
 	const createdAtLabel = report?.createdAt ? formatDate(report.createdAt) : '';
 	const shellTitle =
 		contentKind === 'classic'
@@ -368,6 +383,8 @@ export default function PracticeReportDetailPage() {
 							roundTotal={latestRound?.items.length ?? report.totalCount}
 							practicedTotal={practicedUnique || report.totalCount}
 							poolTotal={report.sourceMeta?.poolTotal}
+							cacheFolder={practiceTtsDisk.cacheFolder}
+							cacheTitle={practiceTtsDisk.cacheTitle}
 							meta={
 								<BoardMeta
 									parts={[

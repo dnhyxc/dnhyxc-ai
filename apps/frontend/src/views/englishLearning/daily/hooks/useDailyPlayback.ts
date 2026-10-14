@@ -5,6 +5,7 @@ import {
 	playPreferred,
 	stopAllPlayback,
 } from '@/utils/speech';
+import { TTS_CACHE_FOLDER } from '../../utils/ttsCacheFolder';
 
 type PlayOptions = { force?: boolean };
 
@@ -48,7 +49,10 @@ export function useDailyPlayback(args: {
 			stopAllPlayback();
 			setPlaying(true);
 			try {
-				await playPreferred(word);
+				await playPreferred(word, {
+					persistDisk: true,
+					cacheFolder: TTS_CACHE_FOLDER.daily,
+				});
 			} finally {
 				if (playRunRef.current === runId) {
 					setPlaying(false);

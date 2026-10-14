@@ -512,6 +512,18 @@ export type PlayPreferredOptions = {
 	 */
 	cloudSingleUtterance?: boolean;
 	/**
+	 * 为 true 时后端写读 Redis/uploads/tts（仅英语学习应传）。
+	 * 听书/划词/试听勿传，默认不落盘。
+	 */
+	persistDisk?: boolean;
+	/**
+	 * 稳定落盘目录键（如 vocab_<libraryId> / 收藏）；勿传可变库标题。
+	 * 未传则后端用「未归类」。
+	 */
+	cacheFolder?: string;
+	/** 当前展示标题；仅写后端 _meta.json，不进路径指纹 */
+	cacheTitle?: string;
+	/**
 	 * 当前段真正开始出声后回调（云端 audio.play / 本机 speak 成功）。
 	 * 听书用来错开预取，避免与首包 HTTP 抢带宽。
 	 */
@@ -536,6 +548,9 @@ type CadencePlaybackHooks = Pick<
 type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
 	rate?: number;
 	singleUtterance?: boolean;
+	persistDisk?: boolean;
+	cacheFolder?: string;
+	cacheTitle?: string;
 };
 
 /** 与 Edge / 讯飞单次上限对齐（字节） */
@@ -1550,6 +1565,9 @@ function cloudPlainWithinSingleLimit(plain: string): boolean {
 async function resolveCloudTtsReady(
 	chunkPlain: string,
 	prefetched?: Promise<TtsSentencePrefetch> | null,
+	persistDisk?: boolean,
+	cacheFolder?: string,
+	cacheTitle?: string,
 ): Promise<CloudTtsReady> {
 	if (prefetched) {
 		try {
@@ -1559,7 +1577,13 @@ async function resolveCloudTtsReady(
 			// 预取失败则回退现场请求
 		}
 	}
-	return startCloudTts(chunkPlain);
+	return startCloudTts(
+		chunkPlain,
+		undefined,
+		persistDisk,
+		cacheFolder,
+		cacheTitle,
+	);
 }
 
 /**
@@ -1568,7 +1592,10 @@ async function resolveCloudTtsReady(
  */
 export function prefetchCloudTts(
 	rawText: string,
-	options?: Pick<PlayPreferredOptions, 'preferLocal'> & {
+	options?: Pick<
+		PlayPreferredOptions,
+		'preferLocal' | 'persistDisk' | 'cacheFolder' | 'cacheTitle'
+	> & {
 		whole?: boolean;
 		signal?: AbortSignal;
 	},
@@ -1580,7 +1607,13 @@ export function prefetchCloudTts(
 		options?.whole && cloudPlainWithinSingleLimit(plain)
 			? plain
 			: firstCloudTtsChunkPlain(plain);
-	return startCloudTts(chunkPlain, options?.signal).then((ready) => ({
+	return startCloudTts(
+		chunkPlain,
+		options?.signal,
+		options?.persistDisk,
+		options?.cacheFolder,
+		options?.cacheTitle,
+	).then((ready) => ({
 		plain: chunkPlain,
 		ready,
 	}));
@@ -1602,9 +1635,26 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
  * 厂商仍按句合成，但浏览器只打 1 次接口 / 批。
  * signal abort 后不写入 LRU。
  */
+function persistDiskBodyExtras(
+	persistDisk?: boolean,
+	cacheFolder?: string,
+	cacheTitle?: string,
+): Record<string, unknown> {
+	if (persistDisk !== true) return {};
+	const out: Record<string, unknown> = { persistDisk: true };
+	const folder = cacheFolder?.trim().slice(0, 120);
+	if (folder) out.cacheFolder = folder;
+	const title = cacheTitle?.trim().slice(0, 200);
+	if (title) out.cacheTitle = title;
+	return out;
+}
+
 export async function prefetchCloudTtsBatch(
 	rawTexts: readonly string[],
-	options?: Pick<PlayPreferredOptions, 'preferLocal'> & {
+	options?: Pick<
+		PlayPreferredOptions,
+		'preferLocal' | 'persistDisk' | 'cacheFolder' | 'cacheTitle'
+	> & {
 		signal?: AbortSignal;
 	},
 ): Promise<void> {
@@ -1663,7 +1713,15 @@ export async function prefetchCloudTtsBatch(
 						Authorization: `Bearer ${token}`,
 						'Content-Type': 'application/json',
 					},
-					body: JSON.stringify({ texts: chunk, ...bodyExtras }),
+					body: JSON.stringify({
+						texts: chunk,
+						...bodyExtras,
+						...persistDiskBodyExtras(
+							options?.persistDisk,
+							options?.cacheFolder,
+							options?.cacheTitle,
+						),
+					}),
 					signal: options?.signal,
 				});
 				if (options?.signal?.aborted) return;
@@ -1716,6 +1774,9 @@ export async function prefetchCloudTtsBatch(
 async function startCloudTts(
 	plain: string,
 	signal?: AbortSignal,
+	persistDisk?: boolean,
+	cacheFolder?: string,
+	cacheTitle?: string,
 ): Promise<CloudTtsReady> {
 	await ensureMinimaxTtsUserPrefsLoaded();
 	const cacheKey = buildCloudTtsCacheKey(plain);
@@ -1775,7 +1836,11 @@ async function startCloudTts(
 			const res = await platformFetch(BASE_URL + endpoint, {
 				method: 'POST',
 				headers,
-				body: JSON.stringify({ text: plain, ...bodyExtras }),
+				body: JSON.stringify({
+					text: plain,
+					...bodyExtras,
+					...persistDiskBodyExtras(persistDisk, cacheFolder, cacheTitle),
+				}),
 				signal,
 			});
 
@@ -1983,6 +2048,9 @@ async function playCloudTtsCadenceSegments(
 		const ready = await resolveCloudTtsReady(
 			chunks[0].text,
 			opts?.prefetchedCloud,
+			opts?.persistDisk,
+			opts?.cacheFolder,
+			opts?.cacheTitle,
 		);
 		// 检查播放世代是否仍有效，用户可能已终止
 		if (!isPlaybackGenerationActive(generation)) return;
@@ -2005,6 +2073,9 @@ async function playCloudTtsCadenceSegments(
 	let pendingReady: Promise<CloudTtsReady> | null = resolveCloudTtsReady(
 		chunks[0].text,
 		opts?.prefetchedCloud,
+		opts?.persistDisk,
+		opts?.cacheFolder,
+		opts?.cacheTitle,
 	);
 
 	// 逐段播放 TTS，支持逐句暂停与准备下一段
@@ -2031,7 +2102,15 @@ async function playCloudTtsCadenceSegments(
 
 		// 并行尝试准备下一个 chunk 的 TTS（浏览器端潜在并行请求），如到最后一段则置 null
 		pendingReady =
-			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
+			i + 1 < chunks.length
+				? startCloudTts(
+						chunks[i + 1].text,
+						undefined,
+						opts?.persistDisk,
+						opts?.cacheFolder,
+						opts?.cacheTitle,
+					)
+				: null;
 
 		// 播放当前段 MP3
 		await playCloudTtsReady(ready, generation, undefined, undefined, () => {
@@ -2135,7 +2214,13 @@ async function playCloudTtsSingleUtterance(
 		emitSentence(0, 'start');
 	}
 
-	const ready = await resolveCloudTtsReady(plain, opts?.prefetchedCloud);
+	const ready = await resolveCloudTtsReady(
+		plain,
+		opts?.prefetchedCloud,
+		opts?.persistDisk,
+		opts?.cacheFolder,
+		opts?.cacheTitle,
+	);
 	if (!isPlaybackGenerationActive(generation)) return;
 
 	await playCloudTtsReady(
@@ -2643,6 +2728,9 @@ export async function playPreferred(
 		onAwaitingPlayback: options?.onAwaitingPlayback,
 		rate: speakOpts?.rate,
 		singleUtterance: options?.cloudSingleUtterance === true,
+		persistDisk: options?.persistDisk === true,
+		cacheFolder: options?.cacheFolder,
+		cacheTitle: options?.cacheTitle,
 	};
 
 	try {

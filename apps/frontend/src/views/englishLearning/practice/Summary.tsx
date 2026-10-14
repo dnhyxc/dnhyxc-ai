@@ -18,6 +18,7 @@ import {
 	type BoardRound,
 } from '../components/result';
 import { dispatchEnglishReviewSummaryRefresh } from '../sidebar';
+import { resolvePracticeTtsCache } from '../utils/ttsCacheFolder';
 import type { PracticeAttemptResult, SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
 import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
@@ -115,6 +116,23 @@ export function Summary({
 	);
 
 	const isReviewSession = config.source === 'review';
+	const practiceTtsDisk = useMemo(
+		() =>
+			resolvePracticeTtsCache({
+				contentKind: config.contentKind,
+				source: config.source,
+				libraryId: config.libraryId,
+				streamId: config.streamId,
+				sourceTitle: config.sourceTitle,
+			}),
+		[
+			config.contentKind,
+			config.libraryId,
+			config.source,
+			config.sourceTitle,
+			config.streamId,
+		],
+	);
 	const mistakesPath =
 		config.contentKind === 'classic'
 			? '/english-learning/mistakes?kind=classic'
@@ -298,6 +316,8 @@ export function Summary({
 				roundTotal={latestResults.length}
 				practicedTotal={practicedTotal}
 				poolTotal={config.poolTotal}
+				cacheFolder={practiceTtsDisk.cacheFolder}
+				cacheTitle={practiceTtsDisk.cacheTitle}
 				meta={
 					<BoardMeta
 						parts={[

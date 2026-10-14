@@ -52,6 +52,10 @@ export type BoardProps = {
 	emptyBody?: ReactNode;
 	footer: ReactNode;
 	cloudSingleUtterance?: boolean;
+	/** TTS 稳定落盘目录键（如 vocab_<id> / 收藏） */
+	cacheFolder?: string;
+	/** 展示标题；仅写后端 _meta，不进路径 */
+	cacheTitle?: string;
 	/** 是否包 PracticeCard，默认 true */
 	withCard?: boolean;
 	className?: string;
@@ -71,6 +75,8 @@ export function Board({
 	emptyBody,
 	footer,
 	cloudSingleUtterance = true,
+	cacheFolder,
+	cacheTitle,
 	withCard = true,
 	className,
 }: BoardProps) {
@@ -134,10 +140,12 @@ export function Board({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(
-					text,
-					cloudSingleUtterance ? { cloudSingleUtterance: true } : undefined,
-				);
+				await playPreferred(text, {
+					persistDisk: true,
+					cacheFolder: cacheFolder?.trim() || undefined,
+					cacheTitle: cacheTitle?.trim() || undefined,
+					...(cloudSingleUtterance ? { cloudSingleUtterance: true } : {}),
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -147,7 +155,7 @@ export function Board({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[cloudSingleUtterance, playingKey, t],
+		[cacheFolder, cacheTitle, cloudSingleUtterance, playingKey, t],
 	);
 
 	useEffect(() => () => stopAllPlayback(), []);

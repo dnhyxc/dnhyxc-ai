@@ -258,6 +258,10 @@ export type SessionProps = {
 	itemIndex: number;
 	/** 与 Setup 顶栏一致的来源标题 */
 	sourceTitle?: string;
+	/** TTS 稳定落盘目录键 */
+	cacheFolder?: string;
+	/** TTS 展示标题 → 后端 _meta */
+	cacheTitle?: string;
 	/** 当前句出声后触发后续题分批预取 */
 	onTtsPipelineKick?: (cursorIndex: number) => void;
 	/** 练习请求世代 AbortSignal */

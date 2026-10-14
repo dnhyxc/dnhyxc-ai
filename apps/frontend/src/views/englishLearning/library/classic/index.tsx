@@ -34,6 +34,7 @@ import {
 	composeViewportScroll,
 	useListCornerFab,
 } from '../../hooks/useListCornerFab';
+import { ttsCacheScopeClassic } from '../../utils/ttsCacheFolder';
 import {
 	LibraryListLoadMoreRow,
 	LibraryVirtuosoGrid,
@@ -161,7 +162,16 @@ export function ClassicQuotesLibrarySection({
 			stopAllPlayback();
 			setPlayingKey(key);
 			try {
-				await playPreferred(text, { cloudSingleUtterance: true });
+				const title =
+					(libraryMeta ?? resolvedLibrary)?.title?.trim() || undefined;
+				await playPreferred(text, {
+					cloudSingleUtterance: true,
+					persistDisk: true,
+					...(libraryId
+						? { cacheFolder: ttsCacheScopeClassic(libraryId) }
+						: {}),
+					...(title ? { cacheTitle: title } : {}),
+				});
 			} catch {
 				Toast({
 					type: 'warning',
@@ -171,7 +181,7 @@ export function ClassicQuotesLibrarySection({
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[playingKey, t],
+		[libraryId, libraryMeta, playingKey, resolvedLibrary, t],
 	);
 
 	const toggleClassicQuoteFavorite = useCallback(

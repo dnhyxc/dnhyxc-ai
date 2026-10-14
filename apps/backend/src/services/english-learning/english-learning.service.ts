@@ -45,6 +45,7 @@ import {
 	repairJsonUnescapedInteriorQuotes,
 } from '../../utils/english-pack';
 import { LlmConfigService } from '../llm-config/llm-config.service';
+import { TtsFileCacheService } from '../speech-transcription/tts-file-cache.service';
 import {
 	ANNOTATE_LLM_ATTACH_ENGLISH_MIN_WORDS,
 	ANNOTATE_SOURCE_DB_CHUNK,
@@ -360,6 +361,7 @@ export class EnglishLearningService {
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
+		private readonly ttsFileCache: TtsFileCacheService,
 		cache: Cache,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
@@ -2649,6 +2651,10 @@ ${existingHintBlock}
 			userId,
 			saved.isPublic,
 		);
+		void this.ttsFileCache.writeScopeMeta(`vocab_${libraryId}`, {
+			title: t,
+			kind: 'vocab',
+		});
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'vocab',
@@ -3039,6 +3045,10 @@ ${existingHintBlock}
 			userId,
 			saved.isPublic,
 		);
+		void this.ttsFileCache.writeScopeMeta(`classic_${libraryId}`, {
+			title: t,
+			kind: 'classic',
+		});
 		const resume = await this.getLibraryItemsResumeOffset(
 			userId,
 			'classic',
