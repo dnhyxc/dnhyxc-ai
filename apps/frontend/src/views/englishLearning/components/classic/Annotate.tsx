@@ -62,6 +62,8 @@ function AnnotateInner({
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [importing, setImporting] = useState(false);
 	const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const menuOpenRef = useRef(false);
+	menuOpenRef.current = menuOpen;
 	const fileRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -91,7 +93,8 @@ function AnnotateInner({
 			clearTimeout(closeTimerRef.current);
 			closeTimerRef.current = null;
 		}
-		setMenuOpen(true);
+		// 已打开时勿反复 setState，避免 hover 抖动打爆渲染
+		if (!menuOpenRef.current) setMenuOpen(true);
 	}, []);
 
 	const scheduleCloseMenu = useCallback(() => {
@@ -303,22 +306,23 @@ function AnnotateInner({
 				cancelText={t('common.cancel')}
 				onConfirm={startAndGo}
 			/>
-			<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+			{/* modal=false：hover 菜单勿锁 body，反复开关否则易卡死 */}
+			<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
 				<DropdownMenuTrigger asChild>
 					{variant === 'text' ? textTrigger : iconTrigger}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
-					align="end"
+					align="center"
 					sideOffset={6}
 					scrollable={false}
-					className="min-w-34"
+					className="min-w-28"
 					onCloseAutoFocus={(e) => e.preventDefault()}
 					onMouseEnter={openMenu}
 					onMouseLeave={scheduleCloseMenu}
 					onClick={(e) => e.stopPropagation()}
 				>
 					<DropdownMenuItem
-						className="justify-center"
+						className="flex w-full items-center justify-center text-center"
 						disabled={importing}
 						onSelect={(e) => {
 							e.preventDefault();
@@ -330,7 +334,7 @@ function AnnotateInner({
 							: t('englishLearning.annotateSource.menuOnline')}
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						className="justify-center"
+						className="flex w-full items-center justify-center text-center"
 						disabled={importing || running}
 						onSelect={(e) => {
 							e.preventDefault();

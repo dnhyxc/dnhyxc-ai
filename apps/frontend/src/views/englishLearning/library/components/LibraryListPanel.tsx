@@ -19,7 +19,7 @@ import {
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_LIBRARY_LIST_PAGE_SIZE,
 } from '@/constants';
-import { useI18n, useIsSuperAdmin } from '@/hooks';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	deleteEnglishClassicQuotesLibrary,
@@ -41,18 +41,19 @@ import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
 import { LibraryEditDialog } from './LibraryEditDialog';
 
-/** 与知识库列表一致：hover 时标题右侧预留（索引 = 可见操作按钮数） */
+/** 与知识库列表一致：hover / 菜单打开时标题右侧预留（索引 = 可见操作按钮数） */
 const ROW_HOVER_PR = [
 	'',
-	'group-hover:pr-8',
-	'group-hover:pr-14',
-	'group-hover:pr-22',
-	'group-hover:pr-30',
-	'group-hover:pr-38',
+	'group-hover:pr-8 group-has-[[data-state=open]]:pr-8',
+	'group-hover:pr-14 group-has-[[data-state=open]]:pr-14',
+	'group-hover:pr-22 group-has-[[data-state=open]]:pr-22',
+	'group-hover:pr-30 group-has-[[data-state=open]]:pr-30',
+	'group-hover:pr-38 group-has-[[data-state=open]]:pr-38',
 ] as const;
 
+/** hover 或 Dropdown/Tooltip 打开时保持操作区可见（菜单在 Portal，勿丢 hover） */
 const ROW_ACTIONS_CLASS =
-	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
+	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=open]]:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
 
 export type LibraryListPanelProps = {
 	kind: LibraryKind;
@@ -101,7 +102,6 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 }: LibraryListPanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
-	const isSuperAdmin = useIsSuperAdmin();
 
 	const [entries, setEntries] = useState<EnglishLibraryListItem[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -385,9 +385,8 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 							const itemCount = getLibraryItemCount(lib, kind);
 							const showEntry = itemCount > 0;
 							const canDelete = lib.isOwned !== false;
-							const showEdit = lib.isPublic
-								? isSuperAdmin
-								: lib.isOwned !== false;
+							// 仅所有者可编辑（含已公开库）；超管也不能改他人库
+							const showEdit = lib.isOwned !== false;
 							// classic：标注 + 练习；vocab：仅练习
 							const practiceActions = showEntry
 								? kind === 'classic'

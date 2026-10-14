@@ -9,7 +9,7 @@ import {
 	Min,
 } from 'class-validator';
 
-/** Microsoft Edge 在线语音合成（edge-tts-universal）请求体 */
+/** Microsoft Edge 在线语音合成（@andresaya/edge-tts）请求体 */
 export class EdgeTtsDto {
 	@IsString()
 	@IsNotEmpty()

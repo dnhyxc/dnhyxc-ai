@@ -17,14 +17,15 @@ import { Export } from '../../components/export';
 /** 与知识库列表一致：hover 时标题右侧预留 */
 const ROW_HOVER_PR = [
 	'',
-	'group-hover:pr-8',
-	'group-hover:pr-14',
-	'group-hover:pr-22',
-	'group-hover:pr-30',
+	'group-hover:pr-8 group-has-[[data-state=open]]:pr-8',
+	'group-hover:pr-14 group-has-[[data-state=open]]:pr-14',
+	'group-hover:pr-22 group-has-[[data-state=open]]:pr-22',
+	'group-hover:pr-30 group-has-[[data-state=open]]:pr-30',
 ] as const;
 
+/** hover 或 Dropdown/Tooltip 打开时保持操作区可见（菜单在 Portal，勿丢 hover） */
 const ROW_ACTIONS_CLASS =
-	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
+	'absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto has-[[data-state=open]]:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=delayed-open]]:opacity-100 has-[[data-state=delayed-open]]:pointer-events-auto has-[[data-state=instant-open]]:opacity-100 has-[[data-state=instant-open]]:pointer-events-auto';
 
 export type VocabularyHistoryDrawerProps = {
 	open: boolean;

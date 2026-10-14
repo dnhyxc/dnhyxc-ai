@@ -1,10 +1,10 @@
 /**
- * 资源库编辑：修改标题；超级管理员另可设置是否公开
+ * 资源库编辑：仅所有者可改标题与是否公开（超管也不能改他人库）
  */
 import Model from '@design/Model';
 import { Button, Input, Label, Spinner, Switch, Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useI18n, useIsSuperAdmin } from '@/hooks';
+import { useI18n } from '@/hooks';
 import {
 	patchEnglishClassicQuotesLibraryTitle,
 	patchEnglishClassicQuotesLibraryVisibility,
@@ -32,12 +32,13 @@ export function LibraryEditDialog({
 	onSaved,
 }: LibraryVisibilityDialogProps) {
 	const { t } = useI18n();
-	const isSuperAdmin = useIsSuperAdmin();
 	const [editTitle, setEditTitle] = useState('');
 	const [isPublic, setIsPublic] = useState(false);
 	const [saving, setSaving] = useState(false);
 
-	const canEditTitle = library?.isOwned !== false;
+	const isOwner = library?.isOwned !== false;
+	const canEditTitle = isOwner;
+	const canEditVisibility = isOwner;
 
 	useEffect(() => {
 		if (open && library) {
@@ -75,7 +76,9 @@ export function LibraryEditDialog({
 		library != null &&
 		editTitle.trim() !== (library.title ?? '').trim();
 	const visibilityChanged =
-		isSuperAdmin && library != null && isPublic !== Boolean(library.isPublic);
+		canEditVisibility &&
+		library != null &&
+		isPublic !== Boolean(library.isPublic);
 	const canSave =
 		library != null &&
 		(titleChanged || visibilityChanged) &&
@@ -201,7 +204,7 @@ export function LibraryEditDialog({
 					) : null}
 				</div>
 
-				{isSuperAdmin ? (
+				{canEditVisibility ? (
 					<div className="flex flex-col gap-2">
 						<div className="flex items-center justify-between gap-3">
 							<Label

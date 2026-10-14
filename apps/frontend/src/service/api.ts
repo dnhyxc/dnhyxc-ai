@@ -83,7 +83,7 @@ export const SPEECH_XFYUN_TTS_STREAM =
 /** 讯飞批量合成（练习预取） */
 export const SPEECH_XFYUN_TTS_BATCH =
 	'/speech-transcription/xfyun/speech/batch';
-/** Microsoft Edge 在线语音合成（edge-tts-universal，免费无需 API Key） */
+/** Microsoft Edge 在线语音合成（后端 @andresaya/edge-tts，免费无需 API Key） */
 export const SPEECH_EDGE_TTS = '/speech-transcription/edge/speech';
 /** Edge TTS + WordBoundary 时间戳（JSON：audioBase64 + boundaries） */
 export const SPEECH_EDGE_TTS_TIMED = '/speech-transcription/edge/speech/timed';

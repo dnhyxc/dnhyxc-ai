@@ -35,6 +35,7 @@
 		"schema:drop": "npm run typeorm schema:drop"
 	},
 	"dependencies": {
+		"@andresaya/edge-tts": "^1.9.1",
 		"@casl/ability": "^6.7.5",
 		"@keyv/redis": "^5.1.5",
 		"@langchain/community": "^1.1.20",
@@ -63,7 +64,6 @@
 		"cos-nodejs-sdk-v5": "^2.14.6",
 		"docx": "^9.5.0",
 		"dotenv": "^17.2.3",
-		"edge-tts-universal": "^1.4.0",
 		"express-rate-limit": "^8.2.1",
 		"helmet": "^8.1.0",
 		"install": "^0.13.0",

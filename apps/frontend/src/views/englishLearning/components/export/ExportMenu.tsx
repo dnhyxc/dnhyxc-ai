@@ -1,6 +1,7 @@
 /**
  * 通用导出菜单：hover 打开；多格式可并行，busy 落在对应项；
  * 触发图标有 loading 但不因导出禁用。业务侧只声明 items。
+ * modal=false：hover 菜单勿锁 body，反复开关否则易卡死。
  */
 import { Button } from '@ui/button';
 import {
@@ -56,6 +57,8 @@ export function ExportMenu({
 	const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
 	const [menuOpen, setMenuOpen] = useState(false);
 	const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const menuOpenRef = useRef(false);
+	menuOpenRef.current = menuOpen;
 	const busyRef = useRef(busyIds);
 	busyRef.current = busyIds;
 
@@ -74,7 +77,8 @@ export function ExportMenu({
 			clearTimeout(closeTimerRef.current);
 			closeTimerRef.current = null;
 		}
-		setMenuOpen(true);
+		// 已打开时勿反复 setState，避免 hover 抖动打爆渲染
+		if (!menuOpenRef.current) setMenuOpen(true);
 	};
 
 	const scheduleCloseMenu = () => {
@@ -100,7 +104,7 @@ export function ExportMenu({
 	};
 
 	return (
-		<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+		<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
 			<DropdownMenuTrigger asChild>
 				<Button
 					type="button"
@@ -118,6 +122,7 @@ export function ExportMenu({
 					onClick={(e) => {
 						onBeforeClick?.(e);
 						e.stopPropagation();
+						openMenu();
 					}}
 					onMouseEnter={openMenu}
 					onMouseLeave={scheduleCloseMenu}
@@ -130,7 +135,7 @@ export function ExportMenu({
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
-				align="end"
+				align="center"
 				sideOffset={6}
 				scrollable={false}
 				className={cn('min-w-34', contentClassName)}
@@ -144,7 +149,7 @@ export function ExportMenu({
 					return (
 						<DropdownMenuItem
 							key={item.id}
-							className="justify-center gap-1.5"
+							className="flex w-full items-center justify-center gap-1.5 text-center"
 							disabled={item.disabled || busy}
 							onSelect={(e) => {
 								e.preventDefault();

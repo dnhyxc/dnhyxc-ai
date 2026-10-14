@@ -1,3 +1,4 @@
+import { EdgeTTS } from '@andresaya/edge-tts';
 import {
 	HttpException,
 	HttpStatus,
@@ -5,7 +6,6 @@ import {
 	Injectable,
 	type LoggerService,
 } from '@nestjs/common';
-import { EdgeTTS } from 'edge-tts-universal';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import type { EdgeTtsDto } from './dto/edge-tts.dto';
 import {
@@ -19,6 +19,8 @@ import { TtsFileCacheService } from './tts-file-cache.service';
 
 const TTS_INPUT_MAX_BYTES = 8000;
 const TTS_SPEECH_CACHE_MAX = 128;
+/** 单次合成超时：上游卡住时尽快 502，避免请求挂死 */
+const EDGE_TTS_TIMEOUT_MS = 20_000;
 /** Edge WordBoundary 单位：100ns；÷10000 → ms */
 const EDGE_TICKS_PER_MS = 10_000;
 
@@ -49,7 +51,8 @@ type CachedSpeech = {
 };
 
 /**
- * Microsoft Edge 在线语音合成（edge-tts-universal）：免费、无需 API Key。
+ * Microsoft Edge 在线语音合成（@andresaya/edge-tts → api.msedgeservices.com）：
+ * 免费、无需 API Key。勿用仍走 speech.platform.bing.com 的旧包。
  */
 @Injectable()
 export class EdgeTtsService {
@@ -126,15 +129,20 @@ export class EdgeTtsService {
 	}
 
 	private async synthesize(resolved: EdgeTtsResolved): Promise<CachedSpeech> {
-		const tts = new EdgeTTS(resolved.text, resolved.voice, {
-			rate: resolved.rate,
-			volume: resolved.volume,
-			pitch: resolved.pitch,
-		});
+		// generate() 返回独立结果，适合 Nest 并发；勿读 protected word_boundaries
+		const tts = new EdgeTTS({ timeout: EDGE_TTS_TIMEOUT_MS });
 		try {
-			const result = await tts.synthesize();
-			const buffer = Buffer.from(await result.audio.arrayBuffer());
-			const boundaries = this.toBoundaryDto(result.subtitle ?? []);
+			const result = await tts.generate(resolved.text, resolved.voice, {
+				rate: resolved.rate,
+				volume: resolved.volume,
+				pitch: resolved.pitch,
+				timeout: EDGE_TTS_TIMEOUT_MS,
+			});
+			const buffer = Buffer.from(result.audio);
+			if (!buffer.length) {
+				throw new Error('未收到音频数据');
+			}
+			const boundaries = this.toBoundaryDto(result.wordBoundaries ?? []);
 			return { buffer, boundaries };
 		} catch (err) {
 			const detail = err instanceof Error ? err.message : String(err);

@@ -10,7 +10,6 @@ import { Cache } from '@nestjs/cache-manager';
 import {
 	BadGatewayException,
 	BadRequestException,
-	ForbiddenException,
 	HttpException,
 	HttpStatus,
 	Inject,
@@ -46,7 +45,6 @@ import {
 	repairJsonUnescapedInteriorQuotes,
 } from '../../utils/english-pack';
 import { LlmConfigService } from '../llm-config/llm-config.service';
-import { UserService } from '../user/user.service';
 import {
 	ANNOTATE_LLM_ATTACH_ENGLISH_MIN_WORDS,
 	ANNOTATE_SOURCE_DB_CHUNK,
@@ -403,7 +401,6 @@ export class EnglishLearningService {
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
 		@InjectRepository(EnglishSentenceWordAnnotationCache)
 		private readonly sentenceWordAnnotationCacheRepo: Repository<EnglishSentenceWordAnnotationCache>,
-		private readonly userService: UserService,
 	) {
 		this.libraryCache = new EnglishLearningLibraryCache(cache, this.logger);
 	}
@@ -2614,15 +2611,8 @@ ${existingHintBlock}
 		libraryId: string,
 		dto: UpdateLibraryVisibilityDto,
 	): Promise<VocabularyLibraryListItem> {
-		if (!(await this.userService.userHasSuperAdminRole(userId))) {
-			throw new ForbiddenException('需要超级管理员权限');
-		}
-		const lib = await this.vocabLibraryRepo.findOne({
-			where: { id: libraryId },
-		});
-		if (!lib) {
-			throw new NotFoundException('单词库不存在');
-		}
+		// 仅所有者可改可见性（超管也不能改他人库）
+		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
 		const wasPublic = lib.isPublic;
 		lib.isPublic = dto.isPublic;
 		const saved = await this.vocabLibraryRepo.save(lib);
@@ -3011,15 +3001,8 @@ ${existingHintBlock}
 		libraryId: string,
 		dto: UpdateLibraryVisibilityDto,
 	): Promise<ClassicQuotesLibraryListItem> {
-		if (!(await this.userService.userHasSuperAdminRole(userId))) {
-			throw new ForbiddenException('需要超级管理员权限');
-		}
-		const lib = await this.classicQuotesLibraryRepo.findOne({
-			where: { id: libraryId },
-		});
-		if (!lib) {
-			throw new NotFoundException('经典语句库不存在');
-		}
+		// 仅所有者可改可见性（超管也不能改他人库）
+		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
 		const wasPublic = lib.isPublic;
 		lib.isPublic = dto.isPublic;
 		const saved = await this.classicQuotesLibraryRepo.save(lib);

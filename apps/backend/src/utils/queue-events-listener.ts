@@ -68,8 +68,9 @@ export class QueueEventsListener implements OnModuleInit, OnModuleDestroy {
 					})}`,
 				);
 			} catch (error) {
+				const msg = error instanceof Error ? error.message : String(error);
 				this.logger.error?.(
-					`[QueueEventsListener] Failed to parse completed event for job ${jobId}, error: ${error?.message}`,
+					`[QueueEventsListener] Failed to parse completed event for job ${jobId}, error: ${msg}`,
 				);
 			}
 		});
@@ -151,10 +152,9 @@ export class QueueEventsListener implements OnModuleInit, OnModuleDestroy {
 				.then(() => {
 					this.logger.log?.('[QueueEventsListener] Closed');
 				})
-				.catch((error) => {
-					this.logger.error?.(
-						`[QueueEventsListener] Failed to close: ${error.message}`,
-					);
+				.catch((error: unknown) => {
+					const msg = error instanceof Error ? error.message : String(error);
+					this.logger.error?.(`[QueueEventsListener] Failed to close: ${msg}`);
 				});
 		}
 	}

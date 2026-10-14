@@ -171,7 +171,7 @@ export class SpeechTranscriptionController {
 	}
 
 	/**
-	 * Microsoft Edge 在线语音合成（edge-tts-universal）：免费、无需 API Key。
+	 * Microsoft Edge 在线语音合成（@andresaya/edge-tts）：免费、无需 API Key。
 	 */
 	@Post('edge/speech/stream')
 	async edgeSpeechStream(

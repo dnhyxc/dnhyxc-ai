@@ -606,7 +606,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 超级管理员：设置单词库是否对全站公开 */
+	/** 仅所有者：设置单词库是否对全站登录用户公开 */
 	@Patch('vocabulary-libraries/:libraryId/visibility')
 	async updateVocabularyLibraryVisibility(
 		@Req() req: AuthedRequest,
@@ -853,7 +853,7 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	/** 超级管理员：设置经典语句库是否对全站公开 */
+	/** 仅所有者：设置经典语句库是否对全站登录用户公开 */
 	@Patch('classic-quotes-libraries/:libraryId/visibility')
 	async updateClassicQuotesLibraryVisibility(
 		@Req() req: AuthedRequest,
