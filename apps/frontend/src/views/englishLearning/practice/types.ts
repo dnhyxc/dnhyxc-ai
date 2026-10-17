@@ -164,6 +164,8 @@ export type PracticePageShellProps = {
 	backLabel?: string;
 	headerRight?: ReactNode;
 	children: ReactNode;
+	/** 钉在滚动区下方，不随内容滚动 */
+	footer?: ReactNode;
 	/** fill：占满剩余高度（结算板）；start：顶对齐可滚动列表；center：垂直居中 */
 	contentLayout?: 'center' | 'fill' | 'start';
 	/** 作答页：隐藏壳顶栏、内容无内边距，由 Session 铺满白色区域 */

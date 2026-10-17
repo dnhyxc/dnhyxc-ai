@@ -16,7 +16,7 @@ import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
 // 路由懒加载后不再靠 document 页静态副作用打进主包；预览入口自行引入
 import '@dnhyxc-ai/markdown-kit/styles.css';
 import { ScrollArea } from '@ui/index';
-import { ChevronDown, ChevronUp, Component } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import {
 	memo,
 	type RefObject,
@@ -491,8 +491,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					<Loading text={t?.('markdown.preview.loading') ?? '内容加载中…'} />
 				</div>
 			) : (
-				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
-					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />
+				<div className="flex items-center justify-center flex-col gap-3 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
+					<BookOpen className="size-16 text-textcolor opacity-60 animate-bounce" />
 					<div className="text-sm text-textcolor/80">
 						{t?.('markdown.preview.empty') ?? '预览内容为空'}
 					</div>

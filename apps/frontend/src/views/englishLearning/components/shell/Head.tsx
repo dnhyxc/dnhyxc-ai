@@ -1,6 +1,6 @@
 /**
  * 英语学习会话页顶栏：返回 / 主内容 / 右侧操作。
- * 默认 px-2；用 className 覆盖 padding 等（如 pl-4 pr-2）。
+ * 默认 px-2；用 className 覆盖 padding 等（如 px-4）。
  */
 import { Button } from '@ui/index';
 import { ArrowLeft } from 'lucide-react';

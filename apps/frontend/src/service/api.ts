@@ -229,6 +229,12 @@ export const ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX =
 /** 间隔复习：今日待复习统计、拉题、结算上报 */
 export const ENGLISH_LEARNING_PRACTICE_REVIEW =
 	'/english-learning/practice/review';
+export const ENGLISH_LEARNING_DAILY_READINGS =
+	'/english-learning/daily-readings';
+export const ENGLISH_LEARNING_DAILY_READING_MANUAL =
+	'/english-learning/daily-readings/manual';
+export const ENGLISH_LEARNING_DAILY_READING_SETTINGS =
+	'/english-learning/daily-reading-settings';
 export const ENGLISH_LEARNING_PRACTICE_REPORTS =
 	'/english-learning/practice/reports';
 export const ENGLISH_LEARNING_PRACTICE_DAILY =

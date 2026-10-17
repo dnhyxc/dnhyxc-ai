@@ -28,6 +28,15 @@ const EnglishLearning = lazy(() => import('@/views/englishLearning'));
 const EnglishLearningDailyPage = lazy(
 	() => import('@/views/englishLearning/daily'),
 );
+const EnglishDailyReadingListPage = lazy(
+	() => import('@/views/englishLearning/dailyReading'),
+);
+const EnglishDailyReadingSettingsPage = lazy(
+	() => import('@/views/englishLearning/dailyReading/Settings'),
+);
+const EnglishDailyReadingDetailPage = lazy(
+	() => import('@/views/englishLearning/dailyReading/Detail'),
+);
 const EnglishLearningDailyRecordsPage = lazy(
 	() => import('@/views/englishLearning/daily/records'),
 );
@@ -344,6 +353,27 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningPracticeReportDetailPage,
 						meta: {
 							titleKey: 'englishLearning.practice.reportsTitle',
+						},
+					},
+					{
+						path: 'daily-reading',
+						Component: EnglishDailyReadingListPage,
+						meta: {
+							titleKey: 'route.englishLearning.dailyReading.title',
+						},
+					},
+					{
+						path: 'daily-reading/settings',
+						Component: EnglishDailyReadingSettingsPage,
+						meta: {
+							titleKey: 'route.englishLearning.dailyReading.settings',
+						},
+					},
+					{
+						path: 'daily-reading/:id',
+						Component: EnglishDailyReadingDetailPage,
+						meta: {
+							titleKey: 'route.englishLearning.dailyReading.detail',
 						},
 					},
 					{

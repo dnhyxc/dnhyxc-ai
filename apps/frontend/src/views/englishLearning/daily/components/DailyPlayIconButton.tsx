@@ -31,10 +31,7 @@ export function DailyPlayIconButton({
 				}}
 				aria-label={playLabel}
 				aria-pressed={playing}
-				className={cn(
-					PLAY_ICON_BTN,
-					playing ? 'text-teal-500' : 'text-textcolor/55',
-				)}
+				className={cn(PLAY_ICON_BTN, 'text-teal-500 hover:text-teal-400')}
 			>
 				{playing ? (
 					<Square className="size-4.5 fill-current" aria-hidden />

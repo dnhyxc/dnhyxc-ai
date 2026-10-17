@@ -979,7 +979,7 @@ const LlmSetting = observer(() => {
 										disabled={saving || !canSubmitSave}
 										onClick={() => void onSave()}
 									>
-										{saving ? <Spinner className="size-4" /> : null}
+										{saving ? <Spinner className="size-4 text-white" /> : null}
 										{t('setting.llm.save')}
 									</Button>
 								</div>
@@ -1242,7 +1242,9 @@ const LlmSetting = observer(() => {
 												}
 												onClick={() => void onSaveVector()}
 											>
-												{vectorSaving ? <Spinner className="size-4" /> : null}
+												{vectorSaving ? (
+													<Spinner className="size-4 text-white" />
+												) : null}
 												{t('setting.llm.vectorSave')}
 											</Button>
 										</div>

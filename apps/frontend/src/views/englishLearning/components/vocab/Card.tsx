@@ -173,9 +173,11 @@ export function Card({
 					/>
 				) : null}
 			</div>
-			<div className="min-w-0 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
-				{displayIpaWrapped(ipa)}
-			</div>
+			{ipa.trim() ? (
+				<div className="min-w-0 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
+					{displayIpaWrapped(ipa)}
+				</div>
+			) : null}
 			<Segment segmentation={segmentation} className="min-w-0" />
 			<div className="text-textcolor/95 text-sm leading-snug">
 				{translationZh}

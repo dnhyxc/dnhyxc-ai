@@ -3,6 +3,7 @@ import { useI18n } from '@/hooks';
 import { useEnglishSidebarMasonry } from '../hooks/useEnglishSidebarMasonry';
 import { ClassicQuotesSection } from '../sections/classic';
 import { VocabularyPackSection } from '../sections/vocabulary';
+import { DailyReadingSession } from './components/DailyReadingSession';
 import { DailySession } from './components/DailySession';
 import { EnglishSource } from './components/EnglishSource';
 import { FavoriteSession } from './components/FavoriteSession';
@@ -41,6 +42,7 @@ export function EnglishSidebar({
 				title={t('englishLearning.library.classic.title')}
 				description={t('englishLearning.library.classic.descShort')}
 			/>
+			<DailyReadingSession />
 			<FavoriteSession />
 			<MistakeBookSession />
 			<ReviewSession />

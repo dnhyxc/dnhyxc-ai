@@ -274,6 +274,33 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			}
 		}
 
+		// 每日阅读详情：英语学习 > 每日阅读 > 篇目标题。点「每日阅读」回列表。
+		const dailyReadingDetail = matchPath(
+			{ path: '/english-learning/daily-reading/:id', end: true },
+			location.pathname,
+		);
+		if (
+			dailyReadingDetail &&
+			dailyReadingDetail.params.id !== 'settings' &&
+			trail.length > 0
+		) {
+			const origin = new URLSearchParams(location.search).get('origin');
+			trail[trail.length - 1] = {
+				label: t('route.englishLearning.dailyReading.title'),
+				path:
+					origin === 'manual'
+						? '/english-learning/daily-reading?origin=manual'
+						: '/english-learning/daily-reading',
+			};
+			const passageTitle = new URLSearchParams(location.search)
+				.get('title')
+				?.trim();
+			trail.push({
+				label: passageTitle || t('englishLearning.dailyReading.passage'),
+				path: `${location.pathname}${location.search}`,
+			});
+		}
+
 		if (trail.length >= 2) {
 			return { breadcrumbTrail: trail, headerTitle: undefined };
 		}

@@ -23,6 +23,8 @@ export type CreatableComboboxProps = {
 	inputClassName?: string;
 	/** 输入框展示文案；不传则与 value 相同（value 仍为实际存储值） */
 	displayValue?: string;
+	/** 贴底时向上展开，避免被父级 overflow 裁掉 */
+	optionsPlacement?: 'top' | 'bottom';
 	/** 选项较多时 ScrollArea 固定高度（Tailwind）；选项少时不生效，高度随内容收缩 */
 	optionsScrollHeightClassName?: string;
 };
@@ -46,6 +48,7 @@ export function CreatableCombobox({
 	className,
 	inputClassName,
 	displayValue,
+	optionsPlacement = 'bottom',
 	optionsScrollHeightClassName = DEFAULT_OPTIONS_SCROLL_HEIGHT,
 }: CreatableComboboxProps) {
 	const [open, setOpen] = useState(false);
@@ -153,7 +156,10 @@ export function CreatableCombobox({
 					<div
 						role="listbox"
 						className={cn(
-							'absolute top-[calc(100%+4px)] left-0 z-50 w-full',
+							'absolute left-0 z-50 w-full',
+							optionsPlacement === 'top'
+								? 'bottom-[calc(100%+4px)]'
+								: 'top-[calc(100%+4px)]',
 							'rounded-md border border-theme/10 bg-theme-background shadow-md',
 						)}
 					>

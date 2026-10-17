@@ -22,6 +22,10 @@ export function ttsCacheScopePack(streamId: string): string {
 	return `pack_${streamId.trim()}`;
 }
 
+export function ttsCacheScopeDailyReading(id: string): string {
+	return `daily_reading_${id.trim()}`;
+}
+
 export type TtsDiskCacheOpts = {
 	cacheFolder?: string;
 	cacheTitle?: string;

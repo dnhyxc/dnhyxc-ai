@@ -1,0 +1,510 @@
+/** 发布日是上海日历日，禁止用数据库 CURRENT_DATE（库时区常常是 UTC）。 */
+const SHANGHAI = 'Asia/Shanghai';
+
+export const DEFAULT_THEMES = [
+	'日常',
+	'自然',
+	'城市',
+	'科学随笔',
+	'旅行见闻',
+	'校园',
+	'工作',
+	'美食',
+	'运动',
+	'家庭',
+	'读书',
+] as const;
+
+const THEME_MAX = 16;
+const THEME_LIMIT = 24;
+
+const ZW = /\u200b|\u200c|\u200d|\ufeff/g;
+
+export type PassageDraft = {
+	titleEn: string;
+	titleZh: string;
+	bodyEn: string;
+	bodyZh: string;
+};
+
+export function shanghaiToday(now = new Date()): string {
+	return new Intl.DateTimeFormat('en-CA', {
+		timeZone: SHANGHAI,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).format(now);
+}
+
+/** 在 YYYY-MM-DD 上加减天数，不经过「现在」的时区。 */
+export function addCalendarDays(ymd: string, days: number): string {
+	const [y, m, d] = ymd.split('-').map((n) => Number(n));
+	const utc = new Date(Date.UTC(y, m - 1, d + days));
+	const mm = String(utc.getUTCMonth() + 1).padStart(2, '0');
+	const dd = String(utc.getUTCDate()).padStart(2, '0');
+	return `${utc.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+export type ReadingLevel = 'A2' | 'B1' | 'B2' | 'C1';
+export type ReadingLength = 'short' | 'medium' | 'long';
+export type ReadingFocus = 'reading' | 'vocab' | 'grammar' | 'both';
+
+/** 没改过设置时等于现在的生成：B1、中篇、不要附件、允许联网。 */
+export type ReadingProfile = {
+	level: ReadingLevel;
+	length: ReadingLength;
+	focus: ReadingFocus;
+	questions: 0 | 2 | 3;
+	useWeb: boolean;
+};
+
+/** 词汇上限。不够这个数时，合格的有多少留多少。 */
+export function glossaryLimit(length: ReadingLength): number {
+	if (length === 'short') return 10;
+	if (length === 'long') return 20;
+	return 15;
+}
+
+export const DEFAULT_PROFILE: ReadingProfile = {
+	level: 'B1',
+	length: 'medium',
+	focus: 'reading',
+	questions: 0,
+	useWeb: true,
+};
+
+export type ReadingExtras = {
+	level: ReadingLevel;
+	length: ReadingLength;
+	focus: ReadingFocus;
+	glossary?: { word: string; zh: string }[];
+	/** 按句列出正文里的词，zh 是该词在这一句里的意思。 */
+	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
+	grammarNotes?: string[];
+	questions?: { q: string; options: string[]; answer: number }[];
+	/** 这次联网取材用到的条目，详情全部展示。 */
+	sources?: { title: string; url: string }[];
+};
+
+const LEVELS: readonly ReadingLevel[] = ['A2', 'B1', 'B2', 'C1'];
+const LENGTHS: readonly ReadingLength[] = ['short', 'medium', 'long'];
+const FOCUSES: readonly ReadingFocus[] = [
+	'reading',
+	'vocab',
+	'grammar',
+	'both',
+];
+
+/** 脏枚举回默认，不让整单失败。 */
+export function normalizeProfile(input: unknown): ReadingProfile {
+	const src =
+		input && typeof input === 'object'
+			? (input as Record<string, unknown>)
+			: {};
+	const level =
+		LEVELS.find((item) => item === src.level) ?? DEFAULT_PROFILE.level;
+	const length =
+		LENGTHS.find((item) => item === src.length) ?? DEFAULT_PROFILE.length;
+	const focus =
+		FOCUSES.find((item) => item === src.focus) ?? DEFAULT_PROFILE.focus;
+	const questions =
+		src.questions === 0 || src.questions === 2 || src.questions === 3
+			? src.questions
+			: DEFAULT_PROFILE.questions;
+	const useWeb =
+		typeof src.useWeb === 'boolean' ? src.useWeb : DEFAULT_PROFILE.useWeb;
+	return { level, length, focus, questions, useWeb };
+}
+
+export function themeForDate(
+	ymd: string,
+	themes: readonly string[] = DEFAULT_THEMES,
+): string {
+	const list = themes.length > 0 ? themes : DEFAULT_THEMES;
+	let h = 0;
+	for (const c of ymd) h = (h * 33 + c.charCodeAt(0)) >>> 0;
+	return list[h % list.length] ?? DEFAULT_THEMES[0];
+}
+
+/** 不合格返回 null。空项跳过，重复项只留第一次。 */
+export function normalizeThemeList(input: unknown): string[] | null {
+	if (!Array.isArray(input)) return null;
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const item of input) {
+		if (typeof item !== 'string') return null;
+		const label = stripZw(item).replace(/\s+/g, ' ');
+		if (!label) continue;
+		if (label.length > THEME_MAX || /[<>]/.test(label)) return null;
+		if (seen.has(label)) continue;
+		seen.add(label);
+		out.push(label);
+	}
+	if (out.length < 1 || out.length > THEME_LIMIT) return null;
+	return out;
+}
+
+/** 库存主题不合法时用当前默认。 */
+export function themesForSettings(stored: unknown): string[] {
+	return normalizeThemeList(stored) ?? [...DEFAULT_THEMES];
+}
+
+/** 同一天再写一篇时换个主题。列表只剩被避开的那一个时仍用它。 */
+export function pickManualTheme(
+	themes: readonly string[],
+	avoid: string | null,
+): string {
+	const rest = avoid ? themes.filter((item) => item !== avoid) : [...themes];
+	const list = rest.length > 0 ? rest : [...themes];
+	return list[Math.floor(Math.random() * list.length)] ?? DEFAULT_THEMES[0];
+}
+
+export function stripZw(raw: string): string {
+	return raw.replace(ZW, '').trim();
+}
+
+export function normalizeBody(raw: string): string {
+	return stripZw(raw).toLowerCase().replace(/\s+/g, ' ');
+}
+
+function count(text: string, re: RegExp): number {
+	return text.match(re)?.length ?? 0;
+}
+
+/** 连续这么多个英文词与检索材料相同，才算照搬。8 个词会误伤常用说法。 */
+export const SNIPPET_COPY_WORDS = 16;
+
+export function copiesSnippet(body: string, snippet: string): boolean {
+	const words = body.toLowerCase().match(/[a-z']+/g) ?? [];
+	const src = snippet.toLowerCase().match(/[a-z']+/g) ?? [];
+	const n = SNIPPET_COPY_WORDS;
+	if (src.length < n || words.length < n) return false;
+	const grams = new Set<string>();
+	for (let i = 0; i + n <= src.length; i += 1) {
+		grams.add(src.slice(i, i + n).join(' '));
+	}
+	for (let i = 0; i + n <= words.length; i += 1) {
+		if (grams.has(words.slice(i, i + n).join(' '))) return true;
+	}
+	return false;
+}
+
+export function sanitizeHttpUrl(raw: string | undefined): string | null {
+	const v = raw?.trim() ?? '';
+	if (!v || v.length > 500) return null;
+	try {
+		const u = new URL(v);
+		if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+		return u.toString().slice(0, 500);
+	} catch {
+		return null;
+	}
+}
+
+/** 不合格返回原因；合格返回 null。不截断正文。 */
+export function rejectPassage(
+	draft: PassageDraft,
+	recentNorms: string[],
+	snippet?: string | null,
+): string | null {
+	const titleEn = stripZw(draft.titleEn);
+	const titleZh = stripZw(draft.titleZh);
+	const bodyEn = stripZw(draft.bodyEn);
+	const bodyZh = stripZw(draft.bodyZh);
+	if (!titleEn || !titleZh || !bodyEn || !bodyZh) return 'empty';
+	if (titleEn.length > 80 || titleZh.length > 80) return 'title';
+	if (bodyEn.length > 6000 || bodyZh.length > 6000) return 'length';
+	if (/[<>]|```/.test(bodyEn) || /[<>]|```/.test(bodyZh)) return 'markup';
+	if (count(bodyEn, /[.!?]/g) < 2) return 'sentences';
+	const letters = count(bodyEn, /[A-Za-z]/g);
+	const cjkEn = count(bodyEn, /[\u4e00-\u9fff]/g);
+	if (letters < cjkEn) return 'english';
+	if (count(bodyZh, /[\u4e00-\u9fff]/g) < 1) return 'chinese';
+	const norm = normalizeBody(bodyEn);
+	if (recentNorms.some((n) => n === norm)) return 'duplicate';
+	if (snippet && copiesSnippet(bodyEn, snippet)) return 'snippet';
+	return null;
+}
+
+/** 废稿原因给接口展示。未知码原样返回，避免再收成一句「生成失败」。 */
+export function rejectReasonText(reason: string): string {
+	const text: Record<string, string> = {
+		json: '模型没有返回可解析的短文',
+		empty: '标题或正文是空的',
+		title: '标题超过 80 字',
+		length: '正文超过 6000 字',
+		markup: '正文含有标记或代码块',
+		sentences: '英文句子不足两句',
+		english: '英文正文不像英文',
+		chinese: '中文译文缺少汉字',
+		duplicate: '和最近的短文重复',
+		snippet: '正文抄了检索材料',
+	};
+	return text[reason] ?? reason;
+}
+
+export function parseModelObject(raw: string): Record<string, unknown> | null {
+	const s = raw.trim().replace(/^\uFEFF/, '');
+	const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+	const candidate = (fence?.[1] ?? s).trim();
+	const start = candidate.indexOf('{');
+	const end = candidate.lastIndexOf('}');
+	const slice =
+		start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate;
+	let value: unknown;
+	try {
+		value = JSON.parse(slice);
+	} catch {
+		try {
+			value = JSON.parse(slice.replace(/,\s*([\]}])/g, '$1'));
+		} catch {
+			return null;
+		}
+	}
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	return value as Record<string, unknown>;
+}
+
+export function parsePassageJson(raw: string): PassageDraft | null {
+	const o = parseModelObject(raw);
+	if (!o) return null;
+	const pick = (k: string) =>
+		typeof o[k] === 'string' ? (o[k] as string) : '';
+	return {
+		titleEn: pick('titleEn'),
+		titleZh: pick('titleZh'),
+		bodyEn: pick('bodyEn'),
+		bodyZh: pick('bodyZh'),
+	};
+}
+
+/** 模型常把正确项放在中间。打乱后 answer 仍指向原来的正确项。 */
+export function shuffleOptions(
+	options: string[],
+	answer: number,
+	roll: () => number = Math.random,
+): { options: string[]; answer: number } {
+	const next = options.map((text, index) => ({ text, ok: index === answer }));
+	for (let i = next.length - 1; i > 0; i -= 1) {
+		const j = Math.floor(roll() * (i + 1));
+		[next[i], next[j]] = [next[j], next[i]];
+	}
+	return {
+		options: next.map((item) => item.text),
+		answer: next.findIndex((item) => item.ok),
+	};
+}
+
+/** 只给这两个模型补释义。付费模型一次就能写全，再打只会加费用。 */
+const FLASH_GLOSS_MODELS = new Set(['glm-4-flash', 'glm-4.7-flash']);
+
+/** 网关常把厂商前缀写在名字前面。去掉前缀后全等，避免「名字里有 flash」误伤别的模型。 */
+export function isFlashGlossModel(modelName: string): boolean {
+	const bare = modelName.trim().split('/').pop()?.toLowerCase() ?? '';
+	return FLASH_GLOSS_MODELS.has(bare);
+}
+
+function passageWords(text: string): string[] {
+	return text
+		.split(/\s+/)
+		.map((token) => token.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, ''))
+		.filter(Boolean);
+}
+
+function wordQueues(words: { w: string; zh: string }[]): Map<string, string[]> {
+	const queues = new Map<string, string[]>();
+	for (const item of words) {
+		const key = item.w.toLowerCase();
+		const list = queues.get(key);
+		if (list) list.push(item.zh);
+		else queues.set(key, [item.zh]);
+	}
+	return queues;
+}
+
+/** 漏掉的词次数，只写进日志，不写正文。 */
+export function missingGlossCount(
+	bodyEn: string,
+	gloss: ReadingExtras['wordGloss'],
+): number {
+	const have = new Map<string, number>();
+	for (const sentence of gloss ?? []) {
+		for (const item of sentence.words) {
+			const key = item.w.toLowerCase();
+			have.set(key, (have.get(key) ?? 0) + 1);
+		}
+	}
+	let missing = 0;
+	for (const word of passageWords(bodyEn)) {
+		const key = word.toLowerCase();
+		const left = have.get(key) ?? 0;
+		if (left <= 0) missing += 1;
+		else have.set(key, left - 1);
+	}
+	return missing;
+}
+
+function glossEnKey(en: string): string {
+	return en.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** 同一句里补全优先；只有首次写过的词按正文顺序留下。 */
+export function mergeWordGloss(
+	first: ReadingExtras['wordGloss'],
+	second: ReadingExtras['wordGloss'],
+): ReadingExtras['wordGloss'] {
+	const prev = first ?? [];
+	const next = second ?? [];
+	if (!next.length) return prev.length ? prev : undefined;
+	const used = new Set<number>();
+	const out: NonNullable<ReadingExtras['wordGloss']> = [];
+	for (const sentence of next) {
+		const key = glossEnKey(sentence.en);
+		const index = prev.findIndex(
+			(item, i) => !used.has(i) && glossEnKey(item.en) === key,
+		);
+		const kept = index >= 0 ? prev[index] : undefined;
+		if (index >= 0) used.add(index);
+		const words = mergeSentenceWords(
+			sentence.en,
+			kept?.words ?? [],
+			sentence.words,
+		);
+		if (words.length) out.push({ en: sentence.en, words });
+	}
+	for (let i = 0; i < prev.length; i += 1) {
+		if (!used.has(i)) out.push(prev[i]);
+	}
+	return out.length ? out : undefined;
+}
+
+function mergeSentenceWords(
+	en: string,
+	first: { w: string; zh: string }[],
+	fill: { w: string; zh: string }[],
+): { w: string; zh: string }[] {
+	const fillQueue = wordQueues(fill);
+	const firstQueue = wordQueues(first);
+	const words: { w: string; zh: string }[] = [];
+	for (const token of passageWords(en)) {
+		const key = token.toLowerCase();
+		const zh = fillQueue.get(key)?.shift() ?? firstQueue.get(key)?.shift();
+		if (zh) words.push({ w: token, zh });
+	}
+	return words;
+}
+
+export function pickWordGloss(
+	raw: unknown,
+	bodyEn: string,
+): ReadingExtras['wordGloss'] | undefined {
+	if (!Array.isArray(raw)) return undefined;
+	const body = stripZw(bodyEn).toLowerCase();
+	const out: NonNullable<ReadingExtras['wordGloss']> = [];
+	for (const item of raw) {
+		if (out.length >= 40) break;
+		if (!item || typeof item !== 'object') continue;
+		const row = item as Record<string, unknown>;
+		const en = typeof row.en === 'string' ? stripZw(row.en) : '';
+		const enNorm = en.toLowerCase().replace(/\s+/g, ' ');
+		if (!en || en.length > 600 || !body.replace(/\s+/g, ' ').includes(enNorm))
+			continue;
+		const wordsRaw = Array.isArray(row.words) ? row.words : [];
+		const words: { w: string; zh: string }[] = [];
+		for (const piece of wordsRaw) {
+			if (words.length >= 80) break;
+			if (!piece || typeof piece !== 'object') continue;
+			const cell = piece as Record<string, unknown>;
+			const w = typeof cell.w === 'string' ? stripZw(cell.w) : '';
+			const zh = typeof cell.zh === 'string' ? stripZw(cell.zh) : '';
+			if (!w || w.length > 40 || !zh || zh.length > 24) continue;
+			if (!/[\u4e00-\u9fff]/.test(zh) || !inBody(en, w)) continue;
+			words.push({ w, zh });
+		}
+		if (words.length > 0) out.push({ en, words });
+	}
+	return out.length > 0 ? out : undefined;
+}
+
+function inBody(bodyEn: string, word: string): boolean {
+	const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`\\b${escaped}\\b`, 'i').test(bodyEn);
+}
+
+/** 正文已经合格。学习块不合格就省略该键，不让附件废掉整篇。 */
+export function pickExtras(
+	payload: unknown,
+	bodyEn: string,
+	profile: ReadingProfile,
+): ReadingExtras {
+	const extras: ReadingExtras = {
+		level: profile.level,
+		length: profile.length,
+		focus: profile.focus,
+	};
+	const o =
+		payload && typeof payload === 'object'
+			? (payload as Record<string, unknown>)
+			: {};
+	if (
+		(profile.focus === 'vocab' || profile.focus === 'both') &&
+		Array.isArray(o.glossary)
+	) {
+		const glossary: { word: string; zh: string }[] = [];
+		for (const item of o.glossary) {
+			if (glossary.length >= glossaryLimit(profile.length)) break;
+			if (!item || typeof item !== 'object') continue;
+			const row = item as Record<string, unknown>;
+			const word = typeof row.word === 'string' ? stripZw(row.word) : '';
+			const zh = typeof row.zh === 'string' ? stripZw(row.zh) : '';
+			if (!word || word.length > 40 || !zh || zh.length > 40) continue;
+			if (!inBody(bodyEn, word)) continue;
+			glossary.push({ word, zh });
+		}
+		if (glossary.length > 0) extras.glossary = glossary;
+	}
+	if (profile.focus === 'grammar' || profile.focus === 'both') {
+		const rawNotes = Array.isArray(o.grammarNotes)
+			? o.grammarNotes
+			: typeof o.grammarNote === 'string'
+				? [o.grammarNote]
+				: [];
+		const grammarNotes: string[] = [];
+		for (const item of rawNotes) {
+			if (grammarNotes.length >= 3) break;
+			if (typeof item !== 'string') continue;
+			const note = stripZw(item);
+			if (!note || note.length > 120 || !/[\u4e00-\u9fff]/.test(note)) continue;
+			if (grammarNotes.includes(note)) continue;
+			grammarNotes.push(note);
+		}
+		if (grammarNotes.length > 0) extras.grammarNotes = grammarNotes;
+	}
+	const wordGloss = pickWordGloss(o.wordGloss, bodyEn);
+	if (wordGloss) extras.wordGloss = wordGloss;
+	if (profile.questions > 0 && Array.isArray(o.questions)) {
+		const questions: NonNullable<ReadingExtras['questions']> = [];
+		for (const item of o.questions) {
+			if (!item || typeof item !== 'object') continue;
+			const row = item as Record<string, unknown>;
+			const q = typeof row.q === 'string' ? stripZw(row.q) : '';
+			const options = Array.isArray(row.options)
+				? row.options.filter(
+						(opt): opt is string => typeof opt === 'string' && !!stripZw(opt),
+					)
+				: [];
+			const answer = row.answer;
+			if (!q || q.length > 200 || options.length !== 3) continue;
+			if (answer !== 0 && answer !== 1 && answer !== 2) continue;
+			const placed = shuffleOptions(
+				options.map((opt) => stripZw(opt).slice(0, 80)),
+				answer,
+			);
+			questions.push({ q, ...placed });
+		}
+		if (questions.length === profile.questions) {
+			extras.questions = questions.slice(0, profile.questions);
+		}
+	}
+	return extras;
+}

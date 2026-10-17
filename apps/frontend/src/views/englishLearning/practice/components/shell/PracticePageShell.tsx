@@ -13,6 +13,7 @@ export function PracticePageShell({
 	backLabel,
 	headerRight,
 	children,
+	footer,
 	contentLayout = 'center',
 	flush = false,
 }: PracticePageShellProps) {
@@ -30,11 +31,11 @@ export function PracticePageShell({
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 					{showHeader ? (
 						<Head
-							className="pl-4 pr-2"
+							className="px-4"
 							onBack={onBack}
 							backLabel={backLabel}
 							trailing={headerRight}
-							trailingClassName="gap-2"
+							trailingClassName="gap-3"
 						>
 							{typeof (subtitle ?? title) === 'string' ? (
 								<span className="min-w-0 truncate">{subtitle ?? title}</span>
@@ -45,10 +46,10 @@ export function PracticePageShell({
 					) : null}
 					{/* p-4 在 Root：右侧留白给滚动条贴边；fill 时内容仍占满视口 */}
 					<ScrollArea
-						className={cn('min-h-0 flex-1', !flush && 'p-4')}
+						className={cn('h-full min-h-0 flex-1', !flush && 'p-4')}
 						viewportClassName={cn(
-							contentFill &&
-								'flex h-full min-h-0 flex-col [&>div]:flex! [&>div]:h-full! [&>div]:min-h-full! [&>div]:flex-col',
+							(contentFill || !contentStart) &&
+								'flex h-full min-h-0 flex-col [&>div]:flex! [&>div]:h-full! [&>div]:min-h-0! [&>div]:flex-col',
 							contentStart &&
 								'h-full [overflow-anchor:none] [&>div]:block! [&>div]:min-h-0! [&>div]:h-auto! [&>div]:w-full! [&>div]:min-w-0!',
 						)}
@@ -56,16 +57,23 @@ export function PracticePageShell({
 					>
 						<div
 							className={cn(
-								'flex flex-1 flex-col',
+								'flex flex-col',
 								flush && 'min-h-0',
 								contentFill && 'h-full min-h-0 justify-start',
 								contentStart && 'justify-start',
-								!contentFill && !contentStart && 'min-h-full justify-center',
+								!contentFill &&
+									!contentStart &&
+									'h-full min-h-0 items-center justify-center',
 							)}
 						>
 							{children}
 						</div>
 					</ScrollArea>
+					{footer ? (
+						<div className={cn('shrink-0', !flush && 'px-4 pb-4 mt-2.5')}>
+							{footer}
+						</div>
+					) : null}
 				</div>
 			</div>
 		</div>

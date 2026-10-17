@@ -22,6 +22,7 @@ export const ENGLISH_SIDEBAR_ICON_GRADIENT = {
 	mistakes: 'bg-linear-to-r from-rose-500 to-orange-500',
 	reports: 'bg-linear-to-r from-violet-500 to-fuchsia-500',
 	notes: 'bg-linear-to-r from-sky-500 to-indigo-600',
+	dailyReading: 'bg-linear-to-r from-amber-700 to-rose-800',
 } as const;
 
 export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
@@ -47,6 +48,8 @@ export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 		'bg-linear-to-r from-violet-500 to-fuchsia-500 hover:bg-linear-to-r hover:from-violet-400 hover:to-fuchsia-500',
 	notes:
 		'bg-linear-to-r from-sky-500 to-indigo-600 hover:bg-linear-to-r hover:from-sky-400 hover:to-indigo-500',
+	dailyReading:
+		'bg-linear-to-r from-amber-700 to-rose-800 hover:bg-linear-to-r hover:from-amber-600 hover:to-rose-700',
 } as const;
 
 /** 侧栏文字链渐变（与对应入口 icon / 按钮色相一致） */

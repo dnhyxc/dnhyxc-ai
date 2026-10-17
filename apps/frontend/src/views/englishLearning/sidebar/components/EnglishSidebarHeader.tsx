@@ -45,8 +45,13 @@ export function EnglishSidebarHeader({
 					) : null}
 				</div>
 				{description != null ? (
-					<div className={cn(SIDEBAR_DESC, 'flex h-5 items-center gap-2')}>
-						{description}
+					<div
+						className={cn(
+							SIDEBAR_DESC,
+							'flex h-5 min-w-0 items-center gap-2 overflow-hidden',
+						)}
+					>
+						<span className="truncate">{description}</span>
 					</div>
 				) : null}
 			</div>

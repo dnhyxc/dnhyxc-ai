@@ -17,6 +17,7 @@ import {
 	Param,
 	Patch,
 	Post,
+	Put,
 	Query,
 	Req,
 	Res,
@@ -97,6 +98,7 @@ import {
 	VocabularyMistakeRemoveBatchDto,
 	VocabularyMistakeRemoveDto,
 } from './dto/vocabulary-mistake.dto';
+import { EnglishDailyReadingService } from './english-daily-reading.service';
 import { EnglishDocxExportJobService } from './english-docx-export-job.service';
 import {
 	type EnglishLearningPackAgentToolEvent,
@@ -455,6 +457,7 @@ function classicQuoteHttpMessage(e: HttpException): string {
 export class EnglishLearningController {
 	constructor(
 		private readonly englishLearningService: EnglishLearningService,
+		private readonly dailyReadingService: EnglishDailyReadingService,
 		private readonly docxExportJobService: EnglishDocxExportJobService,
 		private readonly annotateSourceTaskService: AnnotateSourceTaskService,
 		private readonly streamAbortRegistry: EnglishLearningStreamAbortRegistry,
@@ -2851,5 +2854,130 @@ export class EnglishLearningController {
 				this.streamAbortRegistry.unregister(streamId);
 			};
 		});
+	}
+
+	@Get('daily-reading-settings')
+	async getDailyReadingSettings(@Req() req: AuthedRequest) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.dailyReadingService.readingSettings(
+			req.user.userId,
+		);
+		return { success: true, data };
+	}
+
+	@Put('daily-reading-settings/auto')
+	async saveDailyReadingAutoSettings(
+		@Req() req: AuthedRequest,
+		@Body() body: { themes?: unknown; profile?: unknown },
+	) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.dailyReadingService.saveAutoSettings(
+			req.user.userId,
+			body ?? {},
+		);
+		return { success: true, data };
+	}
+
+	@Put('daily-reading-settings')
+	async saveDailyReadingSettings(
+		@Req() req: AuthedRequest,
+		@Body() body: { themes?: unknown; profile?: unknown },
+	) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.dailyReadingService.saveSettings(
+			req.user.userId,
+			body ?? {},
+		);
+		return { success: true, data };
+	}
+
+	@Get('daily-readings')
+	async listDailyReadings(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+		@Query('origin') originStr?: string,
+	) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limitNum = Number.parseInt(limitStr ?? '50', 10);
+		const offsetNum = Number.parseInt(offsetStr ?? '0', 10);
+		const limit = Math.min(
+			50,
+			Math.max(1, Number.isNaN(limitNum) ? 50 : limitNum),
+		);
+		const offset = Math.max(0, Number.isNaN(offsetNum) ? 0 : offsetNum);
+		const origin = originStr === 'manual' ? 'manual' : 'day';
+		const data = await this.dailyReadingService.list(
+			req.user.userId,
+			limit,
+			offset,
+			origin,
+		);
+		return { success: true, data };
+	}
+
+	@Get('daily-readings/manual')
+	async manualReadingPending(@Req() req: AuthedRequest) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const pending = await this.dailyReadingService.manualPending(
+			req.user.userId,
+		);
+		return { success: true, data: { pending } };
+	}
+
+	@Post('daily-readings/manual/stop')
+	async stopManualReading(
+		@Req() req: AuthedRequest,
+		@Body() body: { runId?: unknown },
+	) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const stopped = await this.dailyReadingService.stopManual(
+			req.user.userId,
+			body?.runId,
+		);
+		return { success: true, data: { stopped } };
+	}
+
+	@Post('daily-readings/manual')
+	async createManualReading(
+		@Req() req: AuthedRequest,
+		@Body() body: { themes?: unknown; profile?: unknown },
+	) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.dailyReadingService.generateManual(
+			body ?? {},
+			req.user.userId,
+		);
+		return { success: true, data };
+	}
+
+	@Get('daily-readings/:id')
+	async getDailyReading(@Req() req: AuthedRequest, @Param('id') id: string) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		if (
+			!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+				id,
+			)
+		) {
+			throw new BadRequestException('文章不存在');
+		}
+		const data = await this.dailyReadingService.get(id, req.user.userId);
+		return { success: true, data };
 	}
 }

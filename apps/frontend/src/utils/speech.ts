@@ -184,6 +184,36 @@ function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 	return chunks.length > 0 ? chunks : [{ text: trimmed, pauseAfterMs: 0 }];
 }
 
+/**
+ * 首句单独成段，其余按空行段落成段。
+ * 须在空白被压成一行之前切，否则段落边界会丢。
+ */
+export function splitLeadSentenceThenParagraphs(
+	raw: string,
+): TtsCadenceChunk[] {
+	const paragraphs = raw
+		.split(/\r?\n\s*\r?\n/)
+		.map((part) => stripMarkdownForTts(part))
+		.filter(Boolean);
+	if (paragraphs.length === 0) return [];
+	const first = paragraphs[0] ?? '';
+	const leadEnd = buildSentenceOffsetSpans(first)[0]?.end ?? first.length;
+	const texts = [
+		first.slice(0, leadEnd).trim(),
+		first.slice(leadEnd).trim(),
+		...paragraphs.slice(1),
+	].filter(Boolean);
+	const pieces = texts.flatMap((text) => {
+		const bytes = new TextEncoder().encode(text).length;
+		if (bytes <= CLOUD_SINGLE_UTTERANCE_MAX_BYTES) return [text];
+		return splitLongText(text, 3500);
+	});
+	return pieces.map((text, i) => ({
+		text,
+		pauseAfterMs: i === pieces.length - 1 ? 0 : PAUSE_AFTER_SENTENCE_MS,
+	}));
+}
+
 /** 本机音色偏好 storage key 前缀 → `local_tts_voice:{userId}` */
 export const LOCAL_TTS_VOICE_KEY = 'local_tts_voice';
 
@@ -512,6 +542,11 @@ export type PlayPreferredOptions = {
 	 */
 	cloudSingleUtterance?: boolean;
 	/**
+	 * 首句单独合成，其余按空行段落合成。
+	 * 每日阅读用来缩短首声，并避免整篇按句打云端。
+	 */
+	leadThenParagraphs?: boolean;
+	/**
 	 * 为 true 时后端写读 Redis/uploads/tts（仅英语学习应传）。
 	 * 听书/划词/试听勿传，默认不落盘。
 	 */
@@ -548,6 +583,7 @@ type CadencePlaybackHooks = Pick<
 type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
 	rate?: number;
 	singleUtterance?: boolean;
+	leadThenParagraphs?: boolean;
 	persistDisk?: boolean;
 	cacheFolder?: string;
 	cacheTitle?: string;
@@ -1562,8 +1598,46 @@ function cloudPlainWithinSingleLimit(plain: string): boolean {
 	);
 }
 
+function isAbortError(e: unknown): boolean {
+	if (!e || typeof e !== 'object') return false;
+	const name = (e as { name?: string }).name;
+	if (name === 'AbortError') return true;
+	return /abort/i.test(String((e as { message?: unknown }).message ?? ''));
+}
+
+/** 同一段云端请求失败后再打一次。用户已停止或主动取消则不再打。 */
+async function startCloudTtsWithRetry(
+	plain: string,
+	generation: number,
+	persistDisk?: boolean,
+	cacheFolder?: string,
+	cacheTitle?: string,
+): Promise<CloudTtsReady> {
+	try {
+		return await startCloudTts(
+			plain,
+			undefined,
+			persistDisk,
+			cacheFolder,
+			cacheTitle,
+		);
+	} catch (e) {
+		if (isAbortError(e) || !isPlaybackGenerationActive(generation)) throw e;
+		await pauseMs(400);
+		if (!isPlaybackGenerationActive(generation)) throw e;
+		return startCloudTts(
+			plain,
+			undefined,
+			persistDisk,
+			cacheFolder,
+			cacheTitle,
+		);
+	}
+}
+
 async function resolveCloudTtsReady(
 	chunkPlain: string,
+	generation: number,
 	prefetched?: Promise<TtsSentencePrefetch> | null,
 	persistDisk?: boolean,
 	cacheFolder?: string,
@@ -1577,9 +1651,9 @@ async function resolveCloudTtsReady(
 			// 预取失败则回退现场请求
 		}
 	}
-	return startCloudTts(
+	return startCloudTtsWithRetry(
 		chunkPlain,
-		undefined,
+		generation,
 		persistDisk,
 		cacheFolder,
 		cacheTitle,
@@ -2032,7 +2106,9 @@ async function playCloudTtsCadenceSegments(
 	}
 
 	// 将文本按节奏规则切分为块（句、短语等），每块单独生成 TTS
-	const chunks = splitTextForTtsCadence(plain);
+	const chunks = opts?.leadThenParagraphs
+		? splitLeadSentenceThenParagraphs(plain)
+		: splitTextForTtsCadence(plain);
 
 	// 如果无可用块，直接返回
 	if (chunks.length === 0) return;
@@ -2047,6 +2123,7 @@ async function playCloudTtsCadenceSegments(
 		// 请求云端 TTS 资源（可能复用 Prefetch）
 		const ready = await resolveCloudTtsReady(
 			chunks[0].text,
+			generation,
 			opts?.prefetchedCloud,
 			opts?.persistDisk,
 			opts?.cacheFolder,
@@ -2072,6 +2149,7 @@ async function playCloudTtsCadenceSegments(
 	// 多段场景：准备首段的 TTS Promise，后续循环中依次推进
 	let pendingReady: Promise<CloudTtsReady> | null = resolveCloudTtsReady(
 		chunks[0].text,
+		generation,
 		opts?.prefetchedCloud,
 		opts?.persistDisk,
 		opts?.cacheFolder,
@@ -2095,28 +2173,51 @@ async function playCloudTtsCadenceSegments(
 		// 发出“本块开始”事件（供 UI/外部响应）
 		emitCadenceChunk(opts, plain, chunks, i, 'start');
 
-		// 等待本段的 TTS（云端 MP3）就绪
-		const ready = await pendingReady!;
+		// 等待本段的 TTS（云端 MP3）就绪。失败且前面已播出时，从这一段改本机，不回头重读。
+		let ready: CloudTtsReady;
+		try {
+			ready = await pendingReady!;
+		} catch (e) {
+			if (
+				!isPlaybackGenerationActive(generation) ||
+				isAbortError(e) ||
+				i === 0
+			) {
+				throw e;
+			}
+			throw new CloudTtsSegmentError(plain, chunks, i);
+		}
 		// 校验世代合法性，避免用户终止后继续播
 		if (!isPlaybackGenerationActive(generation)) return;
 
 		// 并行尝试准备下一个 chunk 的 TTS（浏览器端潜在并行请求），如到最后一段则置 null
 		pendingReady =
 			i + 1 < chunks.length
-				? startCloudTts(
+				? startCloudTtsWithRetry(
 						chunks[i + 1].text,
-						undefined,
+						generation,
 						opts?.persistDisk,
 						opts?.cacheFolder,
 						opts?.cacheTitle,
 					)
 				: null;
 
-		// 播放当前段 MP3
-		await playCloudTtsReady(ready, generation, undefined, undefined, () => {
-			notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
-			if (i === 0) notifyPlaybackStart();
-		});
+		// 播放当前段 MP3。这一段播不出来且前面已播出时，从这一段改本机。
+		try {
+			await playCloudTtsReady(ready, generation, undefined, undefined, () => {
+				notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
+				if (i === 0) notifyPlaybackStart();
+			});
+		} catch (e) {
+			if (
+				!isPlaybackGenerationActive(generation) ||
+				isAbortError(e) ||
+				i === 0
+			) {
+				throw e;
+			}
+			throw new CloudTtsSegmentError(plain, chunks, i);
+		}
 		// 校验播放后世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 段播放完，发出“本块结束”事件
@@ -2216,6 +2317,7 @@ async function playCloudTtsSingleUtterance(
 
 	const ready = await resolveCloudTtsReady(
 		plain,
+		generation,
 		opts?.prefetchedCloud,
 		opts?.persistDisk,
 		opts?.cacheFolder,
@@ -2312,31 +2414,49 @@ async function playCloudTtsPackedSingleUtterances(
 		if (i > 0) notifyAwaitingPlayback(opts?.onAwaitingPlayback, true);
 		const pack = packs[i]!;
 		const baseSi = sentenceIndexAtOffset(sentences, pack.start);
-		await playCloudTtsSingleUtterance(pack.text, generation, {
-			...opts,
-			// 仅首包可吃预取
-			prefetchedCloud: i === 0 ? opts?.prefetchedCloud : null,
-			onPlaybackStart: () => {
-				notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
-				if (i === 0) opts?.onPlaybackStart?.();
-			},
-			onCadenceChunk: parentOnCadence
-				? (event) => {
-						parentOnCadence({
-							...event,
-							sentenceIndex: baseSi + event.sentenceIndex,
-						});
-					}
-				: undefined,
-			onPlaybackProgress: opts?.onPlaybackProgress
-				? (event) => {
-						opts.onPlaybackProgress!({
-							...event,
-							sentenceIndex: baseSi + event.sentenceIndex,
-						});
-					}
-				: undefined,
-		});
+		try {
+			await playCloudTtsSingleUtterance(pack.text, generation, {
+				...opts,
+				// 仅首包可吃预取
+				prefetchedCloud: i === 0 ? opts?.prefetchedCloud : null,
+				onPlaybackStart: () => {
+					notifyAwaitingPlayback(opts?.onAwaitingPlayback, false);
+					if (i === 0) opts?.onPlaybackStart?.();
+				},
+				onCadenceChunk: parentOnCadence
+					? (event) => {
+							parentOnCadence({
+								...event,
+								sentenceIndex: baseSi + event.sentenceIndex,
+							});
+						}
+					: undefined,
+				onPlaybackProgress: opts?.onPlaybackProgress
+					? (event) => {
+							opts.onPlaybackProgress!({
+								...event,
+								sentenceIndex: baseSi + event.sentenceIndex,
+							});
+						}
+					: undefined,
+			});
+		} catch (e) {
+			if (
+				!isPlaybackGenerationActive(generation) ||
+				isAbortError(e) ||
+				i === 0
+			) {
+				throw e;
+			}
+			throw new CloudTtsSegmentError(
+				plain,
+				packs.map((item) => ({
+					text: item.text,
+					pauseAfterMs: PAUSE_AFTER_SENTENCE_MS,
+				})),
+				i,
+			);
+		}
 	}
 }
 
@@ -2583,7 +2703,8 @@ function waitForVoicesReady(): Promise<void> {
 async function speakTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakOptions & CadencePlaybackHooks,
+	options?: SpeakOptions &
+		CadencePlaybackHooks & { leadThenParagraphs?: boolean },
 ): Promise<void> {
 	// 未检测到本机 TTS 支持时直接返回
 	if (!isSpeechSupported()) return;
@@ -2607,44 +2728,72 @@ async function speakTextWithGeneration(
 	resetCachedLocalVoice();
 
 	// 按语调规则拆分分段，得到拟朗读的 chunk 数组
-	const chunks = splitTextForTtsCadence(plain);
-	// 多段朗读语速稍慢，单段使用标准语速
+	const chunks = options?.leadThenParagraphs
+		? splitLeadSentenceThenParagraphs(text).flatMap((chunk) => {
+				const parts = splitLongText(chunk.text, MAX_UTTERANCE_CHARS);
+				return parts.map((part, i) => ({
+					text: part,
+					pauseAfterMs:
+						i === parts.length - 1 ? chunk.pauseAfterMs : PAUSE_AFTER_CLAUSE_MS,
+				}));
+			})
+		: splitTextForTtsCadence(plain);
+	await speakCadenceChunks(plain, chunks, generation, options);
+}
+
+/** 从 fromIndex 起用本机语音接着读。fromIndex > 0 表示前面已经播过，不再触发 onPlaybackStart。 */
+async function speakCadenceChunks(
+	plain: string,
+	chunks: TtsCadenceChunk[],
+	generation: number,
+	options?: SpeakOptions & CadencePlaybackHooks,
+	fromIndex = 0,
+): Promise<void> {
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
 	let playbackStartNotified = false;
-	/** 出声前清掉 waiting；onPlaybackStart 只通知一次 */
 	const clearAwaitingAndNotifyStart = () => {
 		notifyAwaitingPlayback(options?.onAwaitingPlayback, false);
-		if (playbackStartNotified) return;
+		if (fromIndex > 0 || playbackStartNotified) return;
 		playbackStartNotified = true;
 		options?.onPlaybackStart?.();
 	};
-	// 分段顺次朗读
-	for (let i = 0; i < chunks.length; i += 1) {
-		// 朗读期间，世代快速变动需即刻 return
+	for (let i = fromIndex; i < chunks.length; i += 1) {
 		if (!isPlaybackGenerationActive(generation)) return;
 		const chunk = chunks[i];
-		// 首段无需停顿，每段前按设定停顿
-		if (i > 0) {
-			// 取前一段的分句停顿时间（如无用默认）
+		if (!chunk) continue;
+		if (i > fromIndex) {
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
 			await pauseMs(prevPause);
-			// 停顿期间世代提前变化（用户已停止）须退出
 			if (!isPlaybackGenerationActive(generation)) return;
-			// ponytail: 本机分段只有 pause，无 HTTP；勿 onAwaiting(true)，否则 loading 卡到整段播完
 		}
-		// 分段播放前事件钩子，可外部监听
 		emitCadenceChunk(options, plain, chunks, i, 'start');
 		clearAwaitingAndNotifyStart();
-		// 朗读当前 chunk，单段时用标准语速，多段时降为 chunkRate
-		await speakOneUtterance(chunk.text, generation, {
-			rate: options?.rate ?? chunkRate,
-			pitch: options?.pitch,
-			volume: options?.volume,
-		});
-		// 朗读 chunk 后再校验，部分平台朗读中可被中断
+		const parts = splitLongText(chunk.text, MAX_UTTERANCE_CHARS);
+		for (const part of parts) {
+			if (!isPlaybackGenerationActive(generation)) return;
+			await speakOneUtterance(part, generation, {
+				rate: options?.rate ?? chunkRate,
+				pitch: options?.pitch,
+				volume: options?.volume,
+			});
+		}
 		if (!isPlaybackGenerationActive(generation)) return;
-		// 结束事件钩子触发，可用于外界状态更新
 		emitCadenceChunk(options, plain, chunks, i, 'end');
+	}
+}
+
+/** 云端某一段请求失败，且前面已经播出。本机只接这一段往后。 */
+class CloudTtsSegmentError extends Error {
+	readonly plain: string;
+	readonly chunks: TtsCadenceChunk[];
+	readonly fromIndex: number;
+
+	constructor(plain: string, chunks: TtsCadenceChunk[], fromIndex: number) {
+		super('TTS_SEGMENT');
+		this.name = 'CloudTtsSegmentError';
+		this.plain = plain;
+		this.chunks = chunks;
+		this.fromIndex = fromIndex;
 	}
 }
 
@@ -2715,6 +2864,7 @@ export async function playPreferred(
 		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
+			leadThenParagraphs: options?.leadThenParagraphs === true,
 		});
 		return;
 	}
@@ -2728,16 +2878,39 @@ export async function playPreferred(
 		onAwaitingPlayback: options?.onAwaitingPlayback,
 		rate: speakOpts?.rate,
 		singleUtterance: options?.cloudSingleUtterance === true,
+		leadThenParagraphs: options?.leadThenParagraphs === true,
 		persistDisk: options?.persistDisk === true,
 		cacheFolder: options?.cacheFolder,
 		cacheTitle: options?.cacheTitle,
 	};
 
 	try {
-		await playCloudTtsCadenceSegments(plain, generation, cloudPlayOpts);
+		await playCloudTtsCadenceSegments(
+			options?.leadThenParagraphs ? rawText : plain,
+			generation,
+			cloudPlayOpts,
+		);
 		return;
-	} catch {
+	} catch (e) {
 		if (!isPlaybackGenerationActive(generation)) return;
+
+		if (e instanceof CloudTtsSegmentError) {
+			const canFallbackLocal = isSpeechSupported();
+			notifyCloudTtsFallback(canFallbackLocal, effectiveCloudPlaybackSource());
+			if (!canFallbackLocal) {
+				throwNoTts({ cloudTtsNotified: true });
+			}
+			await prepareLocalSpeechAfterCloud(generation);
+			if (!isPlaybackGenerationActive(generation)) return;
+			await speakCadenceChunks(
+				e.plain,
+				e.chunks,
+				generation,
+				{ ...speakOpts, ...cadenceHooks },
+				e.fromIndex,
+			);
+			return;
+		}
 
 		const preferred = loadMinimaxTtsUserPrefs().playbackSource;
 		const failedSource = effectiveCloudPlaybackSource();
@@ -2749,13 +2922,34 @@ export async function playPreferred(
 			try {
 				sessionCloudSourceOverride = 'edge';
 				notifyCloudFallbackToEdge(failedSource);
-				await playCloudTtsCadenceSegments(plain, generation, {
-					...cloudPlayOpts,
-					prefetchedCloud: null,
-				});
+				await playCloudTtsCadenceSegments(
+					options?.leadThenParagraphs ? rawText : plain,
+					generation,
+					{
+						...cloudPlayOpts,
+						prefetchedCloud: null,
+					},
+				);
 				return;
-			} catch {
+			} catch (edgeErr) {
 				if (!isPlaybackGenerationActive(generation)) return;
+				if (edgeErr instanceof CloudTtsSegmentError) {
+					const canFallbackLocal = isSpeechSupported();
+					notifyCloudTtsFallback(canFallbackLocal, 'edge');
+					if (!canFallbackLocal) {
+						throwNoTts({ cloudTtsNotified: true });
+					}
+					await prepareLocalSpeechAfterCloud(generation);
+					if (!isPlaybackGenerationActive(generation)) return;
+					await speakCadenceChunks(
+						edgeErr.plain,
+						edgeErr.chunks,
+						generation,
+						{ ...speakOpts, ...cadenceHooks },
+						edgeErr.fromIndex,
+					);
+					return;
+				}
 				lastCloudTtsErrorToastAt = 0;
 			}
 		}
@@ -2771,6 +2965,7 @@ export async function playPreferred(
 		await speakTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
+			leadThenParagraphs: options?.leadThenParagraphs === true,
 		});
 	}
 }

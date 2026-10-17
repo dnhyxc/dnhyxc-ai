@@ -84,6 +84,9 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_DAILY_READING_MANUAL,
+	ENGLISH_LEARNING_DAILY_READING_SETTINGS,
+	ENGLISH_LEARNING_DAILY_READINGS,
 	ENGLISH_LEARNING_DOCX_EXPORT_JOBS,
 	ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
@@ -1999,6 +2002,158 @@ export const getEnglishPracticeReport = async (
 	);
 };
 
+export type EnglishDailyReadingProfile = {
+	level: 'A2' | 'B1' | 'B2' | 'C1';
+	length: 'short' | 'medium' | 'long';
+	focus: 'reading' | 'vocab' | 'grammar' | 'both';
+	questions: 0 | 2 | 3;
+	useWeb: boolean;
+};
+
+export type EnglishDailyReadingExtras = {
+	level: EnglishDailyReadingProfile['level'];
+	length: EnglishDailyReadingProfile['length'];
+	focus: EnglishDailyReadingProfile['focus'];
+	glossary?: { word: string; zh: string }[];
+	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
+	grammarNote?: string;
+	grammarNotes?: string[];
+	questions?: { q: string; options: string[]; answer: number }[];
+	sources?: { title: string; url: string }[];
+};
+
+export type EnglishDailyReadingItem = {
+	id: string;
+	publishDate: string;
+	titleEn: string;
+	titleZh: string;
+	bodyEn: string;
+	bodyZh: string;
+	sourceKind: 'llm' | 'web';
+	sourceUrl: string | null;
+	sourceTitle: string | null;
+	origin?: 'day' | 'manual';
+	level?: EnglishDailyReadingProfile['level'] | null;
+	length?: EnglishDailyReadingProfile['length'] | null;
+	extras?: EnglishDailyReadingExtras | null;
+};
+
+export const listEnglishDailyReadings = async (options?: {
+	limit?: number;
+	offset?: number;
+	origin?: 'day' | 'manual';
+	silent?: boolean;
+}) => {
+	return await http.get<{
+		items: EnglishDailyReadingItem[];
+		totalCount?: number;
+		todayStatus: 'ready' | 'generating' | 'failed';
+		today: EnglishDailyReadingItem | null;
+	}>(ENGLISH_LEARNING_DAILY_READINGS, {
+		querys: {
+			...(options?.limit != null ? { limit: options.limit } : {}),
+			...(options?.offset != null ? { offset: options.offset } : {}),
+			...(options?.origin ? { origin: options.origin } : {}),
+		},
+		silent: options?.silent,
+	});
+};
+
+export type EnglishDailyReadingSettings = {
+	themes: string[];
+	defaults: string[];
+	profile: EnglishDailyReadingProfile;
+	profileDefaults: EnglishDailyReadingProfile;
+	auto?: {
+		themes: string[];
+		profile: EnglishDailyReadingProfile;
+	};
+};
+
+export const getEnglishDailyReadingSettings = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishDailyReadingSettings>(
+		ENGLISH_LEARNING_DAILY_READING_SETTINGS,
+		{ silent: options?.silent },
+	);
+};
+
+export const saveEnglishDailyReadingSettings = async (body: {
+	themes: string[];
+	profile: EnglishDailyReadingProfile;
+}) => {
+	return await http.put<EnglishDailyReadingSettings>(
+		ENGLISH_LEARNING_DAILY_READING_SETTINGS,
+		body,
+	);
+};
+
+export const saveEnglishDailyReadingAutoSettings = async (body: {
+	themes: string[];
+	profile: EnglishDailyReadingProfile;
+}) => {
+	return await http.put<{
+		themes: string[];
+		profile: EnglishDailyReadingProfile;
+	}>(`${ENGLISH_LEARNING_DAILY_READING_SETTINGS}/auto`, body);
+};
+
+export const generateEnglishDailyReading = async (
+	body: {
+		themes: string[];
+		profile: EnglishDailyReadingProfile;
+		runId?: string;
+	},
+	options?: {
+		silent?: boolean;
+		timeout?: number;
+		signal?: AbortSignal;
+		retries?: number;
+	},
+) => {
+	return await http.post<EnglishDailyReadingItem>(
+		ENGLISH_LEARNING_DAILY_READING_MANUAL,
+		body,
+		{
+			silent: options?.silent,
+			timeout: options?.timeout,
+			signal: options?.signal,
+			retries: options?.retries,
+		},
+	);
+};
+
+export const stopEnglishDailyReading = async (options?: {
+	silent?: boolean;
+	runId?: string;
+}) => {
+	return await http.post<{ stopped: boolean }>(
+		`${ENGLISH_LEARNING_DAILY_READING_MANUAL}/stop`,
+		{ runId: options?.runId },
+		{ silent: options?.silent },
+	);
+};
+
+export const getEnglishDailyReadingManualPending = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<{ pending: boolean }>(
+		ENGLISH_LEARNING_DAILY_READING_MANUAL,
+		{ silent: options?.silent },
+	);
+};
+
+export const getEnglishDailyReading = async (
+	id: string,
+	options?: { silent?: boolean },
+) => {
+	return await http.get<EnglishDailyReadingItem>(
+		`${ENGLISH_LEARNING_DAILY_READINGS}/${encodeURIComponent(id)}`,
+		{ silent: options?.silent },
+	);
+};
+
 export const removeEnglishPracticeReportsBatch = async (ids: string[]) => {
 	return await http.post<{ removedCount: number }>(
 		`${ENGLISH_LEARNING_PRACTICE_REPORTS}/remove-batch`,
@@ -3688,8 +3843,10 @@ export type LlmSettingsDefaultsView = {
 };
 
 /** GET /settings/llm */
-export const getLlmSettings = async () => {
-	return await http.get<LlmSettingsView>(SETTINGS_LLM);
+export const getLlmSettings = async (options?: { silent?: boolean }) => {
+	return await http.get<LlmSettingsView>(SETTINGS_LLM, {
+		silent: options?.silent,
+	});
 };
 
 /** GET /settings/llm/defaults */
