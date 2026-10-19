@@ -2924,15 +2924,57 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
-	@Get('daily-readings/manual')
-	async manualReadingPending(@Req() req: AuthedRequest) {
+	@Delete('daily-readings/manual/history/:id')
+	async removeManualGen(@Req() req: AuthedRequest, @Param('id') id: string) {
 		if (req.user?.userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const pending = await this.dailyReadingService.manualPending(
-			req.user.userId,
-		);
-		return { success: true, data: { pending } };
+		await this.dailyReadingService.removeGen(req.user.userId, id);
+		return { success: true, data: { removed: true } };
+	}
+
+	@Get('daily-readings/manual/history')
+	async listManualGens(@Req() req: AuthedRequest) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.dailyReadingService.listGens(req.user.userId);
+		return { success: true, data };
+	}
+
+	@Post('daily-readings/manual/stream')
+	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
+	streamManualReading(
+		@Req() req: AuthedRequest,
+		@Body() body: { themes?: unknown; profile?: unknown; runId?: unknown },
+	): Observable<{ data: Record<string, unknown>; id?: string }> {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		return this.manualReadingSse(userId, (emit) => {
+			this.dailyReadingService.openManual(userId, body ?? {}, emit);
+		});
+	}
+
+	@Post('daily-readings/manual/stream/attach')
+	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
+	attachManualReading(
+		@Req() req: AuthedRequest,
+		@Body() body: { runId?: unknown; after?: unknown },
+	): Observable<{ data: Record<string, unknown>; id?: string }> {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		return this.manualReadingSse(userId, (emit) => {
+			this.dailyReadingService.attachManual(
+				userId,
+				body?.runId,
+				body?.after,
+				emit,
+			);
+		});
 	}
 
 	@Post('daily-readings/manual/stop')
@@ -2950,19 +2992,47 @@ export class EnglishLearningController {
 		return { success: true, data: { stopped } };
 	}
 
-	@Post('daily-readings/manual')
-	async createManualReading(
-		@Req() req: AuthedRequest,
-		@Body() body: { themes?: unknown; profile?: unknown },
-	) {
-		if (req.user?.userId == null) {
-			throw new UnauthorizedException('未授权');
-		}
-		const data = await this.dailyReadingService.generateManual(
-			body ?? {},
-			req.user.userId,
-		);
-		return { success: true, data };
+	/** 一条 SSE：马上有心跳，断开只取消订阅。终态延后 complete，避免拆掉清理函数。 */
+	private manualReadingSse(
+		userId: number,
+		open: (emit: (data: Record<string, unknown>) => void) => void,
+	): Observable<{ data: Record<string, unknown>; id?: string }> {
+		return new Observable((subscriber) => {
+			let closed = false;
+			let timer: ReturnType<typeof setInterval> | undefined;
+			const emit = (data: Record<string, unknown>) => {
+				if (closed) return;
+				const seq = typeof data.seq === 'number' ? String(data.seq) : undefined;
+				try {
+					subscriber.next(seq ? { id: seq, data } : { data });
+				} catch {
+					closed = true;
+					return;
+				}
+				const type = data.type;
+				if (
+					type === 'reading.complete' ||
+					type === 'reading.error' ||
+					type === 'reading.stopped' ||
+					type === 'reading.paused'
+				) {
+					closed = true;
+					if (timer) clearInterval(timer);
+					queueMicrotask(() => {
+						if (!subscriber.closed) subscriber.complete();
+					});
+				}
+			};
+			timer = setInterval(() => {
+				emit({ type: 'reading.keepalive' });
+			}, PACK_SSE_KEEPALIVE_INTERVAL_MS);
+			open(emit);
+			return () => {
+				closed = true;
+				if (timer) clearInterval(timer);
+				this.dailyReadingService.detachManual(userId, emit);
+			};
+		});
 	}
 
 	@Get('daily-readings/:id')

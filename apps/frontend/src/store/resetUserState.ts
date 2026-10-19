@@ -7,6 +7,7 @@ import assistantStore from './assistant';
 import ebookStore from './ebook';
 import ebookAssistantStore from './ebookAssistant';
 import englishAgentStore from './englishAgent';
+import englishDailyReadingStore from './englishDailyReading';
 import { clearElResumeCache } from './englishLearningResume';
 import EnglishPackStore from './englishPack';
 import { clearEnglishPracticePoolCache } from './englishPracticePool';
@@ -30,6 +31,7 @@ export function resetUserState(): void {
 		knowledgeRagQaStore.resetConversation();
 		englishAgentStore.resetConversation();
 		EnglishPackStore.resetOnUserSwitch();
+		englishDailyReadingStore.resetOnUserSwitch();
 		knowledgeStore.resetOnUserSwitch();
 		skillStore.resetOnUserSwitch();
 		skillTryStore.resetOnUserSwitch();

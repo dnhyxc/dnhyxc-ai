@@ -22,6 +22,7 @@ import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pa
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
 import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
 import { EnglishDailyReading } from './entity/english-daily-reading.entity';
+import { EnglishDailyReadingGen } from './entity/english-daily-reading-gen.entity';
 import { EnglishDailyReadingSetting } from './entity/english-daily-reading-setting.entity';
 import { EnglishDailyReadingUserSetting } from './entity/english-daily-reading-user-setting.entity';
 import { EnglishLearningResumeModuleSetting } from './entity/english-learning-resume-module-setting.entity';
@@ -58,6 +59,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishPracticeReport,
 			EnglishDailyMemorizeRecord,
 			EnglishDailyReading,
+			EnglishDailyReadingGen,
 			EnglishDailyReadingSetting,
 			EnglishDailyReadingUserSetting,
 			EnglishClassicQuoteFavorite,

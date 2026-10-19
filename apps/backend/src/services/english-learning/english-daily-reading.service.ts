@@ -3,7 +3,6 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
 	BadRequestException,
-	ConflictException,
 	ForbiddenException,
 	Inject,
 	Injectable,
@@ -15,7 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { QueryFailedError, Repository } from 'typeorm';
+import { Not, QueryFailedError, Repository } from 'typeorm';
 import { createLlm } from '../../utils/create-llm';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { UserService } from '../user/user.service';
@@ -30,10 +29,14 @@ import {
 	addCalendarDays,
 	DEFAULT_PROFILE,
 	DEFAULT_THEMES,
+	emptyExtraKeys,
+	extrasRequested,
+	GLOSS_BATCH,
 	glossaryLimit,
 	isFlashGlossModel,
+	mergeExtras,
 	mergeWordGloss,
-	missingGlossCount,
+	missingSentences,
 	normalizeBody,
 	normalizeProfile,
 	normalizeThemeList,
@@ -43,11 +46,15 @@ import {
 	pickExtras,
 	pickManualTheme,
 	pickWordGloss,
+	type ReadingExtraKey,
 	type ReadingExtras,
 	type ReadingProfile,
 	rejectPassage,
 	rejectReasonText,
+	requestedExtraKeys,
 	SNIPPET_COPY_WORDS,
+	salvageExtras,
+	salvageWordGloss,
 	sanitizeHttpUrl,
 	shanghaiToday,
 	stripZw,
@@ -55,8 +62,14 @@ import {
 	themesForSettings,
 } from './daily-reading.rules';
 import { EnglishDailyReading } from './entity/english-daily-reading.entity';
+import {
+	type DailyReadingGenStatus,
+	EnglishDailyReadingGen,
+} from './entity/english-daily-reading-gen.entity';
 import { EnglishDailyReadingSetting } from './entity/english-daily-reading-setting.entity';
 import { EnglishDailyReadingUserSetting } from './entity/english-daily-reading-user-setting.entity';
+
+// 定时篇由队列写 slot=day；手动篇由设置页 SSE 另插一行，slot 等于该行 id。两条路径不共用失败清空。
 
 export type DailyReadingView = {
 	id: string;
@@ -80,16 +93,113 @@ export type DailyReadingList = {
 	today: DailyReadingView | null;
 };
 
+// 定时任务失败后固定隔 2 分钟再试，最多 5 次。手动生成不进这个队列。
 const JOB_OPTS = {
 	attempts: 5,
 	backoff: { type: 'fixed' as const, delay: 120_000 },
 };
+
+type ManualPhase = 'search' | 'draft' | 'gloss';
+type ManualEmit = (data: Record<string, unknown>) => void;
+
+type ManualRun = {
+	// 只由停止接口 abort。刷新关掉页面 SSE 时不调用它。
+	ac: AbortController;
+	// 行主键，与客户端 runId、slot 相同，用来和已发布文章隔开。
+	id: string;
+	userId: number;
+	phase: ManualPhase;
+	// 已拼出的模型原文，快照用全文，delta 往这里追加。
+	text: string;
+	// 已展示的累计 token。流式过程中随输出增加，单次调用结束时换成供应商用量。
+	tokens: number;
+	// 这次生成开始的时间，终态写入历史时用来算耗时。
+	startedAt: number;
+	// 本进程内递增。SSE id 用它，重连只补更大的序号。
+	seq: number;
+	/** 本 run 的帧。同一页断开后按 seq 重放。ponytail: 随 run 删除；多实例要搬到 Redis。 */
+	log: Array<Record<string, unknown> & { seq: number }>;
+	// 当前还连着的页面。断开只删这里的一个 emit，不结束上面的模型调用。
+	subscribers: Set<ManualEmit>;
+};
+
+// 重连时丢掉客户端已经画过的帧，避免同一段 delta 再拼一次。
+function eventsAfter<T extends { seq: number }>(log: T[], after: number): T[] {
+	return log.filter((event) => event.seq > after);
+}
+
+// 模型流一个 chunk 可能是字符串，也可能是带 text 的内容块。这里收成要追加的正文。
+function chunkText(chunk: { content?: unknown }): string {
+	const content = chunk.content;
+	if (typeof content === 'string') return content;
+	if (!Array.isArray(content)) return '';
+	let out = '';
+	for (const part of content) {
+		if (typeof part === 'string') {
+			out += part;
+		} else if (part && typeof part === 'object' && 'text' in part) {
+			out += String((part as { text?: unknown }).text ?? '');
+		}
+	}
+	return out;
+}
+
+// 流式模型每个 chunk 返回的 usage 字段有好几种格式。
+// 最全的是 usage_metadata，其次是 response_metadata，最后是 usage。
+function chunkUsage(chunk: object): number | null {
+	const row = chunk as {
+		usage_metadata?: {
+			input_tokens?: number;
+			output_tokens?: number;
+			total_tokens?: number;
+		};
+		response_metadata?: {
+			usage?: {
+				prompt_tokens?: number;
+				completion_tokens?: number;
+				total_tokens?: number;
+			};
+		};
+	};
+	const um = row.usage_metadata;
+	if (
+		um &&
+		(typeof um.input_tokens === 'number' ||
+			typeof um.output_tokens === 'number' ||
+			typeof um.total_tokens === 'number')
+	) {
+		const prompt = Math.max(0, Math.floor(um.input_tokens ?? 0));
+		const completion = Math.max(0, Math.floor(um.output_tokens ?? 0));
+		return Math.max(0, Math.floor(um.total_tokens ?? prompt + completion));
+	}
+	const usage = row.response_metadata?.usage;
+	if (
+		usage &&
+		(typeof usage.prompt_tokens === 'number' ||
+			typeof usage.completion_tokens === 'number' ||
+			typeof usage.total_tokens === 'number')
+	) {
+		const prompt = Math.max(0, Math.floor(usage.prompt_tokens ?? 0));
+		const completion = Math.max(0, Math.floor(usage.completion_tokens ?? 0));
+		return Math.max(0, Math.floor(usage.total_tokens ?? prompt + completion));
+	}
+	return null;
+}
+
+// ponytail: 流式中按字符粗算（中文约 1 token，英文约 4 字 1 token）。这次调用结束若带回供应商用量，会整次换成那个数。
+function tokenUnits(text: string): number {
+	let units = 0;
+	for (const ch of text) units += (ch.codePointAt(0) ?? 0) > 127 ? 4 : 1;
+	return units;
+}
 
 @Injectable()
 export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	constructor(
 		@InjectRepository(EnglishDailyReading)
 		private readonly repo: Repository<EnglishDailyReading>,
+		@InjectRepository(EnglishDailyReadingGen)
+		private readonly gens: Repository<EnglishDailyReadingGen>,
 		@InjectRepository(EnglishDailyReadingSetting)
 		private readonly settings: Repository<EnglishDailyReadingSetting>,
 		@InjectRepository(EnglishDailyReadingUserSetting)
@@ -106,6 +216,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 
 	async onApplicationBootstrap(): Promise<void> {
 		try {
+			// 每天 23:00（上海）准备下一天。启动时再补今天和明天，避免进程中午才起来漏掉。
 			await this.queue.upsertJobScheduler(
 				'daily-reading-next',
 				{ pattern: '0 23 * * *', tz: 'Asia/Shanghai' },
@@ -119,17 +230,20 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			await this.enqueuePassage(today);
 			await this.enqueuePassage(addCalendarDays(today, 1));
 		} catch (e) {
+			// 队列连不上时定时篇先缺着，不挡住进程启动。手动生成不依赖这次注册。
 			this.logger.warn('[EnglishDailyReading] 调度未注册', e);
 		}
 	}
 
 	/** 工人入口。publishDate 已由调用方钉死。 */
 	async ensurePassage(publishDate: string): Promise<void> {
+		// 队列任务的日期必须是 YYYY-MM-DD，否则直接丢弃，避免写错 slot=day 那一行。
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) return;
 		const saved = await this.loadAutoSettings();
 		const theme = themeForDate(publishDate, saved.themes);
 		const profile = saved.profile;
 		const owned = await this.claim(publishDate, theme);
+		// 抢不到说明今天这行已就绪，或还在冷却。不能接着写，否则会覆盖已发布正文。
 		if (!owned) return;
 		try {
 			const recent = await this.recentNorms({ publishDate });
@@ -146,6 +260,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				? rejectPassage(draft, recent, material.snippet)
 				: 'json';
 			if (reason) {
+				// 只重写一次。第二次仍不合格就废稿，不再循环打模型。
 				parsed = await this.askModel(
 					publishDate,
 					theme,
@@ -159,6 +274,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					: 'json';
 			}
 			if (!draft || reason) {
+				// 定时篇失败会清空标题正文。手动路径不能调用这个方法。
 				await this.markFailed(publishDate);
 				const sample = draft ? JSON.stringify(draft).slice(0, 300) : '';
 				this.logger.warn(
@@ -167,11 +283,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				return;
 			}
 			const bodyEn = stripZw(draft.bodyEn);
-			const extras = await this.completeFlashGloss(
-				bodyEn,
-				pickExtras(parsed?.payload, bodyEn, profile),
-				parsed?.modelName ?? '',
-			);
+			const attached = await this.completeExtras(bodyEn, profile);
+			const extras = await this.completeWordGloss(bodyEn, attached);
 			await this.repo.update(
 				{ publishDate, slot: DAY_SLOT },
 				{
@@ -188,21 +301,25 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				},
 			);
 		} catch (e) {
+			// 模型或检索抛错时也把今天标失败，队列按冷却再入队，避免一直卡在 pending。
 			await this.markFailed(publishDate);
 			throw e;
 		}
 	}
 
+	/** 入队。 */
 	async enqueuePassage(publishDate: string): Promise<void> {
 		const row = await this.repo.findOne({
 			where: { publishDate, slot: DAY_SLOT },
 		});
+		// 已发布不再入队。pending 未过期、failed 仍在冷却时也不入队，避免两台工人同时写同一天。
 		if (row?.status === 'ready') return;
 		const age = row ? Date.now() - new Date(row.startedAt).getTime() : Infinity;
 		if (row?.status === 'pending' && age < PENDING_STALE_MS) return;
 		if (row?.status === 'failed' && age < FAIL_COOLDOWN_MS) return;
 		const existing = await this.queue.getJob(publishDate);
 		if (existing) {
+			// 还在排队或执行就不再加。已经结束的旧任务先删掉，否则同 jobId 加不进去。
 			const state = await existing.getState();
 			if (
 				state === 'waiting' ||
@@ -214,6 +331,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			}
 			await existing.remove().catch(() => undefined);
 		}
+		// jobId 用日期，同一天在队列里只有一个任务。
 		await this.queue.add(
 			'prepare-date',
 			{ publishDate },
@@ -239,6 +357,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			where: { publishDate: today, slot: DAY_SLOT },
 		});
 		let todayStatus: DailyReadingList['todayStatus'] = 'generating';
+		// ready 直接可用。failed 过了冷却、pending 过了 90 秒，才重新入队并显示生成中。
 		if (todayRow?.status === 'ready') todayStatus = 'ready';
 		else if (todayRow?.status === 'failed') {
 			const age = Date.now() - new Date(todayRow.startedAt).getTime();
@@ -255,11 +374,13 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			}
 			todayStatus = 'generating';
 		}
+		// 列表只返回 ready。生成中的 pending 半成品不能变成一条坏文章。
 		const visible = this.repo
 			.createQueryBuilder('row')
 			.where('row.status = :status', { status: 'ready' })
 			.andWhere('row.publishDate <= :today', { today });
 		if (origin === 'manual') {
+			// 手动列表只看本人、且 slot 不是 day。系统日推走另一条查询。
 			visible
 				.andWhere('row.slot != :day', { day: DAY_SLOT })
 				.andWhere('row.userId = :userId', { userId });
@@ -293,6 +414,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		const row = await this.repo.findOne({ where: { id } });
 		const today = shanghaiToday();
 		if (
+			// 未发布、未来日期、别人的手动篇都当不存在。定时篇 slot=day 不看 userId。
 			!row ||
 			row.status !== 'ready' ||
 			row.publishDate > today ||
@@ -303,101 +425,253 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return { ...this.toView(row), extras: row.extras ?? null };
 	}
 
-	/** 每人同时一篇手动生成。停止时 abort 本人的那次，模型调用会跟着停。 */
-	private manualRuns = new Map<
-		number,
-		{
-			ac: AbortController;
-			id: string;
-			runId: string | null;
-		}
-	>();
+	/** 每人同时一篇。断线只删订阅，停止才 abort。ponytail: 单进程 Map，多实例不共享。 */
+	private manualRuns = new Map<string, ManualRun>();
 	/** 停止先于生成到达时记下 runId。ponytail: 只留最近 30 个，超出清空。 */
 	private stoppedRuns = new Set<string>();
+	/** 半成品正文写入 pending.bodyEn。进程重启后模型不会接着跑，只能读到已落库的这段。 */
+	private textTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-	/** 按这次提交的档位再写一篇，不写入设置。发布日是今天，不碰定时篇。 */
-	async generateManual(
-		input: {
-			themes?: unknown;
-			profile?: unknown;
-			runId?: unknown;
-		},
+	/** 开始一篇手动稿。占用看内存里的 run，不看 90 秒窗口。 */
+	openManual(
 		userId: number,
-	): Promise<DailyReadingView> {
+		input: { themes?: unknown; profile?: unknown; runId?: unknown },
+		emit: ManualEmit,
+	): void {
 		const themes = normalizeThemeList(input?.themes);
-		if (!themes) throw new BadRequestException('主题不合法');
-		const profile = normalizeProfile(input?.profile);
 		const runId = this.parseRunId(input?.runId);
-		if (runId && this.stoppedRuns.has(runId)) {
+		if (!themes || !runId) {
+			emit({ type: 'reading.error', message: '主题不合法', runId });
+			return;
+		}
+		if (this.stoppedRuns.has(runId)) {
+			// 停止请求比这次 open 先到。不再插入行，也不再请求模型。
 			this.stoppedRuns.delete(runId);
-			throw new BadRequestException('已停止');
+			emit({ type: 'reading.stopped', runId });
+			return;
 		}
-		if (await this.hasFreshManual(userId)) {
-			throw new ConflictException('正在生成');
+		const existing = this.findManual(userId);
+		if (existing) {
+			// 这个用户已经有一篇在写。新点击只订阅它，避免再插一篇、再开一次模型。
+			this.subscribe(existing, emit, 0);
+			return;
 		}
-		const today = shanghaiToday();
-		const dayRow = await this.repo.findOne({
-			where: { publishDate: today, slot: DAY_SLOT },
+		const run: ManualRun = {
+			ac: new AbortController(),
+			id: runId,
+			userId,
+			phase: 'search',
+			text: '',
+			tokens: 0,
+			startedAt: Date.now(),
+			seq: 0,
+			log: [],
+			subscribers: new Set(),
+		};
+		this.manualRuns.set(this.runKey(userId), run);
+		this.subscribe(run, emit, 0);
+		const profile = normalizeProfile(input?.profile);
+		// 生产者不挂在这条 SSE 上。页面断开只会 detach，这里的模型调用继续。
+		setImmediate(() => {
+			void this.executeManual(userId, run, themes, profile);
 		});
-		const theme = pickManualTheme(themes, dayRow?.theme || null);
-		const id = randomUUID();
-		const ac = new AbortController();
-		this.manualRuns.set(userId, { ac, id, runId });
-		if (runId && this.stoppedRuns.has(runId)) ac.abort();
-		try {
-			if (this.shouldStop(runId, ac.signal)) {
-				throw new BadRequestException('已停止');
+	}
+
+	/** 当前页连接中途断开后续订。内存里没有这次生成就停住，不重新请求模型。 */
+	attachManual(
+		userId: number,
+		runIdRaw: unknown,
+		afterRaw: unknown,
+		emit: ManualEmit,
+	): void {
+		const runId = this.parseRunId(runIdRaw);
+		const after = this.parseAfter(afterRaw);
+		const run = this.findManual(userId);
+		if (run) {
+			// 只重放 after 之后的帧再接着听，不调用 executeManual。
+			this.subscribe(run, emit, after);
+			return;
+		}
+		void this.pauseManual(userId, runId, emit);
+	}
+
+	/** 套接字断开只取消这一条订阅，模型继续跑。 */
+	detachManual(userId: number, emit: ManualEmit): void {
+		const run = this.findManual(userId);
+		if (!run) return;
+		run.subscribers.delete(emit);
+		if (run.text) this.flushText(run);
+	}
+
+	private runKey(userId: number): string {
+		// JWT 的 sub 可能是数字或字符串，统一成同一个 Map 键。
+		return String(userId);
+	}
+
+	private findManual(userId: number): ManualRun | undefined {
+		return this.manualRuns.get(this.runKey(userId));
+	}
+
+	private parseAfter(raw: unknown): number {
+		// 没有合法游标时按 0 处理，订阅方只收当前全文，避免把旧 delta 再拼上去。
+		const value = typeof raw === 'number' ? raw : Number(raw);
+		if (!Number.isFinite(value) || value <= 0) return 0;
+		return Math.floor(value);
+	}
+
+	/** 只改这一条还没发布的手动行。ready 和定时篇不在条件里。 */
+	private pendingOnly(runId: string, userId: number) {
+		return {
+			id: runId,
+			userId,
+			status: 'pending' as const,
+			slot: runId,
+		};
+	}
+
+	private publish(run: ManualRun, data: Record<string, unknown>): void {
+		// 先改内存里的全文，再分配序号。订阅者拿到的帧和日志是同一条。
+		if (data.type === 'reading.snapshot') {
+			if (typeof data.phase === 'string') {
+				run.phase = data.phase as ManualPhase;
 			}
-			await this.repo.insert({
-				id,
-				publishDate: today,
-				slot: id,
-				userId,
-				status: 'pending',
-				startedAt: new Date(),
-				titleEn: '',
-				titleZh: '',
-				bodyEn: '',
-				bodyZh: '',
-				sourceKind: 'llm',
-				sourceUrl: null,
-				sourceTitle: null,
-				theme,
+			run.text = typeof data.text === 'string' ? data.text : '';
+		} else if (data.type === 'reading.delta' && typeof data.text === 'string') {
+			run.text += data.text;
+		}
+		const seq = ++run.seq;
+		// runId 和 seq 写进帧，SSE 的 id 用 seq，客户端用它做下次 after。
+		const frame = { ...data, runId: run.id, seq };
+		run.log.push(frame);
+		for (const emit of [...run.subscribers]) emit(frame);
+		if (
+			(data.type === 'reading.delta' || data.type === 'reading.snapshot') &&
+			run.text
+		) {
+			this.rememberText(run);
+		}
+	}
+
+	/** 把这条 SSE 接上已有日志。after 为 0 时只推当前全文，避免把检查点再拼一遍。 */
+	private subscribe(run: ManualRun, emit: ManualEmit, after: number): void {
+		if (after <= 0) {
+			// 这条快照不经过 publish，不占新序号，也不进 log，避免和后面的 delta 各拼一遍。
+			run.subscribers.add(emit);
+			emit({
+				type: 'reading.snapshot',
+				phase: run.phase,
+				text: run.text,
+				tokens: run.tokens,
+				runId: run.id,
+				seq: run.seq,
 			});
-			if (this.shouldStop(runId, ac.signal)) {
-				await this.markRowFailed(id);
+			return;
+		}
+		const replay = eventsAfter(run.log, after);
+		run.subscribers.add(emit);
+		if (!replay.length) {
+			// 客户端已经跟上最新序号。再推一条当前全文，后面的 delta 仍会进这个订阅者。
+			emit({
+				type: 'reading.snapshot',
+				phase: run.phase,
+				text: run.text,
+				tokens: run.tokens,
+				runId: run.id,
+				seq: run.seq,
+			});
+			return;
+		}
+		for (const event of replay) emit(event);
+	}
+
+	private beginModel(run: ManualRun, phase: 'draft' | 'gloss'): void {
+		// 新一轮模型开始时清空预览。只在生产者里调用，attach 不能走这里。
+		this.publish(run, {
+			type: 'reading.snapshot',
+			phase,
+			text: '',
+			reset: true,
+		});
+	}
+
+	/** flash 的下一轮接在已有输出下面，不把上一轮清掉。 */
+	private continueBelow(run: ManualRun): void {
+		if (!run.text) return;
+		const gap = run.text.endsWith('\n') ? '\n' : '\n\n';
+		this.publish(run, { type: 'reading.delta', text: gap });
+	}
+
+	/** 按这次提交的档位写一篇。发布日是今天，不碰定时篇，也不接另一条已有行重跑模型。 */
+	private async executeManual(
+		userId: number,
+		run: ManualRun,
+		themes: string[],
+		profile: ReadingProfile,
+	): Promise<void> {
+		let settled = 0;
+		const onUsage = (callTotal: number, done = false, paint = false) => {
+			if (!callTotal) return;
+			if (done) settled += callTotal;
+			run.tokens = done ? settled : settled + callTotal;
+			if (!done && !paint) return;
+			try {
+				this.publish(run, { type: 'reading.usage', tokens: run.tokens });
+			} catch {
+				// 订阅者抛错不影响计数。下一段正文仍会带上当前 token。
+			}
+		};
+		const onDelta = (piece: string) => {
+			try {
+				this.publish(run, {
+					type: 'reading.delta',
+					text: piece,
+					tokens: run.tokens,
+				});
+			} catch {
+				// 某个订阅者抛错不能中断模型。这段增量仍留在 run.text 里。
+				// 页面已经断开。模型这次调用继续写，下一个 attach 再订阅。
+			}
+		};
+		try {
+			// 插行、检索、重写、补释义之前都看一次。停止落在两轮模型之间时不再发下一次 HTTP。
+			if (this.shouldStop(run.id, run.ac.signal)) {
 				throw new BadRequestException('已停止');
 			}
+			const theme = await this.claimRow(userId, run, themes);
+			const { ac, id } = run;
+			const today = shanghaiToday();
+			if (this.shouldStop(id, ac.signal))
+				throw new BadRequestException('已停止');
 			const recent = await this.recentNorms({ userId });
 			const material = await this.loadMaterial(theme, profile.useWeb);
-			if (this.shouldStop(runId, ac.signal)) {
-				await this.markRowFailed(id);
+			if (this.shouldStop(id, ac.signal))
 				throw new BadRequestException('已停止');
-			}
+			this.beginModel(run, 'draft');
 			let parsed = await this.askModel(
 				today,
 				theme,
 				profile,
 				material.snippet,
 				null,
-				{ signal: ac.signal, userId },
+				{ signal: ac.signal, userId, onDelta, onUsage },
 			);
 			let draft = parsed?.draft ?? null;
 			let reason = draft
 				? rejectPassage(draft, recent, material.snippet)
 				: 'json';
 			if (reason) {
-				if (this.shouldStop(runId, ac.signal)) {
-					await this.markRowFailed(id);
+				if (this.shouldStop(id, ac.signal))
 					throw new BadRequestException('已停止');
-				}
+				// flash 的第二次全文接在第一次下面。其它模型仍换成新稿。
+				if (isFlashGlossModel(parsed?.modelName ?? '')) this.continueBelow(run);
+				else this.beginModel(run, 'draft');
 				parsed = await this.askModel(
 					today,
 					theme,
 					profile,
 					material.snippet,
 					reason,
-					{ signal: ac.signal, userId },
+					{ signal: ac.signal, userId, onDelta, onUsage },
 				);
 				draft = parsed?.draft ?? null;
 				reason = draft
@@ -405,7 +679,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					: 'json';
 			}
 			if (!draft || reason) {
-				await this.markRowFailed(id);
+				// 重写后仍不合格。标失败并告诉页面原因，不把半成品改成 ready。
+				await this.markRowFailed(id, userId);
 				const fail = reason ?? 'json';
 				const sample = draft ? JSON.stringify(draft).slice(0, 300) : '';
 				this.logger.warn(
@@ -413,48 +688,85 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				);
 				throw new BadRequestException(rejectReasonText(fail));
 			}
-			if (this.shouldStop(runId, ac.signal)) {
-				await this.markRowFailed(id);
+			if (this.shouldStop(id, ac.signal))
 				throw new BadRequestException('已停止');
-			}
 			const bodyEn = stripZw(draft.bodyEn);
-			const extras = await this.completeFlashGloss(
-				bodyEn,
-				pickExtras(parsed?.payload, bodyEn, profile),
-				parsed?.modelName ?? '',
-				{ signal: ac.signal, userId },
-			);
-			await this.repo.update(
-				{ id },
-				{
-					status: 'ready',
-					titleEn: stripZw(draft.titleEn).slice(0, 80),
-					titleZh: stripZw(draft.titleZh).slice(0, 80),
-					bodyEn,
-					bodyZh: stripZw(draft.bodyZh),
-					sourceKind: material.snippet ? 'web' : 'llm',
-					sourceUrl: material.sourceUrl,
-					sourceTitle: material.sourceTitle,
-					theme,
-					extras: this.withSources(extras, material.sources),
-				},
-			);
-			const row = await this.repo.findOne({ where: { id } });
-			if (!row) throw new NotFoundException('文章不存在');
-			return this.toView(row);
-		} catch (e) {
-			if (this.isAbort(e, ac.signal)) {
-				await this.markRowFailed(id);
+			const attached = await this.completeExtras(bodyEn, profile, {
+				signal: ac.signal,
+				userId,
+				onDelta,
+				onUsage,
+				onSecond: () => this.continueBelow(run),
+			});
+			if (this.shouldStop(id, ac.signal))
 				throw new BadRequestException('已停止');
+			const extras = await this.completeWordGloss(bodyEn, attached, {
+				signal: ac.signal,
+				userId,
+				onDelta,
+				onUsage,
+				onSecond: () => this.continueBelow(run),
+			});
+			const saved = await this.repo.update(this.pendingOnly(id, userId), {
+				status: 'ready',
+				titleEn: stripZw(draft.titleEn).slice(0, 80),
+				titleZh: stripZw(draft.titleZh).slice(0, 80),
+				bodyEn,
+				bodyZh: stripZw(draft.bodyZh),
+				sourceKind: material.snippet ? 'web' : 'llm',
+				sourceUrl: material.sourceUrl,
+				sourceTitle: material.sourceTitle,
+				theme,
+				extras: this.withSources(extras, material.sources),
+			});
+			if (!saved.affected) {
+				// 行已不是 pending（被停止或已发布）。不能改写，也不发 complete。
+				this.logger.warn(
+					`[EnglishDailyReading] 跳过发布 id=${id}，行已不是 pending`,
+				);
+				return;
 			}
-			if (e instanceof BadRequestException || e instanceof NotFoundException)
-				throw e;
-			await this.markRowFailed(id);
-			throw e;
+			await this.rememberGen(run, 'done');
+			this.publish(run, { type: 'reading.complete', id });
+		} catch (e) {
+			if (this.findManual(userId) !== run) return;
+			// 停止接口已经 abort。这里补失败标记和 stopped，不再当成模型报错。
+			if (run.ac.signal.aborted || this.stoppedRuns.has(run.id)) {
+				await this.markRowFailed(run.id, userId);
+				await this.rememberGen(run, 'stopped');
+				this.publish(run, { type: 'reading.stopped' });
+				return;
+			}
+			if (this.isHangup(e)) {
+				// 上游自己断了。停住并留下已写正文，不自动再开一次模型。
+				console.warn('[EnglishDailyReading] 上游断开', e);
+				this.flushText(run);
+				await this.rememberGen(run, 'paused');
+				this.publish(run, {
+					type: 'reading.paused',
+					phase: run.phase,
+					text: run.text,
+				});
+				return;
+			}
+			if (
+				!(e instanceof BadRequestException || e instanceof NotFoundException)
+			) {
+				// 业务拒绝已经在抛出前标过失败。其余异常在这里标，避免 pending 一直占着。
+				await this.markRowFailed(run.id, userId);
+			}
+			await this.rememberGen(run, 'error');
+			this.publish(run, {
+				type: 'reading.error',
+				message: this.failText(e),
+			});
 		} finally {
-			if (runId) this.stoppedRuns.delete(runId);
-			if (this.manualRuns.get(userId)?.ac === ac)
-				this.manualRuns.delete(userId);
+			this.clearTextTimer(run.id);
+			this.stoppedRuns.delete(run.id);
+			// 生产者结束就移出 Map。之后的 attach 会走 paused，不会假装流还在。
+			if (this.findManual(userId) === run) {
+				this.manualRuns.delete(this.runKey(userId));
+			}
 		}
 	}
 
@@ -465,17 +777,72 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			if (this.stoppedRuns.size > 30) this.stoppedRuns.clear();
 			this.stoppedRuns.add(runId);
 		}
-		const run = this.manualRuns.get(userId);
-		if (run && (!runId || run.runId === runId)) {
+		const run = this.findManual(userId);
+		console.warn('[EnglishDailyReading] 停止生成', {
+			userId: String(userId),
+			runId,
+			hit: Boolean(run),
+			keys: [...this.manualRuns.keys()],
+		});
+		if (run) {
+			this.stoppedRuns.add(run.id);
+			// 这个 abort 会取消已经交给 llm.stream 的那次 HTTP。对不上 run 时不会执行。
 			run.ac.abort();
-			await this.repo.update(
-				{ id: run.id, status: 'pending', userId },
-				{ status: 'failed', startedAt: new Date() },
-			);
+			this.clearTextTimer(run.id);
+			await this.markRowFailed(run.id, run.userId);
+			await this.rememberGen(run, 'stopped');
+			this.publish(run, { type: 'reading.stopped' });
+			this.manualRuns.delete(this.runKey(run.userId));
 			return true;
 		}
-		await this.failFreshPending(userId);
+		if (runId) await this.markRowFailed(runId, userId);
+		// 内存里没有这次生成。模型请求取消不了，只尝试把还 pending 的那行标失败。
 		return true;
+	}
+
+	/** 这个用户已结束的手动生成，新的在前。 */
+	async listGens(userId: number) {
+		const rows = await this.gens.find({
+			where: { userId, status: Not('error') },
+			order: { startedAt: 'DESC' },
+		});
+		return rows.map((row) => ({
+			id: row.id,
+			text: row.text,
+			tokens: row.tokens,
+			elapsed: row.elapsedMs,
+			startedAt: row.startedAt.getTime(),
+			status: row.status,
+		}));
+	}
+
+	/** 只删这个用户自己的一条。别人的 id 删不到。 */
+	async removeGen(userId: number, id: string): Promise<void> {
+		if (!this.parseRunId(id)) return;
+		await this.gens.delete({ id, userId });
+	}
+
+	/** 终态写一条。失败不记，没有可回看的正文。同一 run 再写会覆盖。正文和 Token 都空则不记。 */
+	private async rememberGen(
+		run: ManualRun,
+		status: DailyReadingGenStatus,
+	): Promise<void> {
+		if (status === 'error') return;
+		const text = run.text ?? '';
+		if (!text.trim() && !run.tokens) return;
+		try {
+			await this.gens.save({
+				id: run.id,
+				userId: run.userId,
+				text,
+				tokens: run.tokens,
+				elapsedMs: Math.max(0, Date.now() - run.startedAt),
+				startedAt: new Date(run.startedAt),
+				status,
+			});
+		} catch (e) {
+			this.logger.warn('[EnglishDailyReading] 生成历史未写入', e);
+		}
 	}
 
 	private parseRunId(raw: unknown): string | null {
@@ -488,6 +855,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	}
 
 	private shouldStop(runId: string | null, signal: AbortSignal): boolean {
+		// 停止可能发生在两轮模型之间，那时还没有正在读的流，靠这个集合拦住下一轮。
 		return signal.aborted || (runId != null && this.stoppedRuns.has(runId));
 	}
 
@@ -497,6 +865,17 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		const name = (e as { name?: string }).name;
 		if (name === 'AbortError') return true;
 		return /abort/i.test(String((e as { message?: unknown }).message ?? ''));
+	}
+
+	/** 上游连接自己断了。用户停止已在调用方按 signal 分开，这里命中后发 paused，不自动再请求模型。 */
+	private isHangup(e: unknown): boolean {
+		if (!e || typeof e !== 'object') return false;
+		const name = (e as { name?: string }).name ?? '';
+		if (name === 'AbortError') return true;
+		const message = String((e as { message?: unknown }).message ?? '');
+		return /abort|terminated|ECONNRESET|EPIPE|socket hang up|other side closed|Premature close|UND_ERR/i.test(
+			message,
+		);
 	}
 
 	async readingSettings(userId: number): Promise<{
@@ -513,6 +892,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			profile: saved.profile,
 			profileDefaults: { ...DEFAULT_PROFILE },
 		};
+		// 全站定时档位只给超管看和改，普通用户的返回里没有 auto。
 		if (!(await this.userService.userHasSuperAdminRole(userId))) return body;
 		const auto = await this.loadAutoSettings();
 		return { ...body, auto };
@@ -605,6 +985,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	}
 
 	private async claim(publishDate: string, theme: string): Promise<boolean> {
+		// 先插入 slot=day。唯一索引冲突说明今天已有行，再按冷却决定能不能接手。
 		const now = new Date();
 		try {
 			await this.repo.insert({
@@ -646,10 +1027,12 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				{ stale: staleBefore, cool: coolBefore },
 			)
 			.execute();
+		// 条件更新没改到行，说明别的工人刚接手或文章已发布。这次放弃。
 		return (res.affected ?? 0) === 1;
 	}
 
 	private async markFailed(publishDate: string): Promise<void> {
+		// 只清定时篇。手动稿走 markRowFailed，不能把标题正文写成空串。
 		await this.repo.update(
 			{ publishDate, slot: DAY_SLOT },
 			{
@@ -663,18 +1046,22 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		);
 	}
 
-	private async markRowFailed(id: string): Promise<void> {
-		await this.repo.update(
-			{ id },
-			{
-				status: 'failed',
-				startedAt: new Date(),
-				titleEn: '',
-				titleZh: '',
-				bodyEn: '',
-				bodyZh: '',
-			},
-		);
+	/**
+	 * 把这一次手动生成标成失败。
+	 * 更新条件是 pendingOnly：主键、主人、status=pending、slot=这次 runId 四条同时成立才改。
+	 * 已经发布的文章和定时篇不在条件里，标题和正文也不清空。
+	 * affected 为 0 说明这行已经不是 pending，只打日志，不再换一个 id 去改。
+	 */
+	private async markRowFailed(id: string, userId: number): Promise<void> {
+		const saved = await this.repo.update(this.pendingOnly(id, userId), {
+			status: 'failed',
+			startedAt: new Date(),
+		});
+		if (!saved.affected) {
+			this.logger.warn(
+				`[EnglishDailyReading] 跳过失败标记 id=${id}，行已不是 pending`,
+			);
+		}
 	}
 
 	/** 定时对照只用全站定时篇。手动再带上本人已发布的手动篇，不读别人的正文。 */
@@ -704,34 +1091,105 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return rows.map((r) => normalizeBody(r.bodyEn));
 	}
 
-	/** 这个用户的手动稿还在写。离开页面或刷新后，用这个恢复「正在生成」。 */
-	async manualPending(userId: number): Promise<boolean> {
-		return this.hasFreshManual(userId);
+	/** 只插入这次 runId 的 pending 行。不改已发布行，也不把别的 pending 拿来重跑模型。 */
+	private async claimRow(
+		userId: number,
+		run: ManualRun,
+		themes: string[],
+	): Promise<string> {
+		const mine = await this.repo.findOne({ where: { id: run.id, userId } });
+		if (mine?.status === 'pending') {
+			// 同一 runId 还在写。沿用原来的主题，不新插一行。
+			return mine.theme || pickManualTheme(themes, null);
+		}
+		if (mine) throw new BadRequestException('生成已结束');
+		const today = shanghaiToday();
+		const dayRow = await this.repo.findOne({
+			where: { publishDate: today, slot: DAY_SLOT },
+		});
+		const theme = pickManualTheme(themes, dayRow?.theme || null);
+		// slot 用 run.id，不会撞上定时篇的 day，也不会改到别的已发布行。
+		await this.repo.insert({
+			id: run.id,
+			publishDate: today,
+			slot: run.id,
+			userId,
+			status: 'pending',
+			startedAt: new Date(),
+			titleEn: '',
+			titleZh: '',
+			bodyEn: '',
+			bodyZh: '',
+			sourceKind: 'llm',
+			sourceUrl: null,
+			sourceTitle: null,
+			theme,
+		});
+		return theme;
 	}
 
-	/** 这个用户有未过期的手动稿还在写时，拒绝再开一篇。 */
-	private async hasFreshManual(userId: number): Promise<boolean> {
-		return (await this.findFreshManual(userId)) != null;
+	/** 进程里没有生产者。把已落库的半成品推回去，不请求模型。 */
+	private async pauseManual(
+		userId: number,
+		hinted: string | null,
+		emit: ManualEmit,
+	): Promise<void> {
+		if (hinted && this.stoppedRuns.has(hinted)) {
+			emit({ type: 'reading.stopped', runId: hinted });
+			return;
+		}
+		const current = this.findManual(userId);
+		if (current) {
+			this.subscribe(current, emit, 0);
+			return;
+		}
+		const row = hinted
+			? await this.repo.findOne({
+					where: { id: hinted, userId, status: 'pending' },
+				})
+			: null;
+		if (this.findManual(userId)) {
+			// 查库期间生产者才出现。改去订阅它，不能把即将开始的流标成 paused。
+			this.attachManual(userId, hinted, 0, emit);
+			return;
+		}
+		emit({
+			// 终态。客户端停转并留下这段正文，不会自动再点生成。
+			type: 'reading.paused',
+			phase: 'draft',
+			text: row?.bodyEn || '',
+			runId: hinted,
+		});
 	}
 
-	private async findFreshManual(userId: number) {
-		const staleBefore = new Date(Date.now() - PENDING_STALE_MS);
-		return this.repo
-			.createQueryBuilder('row')
-			.where('row.slot != :day', { day: DAY_SLOT })
-			.andWhere('row.userId = :userId', { userId })
-			.andWhere('row.status = :status', { status: 'pending' })
-			.andWhere('row.startedAt >= :stale', { stale: staleBefore })
-			.getOne();
-	}
-
-	private async failFreshPending(userId: number): Promise<void> {
-		const row = await this.findFreshManual(userId);
-		if (!row) return;
-		await this.repo.update(
-			{ id: row.id, status: 'pending', userId },
-			{ status: 'failed', startedAt: new Date() },
+	private rememberText(run: ManualRun): void {
+		// 400ms 内多次 delta 只落一次库。条件仍是 pending，发布后的正文不会被半成品盖掉。
+		const prev = this.textTimers.get(run.id);
+		if (prev) clearTimeout(prev);
+		this.textTimers.set(
+			run.id,
+			setTimeout(() => {
+				this.textTimers.delete(run.id);
+				void this.repo.update(this.pendingOnly(run.id, run.userId), {
+					bodyEn: run.text,
+				});
+			}, 400),
 		);
+	}
+
+	private flushText(run: ManualRun): void {
+		// 断开或上游中断时立刻把当前全文写入 pending 行，不等那 400ms。
+		this.clearTextTimer(run.id);
+		if (!run.text) return;
+		void this.repo.update(this.pendingOnly(run.id, run.userId), {
+			bodyEn: run.text,
+		});
+	}
+
+	private clearTextTimer(id: string): void {
+		const prev = this.textTimers.get(id);
+		if (prev) clearTimeout(prev);
+		this.textTimers.delete(id);
 	}
 
 	private async loadMaterial(
@@ -750,6 +1208,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			sources: [] as { title: string; url: string }[],
 		};
 		if (!useWeb) return empty;
+		// 检索失败或没配密钥时仍用主题写，不让整篇生成停在这里。
 		const provider = this.webSearchService.resolveProvider();
 		if (!this.webSearchService.isProviderConfigured(provider)) return empty;
 		try {
@@ -801,14 +1260,20 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		profile: ReadingProfile,
 		snippet: string | null,
 		previousReject: string | null,
-		opts?: { signal?: AbortSignal; userId?: number },
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+		},
 	): Promise<{
-		draft: PassageDraft;
-		payload: Record<string, unknown>;
+		draft: PassageDraft | null;
+		payload: Record<string, unknown> | null;
 		modelName: string;
-	} | null> {
+	}> {
 		const signal = opts?.signal;
 		if (signal?.aborted) {
+			// 停止发生在创建客户端之前。不再发这次 HTTP。
 			const err = new Error('aborted');
 			err.name = 'AbortError';
 			throw err;
@@ -818,13 +1283,12 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			{
 				preset: 'englishLearning',
 				userId: opts?.userId,
-				streaming: false,
+				streaming: true,
 				temperature: 0.7,
 				defaultTemperature: 0.7,
 				maxTokens: 8192,
 				maxTokensPolicy: 'default',
 				modelKwargs: { response_format: { type: 'json_object' } },
-				abortSignal: signal,
 			},
 			this.llmConfigService,
 		);
@@ -834,23 +1298,12 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				: profile.length === 'long'
 					? 'bodyEn is about 190 English words (160-220), 3-4 paragraphs separated by a blank line. Each paragraph has several sentences. Do not put a blank line after every sentence.'
 					: 'bodyEn is 120-180 English words, 2-4 paragraphs separated by a blank line. Each paragraph has several sentences. Do not put a blank line after every sentence.';
-		const extraKeys = [
-			profile.focus === 'vocab' || profile.focus === 'both'
-				? `glossary: up to ${glossaryLimit(profile.length)} objects {word, zh}; each word must appear in bodyEn; pick advanced, precise, high-value words a learner would look up, not basic everyday words`
-				: '',
-			profile.focus === 'grammar' || profile.focus === 'both'
-				? 'grammarNotes: up to 3 different Chinese sentences, each within 120 characters, each about one grammar pattern in the passage'
-				: '',
-			profile.questions > 0
-				? `questions: exactly ${profile.questions} objects {q, options, answer}; options has 3 strings; answer is 0, 1, or 2`
-				: '',
-		].filter(Boolean);
 		const system = [
 			`Write an original CEFR ${profile.level} English reading passage for learners.`,
-			`Return one JSON object with keys titleEn, titleZh, bodyEn, bodyZh, wordGloss${extraKeys.length ? `, ${extraKeys.join(', ')}` : ''}.`,
+			'Return one JSON object with keys titleEn, titleZh, bodyEn, bodyZh.',
+			'Do not include glossary, grammarNotes, questions, or wordGloss.',
 			lengthLine,
 			'bodyZh is the Chinese translation of the whole passage.',
-			'wordGloss: one object per bodyEn sentence, in order, {en, words}. words lists every word in en in order as {w, zh}. Skip punctuation. zh is a short Chinese gloss of w as used in that sentence, within 8 Chinese characters, including small words such as a, the, of.',
 			profile.focus === 'vocab' || profile.focus === 'both'
 				? 'Write bodyEn with advanced, precise vocabulary so the glossary can list those words.'
 				: '',
@@ -870,68 +1323,211 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		]
 			.filter(Boolean)
 			.join('\n\n');
-		const res = await llm.invoke(
+		const text = await this.readStream(
+			llm,
 			[new SystemMessage(system), new HumanMessage(user)],
-			signal ? { signal } : undefined,
+			signal,
+			opts?.onDelta,
+			opts?.onUsage,
 		);
-		const text =
-			typeof res.content === 'string'
-				? res.content
-				: Array.isArray(res.content)
-					? res.content
-							.map((p) =>
-								p && typeof p === 'object' && 'text' in p
-									? String((p as { text?: string }).text ?? '')
-									: '',
-							)
-							.join('')
-					: '';
 		const payload = parseModelObject(text);
 		const draft = parsePassageJson(text);
-		if (!payload || !draft) return null;
 		const named = llm as { model?: string; modelName?: string };
-		return {
-			draft,
-			payload,
-			modelName: named.modelName ?? named.model ?? '',
-		};
+		const modelName = named.modelName ?? named.model ?? '';
+		// 流式过程只累积原文。整篇 JSON 不完整时当废稿，由调用方决定是否重试。模型名仍要带回去，第二次才能接在下面。
+		if (!payload || !draft) return { draft: null, payload: null, modelName };
+		return { draft, payload, modelName };
 	}
 
-	/** flash 且有词没释义时再请求一次。失败或停止都不改已合格的正文。 */
-	private async completeFlashGloss(
+	/** 短文已合格。附件截断或失败都不废正文。停止仍向上抛。 */
+	private async completeExtras(
 		bodyEn: string,
-		extras: ReadingExtras,
-		modelName: string,
-		opts?: { signal?: AbortSignal; userId?: number },
+		profile: ReadingProfile,
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+			onSecond?: () => void;
+		},
 	): Promise<ReadingExtras> {
-		if (!isFlashGlossModel(modelName)) return extras;
-		const missing = missingGlossCount(bodyEn, extras.wordGloss);
-		if (missing === 0) return extras;
-		if (opts?.signal?.aborted) {
+		const base: ReadingExtras = {
+			level: profile.level,
+			length: profile.length,
+			focus: profile.focus,
+		};
+		if (!extrasRequested(profile)) return base;
+		let extras = base;
+		const callOpts = {
+			signal: opts?.signal,
+			userId: opts?.userId,
+			onDelta: opts?.onDelta,
+			onUsage: opts?.onUsage,
+		};
+		const aborted = () => {
+			if (!opts?.signal?.aborted) return;
 			const err = new Error('aborted');
 			err.name = 'AbortError';
 			throw err;
-		}
-		this.logger.warn(
-			`[EnglishDailyReading] 释义不全 model=${modelName} missing=${missing}`,
-		);
+		};
 		try {
-			const filled = await this.fillWordGloss(bodyEn, opts);
-			if (!filled?.length) return extras;
-			const wordGloss = mergeWordGloss(extras.wordGloss, filled);
-			return wordGloss ? { ...extras, wordGloss } : extras;
+			aborted();
+			opts?.onSecond?.();
+			const first = await this.fillExtras(bodyEn, profile, callOpts);
+			extras =
+				first.ok && first.payload
+					? pickExtras(first.payload, bodyEn, profile)
+					: salvageExtras(first.raw, bodyEn, profile);
+			const missing = emptyExtraKeys(extras, profile);
+			if (!missing.length) return extras;
+			aborted();
+			opts?.onSecond?.();
+			const second = await this.fillExtras(bodyEn, profile, {
+				...callOpts,
+				keys: missing,
+			});
+			const more =
+				second.ok && second.payload
+					? pickExtras(second.payload, bodyEn, profile)
+					: salvageExtras(second.raw, bodyEn, profile);
+			return mergeExtras(extras, more);
 		} catch (e) {
 			if (opts?.signal?.aborted || this.isAbort(e, opts?.signal)) throw e;
-			this.logger.warn('[EnglishDailyReading] 释义补全失败', e);
+			this.logger.warn('[EnglishDailyReading] 附件补全失败', e);
 			return extras;
 		}
 	}
 
-	/** 只补 wordGloss。输入是定稿正文，不带检索材料，也不要求新短文。 */
+	/** 只写这次列出的附件。正文已定稿，不让模型再输出正文。 */
+	private async fillExtras(
+		bodyEn: string,
+		profile: ReadingProfile,
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+			keys?: ReadingExtraKey[];
+		},
+	): Promise<{
+		ok: boolean;
+		payload: Record<string, unknown> | null;
+		raw: string;
+	}> {
+		const signal = opts?.signal;
+		if (signal?.aborted) {
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		const keys = opts?.keys?.length ? opts.keys : requestedExtraKeys(profile);
+		const llm = await createLlm(
+			this.configService,
+			{
+				preset: 'englishLearning',
+				userId: opts?.userId,
+				streaming: true,
+				temperature: 0.7,
+				defaultTemperature: 0.7,
+				maxTokens: 8192,
+				maxTokensPolicy: 'default',
+				modelKwargs: { response_format: { type: 'json_object' } },
+			},
+			this.llmConfigService,
+		);
+		const lines = keys.map((key) => {
+			if (key === 'glossary') {
+				return `glossary: up to ${glossaryLimit(profile.length)} objects {word, zh}; each word must appear in the passage; pick advanced, precise, high-value words a learner would look up, not basic everyday words`;
+			}
+			if (key === 'grammarNotes') {
+				return 'grammarNotes: up to 3 different Chinese sentences, each within 120 characters, each about one grammar pattern in the passage';
+			}
+			return `questions: exactly ${profile.questions} objects {q, options, answer}; options has 3 strings; answer is 0, 1, or 2`;
+		});
+		const system = [
+			'The English passage is fixed. Do not repeat it in the output.',
+			`Return one JSON object with keys ${keys.join(', ')} only.`,
+			'Do not include titleEn, titleZh, bodyEn, bodyZh, or wordGloss.',
+			...lines,
+		].join('\n');
+		const text = await this.readStream(
+			llm,
+			[new SystemMessage(system), new HumanMessage(bodyEn)],
+			signal,
+			opts?.onDelta,
+			opts?.onUsage,
+		);
+		const payload = parseModelObject(text);
+		return { ok: Boolean(payload), payload, raw: text };
+	}
+
+	/** 短文已合格。释义截断或失败都不废正文。停止仍向上抛。 */
+	private async completeWordGloss(
+		bodyEn: string,
+		extras: ReadingExtras,
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+			onSecond?: () => void;
+		},
+	): Promise<ReadingExtras> {
+		let gloss: ReadingExtras['wordGloss'];
+		const glossOpts = {
+			signal: opts?.signal,
+			userId: opts?.userId,
+			onDelta: opts?.onDelta,
+			onUsage: opts?.onUsage,
+		};
+		const aborted = () => {
+			if (!opts?.signal?.aborted) return;
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			throw err;
+		};
+		try {
+			aborted();
+			// 释义接在短文预览下面。定时篇没有预览，这次调用是空的。
+			opts?.onSecond?.();
+			gloss = (await this.fillWordGloss(bodyEn, glossOpts)).gloss;
+			const missing = missingSentences(bodyEn, gloss);
+			if (missing.length) {
+				this.logger.warn(
+					`[EnglishDailyReading] 释义不全 missing=${missing.length}`,
+				);
+			}
+			for (let i = 0; i < missing.length; i += GLOSS_BATCH) {
+				aborted();
+				opts?.onSecond?.();
+				const part = await this.fillWordGloss(bodyEn, {
+					...glossOpts,
+					sentences: missing.slice(i, i + GLOSS_BATCH),
+				});
+				// 这一批没有可解析的句子就停。后面的批不再请求，已有释义保留。
+				if (!part.gloss?.length) break;
+				gloss = mergeWordGloss(gloss, part.gloss);
+			}
+			return gloss?.length ? { ...extras, wordGloss: gloss } : extras;
+		} catch (e) {
+			// 停止要往上抛，让整次生成停掉。补释义失败则保留已经合格的正文。
+			if (opts?.signal?.aborted || this.isAbort(e, opts?.signal)) throw e;
+			this.logger.warn('[EnglishDailyReading] 释义补全失败', e);
+			return gloss?.length ? { ...extras, wordGloss: gloss } : extras;
+		}
+	}
+
+	/** 只补 wordGloss。正文已定稿。sentences 有值时只给这一批句子。 */
 	private async fillWordGloss(
 		bodyEn: string,
-		opts?: { signal?: AbortSignal; userId?: number },
-	): Promise<ReadingExtras['wordGloss']> {
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+			sentences?: string[];
+		},
+	): Promise<{ gloss: ReadingExtras['wordGloss']; raw: string }> {
 		const signal = opts?.signal;
 		if (signal?.aborted) {
 			const err = new Error('aborted');
@@ -943,39 +1539,135 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			{
 				preset: 'englishLearning',
 				userId: opts?.userId,
-				streaming: false,
+				streaming: true,
 				temperature: 0.7,
 				defaultTemperature: 0.7,
 				maxTokens: 8192,
 				maxTokensPolicy: 'default',
 				modelKwargs: { response_format: { type: 'json_object' } },
-				abortSignal: signal,
 			},
 			this.llmConfigService,
 		);
+		const sentences = opts?.sentences ?? [];
 		const system = [
-			'The English passage is fixed. Do not rewrite it.',
+			'The English text is fixed. Do not rewrite it.',
 			'Return one JSON object with the key wordGloss only.',
 			'wordGloss: one object per sentence, in order, {en, words}. words lists every word in en in order as {w, zh}. Skip punctuation. zh is a short Chinese gloss of w as used in that sentence, within 8 Chinese characters, including small words such as a, the, of.',
-		].join('\n');
-		const res = await llm.invoke(
-			[new SystemMessage(system), new HumanMessage(bodyEn)],
+			sentences.length
+				? 'Copy each en exactly. Gloss only the sentences in the user message.'
+				: '',
+		]
+			.filter(Boolean)
+			.join('\n');
+		const text = await this.readStream(
+			llm,
+			[
+				new SystemMessage(system),
+				new HumanMessage(sentences.length ? sentences.join('\n') : bodyEn),
+			],
+			signal,
+			opts?.onDelta,
+			opts?.onUsage,
+		);
+		const payload = parseModelObject(text);
+		// 整段解析失败时，已闭合的句子仍留下，避免这些句子再生成一遍。
+		const gloss =
+			pickWordGloss(payload?.wordGloss, bodyEn) ??
+			salvageWordGloss(text, bodyEn);
+		return { gloss, raw: text };
+	}
+
+	private async readStream(
+		llm: Awaited<ReturnType<typeof createLlm>>,
+		messages: Array<SystemMessage | HumanMessage>,
+		signal: AbortSignal | undefined,
+		onDelta?: (piece: string) => void,
+		onUsage?: (total: number, done?: boolean, paint?: boolean) => void,
+	): Promise<string> {
+		if (signal?.aborted) {
+			// 进入读流前已停止。不再向供应商发这次请求。
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		let full = '';
+		let usage = 0;
+		let units = 0;
+		for (const message of messages) {
+			if (typeof message.content === 'string')
+				units += tokenUnits(message.content);
+		}
+		const live = () => Math.ceil(units / 4);
+		// 请求发出时先按提示词计一笔，正文每到一段再往上加。供应商用量要等这次流结束才有。
+		onUsage?.(live(), false, true);
+		// 这个 signal 只有停止按钮会 abort。刷新不碰它，所以可以交给这一次请求。
+		const iterable = await llm.stream(
+			messages,
 			signal ? { signal } : undefined,
 		);
-		const text =
-			typeof res.content === 'string'
-				? res.content
-				: Array.isArray(res.content)
-					? res.content
-							.map((p) =>
-								p && typeof p === 'object' && 'text' in p
-									? String((p as { text?: string }).text ?? '')
-									: '',
-							)
-							.join('')
-					: '';
-		const payload = parseModelObject(text);
-		return pickWordGloss(payload?.wordGloss, bodyEn);
+		let noted = false;
+		const noteStop = () => {
+			if (noted || !signal?.aborted) return;
+			noted = true;
+			this.logger.warn('[EnglishDailyReading] 模型请求已中断');
+		};
+		const cancel = () => {
+			noteStop();
+			void Promise.resolve(
+				(iterable as AsyncIterator<unknown>).return?.(undefined),
+			).catch(() => {});
+		};
+		signal?.addEventListener('abort', cancel);
+		// stream() 返回前就已经 abort 的话，监听器不会补发，这里立刻关掉迭代器。
+		if (signal?.aborted) cancel();
+		try {
+			for await (const chunk of iterable) {
+				// 停止后不再把后续 token 拼进预览。循环外再抛 AbortError，调用方走 stopped。
+				if (signal?.aborted) break;
+				const used = chunkUsage(chunk);
+				if (used) usage = used;
+				const piece = chunkText(chunk);
+				if (!piece) continue;
+				units += tokenUnits(piece);
+				onUsage?.(live(), false);
+				full += piece;
+				onDelta?.(piece);
+			}
+		} catch (e) {
+			if (signal?.aborted) {
+				const total = usage || live();
+				if (total) onUsage?.(total, true);
+				noteStop();
+				const err = new Error('aborted');
+				err.name = 'AbortError';
+				throw err;
+			}
+			throw e;
+		} finally {
+			signal?.removeEventListener('abort', cancel);
+		}
+		const total = usage || live();
+		if (total) onUsage?.(total, true);
+		if (signal?.aborted) {
+			noteStop();
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		return full;
+	}
+
+	private failText(e: unknown): string {
+		// 业务异常把原因给页面。模型或网络错误不把内部堆栈发到 SSE。
+		if (e instanceof BadRequestException || e instanceof NotFoundException) {
+			const res = e.getResponse();
+			if (typeof res === 'string' && res.trim()) return res;
+			if (res && typeof res === 'object' && 'message' in res) {
+				const message = (res as { message: unknown }).message;
+				if (typeof message === 'string' && message.trim()) return message;
+			}
+		}
+		return '生成失败';
 	}
 
 	private toView(row: EnglishDailyReading): DailyReadingView {
@@ -989,6 +1681,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			sourceKind: row.sourceKind,
 			sourceUrl: row.sourceUrl,
 			sourceTitle: row.sourceTitle,
+			// 列表用 origin 分系统日推和手动篇，不把 slot 原值露给前端。
 			origin: row.slot === DAY_SLOT ? 'day' : 'manual',
 			level: row.extras?.level ?? null,
 			length: row.extras?.length ?? null,
@@ -996,6 +1689,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	}
 
 	private isDup(e: unknown): boolean {
+		// 定时篇 (publishDate, slot=day) 已被别的工人插入。调用方改为接手或放弃。
 		if (!(e instanceof QueryFailedError)) return false;
 		const driver = e.driverError as { errno?: number; code?: string };
 		return driver?.errno === 1062 || driver?.code === 'ER_DUP_ENTRY';

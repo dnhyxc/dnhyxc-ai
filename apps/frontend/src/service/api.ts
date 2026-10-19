@@ -233,6 +233,12 @@ export const ENGLISH_LEARNING_DAILY_READINGS =
 	'/english-learning/daily-readings';
 export const ENGLISH_LEARNING_DAILY_READING_MANUAL =
 	'/english-learning/daily-readings/manual';
+export const ENGLISH_LEARNING_DAILY_READING_MANUAL_STREAM =
+	'/english-learning/daily-readings/manual/stream';
+export const ENGLISH_LEARNING_DAILY_READING_MANUAL_ATTACH =
+	'/english-learning/daily-readings/manual/stream/attach';
+export const ENGLISH_LEARNING_DAILY_READING_MANUAL_HISTORY =
+	'/english-learning/daily-readings/manual/history';
 export const ENGLISH_LEARNING_DAILY_READING_SETTINGS =
 	'/english-learning/daily-reading-settings';
 export const ENGLISH_LEARNING_PRACTICE_REPORTS =

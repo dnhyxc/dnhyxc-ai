@@ -1,30 +1,54 @@
 /**
  * 每日阅读设置：主题和生成档位。保存不重写已发布的短文。
  */
+import { StreamingMarkdownBody } from '@design/ChatAssistantMessage/StreamingMarkdownBody';
+import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import { Button, Input, RadioGroup, RadioGroupItem, Toast } from '@ui/index';
+import {
+	bindMarkdownCodeFenceActions,
+	MarkdownParser,
+} from '@dnhyxc-ai/markdown-kit';
+import '@dnhyxc-ai/markdown-kit/styles.css';
+import {
+	Button,
+	Input,
+	Popover,
+	PopoverAnchor,
+	PopoverContent,
+	PopoverTrigger,
+	RadioGroup,
+	RadioGroupItem,
+	ScrollArea,
+	Toast,
+} from '@ui/index';
 import { Spinner } from '@ui/spinner';
-import { BookOpen, X } from 'lucide-react';
+import { BookOpen, History, ScrollText, Trash2, X } from 'lucide-react';
+import { observer } from 'mobx-react';
 import {
 	type ReactNode,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useI18n, useIsSuperAdmin } from '@/hooks';
+import { useTheme } from '@/hooks/theme';
+import { useStickToBottomScroll } from '@/hooks/useStickToBottomScroll';
 import { cn } from '@/lib/utils';
 import {
+	type DailyReadingGen,
 	type EnglishDailyReadingProfile,
-	generateEnglishDailyReading,
-	getEnglishDailyReadingManualPending,
 	getEnglishDailyReadingSettings,
+	listEnglishDailyReadingGens,
+	removeEnglishDailyReadingGen,
 	saveEnglishDailyReadingAutoSettings,
 	saveEnglishDailyReadingSettings,
-	stopEnglishDailyReading,
 } from '@/service';
-import { getRequestErrorMessage } from '@/utils/fetch';
+import englishDailyReadingStore from '@/store/englishDailyReading';
+import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import { PracticePageShell } from '../practice/components/shell';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../practice/constants';
 
@@ -37,6 +61,184 @@ const OPT_BTN = cn(
 	'flex h-10 w-full cursor-pointer items-center justify-center rounded-md text-base font-semibold disabled:cursor-not-allowed',
 	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 );
+
+/** 短文 JSON 后面还会接释义。只取第一段已闭合的对象，避免整段解析失败后退回时间。 */
+function firstJsonObject(text: string): string | null {
+	const start = text.indexOf('{');
+	if (start < 0) return null;
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = start; i < text.length; i += 1) {
+		const ch = text[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === '\\') escaped = true;
+			else if (ch === '"') inString = false;
+			continue;
+		}
+		if (ch === '"') {
+			inString = true;
+			continue;
+		}
+		if (ch === '{') depth += 1;
+		else if (ch === '}') {
+			depth -= 1;
+			if (depth === 0) return text.slice(start, i + 1);
+		}
+	}
+	return null;
+}
+
+function recordTitle(text: string, startedAt: number): string {
+	const slice = firstJsonObject(text);
+	if (slice) {
+		try {
+			const data = JSON.parse(slice) as {
+				titleZh?: unknown;
+				titleEn?: unknown;
+				answer?: { titleZh?: unknown; titleEn?: unknown };
+			};
+			const title =
+				data.titleZh ??
+				data.answer?.titleZh ??
+				data.titleEn ??
+				data.answer?.titleEn;
+			if (typeof title === 'string' && title.trim()) return title.trim();
+		} catch {
+			// 第一段还不是完整 JSON 时，列表用开始时间。
+		}
+	}
+	return new Date(startedAt).toLocaleString();
+}
+
+function formatElapsed(ms: number): string {
+	const total = Math.max(0, Math.floor(ms / 1000));
+	const h = Math.floor(total / 3600);
+	const m = Math.floor((total % 3600) / 60);
+	const s = total % 60;
+	const pad = (n: number) => String(n).padStart(2, '0');
+	if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+	return `${pad(m)}:${pad(s)}`;
+}
+
+function StreamMeta({
+	startedAt,
+	elapsed,
+	tokens,
+}: {
+	startedAt: number | null;
+	elapsed: number;
+	tokens: number;
+}) {
+	const { t } = useI18n();
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		if (!startedAt) return;
+		const id = window.setInterval(() => setNow(Date.now()), 1000);
+		return () => window.clearInterval(id);
+	}, [startedAt]);
+	const ms = startedAt ? Math.max(0, now - startedAt) : elapsed;
+	return (
+		<div className="flex justify-between px-3 pt-2 pb-3 border-b border-theme/10 text-textcolor">
+			<div className="text-base">
+				{t('englishLearning.dailyReading.titleGenerationInfo')}
+			</div>
+			<div className="flex gap-4 text-textcolor/65">
+				<div className="flex items-center">
+					<div className="text-sm">
+						{t('englishLearning.dailyReading.elapsed')}：
+					</div>
+					<div className="mt-0.5 text-sm tabular-nums">{formatElapsed(ms)}</div>
+				</div>
+				<div className="flex items-center">
+					<div className="text-sm">
+						{t('englishLearning.dailyReading.tokens')}：
+					</div>
+					<div className="mt-0.5 text-sm tabular-nums">
+						{tokens.toLocaleString()}
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function StreamPreview({
+	text,
+	generating,
+}: {
+	text: string;
+	generating: boolean;
+}) {
+	const { t } = useI18n();
+	const { theme } = useTheme();
+	const rootRef = useRef<HTMLDivElement>(null);
+	const { viewportRef, scrollViewportHandlers } = useStickToBottomScroll({
+		isStreaming: generating,
+		contentRevision: text,
+		idleFlushKey: generating ? null : 'paused',
+	});
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				enableChatCodeFenceToolbar: true,
+				chatCodeFenceToolbarTexts: {
+					copy: t('common.copy'),
+					download: t('common.download'),
+				},
+				enableMermaid: false,
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+			}),
+		[theme, t],
+	);
+	useEffect(() => {
+		const el = rootRef.current;
+		if (!el) return;
+		return bindMarkdownCodeFenceActions(el, {
+			onDownload(payload) {
+				void downloadChatCodeBlock(payload.block, payload.lang);
+			},
+		});
+	}, []);
+	const markdown = text
+		? `\`\`\`json\n${text}${generating ? '' : '\n```'}`
+		: '';
+	return (
+		<ScrollArea
+			ref={viewportRef}
+			className="h-full min-w-0 flex-1"
+			viewportClassName="[overflow-anchor:none]"
+			scrollbarClassName="right-0 w-1.5 border-l-0 p-0"
+			{...scrollViewportHandlers}
+		>
+			<div
+				ref={rootRef}
+				data-stick-scroll-content
+				className="p-3 [&_.chat-md-code-block]:my-0"
+			>
+				{markdown ? (
+					<StreamingMarkdownBody
+						markdown={markdown}
+						parser={parser}
+						preferDark={theme === 'black'}
+						isStreaming={generating}
+						t={t}
+						className="min-w-0 w-full mb-2.5 max-w-full [&_.streaming-md-body]:min-w-0 [&_.markdown-body]:text-textcolor/90! [&_.markdown-body]:rounded-md"
+					/>
+				) : null}
+				{generating ? (
+					<div className="flex items-center">
+						<Spinner className="mr-2 h-4 w-4 text-textcolor/50" />
+						<span className="text-sm text-textcolor/50">
+							{t('chat.assistant.generating')}
+						</span>
+					</div>
+				) : null}
+			</div>
+		</ScrollArea>
+	);
+}
 
 function nextFocus(
 	current: EnglishDailyReadingProfile['focus'],
@@ -415,7 +617,7 @@ function SettingActions({
 	);
 }
 
-export default function DailyReadingSettingsPage() {
+export default observer(function DailyReadingSettingsPage() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const isSuperAdmin = useIsSuperAdmin();
@@ -439,15 +641,65 @@ export default function DailyReadingSettingsPage() {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [autoSaving, setAutoSaving] = useState(false);
-	const [flight, setFlight] = useState(false);
-	const [pending, setPending] = useState(false);
-	const [resumeWatch, setResumeWatch] = useState(0);
-	const generating = flight || pending;
-	const abortRef = useRef<AbortController | null>(null);
-	const runIdRef = useRef<string | null>(null);
-	const stoppedRef = useRef(false);
 	const [error, setError] = useState<string | null>(null);
-	const [generateError, setGenerateError] = useState<string | null>(null);
+	const [streamOpen, setStreamOpen] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [deleteId, setDeleteId] = useState<string | null>(null);
+	const [records, setRecords] = useState<DailyReadingGen[]>([]);
+	const generating = englishDailyReadingStore.generating;
+	const paused = englishDailyReadingStore.paused;
+	const preview = englishDailyReadingStore.text;
+	const generateError = englishDailyReadingStore.error;
+	const historyRev = englishDailyReadingStore.historyRev;
+	const runId = englishDailyReadingStore.runId;
+	const showStream = generating || (paused && Boolean(preview));
+	const selected = records.find((row) => row.id === selectedId) ?? null;
+	const historyView = Boolean(
+		selected && (!generating || selected.id !== runId),
+	);
+	const showHistory = records.length > 0 || generating;
+	const liveRow =
+		generating && runId
+			? {
+					id: runId,
+					text: preview,
+					startedAt: englishDailyReadingStore.startedAt ?? Date.now(),
+					live: true as const,
+				}
+			: null;
+	const historyRows = [
+		...(liveRow ? [liveRow] : []),
+		...records
+			.filter((row) => row.id !== liveRow?.id)
+			.map((row) => ({
+				id: row.id,
+				text: row.text,
+				startedAt: row.startedAt,
+				live: false as const,
+			})),
+	];
+
+	useEffect(() => {
+		let cancelled = false;
+		void listEnglishDailyReadingGens()
+			.then((res) => {
+				if (!cancelled) setRecords(Array.isArray(res.data) ? res.data : []);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [historyRev]);
+
+	useEffect(() => {
+		englishDailyReadingStore.setOnReady(() => {
+			navigate('/english-learning/daily-reading?origin=manual');
+		});
+		return () => {
+			englishDailyReadingStore.setOnReady(null);
+		};
+	}, [navigate]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -557,241 +809,319 @@ export default function DailyReadingSettingsPage() {
 		sameThemes(autoThemes, defaults) &&
 		sameProfile(autoProfile, profileDefaults);
 
-	useEffect(() => {
-		let cancelled = false;
-		let timer = 0;
-		const tick = async () => {
-			try {
-				const res = await getEnglishDailyReadingManualPending({
-					silent: true,
-				});
-				if (cancelled) return;
-				const isPending = !stoppedRef.current && res.data?.pending === true;
-				setPending(isPending);
-				if (isPending && !timer) {
-					timer = window.setInterval(() => void tick(), 2000);
-				}
-				if (!isPending && timer) {
-					window.clearInterval(timer);
-					timer = 0;
-				}
-			} catch {
-				// 查询失败时保留上一次的生成状态
-			}
-		};
-		void tick();
-		return () => {
-			cancelled = true;
-			window.clearInterval(timer);
-		};
-	}, [resumeWatch]);
-
-	const generate = useCallback(async () => {
-		stoppedRef.current = false;
-		const ac = new AbortController();
-		const runId = crypto.randomUUID();
-		abortRef.current = ac;
-		runIdRef.current = runId;
-		setFlight(true);
-		setGenerateError(null);
-		try {
-			const res = await generateEnglishDailyReading(
-				{
-					themes,
-					profile,
-					runId,
-				},
-				{ silent: true, timeout: 180_000, signal: ac.signal, retries: 0 },
-			);
-			if (stoppedRef.current || ac.signal.aborted) return;
-			if (!res.success) {
-				setGenerateError(
-					res.message || t('englishLearning.dailyReading.generateFailed'),
-				);
-				return;
-			}
-			navigate('/english-learning/daily-reading?origin=manual');
-		} catch (e) {
-			if (stoppedRef.current || ac.signal.aborted) return;
-			const message = getRequestErrorMessage(e);
-			if (message === '已停止') return;
-			setGenerateError(message);
-		} finally {
-			if (stoppedRef.current) {
-				setPending(false);
-			} else {
-				try {
-					const res = await getEnglishDailyReadingManualPending({
-						silent: true,
-					});
-					const isPending = res.data?.pending === true;
-					setPending(isPending);
-					if (isPending) setResumeWatch((n) => n + 1);
-				} catch {
-					// 查不到时按未在生成处理，避免按钮一直转
-					setPending(false);
-				}
-			}
-			setFlight(false);
-		}
-	}, [navigate, profile, themes, t]);
-
-	const stopGenerate = useCallback(async () => {
-		stoppedRef.current = true;
-		setPending(false);
-		try {
-			await stopEnglishDailyReading({
-				silent: true,
-				runId: runIdRef.current ?? undefined,
-			});
-		} catch {
-			stoppedRef.current = false;
-		}
-		abortRef.current?.abort();
-		setFlight(false);
-	}, []);
-
 	return (
-		<PracticePageShell
-			title={
-				<span className="text-textcolor min-w-0 truncate text-base font-semibold">
-					{t('englishLearning.dailyReading.settingsHint')}
-				</span>
-			}
-			contentLayout={loading ? 'fill' : 'start'}
-			footer={
-				!loading && !error ? (
-					<div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
-						{generateError ? (
-							<div className="flex items-center justify-between gap-2">
-								<p
-									className="min-w-0 flex-1 truncate text-sm text-rose-500"
-									title={generateError}
-								>
-									{generateError}
-								</p>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-sm"
-									className="size-7 -mr-2 shrink-0 bg-transparent p-0 text-textcolor/55 shadow-none hover:bg-transparent hover:text-rose-500"
-									aria-label={t('englishLearning.dailyReading.dismissError')}
-									onClick={() => setGenerateError(null)}
-								>
-									<X className="size-4" aria-hidden />
-								</Button>
-							</div>
-						) : null}
-						<Button
-							type="button"
-							disabled={saving && !generating}
-							className={cn(
-								'h-10 w-full text-base font-semibold',
-								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
-							)}
-							onClick={() => {
-								if (generating) {
-									void stopGenerate();
-									return;
-								}
-								void generate();
-							}}
+		<>
+			<Confirm
+				open={deleteId != null}
+				onOpenChange={(open) => {
+					if (!open) setDeleteId(null);
+				}}
+				title={t('englishLearning.dailyReading.deleteHistoryTitle')}
+				description={t('englishLearning.dailyReading.deleteHistoryDesc')}
+				confirmText={t('common.delete')}
+				cancelText={t('common.cancel')}
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={() => {
+					const id = deleteId;
+					if (!id) return;
+					void removeEnglishDailyReadingGen(id)
+						.then(() => {
+							setRecords((rows) => rows.filter((row) => row.id !== id));
+							if (selectedId === id) {
+								setSelectedId(null);
+								setStreamOpen(false);
+							}
+							setDeleteId(null);
+						})
+						.catch(() => {});
+				}}
+			/>
+			<PracticePageShell
+				title={
+					<span className="text-textcolor min-w-0 truncate text-base font-semibold">
+						{t('englishLearning.dailyReading.settingsHint')}
+					</span>
+				}
+				contentLayout={loading ? 'fill' : 'start'}
+				footer={
+					!loading && !error ? (
+						<Popover
+							open={streamOpen && (historyView || showStream)}
+							onOpenChange={setStreamOpen}
 						>
-							{generating ? <Spinner className="size-4 text-white" /> : null}
-							{generating
-								? t('englishLearning.dailyReading.stopGenerate')
-								: t('englishLearning.dailyReading.generate')}
-						</Button>
-					</div>
-				) : undefined
-			}
-			headerRight={
-				!loading && !error ? (
-					<button
-						type="button"
-						className={LINK_CLASS}
-						onClick={() => navigate('/english-learning/daily-reading')}
-					>
-						<BookOpen className="size-4 shrink-0 mt-0.5" aria-hidden />
-						<span>{t('englishLearning.dailyReading.openList')}</span>
-					</button>
-				) : undefined
-			}
-		>
-			{loading ? <Loading /> : null}
-			{!loading && error ? (
-				<p className="text-textcolor/55 py-16 text-center text-sm">{error}</p>
-			) : null}
-			{!loading && !error ? (
-				<div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
-					{isSuperAdmin ? (
-						<div className="flex min-w-0 items-center gap-3">
-							<h2 className={cn(LABEL, 'shrink-0')}>
-								{t('englishLearning.dailyReading.manualTitle')}
-							</h2>
-							<p className="text-textcolor/55 ml-auto min-w-0 text-right text-sm">
-								{t('englishLearning.dailyReading.manualHint')}
-							</p>
-						</div>
-					) : null}
-					<ProfileFields
-						idPrefix="manual"
-						themes={themes}
-						setThemes={setThemes}
-						draft={draft}
-						setDraft={setDraft}
-						profile={profile}
-						setProfile={setProfile}
-						disabled={saving}
-						actions={
-							dirty || !isDefault ? (
-								<SettingActions
-									dirty={dirty}
-									isDefault={isDefault}
-									disabled={saving}
-									onSave={() => void persist(themes, profile)}
-									onReset={() => void persist(defaults, profileDefaults)}
+							<PopoverAnchor asChild>
+								<div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
+									{generateError ? (
+										<div className="flex items-center justify-between gap-2">
+											<p
+												className="min-w-0 flex-1 truncate text-sm text-rose-500"
+												title={generateError}
+											>
+												{generateError}
+											</p>
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon-sm"
+												className="size-7 -mr-2 shrink-0 bg-transparent p-0 text-textcolor/55 shadow-none hover:bg-transparent hover:text-rose-500"
+												aria-label={t(
+													'englishLearning.dailyReading.dismissError',
+												)}
+												onClick={() => englishDailyReadingStore.clearError()}
+											>
+												<X className="size-4" aria-hidden />
+											</Button>
+										</div>
+									) : null}
+									<div className="flex items-center gap-2">
+										<Button
+											type="button"
+											disabled={saving && !generating}
+											className={cn(
+												'h-10 min-w-0 flex-1 text-base font-semibold',
+												PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+											)}
+											onClick={() => {
+												setSelectedId(null);
+												setStreamOpen(false);
+												if (generating) {
+													englishDailyReadingStore.stopRun();
+													return;
+												}
+												englishDailyReadingStore.startRun(themes, profile);
+											}}
+										>
+											{generating ? (
+												<Spinner className="size-4 text-white" />
+											) : null}
+											{generating
+												? t('englishLearning.dailyReading.stopGenerate')
+												: t('englishLearning.dailyReading.generate')}
+										</Button>
+										{showHistory ? (
+											<Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+												<PopoverTrigger asChild>
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														aria-expanded={historyOpen}
+														aria-label={t(
+															'englishLearning.dailyReading.history',
+														)}
+														className={cn(
+															'size-10 shrink-0 border',
+															historyOpen ? OPT_ON : OPT_OFF,
+														)}
+													>
+														<History className="size-4" aria-hidden />
+													</Button>
+												</PopoverTrigger>
+												<PopoverContent
+													side="top"
+													align="end"
+													sideOffset={8}
+													className="w-72 overflow-hidden p-0"
+												>
+													<ScrollArea
+														className="w-full"
+														style={{
+															height: Math.min(288, historyRows.length * 40),
+														}}
+													>
+														{historyRows.map((row) => (
+															<div
+																key={row.id}
+																className="flex h-10 items-center pr-1.5 hover:bg-teal-500/10"
+															>
+																<Button
+																	type="button"
+																	variant="ghost"
+																	className="h-10 min-w-0 flex-1 justify-start rounded-none bg-transparent px-3 hover:bg-transparent"
+																	onClick={() => {
+																		setSelectedId(row.id);
+																		setStreamOpen(true);
+																		setHistoryOpen(false);
+																	}}
+																>
+																	<span className="min-w-0 flex-1 truncate text-left text-sm">
+																		{recordTitle(row.text, row.startedAt)}
+																	</span>
+																</Button>
+																{row.live ? (
+																	<Spinner className="mr-1.5 size-4 shrink-0 text-textcolor" />
+																) : (
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		className="h-7 w-7 shrink-0 rounded-md p-0 text-textcolor/65 transition-colors hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive"
+																		aria-label={t(
+																			'englishLearning.dailyReading.deleteHistory',
+																		)}
+																		onClick={(event) => {
+																			event.stopPropagation();
+																			setDeleteId(row.id);
+																		}}
+																	>
+																		<Trash2 className="size-3.5" aria-hidden />
+																	</Button>
+																)}
+															</div>
+														))}
+													</ScrollArea>
+												</PopoverContent>
+											</Popover>
+										) : null}
+										{showStream ? (
+											<PopoverTrigger asChild>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon"
+													aria-expanded={streamOpen && !historyView}
+													aria-label={t(
+														'englishLearning.dailyReading.showStream',
+													)}
+													className={cn(
+														'size-10 shrink-0 border',
+														streamOpen && !historyView ? OPT_ON : OPT_OFF,
+													)}
+													onClick={(event) => {
+														setSelectedId(null);
+														if (historyView) {
+															event.preventDefault();
+															setStreamOpen(true);
+														}
+													}}
+												>
+													<ScrollText className="size-4" aria-hidden />
+												</Button>
+											</PopoverTrigger>
+										) : null}
+									</div>
+								</div>
+							</PopoverAnchor>
+							<PopoverContent
+								side="top"
+								align="start"
+								sideOffset={8}
+								className="w-(--radix-popover-trigger-width) overflow-hidden p-0"
+							>
+								<StreamMeta
+									startedAt={
+										historyView ? null : englishDailyReadingStore.startedAt
+									}
+									elapsed={
+										historyView && selected
+											? selected.elapsed
+											: englishDailyReadingStore.elapsed
+									}
+									tokens={
+										historyView && selected
+											? selected.tokens
+											: englishDailyReadingStore.tokens
+									}
 								/>
-							) : undefined
-						}
-					/>
-					{isSuperAdmin ? (
-						<section className="border-theme/10 flex flex-col gap-5 border-t pt-5">
+								<div className="flex h-65">
+									<StreamPreview
+										text={historyView && selected ? selected.text : preview}
+										generating={historyView ? false : generating}
+									/>
+								</div>
+							</PopoverContent>
+						</Popover>
+					) : undefined
+				}
+				headerRight={
+					!loading && !error ? (
+						<button
+							type="button"
+							className={LINK_CLASS}
+							onClick={() => navigate('/english-learning/daily-reading')}
+						>
+							<BookOpen className="size-4 shrink-0 mt-0.5" aria-hidden />
+							<span>{t('englishLearning.dailyReading.openList')}</span>
+						</button>
+					) : undefined
+				}
+			>
+				{loading ? <Loading /> : null}
+				{!loading && error ? (
+					<p className="text-textcolor/55 py-16 text-center text-sm">{error}</p>
+				) : null}
+				{!loading && !error ? (
+					<div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+						{isSuperAdmin ? (
 							<div className="flex min-w-0 items-center gap-3">
 								<h2 className={cn(LABEL, 'shrink-0')}>
-									{t('englishLearning.dailyReading.autoTitle')}
+									{t('englishLearning.dailyReading.manualTitle')}
 								</h2>
 								<p className="text-textcolor/55 ml-auto min-w-0 text-right text-sm">
-									{t('englishLearning.dailyReading.autoHint')}
+									{t('englishLearning.dailyReading.manualHint')}
 								</p>
 							</div>
-							<ProfileFields
-								idPrefix="auto"
-								themes={autoThemes}
-								setThemes={setAutoThemes}
-								draft={autoDraft}
-								setDraft={setAutoDraft}
-								profile={autoProfile}
-								setProfile={setAutoProfile}
-								disabled={autoSaving}
-								actions={
-									autoDirty || !autoIsDefault ? (
-										<SettingActions
-											dirty={autoDirty}
-											isDefault={autoIsDefault}
-											disabled={autoSaving}
-											onSave={() => void persistAuto(autoThemes, autoProfile)}
-											onReset={() =>
-												void persistAuto(defaults, profileDefaults)
-											}
-										/>
-									) : undefined
-								}
-							/>
-						</section>
-					) : null}
-				</div>
-			) : null}
-		</PracticePageShell>
+						) : null}
+						<ProfileFields
+							idPrefix="manual"
+							themes={themes}
+							setThemes={setThemes}
+							draft={draft}
+							setDraft={setDraft}
+							profile={profile}
+							setProfile={setProfile}
+							disabled={saving}
+							actions={
+								dirty || !isDefault ? (
+									<SettingActions
+										dirty={dirty}
+										isDefault={isDefault}
+										disabled={saving}
+										onSave={() => void persist(themes, profile)}
+										onReset={() => void persist(defaults, profileDefaults)}
+									/>
+								) : undefined
+							}
+						/>
+						{isSuperAdmin ? (
+							<section className="border-theme/10 flex flex-col gap-5 border-t pt-5">
+								<div className="flex min-w-0 items-center gap-3">
+									<h2 className={cn(LABEL, 'shrink-0')}>
+										{t('englishLearning.dailyReading.autoTitle')}
+									</h2>
+									<p className="text-textcolor/55 ml-auto min-w-0 text-right text-sm">
+										{t('englishLearning.dailyReading.autoHint')}
+									</p>
+								</div>
+								<ProfileFields
+									idPrefix="auto"
+									themes={autoThemes}
+									setThemes={setAutoThemes}
+									draft={autoDraft}
+									setDraft={setAutoDraft}
+									profile={autoProfile}
+									setProfile={setAutoProfile}
+									disabled={autoSaving}
+									actions={
+										autoDirty || !autoIsDefault ? (
+											<SettingActions
+												dirty={autoDirty}
+												isDefault={autoIsDefault}
+												disabled={autoSaving}
+												onSave={() => void persistAuto(autoThemes, autoProfile)}
+												onReset={() =>
+													void persistAuto(defaults, profileDefaults)
+												}
+											/>
+										) : undefined
+									}
+								/>
+							</section>
+						) : null}
+					</div>
+				) : null}
+			</PracticePageShell>
+		</>
 	);
-}
+});

@@ -561,7 +561,7 @@ export default function DailyReadingDetailPage() {
 											{row.extras.glossary.map((item) => (
 												<Card
 													key={item.word}
-													className="[&_[data-word]]:text-xl"
+													className="**:data-word:text-xl"
 													data={{
 														word: item.word,
 														ipa: '',

@@ -295,7 +295,7 @@ export function shuffleOptions(
 	};
 }
 
-/** 只给这两个模型补释义。付费模型一次就能写全，再打只会加费用。 */
+/** 短文重试时，这两个模型的预览接在上一轮下面。释义对所有模型都另请求。 */
 const FLASH_GLOSS_MODELS = new Set(['glm-4-flash', 'glm-4.7-flash']);
 
 /** 网关常把厂商前缀写在名字前面。去掉前缀后全等，避免「名字里有 flash」误伤别的模型。 */
@@ -342,6 +342,124 @@ export function missingGlossCount(
 		else have.set(key, left - 1);
 	}
 	return missing;
+}
+
+/** 一批缺句的句数。四句的逐词 JSON 停在 8192 的一半以下。 */
+export const GLOSS_BATCH = 4;
+
+// ponytail: 句号后的大写才切句。Mr. / U.S. 可能被切开；用 includesEither 兜住，不引入分句库。
+function passageSentences(bodyEn: string): string[] {
+	return stripZw(bodyEn)
+		.split(/\n\s*\n/)
+		.flatMap((paragraph) =>
+			paragraph
+				.split(/(?<=[.!?])\s+(?=[A-Z])/)
+				.map((sentence) => sentence.replace(/\s+/g, ' ').trim())
+				.filter(Boolean),
+		);
+}
+
+function includesEither(sentence: string, en: string): boolean {
+	const left = sentence.replace(/\s+/g, ' ').trim().toLowerCase();
+	const right = en.replace(/\s+/g, ' ').trim().toLowerCase();
+	if (Math.min(left.length, right.length) < 8) return false;
+	return left.includes(right) || right.includes(left);
+}
+
+function sentenceStillMissing(
+	sentence: string,
+	words: { w: string; zh: string }[],
+): boolean {
+	const have = new Map<string, number>();
+	for (const item of words) {
+		const key = item.w.toLowerCase();
+		have.set(key, (have.get(key) ?? 0) + 1);
+	}
+	for (const token of passageWords(sentence)) {
+		const key = token.toLowerCase();
+		const left = have.get(key) ?? 0;
+		if (left <= 0) return true;
+		have.set(key, left - 1);
+	}
+	return false;
+}
+
+function isCovered(
+	sentence: string,
+	rows: NonNullable<ReadingExtras['wordGloss']>,
+): boolean {
+	const hit = rows.find((row) => includesEither(sentence, row.en));
+	return !!hit && !sentenceStillMissing(sentence, hit.words);
+}
+
+/** 还要再请求的句子。整句没有释义，或句中仍有词没有中文，都算缺。 */
+export function missingSentences(
+	bodyEn: string,
+	gloss: ReadingExtras['wordGloss'],
+): string[] {
+	const rows = gloss ?? [];
+	return passageSentences(bodyEn).filter(
+		(sentence) => !isCovered(sentence, rows),
+	);
+}
+
+function balancedObjectEnd(text: string, open: number): number {
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = open; i < text.length; i += 1) {
+		const ch = text[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === '\\') escaped = true;
+			else if (ch === '"') inString = false;
+			continue;
+		}
+		if (ch === '"') {
+			inString = true;
+			continue;
+		}
+		if (ch === '{') depth += 1;
+		else if (ch === '}') {
+			depth -= 1;
+			if (depth === 0) return i;
+		}
+	}
+	return -1;
+}
+
+function closedGlossObjects(raw: string): unknown[] {
+	const keyAt = raw.indexOf('"wordGloss"');
+	if (keyAt < 0) return [];
+	const start = raw.indexOf('[', keyAt);
+	if (start < 0) return [];
+	const out: unknown[] = [];
+	let i = start + 1;
+	while (i < raw.length) {
+		const ch = raw[i];
+		if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t' || ch === ',') {
+			i += 1;
+			continue;
+		}
+		if (ch !== '{') break;
+		const end = balancedObjectEnd(raw, i);
+		if (end < 0) break;
+		try {
+			out.push(JSON.parse(raw.slice(i, end + 1)));
+		} catch {
+			break;
+		}
+		i = end + 1;
+	}
+	return out;
+}
+
+/** 整段 JSON 被截断时，留下括号已经配平的句子。末尾半截丢掉。 */
+export function salvageWordGloss(
+	raw: string,
+	bodyEn: string,
+): ReadingExtras['wordGloss'] {
+	return pickWordGloss(closedGlossObjects(raw), bodyEn);
 }
 
 function glossEnKey(en: string): string {
@@ -502,9 +620,127 @@ export function pickExtras(
 			);
 			questions.push({ q, ...placed });
 		}
-		if (questions.length === profile.questions) {
+		if (questions.length > 0) {
 			extras.questions = questions.slice(0, profile.questions);
 		}
 	}
 	return extras;
+}
+
+export type ReadingExtraKey = 'glossary' | 'grammarNotes' | 'questions';
+
+/** 只阅读且不出题时不发附件请求。 */
+export function extrasRequested(profile: ReadingProfile): boolean {
+	return profile.focus !== 'reading' || profile.questions > 0;
+}
+
+/** 这次设置要的附件键。补空类时只取其中为空的那些。 */
+export function requestedExtraKeys(profile: ReadingProfile): ReadingExtraKey[] {
+	const keys: ReadingExtraKey[] = [];
+	if (profile.focus === 'vocab' || profile.focus === 'both')
+		keys.push('glossary');
+	if (profile.focus === 'grammar' || profile.focus === 'both')
+		keys.push('grammarNotes');
+	if (profile.questions > 0) keys.push('questions');
+	return keys;
+}
+
+/** 某一类一个都没有才需要再要。已有若干条就不补。 */
+export function emptyExtraKeys(
+	extras: ReadingExtras,
+	profile: ReadingProfile,
+): ReadingExtraKey[] {
+	return requestedExtraKeys(profile).filter((key) => {
+		if (key === 'glossary') return !extras.glossary?.length;
+		if (key === 'grammarNotes') return !extras.grammarNotes?.length;
+		return !extras.questions?.length;
+	});
+}
+
+/** 同一类两次都有时留下先拿到的，避免补请求盖掉已合格的条目。 */
+export function mergeExtras(
+	first: ReadingExtras,
+	second: ReadingExtras,
+): ReadingExtras {
+	const extras: ReadingExtras = {
+		level: first.level,
+		length: first.length,
+		focus: first.focus,
+	};
+	const glossary = first.glossary?.length ? first.glossary : second.glossary;
+	const grammarNotes = first.grammarNotes?.length
+		? first.grammarNotes
+		: second.grammarNotes;
+	const questions = first.questions?.length
+		? first.questions
+		: second.questions;
+	const wordGloss = first.wordGloss?.length
+		? first.wordGloss
+		: second.wordGloss;
+	if (glossary?.length) extras.glossary = glossary;
+	if (grammarNotes?.length) extras.grammarNotes = grammarNotes;
+	if (questions?.length) extras.questions = questions;
+	if (wordGloss?.length) extras.wordGloss = wordGloss;
+	return extras;
+}
+
+function balancedStringEnd(text: string, open: number): number {
+	let escaped = false;
+	for (let i = open + 1; i < text.length; i += 1) {
+		const ch = text[i];
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+		if (ch === '\\') {
+			escaped = true;
+			continue;
+		}
+		if (ch === '"') return i;
+	}
+	return -1;
+}
+
+function closedArrayItems(raw: string, key: string): unknown[] | undefined {
+	const keyAt = raw.indexOf(`"${key}"`);
+	if (keyAt < 0) return undefined;
+	const start = raw.indexOf('[', keyAt);
+	if (start < 0) return undefined;
+	const out: unknown[] = [];
+	let i = start + 1;
+	while (i < raw.length) {
+		const ch = raw[i];
+		if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t' || ch === ',') {
+			i += 1;
+			continue;
+		}
+		if (ch === ']') break;
+		if (ch !== '{' && ch !== '"') break;
+		const end =
+			ch === '{' ? balancedObjectEnd(raw, i) : balancedStringEnd(raw, i);
+		if (end < 0) break;
+		try {
+			out.push(JSON.parse(raw.slice(i, end + 1)));
+		} catch {
+			break;
+		}
+		i = end + 1;
+	}
+	return out;
+}
+
+/** 整段 JSON 被截断时，留下已闭合的词汇、语法和题目。末尾半截丢掉。 */
+export function salvageExtras(
+	raw: string,
+	bodyEn: string,
+	profile: ReadingProfile,
+): ReadingExtras {
+	const payload: Record<string, unknown> = {};
+	const glossary = closedArrayItems(raw, 'glossary');
+	const grammarNotes = closedArrayItems(raw, 'grammarNotes');
+	const questions = closedArrayItems(raw, 'questions');
+	if (glossary) payload.glossary = glossary;
+	if (grammarNotes) payload.grammarNotes = grammarNotes;
+	if (questions) payload.questions = questions;
+	return pickExtras(payload, bodyEn, profile);
 }

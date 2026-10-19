@@ -85,6 +85,7 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_DAILY_READING_MANUAL,
+	ENGLISH_LEARNING_DAILY_READING_MANUAL_HISTORY,
 	ENGLISH_LEARNING_DAILY_READING_SETTINGS,
 	ENGLISH_LEARNING_DAILY_READINGS,
 	ENGLISH_LEARNING_DOCX_EXPORT_JOBS,
@@ -2099,28 +2100,25 @@ export const saveEnglishDailyReadingAutoSettings = async (body: {
 	}>(`${ENGLISH_LEARNING_DAILY_READING_SETTINGS}/auto`, body);
 };
 
-export const generateEnglishDailyReading = async (
-	body: {
-		themes: string[];
-		profile: EnglishDailyReadingProfile;
-		runId?: string;
-	},
-	options?: {
-		silent?: boolean;
-		timeout?: number;
-		signal?: AbortSignal;
-		retries?: number;
-	},
-) => {
-	return await http.post<EnglishDailyReadingItem>(
-		ENGLISH_LEARNING_DAILY_READING_MANUAL,
-		body,
-		{
-			silent: options?.silent,
-			timeout: options?.timeout,
-			signal: options?.signal,
-			retries: options?.retries,
-		},
+export type DailyReadingGen = {
+	id: string;
+	text: string;
+	tokens: number;
+	elapsed: number;
+	startedAt: number;
+	status: 'done' | 'stopped' | 'error' | 'paused';
+};
+
+export const listEnglishDailyReadingGens = async () => {
+	return await http.get<DailyReadingGen[]>(
+		ENGLISH_LEARNING_DAILY_READING_MANUAL_HISTORY,
+		{ silent: true },
+	);
+};
+
+export const removeEnglishDailyReadingGen = async (id: string) => {
+	return await http.delete<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_DAILY_READING_MANUAL_HISTORY}/${encodeURIComponent(id)}`,
 	);
 };
 
@@ -2131,15 +2129,6 @@ export const stopEnglishDailyReading = async (options?: {
 	return await http.post<{ stopped: boolean }>(
 		`${ENGLISH_LEARNING_DAILY_READING_MANUAL}/stop`,
 		{ runId: options?.runId },
-		{ silent: options?.silent },
-	);
-};
-
-export const getEnglishDailyReadingManualPending = async (options?: {
-	silent?: boolean;
-}) => {
-	return await http.get<{ pending: boolean }>(
-		ENGLISH_LEARNING_DAILY_READING_MANUAL,
 		{ silent: options?.silent },
 	);
 };
