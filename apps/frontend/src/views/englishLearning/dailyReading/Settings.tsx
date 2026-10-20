@@ -215,7 +215,7 @@ function StreamPreview({
 			<div
 				ref={rootRef}
 				data-stick-scroll-content
-				className="p-3 [&_.chat-md-code-block]:my-0"
+				className="message-md-wrap p-3 [&_.chat-md-code-block]:my-0"
 			>
 				{markdown ? (
 					<StreamingMarkdownBody
@@ -224,7 +224,10 @@ function StreamPreview({
 						preferDark={theme === 'black'}
 						isStreaming={generating}
 						t={t}
-						className="min-w-0 w-full mb-2.5 max-w-full [&_.streaming-md-body]:min-w-0 [&_.markdown-body]:text-textcolor/90! [&_.markdown-body]:rounded-md"
+						className={cn(
+							'min-w-0 w-full max-w-full [&_.streaming-md-body]:min-w-0 [&_.markdown-body]:text-textcolor/90! [&_.markdown-body]:rounded-md',
+							generating ? 'mb-2.5' : 'mb-0',
+						)}
 					/>
 				) : null}
 				{generating ? (
