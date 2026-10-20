@@ -13,6 +13,7 @@ import {
 	openDailyReadingStream,
 	type ReadingFrame,
 } from '@/utils/dailyReadingSse';
+import { createStreamingMobxPatchScheduler } from '@/utils/scheduleStreamingMobxPatch';
 
 class EnglishDailyReading {
 	generating = false;
@@ -24,6 +25,12 @@ class EnglishDailyReading {
 	elapsed = 0;
 	tokens = 0;
 	historyRev = 0;
+	level: EnglishDailyReadingProfile['level'] | null = null;
+	length: EnglishDailyReadingProfile['length'] | null = null;
+	/** 本帧已拼好的原文。界面只看 text，不订这个字段。 */
+	private buf = '';
+	private bufTokens = 0;
+	private paint!: ReturnType<typeof createStreamingMobxPatchScheduler>;
 	private gen = 0;
 	private activeId: string | null = null;
 	private failAttempt = 0;
@@ -33,7 +40,20 @@ class EnglishDailyReading {
 	private ready: (() => void) | null = null;
 
 	constructor() {
-		makeAutoObservable(this);
+		makeAutoObservable<EnglishDailyReading, 'buf' | 'bufTokens' | 'paint'>(
+			this,
+			{
+				buf: false,
+				bufTokens: false,
+				paint: false,
+			},
+		);
+		this.paint = createStreamingMobxPatchScheduler(() => {
+			runInAction(() => {
+				this.text = this.buf;
+				this.tokens = this.bufTokens;
+			});
+		});
 	}
 
 	get runId(): string | null {
@@ -52,9 +72,12 @@ class EnglishDailyReading {
 		if (this.generating) return;
 		const runId = crypto.randomUUID();
 		this.activeId = runId;
+		this.paint.cancel();
 		this.userStop = false;
 		this.failAttempt = 0;
 		this.generating = true;
+		this.buf = '';
+		this.bufTokens = 0;
 		this.text = '';
 		this.seq = 0;
 		this.paused = false;
@@ -62,6 +85,8 @@ class EnglishDailyReading {
 		this.startedAt = Date.now();
 		this.elapsed = 0;
 		this.tokens = 0;
+		this.level = profile.level;
+		this.length = profile.length;
 		this.connect(ENGLISH_LEARNING_DAILY_READING_MANUAL_STREAM, {
 			themes,
 			profile,
@@ -75,6 +100,7 @@ class EnglishDailyReading {
 	}
 
 	stopRun() {
+		this.paint.flush();
 		this.userStop = true;
 		this.gen += 1;
 		window.clearTimeout(this.timer);
@@ -82,6 +108,8 @@ class EnglishDailyReading {
 		this.activeId = null;
 		this.generating = false;
 		this.paused = false;
+		this.buf = '';
+		this.bufTokens = 0;
 		this.text = '';
 		this.startedAt = null;
 		this.elapsed = 0;
@@ -139,41 +167,45 @@ class EnglishDailyReading {
 		}, delay);
 	}
 
+	private takeText(frame: ReadingFrame) {
+		if (typeof frame.seq === 'number' && frame.seq > this.seq) {
+			this.seq = frame.seq;
+		}
+		if (typeof frame.tokens === 'number') this.bufTokens = frame.tokens;
+		if (frame.type === 'reading.snapshot' || frame.type === 'reading.paused') {
+			const next = frame.text ?? '';
+			const replace =
+				frame.type === 'reading.paused'
+					? next.length > this.buf.length
+					: Boolean(frame.reset) || next.length >= this.buf.length;
+			if (replace) this.buf = next;
+			return;
+		}
+		if (frame.type === 'reading.delta') this.buf += frame.text ?? '';
+	}
+
 	private onFrame(frame: ReadingFrame) {
-		runInAction(() => {
-			if (typeof frame.seq === 'number' && frame.seq > this.seq) {
-				this.seq = frame.seq;
-			}
-			if (typeof frame.tokens === 'number') this.tokens = frame.tokens;
-			if (frame.type === 'reading.paused') {
-				const next = frame.text ?? '';
-				if (next.length > this.text.length) this.text = next;
-				this.paused = true;
-				this.finish();
-				return;
-			}
-			if (frame.type === 'reading.snapshot' || frame.type === 'reading.delta') {
-				this.failAttempt = 0;
-				if (frame.type === 'reading.snapshot') {
-					const next = frame.text ?? '';
-					if (frame.reset || next.length >= this.text.length) this.text = next;
-				} else {
-					this.text += frame.text ?? '';
-				}
-				return;
-			}
-			if (frame.type === 'reading.error') {
-				this.error = frame.message || '生成失败';
-				this.finish();
-				return;
-			}
-			if (frame.type === 'reading.complete') {
-				this.finish();
-				this.ready?.();
-				return;
-			}
-			if (frame.type === 'reading.stopped') this.finish();
-		});
+		this.takeText(frame);
+		if (frame.type === 'reading.snapshot' || frame.type === 'reading.delta') {
+			this.failAttempt = 0;
+			this.paint.schedule();
+			return;
+		}
+		if (
+			frame.type !== 'reading.paused' &&
+			frame.type !== 'reading.error' &&
+			frame.type !== 'reading.complete' &&
+			frame.type !== 'reading.stopped'
+		) {
+			return;
+		}
+		this.paint.flush();
+		if (frame.type === 'reading.paused') this.paused = true;
+		if (frame.type === 'reading.error') {
+			this.error = frame.message || '生成失败';
+		}
+		this.finish();
+		if (frame.type === 'reading.complete') this.ready?.();
 	}
 
 	private finish() {

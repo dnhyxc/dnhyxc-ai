@@ -2,115 +2,21 @@
  * 每日阅读列表：只展示已到发布日的篇目。生成在队列里，本页轮询状态。
  */
 import Loading from '@design/Loading';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@ui/dropdown-menu';
 import { Button, Toast } from '@ui/index';
 import { Spinner } from '@ui/spinner';
-import {
-	BookOpen,
-	Check,
-	Layers,
-	Layers2,
-	PanelTopClose,
-	PanelTopOpen,
-	WandSparkles,
-} from 'lucide-react';
+import { BookOpen, WandSparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { HISTORY_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
-import { cn } from '@/lib/utils';
 import {
 	type EnglishDailyReadingItem,
 	listEnglishDailyReadings,
 } from '@/service';
 import { LIBRARY_LIST_AT_BOTTOM_THRESHOLD_PX } from '../hooks/useListCornerFab';
 import { PracticePageShell } from '../practice/components/shell';
-
-type ReadingOrigin = 'day' | 'manual';
-
-function parseOrigin(raw: string | null): ReadingOrigin {
-	return raw === 'manual' ? 'manual' : 'day';
-}
-
-function OriginMenu({
-	origin,
-	onSelect,
-}: {
-	origin: ReadingOrigin;
-	onSelect: (origin: ReadingOrigin) => void;
-}) {
-	const { t } = useI18n();
-	const [open, setOpen] = useState(false);
-	const items: {
-		id: ReadingOrigin;
-		label: string;
-		Icon: typeof Layers;
-	}[] = [
-		{
-			id: 'day',
-			label: t('englishLearning.dailyReading.day'),
-			Icon: Layers,
-		},
-		{
-			id: 'manual',
-			label: t('englishLearning.dailyReading.manual'),
-			Icon: Layers2,
-		},
-	];
-	const current = items.find((item) => item.id === origin) ?? items[0]!;
-	const TriggerIcon = open ? PanelTopClose : PanelTopOpen;
-	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<DropdownMenuTrigger asChild>
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					aria-label={current.label}
-					aria-expanded={open}
-					className={cn(
-						'h-auto gap-1.5 px-0! py-0 text-sm font-medium text-teal-500 shadow-none',
-						'has-[>svg]:px-0!',
-						'hover:bg-transparent hover:text-teal-400',
-						'focus-visible:border-transparent focus-visible:ring-0 focus-visible:shadow-none',
-						'data-[state=open]:bg-transparent data-[state=open]:text-teal-400 data-[state=open]:ring-0',
-					)}
-				>
-					<TriggerIcon className="size-4 shrink-0 opacity-90" aria-hidden />
-					<span className="max-w-36 truncate">{current.label}</span>
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" sideOffset={6} className="min-w-36">
-				{items.map((item) => {
-					const active = origin === item.id;
-					const Icon = item.Icon;
-					return (
-						<DropdownMenuItem
-							key={item.id}
-							className="gap-2"
-							onSelect={() => onSelect(item.id)}
-						>
-							<Icon className="size-4 shrink-0 opacity-90" aria-hidden />
-							<span className="min-w-0 flex-1 truncate">{item.label}</span>
-							<Check
-								className={cn(
-									'size-3.5 shrink-0',
-									active ? 'opacity-100' : 'opacity-0',
-								)}
-								aria-hidden
-							/>
-						</DropdownMenuItem>
-					);
-				})}
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
+import { OriginMenu } from './components/OriginMenu';
+import { parseOrigin, type ReadingOrigin } from './utils/origin';
 
 const CARD =
 	'border-theme/10 bg-theme/5 hover:border-teal-500/35 hover:bg-teal-500/10 flex min-w-0 cursor-pointer flex-col gap-1 rounded-md border px-3 py-3 text-left transition-colors';

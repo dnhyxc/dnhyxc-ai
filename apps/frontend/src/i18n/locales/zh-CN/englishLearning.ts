@@ -346,6 +346,7 @@ export const englishLearning = {
 	'englishLearning.dailyReading.themeRemove': '移除',
 	'englishLearning.dailyReading.themeReset': '恢复默认',
 	'englishLearning.dailyReading.openList': '今日阅读',
+	'englishLearning.dailyReading.openReading': '进入阅读',
 	'englishLearning.dailyReading.themeInvalid':
 		'主题需为 1 到 16 个字，至少保留一项',
 	'englishLearning.dailyReading.listTitle': '每日阅读',
@@ -363,6 +364,9 @@ export const englishLearning = {
 	'englishLearning.dailyReading.loadFailed': '列表加载失败',
 	'englishLearning.dailyReading.notFound': '这篇还不能阅读',
 	'englishLearning.dailyReading.play': '朗读',
+	'englishLearning.dailyReading.continueGenerate': '继续生成',
+	'englishLearning.dailyReading.listShow': '打开阅读列表',
+	'englishLearning.dailyReading.listHide': '关闭阅读列表',
 	'englishLearning.dailyReading.showZh': '显示中文释义',
 	'englishLearning.dailyReading.hideZh': '收起中文释义',
 	'englishLearning.dailyReading.sourceHint': '参考来源',

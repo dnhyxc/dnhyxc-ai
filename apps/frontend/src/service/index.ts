@@ -2107,6 +2107,8 @@ export type DailyReadingGen = {
 	elapsed: number;
 	startedAt: number;
 	status: 'done' | 'stopped' | 'error' | 'paused';
+	level: EnglishDailyReadingProfile['level'] | null;
+	length: EnglishDailyReadingProfile['length'] | null;
 };
 
 export const listEnglishDailyReadingGens = async () => {

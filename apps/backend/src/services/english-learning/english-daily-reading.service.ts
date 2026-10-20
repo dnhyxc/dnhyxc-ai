@@ -33,10 +33,12 @@ import {
 	extrasRequested,
 	GLOSS_BATCH,
 	glossaryLimit,
+	glossGapText,
+	glossUserText,
 	isFlashGlossModel,
 	mergeExtras,
 	mergeWordGloss,
-	missingSentences,
+	missingWordSlots,
 	normalizeBody,
 	normalizeProfile,
 	normalizeThemeList,
@@ -46,6 +48,7 @@ import {
 	pickExtras,
 	pickManualTheme,
 	pickWordGloss,
+	placeGapGloss,
 	type ReadingExtraKey,
 	type ReadingExtras,
 	type ReadingProfile,
@@ -193,6 +196,40 @@ function tokenUnits(text: string): number {
 	return units;
 }
 
+/** 认出账户限流。只看状态码和 LangChain 错误码，不按文案猜。 */
+function isRateLimit(err: unknown, depth = 0): boolean {
+	if (!err || typeof err !== 'object' || depth > 3) return false;
+	const o = err as {
+		status?: number;
+		lc_error_code?: string;
+		cause?: unknown;
+	};
+	if (o.status === 429 || o.lc_error_code === 'MODEL_RATE_LIMIT') return true;
+	return isRateLimit(o.cause, depth + 1);
+}
+
+/** 退避等待。停止信号一到就结束，不再发下一次请求。 */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+	if (signal?.aborted) {
+		const err = new Error('aborted');
+		err.name = 'AbortError';
+		return Promise.reject(err);
+	}
+	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => {
+			signal?.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+		const onAbort = () => {
+			clearTimeout(timer);
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			reject(err);
+		};
+		signal?.addEventListener('abort', onAbort, { once: true });
+	});
+}
+
 @Injectable()
 export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	constructor(
@@ -283,8 +320,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				return;
 			}
 			const bodyEn = stripZw(draft.bodyEn);
-			const attached = await this.completeExtras(bodyEn, profile);
-			const extras = await this.completeWordGloss(bodyEn, attached);
+			const extras = await this.finishReading(bodyEn, profile);
 			await this.repo.update(
 				{ publishDate, slot: DAY_SLOT },
 				{
@@ -609,17 +645,28 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		profile: ReadingProfile,
 	): Promise<void> {
 		let settled = 0;
-		const onUsage = (callTotal: number, done = false, paint = false) => {
-			if (!callTotal) return;
-			if (done) settled += callTotal;
-			run.tokens = done ? settled : settled + callTotal;
-			if (!done && !paint) return;
-			try {
-				this.publish(run, { type: 'reading.usage', tokens: run.tokens });
-			} catch {
-				// 订阅者抛错不影响计数。下一段正文仍会带上当前 token。
-			}
+		const lanes = new Map<number, number>();
+		let usageId = 0;
+		// 同一篇里的模型请求是串行的，一路记完再记下一路。
+		const trackUsage = () => {
+			const id = ++usageId;
+			return (callTotal: number, done = false, paint = false) => {
+				if (!callTotal) return;
+				if (done) {
+					lanes.delete(id);
+					settled += callTotal;
+				} else lanes.set(id, callTotal);
+				const pending = [...lanes.values()].reduce((sum, n) => sum + n, 0);
+				run.tokens = settled + pending;
+				if (!done && !paint) return;
+				try {
+					this.publish(run, { type: 'reading.usage', tokens: run.tokens });
+				} catch {
+					// 订阅者抛错不影响计数。下一段正文仍会带上当前 token。
+				}
+			};
 		};
+		const onUsage = trackUsage();
 		const onDelta = (piece: string) => {
 			try {
 				this.publish(run, {
@@ -637,7 +684,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			if (this.shouldStop(run.id, run.ac.signal)) {
 				throw new BadRequestException('已停止');
 			}
-			const theme = await this.claimRow(userId, run, themes);
+			const theme = await this.claimRow(userId, run, themes, profile);
 			const { ac, id } = run;
 			const today = shanghaiToday();
 			if (this.shouldStop(id, ac.signal))
@@ -691,16 +738,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			if (this.shouldStop(id, ac.signal))
 				throw new BadRequestException('已停止');
 			const bodyEn = stripZw(draft.bodyEn);
-			const attached = await this.completeExtras(bodyEn, profile, {
-				signal: ac.signal,
-				userId,
-				onDelta,
-				onUsage,
-				onSecond: () => this.continueBelow(run),
-			});
-			if (this.shouldStop(id, ac.signal))
-				throw new BadRequestException('已停止');
-			const extras = await this.completeWordGloss(bodyEn, attached, {
+			const extras = await this.finishReading(bodyEn, profile, {
 				signal: ac.signal,
 				userId,
 				onDelta,
@@ -806,14 +844,29 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			where: { userId, status: Not('error') },
 			order: { startedAt: 'DESC' },
 		});
-		return rows.map((row) => ({
-			id: row.id,
-			text: row.text,
-			tokens: row.tokens,
-			elapsed: row.elapsedMs,
-			startedAt: row.startedAt.getTime(),
-			status: row.status,
-		}));
+		const ids = rows.map((row) => row.id);
+		const readings = ids.length
+			? await this.repo
+					.createQueryBuilder('row')
+					.select(['row.id', 'row.extras'])
+					.where('row.userId = :userId', { userId })
+					.andWhere('row.id IN (:...ids)', { ids })
+					.getMany()
+			: [];
+		const extrasById = new Map(readings.map((row) => [row.id, row.extras]));
+		return rows.map((row) => {
+			const extras = extrasById.get(row.id);
+			return {
+				id: row.id,
+				text: row.text,
+				tokens: row.tokens,
+				elapsed: row.elapsedMs,
+				startedAt: row.startedAt.getTime(),
+				status: row.status,
+				level: extras?.level ?? null,
+				length: extras?.length ?? null,
+			};
+		});
 	}
 
 	/** 只删这个用户自己的一条。别人的 id 删不到。 */
@@ -857,6 +910,31 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	private shouldStop(runId: string | null, signal: AbortSignal): boolean {
 		// 停止可能发生在两轮模型之间，那时还没有正在读的流，靠这个集合拦住下一轮。
 		return signal.aborted || (runId != null && this.stoppedRuns.has(runId));
+	}
+
+	/** 只重试这一次流。成功不等待。429 才等 2 秒、4 秒，连同首次最多 3 次。 */
+	private async withRateRetry<T>(
+		run: () => Promise<T>,
+		signal?: AbortSignal,
+	): Promise<T> {
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			try {
+				return await run();
+			} catch (err) {
+				if (
+					signal?.aborted ||
+					this.isAbort(err, signal) ||
+					attempt === 2 ||
+					!isRateLimit(err)
+				) {
+					throw err;
+				}
+				const delay = 2000 * 2 ** attempt;
+				this.logger.warn(`[EnglishDailyReading] 限流，${delay / 1000}秒后重试`);
+				await wait(delay, signal);
+			}
+		}
+		throw new Error('rate limit');
 	}
 
 	private isAbort(e: unknown, signal?: AbortSignal): boolean {
@@ -1096,6 +1174,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		userId: number,
 		run: ManualRun,
 		themes: string[],
+		profile: ReadingProfile,
 	): Promise<string> {
 		const mine = await this.repo.findOne({ where: { id: run.id, userId } });
 		if (mine?.status === 'pending') {
@@ -1124,6 +1203,11 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			sourceUrl: null,
 			sourceTitle: null,
 			theme,
+			extras: {
+				level: profile.level,
+				length: profile.length,
+				focus: profile.focus,
+			},
 		});
 		return theme;
 	}
@@ -1323,12 +1407,16 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		]
 			.filter(Boolean)
 			.join('\n\n');
-		const text = await this.readStream(
-			llm,
-			[new SystemMessage(system), new HumanMessage(user)],
+		const text = await this.withRateRetry(
+			() =>
+				this.readStream(
+					llm,
+					[new SystemMessage(system), new HumanMessage(user)],
+					signal,
+					opts?.onDelta,
+					opts?.onUsage,
+				),
 			signal,
-			opts?.onDelta,
-			opts?.onUsage,
 		);
 		const payload = parseModelObject(text);
 		const draft = parsePassageJson(text);
@@ -1337,6 +1425,50 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		// 流式过程只累积原文。整篇 JSON 不完整时当废稿，由调用方决定是否重试。模型名仍要带回去，第二次才能接在下面。
 		if (!payload || !draft) return { draft: null, payload: null, modelName };
 		return { draft, payload, modelName };
+	}
+
+	/** 短文已合格后先附件、再释义。同一篇同时只有一路模型请求。停止仍向上抛。 */
+	private async finishReading(
+		bodyEn: string,
+		profile: ReadingProfile,
+		opts?: {
+			signal?: AbortSignal;
+			userId?: number;
+			onDelta?: (piece: string) => void;
+			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+			onSecond?: () => void;
+		},
+	): Promise<ReadingExtras> {
+		const base: ReadingExtras = {
+			level: profile.level,
+			length: profile.length,
+			focus: profile.focus,
+		};
+		const lane = opts
+			? { signal: opts.signal, userId: opts.userId }
+			: undefined;
+		const attached = await this.completeExtras(
+			bodyEn,
+			profile,
+			lane && {
+				...lane,
+				onDelta: opts?.onDelta,
+				onUsage: opts?.onUsage,
+				onSecond: opts?.onSecond,
+			},
+		);
+		const glossExtras = await this.completeWordGloss(
+			bodyEn,
+			base,
+			lane && {
+				...lane,
+				onDelta: opts?.onDelta,
+				onUsage: opts?.onUsage,
+				onSecond: opts?.onSecond,
+			},
+		);
+		const gloss = glossExtras.wordGloss;
+		return gloss?.length ? { ...attached, wordGloss: gloss } : attached;
 	}
 
 	/** 短文已合格。附件截断或失败都不废正文。停止仍向上抛。 */
@@ -1450,12 +1582,16 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			'Do not include titleEn, titleZh, bodyEn, bodyZh, or wordGloss.',
 			...lines,
 		].join('\n');
-		const text = await this.readStream(
-			llm,
-			[new SystemMessage(system), new HumanMessage(bodyEn)],
+		const text = await this.withRateRetry(
+			() =>
+				this.readStream(
+					llm,
+					[new SystemMessage(system), new HumanMessage(bodyEn)],
+					signal,
+					opts?.onDelta,
+					opts?.onUsage,
+				),
 			signal,
-			opts?.onDelta,
-			opts?.onUsage,
 		);
 		const payload = parseModelObject(text);
 		return { ok: Boolean(payload), payload, raw: text };
@@ -1491,22 +1627,32 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			// 释义接在短文预览下面。定时篇没有预览，这次调用是空的。
 			opts?.onSecond?.();
 			gloss = (await this.fillWordGloss(bodyEn, glossOpts)).gloss;
-			const missing = missingSentences(bodyEn, gloss);
-			if (missing.length) {
+			const gaps = missingWordSlots(bodyEn, gloss);
+			if (gaps.length) {
 				this.logger.warn(
-					`[EnglishDailyReading] 释义不全 missing=${missing.length}`,
+					`[EnglishDailyReading] 释义缺词 sentences=${gaps.length}`,
 				);
 			}
-			for (let i = 0; i < missing.length; i += GLOSS_BATCH) {
+			for (let i = 0; i < gaps.length; i += GLOSS_BATCH) {
 				aborted();
 				opts?.onSecond?.();
-				const part = await this.fillWordGloss(bodyEn, {
-					...glossOpts,
-					sentences: missing.slice(i, i + GLOSS_BATCH),
-				});
-				// 这一批没有可解析的句子就停。后面的批不再请求，已有释义保留。
-				if (!part.gloss?.length) break;
-				gloss = mergeWordGloss(gloss, part.gloss);
+				try {
+					const part = await this.fillWordGloss(bodyEn, {
+						...glossOpts,
+						gaps: gaps.slice(i, i + GLOSS_BATCH),
+					});
+					// 这一批没有可解析的词就停。限流耗尽不算这种空结果，下面继续下一批。
+					if (!part.gloss?.length) break;
+					gloss = mergeWordGloss(gloss, part.gloss);
+				} catch (e) {
+					if (opts?.signal?.aborted || this.isAbort(e, opts?.signal)) throw e;
+					// 这一批 429 用尽后仍补后面的句。其它错误交给外层，留下已有释义。
+					if (isRateLimit(e)) {
+						this.logger.warn('[EnglishDailyReading] 释义本批限流，继续下一批');
+						continue;
+					}
+					throw e;
+				}
 			}
 			return gloss?.length ? { ...extras, wordGloss: gloss } : extras;
 		} catch (e) {
@@ -1525,7 +1671,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			userId?: number;
 			onDelta?: (piece: string) => void;
 			onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
-			sentences?: string[];
+			gaps?: { sentence: string; words: string[] }[];
 		},
 	): Promise<{ gloss: ReadingExtras['wordGloss']; raw: string }> {
 		const signal = opts?.signal;
@@ -1548,32 +1694,35 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			},
 			this.llmConfigService,
 		);
-		const sentences = opts?.sentences ?? [];
+		const gaps = opts?.gaps ?? [];
+		const numbered = gaps.length
+			? glossGapText(bodyEn, gaps)
+			: glossUserText(bodyEn);
 		const system = [
-			'The English text is fixed. Do not rewrite it.',
+			'The English text is fixed. Do not rewrite it or copy the sentences into the output.',
 			'Return one JSON object with the key wordGloss only.',
-			'wordGloss: one object per sentence, in order, {en, words}. words lists every word in en in order as {w, zh}. Skip punctuation. zh is a short Chinese gloss of w as used in that sentence, within 8 Chinese characters, including small words such as a, the, of.',
-			sentences.length
-				? 'Copy each en exactly. Gloss only the sentences in the user message.'
-				: '',
-		]
-			.filter(Boolean)
-			.join('\n');
-		const text = await this.readStream(
-			llm,
-			[
-				new SystemMessage(system),
-				new HumanMessage(sentences.length ? sentences.join('\n') : bodyEn),
-			],
+			'wordGloss must be an array. Copy this shape: {"wordGloss":[{"i":1,"words":[{"w":"Cats","zh":"猫"}]}]}. Do not use sentence numbers as keys, like {"1":[...]}.',
+			gaps.length
+				? 'wordGloss: one object per numbered line, {i, words}. i is the number. words lists only the words on that line, in the same order, as {w, zh}. zh is a short Chinese gloss within 8 Chinese characters. Do not add words that are not on the line.'
+				: 'wordGloss: one object per numbered sentence, {i, words}. i is the number before the sentence. words lists every word in that sentence in order as {w, zh}. Skip punctuation. zh is a short Chinese gloss of w as used in that sentence, within 8 Chinese characters, including small words such as a, the, of.',
+		].join('\n');
+		const text = await this.withRateRetry(
+			() =>
+				this.readStream(
+					llm,
+					[new SystemMessage(system), new HumanMessage(numbered || bodyEn)],
+					signal,
+					opts?.onDelta,
+					opts?.onUsage,
+				),
 			signal,
-			opts?.onDelta,
-			opts?.onUsage,
 		);
 		const payload = parseModelObject(text);
-		// 整段解析失败时，已闭合的句子仍留下，避免这些句子再生成一遍。
-		const gloss =
-			pickWordGloss(payload?.wordGloss, bodyEn) ??
-			salvageWordGloss(text, bodyEn);
+		// 缺词批不信模型自己写的序号。它经常把第 9 句改成 i:1，挂错句后整句被丢掉。
+		const gloss = gaps.length
+			? placeGapGloss(payload?.wordGloss, bodyEn, gaps, text)
+			: (pickWordGloss(payload?.wordGloss, bodyEn) ??
+				salvageWordGloss(text, bodyEn));
 		return { gloss, raw: text };
 	}
 

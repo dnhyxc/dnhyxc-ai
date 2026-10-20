@@ -377,6 +377,7 @@ export const englishLearning = {
 	'englishLearning.dailyReading.themeRemove': 'Remove',
 	'englishLearning.dailyReading.themeReset': 'Reset',
 	'englishLearning.dailyReading.openList': 'Today',
+	'englishLearning.dailyReading.openReading': 'Open reading',
 	'englishLearning.dailyReading.themeInvalid':
 		'Use 1–16 characters, and keep at least one theme',
 	'englishLearning.dailyReading.listTitle': 'Daily reading',
@@ -397,6 +398,9 @@ export const englishLearning = {
 	'englishLearning.dailyReading.loadFailed': 'Could not load the list',
 	'englishLearning.dailyReading.notFound': 'This passage is not available',
 	'englishLearning.dailyReading.play': 'Read aloud',
+	'englishLearning.dailyReading.continueGenerate': 'Continue generating',
+	'englishLearning.dailyReading.listShow': 'Open reading list',
+	'englishLearning.dailyReading.listHide': 'Hide reading list',
 	'englishLearning.dailyReading.showZh': 'Show Chinese',
 	'englishLearning.dailyReading.hideZh': 'Hide Chinese',
 	'englishLearning.dailyReading.sourceHint': 'Source',

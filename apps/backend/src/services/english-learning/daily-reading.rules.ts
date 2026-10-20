@@ -366,41 +366,68 @@ function includesEither(sentence: string, en: string): boolean {
 	return left.includes(right) || right.includes(left);
 }
 
-function sentenceStillMissing(
-	sentence: string,
-	words: { w: string; zh: string }[],
-): boolean {
-	const have = new Map<string, number>();
-	for (const item of words) {
-		const key = item.w.toLowerCase();
-		have.set(key, (have.get(key) ?? 0) + 1);
-	}
-	for (const token of passageWords(sentence)) {
-		const key = token.toLowerCase();
-		const left = have.get(key) ?? 0;
-		if (left <= 0) return true;
-		have.set(key, left - 1);
-	}
-	return false;
+/** 给模型的编号文本。序号是全文里的编号。 */
+export function glossUserText(bodyEn: string): string {
+	return passageSentences(bodyEn)
+		.map((sentence, index) => `${index + 1}. ${sentence}`)
+		.join('\n');
 }
 
-function isCovered(
-	sentence: string,
-	rows: NonNullable<ReadingExtras['wordGloss']>,
-): boolean {
-	const hit = rows.find((row) => includesEither(sentence, row.en));
-	return !!hit && !sentenceStillMissing(sentence, hit.words);
+/** 已有 en 就保持原对照。只有序号时换成切句结果，越界则空。 */
+export function glossFromIndex(
+	row: Record<string, unknown>,
+	sentences: string[],
+): string {
+	const en = typeof row.en === 'string' ? stripZw(row.en) : '';
+	if (en) return en;
+	const index = typeof row.i === 'number' ? row.i : Number.NaN;
+	if (!Number.isInteger(index)) return '';
+	return sentences[index - 1] ?? '';
 }
 
-/** 还要再请求的句子。整句没有释义，或句中仍有词没有中文，都算缺。 */
-export function missingSentences(
+/** 一句里还没有中文的词。已有释义的词不在这里。 */
+export function missingWordSlots(
 	bodyEn: string,
 	gloss: ReadingExtras['wordGloss'],
-): string[] {
+): { sentence: string; words: string[] }[] {
 	const rows = gloss ?? [];
-	return passageSentences(bodyEn).filter(
-		(sentence) => !isCovered(sentence, rows),
-	);
+	const out: { sentence: string; words: string[] }[] = [];
+	for (const sentence of passageSentences(bodyEn)) {
+		const hit = rows.find((row) => includesEither(sentence, row.en));
+		const have = new Map<string, number>();
+		for (const item of hit?.words ?? []) {
+			const key = item.w.toLowerCase();
+			have.set(key, (have.get(key) ?? 0) + 1);
+		}
+		const words: string[] = [];
+		for (const token of passageWords(sentence)) {
+			const key = token.toLowerCase();
+			const left = have.get(key) ?? 0;
+			if (left <= 0) words.push(token);
+			else have.set(key, left - 1);
+		}
+		if (words.length) out.push({ sentence, words });
+	}
+	return out;
+}
+
+/** 补词请求只带序号和缺词。序号仍是全文里的编号。 */
+export function glossGapText(
+	bodyEn: string,
+	gaps: { sentence: string; words: string[] }[],
+): string {
+	const all = passageSentences(bodyEn);
+	const used = new Set<number>();
+	const lines: string[] = [];
+	for (const gap of gaps) {
+		const index = all.findIndex(
+			(item, i) => !used.has(i) && item === gap.sentence,
+		);
+		if (index < 0) continue;
+		used.add(index);
+		lines.push(`${index + 1}. ${gap.words.join(' ')}`);
+	}
+	return lines.join('\n');
 }
 
 function balancedObjectEnd(text: string, open: number): number {
@@ -466,7 +493,7 @@ function glossEnKey(en: string): string {
 	return en.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** 同一句里补全优先；只有首次写过的词按正文顺序留下。 */
+/** 同一句里已有中文优先。补上的词只填还空着的位置。 */
 export function mergeWordGloss(
 	first: ReadingExtras['wordGloss'],
 	second: ReadingExtras['wordGloss'],
@@ -506,47 +533,166 @@ function mergeSentenceWords(
 	const words: { w: string; zh: string }[] = [];
 	for (const token of passageWords(en)) {
 		const key = token.toLowerCase();
-		const zh = fillQueue.get(key)?.shift() ?? firstQueue.get(key)?.shift();
+		const zh = firstQueue.get(key)?.shift() ?? fillQueue.get(key)?.shift();
 		if (zh) words.push({ w: token, zh });
 	}
 	return words;
 }
 
+// 把模型的 wordGloss 收成可入库的 {en, words}。序号和旧的英文原句都收，对不上正文的整句丢掉。
 export function pickWordGloss(
+	// 模型给出的句子数组。截断抢救也可能把未解析完的片段传进来。
 	raw: unknown,
+	// 已经定稿的英文正文。句子必须能在这里找到，词也必须出现在对应句里。
 	bodyEn: string,
+	// 没有合格句子时返回 undefined，调用方不会把空的 wordGloss 写进 extras。
 ): ReadingExtras['wordGloss'] | undefined {
+	// 不是数组就无法逐句看 en、i 和 words，直接当成这次没有释义。
 	if (!Array.isArray(raw)) return undefined;
+	// 编号和落库用同一套切句，模型返回的 1 才对应正文第一句。
+	const sentences = passageSentences(bodyEn);
+	// 整篇去掉零宽字符并转小写，后面用包含关系确认这句确实来自这篇正文。
 	const body = stripZw(bodyEn).toLowerCase();
+	// 同一个序号只收第一次。重复的 i 不再挂第二份词表。
+	const usedIndex = new Set<number>();
+	// 通过正文对照和词校验的句子。详情页只读这里的 en 和 words。
 	const out: NonNullable<ReadingExtras['wordGloss']> = [];
+	// 按模型给出的顺序收。先出现的序号占住后，后面的重复项会被跳过。
 	for (const item of raw) {
+		// 单篇最多留 40 句，避免模型写出远超正文的释义列表。
 		if (out.length >= 40) break;
+		// 空位或非对象拿不到 en、i、words，跳过这一项，继续看后面的句子。
 		if (!item || typeof item !== 'object') continue;
+		// 收成字段记录，后面分别读取英文原句、序号和词表。
 		const row = item as Record<string, unknown>;
-		const en = typeof row.en === 'string' ? stripZw(row.en) : '';
-		const enNorm = en.toLowerCase().replace(/\s+/g, ' ');
-		if (!en || en.length > 600 || !body.replace(/\s+/g, ' ').includes(enNorm))
-			continue;
-		const wordsRaw = Array.isArray(row.words) ? row.words : [];
-		const words: { w: string; zh: string }[] = [];
-		for (const piece of wordsRaw) {
-			if (words.length >= 80) break;
-			if (!piece || typeof piece !== 'object') continue;
-			const cell = piece as Record<string, unknown>;
-			const w = typeof cell.w === 'string' ? stripZw(cell.w) : '';
-			const zh = typeof cell.zh === 'string' ? stripZw(cell.zh) : '';
-			if (!w || w.length > 40 || !zh || zh.length > 24) continue;
-			if (!/[\u4e00-\u9fff]/.test(zh) || !inBody(en, w)) continue;
-			words.push({ w, zh });
+		// 旧格式自带英文原句。有这段就沿用原来的对照，不用序号改写它。
+		const direct = typeof row.en === 'string' ? stripZw(row.en) : '';
+		// 新格式的序号必须是数字。缺字段或写成字符串都视为没有序号。
+		const index = typeof row.i === 'number' ? row.i : Number.NaN;
+		// 没有英文原句时才依赖序号。序号不是整数，或这个序号已经用过，这句不要。
+		if (!direct) {
+			if (!Number.isInteger(index) || usedIndex.has(index)) continue;
+			// 先占住序号。后面词校验失败也不会让同一个 i 再挂到另一份词表。
+			usedIndex.add(index);
+			// 结束只靠序号的这一支。带 en 的旧格式不进这里。
 		}
+		// 有 en 就用 en。只有合法序号时换成切出来的那一句，越界序号会变成空串。
+		const en = glossFromIndex(row, sentences);
+		// 对照前压掉多余空白并转小写，避免模型多写的换行让同一句对不上。
+		const enNorm = en.toLowerCase().replace(/\s+/g, ' ');
+		// 空句、超过 600 字，或压空白后的正文里找不到这句，都不能挂词，否则详情会错位。
+		if (!en || en.length > 600 || !body.replace(/\s+/g, ' ').includes(enNorm))
+			// 这句对不上正文，丢掉，继续看模型给出的下一句。
+			continue;
+		// words 不是数组就当成这句没有词，下面的循环不会收集任何词。
+		const wordsRaw = Array.isArray(row.words) ? row.words : [];
+		// 只留下能在这句里对上的词。入库后的每一项仍是 {w, zh}。
+		const words: { w: string; zh: string }[] = [];
+		// 按模型给出的词序收集，缺词判断才能按出现次数对齐。
+		for (const piece of wordsRaw) {
+			// 一句最多 80 个词，挡住把标点或重复项无限列下去。
+			if (words.length >= 80) break;
+			// 词项必须是对象，否则没有 w 和 zh 可取。
+			if (!piece || typeof piece !== 'object') continue;
+			// 取出这一项的词面和中文，后面分别检查长度和是否在句中。
+			const cell = piece as Record<string, unknown>;
+			// 词面只收字符串，并去掉零宽字符。其它类型当成这个词不存在。
+			const w = typeof cell.w === 'string' ? stripZw(cell.w) : '';
+			// 中文释义同样只收字符串。空串会在下一行被丢掉。
+			const zh = typeof cell.zh === 'string' ? stripZw(cell.zh) : '';
+			// 词面或释义为空、词面超过 40、释义超过 24，都不是能展示的逐词释义。
+			if (!w || w.length > 40 || !zh || zh.length > 24) continue;
+			// 释义里要有汉字，并且 w 必须作为整词出现在这句里，避免把别的句子的词挂过来。
+			if (!/[\u4e00-\u9fff]/.test(zh) || !inBody(en, w)) continue;
+			// 这个词通过校验，按模型顺序放进这句的词表。
+			words.push({ w, zh });
+			// 结束这一句的词过滤，words 里只剩能挂上正文的词。
+		}
+		// 一个词都没留下的句子不入库。详情里这句会继续显示纯英文。
 		if (words.length > 0) out.push({ en, words });
+		// 结束对模型句子数组的遍历，out 是准备写入 extras 的释义。
 	}
+	// 整段都没有合格句子时返回 undefined，调用方不会把空数组写进 extras。
 	return out.length > 0 ? out : undefined;
 }
 
 function inBody(bodyEn: string, word: string): boolean {
 	const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	return new RegExp(`\\b${escaped}\\b`, 'i').test(bodyEn);
+}
+
+function acceptedGlossWords(
+	wordsRaw: unknown,
+	en: string,
+): { w: string; zh: string }[] {
+	const words: { w: string; zh: string }[] = [];
+	if (!Array.isArray(wordsRaw)) return words;
+	for (const piece of wordsRaw) {
+		if (words.length >= 80) break;
+		if (!piece || typeof piece !== 'object') continue;
+		const cell = piece as Record<string, unknown>;
+		const w = typeof cell.w === 'string' ? stripZw(cell.w) : '';
+		const zh = typeof cell.zh === 'string' ? stripZw(cell.zh) : '';
+		if (!w || !zh || zh.length > 24 || !/[\u4e00-\u9fff]/.test(zh)) continue;
+		for (const token of w.split(/\s+/)) {
+			if (words.length >= 80) break;
+			if (!token || token.length > 40 || !inBody(en, token)) continue;
+			words.push({ w: token, zh });
+		}
+	}
+	return words;
+}
+
+/**
+ * 缺词批挂回这批句子。模型常把唯一一行改成 i:1，按原序号对上才收，对不上就按顺序挂。
+ */
+export function placeGapGloss(
+	raw: unknown,
+	bodyEn: string,
+	gaps: { sentence: string; words: string[] }[],
+	salvageText?: string,
+): ReadingExtras['wordGloss'] | undefined {
+	const all = passageSentences(bodyEn);
+	const used = new Set<number>();
+	const slots: { i: number; en: string }[] = [];
+	for (const gap of gaps) {
+		const at = all.findIndex(
+			(item, n) => !used.has(n) && item === gap.sentence,
+		);
+		if (at < 0) continue;
+		used.add(at);
+		slots.push({ i: at + 1, en: all[at] });
+	}
+	if (!slots.length) return undefined;
+	let list = Array.isArray(raw) ? raw : [];
+	if (!list.length && salvageText) list = closedGlossObjects(salvageText);
+	const items = list.filter(
+		(item): item is Record<string, unknown> =>
+			!!item && typeof item === 'object',
+	);
+	const slotByI = new Map(slots.map((slot) => [slot.i, slot]));
+	const taken = new Set<number>();
+	const wordsAt = new Map<number, { w: string; zh: string }[]>();
+	const leftover: Record<string, unknown>[] = [];
+	for (const row of items) {
+		const i = typeof row.i === 'number' ? row.i : Number(row.i);
+		const slot = slotByI.get(i);
+		if (slot && !taken.has(i)) {
+			taken.add(i);
+			wordsAt.set(i, acceptedGlossWords(row.words, slot.en));
+		} else leftover.push(row);
+	}
+	const open = slots.filter((slot) => !taken.has(slot.i));
+	leftover.forEach((row, n) => {
+		const slot = open[n];
+		if (!slot) return;
+		wordsAt.set(slot.i, acceptedGlossWords(row.words, slot.en));
+	});
+	const out = slots.flatMap((slot) => {
+		const words = wordsAt.get(slot.i) ?? [];
+		return words.length ? [{ en: slot.en, words }] : [];
+	});
+	return out.length ? out : undefined;
 }
 
 /** 正文已经合格。学习块不合格就省略该键，不让附件废掉整篇。 */
