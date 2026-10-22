@@ -2004,21 +2004,23 @@ export const getEnglishPracticeReport = async (
 };
 
 export type EnglishDailyReadingProfile = {
-	level: 'A2' | 'B1' | 'B2' | 'C1';
-	length: 'short' | 'medium' | 'long';
-	focus: 'reading' | 'vocab' | 'grammar' | 'both';
-	questions: 0 | 2 | 3;
+	level: 'A2' | 'B1' | 'B2' | 'C1' | 'random';
+	length: 'short' | 'medium' | 'long' | 'random';
+	focus: 'reading' | 'vocab' | 'grammar' | 'both' | 'random';
+	questions: 0 | 2 | 3 | 'random';
 	useWeb: boolean;
 };
 
 export type EnglishDailyReadingExtras = {
-	level: EnglishDailyReadingProfile['level'];
-	length: EnglishDailyReadingProfile['length'];
-	focus: EnglishDailyReadingProfile['focus'];
+	level: Exclude<EnglishDailyReadingProfile['level'], 'random'>;
+	length: Exclude<EnglishDailyReadingProfile['length'], 'random'>;
+	focus: Exclude<EnglishDailyReadingProfile['focus'], 'random'>;
 	glossary?: { word: string; zh: string }[];
 	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
 	grammarNote?: string;
-	grammarNotes?: string[];
+	grammarNotes?: Array<
+		string | { point: string; excerpt: string; explain: string }
+	>;
 	questions?: { q: string; options: string[]; answer: number }[];
 	sources?: { title: string; url: string }[];
 };
@@ -2034,8 +2036,8 @@ export type EnglishDailyReadingItem = {
 	sourceUrl: string | null;
 	sourceTitle: string | null;
 	origin?: 'day' | 'manual';
-	level?: EnglishDailyReadingProfile['level'] | null;
-	length?: EnglishDailyReadingProfile['length'] | null;
+	level?: EnglishDailyReadingExtras['level'] | null;
+	length?: EnglishDailyReadingExtras['length'] | null;
 	extras?: EnglishDailyReadingExtras | null;
 };
 
@@ -2068,6 +2070,7 @@ export type EnglishDailyReadingSettings = {
 	auto?: {
 		themes: string[];
 		profile: EnglishDailyReadingProfile;
+		hour: number;
 	};
 };
 
@@ -2093,10 +2096,12 @@ export const saveEnglishDailyReadingSettings = async (body: {
 export const saveEnglishDailyReadingAutoSettings = async (body: {
 	themes: string[];
 	profile: EnglishDailyReadingProfile;
+	hour: number;
 }) => {
 	return await http.put<{
 		themes: string[];
 		profile: EnglishDailyReadingProfile;
+		hour: number;
 	}>(`${ENGLISH_LEARNING_DAILY_READING_SETTINGS}/auto`, body);
 };
 
@@ -2107,8 +2112,10 @@ export type DailyReadingGen = {
 	elapsed: number;
 	startedAt: number;
 	status: 'done' | 'stopped' | 'error' | 'paused';
-	level: EnglishDailyReadingProfile['level'] | null;
-	length: EnglishDailyReadingProfile['length'] | null;
+	level: EnglishDailyReadingExtras['level'] | null;
+	length: EnglishDailyReadingExtras['length'] | null;
+	focus: EnglishDailyReadingExtras['focus'] | null;
+	questionCount: 0 | 2 | 3 | null;
 };
 
 export const listEnglishDailyReadingGens = async () => {
@@ -2142,6 +2149,12 @@ export const getEnglishDailyReading = async (
 	return await http.get<EnglishDailyReadingItem>(
 		`${ENGLISH_LEARNING_DAILY_READINGS}/${encodeURIComponent(id)}`,
 		{ silent: options?.silent },
+	);
+};
+
+export const removeEnglishDailyReading = async (id: string) => {
+	return await http.delete<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_DAILY_READINGS}/${encodeURIComponent(id)}`,
 	);
 };
 

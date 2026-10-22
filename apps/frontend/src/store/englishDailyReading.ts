@@ -25,8 +25,10 @@ class EnglishDailyReading {
 	elapsed = 0;
 	tokens = 0;
 	historyRev = 0;
-	level: EnglishDailyReadingProfile['level'] | null = null;
-	length: EnglishDailyReadingProfile['length'] | null = null;
+	level: Exclude<EnglishDailyReadingProfile['level'], 'random'> | null = null;
+	length: Exclude<EnglishDailyReadingProfile['length'], 'random'> | null = null;
+	focus: Exclude<EnglishDailyReadingProfile['focus'], 'random'> | null = null;
+	questions: 0 | 2 | 3 | null = null;
 	/** 本帧已拼好的原文。界面只看 text，不订这个字段。 */
 	private buf = '';
 	private bufTokens = 0;
@@ -85,8 +87,10 @@ class EnglishDailyReading {
 		this.startedAt = Date.now();
 		this.elapsed = 0;
 		this.tokens = 0;
-		this.level = profile.level;
-		this.length = profile.length;
+		this.level = profile.level === 'random' ? null : profile.level;
+		this.length = profile.length === 'random' ? null : profile.length;
+		this.focus = profile.focus === 'random' ? null : profile.focus;
+		this.questions = profile.questions === 'random' ? null : profile.questions;
 		this.connect(ENGLISH_LEARNING_DAILY_READING_MANUAL_STREAM, {
 			themes,
 			profile,

@@ -18,3 +18,29 @@ export function lengthLabel(
 	if (length === 'long') return t('englishLearning.dailyReading.lengthLong');
 	return '';
 }
+
+export function focusLabel(
+	focus: 'reading' | 'vocab' | 'grammar' | 'both' | null,
+	t: (key: string) => string,
+): string {
+	if (focus === 'both') {
+		return `${t('englishLearning.dailyReading.focusVocab')} · ${t('englishLearning.dailyReading.focusGrammar')}`;
+	}
+	if (focus === 'vocab') return t('englishLearning.dailyReading.focusVocab');
+	if (focus === 'grammar')
+		return t('englishLearning.dailyReading.focusGrammar');
+	if (focus === 'reading')
+		return t('englishLearning.dailyReading.focusReading');
+	return '';
+}
+
+export function questionsLabel(
+	count: number | null,
+	t: (key: string) => string,
+): string {
+	if (count == null) return '';
+	if (count >= 3) return t('englishLearning.dailyReading.questions3');
+	if (count === 2) return t('englishLearning.dailyReading.questions2');
+	if (count === 1) return t('englishLearning.dailyReading.questions1');
+	return t('englishLearning.dailyReading.questions0');
+}

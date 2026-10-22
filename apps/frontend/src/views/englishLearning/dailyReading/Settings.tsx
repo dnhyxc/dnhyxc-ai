@@ -2,6 +2,7 @@
  * 每日阅读设置：主题和生成档位。保存不重写已发布的短文。
  */
 import Confirm from '@design/Confirm';
+import HourPicker from '@design/HourPicker';
 import Loading from '@design/Loading';
 import { Toast } from '@ui/index';
 import { BookOpen } from 'lucide-react';
@@ -29,6 +30,8 @@ import { sameProfile, sameThemes } from './utils/profile';
 
 const LINK_CLASS =
 	'flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-teal-500 hover:text-teal-400 disabled:cursor-not-allowed disabled:opacity-50';
+
+const DEFAULT_AUTO_HOUR = 23;
 
 const EMPTY_PROFILE: EnglishDailyReadingProfile = {
 	level: 'B1',
@@ -58,6 +61,8 @@ export default observer(function DailyReadingSettingsPage() {
 	const [savedAutoThemes, setSavedAutoThemes] = useState<string[]>([]);
 	const [savedAutoProfile, setSavedAutoProfile] =
 		useState<EnglishDailyReadingProfile>(EMPTY_PROFILE);
+	const [autoHour, setAutoHour] = useState(DEFAULT_AUTO_HOUR);
+	const [savedAutoHour, setSavedAutoHour] = useState(DEFAULT_AUTO_HOUR);
 	const [autoDraft, setAutoDraft] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
@@ -107,10 +112,13 @@ export default observer(function DailyReadingSettingsPage() {
 				if (res.data.auto) {
 					const nextAutoThemes = res.data.auto.themes ?? [];
 					const nextAutoProfile = res.data.auto.profile ?? EMPTY_PROFILE;
+					const nextHour = res.data.auto.hour ?? DEFAULT_AUTO_HOUR;
 					setAutoThemes(nextAutoThemes);
 					setSavedAutoThemes(nextAutoThemes);
 					setAutoProfile(nextAutoProfile);
 					setSavedAutoProfile(nextAutoProfile);
+					setAutoHour(nextHour);
+					setSavedAutoHour(nextHour);
 				}
 				setError(null);
 			})
@@ -162,19 +170,27 @@ export default observer(function DailyReadingSettingsPage() {
 	);
 
 	const persistAuto = useCallback(
-		async (nextThemes: string[], nextProfile: EnglishDailyReadingProfile) => {
+		async (
+			nextThemes: string[],
+			nextProfile: EnglishDailyReadingProfile,
+			nextHour: number,
+		) => {
 			setAutoSaving(true);
 			try {
 				const res = await saveEnglishDailyReadingAutoSettings({
 					themes: nextThemes,
 					profile: nextProfile,
+					hour: nextHour,
 				});
 				const storedThemes = res.data?.themes ?? nextThemes;
 				const storedProfile = res.data?.profile ?? nextProfile;
+				const storedHour = res.data?.hour ?? nextHour;
 				setAutoThemes(storedThemes);
 				setSavedAutoThemes(storedThemes);
 				setAutoProfile(storedProfile);
 				setSavedAutoProfile(storedProfile);
+				setAutoHour(storedHour);
+				setSavedAutoHour(storedHour);
 				Toast({
 					type: 'success',
 					title: t('englishLearning.dailyReading.settingsSaved'),
@@ -194,10 +210,12 @@ export default observer(function DailyReadingSettingsPage() {
 		sameThemes(themes, defaults) && sameProfile(profile, profileDefaults);
 	const autoDirty =
 		!sameThemes(autoThemes, savedAutoThemes) ||
-		!sameProfile(autoProfile, savedAutoProfile);
+		!sameProfile(autoProfile, savedAutoProfile) ||
+		autoHour !== savedAutoHour;
 	const autoIsDefault =
 		sameThemes(autoThemes, defaults) &&
-		sameProfile(autoProfile, profileDefaults);
+		sameProfile(autoProfile, profileDefaults) &&
+		autoHour === DEFAULT_AUTO_HOUR;
 
 	return (
 		<>
@@ -313,6 +331,16 @@ export default observer(function DailyReadingSettingsPage() {
 								</div>
 								<ProfileFields
 									idPrefix="auto"
+									random
+									hour={
+										<HourPicker
+											name="auto-hour"
+											label={t('englishLearning.dailyReading.autoHour')}
+											value={autoHour}
+											disabled={autoSaving}
+											onChange={setAutoHour}
+										/>
+									}
 									themes={autoThemes}
 									setThemes={setAutoThemes}
 									draft={autoDraft}
@@ -326,9 +354,15 @@ export default observer(function DailyReadingSettingsPage() {
 												dirty={autoDirty}
 												isDefault={autoIsDefault}
 												disabled={autoSaving}
-												onSave={() => void persistAuto(autoThemes, autoProfile)}
+												onSave={() =>
+													void persistAuto(autoThemes, autoProfile, autoHour)
+												}
 												onReset={() =>
-													void persistAuto(defaults, profileDefaults)
+													void persistAuto(
+														defaults,
+														profileDefaults,
+														DEFAULT_AUTO_HOUR,
+													)
 												}
 											/>
 										) : undefined

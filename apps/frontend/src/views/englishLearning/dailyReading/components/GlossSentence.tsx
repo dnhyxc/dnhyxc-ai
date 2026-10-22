@@ -2,6 +2,50 @@ import { Button, Popover, PopoverContent, PopoverTrigger } from '@ui/index';
 import { Square, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/** 正文点词和文末单词列表共用这一套：词、朗读、释义。 */
+export function WordLine({
+	word,
+	zh,
+	playing,
+	onPlay,
+	playLabel,
+	stopLabel,
+}: {
+	word: string;
+	zh: string;
+	playing: boolean;
+	onPlay: () => void;
+	playLabel: string;
+	stopLabel: string;
+}) {
+	return (
+		<div className="flex flex-col">
+			<div className="flex items-center gap-1.5">
+				<span className="text-textcolor text-lg leading-7">{word}</span>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					className={cn(
+						'size-6 shrink-0 rounded-md p-0 shadow-none',
+						'focus-visible:border-transparent focus-visible:ring-0',
+						playing ? 'text-teal-500' : 'text-textcolor/55 hover:text-teal-400',
+					)}
+					aria-label={playing ? stopLabel : playLabel}
+					onClick={onPlay}
+				>
+					{playing ? (
+						<Square className="size-3.5 fill-current" aria-hidden />
+					) : (
+						<Volume2 className="size-3.5" aria-hidden />
+					)}
+				</Button>
+			</div>
+			<span className="text-textcolor/80 text-sm leading-7">{zh}</span>
+		</div>
+	);
+}
+
 export function GlossSentence({
 	en,
 	words,
@@ -70,36 +114,14 @@ export function GlossSentence({
 							onOpenAutoFocus={(event) => event.preventDefault()}
 							onCloseAutoFocus={(event) => event.preventDefault()}
 						>
-							<div className="flex flex-col gap-1">
-								<div className="flex items-center gap-1.5">
-									<span className="text-textcolor text-base font-semibold leading-none">
-										{gloss.w}
-									</span>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										className={cn(
-											'size-6 shrink-0 rounded-md p-0 shadow-none',
-											'focus-visible:border-transparent focus-visible:ring-0',
-											playing
-												? 'text-teal-500'
-												: 'text-textcolor/55 hover:text-teal-400',
-										)}
-										aria-label={playing ? stopLabel : playLabel}
-										onClick={() => onPlay(gloss.w)}
-									>
-										{playing ? (
-											<Square className="size-3.5 fill-current" aria-hidden />
-										) : (
-											<Volume2 className="size-3.5" aria-hidden />
-										)}
-									</Button>
-								</div>
-								<span className="text-textcolor/70 text-sm leading-5">
-									{gloss.zh}
-								</span>
-							</div>
+							<WordLine
+								word={gloss.w}
+								zh={gloss.zh}
+								playing={playing}
+								onPlay={() => onPlay(gloss.w)}
+								playLabel={playLabel}
+								stopLabel={stopLabel}
+							/>
 						</PopoverContent>
 					</Popover>
 				);

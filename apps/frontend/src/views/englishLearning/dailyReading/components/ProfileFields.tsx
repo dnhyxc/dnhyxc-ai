@@ -21,6 +21,8 @@ export function ProfileFields({
 	setProfile,
 	disabled,
 	actions,
+	hour,
+	random = false,
 }: {
 	idPrefix: string;
 	themes: string[];
@@ -31,6 +33,9 @@ export function ProfileFields({
 	setProfile: (next: EnglishDailyReadingProfile) => void;
 	disabled: boolean;
 	actions?: ReactNode;
+	hour?: ReactNode;
+	/** 只有自动档提供随机。手动档保持具体选项。 */
+	random?: boolean;
 }) {
 	const { t } = useI18n();
 	const addTheme = () => {
@@ -108,16 +113,6 @@ export function ProfileFields({
 			</section>
 			<div className="grid grid-cols-2 gap-4">
 				<OptionRow
-					name={`${idPrefix}-level`}
-					label={t('englishLearning.dailyReading.level')}
-					value={profile.level}
-					options={(['A2', 'B1', 'B2', 'C1'] as const).map((value) => ({
-						value,
-						label: value,
-					}))}
-					onChange={(level) => setProfile({ ...profile, level })}
-				/>
-				<OptionRow
 					name={`${idPrefix}-length`}
 					label={t('englishLearning.dailyReading.length')}
 					value={profile.length}
@@ -134,14 +129,40 @@ export function ProfileFields({
 							value: 'long',
 							label: t('englishLearning.dailyReading.lengthLong'),
 						},
+						...(random
+							? [
+									{
+										value: 'random' as const,
+										label: t('englishLearning.dailyReading.random'),
+									},
+								]
+							: []),
 					]}
 					onChange={(length) => setProfile({ ...profile, length })}
+				/>
+				<OptionRow
+					name={`${idPrefix}-level`}
+					label={t('englishLearning.dailyReading.level')}
+					value={profile.level}
+					options={(random
+						? (['A2', 'B1', 'B2', 'C1', 'random'] as const)
+						: (['A2', 'B1', 'B2', 'C1'] as const)
+					).map((value) => ({
+						value,
+						label:
+							value === 'random'
+								? t('englishLearning.dailyReading.random')
+								: value,
+					}))}
+					onChange={(level) => setProfile({ ...profile, level })}
 				/>
 			</div>
 			<div className="grid grid-cols-2 gap-4">
 				<section className="flex min-w-0 flex-col gap-3">
 					<h2 className={LABEL}>{t('englishLearning.dailyReading.focus')}</h2>
-					<div className="grid grid-cols-3 gap-4">
+					<div
+						className={cn('grid gap-4', random ? 'grid-cols-4' : 'grid-cols-3')}
+					>
 						{(
 							[
 								['reading', 'englishLearning.dailyReading.focusReading'],
@@ -168,7 +189,10 @@ export function ProfileFields({
 									onClick={() =>
 										setProfile({
 											...profile,
-											focus: nextFocus(profile.focus, key),
+											focus:
+												profile.focus === 'random'
+													? key
+													: nextFocus(profile.focus, key),
 										})
 									}
 								>
@@ -176,12 +200,26 @@ export function ProfileFields({
 								</Button>
 							);
 						})}
+						{random ? (
+							<Button
+								type="button"
+								variant="ghost"
+								aria-pressed={profile.focus === 'random'}
+								className={cn(
+									'h-10 w-full border text-base font-semibold',
+									profile.focus === 'random' ? OPT_ON : OPT_OFF,
+								)}
+								onClick={() => setProfile({ ...profile, focus: 'random' })}
+							>
+								{t('englishLearning.dailyReading.random')}
+							</Button>
+						) : null}
 					</div>
 				</section>
 				<OptionRow
 					name={`${idPrefix}-questions`}
 					label={t('englishLearning.dailyReading.questions')}
-					value={String(profile.questions) as '0' | '2' | '3'}
+					value={String(profile.questions) as '0' | '2' | '3' | 'random'}
 					options={[
 						{
 							value: '0',
@@ -195,32 +233,57 @@ export function ProfileFields({
 							value: '3',
 							label: t('englishLearning.dailyReading.questions3'),
 						},
+						...(random
+							? [
+									{
+										value: 'random' as const,
+										label: t('englishLearning.dailyReading.random'),
+									},
+								]
+							: []),
 					]}
 					onChange={(value) =>
 						setProfile({
 							...profile,
-							questions: Number(value) as 0 | 2 | 3,
+							questions:
+								value === 'random' ? 'random' : (Number(value) as 0 | 2 | 3),
 						})
 					}
 				/>
 			</div>
-			<OptionRow
-				name={`${idPrefix}-useWeb`}
-				label={t('englishLearning.dailyReading.useWeb')}
-				value={profile.useWeb ? 'on' : 'off'}
-				options={[
-					{
-						value: 'on',
-						label: t('englishLearning.dailyReading.useWebOn'),
-					},
-					{
-						value: 'off',
-						label: t('englishLearning.dailyReading.useWebOff'),
-					},
-				]}
-				onChange={(value) => setProfile({ ...profile, useWeb: value === 'on' })}
-				trailing={actions}
-			/>
+			<div
+				className={cn('grid gap-4', actions ? 'grid-cols-2' : 'grid-cols-1')}
+			>
+				<div
+					className={cn(
+						'grid min-w-0 gap-4',
+						hour ? 'grid-cols-3' : 'grid-cols-1',
+					)}
+				>
+					<div className={hour ? 'col-span-2 min-w-0' : undefined}>
+						<OptionRow
+							name={`${idPrefix}-useWeb`}
+							label={t('englishLearning.dailyReading.useWeb')}
+							value={profile.useWeb ? 'on' : 'off'}
+							options={[
+								{
+									value: 'on',
+									label: t('englishLearning.dailyReading.useWebOn'),
+								},
+								{
+									value: 'off',
+									label: t('englishLearning.dailyReading.useWebOff'),
+								},
+							]}
+							onChange={(value) =>
+								setProfile({ ...profile, useWeb: value === 'on' })
+							}
+						/>
+					</div>
+					{hour}
+				</div>
+				{actions}
+			</div>
 		</>
 	);
 }

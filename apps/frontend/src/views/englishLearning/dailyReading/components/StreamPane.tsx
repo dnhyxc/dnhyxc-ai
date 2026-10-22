@@ -10,7 +10,15 @@ export const StreamPane = observer(function StreamPane({
 }: {
 	history: Pick<
 		DailyReadingGen,
-		'text' | 'elapsed' | 'tokens' | 'level' | 'length'
+		| 'id'
+		| 'status'
+		| 'text'
+		| 'elapsed'
+		| 'tokens'
+		| 'level'
+		| 'length'
+		| 'focus'
+		| 'questionCount'
 	> | null;
 }) {
 	const live = history == null;
@@ -21,6 +29,10 @@ export const StreamPane = observer(function StreamPane({
 	const tokens = live ? englishDailyReadingStore.tokens : history.tokens;
 	const level = live ? englishDailyReadingStore.level : history.level;
 	const length = live ? englishDailyReadingStore.length : history.length;
+	const focus = live ? englishDailyReadingStore.focus : history.focus;
+	const questions = live
+		? englishDailyReadingStore.questions
+		: history.questionCount;
 	return (
 		<>
 			<StreamMeta
@@ -29,6 +41,9 @@ export const StreamPane = observer(function StreamPane({
 				tokens={tokens}
 				level={level}
 				length={length}
+				focus={focus}
+				questions={questions}
+				readingId={history?.status === 'done' ? history.id : null}
 			/>
 			<div className="flex h-65">
 				<StreamPreview text={text} generating={generating} />

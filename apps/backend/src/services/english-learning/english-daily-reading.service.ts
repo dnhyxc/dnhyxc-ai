@@ -26,15 +26,16 @@ import {
 	PENDING_STALE_MS,
 } from './daily-reading.constants';
 import {
-	addCalendarDays,
 	DEFAULT_PROFILE,
 	DEFAULT_THEMES,
+	duePublishDate,
 	emptyExtraKeys,
 	extrasRequested,
 	GLOSS_BATCH,
 	glossaryLimit,
 	glossGapText,
 	glossUserText,
+	hourInShanghai,
 	isFlashGlossModel,
 	mergeExtras,
 	mergeWordGloss,
@@ -55,7 +56,9 @@ import {
 	rejectPassage,
 	rejectReasonText,
 	requestedExtraKeys,
+	resolveProfile,
 	SNIPPET_COPY_WORDS,
+	type StoredProfile,
 	salvageExtras,
 	salvageWordGloss,
 	sanitizeHttpUrl,
@@ -253,23 +256,27 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 
 	async onApplicationBootstrap(): Promise<void> {
 		try {
-			// 每天 23:00（上海）准备下一天。启动时再补今天和明天，避免进程中午才起来漏掉。
-			await this.queue.upsertJobScheduler(
-				'daily-reading-next',
-				{ pattern: '0 23 * * *', tz: 'Asia/Shanghai' },
-				{
-					name: 'prepare-next',
-					data: {},
-					opts: JOB_OPTS,
-				},
-			);
-			const today = shanghaiToday();
-			await this.enqueuePassage(today);
-			await this.enqueuePassage(addCalendarDays(today, 1));
+			const saved = await this.loadAutoSettings();
+			await this.registerScheduler(saved.hour);
+			await this.enqueuePassage(duePublishDate(saved.hour));
 		} catch (e) {
 			// 队列连不上时定时篇先缺着，不挡住进程启动。手动生成不依赖这次注册。
 			this.logger.warn('[EnglishDailyReading] 调度未注册', e);
 		}
+	}
+
+	/** 同一 scheduler id，改整点只换 cron，不会新旧两档一起响。 */
+	private async registerScheduler(hour: number): Promise<void> {
+		const h = hour >= 0 && hour <= 23 ? hour : 23;
+		await this.queue.upsertJobScheduler(
+			'daily-reading-next',
+			{ pattern: `0 ${h} * * *`, tz: 'Asia/Shanghai' },
+			{
+				name: 'prepare-next',
+				data: {},
+				opts: JOB_OPTS,
+			},
+		);
 	}
 
 	/** 工人入口。publishDate 已由调用方钉死。 */
@@ -278,7 +285,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) return;
 		const saved = await this.loadAutoSettings();
 		const theme = themeForDate(publishDate, saved.themes);
-		const profile = saved.profile;
+		const profile = resolveProfile(saved.profile);
 		const owned = await this.claim(publishDate, theme);
 		// 抢不到说明今天这行已就绪，或还在冷却。不能接着写，否则会覆盖已发布正文。
 		if (!owned) return;
@@ -385,15 +392,11 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		origin: 'day' | 'manual' = 'day',
 	): Promise<DailyReadingList> {
 		const today = shanghaiToday();
-		const tomorrow = addCalendarDays(today, 1);
-		await this.enqueuePassage(tomorrow).catch((e) => {
-			this.logger.warn('[EnglishDailyReading] 入队失败', e);
-		});
 		const todayRow = await this.repo.findOne({
 			where: { publishDate: today, slot: DAY_SLOT },
 		});
-		let todayStatus: DailyReadingList['todayStatus'] = 'generating';
-		// ready 直接可用。failed 过了冷却、pending 过了 90 秒，才重新入队并显示生成中。
+		// 没有今天这行时保持 failed，不入队，避免列表打开就生成、状态一直转圈。
+		let todayStatus: DailyReadingList['todayStatus'] = 'failed';
 		if (todayRow?.status === 'ready') todayStatus = 'ready';
 		else if (todayRow?.status === 'failed') {
 			const age = Date.now() - new Date(todayRow.startedAt).getTime();
@@ -401,11 +404,9 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			if (todayStatus === 'generating') {
 				await this.enqueuePassage(today).catch(() => undefined);
 			}
-		} else if (!todayRow || todayRow.status === 'pending') {
-			const age = todayRow
-				? Date.now() - new Date(todayRow.startedAt).getTime()
-				: Infinity;
-			if (!todayRow || age >= PENDING_STALE_MS) {
+		} else if (todayRow?.status === 'pending') {
+			const age = Date.now() - new Date(todayRow.startedAt).getTime();
+			if (age >= PENDING_STALE_MS) {
 				await this.enqueuePassage(today).catch(() => undefined);
 			}
 			todayStatus = 'generating';
@@ -642,8 +643,9 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		userId: number,
 		run: ManualRun,
 		themes: string[],
-		profile: ReadingProfile,
+		stored: StoredProfile,
 	): Promise<void> {
+		const profile = resolveProfile(stored);
 		let settled = 0;
 		const lanes = new Map<number, number>();
 		let usageId = 0;
@@ -865,6 +867,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				status: row.status,
 				level: extras?.level ?? null,
 				length: extras?.length ?? null,
+				focus: extras?.focus ?? null,
+				questionCount: extras?.questionCount ?? null,
 			};
 		});
 	}
@@ -872,6 +876,18 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	/** 只删这个用户自己的一条。别人的 id 删不到。 */
 	async removeGen(userId: number, id: string): Promise<void> {
 		if (!this.parseRunId(id)) return;
+		await this.gens.delete({ id, userId });
+	}
+
+	/** 只删本人的手动篇。定时篇全站共用，删不到。同 id 的生成历史一并去掉。 */
+	async remove(userId: number, id: string): Promise<void> {
+		if (!this.parseRunId(id)) throw new NotFoundException('文章不存在');
+		const res = await this.repo.delete({
+			id,
+			userId,
+			slot: Not(DAY_SLOT),
+		});
+		if (!res.affected) throw new NotFoundException('文章不存在');
 		await this.gens.delete({ id, userId });
 	}
 
@@ -959,9 +975,9 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	async readingSettings(userId: number): Promise<{
 		themes: string[];
 		defaults: string[];
-		profile: ReadingProfile;
+		profile: StoredProfile;
 		profileDefaults: ReadingProfile;
-		auto?: { themes: string[]; profile: ReadingProfile };
+		auto?: { themes: string[]; profile: StoredProfile; hour: number };
 	}> {
 		const saved = await this.loadSettings(userId);
 		const body = {
@@ -982,7 +998,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	): Promise<{
 		themes: string[];
 		defaults: string[];
-		profile: ReadingProfile;
+		profile: StoredProfile;
 		profileDefaults: ReadingProfile;
 	}> {
 		const themes = normalizeThemeList(input?.themes);
@@ -1004,14 +1020,15 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 
 	async saveAutoSettings(
 		userId: number,
-		input: { themes?: unknown; profile?: unknown },
-	): Promise<{ themes: string[]; profile: ReadingProfile }> {
+		input: { themes?: unknown; profile?: unknown; hour?: unknown },
+	): Promise<{ themes: string[]; profile: StoredProfile; hour: number }> {
 		if (!(await this.userService.userHasSuperAdminRole(userId))) {
 			throw new ForbiddenException('需要超级管理员权限');
 		}
 		const themes = normalizeThemeList(input?.themes);
 		if (!themes) throw new BadRequestException('主题不合法');
 		const profile = normalizeProfile(input?.profile);
+		const hour = parseAutoHour(input?.hour);
 		const existing = await this.settings.findOne({ where: { id: 1 } });
 		if (!existing) {
 			await this.settings.insert({
@@ -1020,20 +1037,27 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				profile: { ...DEFAULT_PROFILE },
 				autoThemes: themes,
 				autoProfile: profile,
+				autoHour: hour,
 			});
 		} else {
 			await this.settings.update(
 				{ id: 1 },
-				{ autoThemes: themes, autoProfile: profile },
+				{ autoThemes: themes, autoProfile: profile, autoHour: hour },
 			);
 		}
-		return { themes, profile };
+		await this.registerScheduler(hour);
+		if (hourInShanghai() >= hour) {
+			await this.enqueuePassage(duePublishDate(hour)).catch((e) => {
+				this.logger.warn('[EnglishDailyReading] 改点后补队失败', e);
+			});
+		}
+		return { themes, profile, hour };
 	}
 
 	/** 没有这一用户的行时回系统默认，不把全站旧档套到别人身上。 */
 	private async loadSettings(userId: number): Promise<{
 		themes: string[];
-		profile: ReadingProfile;
+		profile: StoredProfile;
 	}> {
 		const row = await this.userSettings.findOne({ where: { userId } });
 		return {
@@ -1045,7 +1069,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	/** 定时篇只读自动档。列还空着时用手动档，再空才用代码默认。 */
 	private async loadAutoSettings(): Promise<{
 		themes: string[];
-		profile: ReadingProfile;
+		profile: StoredProfile;
+		hour: number;
 	}> {
 		const row = await this.settings.findOne({ where: { id: 1 } });
 		const manual = {
@@ -1053,12 +1078,14 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			profile: normalizeProfile(row?.profile),
 		};
 		const autoThemes = normalizeThemeList(row?.autoThemes);
+		const hour = Number(row?.autoHour);
 		return {
 			themes: autoThemes ?? manual.themes,
 			profile:
 				row?.autoProfile != null
 					? normalizeProfile(row.autoProfile)
 					: manual.profile,
+			hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 23,
 		};
 	}
 
@@ -1207,6 +1234,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				level: profile.level,
 				length: profile.length,
 				focus: profile.focus,
+				questionCount: profile.questions,
 			},
 		});
 		return theme;
@@ -1468,7 +1496,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			},
 		);
 		const gloss = glossExtras.wordGloss;
-		return gloss?.length ? { ...attached, wordGloss: gloss } : attached;
+		const extras = gloss?.length ? { ...attached, wordGloss: gloss } : attached;
+		return { ...extras, questionCount: profile.questions };
 	}
 
 	/** 短文已合格。附件截断或失败都不废正文。停止仍向上抛。 */
@@ -1522,7 +1551,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				second.ok && second.payload
 					? pickExtras(second.payload, bodyEn, profile)
 					: salvageExtras(second.raw, bodyEn, profile);
-			return mergeExtras(extras, more);
+			return mergeExtras(extras, more, profile);
 		} catch (e) {
 			if (opts?.signal?.aborted || this.isAbort(e, opts?.signal)) throw e;
 			this.logger.warn('[EnglishDailyReading] 附件补全失败', e);
@@ -1572,7 +1601,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				return `glossary: up to ${glossaryLimit(profile.length)} objects {word, zh}; each word must appear in the passage; pick advanced, precise, high-value words a learner would look up, not basic everyday words`;
 			}
 			if (key === 'grammarNotes') {
-				return 'grammarNotes: up to 3 different Chinese sentences, each within 120 characters, each about one grammar pattern in the passage';
+				return 'grammarNotes: up to 3 objects {point, excerpt, explain}, not Chinese sentences. point: Chinese name of one pattern in the passage, within 20 characters. excerpt: an English fragment copied verbatim from the passage, 8-80 characters. explain: one Chinese sentence within 120 characters that says how the pattern works in that excerpt, and must contain 表示 or 用于. Do not translate the excerpt or the passage.';
 			}
 			return `questions: exactly ${profile.questions} objects {q, options, answer}; options has 3 strings; answer is 0, 1, or 2`;
 		});
@@ -1843,4 +1872,13 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		const driver = e.driverError as { errno?: number; code?: string };
 		return driver?.errno === 1062 || driver?.code === 'ER_DUP_ENTRY';
 	}
+}
+
+function parseAutoHour(input: unknown): number {
+	if (input == null || input === '') return 23;
+	const n = typeof input === 'number' ? input : Number(input);
+	if (!Number.isInteger(n) || n < 0 || n > 23) {
+		throw new BadRequestException('入队时间不合法');
+	}
+	return n;
 }

@@ -344,10 +344,12 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 				onConfirm={() => void executeDeleteLibrary()}
 			/>
 			<div className="h-12 flex items-center justify-between px-4 py-1">
-				<div className="flex items-center gap-2">
-					{kind === 'vocab'
-						? t('englishLearning.library.vocab.title')
-						: t('englishLearning.library.classic.title')}
+				<div className="flex min-w-0 items-center gap-2">
+					<span className="text-textcolor min-w-0 truncate text-base font-semibold">
+						{kind === 'vocab'
+							? t('englishLearning.library.vocab.title')
+							: t('englishLearning.library.classic.title')}
+					</span>
 					<div className="text-textcolor/50 mt-0.5 text-sm">
 						{t('englishLearning.library.listCount', {
 							count: entries.length,
@@ -365,7 +367,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 					{t('englishLearning.library.goImport')}
 				</div>
 			</div>
-			<ScrollArea className="min-h-0 flex-1 py-4" onScroll={onViewportScroll}>
+			<ScrollArea className="min-h-0 flex-1 pb-4" onScroll={onViewportScroll}>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
 						<Loading text={t('englishLearning.library.listLoading')} />

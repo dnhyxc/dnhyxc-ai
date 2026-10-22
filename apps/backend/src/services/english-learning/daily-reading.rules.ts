@@ -36,6 +36,26 @@ export function shanghaiToday(now = new Date()): string {
 	}).format(now);
 }
 
+/** 与 cron 的 Asia/Shanghai 同一套钟。 */
+export function hourInShanghai(now = new Date()): number {
+	const hour = new Intl.DateTimeFormat('en-GB', {
+		timeZone: SHANGHAI,
+		hour: 'numeric',
+		hourCycle: 'h23',
+	})
+		.formatToParts(now)
+		.find((part) => part.type === 'hour')?.value;
+	const n = Number(hour);
+	return Number.isInteger(n) ? n : 0;
+}
+
+/** 已过今天的整点则补明天，否则只可能补上一档产出的今天。 */
+export function duePublishDate(hour: number, now = new Date()): string {
+	const h = hour >= 0 && hour <= 23 ? hour : 23;
+	const today = shanghaiToday(now);
+	return hourInShanghai(now) >= h ? addCalendarDays(today, 1) : today;
+}
+
 /** 在 YYYY-MM-DD 上加减天数，不经过「现在」的时区。 */
 export function addCalendarDays(ymd: string, days: number): string {
 	const [y, m, d] = ymd.split('-').map((n) => Number(n));
@@ -48,6 +68,15 @@ export function addCalendarDays(ymd: string, days: number): string {
 export type ReadingLevel = 'A2' | 'B1' | 'B2' | 'C1';
 export type ReadingLength = 'short' | 'medium' | 'long';
 export type ReadingFocus = 'reading' | 'vocab' | 'grammar' | 'both';
+
+/** 设置可记住随机。提示词和 extras 只用抽完的具体档。 */
+export type StoredProfile = {
+	level: ReadingLevel | 'random';
+	length: ReadingLength | 'random';
+	focus: ReadingFocus | 'random';
+	questions: 0 | 2 | 3 | 'random';
+	useWeb: boolean;
+};
 
 /** 没改过设置时等于现在的生成：B1、中篇、不要附件、允许联网。 */
 export type ReadingProfile = {
@@ -73,14 +102,23 @@ export const DEFAULT_PROFILE: ReadingProfile = {
 	useWeb: true,
 };
 
+/** 一条语法：名称、正文里的英文片段、用法。纯中文句子不是讲解。 */
+export type GrammarNote = {
+	point: string;
+	excerpt: string;
+	explain: string;
+};
+
 export type ReadingExtras = {
 	level: ReadingLevel;
 	length: ReadingLength;
 	focus: ReadingFocus;
+	/** 这次设置要几道理解题。和 questions 数组分开，条数没凑满时仍显示设定。 */
+	questionCount?: 0 | 2 | 3;
 	glossary?: { word: string; zh: string }[];
 	/** 按句列出正文里的词，zh 是该词在这一句里的意思。 */
 	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
-	grammarNotes?: string[];
+	grammarNotes?: GrammarNote[];
 	questions?: { q: string; options: string[]; answer: number }[];
 	/** 这次联网取材用到的条目，详情全部展示。 */
 	sources?: { title: string; url: string }[];
@@ -94,26 +132,55 @@ const FOCUSES: readonly ReadingFocus[] = [
 	'grammar',
 	'both',
 ];
+const QUESTION_COUNTS = [0, 2, 3] as const;
 
-/** 脏枚举回默认，不让整单失败。 */
-export function normalizeProfile(input: unknown): ReadingProfile {
+function pick<T>(items: readonly T[]): T {
+	return items[Math.floor(Math.random() * items.length)] as T;
+}
+
+function kept<T extends string>(
+	value: unknown,
+	allowed: readonly T[],
+	fallback: T,
+): T {
+	return allowed.find((item) => item === value) ?? fallback;
+}
+
+/** 脏枚举回默认。random 要留下来，否则保存后的随机会被收成 B1。 */
+export function normalizeProfile(input: unknown): StoredProfile {
 	const src =
 		input && typeof input === 'object'
 			? (input as Record<string, unknown>)
 			: {};
-	const level =
-		LEVELS.find((item) => item === src.level) ?? DEFAULT_PROFILE.level;
-	const length =
-		LENGTHS.find((item) => item === src.length) ?? DEFAULT_PROFILE.length;
-	const focus =
-		FOCUSES.find((item) => item === src.focus) ?? DEFAULT_PROFILE.focus;
+	const level = kept(src.level, [...LEVELS, 'random'], DEFAULT_PROFILE.level);
+	const length = kept(
+		src.length,
+		[...LENGTHS, 'random'],
+		DEFAULT_PROFILE.length,
+	);
+	const focus = kept(src.focus, [...FOCUSES, 'random'], DEFAULT_PROFILE.focus);
 	const questions =
-		src.questions === 0 || src.questions === 2 || src.questions === 3
+		src.questions === 'random' ||
+		src.questions === 0 ||
+		src.questions === 2 ||
+		src.questions === 3
 			? src.questions
 			: DEFAULT_PROFILE.questions;
 	const useWeb =
 		typeof src.useWeb === 'boolean' ? src.useWeb : DEFAULT_PROFILE.useWeb;
 	return { level, length, focus, questions, useWeb };
+}
+
+/** 每个 random 字段均匀抽一次。具体字段保持原值，同一次生成复用返回值。 */
+export function resolveProfile(stored: StoredProfile): ReadingProfile {
+	return {
+		level: stored.level === 'random' ? pick(LEVELS) : stored.level,
+		length: stored.length === 'random' ? pick(LENGTHS) : stored.length,
+		focus: stored.focus === 'random' ? pick(FOCUSES) : stored.focus,
+		questions:
+			stored.questions === 'random' ? pick(QUESTION_COUNTS) : stored.questions,
+		useWeb: stored.useWeb,
+	};
 }
 
 export function themeForDate(
@@ -728,20 +795,7 @@ export function pickExtras(
 		if (glossary.length > 0) extras.glossary = glossary;
 	}
 	if (profile.focus === 'grammar' || profile.focus === 'both') {
-		const rawNotes = Array.isArray(o.grammarNotes)
-			? o.grammarNotes
-			: typeof o.grammarNote === 'string'
-				? [o.grammarNote]
-				: [];
-		const grammarNotes: string[] = [];
-		for (const item of rawNotes) {
-			if (grammarNotes.length >= 3) break;
-			if (typeof item !== 'string') continue;
-			const note = stripZw(item);
-			if (!note || note.length > 120 || !/[\u4e00-\u9fff]/.test(note)) continue;
-			if (grammarNotes.includes(note)) continue;
-			grammarNotes.push(note);
-		}
+		const grammarNotes = pickGrammarNotes(o.grammarNotes, bodyEn);
 		if (grammarNotes.length > 0) extras.grammarNotes = grammarNotes;
 	}
 	const wordGloss = pickWordGloss(o.wordGloss, bodyEn);
@@ -757,9 +811,9 @@ export function pickExtras(
 						(opt): opt is string => typeof opt === 'string' && !!stripZw(opt),
 					)
 				: [];
-			const answer = row.answer;
-			if (!q || q.length > 200 || options.length !== 3) continue;
-			if (answer !== 0 && answer !== 1 && answer !== 2) continue;
+			const answer = questionAnswer(row.answer);
+			if (!q || q.length > 200 || options.length !== 3 || answer == null)
+				continue;
 			const placed = shuffleOptions(
 				options.map((opt) => stripZw(opt).slice(0, 80)),
 				answer,
@@ -771,6 +825,52 @@ export function pickExtras(
 		}
 	}
 	return extras;
+}
+
+const GRAMMAR_CUE = /表示|用于/;
+
+/** 摘录折叠空白后必须出现在这篇正文里，避免讲到别的文章。 */
+function excerptInBody(bodyEn: string, excerpt: string): boolean {
+	const left = stripZw(bodyEn).replace(/\s+/g, ' ').toLowerCase();
+	const right = excerpt.replace(/\s+/g, ' ').trim().toLowerCase();
+	if (right.length < 8 || right.length > 80) return false;
+	if (!/[a-z]/i.test(right)) return false;
+	return left.includes(right);
+}
+
+/** 只留讲到本文的语法。字符串和整句中文翻译都丢掉，好让外层再要一次。 */
+export function pickGrammarNotes(raw: unknown, bodyEn: string): GrammarNote[] {
+	if (!Array.isArray(raw)) return [];
+	const notes: GrammarNote[] = [];
+	for (const item of raw) {
+		if (notes.length >= 3) break;
+		if (!item || typeof item !== 'object') continue;
+		const row = item as Record<string, unknown>;
+		const point = typeof row.point === 'string' ? stripZw(row.point) : '';
+		const excerpt = typeof row.excerpt === 'string' ? stripZw(row.excerpt) : '';
+		const explain = typeof row.explain === 'string' ? stripZw(row.explain) : '';
+		if (!point || point.length > 20 || !/[\u4e00-\u9fff]/.test(point)) continue;
+		if (!excerptInBody(bodyEn, excerpt)) continue;
+		if (
+			!explain ||
+			explain.length > 120 ||
+			!/[\u4e00-\u9fff]/.test(explain) ||
+			!GRAMMAR_CUE.test(explain)
+		) {
+			continue;
+		}
+		const key = excerpt.replace(/\s+/g, ' ').trim().toLowerCase();
+		if (
+			notes.some(
+				(note) =>
+					note.excerpt.replace(/\s+/g, ' ').trim().toLowerCase() === key,
+			)
+		) {
+			continue;
+		}
+		notes.push({ point, excerpt, explain });
+	}
+	return notes;
 }
 
 export type ReadingExtraKey = 'glossary' | 'grammarNotes' | 'questions';
@@ -791,7 +891,7 @@ export function requestedExtraKeys(profile: ReadingProfile): ReadingExtraKey[] {
 	return keys;
 }
 
-/** 某一类一个都没有才需要再要。已有若干条就不补。 */
+/** 词汇和语法一个都没有才再要。题目没凑满设定条数也再要。 */
 export function emptyExtraKeys(
 	extras: ReadingExtras,
 	profile: ReadingProfile,
@@ -799,14 +899,37 @@ export function emptyExtraKeys(
 	return requestedExtraKeys(profile).filter((key) => {
 		if (key === 'glossary') return !extras.glossary?.length;
 		if (key === 'grammarNotes') return !extras.grammarNotes?.length;
-		return !extras.questions?.length;
+		return (extras.questions?.length ?? 0) < profile.questions;
 	});
 }
 
-/** 同一类两次都有时留下先拿到的，避免补请求盖掉已合格的条目。 */
+/** 答案常被模型写成字符串。只接受 0、1、2。 */
+function questionAnswer(raw: unknown): 0 | 1 | 2 | null {
+	const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
+	if (n === 0 || n === 1 || n === 2) return n;
+	return null;
+}
+
+/** 题目按题干去重，凑满设定条数为止。先留下的优先。 */
+function fillQuestions(
+	first: ReadingExtras['questions'],
+	second: ReadingExtras['questions'],
+	cap: number,
+): NonNullable<ReadingExtras['questions']> {
+	const out = [...(first ?? [])];
+	for (const item of second ?? []) {
+		if (out.length >= cap) break;
+		if (out.some((row) => row.q === item.q)) continue;
+		out.push(item);
+	}
+	return out.slice(0, cap);
+}
+
+/** 同一类两次都有时留下先拿到的。题目不足时用后一次补满。 */
 export function mergeExtras(
 	first: ReadingExtras,
 	second: ReadingExtras,
+	profile: ReadingProfile,
 ): ReadingExtras {
 	const extras: ReadingExtras = {
 		level: first.level,
@@ -817,9 +940,11 @@ export function mergeExtras(
 	const grammarNotes = first.grammarNotes?.length
 		? first.grammarNotes
 		: second.grammarNotes;
-	const questions = first.questions?.length
-		? first.questions
-		: second.questions;
+	const questions = fillQuestions(
+		first.questions,
+		second.questions,
+		profile.questions,
+	);
 	const wordGloss = first.wordGloss?.length
 		? first.wordGloss
 		: second.wordGloss;

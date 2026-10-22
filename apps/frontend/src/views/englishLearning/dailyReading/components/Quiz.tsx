@@ -6,8 +6,6 @@ import type { EnglishDailyReadingExtras } from '@/service';
 import { QUIZ_OPTION_CLASS } from '../../daily/constants';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../practice/constants';
 
-const SECTION = 'text-textcolor text-sm font-semibold';
-
 export function Quiz({
 	items,
 }: {
@@ -19,17 +17,19 @@ export function Quiz({
 	const ready = items.every((_, index) => picked[index] != null);
 	return (
 		<section className="flex flex-col gap-3">
-			<h2 className={SECTION}>{t('englishLearning.dailyReading.quiz')}</h2>
+			<h2 className="text-sm text-textcolor/80">
+				{t('englishLearning.dailyReading.quiz')}
+			</h2>
 			{items.map((item, index) => {
 				const chosen = picked[index];
 				const correct = chosen === item.answer;
 				return (
-					<div key={index} className="flex flex-col gap-2">
-						<p className="text-textcolor text-base leading-7">
+					<div key={index} className="flex flex-col gap-3">
+						<div className="text-textcolor text-lg leading-7">
 							{submitted ? (
 								<span
 									className={cn(
-										'mr-2',
+										'mr-2 text-base',
 										correct ? 'text-teal-500' : 'text-rose-500',
 									)}
 								>
@@ -39,7 +39,7 @@ export function Quiz({
 								</span>
 							) : null}
 							{item.q}
-						</p>
+						</div>
 						{item.options.map((opt, optIndex) => {
 							const on = chosen === optIndex;
 							const right = optIndex === item.answer;

@@ -1401,6 +1401,7 @@ const Knowledge = observer(() => {
 				checkedMessages={shareCheckedMessages}
 				sessionId={knowledgeStore.knowledgeEditingKnowledgeId ?? undefined}
 				shareType="knowledge"
+				articleTitle={knowledgeStore.knowledgeTitle}
 			/>
 		</div>
 	);

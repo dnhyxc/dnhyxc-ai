@@ -2870,7 +2870,7 @@ export class EnglishLearningController {
 	@Put('daily-reading-settings/auto')
 	async saveDailyReadingAutoSettings(
 		@Req() req: AuthedRequest,
-		@Body() body: { themes?: unknown; profile?: unknown },
+		@Body() body: { themes?: unknown; profile?: unknown; hour?: unknown },
 	) {
 		if (req.user?.userId == null) {
 			throw new UnauthorizedException('未授权');
@@ -3033,6 +3033,15 @@ export class EnglishLearningController {
 				this.dailyReadingService.detachManual(userId, emit);
 			};
 		});
+	}
+
+	@Delete('daily-readings/:id')
+	async removeDailyReading(@Req() req: AuthedRequest, @Param('id') id: string) {
+		if (req.user?.userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		await this.dailyReadingService.remove(req.user.userId, id);
+		return { success: true, data: { removed: true } };
 	}
 
 	@Get('daily-readings/:id')

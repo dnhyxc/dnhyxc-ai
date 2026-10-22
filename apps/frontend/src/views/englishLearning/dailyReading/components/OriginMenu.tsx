@@ -61,7 +61,10 @@ export function OriginMenu({
 						'data-[state=open]:bg-transparent data-[state=open]:text-teal-400 data-[state=open]:ring-0',
 					)}
 				>
-					<TriggerIcon className="size-4 shrink-0 opacity-90" aria-hidden />
+					<TriggerIcon
+						className="size-4 shrink-0 opacity-90 -mb-0.5"
+						aria-hidden
+					/>
 					<span className="max-w-36 truncate">{current.label}</span>
 				</Button>
 			</DropdownMenuTrigger>

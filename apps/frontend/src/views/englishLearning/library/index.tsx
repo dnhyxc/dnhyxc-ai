@@ -8,7 +8,6 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { cn } from '@/lib/utils';
 import type {
 	EnglishClassicQuotesLibraryListItem,
 	EnglishVocabularyLibraryListItem,
@@ -173,11 +172,7 @@ export default function EnglishLearningLibraryPage() {
 							defaultSize="35%"
 							className="min-h-0 min-w-0"
 						>
-							<aside
-								className={cn(
-									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
-								)}
-							>
+							<aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10 bg-theme-background">
 								<LibraryListPanel
 									kind={kind}
 									selectedId={activeLibraryId}
@@ -194,7 +189,7 @@ export default function EnglishLearningLibraryPage() {
 							defaultSize="65%"
 							className="min-h-0 min-w-0"
 						>
-							<section className="border-l border-theme/5 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
+							<section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
 								{kind === 'vocab' ? (
 									<VocabularyLibrarySection
 										libraryId={activeLibraryId}

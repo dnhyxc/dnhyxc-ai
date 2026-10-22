@@ -16,7 +16,6 @@ import type { DailyReadingGen, EnglishDailyReadingProfile } from '@/service';
 import englishDailyReadingStore from '@/store/englishDailyReading';
 import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../practice/constants';
 import { recordTitle } from '../utils/recordTitle';
-import { OPT_OFF, OPT_ON } from './classes';
 import { StreamPane } from './StreamPane';
 
 /** 底栏只订生成状态。进行中的历史行不扫全文。 */
@@ -57,7 +56,14 @@ export const GenerateBar = observer(function GenerateBar({
 	const historyView = Boolean(
 		selected && (!generating || selected.id !== runId),
 	);
+	const streamShown = streamOpen && (historyView || showStream);
 	const showHistory = records.length > 0 || generating;
+	const bothIcons = showHistory && showStream;
+	const iconClass = cn(
+		'h-10 shrink-0 px-0 transition-colors',
+		PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+		bothIcons ? 'w-auto min-w-0 flex-1' : 'w-10',
+	);
 	const liveRow =
 		generating && runId
 			? {
@@ -80,8 +86,11 @@ export const GenerateBar = observer(function GenerateBar({
 	];
 	return (
 		<Popover
-			open={streamOpen && (historyView || showStream)}
-			onOpenChange={setStreamOpen}
+			open={streamShown}
+			onOpenChange={(open) => {
+				setStreamOpen(open);
+				if (open) setHistoryOpen(false);
+			}}
 		>
 			<PopoverAnchor asChild>
 				<div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
@@ -105,12 +114,12 @@ export const GenerateBar = observer(function GenerateBar({
 							</Button>
 						</div>
 					) : null}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-4">
 						<Button
 							type="button"
 							disabled={saving && !generating}
 							className={cn(
-								'h-10 min-w-0 flex-1 text-base font-semibold',
+								'h-10 min-w-0 flex-1 text-base font-semibold transition-colors',
 								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 							)}
 							onClick={() => {
@@ -128,144 +137,168 @@ export const GenerateBar = observer(function GenerateBar({
 								? t('englishLearning.dailyReading.stopGenerate')
 								: t('englishLearning.dailyReading.generate')}
 						</Button>
-						{showHistory ? (
-							<Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-								<PopoverTrigger asChild>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										aria-expanded={historyOpen}
-										aria-label={t('englishLearning.dailyReading.history')}
-										className={cn(
-											'size-10 shrink-0 border',
-											historyOpen ? OPT_ON : OPT_OFF,
-										)}
-									>
-										<History className="size-4" aria-hidden />
-									</Button>
-								</PopoverTrigger>
-								<PopoverContent
-									side="top"
-									align="end"
-									sideOffset={8}
-									className="w-72 overflow-hidden p-0"
-								>
-									<ScrollArea
-										className="w-full"
-										style={{
-											height: Math.min(336, historyRows.length * 56),
+						{showHistory || showStream ? (
+							<div
+								className={cn(
+									'flex shrink-0 gap-4',
+									bothIcons && 'w-[calc((100%-7rem)/8)]',
+								)}
+							>
+								{showHistory ? (
+									<Popover
+										open={historyOpen}
+										onOpenChange={(open) => {
+											setHistoryOpen(open);
+											if (open) setStreamOpen(false);
 										}}
 									>
-										{historyRows.map((row) => (
-											<div
-												key={row.id}
-												className="group relative flex h-14 items-center hover:bg-teal-500/10"
-											>
-												<Button
-													type="button"
-													variant="ghost"
-													className={cn(
-														'h-14 min-w-0 flex-1 justify-start rounded-none bg-transparent px-3 hover:bg-transparent',
-														row.live && 'pr-8',
-													)}
-													onClick={() => {
-														setSelectedId(row.id);
-														setStreamOpen(true);
+										<PopoverTrigger asChild>
+											<Button
+												type="button"
+												size="icon"
+												aria-expanded={historyOpen}
+												aria-label={t('englishLearning.dailyReading.history')}
+												className={iconClass}
+												onPointerDown={() => {
+													if (historyOpen) {
 														setHistoryOpen(false);
-													}}
-												>
-													<span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-														<span
-															className={cn(
-																'w-full truncate text-left text-sm',
-																row.live
-																	? ''
-																	: row.status === 'done'
-																		? 'group-hover:pr-14'
-																		: 'group-hover:pr-8',
-															)}
-														>
-															{row.live
-																? t(
-																		'englishLearning.dailyReading.generatingManual',
-																	)
-																: recordTitle(row.text, row.startedAt)}
-														</span>
-														<span className="w-full truncate text-left text-xs text-textcolor/45">
-															{new Date(row.startedAt).toLocaleString()}
-														</span>
-													</span>
-												</Button>
-												{row.live ? (
-													<Spinner className="mr-2 size-4 shrink-0 text-textcolor" />
-												) : (
-													<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
-														{row.status === 'done' ? (
-															<Button
-																type="button"
-																variant="ghost"
-																size="sm"
-																className="h-7 w-7 shrink-0 rounded-md p-0 text-textcolor/65 transition-colors hover:border hover:border-teal-500/20 hover:bg-teal-500/10 hover:text-teal-500"
-																aria-label={t(
-																	'englishLearning.dailyReading.openReading',
-																)}
-																onClick={(event) => {
-																	event.stopPropagation();
-																	navigate(
-																		`/english-learning/daily-reading/${row.id}?origin=manual`,
-																	);
-																}}
-															>
-																<BookOpen className="size-3.5" aria-hidden />
-															</Button>
-														) : null}
+														return;
+													}
+													setStreamOpen(false);
+													setHistoryOpen(true);
+												}}
+												onClick={(event) => event.preventDefault()}
+											>
+												<History className="size-4" aria-hidden />
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent
+											side="top"
+											align="end"
+											sideOffset={8}
+											className="w-72 overflow-hidden p-0"
+											style={{ animation: 'none' }}
+											onCloseAutoFocus={(event) => event.preventDefault()}
+										>
+											<ScrollArea
+												className="w-full"
+												style={{
+													height: Math.min(336, historyRows.length * 56),
+												}}
+											>
+												{historyRows.map((row) => (
+													<div
+														key={row.id}
+														className="group relative flex h-14 items-center hover:bg-teal-500/10"
+													>
 														<Button
 															type="button"
 															variant="ghost"
-															size="sm"
-															className="h-7 w-7 shrink-0 rounded-md p-0 text-textcolor/65 transition-colors hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive"
-															aria-label={t(
-																'englishLearning.dailyReading.deleteHistory',
+															className={cn(
+																'h-14 min-w-0 flex-1 justify-start rounded-none bg-transparent px-3 hover:bg-transparent',
+																row.live && 'pr-8',
 															)}
-															onClick={(event) => {
-																event.stopPropagation();
-																setDeleteId(row.id);
+															onClick={() => {
+																setSelectedId(row.id);
+																setStreamOpen(true);
+																setHistoryOpen(false);
 															}}
 														>
-															<Trash2 className="size-3.5" aria-hidden />
+															<span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+																<span
+																	className={cn(
+																		'w-full truncate text-left text-sm',
+																		row.live
+																			? ''
+																			: row.status === 'done'
+																				? 'group-hover:pr-14'
+																				: 'group-hover:pr-8',
+																	)}
+																>
+																	{row.live
+																		? t(
+																				'englishLearning.dailyReading.generatingManual',
+																			)
+																		: recordTitle(row.text, row.startedAt)}
+																</span>
+																<span className="w-full truncate text-left text-xs text-textcolor/45">
+																	{new Date(row.startedAt).toLocaleString()}
+																</span>
+															</span>
 														</Button>
+														{row.live ? (
+															<Spinner className="mr-2 size-4 shrink-0 text-textcolor/55" />
+														) : (
+															<div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+																{row.status === 'done' ? (
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		className="h-7 w-7 shrink-0 rounded-md p-0 text-textcolor/65 transition-colors hover:border hover:border-teal-500/20 hover:bg-teal-500/10 hover:text-teal-500"
+																		aria-label={t(
+																			'englishLearning.dailyReading.openReading',
+																		)}
+																		onClick={(event) => {
+																			event.stopPropagation();
+																			navigate(
+																				`/english-learning/daily-reading/${row.id}?origin=manual`,
+																			);
+																		}}
+																	>
+																		<BookOpen
+																			className="size-3.5"
+																			aria-hidden
+																		/>
+																	</Button>
+																) : null}
+																<Button
+																	type="button"
+																	variant="ghost"
+																	size="sm"
+																	className="h-7 w-7 shrink-0 rounded-md p-0 text-textcolor/65 transition-colors hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive"
+																	aria-label={t(
+																		'englishLearning.dailyReading.deleteHistory',
+																	)}
+																	onClick={(event) => {
+																		event.stopPropagation();
+																		setDeleteId(row.id);
+																	}}
+																>
+																	<Trash2 className="size-3.5" aria-hidden />
+																</Button>
+															</div>
+														)}
 													</div>
-												)}
-											</div>
-										))}
-									</ScrollArea>
-								</PopoverContent>
-							</Popover>
-						) : null}
-						{showStream ? (
-							<PopoverTrigger asChild>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									aria-expanded={streamOpen && !historyView}
-									aria-label={t('englishLearning.dailyReading.showStream')}
-									className={cn(
-										'size-10 shrink-0 border',
-										streamOpen && !historyView ? OPT_ON : OPT_OFF,
-									)}
-									onClick={(event) => {
-										setSelectedId(null);
-										if (historyView) {
-											event.preventDefault();
-											setStreamOpen(true);
-										}
-									}}
-								>
-									<ScrollText className="size-4" aria-hidden />
-								</Button>
-							</PopoverTrigger>
+												))}
+											</ScrollArea>
+										</PopoverContent>
+									</Popover>
+								) : null}
+								{showStream ? (
+									<PopoverTrigger asChild>
+										<Button
+											type="button"
+											size="icon"
+											aria-expanded={streamOpen && !historyView}
+											aria-label={t('englishLearning.dailyReading.showStream')}
+											className={iconClass}
+											onPointerDown={() => {
+												if (streamShown && !historyView) {
+													setStreamOpen(false);
+													return;
+												}
+												setHistoryOpen(false);
+												setSelectedId(null);
+												setStreamOpen(true);
+											}}
+											onClick={(event) => event.preventDefault()}
+										>
+											<ScrollText className="size-4" aria-hidden />
+										</Button>
+									</PopoverTrigger>
+								) : null}
+							</div>
 						) : null}
 					</div>
 				</div>
@@ -275,6 +308,8 @@ export const GenerateBar = observer(function GenerateBar({
 				align="start"
 				sideOffset={8}
 				className="w-(--radix-popover-trigger-width) overflow-hidden p-0"
+				style={{ animation: 'none' }}
+				onCloseAutoFocus={(event) => event.preventDefault()}
 			>
 				<StreamPane history={historyView && selected ? selected : null} />
 			</PopoverContent>

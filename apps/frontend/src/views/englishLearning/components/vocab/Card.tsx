@@ -71,7 +71,10 @@ function WordHeader({
 				htmlFor={controlId}
 				className="select-text h-full flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
 			>
-				<span className="truncate text-lg font-semibold text-textcolor">
+				<span
+					data-word=""
+					className="truncate text-lg font-semibold text-textcolor"
+				>
 					{word}
 				</span>
 				{posNode}
@@ -81,7 +84,7 @@ function WordHeader({
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-			<div className="truncate text-lg font-semibold text-textcolor">
+			<div data-word="" className="truncate text-lg text-textcolor">
 				{word}
 			</div>
 			{posNode}
