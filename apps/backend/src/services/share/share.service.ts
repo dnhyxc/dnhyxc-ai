@@ -40,6 +40,23 @@ import {
 
 // 默认过期时间：7天（毫秒）
 const DEFAULT_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000;
+// 最短 1 小时；0 在部分 Redis 客户端会被当成永不过期
+const MIN_EXPIRES_IN = 60 * 60 * 1000;
+// 最长 30 天，避免分享键一直占着
+const MAX_EXPIRES_IN = 30 * 24 * 60 * 60 * 1000;
+
+/** 缺省 7 天；越界拒绝，避免静默改成另一个时长 */
+function resolveExpiresIn(expiresInMs?: number): number {
+	if (expiresInMs == null) return DEFAULT_EXPIRES_IN;
+	if (
+		!Number.isInteger(expiresInMs) ||
+		expiresInMs < MIN_EXPIRES_IN ||
+		expiresInMs > MAX_EXPIRES_IN
+	) {
+		throw new HttpException('过期时间超出允许范围', HttpStatus.BAD_REQUEST);
+	}
+	return expiresInMs;
+}
 
 @Injectable()
 export class ShareService {
@@ -399,7 +416,8 @@ export class ShareService {
 	async createShare(dto: CreateShareDto): Promise<CreateShareResponseDto> {
 		const shareId = randomUUID().replace(/-/g, '');
 		const now = Date.now();
-		const expiresAt = now + DEFAULT_EXPIRES_IN;
+		const ttl = resolveExpiresIn(dto.expiresInMs);
+		const expiresAt = now + ttl;
 		const shareType = dto.shareType ?? 'session';
 
 		// 存储到 Redis
@@ -413,11 +431,7 @@ export class ShareService {
 			expiresAt,
 		};
 
-		await this.cache.set(
-			this.getCacheKey(shareId),
-			cacheData,
-			DEFAULT_EXPIRES_IN,
-		);
+		await this.cache.set(this.getCacheKey(shareId), cacheData, ttl);
 
 		this.logger.log(
 			`创建分享: ${shareId}, 会话: ${dto.chatSessionId} ${dto?.messageIds?.length ? `, 消息: ${dto?.messageIds?.length} 条` : ''}`,

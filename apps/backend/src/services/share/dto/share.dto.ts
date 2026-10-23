@@ -3,12 +3,16 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	IsArray,
 	IsIn,
+	IsInt,
 	IsOptional,
 	IsString,
+	Max,
+	Min,
 } from 'class-validator';
 import { ChatSessions } from 'src/services/chat/session.entity';
 
@@ -55,6 +59,16 @@ export class CreateShareDto {
 	@IsString()
 	@IsOptional()
 	baseUrl?: string;
+
+	@ApiPropertyOptional({
+		description: '有效时长（毫秒）。不传则 7 天。允许 1 小时～30 天',
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(60 * 60 * 1000)
+	@Max(30 * 24 * 60 * 60 * 1000)
+	expiresInMs?: number;
 }
 
 // 创建分享响应 DTO

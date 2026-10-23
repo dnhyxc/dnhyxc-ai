@@ -87,6 +87,7 @@ const SessionShare = () => {
 		createdAt: string | number;
 		updatedAt: string | number;
 	} | null>(null);
+	const [expiresAt, setExpiresAt] = useState<number | null>(null);
 
 	const { buildMessageList, getFormatMessages } = useMessageTools();
 
@@ -147,6 +148,14 @@ const SessionShare = () => {
 			id,
 		);
 		if (res.success) {
+			const raw = res.data?.expiresAt;
+			const at =
+				typeof raw === 'number'
+					? raw
+					: typeof raw === 'string'
+						? Number(raw)
+						: NaN;
+			setExpiresAt(Number.isFinite(at) ? at : null);
 			if (type === 'knowledge') {
 				const k = res.data?.knowledge;
 				setKnowledgeData(
@@ -180,6 +189,8 @@ const SessionShare = () => {
 				);
 				setKnowledgeData(null);
 			}
+		} else {
+			setExpiresAt(null);
 		}
 	};
 
@@ -253,18 +264,36 @@ const SessionShare = () => {
 		<TooltipProvider>
 			<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
 				<ChatCodeFloatingToolbar />
-				<div className="flex items-center justify-between px-2.5 h-12.5 border border-b-theme/15">
-					<div className="text-base font-bold">
-						{knowledgeData
-							? t('share.header.knowledgeTitle')
-							: t('share.header.chatTitle')}
+				<div className="border border-b-theme/15 px-2.5 py-2 min-h-12.5">
+					<div className="flex items-center justify-between gap-3">
+						<div className="shrink-0 text-base font-bold">
+							{knowledgeData
+								? t('share.header.knowledgeTitle')
+								: t('share.header.chatTitle')}
+						</div>
+						<div className="flex min-w-0 items-center justify-end gap-3">
+							<div className="flex items-center gap-1 text-sm text-textcolor/80">
+								<CircleAlert size={17} className="shrink-0 text-textcolor/65" />
+								{knowledgeData
+									? t('share.header.knowledgeDisclaimer')
+									: t('share.header.chatDisclaimer')}
+							</div>
+							{expiresAt != null ? (
+								<span className="hidden text-sm text-textcolor/70 md:inline">
+									{t('share.header.expiresAt', {
+										time: formatDate(new Date(expiresAt)),
+									})}
+								</span>
+							) : null}
+						</div>
 					</div>
-					<div className="flex items-center gap-1 text-sm text-textcolor/80">
-						<CircleAlert size={17} className="text-textcolor/65" />
-						{knowledgeData
-							? t('share.header.knowledgeDisclaimer')
-							: t('share.header.chatDisclaimer')}
-					</div>
+					{expiresAt != null ? (
+						<p className="mt-1 text-center text-sm text-textcolor/70 md:hidden">
+							{t('share.header.expiresAt', {
+								time: formatDate(new Date(expiresAt)),
+							})}
+						</p>
+					) : null}
 				</div>
 
 				<ScrollArea

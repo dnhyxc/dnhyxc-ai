@@ -3104,6 +3104,8 @@ export const createShare = async (params: {
 	sessionType?: 'chat' | 'assistant' | 'agent' | 'ebook';
 	/** session=会话分享（默认）；knowledge=知识文章分享 */
 	shareType?: 'session' | 'knowledge';
+	/** 不传则后端按 7 天；仅在用户改过默认项时带上 */
+	expiresInMs?: number;
 }) => {
 	return await http.post<ShareInfo>(CREATE_SHARE, {
 		chatSessionId: params.chatSessionId,
@@ -3111,6 +3113,7 @@ export const createShare = async (params: {
 		messageIds: params.messageIds,
 		baseUrl: params.baseUrl,
 		shareType: params.shareType,
+		...(params.expiresInMs != null ? { expiresInMs: params.expiresInMs } : {}),
 	});
 };
 
