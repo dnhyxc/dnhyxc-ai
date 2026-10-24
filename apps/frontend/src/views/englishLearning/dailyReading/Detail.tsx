@@ -335,7 +335,7 @@ export default function DailyReadingDetailPage() {
 														<Button
 															type="button"
 															variant="link"
-															className="h-auto justify-start gap-1.5 px-0! py-0 has-[>svg]:px-0! text-sm font-medium text-teal-500 hover:text-teal-400"
+															className="h-auto w-fit justify-start gap-1.5 px-0! py-0 has-[>svg]:px-0! text-sm font-medium text-teal-500 hover:text-teal-400"
 															aria-expanded={showZh}
 															onClick={() => setShowZh((v) => !v)}
 														>
