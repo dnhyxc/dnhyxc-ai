@@ -22,6 +22,10 @@ export class EnglishDailyReadingProcessor extends WorkerHost {
 	}
 
 	async process(job: Job<JobData>): Promise<void> {
+		if (job.name === 'reconcile-due') {
+			await this.dailyReading.reconcileDue();
+			return;
+		}
 		const publishDate =
 			job.name === 'prepare-next' || !job.data?.publishDate
 				? addCalendarDays(shanghaiToday(), 1)
@@ -29,6 +33,6 @@ export class EnglishDailyReadingProcessor extends WorkerHost {
 		this.logger.log(
 			`[EnglishDailyReading] 生成 publishDate=${publishDate} job=${job.id}`,
 		);
-		await this.dailyReading.ensurePassage(publishDate);
+		await this.dailyReading.ensurePassage(publishDate, job.timestamp);
 	}
 }

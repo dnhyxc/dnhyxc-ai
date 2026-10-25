@@ -20,12 +20,15 @@ import { LlmConfigService } from '../llm-config/llm-config.service';
 import { UserService } from '../user/user.service';
 import { WebSearchService } from '../web-search/web-search.service';
 import {
+	BACKFILL_PRIORITY,
 	DAILY_READING_QUEUE,
 	DAY_SLOT,
 	FAIL_COOLDOWN_MS,
+	MAX_ATTEMPTS,
 	PENDING_STALE_MS,
 } from './daily-reading.constants';
 import {
+	addCalendarDays,
 	DEFAULT_PROFILE,
 	DEFAULT_THEMES,
 	duePublishDate,
@@ -68,6 +71,7 @@ import {
 	themesForSettings,
 } from './daily-reading.rules';
 import { EnglishDailyReading } from './entity/english-daily-reading.entity';
+import { EnglishDailyReadingAttempt } from './entity/english-daily-reading-attempt.entity';
 import {
 	type DailyReadingGenStatus,
 	EnglishDailyReadingGen,
@@ -95,7 +99,7 @@ export type DailyReadingView = {
 export type DailyReadingList = {
 	items: DailyReadingView[];
 	totalCount: number;
-	todayStatus: 'ready' | 'generating' | 'failed';
+	todayStatus: 'ready' | 'generating' | 'exhausted';
 	today: DailyReadingView | null;
 };
 
@@ -233,6 +237,22 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
+function attemptReason(e: unknown): string {
+	if (e instanceof Error && e.message.trim()) return e.message.slice(0, 500);
+	return '生成失败';
+}
+
+function isPublishDate(value: string): boolean {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+	const [year, month, day] = value.split('-').map(Number);
+	const date = new Date(Date.UTC(year, month - 1, day));
+	return (
+		date.getUTCFullYear() === year &&
+		date.getUTCMonth() === month - 1 &&
+		date.getUTCDate() === day
+	);
+}
+
 @Injectable()
 export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	constructor(
@@ -240,6 +260,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		private readonly repo: Repository<EnglishDailyReading>,
 		@InjectRepository(EnglishDailyReadingGen)
 		private readonly gens: Repository<EnglishDailyReadingGen>,
+		@InjectRepository(EnglishDailyReadingAttempt)
+		private readonly attempts: Repository<EnglishDailyReadingAttempt>,
 		@InjectRepository(EnglishDailyReadingSetting)
 		private readonly settings: Repository<EnglishDailyReadingSetting>,
 		@InjectRepository(EnglishDailyReadingUserSetting)
@@ -258,6 +280,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		try {
 			const saved = await this.loadAutoSettings();
 			await this.registerScheduler(saved.hour);
+			await this.registerReconcile();
 			await this.enqueuePassage(duePublishDate(saved.hour));
 		} catch (e) {
 			// 队列连不上时定时篇先缺着，不挡住进程启动。手动生成不依赖这次注册。
@@ -274,21 +297,84 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			{
 				name: 'prepare-next',
 				data: {},
-				opts: JOB_OPTS,
+				opts: { ...JOB_OPTS, priority: 0 },
 			},
 		);
 	}
 
-	/** 工人入口。publishDate 已由调用方钉死。 */
-	async ensurePassage(publishDate: string): Promise<void> {
+	/** 每 15 分钟只补今天和明天。历史缺口不在这里入队。 */
+	private async registerReconcile(): Promise<void> {
+		await this.queue.upsertJobScheduler(
+			'daily-reading-reconcile',
+			{ pattern: '*/15 * * * *', tz: 'Asia/Shanghai' },
+			{
+				name: 'reconcile-due',
+				data: {},
+				opts: { ...JOB_OPTS, priority: 0 },
+			},
+		);
+	}
+
+	async reconcileDue(): Promise<void> {
+		const dates = [shanghaiToday(), addCalendarDays(shanghaiToday(), 1)];
+		for (const date of dates) {
+			const row = await this.repo.findOne({
+				where: { publishDate: date, slot: DAY_SLOT },
+			});
+			if (row?.status === 'ready' || (row?.attemptCount ?? 0) >= MAX_ATTEMPTS) {
+				continue;
+			}
+			await this.enqueuePassage(date);
+		}
+	}
+
+	/** 工人入口。publishDate 已由调用方钉死。enqueuedAt 是队列任务的 timestamp。 */
+	async ensurePassage(publishDate: string, enqueuedAt?: number): Promise<void> {
 		// 队列任务的日期必须是 YYYY-MM-DD，否则直接丢弃，避免写错 slot=day 那一行。
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) return;
+		const prior = await this.repo.findOne({
+			where: { publishDate, slot: DAY_SLOT },
+		});
+		// 本轮已满。队列多投递的一次直接结束，不再打模型。
+		if ((prior?.attemptCount ?? 0) >= MAX_ATTEMPTS) return;
 		const saved = await this.loadAutoSettings();
 		const theme = themeForDate(publishDate, saved.themes);
 		const profile = resolveProfile(saved.profile);
+		const started = new Date();
 		const owned = await this.claim(publishDate, theme);
-		// 抢不到说明今天这行已就绪，或还在冷却。不能接着写，否则会覆盖已发布正文。
+		// 抢不到说明今天这行已就绪，或还在冷却。不写尝试行。
 		if (!owned) return;
+		const usage = { tokens: 0, open: 0 };
+		const onUsage = (total: number, done?: boolean) => {
+			const n = Math.max(0, Math.floor(total));
+			if (done) {
+				usage.tokens += n;
+				usage.open = 0;
+				return;
+			}
+			usage.open = n;
+		};
+		const spent = () => {
+			usage.tokens += usage.open;
+			usage.open = 0;
+			return usage.tokens;
+		};
+		let recorded = false;
+		const giveUp = async (reason: string) => {
+			recorded = true;
+			const next = await this.recordFailure(
+				publishDate,
+				reason,
+				started,
+				enqueuedAt,
+				spent(),
+			);
+			if (next < MAX_ATTEMPTS) {
+				const err = new Error(reason);
+				err.name = 'AttemptRecorded';
+				throw err;
+			}
+		};
 		try {
 			const recent = await this.recentNorms({ publishDate });
 			const material = await this.loadMaterial(theme, profile.useWeb);
@@ -298,6 +384,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				profile,
 				material.snippet,
 				null,
+				{ onUsage },
 			);
 			let draft = parsed?.draft ?? null;
 			let reason = draft
@@ -311,6 +398,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					profile,
 					material.snippet,
 					reason,
+					{ onUsage },
 				);
 				draft = parsed?.draft ?? null;
 				reason = draft
@@ -318,16 +406,15 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					: 'json';
 			}
 			if (!draft || reason) {
-				// 定时篇失败会清空标题正文。手动路径不能调用这个方法。
-				await this.markFailed(publishDate);
 				const sample = draft ? JSON.stringify(draft).slice(0, 300) : '';
 				this.logger.warn(
 					`[EnglishDailyReading] 废稿 publishDate=${publishDate} reason=${reason ?? 'json'} ${sample}`,
 				);
+				await giveUp(reason ?? 'json');
 				return;
 			}
 			const bodyEn = stripZw(draft.bodyEn);
-			const extras = await this.finishReading(bodyEn, profile);
+			const extras = await this.finishReading(bodyEn, profile, { onUsage });
 			await this.repo.update(
 				{ publishDate, slot: DAY_SLOT },
 				{
@@ -343,15 +430,20 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					extras: this.withSources(extras, material.sources),
 				},
 			);
+			await this.recordSuccess(publishDate, started, enqueuedAt, spent());
 		} catch (e) {
-			// 模型或检索抛错时也把今天标失败，队列按冷却再入队，避免一直卡在 pending。
-			await this.markFailed(publishDate);
-			throw e;
+			if (recorded || (e instanceof Error && e.name === 'AttemptRecorded')) {
+				throw e;
+			}
+			await giveUp(attemptReason(e));
 		}
 	}
 
-	/** 入队。 */
-	async enqueuePassage(publishDate: string): Promise<void> {
+	/** 入队。priority 默认 0。管理员补历史传 BACKFILL_PRIORITY。 */
+	async enqueuePassage(
+		publishDate: string,
+		opts?: { priority?: number },
+	): Promise<void> {
 		const row = await this.repo.findOne({
 			where: { publishDate, slot: DAY_SLOT },
 		});
@@ -381,6 +473,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			{
 				jobId: publishDate,
 				...JOB_OPTS,
+				priority: opts?.priority ?? 0,
 			},
 		);
 	}
@@ -395,21 +488,14 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		const todayRow = await this.repo.findOne({
 			where: { publishDate: today, slot: DAY_SLOT },
 		});
-		// 没有今天这行时保持 failed，不入队，避免列表打开就生成、状态一直转圈。
-		let todayStatus: DailyReadingList['todayStatus'] = 'failed';
+		// 列表只读。今天缺篇或失败由补队和队列重试，不在这里入队。
+		let todayStatus: DailyReadingList['todayStatus'] = 'generating';
 		if (todayRow?.status === 'ready') todayStatus = 'ready';
-		else if (todayRow?.status === 'failed') {
-			const age = Date.now() - new Date(todayRow.startedAt).getTime();
-			todayStatus = age < FAIL_COOLDOWN_MS ? 'failed' : 'generating';
-			if (todayStatus === 'generating') {
-				await this.enqueuePassage(today).catch(() => undefined);
-			}
-		} else if (todayRow?.status === 'pending') {
-			const age = Date.now() - new Date(todayRow.startedAt).getTime();
-			if (age >= PENDING_STALE_MS) {
-				await this.enqueuePassage(today).catch(() => undefined);
-			}
-			todayStatus = 'generating';
+		else if (
+			todayRow?.status === 'failed' &&
+			(todayRow.attemptCount ?? 0) >= MAX_ATTEMPTS
+		) {
+			todayStatus = 'exhausted';
 		}
 		// 列表只返回 ready。生成中的 pending 半成品不能变成一条坏文章。
 		const visible = this.repo
@@ -1136,7 +1222,147 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return (res.affected ?? 0) === 1;
 	}
 
-	private async markFailed(publishDate: string): Promise<void> {
+	async backfillDay(publishDate: string): Promise<{
+		ok: boolean;
+		queued?: boolean;
+		reason?: string;
+	}> {
+		if (!isPublishDate(publishDate) || publishDate > shanghaiToday()) {
+			return { ok: false, reason: 'future' };
+		}
+		const row = await this.repo.findOne({
+			where: { publishDate, slot: DAY_SLOT },
+		});
+		if (row?.status === 'ready') return { ok: false, reason: 'ready' };
+		if (await this.jobInFlight(publishDate)) return { ok: true, queued: true };
+		const age = row ? Date.now() - new Date(row.startedAt).getTime() : Infinity;
+		if (row?.status === 'pending' && age < PENDING_STALE_MS) {
+			return { ok: false, reason: 'busy' };
+		}
+		if (
+			row?.status === 'failed' &&
+			(row.attemptCount ?? 0) < MAX_ATTEMPTS &&
+			age < FAIL_COOLDOWN_MS
+		) {
+			return { ok: false, reason: 'cooldown' };
+		}
+		if (row && (row.attemptCount ?? 0) >= MAX_ATTEMPTS) {
+			await this.resetAttempts(publishDate);
+		}
+		try {
+			await this.enqueuePassage(publishDate, { priority: BACKFILL_PRIORITY });
+		} catch (e) {
+			if (await this.jobInFlight(publishDate))
+				return { ok: true, queued: true };
+			throw e;
+		}
+		return { ok: true, queued: true };
+	}
+
+	private async jobInFlight(publishDate: string): Promise<boolean> {
+		const existing = await this.queue.getJob(publishDate);
+		if (!existing) return false;
+		const state = await existing.getState();
+		return (
+			state === 'waiting' ||
+			state === 'active' ||
+			state === 'delayed' ||
+			state === 'prioritized'
+		);
+	}
+
+	/** 只清本轮次数，并把 startedAt 拨出冷却。不删尝试行。 */
+	private async resetAttempts(publishDate: string): Promise<void> {
+		await this.repo.update(
+			{ publishDate, slot: DAY_SLOT },
+			{
+				attemptCount: 0,
+				startedAt: new Date(Date.now() - FAIL_COOLDOWN_MS - 1000),
+			},
+		);
+	}
+
+	private async recordFailure(
+		publishDate: string,
+		reason: string,
+		started: Date,
+		enqueuedAt: number | undefined,
+		tokens: number,
+	): Promise<number> {
+		const row = await this.repo.findOne({
+			where: { publishDate, slot: DAY_SLOT },
+		});
+		const next = (row?.attemptCount ?? 0) + 1;
+		const text = reason.slice(0, 500);
+		await this.markFailed(publishDate, text, next);
+		await this.insertAttempt({
+			publishDate,
+			outcome: 'failed',
+			reason: text,
+			started,
+			enqueuedAt,
+			tokens,
+		});
+		return next;
+	}
+
+	private async recordSuccess(
+		publishDate: string,
+		started: Date,
+		enqueuedAt: number | undefined,
+		tokens: number,
+	): Promise<void> {
+		await this.insertAttempt({
+			publishDate,
+			outcome: 'ready',
+			reason: null,
+			started,
+			enqueuedAt,
+			tokens,
+		});
+	}
+
+	private async insertAttempt(input: {
+		publishDate: string;
+		outcome: 'ready' | 'failed';
+		reason: string | null;
+		started: Date;
+		enqueuedAt: number | undefined;
+		tokens: number;
+	}): Promise<void> {
+		const finished = new Date();
+		try {
+			const attemptNo = await this.nextAttemptNo(input.publishDate);
+			await this.attempts.insert({
+				publishDate: input.publishDate,
+				attemptNo,
+				enqueuedAt: new Date(input.enqueuedAt ?? input.started.getTime()),
+				startedAt: input.started,
+				finishedAt: finished,
+				elapsedMs: Math.max(0, finished.getTime() - input.started.getTime()),
+				tokens: Math.max(0, Math.floor(input.tokens)),
+				outcome: input.outcome,
+				reason: input.reason,
+			});
+		} catch (e) {
+			this.logger.warn('[EnglishDailyReading] 尝试记录未写入', e);
+		}
+	}
+
+	private async nextAttemptNo(publishDate: string): Promise<number> {
+		const raw = await this.attempts
+			.createQueryBuilder('row')
+			.select('COALESCE(MAX(row.attemptNo), 0)', 'max')
+			.where('row.publishDate = :publishDate', { publishDate })
+			.getRawOne<{ max: string | number | null }>();
+		return Number(raw?.max ?? 0) + 1;
+	}
+
+	private async markFailed(
+		publishDate: string,
+		reason: string,
+		attemptCount: number,
+	): Promise<void> {
 		// 只清定时篇。手动稿走 markRowFailed，不能把标题正文写成空串。
 		await this.repo.update(
 			{ publishDate, slot: DAY_SLOT },
@@ -1147,6 +1373,8 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				titleZh: '',
 				bodyEn: '',
 				bodyZh: '',
+				attemptCount,
+				lastError: reason.slice(0, 500),
 			},
 		);
 	}

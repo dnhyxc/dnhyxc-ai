@@ -365,6 +365,7 @@ export const englishLearning = {
 	'englishLearning.dailyReading.backList': '返回列表',
 	'englishLearning.dailyReading.generating': '今天的短文正在准备',
 	'englishLearning.dailyReading.failed': '今天的短文没有生成成功',
+	'englishLearning.dailyReading.exhausted': '今天的短文暂时没有',
 	'englishLearning.dailyReading.retry': '重试',
 	'englishLearning.dailyReading.empty': '还没有可阅读的短文',
 	'englishLearning.dailyReading.loadFailed': '列表加载失败',

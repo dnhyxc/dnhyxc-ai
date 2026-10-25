@@ -2,7 +2,7 @@
  * 每日阅读列表：只展示已到发布日的篇目。生成在队列里，本页轮询状态。
  */
 import Loading from '@design/Loading';
-import { Button, Toast } from '@ui/index';
+import { Toast } from '@ui/index';
 import { Spinner } from '@ui/spinner';
 import { BookOpen, WandSparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +36,7 @@ export default function DailyReadingListPage() {
 	);
 	const [items, setItems] = useState<EnglishDailyReadingItem[]>([]);
 	const [todayStatus, setTodayStatus] = useState<
-		'ready' | 'generating' | 'failed' | null
+		'ready' | 'generating' | 'failed' | 'exhausted' | null
 	>(null);
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
@@ -48,9 +48,7 @@ export default function DailyReadingListPage() {
 	const itemsRef = useRef<EnglishDailyReadingItem[]>([]);
 	const loadedOriginRef = useRef(origin);
 	const tailRef = useRef<HTMLDivElement>(null);
-	const [watch, setWatch] = useState(0);
 	const [pageError, setPageError] = useState<string | null>(null);
-	const [retryLocked, setRetryLocked] = useState(false);
 
 	const load = useCallback(
 		async (offset: number, append: boolean) => {
@@ -136,14 +134,17 @@ export default function DailyReadingListPage() {
 	}, [load]);
 
 	useEffect(() => {
-		if (todayStatus !== 'failed') {
-			setRetryLocked(false);
-			return;
-		}
-		setRetryLocked(true);
-		const timer = window.setTimeout(() => setRetryLocked(false), 5000);
-		return () => window.clearTimeout(timer);
-	}, [todayStatus]);
+		if (origin !== 'day' || todayStatus !== 'generating') return;
+		const startedAt = Date.now();
+		const timer = window.setInterval(() => {
+			if (Date.now() - startedAt > 10 * 60 * 1000) {
+				window.clearInterval(timer);
+				return;
+			}
+			void load(0, false);
+		}, 5000);
+		return () => window.clearInterval(timer);
+	}, [origin, todayStatus, load]);
 
 	const onSelectOrigin = useCallback(
 		(next: ReadingOrigin) => {
@@ -177,7 +178,7 @@ export default function DailyReadingListPage() {
 			void load(0, false);
 		}, 5000);
 		return () => window.clearInterval(timer);
-	}, [origin, todayStatus, load, watch]);
+	}, [origin, todayStatus, load]);
 
 	const preparingEmpty =
 		origin === 'day' &&
@@ -251,21 +252,10 @@ export default function DailyReadingListPage() {
 					</p>
 				</div>
 			) : null}
-			{origin === 'day' && todayStatus === 'failed' ? (
-				<div className="border-theme/10 bg-theme/5 mb-4 flex items-center justify-between gap-3 rounded-md border px-3 py-3 text-sm">
-					<span>{t('englishLearning.dailyReading.failed')}</span>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						disabled={retryLocked}
-						onClick={() => {
-							setWatch((n) => n + 1);
-							void load(0, false);
-						}}
-					>
-						{t('englishLearning.dailyReading.retry')}
-					</Button>
+			{origin === 'day' &&
+			(todayStatus === 'failed' || todayStatus === 'exhausted') ? (
+				<div className="border-theme/10 bg-theme/5 mb-4 rounded-md border px-3 py-3 text-sm">
+					<span>{t('englishLearning.dailyReading.exhausted')}</span>
 				</div>
 			) : null}
 			{loading && items.length === 0 ? <Loading /> : null}

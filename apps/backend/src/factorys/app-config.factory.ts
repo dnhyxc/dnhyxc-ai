@@ -43,6 +43,7 @@ export const appConfig = () => ({
 		STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
 		SILICONFLOW_EMBEDDING_URL: Joi.string().uri().optional().allow(''),
 		SILICONFLOW_RERANK_URL: Joi.string().uri().optional().allow(''),
+		DAILY_READING_INTERNAL_TOKEN: Joi.string().optional().allow(''),
 	}),
 });
 

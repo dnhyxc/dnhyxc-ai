@@ -2050,7 +2050,7 @@ export const listEnglishDailyReadings = async (options?: {
 	return await http.get<{
 		items: EnglishDailyReadingItem[];
 		totalCount?: number;
-		todayStatus: 'ready' | 'generating' | 'failed';
+		todayStatus: 'ready' | 'generating' | 'failed' | 'exhausted';
 		today: EnglishDailyReadingItem | null;
 	}>(ENGLISH_LEARNING_DAILY_READINGS, {
 		querys: {

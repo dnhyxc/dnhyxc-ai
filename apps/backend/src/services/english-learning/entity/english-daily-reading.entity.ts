@@ -36,6 +36,14 @@ export class EnglishDailyReading {
 	@Column({ type: 'varchar', length: 16, default: 'pending' })
 	status!: DailyReadingStatus;
 
+	/** 本轮已经失败的次数。成功后保留，管理员再次补生成才清零。 */
+	@Column({ name: 'attempt_count', type: 'int', default: 0 })
+	attemptCount!: number;
+
+	/** 最后一次失败摘要。详情以尝试表最后一行为准。 */
+	@Column({ name: 'last_error', type: 'varchar', length: 500, nullable: true })
+	lastError!: string | null;
+
 	@Column({ name: 'started_at', type: 'datetime', precision: 6 })
 	startedAt!: Date;
 

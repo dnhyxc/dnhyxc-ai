@@ -6,6 +6,7 @@ import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
 import { SpeechTranscriptionModule } from '../speech-transcription/speech-transcription.module';
 import { AnnotateSourceTaskService } from './annotate-source-task.service';
 import { DAILY_READING_QUEUE } from './daily-reading.constants';
+import { DailyReadingInternalController } from './daily-reading-internal.controller';
 import { EnglishDailyReadingProcessor } from './english-daily-reading.processor';
 import { EnglishDailyReadingService } from './english-daily-reading.service';
 import { EnglishDocxExportJobService } from './english-docx-export-job.service';
@@ -22,6 +23,7 @@ import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pa
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
 import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
 import { EnglishDailyReading } from './entity/english-daily-reading.entity';
+import { EnglishDailyReadingAttempt } from './entity/english-daily-reading-attempt.entity';
 import { EnglishDailyReadingGen } from './entity/english-daily-reading-gen.entity';
 import { EnglishDailyReadingSetting } from './entity/english-daily-reading-setting.entity';
 import { EnglishDailyReadingUserSetting } from './entity/english-daily-reading-user-setting.entity';
@@ -59,6 +61,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishPracticeReport,
 			EnglishDailyMemorizeRecord,
 			EnglishDailyReading,
+			EnglishDailyReadingAttempt,
 			EnglishDailyReadingGen,
 			EnglishDailyReadingSetting,
 			EnglishDailyReadingUserSetting,
@@ -74,7 +77,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishAnnotateSourceTask,
 		]),
 	],
-	controllers: [EnglishLearningController],
+	controllers: [EnglishLearningController, DailyReadingInternalController],
 	providers: [
 		EnglishLearningService,
 		EnglishDailyReadingService,

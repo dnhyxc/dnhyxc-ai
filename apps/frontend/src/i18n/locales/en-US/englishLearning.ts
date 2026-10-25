@@ -398,6 +398,8 @@ export const englishLearning = {
 		'Today’s passage is being prepared',
 	'englishLearning.dailyReading.failed':
 		'Today’s passage could not be prepared',
+	'englishLearning.dailyReading.exhausted':
+		'Today’s passage is not available yet',
 	'englishLearning.dailyReading.retry': 'Retry',
 	'englishLearning.dailyReading.empty': 'No passages yet',
 	'englishLearning.dailyReading.loadFailed': 'Could not load the list',
