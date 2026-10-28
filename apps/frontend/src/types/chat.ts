@@ -71,6 +71,28 @@ export interface Message {
 	searchOrganic?: SearchOrganicItem[] | null;
 	/** 本轮 Agent 强制应用的 Skill（SSE skillsApplied） */
 	appliedSkills?: Array<{ id: string; title: string }> | null;
+	/** 英语 Agent 大列表旁路清单 */
+	elResources?: ElResourceBlock[] | null;
+}
+
+/** 英语 Agent 外溢清单（SSE / 消息快照） */
+export interface ElResourceBlock {
+	artifactId: string;
+	title: string;
+	source:
+		| 'library'
+		| 'favorites'
+		| 'mistakes'
+		| 'memo'
+		| 'reading'
+		| 'pack'
+		| 'notes'
+		| 'other';
+	contentKind?: 'vocab' | 'classic';
+	libraryId?: string;
+	totalCount: number;
+	truncated: boolean;
+	items?: unknown[];
 }
 
 export interface ChatRequestParams {

@@ -31,13 +31,15 @@ export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
  * - knowledgeQa: 知识库问答
  * - englishLearning: 英语学习
  * - ocr: 图片 OCR（固定 GLM_* 环境变量 + GLM-4.6V-Flash，不走设置页覆盖）
+ * - decide: 短决策（固定 GLM_* + 调用方写死的 glm-4.7-flash，会员也不切硅基）
  */
 export type SiliconFlowLlmPreset =
 	| 'chat'
 	| 'assistant'
 	| 'knowledgeQa'
 	| 'englishLearning'
-	| 'ocr';
+	| 'ocr'
+	| 'decide';
 
 /**
  * @description 配置传递到 ChatOpenAI 禁用 thinking 链（agent/assistant 工具链和正文流式调用会关闭）
@@ -371,6 +373,11 @@ const siliconFlowResolvePresets: Record<
 			'未配置 GLM_API_KEY，无法进行图片 OCR',
 			throwSiliconFlowError,
 		),
+	decide: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法做决策',
+			throwSiliconFlowError,
+		),
 };
 
 /**
@@ -400,6 +407,11 @@ const memberSiliconFlowResolvePresets: Record<
 	ocr: () =>
 		buildGlmOcrEnvPresetOptions(
 			'未配置 GLM_API_KEY，无法进行图片 OCR',
+			throwSiliconFlowError,
+		),
+	decide: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法做决策',
 			throwSiliconFlowError,
 		),
 };

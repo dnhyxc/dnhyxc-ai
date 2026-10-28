@@ -145,6 +145,16 @@ export function VocabularyMistakesPanel({
 
 	useEffect(() => {
 		if (!active || isReview) return;
+		const onMut = (ev: Event) => {
+			const domain = (ev as CustomEvent<{ domain?: string }>).detail?.domain;
+			if (domain === 'mistakes') void reloadFromStart(true);
+		};
+		window.addEventListener('english-domain-mutation', onMut);
+		return () => window.removeEventListener('english-domain-mutation', onMut);
+	}, [active, isReview, reloadFromStart]);
+
+	useEffect(() => {
+		if (!active || isReview) return;
 		return () => {
 			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
 		};

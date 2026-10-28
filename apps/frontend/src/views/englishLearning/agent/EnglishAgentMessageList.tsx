@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react';
-import { memo, type RefObject } from 'react';
+import { memo, type RefObject, useCallback } from 'react';
 import {
 	AssistantMessageRow,
 	type AssistantShareSelection,
@@ -42,6 +42,12 @@ export const EnglishAgentMessageList = memo(
 		onSpeakContent,
 	}: EnglishAgentMessageListProps) {
 		const messages = englishAgentStore.messages;
+		/** 继续回答：从上次导语的断点接着写完，不要逐条复述清单，完整条目在下方卡片。 */
+		const continueProse = useCallback(() => {
+			void englishAgentStore.sendMessage(
+				'继续回答。请从上次导语的断点接着写完，不要逐条复述清单，完整条目在下方卡片。',
+			);
+		}, []);
 
 		return messages.map((m, index) => (
 			<AssistantMessageRow
@@ -62,6 +68,7 @@ export const EnglishAgentMessageList = memo(
 				t={t}
 				getSelectionContextMenuItems={getSelectionContextMenuItems}
 				onSpeakContent={onSpeakContent}
+				onContinueAnswering={continueProse}
 			/>
 		));
 	}),

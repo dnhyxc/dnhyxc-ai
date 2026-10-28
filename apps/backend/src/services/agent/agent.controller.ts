@@ -18,6 +18,7 @@ import { JwtGuard } from 'src/guards/jwt.guard';
 import { AgentService, formatAgentStreamError } from './agent.service';
 import { AgentChatDto } from './dto/agent-chat.dto';
 import { AgentStopDto } from './dto/agent-stop.dto';
+import { CommitElProposalDto } from './dto/commit-el-proposal.dto';
 import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
 import { UpdateAgentSessionTitleDto } from './dto/update-agent-session-title.dto';
 
@@ -70,6 +71,41 @@ export class AgentController {
 				})),
 			},
 		};
+	}
+
+	/** 大列表旁路补拉；属主不符或 TTL 过期为 404 */
+	@Get('el-artifact/:id')
+	async getElArtifact(@Req() req: AuthedRequest, @Param('id') id: string) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.agentService.getElArtifact(userId, id);
+		if (!data) {
+			return { success: false, message: '清单已过期或不存在' };
+		}
+		return { success: true, data };
+	}
+
+	/** 确认条直提交提案，不另开一轮对话 */
+	@Post('el-proposal/commit')
+	async commitElProposal(
+		@Req() req: AuthedRequest,
+		@Body() dto: CommitElProposalDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.agentService.commitElProposal(userId, dto);
+		if (!data.ok) {
+			return {
+				success: false,
+				message: data.message,
+				data: { code: data.code },
+			};
+		}
+		return { success: true, data };
 	}
 
 	@Get('session/:sessionId')
@@ -162,6 +198,43 @@ export class AgentController {
 						data: {
 							type: 'skillsApplied',
 							skills: chunk.data.skills,
+							done: false,
+						},
+					};
+				}
+				if (chunk.type === 'domainMutation') {
+					return {
+						data: {
+							type: 'domainMutation',
+							domain: chunk.data.domain,
+							done: false,
+						},
+					};
+				}
+				if (chunk.type === 'elResourceList') {
+					return {
+						data: {
+							type: 'elResourceList',
+							...chunk.data,
+							done: false,
+						},
+					};
+				}
+				if (chunk.type === 'contentReplace') {
+					return {
+						data: {
+							type: 'contentReplace',
+							content: chunk.data,
+							done: false,
+						},
+					};
+				}
+				if (chunk.type === 'finish') {
+					return {
+						data: {
+							type: 'finish',
+							reason: chunk.data.reason,
+							maxTokensReached: chunk.data.maxTokensReached,
 							done: false,
 						},
 					};

@@ -7,6 +7,7 @@ import {
 	ManyToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { ElResourceListPayload } from '../../agent/tools/english/artifact.store';
 import type { SerperOrganicItem } from '../../web-search/web-search.types';
 import { EnglishAgentSession } from './english-agent-session.entity';
 
@@ -20,7 +21,7 @@ export enum EnglishAgentMessageRole {
 @Index('idx_english_agent_msg_session_turn', ['session', 'turnId'])
 export class EnglishAgentMessage {
 	@PrimaryGeneratedColumn('uuid')
-	id: string;
+	id!: string;
 
 	@ManyToOne(
 		() => EnglishAgentSession,
@@ -28,23 +29,27 @@ export class EnglishAgentMessage {
 		{ onDelete: 'CASCADE' },
 	)
 	@JoinColumn({ name: 'session_id' })
-	session: EnglishAgentSession;
+	session!: EnglishAgentSession;
 
 	@Column({
 		type: 'enum',
 		enum: EnglishAgentMessageRole,
 	})
-	role: EnglishAgentMessageRole;
+	role!: EnglishAgentMessageRole;
 
 	@Column({ name: 'turn_id', type: 'varchar', length: 36, nullable: true })
-	turnId: string | null;
+	turnId!: string | null;
 
 	@Column({ type: 'longtext' })
-	content: string;
+	content!: string;
 
 	@Column({ name: 'search_organic', type: 'json', nullable: true })
-	searchOrganic: SerperOrganicItem[] | null;
+	searchOrganic!: SerperOrganicItem[] | null;
+
+	/** 大列表旁路快照；刷新后不依赖 artifact TTL */
+	@Column({ name: 'el_resources', type: 'json', nullable: true })
+	elResources!: ElResourceListPayload[] | null;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
-	createdAt: Date;
+	createdAt!: Date;
 }

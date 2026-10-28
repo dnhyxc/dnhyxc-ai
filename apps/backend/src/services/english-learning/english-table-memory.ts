@@ -178,6 +178,28 @@ export class EnglishTableMemory implements AgentTurnMemory {
 		return { userMessageId: user.id, assistantMessageId: assistant.id };
 	}
 
+	/** 确认按钮的回执：只插助手行，不配用户句 */
+	async insertAssistantNote(
+		sessionId: string,
+		content: string,
+	): Promise<string> {
+		const session = await this.sessionRepo.findOne({
+			where: { id: sessionId },
+		});
+		if (!session) {
+			throw new Error(`英语学习会话不存在: ${sessionId}`);
+		}
+		const row = this.messageRepo.create({
+			session,
+			role: EnglishAgentMessageRole.ASSISTANT,
+			content,
+			turnId: null,
+		});
+		await this.messageRepo.save(row);
+		await this.sessionRepo.update({ id: sessionId }, { updatedAt: new Date() });
+		return row.id;
+	}
+
 	async updateAssistantContent(
 		sessionId: string,
 		assistantMessageId: string,
@@ -188,12 +210,20 @@ export class EnglishTableMemory implements AgentTurnMemory {
 		const patch: {
 			content: string;
 			searchOrganic?: UpdateAssistantContentOpts['searchOrganic'];
+			elResources?: UpdateAssistantContentOpts['elResources'];
 		} = { content };
 		if (opts?.searchOrganic !== undefined) {
 			patch.searchOrganic = opts.searchOrganic;
 		}
+		if (opts?.elResources !== undefined) {
+			patch.elResources = opts.elResources;
+		}
 		await Promise.all([
-			this.messageRepo.update({ id: assistantMessageId }, patch),
+			// JSON 列里的 unknown[] 过不了 TypeORM 的 DeepPartial
+			this.messageRepo.update(
+				{ id: assistantMessageId },
+				patch as Parameters<Repository<EnglishAgentMessage>['update']>[1],
+			),
 			this.sessionRepo.update({ id: sessionId }, { updatedAt: now }),
 		]);
 	}
@@ -212,7 +242,15 @@ export class EnglishTableMemory implements AgentTurnMemory {
 		return this.messageRepo.find({
 			where: { session: { id: sessionId } },
 			order: { createdAt: 'ASC' },
-			select: ['id', 'turnId', 'role', 'content', 'searchOrganic', 'createdAt'],
+			select: [
+				'id',
+				'turnId',
+				'role',
+				'content',
+				'searchOrganic',
+				'elResources',
+				'createdAt',
+			],
 		});
 	}
 

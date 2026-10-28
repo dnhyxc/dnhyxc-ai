@@ -125,6 +125,16 @@ export function ClassicQuotesFavoritesSection({
 
 	useEffect(() => {
 		if (!active) return;
+		const onMut = (ev: Event) => {
+			const domain = (ev as CustomEvent<{ domain?: string }>).detail?.domain;
+			if (domain === 'favorites') void reloadFromStart(true);
+		};
+		window.addEventListener('english-domain-mutation', onMut);
+		return () => window.removeEventListener('english-domain-mutation', onMut);
+	}, [active, reloadFromStart]);
+
+	useEffect(() => {
+		if (!active) return;
 		return () => {
 			flushElFixedListResume(LIST_SCOPE, { keepalive: true });
 		};

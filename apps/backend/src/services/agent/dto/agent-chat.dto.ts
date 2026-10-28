@@ -33,6 +33,15 @@ export class AgentChatDto {
 	@MaxLength(80_000)
 	intentPrefix?: string;
 
+	/**
+	 * 侧栏 / 当前页结构化上下文（不入库），拼入本轮 HumanMessage，便于 el_* 定位。
+	 * 例：{"route":"daily-reading","readingId":"...","module":"favorites"}
+	 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(4_000)
+	activeContext?: string;
+
 	@IsOptional()
 	@IsString()
 	@MaxLength(255)

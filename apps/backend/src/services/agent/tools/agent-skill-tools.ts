@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AIMessage, ToolMessage } from '@langchain/core/messages';
 import { DynamicTool } from '@langchain/core/tools';
-import type { SkillBody } from '../skill/skill.service';
+import type { SkillBody } from '../../skill/skill.service';
 
 export function formatSkillToolResult(skill: SkillBody): string {
 	return `### Skill: ${skill.title}\n${skill.content}`;

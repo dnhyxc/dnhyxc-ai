@@ -1,5 +1,6 @@
 import type { BaseMessage } from '@langchain/core/messages';
 import type { SerperOrganicItem } from '../web-search/web-search.types';
+import type { ElResourceListPayload } from './tools/english/artifact.store';
 
 /** 本轮强制应用的 Skill 快照（落库 / SSE） */
 export type AppliedSkillRef = { id: string; title: string };
@@ -10,6 +11,8 @@ export type UpdateAssistantContentOpts = {
 	searchOrganic?: SerperOrganicItem[] | null;
 	/** undefined：不改列；null：清空；数组：落库（assistant_* / skill_try_*） */
 	appliedSkills?: AppliedSkillRef[] | null;
+	/** undefined：不改列；数组：英语消息快照（含全量行，刷新后仍可滚） */
+	elResources?: ElResourceListPayload[] | null;
 };
 
 /**

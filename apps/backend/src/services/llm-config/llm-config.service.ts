@@ -297,11 +297,11 @@ export class LlmConfigService {
 		preset: SiliconFlowLlmPreset,
 		userId?: number,
 	): Promise<SiliconFlowCredentials> {
-		/** OCR 固定走 GLM_* + GLM-4.6V-Flash，不受设置页自定义大模型覆盖 */
-		if (preset === 'ocr') {
+		/** OCR 与短决策固定走 GLM_*，不受设置页自定义大模型或会员硅基覆盖 */
+		if (preset === 'ocr' || preset === 'decide') {
 			return resolveEnvSiliconFlowCredentials(
 				config,
-				siliconFlowResolvePresetsForPreset('ocr')(config),
+				siliconFlowResolvePresetsForPreset(preset)(config),
 			);
 		}
 		const snapshot = await this.getActiveChatSnapshotForUser(userId);

@@ -183,6 +183,264 @@ export function resolveProfile(stored: StoredProfile): ReadingProfile {
 	};
 }
 
+/** 原话点名的键才出现。缺省表示沿用已保存的自选档，不能填默认档。 */
+export type ReadingOverride = {
+	themes?: string[];
+	level?: StoredProfile['level'];
+	length?: StoredProfile['length'];
+	focus?: StoredProfile['focus'];
+	questions?: StoredProfile['questions'];
+	useWeb?: boolean;
+};
+
+function nearNo(text: string, at: number): boolean {
+	const pre = text.slice(Math.max(0, at - 2), at);
+	return pre === '不要' || pre === '不是' || pre.endsWith('别');
+}
+
+function hits(
+	text: string,
+	re: RegExp,
+	skip?: (at: number) => boolean,
+): number[] {
+	const out: number[] = [];
+	for (const m of text.matchAll(re)) {
+		const at = m.index ?? 0;
+		if (nearNo(text, at) || skip?.(at)) continue;
+		out.push(at);
+	}
+	return out;
+}
+
+function lastAt(list: number[]): number {
+	return list.length ? Math.max(...list) : -1;
+}
+
+/** 「学习的长篇」只留主题。篇幅词本身不是主题。 */
+function trimThemePiece(raw: string): string {
+	let t = raw
+		.trim()
+		.replace(/[「」『』"“”'']/g, '')
+		.trim();
+	t = t.replace(/^(?:关于|有关)/, '').trim();
+	t = t.replace(/(?:的)?(?:长篇|短篇|中篇|长文|短文)[\s\S]*$/, '').trim();
+	t = t.replace(/的$/, '').trim();
+	return t;
+}
+
+function themesFromClause(raw: string): string[] | null {
+	const parts = raw
+		.split(/[、,，]|和/)
+		.map((part) => trimThemePiece(part))
+		.filter(Boolean);
+	return normalizeThemeList(parts);
+}
+
+/**
+ * 自选生成的原话词表。只覆盖点名的字段。
+ * savedThemes 用来认「原话里出现的已保存主题全文」。
+ */
+export function parseReadingOverride(
+	userText: string,
+	savedThemes: readonly string[] = [],
+): ReadingOverride {
+	const text = userText ?? '';
+	const said: ReadingOverride = {};
+	const levelHits: { at: number; value: StoredProfile['level'] }[] = [];
+	for (const m of text.matchAll(/中高级|初级|中级|高级|难度随机/g)) {
+		const at = m.index ?? 0;
+		if (nearNo(text, at)) continue;
+		if (m[0] === '高级' && text[at - 1] === '中') continue;
+		const value =
+			m[0] === '中高级'
+				? 'B2'
+				: m[0] === '初级'
+					? 'A2'
+					: m[0] === '中级'
+						? 'B1'
+						: m[0] === '高级'
+							? 'C1'
+							: 'random';
+		levelHits.push({ at, value });
+	}
+	for (const m of text.matchAll(/A2|B1|B2|C1/gi)) {
+		const at = m.index ?? 0;
+		const word = m[0];
+		const before = text[at - 1] ?? '';
+		const after = text[at + word.length] ?? '';
+		if (/[A-Za-z0-9]/.test(before) || /[A-Za-z0-9]/.test(after)) continue;
+		if (nearNo(text, at)) continue;
+		levelHits.push({
+			at,
+			value: word.toUpperCase() as StoredProfile['level'],
+		});
+	}
+	if (levelHits.length) {
+		said.level = levelHits.reduce((a, b) => (b.at >= a.at ? b : a)).value;
+	}
+	const lengthMap: [RegExp, StoredProfile['length']][] = [
+		[/短篇/g, 'short'],
+		[/中篇/g, 'medium'],
+		[/长篇|长文/g, 'long'],
+		[/\bshort\b/gi, 'short'],
+		[/\bmedium\b/gi, 'medium'],
+		[/\blong\b/gi, 'long'],
+	];
+	const lengthHits: { at: number; value: StoredProfile['length'] }[] = [];
+	for (const [re, value] of lengthMap) {
+		for (const at of hits(text, re)) lengthHits.push({ at, value });
+	}
+	if (lengthHits.length) {
+		said.length = lengthHits.reduce((a, b) => (b.at >= a.at ? b : a)).value;
+	}
+	const vocabAt = [...hits(text, /附词汇/g), ...hits(text, /只要词汇/g)];
+	const grammarAt = [...hits(text, /附语法/g), ...hits(text, /只要语法/g)];
+	const readingAt = hits(text, /只读短文/g);
+	const focusRandomAt = hits(text, /侧重随机/g);
+	const pairAt = Math.max(lastAt(vocabAt), lastAt(grammarAt));
+	const exclusiveAt = Math.max(lastAt(readingAt), lastAt(focusRandomAt));
+	if (vocabAt.length && grammarAt.length && pairAt > exclusiveAt) {
+		said.focus = 'both';
+	} else if (exclusiveAt >= 0 && exclusiveAt >= pairAt) {
+		said.focus =
+			lastAt(focusRandomAt) > lastAt(readingAt) ? 'random' : 'reading';
+	} else if (vocabAt.length || grammarAt.length) {
+		said.focus = lastAt(vocabAt) >= lastAt(grammarAt) ? 'vocab' : 'grammar';
+	}
+	const questionHits: { at: number; value: StoredProfile['questions'] }[] = [];
+	for (const at of hits(text, /不出题|不要题/g)) {
+		questionHits.push({ at, value: 0 });
+	}
+	for (const at of hits(text, /题数随机/g)) {
+		questionHits.push({ at, value: 'random' });
+	}
+	for (const at of hits(text, /两道|两题|2\s*题/g)) {
+		questionHits.push({ at, value: 2 });
+	}
+	for (const at of hits(text, /三道|三题|3\s*题/g)) {
+		questionHits.push({ at, value: 3 });
+	}
+	if (questionHits.length) {
+		said.questions = questionHits.reduce((a, b) =>
+			b.at >= a.at ? b : a,
+		).value;
+	}
+	const webHits: { at: number; value: boolean }[] = [];
+	for (const at of hits(text, /关闭智能搜索|不要联网|别搜/g)) {
+		webHits.push({ at, value: false });
+	}
+	for (const at of hits(
+		text,
+		/开启智能搜索|要联网/g,
+		(at) => text[at - 1] === '不',
+	)) {
+		webHits.push({ at, value: true });
+	}
+	if (webHits.length) {
+		said.useWeb = webHits.reduce((a, b) => (b.at >= a.at ? b : a)).value;
+	}
+	let themeAt = -1;
+	let themes: string[] | undefined;
+	const use = (at: number, list: string[]) => {
+		if (at >= themeAt) {
+			themeAt = at;
+			themes = list;
+		}
+	};
+	for (const m of text.matchAll(/默认配置|恢复默认/g)) {
+		const at = m.index ?? 0;
+		if (nearNo(text, at)) continue;
+		said.level =
+			said.level && levelHits.some((h) => h.at > at)
+				? said.level
+				: DEFAULT_PROFILE.level;
+		said.length =
+			said.length && lengthHits.some((h) => h.at > at)
+				? said.length
+				: DEFAULT_PROFILE.length;
+		said.focus =
+			said.focus &&
+			Math.max(pairAt, exclusiveAt, lastAt(vocabAt), lastAt(grammarAt)) > at
+				? said.focus
+				: DEFAULT_PROFILE.focus;
+		said.questions =
+			said.questions !== undefined && questionHits.some((h) => h.at > at)
+				? said.questions
+				: DEFAULT_PROFILE.questions;
+		said.useWeb =
+			said.useWeb !== undefined && webHits.some((h) => h.at > at)
+				? said.useWeb
+				: DEFAULT_PROFILE.useWeb;
+		use(at, [...DEFAULT_THEMES]);
+	}
+	const explicitSpans: { start: number; end: number }[] = [];
+	for (const m of text.matchAll(
+		/主题\s*(?:是|用|为|改成|设为|关于|有关)\s*([^，。；\n]{1,24})/g,
+	)) {
+		const at = m.index ?? 0;
+		explicitSpans.push({ start: at, end: at + m[0].length });
+		if (nearNo(text, at)) continue;
+		const list = themesFromClause(m[1] ?? '');
+		if (list) use(at, list);
+	}
+	for (const m of text.matchAll(
+		/(?:关于|有关)\s*([^，。；\n的]{1,16})\s*的\s*(?:长篇|短篇|中篇|长文|短文)/g,
+	)) {
+		const at = m.index ?? 0;
+		const inside = explicitSpans.some(
+			(span) => at >= span.start && at < span.end,
+		);
+		explicitSpans.push({ start: at, end: at + m[0].length });
+		if (inside || nearNo(text, at)) continue;
+		const list = themesFromClause(m[1] ?? '');
+		if (list) use(at, list);
+	}
+	const savedHits: { at: number; label: string }[] = [];
+	for (const label of savedThemes) {
+		if (!label) continue;
+		let from = 0;
+		while (from <= text.length) {
+			const at = text.indexOf(label, from);
+			if (at < 0) break;
+			const inside = explicitSpans.some(
+				(span) => at >= span.start && at < span.end,
+			);
+			if (!inside && !nearNo(text, at)) savedHits.push({ at, label });
+			from = at + label.length;
+		}
+	}
+	if (savedHits.length && lastAt(savedHits.map((h) => h.at)) > themeAt) {
+		const seen = new Set<string>();
+		themes = [];
+		for (const hit of savedHits) {
+			if (seen.has(hit.label)) continue;
+			seen.add(hit.label);
+			themes.push(hit.label);
+		}
+		themeAt = lastAt(savedHits.map((h) => h.at));
+	}
+	if (themes) said.themes = themes;
+	return said;
+}
+
+/** Agent 自选生成：已保存档为底，原话点名的键覆盖。不写回设置。 */
+export function resolveAgentManual(
+	saved: { themes: string[]; profile: StoredProfile },
+	userText: string,
+): { themes: string[]; profile: StoredProfile } {
+	const said = parseReadingOverride(userText, saved.themes);
+	return {
+		themes: said.themes ?? saved.themes,
+		profile: {
+			level: said.level ?? saved.profile.level,
+			length: said.length ?? saved.profile.length,
+			focus: said.focus ?? saved.profile.focus,
+			questions: said.questions ?? saved.profile.questions,
+			useWeb: said.useWeb ?? saved.profile.useWeb,
+		},
+	};
+}
+
 export function themeForDate(
 	ymd: string,
 	themes: readonly string[] = DEFAULT_THEMES,

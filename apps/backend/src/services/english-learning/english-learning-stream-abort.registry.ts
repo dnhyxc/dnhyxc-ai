@@ -38,6 +38,14 @@ export class EnglishLearningStreamAbortRegistry implements OnModuleDestroy {
 		this.streams.delete(streamId.trim());
 	}
 
+	/** 该用户是否已有单词、语句或标注流。Agent 生成前用来拒绝第二路。 */
+	hasUser(userId: number): boolean {
+		for (const entry of this.streams.values()) {
+			if (entry.userId === userId) return true;
+		}
+		return false;
+	}
+
 	/**
 	 * 用户主动取消 / 刷新 keepalive pause：仅当 key 对应当前用户登记过时才 abort。
 	 * @returns 是否命中并触发了 abort

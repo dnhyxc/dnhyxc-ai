@@ -1,10 +1,21 @@
-# 规划文档 — 代码草图注释
+# 规划文档 — 实现代码注释
 
-`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/ideas/`（`<IDEAS_ROOT>`）实现思路中的代码块仅为 **伪代码 / 接口草图**（建议 ≤30 行/块），**不要**贴大段可运行实现（完整实现属 `implementation-doc-from-diff`）。
+`/Users/dnhyxc/Documents/code/micro-apps/remote-docs/wiki/ideas/`（`<IDEAS_ROOT>`）里的代码是 **选定方案的主链路实现**（关键函数、数据契约、调用点），用来说明打算怎么写。
 
-凡出现的 JS/TS（含伪代码）围栏块，注释规则如下。
+落选方案只在 §4 用文字写差异，不写完整实现。已落地改动的前后对照仍属 `implementation-doc-from-diff`。
 
-## 1. 硬约束
+凡出现的 JS/TS 围栏块，注释规则如下。
+
+## 1. 写多少
+
+| 原则 | 说明 |
+| ---- | ---- |
+| **对准步骤** | 每块对应 §4.4（或 §4.5 某决策）的一个步骤，块首注释写 `对应 §4.4 步骤 n` |
+| **一条路径** | 单块只放一个关键函数、一段数据契约，或一处调用点 |
+| **够落地** | 读者按代码能实现该决策的主链路：分支、写入、返回值要在，不能只留签名加 `// …` |
+| **禁止** | 整文件粘贴；与该决策无关的样板；把落选方案也写成一套实现 |
+
+## 2. 硬约束
 
 | 原则 | 说明 |
 | ---- | ---- |
@@ -14,50 +25,45 @@
 | **豁免** | 空行；纯 `{` / `}` / `},` / `};` / `]);` / `);` 等无表达式闭合行 |
 | **禁止前缀** | 不加 `讲解：` / `说明：` |
 
-## 2. 必须注释的行类型
+## 3. 必须注释的行类型
 
 import、变量声明、函数/参数行、return、if/else/switch、循环、方法调用、对象/数组每个属性行、装饰器、类型声明（`type` / `interface` 成员）。
 
-## 3. 正确示例
+## 4. 正确示例
 
 ```typescript
-// 试跑/生成共用的会话创建入参；generate 可无 skillId 表示草稿桶
+// 对应 §4.4 步骤 1。试跑和生成共用一个创建口，避免两条 API 各写一套会话行
 type CreateTrySessionInput = {
-	// try 必须绑 Skill；generate 可选
+	// try 必须绑 Skill；generate 不带 id 时落草稿桶，调用方不必先存 Skill
 	kind: 'try' | 'generate';
-	// 已保存 Skill id；缺省则 list/create 走 skill_id IS NULL
+	// 已保存 Skill id；缺省则 list/create 走 skill_id IS NULL，草稿不污染已发布 Skill
 	skillId?: string;
-	// 侧栏展示标题，可空
+	// 侧栏标题可空：空则用首条用户消息截断，避免为起名再打一次模型
 	title?: string;
 };
 
-// 新建锚定会话：同 id 写入 agent_sessions + skill_try_sessions
+// 对应 §4.4 步骤 2。同一次分配 id，SSE 和刷新恢复都用它，避免创建后再查一遍
 function createTrySession(input: CreateTrySessionInput): { sessionId: string } {
-	// … 实现阶段再填；此处只定契约
-	return { sessionId: '…' };
-}
-
-// SSE 发送：生成禁 skillIds，正文用条件 intentPrefix 控 token
-function sendGenerate(opts: {
-	sessionId: string;
-	content: string;
-	intentPrefix?: string;
-}): void {
-	// memorySource 固定 skill_try，走业务分表
-	// assistMode=skill_generate 挂生成系统提示
+	// 锚点 id 由服务端生成，客户端传来的 id 不能当主键，防止串到别人的会话
+	const sessionId = createId();
+	// 业务行复用同一个 id，列表接口不用再 join 一次才能打开这条试跑
+	insertTryRow({ sessionId, kind: input.kind, skillId: input.skillId ?? null });
+	return { sessionId };
 }
 ```
 
-## 4. 与完整实现文档的边界
+## 5. 与完整实现文档的边界
 
 | | 本 Skill（ideas） | `implementation-doc-from-diff` |
 |--|-------------------|--------------------------------|
-| 代码量 | ≤30 行/块草图 | 完整符号 + 改动前/后成对 |
+| 代码 | 选定方案的主链路，一块一条路径 | 完整符号 + 改动前/后成对 |
 | 注释 | 同上「做什么+为什么」 | 同左，且两侧各自 100% |
-| 目的 | 定契约与边界 | 归档可对照源码的改动 |
+| 目的 | 比对之后说明打算怎么写 | 归档可对照源码的改动 |
 
-## 5. 自检
+## 6. 自检
 
-- [ ] 草图块非空非纯闭合行均有上一行注释
+- [ ] 代码只覆盖最终方案，且每块能对上 §4.4 / §4.5 的步骤号
+- [ ] 主链路的分支、写入、返回值在代码里，不是只留签名
+- [ ] 非空非纯闭合行均有上一行注释
 - [ ] 注释含做什么 + 为什么，无废话
-- [ ] 单块 ≤30 行；未贴大段实现
+- [ ] 没有整文件粘贴

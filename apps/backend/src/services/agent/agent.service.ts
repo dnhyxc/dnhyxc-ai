@@ -20,9 +20,13 @@ import {
 	GLM_THINKING_DISABLED_KWARGS,
 } from '../../utils/create-llm';
 import { AssistantTableMemory } from '../assistant/assistant-table-memory';
+import { EnglishDailyReadingService } from '../english-learning/english-daily-reading.service';
+import { EnglishLearningService } from '../english-learning/english-learning.service';
+import { EnglishLearningStreamAbortRegistry } from '../english-learning/english-learning-stream-abort.registry';
 import { EnglishTableMemory } from '../english-learning/english-table-memory';
 import { EnglishAgentSession } from '../english-learning/entity/english-agent-session.entity';
 import { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
+import { LearningNotesService } from '../learning-notes/learning-notes.service';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { SkillService } from '../skill/skill.service';
 import { SkillTrySession } from '../skill/skill-try-session.entity';
@@ -43,16 +47,46 @@ import {
 	buildAgentLangchainMiddleware,
 } from './agent-middleware';
 import { AgentSession } from './agent-session.entity';
+import type { AgentTurnMemory, AppliedSkillRef } from './agent-turn-memory';
+import { AgentChatDto } from './dto/agent-chat.dto';
+import type { CommitElProposalDto } from './dto/commit-el-proposal.dto';
+import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
 import {
 	buildAgentSkillTools,
 	formatSkillsSystemAppend,
 	formatSkillsUserForcePrefix,
 	preseedApplySkillMessages,
-} from './agent-skill-tools';
-import { buildAgentLangChainTools } from './agent-tools';
-import type { AgentTurnMemory, AppliedSkillRef } from './agent-turn-memory';
-import { AgentChatDto } from './dto/agent-chat.dto';
-import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
+} from './tools/agent-skill-tools';
+import { buildAgentLangChainTools } from './tools/agent-tools';
+import {
+	applyElProposal,
+	proposalReceipt,
+} from './tools/english/apply-proposal';
+import {
+	ElArtifactStore,
+	type ElResourceListPayload,
+} from './tools/english/artifact.store';
+import {
+	buildEnglishLearningDomainTools,
+	type ElDomainMutation,
+	missingNoteCard,
+	startConfirmedPack,
+	startConfirmedReading,
+} from './tools/english/domain-tools';
+import {
+	favoriteAsk,
+	pickFavoriteCard,
+	proposeFavoriteRows,
+} from './tools/english/favorite-ask';
+import { ElProposalStore } from './tools/english/proposal.store';
+import {
+	type ElListSurface,
+	elCardAnchor,
+	forSse,
+	inventoryFallback,
+	placeCardHint,
+	stripDumpedList,
+} from './tools/english/spill';
 
 function resolveAgentSystemPrompt(dto: AgentChatDto, skillAppend = ''): string {
 	let base = DEFAULT_AGENT_SYSTEM_PROMPT;
@@ -98,6 +132,19 @@ const AGENT_STREAM_STATE_TTL_MS = 12 * 60 * 60 * 1000;
  * @param chunk AIMessageChunk类型，可能为undefined
  * @returns 提取到的文本内容
  */
+function readFinishReason(
+	chunk: AIMessageChunk | undefined,
+): 'length' | 'stop' | undefined {
+	const meta = chunk?.response_metadata;
+	if (!meta || typeof meta !== 'object') return undefined;
+	const raw =
+		(meta as { finish_reason?: unknown }).finish_reason ??
+		(meta as { finishReason?: unknown }).finishReason;
+	if (raw === 'length' || raw === 'max_tokens') return 'length';
+	if (raw === 'stop') return 'stop';
+	return undefined;
+}
+
 function extractChunkText(chunk: AIMessageChunk | undefined): string {
 	if (!chunk) return '';
 	const { content } = chunk;
@@ -123,17 +170,29 @@ function extractChunkText(chunk: AIMessageChunk | undefined): string {
 
 /** 从 LangChain / HTTP 异常中抽出可读文案（含 429 限流嵌套 message） */
 export function formatAgentStreamError(err: unknown): string {
+	if (
+		(err instanceof Error && err.message.includes('Recursion limit')) ||
+		(typeof err === 'string' && err.includes('Recursion limit'))
+	) {
+		return '这次没有查完，请把问题再说得具体一些。';
+	}
 	if (err == null) return '处理失败';
 	if (typeof err === 'string' && err.trim()) return err.trim();
 	if (err instanceof Error && err.message.trim()) return err.message.trim();
 	if (typeof err === 'object') {
 		const o = err as Record<string, unknown>;
 		if (typeof o.message === 'string' && o.message.trim()) {
+			if (o.message.includes('Recursion limit')) {
+				return '这次没有查完，请把问题再说得具体一些。';
+			}
 			return o.message.trim();
 		}
 		const nested = o.error;
 		if (nested && typeof nested === 'object') {
 			const m = (nested as { message?: unknown }).message;
+			if (typeof m === 'string' && m.includes('Recursion limit')) {
+				return '这次没有查完，请把问题再说得具体一些。';
+			}
 			if (typeof m === 'string' && m.trim()) return m.trim();
 		}
 		if (o.lc_error_code === 'MODEL_RATE_LIMIT' || o.status === 429) {
@@ -165,6 +224,17 @@ export type AgentSseChunk =
 			type: 'skillsApplied';
 			data: { skills: Array<{ id: string; title: string }> };
 	  }
+	/** 英语领域写成功后通知前端刷新侧栏/列表 */
+	| { type: 'domainMutation'; data: { domain: ElDomainMutation } }
+	/** 大列表旁路：全量不进模型正文 */
+	| { type: 'elResourceList'; data: ElResourceListPayload }
+	/** 剥掉模型复述的长表后，用导语替换已流出的正文 */
+	| { type: 'contentReplace'; data: string }
+	/** 最后一轮 completion 触顶：只续散文，清单仍在旁路 */
+	| {
+			type: 'finish';
+			data: { reason: 'length' | 'stop'; maxTokensReached: boolean };
+	  }
 	/** 业务失败：须 next+complete，勿 subscriber.error（Nest SSE 中途 error 常丢帧） */
 	| { type: 'error'; data: string };
 
@@ -187,6 +257,12 @@ export class AgentService {
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly skillService: SkillService,
+		private readonly englishLearningService: EnglishLearningService,
+		private readonly englishDailyReadingService: EnglishDailyReadingService,
+		private readonly learningNotesService: LearningNotesService,
+		private readonly elStreams: EnglishLearningStreamAbortRegistry,
+		private readonly elProposalStore: ElProposalStore,
+		private readonly elArtifactStore: ElArtifactStore,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
@@ -456,6 +532,7 @@ export class AgentService {
 					role: m.role,
 					content: m.content,
 					searchOrganic: m.searchOrganic ?? null,
+					elResources: m.elResources ?? null,
 					createdAt: m.createdAt,
 				})),
 			};
@@ -542,12 +619,137 @@ export class AgentService {
 	 * 构建主模型与摘要模型（preset `chat`：与主站对话共用凭证与模型名）
 	 * @param options maxTokens|temperature|signal
 	 */
+	async getElArtifact(userId: number, artifactId: string) {
+		return this.elArtifactStore.get(userId, artifactId);
+	}
+
+	/**
+	 * 确认条直提交：消费提案、落库、只插一条助手回执。
+	 * 不开启模型轮，因此不会在会话里出现「请对提案调用 commit」。
+	 */
+	async commitElProposal(userId: number, dto: CommitElProposalDto) {
+		const session = await this.englishSessionRepo.findOne({
+			where: { id: dto.sessionId, userId },
+		});
+		if (!session) {
+			return {
+				ok: false as const,
+				code: 'forbidden' as const,
+				message: '会话不存在',
+			};
+		}
+		const pending = await this.elProposalStore.peek(userId, dto.proposalId);
+		if (!pending) {
+			return {
+				ok: false as const,
+				code: 'expired' as const,
+				message: '提案已过期',
+			};
+		}
+		if (pending.kind === 'pack_generate' && this.elStreams.hasUser(userId)) {
+			return {
+				ok: false as const,
+				code: 'failed' as const,
+				message: '已有生成进行中',
+			};
+		}
+		if (
+			pending.kind === 'reading_generate' &&
+			this.englishDailyReadingService.peekManualRun(userId)
+		) {
+			return {
+				ok: false as const,
+				code: 'failed' as const,
+				message: '已有自选生成进行中',
+			};
+		}
+		const payload = await this.elProposalStore.consume(userId, dto.proposalId);
+		if (!payload) {
+			return {
+				ok: false as const,
+				code: 'expired' as const,
+				message: '提案已过期',
+			};
+		}
+		if (
+			payload.kind === 'pack_generate' ||
+			payload.kind === 'reading_generate'
+		) {
+			const content =
+				payload.kind === 'pack_generate' ? '已开始生成。' : '已开始自选生成。';
+			if (payload.kind === 'pack_generate') {
+				startConfirmedPack(
+					this.englishLearningService,
+					this.elStreams,
+					userId,
+					payload.body,
+				);
+			} else {
+				startConfirmedReading(
+					this.englishDailyReadingService,
+					userId,
+					payload.body,
+				);
+			}
+			const messageId = await this.englishTableMemory.insertAssistantNote(
+				dto.sessionId,
+				content,
+			);
+			return {
+				ok: true as const,
+				messageId,
+				content,
+				kind: payload.kind,
+				domain:
+					payload.kind === 'pack_generate'
+						? ('pack' as const)
+						: ('daily_reading' as const),
+				created: 0,
+				existed: 0,
+				failed: 0,
+				truncated: false,
+				gaps: [] as Array<'cap' | 'list' | 'judge'>,
+			};
+		}
+		const stats = await applyElProposal(
+			this.englishLearningService,
+			userId,
+			payload,
+		);
+		const lang = dto.lang === 'en-US' ? 'en-US' : 'zh-CN';
+		const content = proposalReceipt(
+			lang,
+			payload.kind,
+			stats,
+			Boolean(payload.truncated),
+			payload.gaps,
+		);
+		const messageId = await this.englishTableMemory.insertAssistantNote(
+			dto.sessionId,
+			content,
+		);
+		return {
+			ok: true as const,
+			messageId,
+			content,
+			kind: payload.kind,
+			domain: stats.domain,
+			created: stats.created,
+			existed: stats.existed,
+			failed: stats.failed,
+			truncated: Boolean(payload.truncated),
+			gaps: payload.gaps ?? [],
+		};
+	}
+
 	private async buildModels(
 		userId: number,
 		options: {
 			maxTokens?: number;
 			temperature?: number;
 			signal?: AbortSignal;
+			/** 英语学习：抬高导语上限，清单本身不靠 completion */
+			english?: boolean;
 		},
 	): Promise<{ main: ChatOpenAI; summary: ChatOpenAI }> {
 		const main = await createLlm(
@@ -559,7 +761,7 @@ export class AgentService {
 				temperature: options.temperature,
 				defaultTemperature: 0.3,
 				maxTokens: options.maxTokens,
-				defaultMaxTokens: 4096,
+				defaultMaxTokens: options.english ? 8192 : 4096,
 				abortSignal: options.signal,
 				modelKwargs: GLM_THINKING_DISABLED_KWARGS,
 			},
@@ -610,6 +812,7 @@ export class AgentService {
 		let sessionId = dto.sessionId; // agent 运行句柄（停流/epoch）
 		let session!: AgentSession;
 		let accumulated = ''; // 用户本轮assistant回复内容临时拼接
+		let sawStopTools = false;
 		/** 本轮合并后的联网检索列表（去重），落库与 SSE 推送前补 position */
 		let turnSearchOrganic: WebSearchOrganicItem[] = [];
 		let assistantMessageId: string | undefined;
@@ -619,10 +822,72 @@ export class AgentService {
 		let turnMemory: AgentTurnMemory = this.memory;
 		/** 本轮强制 Skill（收尾写入业务表 applied_skills） */
 		let turnAppliedSkills: AppliedSkillRef[] | null = null;
+		/** 本轮外溢清单（含全量行，落库快照） */
+		const turnElResources: ElResourceListPayload[] = [];
+		const elSurface: ElListSurface = {
+			userText: dto.content,
+			libraryLists: [],
+			presented: false,
+			shownLibraryIds: new Set(),
+			catalog: [],
+		};
+		const pushInventoryCard = async () => {
+			const rows = inventoryFallback(
+				elSurface.userText,
+				elSurface.libraryLists,
+				elSurface.shownLibraryIds,
+			);
+			for (const picked of rows) {
+				elSurface.presented = true;
+				let payload = picked.payload;
+				if (picked.restash) {
+					const { artifactId: _old, ...rest } = payload;
+					const artifactId = await this.elArtifactStore.put(userId, rest);
+					payload = { ...rest, artifactId };
+				}
+				elSurface.shownLibraryIds.add(payload.libraryId ?? payload.artifactId);
+				turnElResources.push(payload);
+				subscriber.next({ type: 'elResourceList', data: forSse(payload) });
+			}
+		};
 
 		/**
 		 * 当前turn完成时的存储收尾，更新内容/清理无回复
 		 */
+		const resolvedAssistantText = (): string => {
+			const spilled = turnElResources.length > 0;
+			const cardItems = turnElResources.reduce(
+				(max, row) => Math.max(max, row.totalCount ?? 0),
+				0,
+			);
+			let text = stripDumpedList(accumulated, spilled, cardItems);
+			const fullLibrary = turnElResources.some(
+				(row) =>
+					row.source === 'library' &&
+					Boolean(row.libraryId) &&
+					(row.contentKind === 'vocab' || row.contentKind === 'classic'),
+			);
+			text = placeCardHint(text, spilled, fullLibrary);
+			if (!text.trim() && spilled) {
+				text = turnElResources
+					.map(
+						(r) => `${r.title}：共 ${r.totalCount} 条，完整内容在清单卡片中。`,
+					)
+					.join('\n');
+			}
+			return text;
+		};
+		const assistantSaveOpts = () => ({
+			searchOrganic:
+				turnSearchOrganic.length > 0
+					? withAgentOrganicPositions(turnSearchOrganic)
+					: null,
+			...(turnAppliedSkills?.length
+				? { appliedSkills: turnAppliedSkills }
+				: {}),
+			...(turnElResources.length ? { elResources: turnElResources } : {}),
+		});
+
 		const finalizeTurn = async () => {
 			if (
 				!businessSessionId ||
@@ -632,26 +897,23 @@ export class AgentService {
 			) {
 				return;
 			}
+			await pushInventoryCard();
+			const text = resolvedAssistantText();
+			if (text !== accumulated) {
+				subscriber.next({ type: 'contentReplace', data: text });
+				accumulated = text;
+			}
 			if (!accumulated.trim()) {
 				// 若assistant回复为空，删掉本轮消息
 				await turnMemory.deleteTurnPair(businessSessionId, activeTurnId);
 				return;
 			}
 			// 正常则补全 assistant 正文与联网胶囊数据源
-			const organicToSave =
-				turnSearchOrganic.length > 0
-					? withAgentOrganicPositions(turnSearchOrganic)
-					: null;
 			await turnMemory.updateAssistantContent(
 				businessSessionId,
 				assistantMessageId,
 				accumulated,
-				{
-					searchOrganic: organicToSave,
-					...(turnAppliedSkills?.length
-						? { appliedSkills: turnAppliedSkills }
-						: {}),
-				},
+				assistantSaveOpts(),
 			);
 		};
 
@@ -664,21 +926,17 @@ export class AgentService {
 				return;
 			}
 			try {
+				await pushInventoryCard();
+				const text = resolvedAssistantText();
+				if (text !== accumulated) {
+					accumulated = text;
+				}
 				if (accumulated.trim()) {
-					const organicToSave =
-						turnSearchOrganic.length > 0
-							? withAgentOrganicPositions(turnSearchOrganic)
-							: null;
 					await turnMemory.updateAssistantContent(
 						businessSessionId,
 						assistantMessageId,
 						accumulated,
-						{
-							searchOrganic: organicToSave,
-							...(turnAppliedSkills?.length
-								? { appliedSkills: turnAppliedSkills }
-								: {}),
-						},
+						assistantSaveOpts(),
 					);
 				} else {
 					await turnMemory.deleteTurnPair(businessSessionId, activeTurnId);
@@ -730,7 +988,14 @@ export class AgentService {
 			const lcMessages =
 				await turnMemory.buildLangChainMessagesFromDb(businessSessionId);
 			const intent = dto.intentPrefix?.trim();
-			if (intent) {
+			const activeCtx = dto.activeContext?.trim();
+			const turnPrefix = [
+				activeCtx ? `【当前侧栏上下文】\n${activeCtx}` : '',
+				intent || '',
+			]
+				.filter(Boolean)
+				.join('\n\n');
+			if (turnPrefix) {
 				for (let i = lcMessages.length - 1; i >= 0; i -= 1) {
 					const msg = lcMessages[i];
 					if (!(msg instanceof HumanMessage)) continue;
@@ -743,7 +1008,7 @@ export class AgentService {
 										.map((p) => (typeof p?.text === 'string' ? p.text : ''))
 										.join('')
 								: String(c ?? '');
-					lcMessages[i] = new HumanMessage(`${intent}\n\n${plain}`);
+					lcMessages[i] = new HumanMessage(`${turnPrefix}\n\n${plain}`);
 					break;
 				}
 			}
@@ -832,10 +1097,12 @@ export class AgentService {
 					maxTokens: dto.maxTokens,
 					temperature: dto.temperature,
 					signal: abortController.signal,
+					english: dto.assistMode === 'english_learning',
 				},
 			);
 
-			// （7）拼装工具集（见 agent-tools.ts）+ 本轮 Skill 工具
+			// （7）拼装工具集（见 agent-tools.ts）+ 英语领域工具 + 本轮 Skill 工具
+			const elWhitelist = new Set<string>();
 			const tools = [
 				...buildAgentLangChainTools(
 					{
@@ -863,6 +1130,44 @@ export class AgentService {
 						},
 					},
 				),
+				...(dto.assistMode === 'english_learning'
+					? buildEnglishLearningDomainTools({
+							userId,
+							learning: this.englishLearningService,
+							dailyReading: this.englishDailyReadingService,
+							notes: this.learningNotesService,
+							streams: this.elStreams,
+							proposals: this.elProposalStore,
+							artifacts: this.elArtifactStore,
+							logger: this.logger,
+							config: this.configService,
+							onResourceList: (payload) => {
+								turnElResources.push(payload);
+								subscriber.next({
+									type: 'elResourceList',
+									data: forSse(payload),
+								});
+							},
+							onPresented: (payload) => {
+								turnElResources.push(payload);
+								const anchor = elCardAnchor(payload.artifactId);
+								accumulated += anchor;
+								subscriber.next({ type: 'content', data: anchor });
+								subscriber.next({
+									type: 'elResourceList',
+									data: forSse(payload),
+								});
+							},
+							whitelist: elWhitelist,
+							surface: elSurface,
+							onMutation: (domain) => {
+								subscriber.next({
+									type: 'domainMutation',
+									data: { domain },
+								});
+							},
+						})
+					: []),
 				...buildAgentSkillTools(skillBodies),
 			];
 
@@ -883,14 +1188,14 @@ export class AgentService {
 					// 把已加载 skill 标题与正文格式化后追加到 systemPrompt 末尾
 					formatSkillsSystemAppend(skillBodies),
 				),
-				// 摘要截断 + 工具调用上限（英语学习会额外限制 internet_search）
+				// 摘要截断。英语学习不按次数封工具，只在空转时收束
 				middleware: buildAgentLangchainMiddleware({
 					// 非流式副模型，仅供 summarizationMiddleware 压缩长上下文
 					summaryLlm: summaryLlm,
 					// 用 memory 侧同一套估算，与摘要 trigger.tokens 阈值一致
 					estimatePromptTokens: (msgs) =>
 						this.memory.estimatePromptTokens(msgs),
-					// english_learning 收紧本轮工具次数，避免搜穿 recursionLimit
+					// english_learning 用安静收束防空转，不按会话累计工具次数
 					profile: agentProfile,
 				}),
 			});
@@ -901,11 +1206,12 @@ export class AgentService {
 				{
 					version: 'v2',
 					signal: abortController.signal,
-					// 默认 25：英语学习反复 search 时易 GRAPH_RECURSION_LIMIT；显式抬高并靠中间件封顶工具
+					// 英语图步由安静来回数推出，晚于收束，只防图自身死循环
 					recursionLimit: agentStreamRecursionLimit(agentProfile),
 				},
 			);
 
+			let finishReason: 'length' | 'stop' | undefined;
 			for await (const ev of eventStream) {
 				// 并发安全：若epoch被外部+1（如stopStream），abort终止
 				const curEpoch = await this.getStreamEpoch(sessionId);
@@ -913,9 +1219,14 @@ export class AgentService {
 					abortController.abort();
 				}
 
+				if (ev.event === 'on_chat_model_start') {
+					finishReason = undefined;
+				}
 				// 模型主内容流
-				if (ev.event === 'on_chat_model_stream') {
+				else if (ev.event === 'on_chat_model_stream') {
 					const chunk = ev.data?.chunk as AIMessageChunk | undefined;
+					const reason = readFinishReason(chunk);
+					if (reason) finishReason = reason;
 					const text = extractChunkText(chunk);
 					if (text) {
 						accumulated += text;
@@ -935,6 +1246,14 @@ export class AgentService {
 				}
 				// 工具调用结束，发送事件
 				else if (ev.event === 'on_tool_end') {
+					const output = ev.data?.output;
+					const outputText =
+						typeof output === 'string'
+							? output
+							: output && typeof output === 'object' && 'content' in output
+								? String((output as { content?: unknown }).content ?? '')
+								: '';
+					if (outputText.includes('"code":"stop_tools"')) sawStopTools = true;
 					subscriber.next({
 						type: 'tool',
 						data: {
@@ -946,8 +1265,112 @@ export class AgentService {
 				}
 			}
 
+			if (!accumulated.trim() && sawStopTools) {
+				accumulated = '已有待确认提案，请直接点确认。';
+				subscriber.next({ type: 'content', data: accumulated });
+			}
+
+			if (
+				dto.assistMode === 'english_learning' &&
+				!turnElResources.some((row) => row.source === 'notes')
+			) {
+				try {
+					const draft = await missingNoteCard(
+						this.learningNotesService,
+						userId,
+						dto.content,
+					);
+					if (draft) {
+						const artifactId = await this.elArtifactStore.put(userId, draft);
+						const payload = { ...draft, artifactId };
+						turnElResources.push(payload);
+						subscriber.next({ type: 'elResourceList', data: forSse(payload) });
+					}
+				} catch (e: unknown) {
+					this.logger.warn?.(
+						`[AgentService] 补笔记卡失败: ${e instanceof Error ? e.message : e}`,
+					);
+				}
+			}
+
+			if (dto.assistMode === 'english_learning' && !elSurface.openProposalId) {
+				try {
+					const ask = favoriteAsk(dto.content);
+					let card = ask ? pickFavoriteCard(ask, turnElResources) : null;
+					if (ask && !card) {
+						const history =
+							await this.englishTableMemory.listMessagesAsc(businessSessionId);
+						for (let i = history.length - 1; i >= 0; i -= 1) {
+							const row = history[i];
+							if (row.role !== 'assistant' || row.id === assistantMessageId)
+								continue;
+							const saved = row.elResources ?? [];
+							card = pickFavoriteCard(ask, saved);
+							if (card) break;
+							const stub = [...saved]
+								.reverse()
+								.find((item) => item.artifactId && !item.items?.length);
+							if (!stub?.artifactId) continue;
+							const stored = await this.elArtifactStore.get(
+								userId,
+								stub.artifactId,
+							);
+							if (!stored) continue;
+							card = pickFavoriteCard(ask, [stored]);
+							if (card) break;
+						}
+					}
+					if (
+						ask &&
+						card?.items?.length &&
+						(card.contentKind === 'vocab' || card.contentKind === 'classic')
+					) {
+						const rows = card.items.filter(
+							(row): row is Record<string, unknown> =>
+								!!row && typeof row === 'object' && !Array.isArray(row),
+						);
+						const proposed = await proposeFavoriteRows(
+							this.englishLearningService,
+							this.elProposalStore,
+							userId,
+							card.contentKind,
+							rows,
+						);
+						const proposalId =
+							proposed.data &&
+							typeof proposed.data === 'object' &&
+							'proposalId' in proposed.data &&
+							typeof (proposed.data as { proposalId?: unknown }).proposalId ===
+								'string'
+								? (proposed.data as { proposalId: string }).proposalId
+								: '';
+						if (proposed.ui && proposalId) {
+							elSurface.openProposalId = proposalId;
+							subscriber.next({
+								type: 'tool',
+								data: {
+									phase: 'end',
+									name: 'el_favorites',
+									output: proposed,
+								},
+							});
+						}
+					}
+				} catch (e: unknown) {
+					this.logger.warn?.(
+						`[AgentService] 补收藏确认失败: ${e instanceof Error ? e.message : e}`,
+					);
+				}
+			}
+
 			// 最后收尾，完整保存assistant内容
 			await finalizeTurn();
+			if (finishReason === 'length') {
+				subscriber.next({
+					type: 'finish',
+					data: { reason: 'length', maxTokensReached: true },
+				});
+			}
 			// 通知流结束
 			subscriber.complete();
 		} catch (err: unknown) {

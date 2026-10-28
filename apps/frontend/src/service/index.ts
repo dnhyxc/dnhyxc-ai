@@ -34,6 +34,7 @@ import type {
 	Prog,
 } from '@/views/ebook/types';
 import {
+	AGENT_EL_PROPOSAL_COMMIT,
 	AGENT_SESSION,
 	AGENT_SESSION_TITLE,
 	AGENT_SESSIONS,
@@ -657,6 +658,7 @@ export type AgentSessionDetailPayload = {
 		content: string;
 		searchOrganic?: SearchOrganicItem[] | null;
 		appliedSkills?: Array<{ id: string; title: string }> | null;
+		elResources?: import('@/types/chat').ElResourceBlock[] | null;
 		createdAt: string;
 	}>;
 };
@@ -689,6 +691,14 @@ export const getAgentSessionDetail = async (sessionId: string) => {
 	return await http.get<AgentSessionDetailPayload>(AGENT_SESSION, {
 		params: [sessionId],
 	});
+};
+
+/** 大列表旁路补拉（TTL 内）；过期时 success=false */
+export const getElArtifact = async (artifactId: string) => {
+	return await http.get<import('@/types/chat').ElResourceBlock>(
+		'/agent/el-artifact',
+		{ params: [artifactId] },
+	);
 };
 
 export type AgentSessionListRow = {
@@ -727,6 +737,35 @@ export const deleteAgentSession = async (sessionId: string) => {
 export const stopAgentStream = async (body: { sessionId: string }) => {
 	return await http.post<{ success: boolean; message: string }>(
 		AGENT_STOP,
+		body,
+	);
+};
+
+export type CommitElProposalResult = {
+	messageId: string;
+	content: string;
+	kind:
+		| 'favorite_add'
+		| 'favorite_remove'
+		| 'mistake_add'
+		| 'pack_generate'
+		| 'reading_generate';
+	domain: 'favorites' | 'mistakes' | 'pack' | 'daily_reading';
+	created: number;
+	existed: number;
+	failed: number;
+	truncated: boolean;
+	gaps?: Array<'cap' | 'list' | 'judge'>;
+};
+
+/** 确认条直提交。过期时 success=false，data.code 为 expired */
+export const commitElProposal = async (body: {
+	sessionId: string;
+	proposalId: string;
+	lang?: 'zh-CN' | 'en-US';
+}) => {
+	return await http.post<CommitElProposalResult>(
+		AGENT_EL_PROPOSAL_COMMIT,
 		body,
 	);
 };

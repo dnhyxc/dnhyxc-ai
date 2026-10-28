@@ -1,7 +1,13 @@
-import type { BaseMessage } from '@langchain/core/messages';
+import {
+	AIMessage,
+	type BaseMessage,
+	HumanMessage,
+	ToolMessage,
+} from '@langchain/core/messages';
 import type { ChatOpenAI } from '@langchain/openai';
 import {
 	type AgentMiddleware,
+	createMiddleware,
 	summarizationMiddleware,
 	toolCallLimitMiddleware,
 } from 'langchain';
@@ -15,7 +21,7 @@ export type BuildAgentLangchainMiddlewareInput = {
 	/** 与 AgentMemoryService.estimatePromptTokens 一致 */
 	estimatePromptTokens: (messages: BaseMessage[]) => number;
 	/**
-	 * english_learning：收紧本轮工具次数，避免模型反复 internet_search 烧穿 LangGraph recursionLimit。
+	 * english_learning：不按次数封工具。同一句空转才收束，下一句从 0 再计。
 	 * 默认与其它 Agent 一致。
 	 */
 	profile?: 'default' | 'english_learning';
@@ -32,27 +38,123 @@ export function buildAgentLangchainMiddleware(
 			keep: { messages: 28 },
 			tokenCounter: input.estimatePromptTokens,
 		}),
-		// 英语学习：单独封顶 internet_search（continue + 工具内硬顶）；勿用 end，否则第 4 次搜直接掐死、来不及作答
 		...(english
-			? [
+			? [quietRoundMiddleware(), brakeAfterModel()]
+			: [
 					toolCallLimitMiddleware({
-						toolName: 'internet_search',
-						runLimit: 3,
+						// 仅按本轮（上次 Human 之后）计数；勿设 threadLimit=runLimit，否则达限后 continue 会空转耗尽图步数
+						runLimit: 12,
 						exitBehavior: 'continue',
 					}),
-				]
-			: []),
-		toolCallLimitMiddleware({
-			// 仅按本轮（上次 Human 之后）计数；勿设 threadLimit=runLimit，否则达限后 continue 会空转耗尽图步数
-			runLimit: english ? 8 : 12,
-			exitBehavior: 'continue',
-		}),
+				]),
 	];
 }
+
+/** 同一句里的空转保险丝。不是会话配额，下一句用户消息重新从 0 计。 */
+const ENGLISH_QUIET_ROUNDS = 24;
 
 /** Agent.streamEvents 的图步上限（默认 LangGraph 为 25，工具往返易触顶） */
 export function agentStreamRecursionLimit(
 	profile?: 'default' | 'english_learning',
 ): number {
-	return profile === 'english_learning' ? 45 : 40;
+	if (profile !== 'english_learning') return 40;
+	// 一轮工具按模型节点 + 工具节点两步计。多出的 16 步留给收束后的正文
+	return ENGLISH_QUIET_ROUNDS * 2 + 16;
+}
+
+/** 这一句的工具来回已满仍要调工具时，不执行，只让模型作答。不 jumpTo end。 */
+function quietRoundMiddleware(): AgentMiddleware {
+	return createMiddleware({
+		name: 'ElQuietRounds',
+		afterModel: {
+			hook: (state) => {
+				const messages = state.messages ?? [];
+				let start = 0;
+				for (let i = messages.length - 1; i >= 0; i -= 1) {
+					if (HumanMessage.isInstance(messages[i])) {
+						start = i;
+						break;
+					}
+				}
+				let rounds = 0;
+				for (let i = start + 1; i < messages.length; i += 1) {
+					const row = messages[i];
+					if (AIMessage.isInstance(row) && row.tool_calls?.length) rounds += 1;
+				}
+				const last = messages[messages.length - 1];
+				if (!AIMessage.isInstance(last) || !last.tool_calls?.length) return;
+				// 这次调用已经算进 rounds。满 24 次仍放行，第 25 次才收束
+				if (rounds <= ENGLISH_QUIET_ROUNDS) return;
+				const closed = last.tool_calls.map(
+					(call) =>
+						new ToolMessage({
+							content:
+								'停止调用工具。用已有结果直接作答。不要向用户提及次数、轮次或上限。',
+							tool_call_id: call.id ?? '',
+							name: call.name,
+							status: 'error',
+						}),
+				);
+				return { messages: closed };
+			},
+		},
+	});
+}
+
+const STOP_TOOLS_MARK = '"code":"stop_tools"';
+
+function messageText(message: BaseMessage): string {
+	const content = message.content;
+	if (typeof content === 'string') return content;
+	try {
+		return JSON.stringify(content ?? '');
+	} catch {
+		return '';
+	}
+}
+
+/** 同轮第二次提案返回 stop_tools 后，若模型还要调工具，直接结束并留下确认句 */
+function brakeAfterModel(): AgentMiddleware {
+	return createMiddleware({
+		name: 'ElStopToolsBrake',
+		afterModel: {
+			canJumpTo: ['end'],
+			hook: (state) => {
+				const messages = state.messages ?? [];
+				let aiIndex = -1;
+				for (let i = messages.length - 1; i >= 0; i -= 1) {
+					if (AIMessage.isInstance(messages[i])) {
+						aiIndex = i;
+						break;
+					}
+				}
+				if (aiIndex < 0) return;
+				const ai = messages[aiIndex];
+				if (!AIMessage.isInstance(ai) || !ai.tool_calls?.length) return;
+				let stop = false;
+				for (let i = aiIndex - 1; i >= 0; i -= 1) {
+					const row = messages[i];
+					if (!ToolMessage.isInstance(row)) break;
+					if (messageText(row).includes(STOP_TOOLS_MARK)) stop = true;
+				}
+				if (!stop) return;
+				const closed = ai.tool_calls.map(
+					(call) =>
+						new ToolMessage({
+							content: '已停止。请让用户点确认，不要再调用工具。',
+							tool_call_id: call.id ?? '',
+							name: call.name,
+							status: 'error',
+						}),
+				);
+				return {
+					jumpTo: 'end' as const,
+					messages: [
+						...closed,
+						new AIMessage('已有待确认提案，请直接点确认。'),
+					],
+				};
+			},
+		},
+	});
 }

@@ -20,5 +20,6 @@ import { LearningNotesService } from './learning-notes.service';
 	],
 	controllers: [LearningNotesController],
 	providers: [LearningNotesService],
+	exports: [LearningNotesService],
 })
 export class LearningNotesModule {}

@@ -1,10 +1,10 @@
 import { DynamicTool } from '@langchain/core/tools';
-import type { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
-import type { WebSearchService } from '../web-search/web-search.service';
+import type { KnowledgeQaService } from '../../knowledge-qa/knowledge-qa.service';
+import type { WebSearchService } from '../../web-search/web-search.service';
 import type {
 	WebSearchContextResult,
 	WebSearchRecencyPreset,
-} from '../web-search/web-search.types';
+} from '../../web-search/web-search.types';
 
 /**
  * 当前服务器 UTC 日期（LangChain DynamicTool，格式 YYYY-MM-DD）。
@@ -72,10 +72,7 @@ export function buildAgentLangChainTools(
 			beforeSearch: () => {
 				if (maxSearch == null) return null;
 				if (searchCalls >= maxSearch) {
-					return (
-						`本轮联网已达上限（${maxSearch} 次）。` +
-						`请立刻根据已有检索结果与常识作答，禁止再次调用 internet_search。`
-					);
+					return '已有检索结果。不要再搜索。直接作答。不要向用户提及次数或上限。';
 				}
 				searchCalls += 1;
 				return null;

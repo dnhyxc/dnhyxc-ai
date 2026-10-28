@@ -6,7 +6,9 @@ import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEvent } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { getActiveLocale, translateSync } from '@/i18n';
 import {
+	commitElProposal,
 	createAgentSession,
 	deleteAgentSession,
 	getAgentSessionDetail,
@@ -23,12 +25,61 @@ function readToken(): string {
 	return localStorage.getItem('token') || '';
 }
 
+/** 从 el_* 工具输出中解析 confirm_proposal UI */
+function parseElConfirmProposal(
+	output: unknown,
+	toolName?: string,
+): { proposalId: string; label: string; tool?: string } | null {
+	let raw = output;
+	if (typeof raw === 'string') {
+		try {
+			raw = JSON.parse(raw) as unknown;
+		} catch {
+			return null;
+		}
+	}
+	// LangChain 有时包一层 { content: "..." }
+	if (raw && typeof raw === 'object' && 'content' in raw) {
+		const c = (raw as { content?: unknown }).content;
+		if (typeof c === 'string') {
+			try {
+				raw = JSON.parse(c) as unknown;
+			} catch {
+				/* keep */
+			}
+		}
+	}
+	if (!raw || typeof raw !== 'object') return null;
+	const ui = (raw as { ui?: unknown }).ui;
+	if (!Array.isArray(ui)) return null;
+	for (const item of ui) {
+		if (
+			item &&
+			typeof item === 'object' &&
+			(item as { type?: string }).type === 'confirm_proposal' &&
+			typeof (item as { proposalId?: string }).proposalId === 'string' &&
+			(item as { proposalId: string }).proposalId
+		) {
+			return {
+				proposalId: (item as { proposalId: string }).proposalId,
+				label:
+					typeof (item as { label?: string }).label === 'string'
+						? (item as { label: string }).label
+						: '确认操作',
+				tool: toolName,
+			};
+		}
+	}
+	return null;
+}
+
 function mapApiMessagesToUi(
 	list: Array<{
 		id: string;
 		role: string;
 		content: string;
 		searchOrganic?: SearchOrganicItem[] | null;
+		elResources?: Message['elResources'];
 		createdAt: string | Date;
 	}>,
 ): Message[] {
@@ -37,18 +88,88 @@ function mapApiMessagesToUi(
 		role: m.role === 'user' ? 'user' : 'assistant',
 		content: m.content,
 		searchOrganic: m.searchOrganic ?? undefined,
+		elResources: m.elResources ?? undefined,
 		timestamp: new Date(m.createdAt),
 		isStreaming: false,
 	}));
 }
 
-/** 单会话运行态（消息、发送、流式句柄、工具条文案） */
+/** 本轮已调用的 Skill 或工具，流式结束前一直留在输入框上方 */
+export type AgentToolChip = {
+	kind: 'skill' | 'tool';
+	key: string;
+	label: string;
+};
+
+const NO_TOOL_TRAIL: AgentToolChip[] = [];
+
+function proposalReceiptText(data: {
+	kind: string;
+	content?: string;
+	created: number;
+	existed: number;
+	failed: number;
+	truncated: boolean;
+	gaps?: Array<'cap' | 'list' | 'judge'>;
+}): string {
+	if (data.kind === 'pack_generate' || data.kind === 'reading_generate') {
+		return (
+			data.content ||
+			(data.kind === 'pack_generate' ? '已开始生成。' : '已开始自选生成。')
+		);
+	}
+	const base =
+		data.kind === 'favorite_remove'
+			? data.created > 0
+				? `${translateSync('englishLearning.proposal.removed', {
+						created: data.created,
+					})}${
+						data.existed > 0
+							? translateSync('englishLearning.proposal.removeMissing', {
+									existed: data.existed,
+								})
+							: ''
+					}`
+				: translateSync('englishLearning.proposal.removeMiss')
+			: translateSync(
+					data.kind === 'mistake_add'
+						? 'englishLearning.proposal.mistakeDone'
+						: 'englishLearning.proposal.saved',
+					{ created: data.created, existed: data.existed },
+				);
+	const failed =
+		data.failed > 0
+			? translateSync('englishLearning.proposal.failedCount', {
+					failed: data.failed,
+				})
+			: '';
+	const gaps = data.gaps?.length ? data.gaps : data.truncated ? ['cap'] : [];
+	const extra = [
+		gaps.includes('cap')
+			? translateSync('englishLearning.proposal.capped')
+			: '',
+		gaps.includes('list')
+			? translateSync('englishLearning.proposal.listGap')
+			: '',
+		gaps.includes('judge')
+			? translateSync('englishLearning.proposal.judgeGap')
+			: '',
+	].join('');
+	return `${base}${failed}${extra}`;
+}
+
+function rememberToolChip(st: EnglishSessionRuntime, chip: AgentToolChip) {
+	if (st.toolTrail.some((row) => row.key === chip.key)) return;
+	st.toolTrail = [...st.toolTrail, chip];
+}
+
+/** 单会话运行态（消息、发送、流式句柄、已调用的 Skill / 工具） */
 export type EnglishSessionRuntime = {
 	messages: Message[];
 	isSending: boolean;
 	isHistoryLoading: boolean;
 	abortStream: (() => void) | null;
-	toolStatus: string | null;
+	toolTrail: AgentToolChip[];
 };
 
 export class EnglishAgentStore {
@@ -73,8 +194,33 @@ export class EnglishAgentStore {
 
 	/** 快捷意图：仅通过 `intentPrefix` 传给服务端拼入模型输入，不入库；发送后清空 */
 	pendingIntentPrefix = '';
+	/** M2：待确认的领域提案（来自 el_* 工具 ui.confirm_proposal） */
+	pendingProposal: { proposalId: string; label: string; tool?: string } | null =
+		null;
+	/** 确认条 HTTP 提交中，避免连点 */
+	proposalCommitting = false;
+	/** M2：领域写成功计数，侧栏/列表可订阅刷新 */
+	domainMutationTick = 0;
+	lastDomainMutation: string | null = null;
 	loadError: string | null = null;
 	isHydrating = false;
+
+	static readonly EL_TOOL_LABELS: Record<string, string> = {
+		el_libraries: '查阅词库/语料库',
+		el_items_search: '检索词条',
+		el_present: '展示清单',
+		el_daily_reading: '每日阅读',
+		el_favorites: '收藏',
+		el_review: '今日复习',
+		el_mistakes: '错题',
+		el_daily_memo: '今日记词',
+		el_packs: '单词与语句',
+		el_notes: '学习笔记',
+		internet_search: '联网检索',
+		knowledge_base_retrieval: '知识库检索',
+		get_current_date: '查询日期',
+		get_current_datetime: '查询日期',
+	};
 
 	constructor() {
 		makeAutoObservable(this);
@@ -113,11 +259,11 @@ export class EnglishAgentStore {
 		return false;
 	}
 
-	get toolStatus(): string | null {
+	get toolTrail(): AgentToolChip[] {
 		const streamSid = this.streamingSessionId;
 		const active = this.activeSessionId;
-		if (!streamSid || streamSid !== active) return null;
-		return this.stateBySession[streamSid]?.toolStatus ?? null;
+		if (!streamSid || streamSid !== active) return NO_TOOL_TRAIL;
+		return this.stateBySession[streamSid]?.toolTrail ?? NO_TOOL_TRAIL;
 	}
 
 	private get hasMoreHistorySessions(): boolean {
@@ -132,7 +278,7 @@ export class EnglishAgentStore {
 				isSending: false,
 				isHistoryLoading: false,
 				abortStream: null,
-				toolStatus: null,
+				toolTrail: [],
 			};
 		}
 		if (!this.stateBySession[id]) {
@@ -141,7 +287,7 @@ export class EnglishAgentStore {
 				isSending: false,
 				isHistoryLoading: false,
 				abortStream: null,
-				toolStatus: null,
+				toolTrail: [],
 			};
 		}
 		return this.stateBySession[id]!;
@@ -458,7 +604,7 @@ export class EnglishAgentStore {
 		runInAction(() => {
 			st.abortStream = null;
 			st.isSending = false;
-			st.toolStatus = null;
+			st.toolTrail = [];
 			st.messages = st.messages.map((m) => {
 				if (!m.isStreaming) return m;
 				return { ...m, isStreaming: false, isStopped: true };
@@ -474,9 +620,83 @@ export class EnglishAgentStore {
 		EnglishPackStore.setSidebarIntentPrefix(prefix);
 	}
 
+	clearPendingProposal(): void {
+		this.pendingProposal = null;
+	}
+
+	/** 点确认：直提交提案，只追加助手回执 */
+	async commitProposal(proposalId: string): Promise<void> {
+		const pending = this.pendingProposal;
+		const sid = this.activeSessionId;
+		if (
+			!sid ||
+			!pending ||
+			pending.proposalId !== proposalId ||
+			this.proposalCommitting
+		) {
+			return;
+		}
+		this.proposalCommitting = true;
+		this.pendingProposal = null;
+		try {
+			const res = await commitElProposal({
+				sessionId: sid,
+				proposalId,
+				lang: getActiveLocale(),
+			});
+			if (!res.success || !res.data?.messageId) {
+				const code = (res.data as { code?: string } | undefined)?.code;
+				if (code !== 'expired') {
+					runInAction(() => {
+						this.pendingProposal = pending;
+					});
+				}
+				Toast({
+					type: 'warning',
+					title: translateSync(
+						code === 'expired'
+							? 'englishLearning.proposal.expired'
+							: 'englishLearning.proposal.failed',
+					),
+				});
+				return;
+			}
+			const data = res.data;
+			const content = proposalReceiptText(data);
+			runInAction(() => {
+				const st = this.ensureSessionState(sid);
+				st.messages.push({
+					chatId: data.messageId,
+					role: 'assistant',
+					content,
+					timestamp: new Date(),
+				});
+				this.noteDomainMutation(data.domain);
+			});
+		} catch {
+			runInAction(() => {
+				if (!this.pendingProposal) this.pendingProposal = pending;
+			});
+		} finally {
+			runInAction(() => {
+				this.proposalCommitting = false;
+			});
+		}
+	}
+
+	noteDomainMutation(domain: string): void {
+		this.lastDomainMutation = domain;
+		this.domainMutationTick += 1;
+		if (typeof window !== 'undefined') {
+			window.dispatchEvent(
+				new CustomEvent('english-domain-mutation', { detail: { domain } }),
+			);
+		}
+	}
+
 	async sendMessage(
 		rawText: string,
-		options?: { titleFallback?: string },
+		options?: { titleFallback?: string; activeContext?: string },
 	): Promise<void> {
 		const userText = (rawText ?? '').trim();
 		if (!userText) return;
@@ -501,7 +721,7 @@ export class EnglishAgentStore {
 		runInAction(() => {
 			st.abortStream = null;
 			st.isSending = true;
-			st.toolStatus = null;
+			st.toolTrail = [];
 		});
 
 		const intentPrefixSnapshot = this.pendingIntentPrefix.trim();
@@ -578,8 +798,16 @@ export class EnglishAgentStore {
 					...(intentPrefixSnapshot
 						? { intentPrefix: intentPrefixSnapshot }
 						: {}),
+					...(options?.activeContext?.trim()
+						? { activeContext: options.activeContext.trim() }
+						: {}),
 				},
 				callbacks: {
+					onDomainMutation: (domain) => {
+						runInAction(() => {
+							this.noteDomainMutation(domain);
+						});
+					},
 					onMessageIds: ({ userMessageId, assistantMessageId }) => {
 						runInAction(() => {
 							const ui = st.messages.findIndex((m) => m.chatId === userRowId);
@@ -605,15 +833,82 @@ export class EnglishAgentStore {
 						});
 					},
 					onDelta: (d) => patchAssistant(d),
+					onMaxTokens: () => {
+						runInAction(() => {
+							const idx = st.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx < 0) return;
+							const prev = st.messages[idx] as Message;
+							st.messages[idx] = {
+								...prev,
+								finishReason: {
+									type: 'finish',
+									reason: 'length',
+									maxTokensReached: true,
+									sessionId: sid,
+								},
+							};
+						});
+					},
+					onContentReplace: (text) => {
+						accumulated = text;
+						assistantPatchScheduler.flush();
+						runInAction(() => {
+							const idx = st.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx < 0) return;
+							const prev = st.messages[idx] as Message;
+							st.messages[idx] = { ...prev, content: text };
+						});
+					},
+					onElResourceList: (block) => {
+						runInAction(() => {
+							const idx = st.messages.findIndex(
+								(m) => m.chatId === assistantRowId,
+							);
+							if (idx < 0) return;
+							const prev = st.messages[idx] as Message;
+							const list = prev.elResources ?? [];
+							const next = list.some((x) => x.artifactId === block.artifactId)
+								? list.map((x) =>
+										x.artifactId === block.artifactId
+											? { ...x, ...block, items: block.items ?? x.items }
+											: x,
+									)
+								: [...list, block];
+							st.messages[idx] = { ...prev, elResources: next };
+						});
+					},
 					onSearchOrganic: (organic) => patchAssistantOrganic(organic),
+					onSkillsApplied: (skills) => {
+						runInAction(() => {
+							for (const skill of skills) {
+								rememberToolChip(st, {
+									kind: 'skill',
+									key: `skill:${skill.id}`,
+									label: skill.title,
+								});
+							}
+						});
+					},
 					onTool: (ev) => {
 						runInAction(() => {
-							st.toolStatus =
-								ev.phase === 'start'
-									? ev.name
-										? `调用工具：${ev.name}`
-										: '检索中'
-									: null;
+							if (ev.phase === 'start') {
+								const name = ev.name?.trim();
+								rememberToolChip(st, {
+									kind: 'tool',
+									key: name ? `tool:${name}` : 'tool:unknown',
+									label: name
+										? (EnglishAgentStore.EL_TOOL_LABELS[name] ?? name)
+										: '检索中',
+								});
+							}
+							if (ev.phase === 'end' && ev.output != null) {
+								const proposal = parseElConfirmProposal(ev.output, ev.name);
+								if (proposal) this.pendingProposal = proposal;
+							}
 						});
 					},
 					onComplete: (err) => {
@@ -642,7 +937,7 @@ export class EnglishAgentStore {
 								};
 							}
 							st.abortStream = null;
-							st.toolStatus = null;
+							st.toolTrail = [];
 							if (this.streamingSessionId === sid) {
 								this.streamingSessionId = null;
 							}
@@ -669,7 +964,7 @@ export class EnglishAgentStore {
 								};
 							}
 							st.abortStream = null;
-							st.toolStatus = null;
+							st.toolTrail = [];
 							if (this.streamingSessionId === sid) {
 								this.streamingSessionId = null;
 							}
@@ -690,6 +985,7 @@ export class EnglishAgentStore {
 					st.messages[idx] = { ...prev, isStreaming: false };
 				}
 				st.abortStream = null;
+				st.toolTrail = [];
 				if (this.streamingSessionId === sid) {
 					this.streamingSessionId = null;
 				}

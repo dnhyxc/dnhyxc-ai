@@ -81,9 +81,14 @@ const EnglishLearning = observer(function EnglishLearning() {
 		const collapsed = text.replace(/\s+/g, ' ');
 		const synopsis =
 			collapsed.length > 36 ? `${collapsed.slice(0, 36)}…` : collapsed;
+		const activeContext = JSON.stringify({
+			route: '/english-learning',
+			intent: englishAgentStore.pendingIntentPrefix || undefined,
+		});
 		await englishAgentStore.sendMessage(text, {
 			titleFallback:
 				sessionTitle || synopsis || t('route.englishLearning.title'),
+			activeContext,
 		});
 		if (englishAgentStore.sessionId) {
 			setSearchParams(

@@ -7,6 +7,8 @@ export const englishLearning = {
 	'englishLearning.agentTool.statusDoing':
 		'Research · {action} in progress{detail}',
 	'englishLearning.agentTool.statusDone': 'Research · {action} done',
+	'englishLearning.agentTool.trail': 'Used tools',
+	'englishLearning.agentTool.skillChip': 'Skill · {title}',
 	'englishLearning.annotateSource.aborted': 'Stopped (partial results kept)',
 	'englishLearning.annotateSource.action': 'Annotate',
 	'englishLearning.annotateSource.confirmAction': 'Start',
@@ -511,6 +513,19 @@ export const englishLearning = {
 	'englishLearning.pendingIntentShort': 'Appended on next send',
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
+	'englishLearning.proposal.capped': ' The proposal was capped at 400.',
+	'englishLearning.proposal.listGap': ' The list was not fully loaded.',
+	'englishLearning.proposal.judgeGap': ' Some batches were not judged.',
+	'englishLearning.proposal.expired': 'This proposal expired. Ask again.',
+	'englishLearning.proposal.failed': 'Could not confirm. Try again.',
+	'englishLearning.proposal.failedCount': ' Failed: {failed}.',
+	'englishLearning.proposal.mistakeDone':
+		'Added {created} to mistakes. Already there: {existed}.',
+	'englishLearning.proposal.removeMiss': 'That favorite was not found.',
+	'englishLearning.proposal.removed': 'Removed {created} from favorites.',
+	'englishLearning.proposal.removeMissing': ' Not found: {existed}.',
+	'englishLearning.proposal.saved':
+		'Saved {created}. Already in favorites: {existed}.',
 	'englishLearning.practice.back': 'Back',
 	'englishLearning.practice.check': 'Check',
 	'englishLearning.practice.classicInputPlaceholder':

@@ -1,7 +1,7 @@
 import { reaction } from 'mobx';
 import { useEffect, useState } from 'react';
 import { buildStreamTick } from '@/components/design/Assistant';
-import englishAgentStore from '@/store/englishAgent';
+import englishAgentStore, { type AgentToolChip } from '@/store/englishAgent';
 
 /** 仅条数变化；流式改 content 不触发 */
 export function useEnglishAgentMessageCount(): number {
@@ -43,7 +43,9 @@ const readIsSending = () => englishAgentStore.isSending;
 const readIsStreaming = () => englishAgentStore.isStreaming;
 const readIsHydrating = () => englishAgentStore.isHydrating;
 const readSessionId = () => englishAgentStore.sessionId;
-const readToolStatus = () => englishAgentStore.toolStatus;
+const readToolTrail = () => englishAgentStore.toolTrail.slice();
+const readPendingProposal = () => englishAgentStore.pendingProposal;
+const readProposalCommitting = () => englishAgentStore.proposalCommitting;
 
 export function useEnglishAgentIsSending(): boolean {
 	return useEnglishAgentFlag(readIsSending);
@@ -61,6 +63,18 @@ export function useEnglishAgentSessionId(): string | null {
 	return useEnglishAgentFlag(readSessionId);
 }
 
-export function useEnglishAgentToolStatus(): string | null {
-	return useEnglishAgentFlag(readToolStatus);
+export function useEnglishAgentToolTrail(): AgentToolChip[] {
+	return useEnglishAgentFlag(readToolTrail);
+}
+
+export function useEnglishAgentPendingProposal(): {
+	proposalId: string;
+	label: string;
+	tool?: string;
+} | null {
+	return useEnglishAgentFlag(readPendingProposal);
+}
+
+export function useEnglishAgentProposalCommitting(): boolean {
+	return useEnglishAgentFlag(readProposalCommitting);
 }

@@ -5,7 +5,7 @@ import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import { AGENT_SSE } from '@/service/api';
-import type { SearchOrganicItem } from '@/types/chat';
+import type { ElResourceBlock, SearchOrganicItem } from '@/types/chat';
 import { ASSISTANT_SSE_USER_ABORT_MARKER } from '@/utils/assistantSse';
 import { getPlatformFetch } from '@/utils/fetch';
 
@@ -30,6 +30,7 @@ function unwrapAgentPayload(
 			'error' in o ||
 			'raw' in o ||
 			'organic' in o ||
+			'domain' in o ||
 			('userMessageId' in o && 'assistantMessageId' in o)
 		) {
 			return o;
@@ -41,7 +42,11 @@ function unwrapAgentPayload(
 export interface AgentSseCallbacks {
 	onDelta: (text: string) => void;
 	/** 工具开始/结束（用于轻量状态条） */
-	onTool?: (ev: { phase: 'start' | 'end'; name?: string }) => void;
+	onTool?: (ev: {
+		phase: 'start' | 'end';
+		name?: string;
+		output?: unknown;
+	}) => void;
 	onStart?: () => void;
 	onComplete?: (error?: string) => void;
 	onError?: (err: Error) => void;
@@ -54,6 +59,14 @@ export interface AgentSseCallbacks {
 		userMessageId: string;
 		assistantMessageId: string;
 	}) => void;
+	/** 英语领域写成功：刷新侧栏/收藏等 */
+	onDomainMutation?: (domain: string) => void;
+	/** 大列表旁路卡片 */
+	onElResourceList?: (block: ElResourceBlock) => void;
+	/** 用导语替换已流出的长表正文 */
+	onContentReplace?: (text: string) => void;
+	/** 最后一轮 completion 触顶，清单不靠续写补 */
+	onMaxTokens?: () => void;
 }
 
 /**
@@ -74,6 +87,10 @@ export async function streamAgentSse(options: {
 		onSearchOrganic,
 		onSkillsApplied,
 		onMessageIds,
+		onDomainMutation,
+		onElResourceList,
+		onContentReplace,
+		onMaxTokens,
 	} = callbacks;
 
 	const controller = new AbortController();
@@ -198,9 +215,62 @@ export async function streamAgentSse(options: {
 							});
 							continue;
 						}
+						if (
+							parsed.type === 'contentReplace' &&
+							typeof parsed.content === 'string'
+						) {
+							onContentReplace?.(parsed.content);
+							continue;
+						}
+						if (parsed.type === 'finish' && parsed.maxTokensReached === true) {
+							onMaxTokens?.();
+							continue;
+						}
+						if (
+							parsed.type === 'elResourceList' &&
+							typeof parsed.artifactId === 'string' &&
+							typeof parsed.title === 'string'
+						) {
+							onElResourceList?.({
+								artifactId: parsed.artifactId,
+								title: parsed.title,
+								source:
+									parsed.source === 'library' ||
+									parsed.source === 'favorites' ||
+									parsed.source === 'mistakes' ||
+									parsed.source === 'memo' ||
+									parsed.source === 'reading' ||
+									parsed.source === 'pack' ||
+									parsed.source === 'notes'
+										? parsed.source
+										: 'other',
+								contentKind:
+									parsed.contentKind === 'vocab' ||
+									parsed.contentKind === 'classic'
+										? parsed.contentKind
+										: undefined,
+								libraryId:
+									typeof parsed.libraryId === 'string'
+										? parsed.libraryId
+										: undefined,
+								totalCount:
+									typeof parsed.totalCount === 'number' ? parsed.totalCount : 0,
+								truncated: parsed.truncated === true,
+								items: Array.isArray(parsed.items) ? parsed.items : undefined,
+							});
+							continue;
+						}
+						if (
+							parsed.type === 'domainMutation' &&
+							typeof parsed.domain === 'string' &&
+							parsed.domain
+						) {
+							onDomainMutation?.(parsed.domain);
+							continue;
+						}
 						if (parsed.type === 'tool') {
 							const rawTool = parsed.raw as
-								| { phase?: string; name?: string }
+								| { phase?: string; name?: string; output?: unknown }
 								| undefined;
 							const phase = rawTool?.phase;
 							if (phase === 'start' || phase === 'end') {
@@ -210,6 +280,7 @@ export async function streamAgentSse(options: {
 										typeof rawTool?.name === 'string'
 											? rawTool.name
 											: undefined,
+									output: rawTool?.output,
 								});
 							}
 						}

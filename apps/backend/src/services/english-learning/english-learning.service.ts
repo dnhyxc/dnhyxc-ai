@@ -29,7 +29,6 @@ import {
 	Repository,
 	SelectQueryBuilder,
 } from 'typeorm';
-import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeEmbeddingService } from '../../services/knowledge-embedding/knowledge-embedding.service';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
 import { WebSearchService } from '../../services/web-search/web-search.service';
@@ -44,6 +43,13 @@ import {
 	isJsonStringClosingQuoteAt,
 	repairJsonUnescapedInteriorQuotes,
 } from '../../utils/english-pack';
+import { buildAgentLangChainTools } from '../agent/tools/agent-tools';
+import {
+	applyFavoriteBatch,
+	fillEmptyFavoriteFields,
+	pickLibrarySnapshots,
+	type VocabLibrarySnap,
+} from '../agent/tools/english/propose-bodies';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { TtsFileCacheService } from '../speech-transcription/tts-file-cache.service';
 import {
@@ -2679,6 +2685,150 @@ ${existingHintBlock}
 		return this.mapVocabularyLibraryListItem(lib, userId, resume);
 	}
 
+	/**
+	 * Agent / 侧栏检索：在可读单词库内按词面或释义模糊搜（q 必填，limit≤20）。
+	 * libraryId 可空 = 全部可读库。
+	 */
+	async searchVocabularyLibraryItems(
+		userId: number,
+		query: { libraryId?: string; q: string; limit?: number },
+	): Promise<{
+		items: Array<{
+			libraryId: string;
+			libraryTitle: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			translationZh: string;
+			example: string;
+		}>;
+	}> {
+		const qRaw = query.q?.trim() ?? '';
+		if (!qRaw) {
+			throw new BadRequestException('搜索关键词不能为空');
+		}
+		// 剥 LIKE 通配，避免用户通配符打爆扫描
+		const q = qRaw.replace(/[%_]/g, '').slice(0, 80);
+		if (!q) {
+			throw new BadRequestException('搜索关键词不能为空');
+		}
+		const limit = Math.min(20, Math.max(1, query.limit ?? 20));
+		if (query.libraryId) {
+			await this.assertVocabularyLibraryReadable(userId, query.libraryId);
+		}
+		const pattern = `%${q}%`;
+		const qb = this.vocabLibraryItemRepo
+			.createQueryBuilder('item')
+			.innerJoin('item.library', 'lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.andWhere(
+				'(LOWER(item.word) LIKE LOWER(:pattern) OR LOWER(item.translationZh) LIKE LOWER(:pattern))',
+				{ pattern },
+			)
+			.select('item.library_id', 'libraryId')
+			.addSelect('lib.title', 'libraryTitle')
+			.addSelect('item.word', 'word')
+			.addSelect('item.ipa', 'ipa')
+			.addSelect('item.pos', 'pos')
+			.addSelect('item.translation_zh', 'translationZh')
+			.addSelect('item.example', 'example')
+			.orderBy('item.word', 'ASC')
+			.take(limit);
+		if (query.libraryId) {
+			qb.andWhere('item.libraryId = :libraryId', {
+				libraryId: query.libraryId,
+			});
+		}
+		const rows = await qb.getRawMany<{
+			libraryId: string;
+			libraryTitle: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			translationZh: string;
+			example: string;
+		}>();
+		return {
+			items: rows.map((r) => ({
+				libraryId: r.libraryId,
+				libraryTitle: r.libraryTitle ?? '',
+				word: r.word,
+				ipa: r.ipa ?? '',
+				pos: r.pos ?? '',
+				translationZh: r.translationZh ?? '',
+				example: r.example ?? '',
+			})),
+		};
+	}
+
+	/** 经典语句库检索（与单词库对称） */
+	async searchClassicQuotesLibraryItems(
+		userId: number,
+		query: { libraryId?: string; q: string; limit?: number },
+	): Promise<{
+		items: Array<{
+			libraryId: string;
+			libraryTitle: string;
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+		}>;
+	}> {
+		const qRaw = query.q?.trim() ?? '';
+		if (!qRaw) {
+			throw new BadRequestException('搜索关键词不能为空');
+		}
+		const q = qRaw.replace(/[%_]/g, '').slice(0, 80);
+		if (!q) {
+			throw new BadRequestException('搜索关键词不能为空');
+		}
+		const limit = Math.min(20, Math.max(1, query.limit ?? 20));
+		if (query.libraryId) {
+			await this.assertClassicQuotesLibraryReadable(userId, query.libraryId);
+		}
+		const pattern = `%${q}%`;
+		const qb = this.classicQuotesLibraryItemRepo
+			.createQueryBuilder('item')
+			.innerJoin('item.library', 'lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.andWhere(
+				'(LOWER(item.english) LIKE LOWER(:pattern) OR LOWER(item.translationZh) LIKE LOWER(:pattern))',
+				{ pattern },
+			)
+			.select('item.library_id', 'libraryId')
+			.addSelect('lib.title', 'libraryTitle')
+			.addSelect('item.english', 'english')
+			.addSelect('item.translation_zh', 'translationZh')
+			.addSelect('item.source', 'source')
+			.addSelect('item.note_zh', 'noteZh')
+			.orderBy('item.sort_order', 'ASC')
+			.take(limit);
+		if (query.libraryId) {
+			qb.andWhere('item.libraryId = :libraryId', {
+				libraryId: query.libraryId,
+			});
+		}
+		const rows = await qb.getRawMany<{
+			libraryId: string;
+			libraryTitle: string;
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+		}>();
+		return {
+			items: rows.map((r) => ({
+				libraryId: r.libraryId,
+				libraryTitle: r.libraryTitle ?? '',
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
+			})),
+		};
+	}
+
 	/** 分页列出某单词库内的词条（按 sort_order 升序） */
 	async listVocabularyLibraryItems(
 		userId: number,
@@ -4718,6 +4868,9 @@ ${existingHintBlock}
 			where: { userId, wordKey },
 		});
 		if (existed) {
+			if (fillEmptyFavoriteFields(existed, item)) {
+				await this.vocabFavoriteRepo.save(existed);
+			}
 			return { created: false, id: existed.id };
 		}
 		const row = this.vocabFavoriteRepo.create({
@@ -4735,6 +4888,40 @@ ${existingHintBlock}
 		});
 		const saved = await this.vocabFavoriteRepo.save(row);
 		return { created: true, id: saved.id };
+	}
+
+	/**
+	 * 确认路径一次写入。去重和补音标与 addVocabularyFavorite 一致。
+	 * ponytail: 500 行一块是单包大小，不是用户可见的条数顶；每块都写完。
+	 */
+	async batchAddVocabularyFavorites(
+		userId: number,
+		items: VocabularyFavoriteBodyDto[],
+	): Promise<{ created: number; existed: number }> {
+		const keys = [
+			...new Set(
+				items
+					.map((item) => this.normalizeVocabularyFavoriteWordKey(item.word))
+					.filter((key) => key.length > 0),
+			),
+		];
+		if (keys.length === 0) return { created: 0, existed: 0 };
+		const existing = await this.vocabFavoriteRepo.find({
+			where: { userId, wordKey: In(keys) },
+		});
+		const plan = applyFavoriteBatch(items, existing);
+		const fresh = plan.fresh.map((row) =>
+			this.vocabFavoriteRepo.create({ userId, ...row }),
+		);
+		const saveChunks = async (rows: EnglishVocabularyFavorite[]) => {
+			const size = 500;
+			for (let i = 0; i < rows.length; i += size) {
+				await this.vocabFavoriteRepo.save(rows.slice(i, i + size));
+			}
+		};
+		if (fresh.length) await saveChunks(fresh);
+		if (plan.patched.length) await saveChunks(plan.patched);
+		return { created: plan.created, existed: plan.existed };
 	}
 
 	async removeVocabularyFavorite(
@@ -4866,6 +5053,90 @@ ${existingHintBlock}
 		return rows.map((r) => ({ contentKey: r.contentKey, id: r.id }));
 	}
 
+	/** 本进程内每个用户只补一次：已收藏但英标为空的词，从词库抄回音标等字段 */
+	private readonly vocabFavoriteFieldsFilled = new Set<number>();
+
+	/**
+	 * 按词面取词库条目。一批词优先落在覆盖最多的那本词库；单词再按译文对齐。
+	 * hints 的 key 是小写词面，value 是收藏或提案里的中文释义。
+	 */
+	async lookupVocabularyLibrarySnapshots(
+		userId: number,
+		words: string[],
+		hints?: ReadonlyMap<string, string>,
+	): Promise<Map<string, VocabLibrarySnap>> {
+		const keys = [
+			...new Set(
+				words
+					.map((word) => this.normalizeVocabularyFavoriteWordKey(word))
+					.filter((key) => key.length > 0),
+			),
+		];
+		const map = new Map<string, VocabLibrarySnap>();
+		if (keys.length === 0) return map;
+		const rows = await this.vocabLibraryItemRepo
+			.createQueryBuilder('item')
+			.innerJoin('item.library', 'lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.andWhere('LOWER(item.word) IN (:...keys)', { keys })
+			.select('LOWER(item.word)', 'wordKey')
+			.addSelect('item.library_id', 'libraryId')
+			.addSelect('item.ipa', 'ipa')
+			.addSelect('item.pos', 'pos')
+			.addSelect('item.segmentation', 'segmentation')
+			.addSelect('item.translation_zh', 'translationZh')
+			.addSelect('item.example', 'example')
+			.addSelect('lib.user_id', 'ownerId')
+			.getRawMany<{
+				wordKey: string;
+				libraryId: string;
+				ipa: string;
+				pos: string;
+				segmentation: string;
+				translationZh: string;
+				example: string;
+				ownerId: number;
+			}>();
+		return pickLibrarySnapshots(rows, userId, hints ?? new Map());
+	}
+
+	/** 收藏行英标为空时，用词库里的音标、词性、音节、例句补上。已有译文不改。 */
+	async fillEmptyVocabularyFavorites(userId: number): Promise<void> {
+		if (this.vocabFavoriteFieldsFilled.has(userId)) return;
+		const empty = await this.vocabFavoriteRepo
+			.createQueryBuilder('fav')
+			.where('fav.userId = :userId', { userId })
+			.andWhere("TRIM(fav.ipa) = ''")
+			.getMany();
+		if (empty.length === 0) {
+			this.vocabFavoriteFieldsFilled.add(userId);
+			return;
+		}
+		const hints = new Map(
+			empty.map((row) => [row.wordKey, row.translationZh.trim()] as const),
+		);
+		const snaps = await this.lookupVocabularyLibrarySnapshots(
+			userId,
+			empty.map((row) => row.word),
+			hints,
+		);
+		const toSave: EnglishVocabularyFavorite[] = [];
+		for (const row of empty) {
+			const snap = snaps.get(row.wordKey);
+			if (!snap?.ipa.trim()) continue;
+			row.ipa = snap.ipa.slice(0, 500);
+			if (!row.pos.trim() && snap.pos) row.pos = snap.pos.slice(0, 32);
+			if (!row.segmentation.trim() && snap.segmentation) {
+				row.segmentation = snap.segmentation.slice(0, 500);
+			}
+			if (!row.example.trim() && snap.example.trim())
+				row.example = snap.example;
+			toSave.push(row);
+		}
+		if (toSave.length > 0) await this.vocabFavoriteRepo.save(toSave);
+		this.vocabFavoriteFieldsFilled.add(userId);
+	}
+
 	/** 分页列出当前用户收藏的单词（按收藏时间倒序，含总数） */
 	async listVocabularyFavoritesPage(
 		userId: number,
@@ -4884,6 +5155,7 @@ ${existingHintBlock}
 		}>;
 		totalCount: number;
 	}> {
+		await this.fillEmptyVocabularyFavorites(userId);
 		const [totalCount, rows] = await Promise.all([
 			this.vocabFavoriteRepo.count({ where: { userId } }),
 			this.vocabFavoriteRepo.find({

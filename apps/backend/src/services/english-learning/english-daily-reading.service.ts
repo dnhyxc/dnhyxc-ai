@@ -635,6 +635,13 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return this.manualRuns.get(this.runKey(userId));
 	}
 
+	/** Agent 工具只读窥视：有进行中的手动生成则返回 runId/phase */
+	peekManualRun(userId: number): { runId: string; phase: string } | null {
+		const run = this.findManual(userId);
+		if (!run) return null;
+		return { runId: run.id, phase: run.phase };
+	}
+
 	private parseAfter(raw: unknown): number {
 		// 没有合法游标时按 0 处理，订阅方只收当前全文，避免把旧 delta 再拼上去。
 		const value = typeof raw === 'number' ? raw : Number(raw);

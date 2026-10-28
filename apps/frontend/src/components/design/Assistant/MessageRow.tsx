@@ -35,6 +35,7 @@ function AssistantMessageBubble({
 	t,
 	getSelectionContextMenuItems,
 	onSpeakContent,
+	onContinueAnswering,
 }: AssistantMessageBubbleProps) {
 	const isUser = message.role === 'user';
 	const { isSharing, checkedMessages, setCheckedMessage, needShare } =
@@ -63,6 +64,7 @@ function AssistantMessageBubble({
 						t={t}
 						className={messageAssistantContentClass(variant)}
 						getSelectionContextMenuItems={getSelectionContextMenuItems}
+						onContinueAnswering={onContinueAnswering}
 					/>
 				)}
 

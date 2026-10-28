@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import type { EdgeTtsDto } from './dto/edge-tts.dto';
+import { speakEdge } from './edge-speak';
 import {
 	edgePitchFromPitch,
 	edgeRateFromSpeed,
@@ -55,8 +56,8 @@ type CachedSpeech = {
 };
 
 /**
- * Microsoft Edge 在线语音合成（@andresaya/edge-tts → api.msedgeservices.com）：
- * 免费、无需 API Key。勿用仍走 speech.platform.bing.com 的旧包。
+ * Microsoft Edge 在线语音合成：speech.platform.bing.com + Sec-MS-GEC v2。
+ * api.msedgeservices.com 在机房出口回 HTTP 200，握手升不了级。
  */
 @Injectable()
 export class EdgeTtsService {
@@ -138,28 +139,53 @@ export class EdgeTtsService {
 	}
 
 	private async synthesize(resolved: EdgeTtsResolved): Promise<CachedSpeech> {
-		// generate() 返回独立结果，适合 Nest 并发；勿读 protected word_boundaries
-		const tts = new EdgeTTS({ timeout: EDGE_TTS_TIMEOUT_MS });
 		try {
-			const result = await tts.generate(resolved.text, resolved.voice, {
-				rate: resolved.rate,
-				volume: resolved.volume,
-				pitch: resolved.pitch,
-				timeout: EDGE_TTS_TIMEOUT_MS,
-			});
-			const buffer = Buffer.from(result.audio);
-			if (!buffer.length) {
-				throw new Error('未收到音频数据');
-			}
-			const boundaries = this.toBoundaryDto(result.wordBoundaries ?? []);
-			return { buffer, boundaries };
-		} catch (err) {
-			const detail = err instanceof Error ? err.message : String(err);
-			throw new HttpException(
-				`Edge 语音合成失败：${detail}`,
-				HttpStatus.BAD_GATEWAY,
+			const spoken = await speakEdge(
+				{
+					text: resolved.text,
+					voice: resolved.voice,
+					rate: resolved.rate,
+					volume: resolved.volume,
+					pitch: resolved.pitch,
+				},
+				EDGE_TTS_TIMEOUT_MS,
 			);
+			return {
+				buffer: spoken.audio,
+				boundaries: this.toBoundaryDto(spoken.words),
+			};
+		} catch (primary) {
+			try {
+				return await this.synthesizeLegacy(resolved);
+			} catch (legacy) {
+				const detail = [primary, legacy]
+					.map((err) => (err instanceof Error ? err.message : String(err)))
+					.join('；');
+				throw new HttpException(
+					`Edge 语音合成失败：${detail}`,
+					HttpStatus.BAD_GATEWAY,
+				);
+			}
 		}
+	}
+
+	/** 家宽上仍可用的新主机。机房对它回 200 时由上面的 bing 通道接住。 */
+	private async synthesizeLegacy(
+		resolved: EdgeTtsResolved,
+	): Promise<CachedSpeech> {
+		const tts = new EdgeTTS({ timeout: EDGE_TTS_TIMEOUT_MS });
+		const result = await tts.generate(resolved.text, resolved.voice, {
+			rate: resolved.rate,
+			volume: resolved.volume,
+			pitch: resolved.pitch,
+			timeout: EDGE_TTS_TIMEOUT_MS,
+		});
+		const buffer = Buffer.from(result.audio);
+		if (!buffer.length) throw new Error('未收到音频数据');
+		return {
+			buffer,
+			boundaries: this.toBoundaryDto(result.wordBoundaries ?? []),
+		};
 	}
 
 	/** L2 指纹：Edge 跨用户共享（不含 userId，与文档一致） */

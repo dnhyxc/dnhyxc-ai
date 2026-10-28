@@ -5,7 +5,7 @@
  * 流式时消息列与输入区解耦：streamTick 只驱动滚动壳，ChatEntry 元素引用保持稳定，避免输入卡顿。
  */
 import ChatEntry from '@design/ChatEntry';
-import { Toast } from '@ui/index';
+import { Button, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import { Atom, Vegan } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -42,9 +42,11 @@ import {
 	useEnglishAgentIsSending,
 	useEnglishAgentIsStreaming,
 	useEnglishAgentMessageCount,
+	useEnglishAgentPendingProposal,
+	useEnglishAgentProposalCommitting,
 	useEnglishAgentSessionId,
 	useEnglishAgentStreamTick,
-	useEnglishAgentToolStatus,
+	useEnglishAgentToolTrail,
 } from './useEnglishAgentSignals';
 
 export type AgentPanelProps = {
@@ -166,6 +168,31 @@ const EnglishAgentShareBar = observer(function EnglishAgentShareBar({
 	);
 });
 
+function ToolTrailBar({
+	items,
+	t,
+}: {
+	items: ReturnType<typeof useEnglishAgentToolTrail>;
+	t: (key: string, params?: Record<string, unknown>) => string;
+}) {
+	if (!items.length) return null;
+	return (
+		<div className="flex flex-wrap items-center px-4.5 pb-2 text-xs leading-5 text-textcolor/50">
+			<span className="shrink-0">{t('englishLearning.agentTool.trail')}：</span>
+			{items.map((item) => (
+				<span
+					key={item.key}
+					className="inline-flex mr-3 max-w-full items-center truncate rounded-full py-px text-textcolor/75"
+				>
+					{item.kind === 'skill'
+						? t('englishLearning.agentTool.skillChip', { title: item.label })
+						: item.label}
+				</span>
+			))}
+		</div>
+	);
+}
+
 function EnglishAgentScrollShell({
 	scrollControlsRef,
 	footerBody,
@@ -204,7 +231,7 @@ function EnglishAgentScrollShell({
 	const isStreaming = useEnglishAgentIsStreaming();
 	const isHydrating = useEnglishAgentIsHydrating();
 	const sessionId = useEnglishAgentSessionId();
-	const toolStatus = useEnglishAgentToolStatus();
+	const toolTrail = useEnglishAgentToolTrail();
 
 	const idleFlushKey = useMemo((): string | null => {
 		if (isHydrating) return null;
@@ -233,11 +260,9 @@ function EnglishAgentScrollShell({
 
 	const conversationColumnActive = !isHydrating && messageCount > 0;
 
-	const toolStatusBlock = toolStatus ? (
-		<div className={cn('px-4.5 py-3', AGENT_MAX_WIDTH)}>
-			<div className="w-full border border-theme/10 rounded-md bg-theme/5 text-textcolor/60 shrink-0 px-4 py-2 text-center text-sm">
-				{toolStatus}
-			</div>
+	const toolStatusBlock = toolTrail.length ? (
+		<div className={cn('mx-auto w-full', AGENT_MAX_WIDTH)}>
+			<ToolTrailBar items={toolTrail} t={t} />
 		</div>
 	) : null;
 
@@ -330,9 +355,9 @@ function EnglishAgentScrollShell({
 					</AssistantFooter>
 				}
 			/>
-			{!conversationColumnActive && toolStatus ? (
-				<div className="border-theme/10 bg-theme/5 text-textcolor/60 shrink-0 border-t px-4 py-2 text-center text-sm">
-					{toolStatus}
+			{!conversationColumnActive && toolTrail.length ? (
+				<div className={cn('mx-auto w-full', AGENT_MAX_WIDTH)}>
+					<ToolTrailBar items={toolTrail} t={t} />
 				</div>
 			) : null}
 		</div>
@@ -358,10 +383,19 @@ export const AgentPanel = observer(function AgentPanel({
 	const isSending = useEnglishAgentIsSending();
 	const isStreaming = useEnglishAgentIsStreaming();
 	const sessionId = useEnglishAgentSessionId();
+	const pendingProposal = useEnglishAgentPendingProposal();
+	const proposalCommitting = useEnglishAgentProposalCommitting();
 	const scrollControlsRef = useRef<ScrollControls>({
 		enableStickToBottom: () => {},
 		flushScrollToBottom: () => {},
 	});
+
+	const confirmPendingProposal = useCallback(async () => {
+		const p = englishAgentStore.pendingProposal;
+		if (!p || isSending || englishAgentStore.proposalCommitting) return;
+		scrollControlsRef.current.enableStickToBottom();
+		await englishAgentStore.commitProposal(p.proposalId);
+	}, [isSending]);
 
 	useEffect(() => {
 		if (!isLoggedIn) return;
@@ -437,37 +471,74 @@ export const AgentPanel = observer(function AgentPanel({
 			);
 		}
 		return (
-			<ChatEntry
-				t={t}
-				chatInputRef={chatInputRef}
-				input={input}
-				setInput={setInput}
-				focusInputAtEndKey={focusInputAtEndKey}
-				maxWidth={AGENT_MAX_WIDTH}
-				className="w-full px-0 pb-4.5"
-				textareaClassName="min-h-12 rounded-md"
-				inputWrapClassName="border-theme/5 bg-theme/5"
-				sendMessage={handleSendMessage}
-				placeholder={t('englishLearning.placeholder')}
-				disableTextInput={false}
-				loading={isSending}
-				stopGenerating={
-					isStreaming ? () => englishAgentStore.stopGenerating() : undefined
-				}
-				entryChildren={
-					<AssistantSessionEntryToolbar
-						store="english"
-						visible={isLoggedIn}
-						showSessionActions
-						isSessionSwitcherLocked={false}
-						isHistoryDrawerOpen={isHistoryDrawerOpen}
-						setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
-						enableStreamStickToBottom={enableStickToBottomStable}
-						flushScrollToBottom={flushScrollToBottomStable}
-						onNewConversation={handleNewChat}
-					/>
-				}
-			/>
+			<div className="flex w-full flex-col gap-2">
+				{pendingProposal ? (
+					<div
+						className={cn(
+							'mx-auto flex w-full items-center justify-between gap-3 rounded-md',
+							'border border-teal-500/20 bg-teal-500/5 px-3 py-2',
+							AGENT_MAX_WIDTH,
+						)}
+					>
+						<span className="text-textcolor/80 min-w-0 truncate text-sm">
+							{pendingProposal.label}
+						</span>
+						<div className="flex shrink-0 items-center gap-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-8"
+								disabled={isSending || proposalCommitting}
+								onClick={() => englishAgentStore.clearPendingProposal()}
+							>
+								取消
+							</Button>
+							<Button
+								type="button"
+								variant="default"
+								size="sm"
+								className="h-8"
+								disabled={isSending || proposalCommitting}
+								onClick={() => void confirmPendingProposal()}
+							>
+								确认
+							</Button>
+						</div>
+					</div>
+				) : null}
+				<ChatEntry
+					t={t}
+					chatInputRef={chatInputRef}
+					input={input}
+					setInput={setInput}
+					focusInputAtEndKey={focusInputAtEndKey}
+					maxWidth={AGENT_MAX_WIDTH}
+					className="w-full px-0 pb-4.5"
+					textareaClassName="min-h-12 rounded-md"
+					inputWrapClassName="border-theme/5 bg-theme/5"
+					sendMessage={handleSendMessage}
+					placeholder={t('englishLearning.placeholder')}
+					disableTextInput={false}
+					loading={isSending}
+					stopGenerating={
+						isStreaming ? () => englishAgentStore.stopGenerating() : undefined
+					}
+					entryChildren={
+						<AssistantSessionEntryToolbar
+							store="english"
+							visible={isLoggedIn}
+							showSessionActions
+							isSessionSwitcherLocked={false}
+							isHistoryDrawerOpen={isHistoryDrawerOpen}
+							setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
+							enableStreamStickToBottom={enableStickToBottomStable}
+							flushScrollToBottom={flushScrollToBottomStable}
+							onNewConversation={handleNewChat}
+						/>
+					}
+				/>
+			</div>
 		);
 	}, [
 		allowAiShare,
@@ -487,6 +558,9 @@ export const AgentPanel = observer(function AgentPanel({
 		enableStickToBottomStable,
 		flushScrollToBottomStable,
 		handleNewChat,
+		pendingProposal,
+		proposalCommitting,
+		confirmPendingProposal,
 	]);
 
 	return (

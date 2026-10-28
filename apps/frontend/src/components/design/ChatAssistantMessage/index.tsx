@@ -14,6 +14,10 @@ import {
 } from '@dnhyxc-ai/markdown-kit';
 // 与 Markdown 预览同套样式；懒路由后需在聊天路径显式引入
 import '@dnhyxc-ai/markdown-kit/styles.css';
+import {
+	calmFullLibraryCopy,
+	ResourceListBlock,
+} from '@design/Assistant/ResourceListBlock';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
@@ -54,6 +58,12 @@ import {
 	syncOrganicMergedAnchorDom,
 } from '@/utils/organicCitation';
 import { patchIncompleteNonMermaidFence } from '@/utils/splitMarkdownFences';
+import {
+	anchoredCardEdges,
+	bodyHasContent,
+	looseCardEdges,
+	splitCardAnchors,
+} from './cardEdges';
 import SearchOrganics from './SearchOrganics';
 import { StreamingMarkdownBody } from './StreamingMarkdownBody';
 
@@ -234,6 +244,13 @@ function ChatAssistantMessageInner({
 			raw = patchIncompleteNonMermaidFence(raw);
 		}
 		raw = normalizePersistedOrganicAnchorsInMarkdown(raw, org);
+		const liveLibrary = message.elResources?.some(
+			(row) =>
+				row.source === 'library' &&
+				Boolean(row.libraryId) &&
+				(row.contentKind === 'vocab' || row.contentKind === 'classic'),
+		);
+		if (liveLibrary) raw = calmFullLibraryCopy(raw);
 		if (!org?.length) {
 			return raw;
 		}
@@ -242,9 +259,28 @@ function ChatAssistantMessageInner({
 		message.content,
 		message.thinkContent,
 		message.searchOrganic,
+		message.elResources,
 		message.isStreaming,
 		t,
 	]);
+
+	const cardParts = useMemo(() => splitCardAnchors(bodyText), [bodyText]);
+	const anchoredIds = useMemo(() => {
+		const ids = new Set<string>();
+		for (const part of cardParts) {
+			if (part.type === 'card') ids.add(part.id);
+		}
+		return ids;
+	}, [cardParts]);
+	const looseResources = useMemo(
+		() =>
+			(message.elResources ?? []).filter(
+				(block) => !anchoredIds.has(block.artifactId),
+			),
+		[message.elResources, anchoredIds],
+	);
+	const resources = message.elResources;
+	const bodyHas = bodyHasContent(cardParts, resources);
 
 	const isSearchOrganicEnabled = (message.searchOrganic?.length ?? 0) > 0;
 
@@ -562,24 +598,49 @@ function ChatAssistantMessageInner({
 					/>
 				) : null}
 			</div>
-			<StreamingMarkdownBody
-				containerRef={bodyMarkdownRef}
-				markdown={bodyText}
-				parser={chatMdParser}
-				preferDark={appTheme === 'black'}
-				isStreaming={!!message.isStreaming}
-				t={t}
-				renderedMarkdownHtmlPostProcess={
-					isSearchOrganicEnabled && message.searchOrganic?.length
-						? injectSearchOrganicAnchorsHtml
-						: undefined
-				}
-				className={cn(
-					`[&_.markdown-body]:text-textcolor/90!`,
-					isSearchOrganicEnabled && '__md-search-enabled__',
-					className,
-				)}
-			/>
+			<div ref={bodyMarkdownRef} className="w-full">
+				{cardParts.map((part, i) => {
+					if (part.type === 'card') {
+						const block = resources?.find((row) => row.artifactId === part.id);
+						if (!block) return null;
+						const edge = anchoredCardEdges(
+							cardParts,
+							i,
+							resources,
+							looseResources.length,
+						);
+						return (
+							<ResourceListBlock
+								key={part.id}
+								block={block}
+								hasAbove={edge.hasAbove}
+								hasBelow={edge.hasBelow}
+							/>
+						);
+					}
+					if (!part.text.trim()) return null;
+					return (
+						<StreamingMarkdownBody
+							key={`md-${i}`}
+							markdown={part.text}
+							parser={chatMdParser}
+							preferDark={appTheme === 'black'}
+							isStreaming={!!message.isStreaming}
+							t={t}
+							renderedMarkdownHtmlPostProcess={
+								isSearchOrganicEnabled && message.searchOrganic?.length
+									? injectSearchOrganicAnchorsHtml
+									: undefined
+							}
+							className={cn(
+								`[&_.markdown-body]:text-textcolor/90!`,
+								isSearchOrganicEnabled && '__md-search-enabled__',
+								className,
+							)}
+						/>
+					);
+				})}
+			</div>
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
@@ -639,6 +700,17 @@ function ChatAssistantMessageInner({
 					</div>
 				</div>
 			)}
+			{looseResources.map((block, i) => {
+				const edge = looseCardEdges(i, looseResources.length, bodyHas);
+				return (
+					<ResourceListBlock
+						key={block.artifactId}
+						block={block}
+						hasAbove={edge.hasAbove}
+						hasBelow={edge.hasBelow}
+					/>
+				);
+			})}
 			<SearchOrganics
 				open={open}
 				onOpenChange={() => setOpen(false)}
@@ -790,6 +862,7 @@ function areChatAssistantMessageMemoPropsEqual(
 		(pm.thinkContent ?? '') === (nm.thinkContent ?? '') &&
 		pm.searchOrganic === nm.searchOrganic &&
 		pm.appliedSkills === nm.appliedSkills &&
+		pm.elResources === nm.elResources &&
 		pm.isStreaming === nm.isStreaming &&
 		pm.finishReason === nm.finishReason &&
 		prev.isShowThinkContent === next.isShowThinkContent &&

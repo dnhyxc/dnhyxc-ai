@@ -6,6 +6,8 @@ export const englishLearning = {
 	'englishLearning.agentTool.querySuffix': '：{q}',
 	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
 	'englishLearning.agentTool.statusDone': '资料助手 · {action} 已完成',
+	'englishLearning.agentTool.trail': '已调用工具',
+	'englishLearning.agentTool.skillChip': 'Skill · {title}',
 	'englishLearning.annotateSource.aborted': '已停止标注（已完成部分仍保留）',
 	'englishLearning.annotateSource.action': '标注',
 	'englishLearning.annotateSource.confirmAction': '开始标注',
@@ -466,6 +468,19 @@ export const englishLearning = {
 	'englishLearning.pendingIntentShort': '下次发送附带',
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
+	'englishLearning.proposal.capped': '提案已截断至 400 条。',
+	'englishLearning.proposal.listGap': '清单未取尽。',
+	'englishLearning.proposal.judgeGap': '有批未能判断。',
+	'englishLearning.proposal.expired': '提案已过期，请重新让助手提案',
+	'englishLearning.proposal.failed': '确认失败，请重试',
+	'englishLearning.proposal.failedCount': '失败 {failed} 个。',
+	'englishLearning.proposal.mistakeDone':
+		'已加入错题 {created} 条，已在错题中 {existed} 条。',
+	'englishLearning.proposal.removeMiss': '没有找到这条收藏。',
+	'englishLearning.proposal.removed': '已取消收藏 {created} 个。',
+	'englishLearning.proposal.removeMissing': '未找到 {existed} 个。',
+	'englishLearning.proposal.saved':
+		'已收藏 {created} 个，已存在 {existed} 个。',
 	'englishLearning.practice.back': '返回',
 	'englishLearning.practice.check': '检查',
 	'englishLearning.practice.classicInputPlaceholder': '输入英文语句',

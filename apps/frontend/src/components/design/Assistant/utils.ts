@@ -5,7 +5,7 @@ import type { AssistantMessageVariant, AssistantShareSelection } from './types';
 /** 单条消息流式订阅 revision（正文 + 思考区 + 流式态 + 已应用 Skill） */
 export function buildMessageRev(message: Message): string {
 	return message.role === 'assistant'
-		? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}:${message.appliedSkills?.length ?? 0}`
+		? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}:${message.appliedSkills?.length ?? 0}:${message.elResources?.length ?? 0}:${message.finishReason?.maxTokensReached ? 1 : 0}`
 		: `${message.content.length}`;
 }
 

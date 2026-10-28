@@ -86,6 +86,10 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 		EnglishLearningStreamAbortRegistry,
 		AnnotateSourceTaskService,
 	],
-	exports: [EnglishLearningService],
+	exports: [
+		EnglishLearningService,
+		EnglishDailyReadingService,
+		EnglishLearningStreamAbortRegistry,
+	],
 })
 export class EnglishLearningModule {}

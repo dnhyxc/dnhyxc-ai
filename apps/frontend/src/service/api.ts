@@ -174,6 +174,7 @@ export const AGENT_SESSIONS = '/agent/sessions';
 export const AGENT_SESSION_TITLE = '/agent/session/title';
 export const AGENT_SSE = '/agent/sse';
 export const AGENT_STOP = '/agent/stop';
+export const AGENT_EL_PROPOSAL_COMMIT = '/agent/el-proposal/commit';
 
 /** Skill / Prompt（独立表，不进知识向量） */
 export const SKILL_SAVE = '/skill/save';
