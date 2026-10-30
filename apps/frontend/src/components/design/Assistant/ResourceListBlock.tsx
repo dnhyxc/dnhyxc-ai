@@ -1,6 +1,7 @@
 import { Button, Input, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Search, Square, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Virtuoso } from 'react-virtuoso';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -15,11 +16,11 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 const PAGE = 1000;
 
 function isLiveLibrary(block: ElResourceBlock): boolean {
-	return (
-		block.source === 'library' &&
-		Boolean(block.libraryId) &&
-		(block.contentKind === 'vocab' || block.contentKind === 'classic')
-	);
+	// 筛选卡的行在 items 里。再按库 id 拉，会把整库尾部画出来，角标却仍是分类条数
+	if (block.filtered) return false;
+	const libraryKind =
+		block.contentKind === 'vocab' || block.contentKind === 'classic';
+	return block.source === 'library' && Boolean(block.libraryId) && libraryKind;
 }
 
 /** 条数单独显示，标题里的「全部 66 条 / 已列出」去掉。 */
@@ -52,7 +53,12 @@ function speakOf(item: unknown): { text: string; sentence: boolean } | null {
 	return null;
 }
 
-function rowOf(item: unknown): { en: string; zh?: string } {
+function rowOf(item: unknown): {
+	en: string;
+	zh?: string;
+	ipa?: string;
+	pos?: string;
+} {
 	if (!item || typeof item !== 'object') {
 		return { en: String(item ?? '') };
 	}
@@ -68,7 +74,33 @@ function rowOf(item: unknown): { en: string; zh?: string } {
 		JSON.stringify(o).slice(0, 180);
 	const zh =
 		text(o.translationZh) || text(o.zh) || text(o.meaning) || text(o.titleZh);
-	return zh ? { en, zh } : { en };
+	const ipa = text(o.ipa);
+	const pos = text(o.pos);
+	return zh ? { en, zh, ipa, pos } : { en, ipa, pos };
+}
+
+/** 日推行 → 阅读详情；词句生成历史行 → stream 页。词条行本身不跳。 */
+function hrefOf(block: ElResourceBlock, item: unknown): string | null {
+	if (!item || typeof item !== 'object') return null;
+	const o = item as Record<string, unknown>;
+	const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+	const id = text(o.id);
+	if (!id) return null;
+	if (block.source === 'reading') {
+		const params = new URLSearchParams();
+		const title = text(o.titleEn);
+		if (title) params.set('title', title);
+		if (text(o.origin) === 'manual') params.set('origin', 'manual');
+		const q = params.toString();
+		return `/english-learning/daily-reading/${encodeURIComponent(id)}${q ? `?${q}` : ''}`;
+	}
+	if (block.source === 'pack') {
+		const topic = text(o.topic);
+		if (!topic || text(o.word) || text(o.english)) return null;
+		const kind = block.contentKind === 'classic' ? 'classic' : 'vocab';
+		return `/english-learning/stream?kind=${kind}&streamId=${encodeURIComponent(id)}`;
+	}
+	return null;
 }
 
 function ListRow({
@@ -77,6 +109,7 @@ function ListRow({
 	last,
 	playingKey,
 	onPlay,
+	onOpen,
 	playWordLabel,
 	playQuoteLabel,
 	stopLabel,
@@ -86,6 +119,7 @@ function ListRow({
 	last: boolean;
 	playingKey: string | null;
 	onPlay: (text: string) => void;
+	onOpen?: () => void;
 	playWordLabel: string;
 	playQuoteLabel: string;
 	stopLabel: string;
@@ -98,11 +132,32 @@ function ListRow({
 			className={cn(
 				'flex items-center gap-3 px-2 py-1.5',
 				!last && 'border-b border-theme/10',
+				onOpen &&
+					'cursor-pointer hover:bg-theme/10 focus-visible:bg-theme/10 focus-visible:outline-none',
 			)}
+			role={onOpen ? 'button' : undefined}
+			tabIndex={onOpen ? 0 : undefined}
+			onClick={onOpen}
+			onKeyDown={
+				onOpen
+					? (e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onOpen();
+							}
+						}
+					: undefined
+			}
 		>
 			<span className="w-12 shrink-0 text-textcolor/40">{index + 1}</span>
 			<span className="min-w-0 flex-1">
-				<span className="block">{row.en}</span>
+				<span className="block">
+					{row.en}
+					{row.ipa
+						? ` ·${row.ipa.startsWith('/') ? row.ipa : `/${row.ipa}/`}`
+						: ''}
+					{row.pos ? ` ·${row.pos}` : ''}
+				</span>
 				{row.zh ? (
 					<span className="block text-textcolor/60">{row.zh}</span>
 				) : null}
@@ -124,7 +179,10 @@ function ListRow({
 								? playQuoteLabel
 								: playWordLabel
 					}
-					onClick={() => onPlay(speak.text)}
+					onClick={(e) => {
+						e.stopPropagation();
+						onPlay(speak.text);
+					}}
 				>
 					{playing ? (
 						<Square className="size-3.5 fill-current" aria-hidden />
@@ -150,6 +208,7 @@ export function ResourceListBlock({
 	hasBelow?: boolean;
 }) {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 	const live = isLiveLibrary(block);
 	const title = shownTitle(block.title);
 	const [playing, setPlaying] = useState<string | null>(null);
@@ -268,6 +327,14 @@ export function ResourceListBlock({
 		[playing, t],
 	);
 
+	const openItem = useCallback(
+		(item: unknown) => {
+			const href = hrefOf(block, item);
+			if (href) navigate(href);
+		},
+		[block, navigate],
+	);
+
 	const filtered = useMemo(() => {
 		const rows = items ?? [];
 		const needle = q.trim().toLowerCase();
@@ -289,7 +356,7 @@ export function ResourceListBlock({
 				hasBelow && 'mb-4',
 			)}
 		>
-			<div className="mb-1 flex items-center gap-3 border-b border-theme/10 px-2 pt-2 pb-2">
+			<div className="flex items-center gap-3 border-b border-theme/10 px-2 pt-2 pb-2">
 				<div className="flex min-w-0 flex-1 items-baseline gap-2">
 					<span className="truncate text-base font-medium">{title}</span>
 					<span className="shrink-0 text-xs tabular-nums text-textcolor/45">
@@ -314,8 +381,8 @@ export function ResourceListBlock({
 				</div>
 			</div>
 			{phase === 'loading' ? (
-				<div className="flex items-center gap-2 px-2 py-4 text-textcolor/60">
-					<Spinner className="size-4" />
+				<div className="flex items-center justify-center gap-2 px-2 py-4 text-textcolor/60">
+					<Spinner className="size-4 text-textcolor/60" />
 					加载清单
 				</div>
 			) : null}
@@ -355,7 +422,7 @@ export function ResourceListBlock({
 					<>
 						<ScrollArea
 							ref={setScrollParent}
-							className="h-80"
+							className="h-79"
 							viewportClassName="h-full [overflow-anchor:none] [&>div]:block! [&>div]:h-auto! [&>div]:min-h-0! [&>div]:w-full!"
 							scrollbarClassName="border-0 p-0"
 						>
@@ -371,6 +438,9 @@ export function ResourceListBlock({
 											last={i === filtered.length - 1}
 											playingKey={playing}
 											onPlay={onPlay}
+											onOpen={
+												hrefOf(block, item) ? () => openItem(item) : undefined
+											}
 											playWordLabel={t('englishLearning.vocab.playWord')}
 											playQuoteLabel={t('englishLearning.classic.playQuote')}
 											stopLabel={t('englishLearning.tts.stop')}
@@ -390,8 +460,8 @@ export function ResourceListBlock({
 			) : null}
 			{phase === 'ready' && !live ? (
 				<ScrollArea
-					className="max-h-80"
-					viewportClassName="max-h-80"
+					className="max-h-79"
+					viewportClassName="max-h-79"
 					scrollbarClassName="border-0 p-0"
 				>
 					{filtered.length === 0 ? (
@@ -405,6 +475,7 @@ export function ResourceListBlock({
 								last={i === filtered.length - 1}
 								playingKey={playing}
 								onPlay={onPlay}
+								onOpen={hrefOf(block, item) ? () => openItem(item) : undefined}
 								playWordLabel={t('englishLearning.vocab.playWord')}
 								playQuoteLabel={t('englishLearning.classic.playQuote')}
 								stopLabel={t('englishLearning.tts.stop')}

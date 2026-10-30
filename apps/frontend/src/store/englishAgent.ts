@@ -106,12 +106,14 @@ const NO_TOOL_TRAIL: AgentToolChip[] = [];
 function proposalReceiptText(data: {
 	kind: string;
 	content?: string;
+	mixed?: boolean;
 	created: number;
 	existed: number;
 	failed: number;
 	truncated: boolean;
 	gaps?: Array<'cap' | 'list' | 'judge'>;
 }): string {
+	if (data.mixed && data.content) return data.content;
 	if (data.kind === 'pack_generate' || data.kind === 'reading_generate') {
 		return (
 			data.content ||
@@ -163,14 +165,37 @@ function rememberToolChip(st: EnglishSessionRuntime, chip: AgentToolChip) {
 	st.toolTrail = [...st.toolTrail, chip];
 }
 
-/** 单会话运行态（消息、发送、流式句柄、已调用的 Skill / 工具） */
+/** 待确认提案（来自 el_* 工具 ui.confirm_proposal） */
+export type ElPendingProposal = {
+	proposalId: string;
+	label: string;
+	tool?: string;
+};
+
+/** 单会话运行态（消息、发送、流式句柄、已调用的 Skill / 工具、确认条） */
 export type EnglishSessionRuntime = {
 	messages: Message[];
 	isSending: boolean;
 	isHistoryLoading: boolean;
 	abortStream: (() => void) | null;
 	toolTrail: AgentToolChip[];
+	/** 只属于本会话；切走后界面读当前会话，不展示其它会话的确认条 */
+	pendingProposal: ElPendingProposal | null;
+	/** 本会话确认条提交中，避免连点 */
+	proposalCommitting: boolean;
 };
+
+function blankSessionRuntime(): EnglishSessionRuntime {
+	return {
+		messages: [],
+		isSending: false,
+		isHistoryLoading: false,
+		abortStream: null,
+		toolTrail: [],
+		pendingProposal: null,
+		proposalCommitting: false,
+	};
+}
 
 export class EnglishAgentStore {
 	/** 当前界面展示的会话 id（与 URL `session` 对齐） */
@@ -194,11 +219,6 @@ export class EnglishAgentStore {
 
 	/** 快捷意图：仅通过 `intentPrefix` 传给服务端拼入模型输入，不入库；发送后清空 */
 	pendingIntentPrefix = '';
-	/** M2：待确认的领域提案（来自 el_* 工具 ui.confirm_proposal） */
-	pendingProposal: { proposalId: string; label: string; tool?: string } | null =
-		null;
-	/** 确认条 HTTP 提交中，避免连点 */
-	proposalCommitting = false;
 	/** M2：领域写成功计数，侧栏/列表可订阅刷新 */
 	domainMutationTick = 0;
 	lastDomainMutation: string | null = null;
@@ -207,6 +227,8 @@ export class EnglishAgentStore {
 
 	static readonly EL_TOOL_LABELS: Record<string, string> = {
 		el_libraries: '查阅词库/语料库',
+		el_vocab_classify: '分类列出单词',
+		el_classic_classify: '分类列出语句',
 		el_items_search: '检索词条',
 		el_present: '展示清单',
 		el_daily_reading: '每日阅读',
@@ -254,6 +276,19 @@ export class EnglishAgentStore {
 		return this.messages.some((m) => m.isStreaming);
 	}
 
+	/** 当前展示会话的确认条；其它会话的提案留在各自 runtime 上 */
+	get pendingProposal(): ElPendingProposal | null {
+		const sid = this.activeSessionId;
+		if (!sid) return null;
+		return this.stateBySession[sid]?.pendingProposal ?? null;
+	}
+
+	get proposalCommitting(): boolean {
+		const sid = this.activeSessionId;
+		if (!sid) return false;
+		return Boolean(this.stateBySession[sid]?.proposalCommitting);
+	}
+
 	/** 知识库式锁定：英语学习无「草稿迁入」场景，恒不锁历史抽屉 */
 	get isEnglishSessionSwitcherLocked(): boolean {
 		return false;
@@ -272,23 +307,9 @@ export class EnglishAgentStore {
 
 	ensureSessionState(sid: string): EnglishSessionRuntime {
 		const id = (sid ?? '').trim();
-		if (!id) {
-			return {
-				messages: [],
-				isSending: false,
-				isHistoryLoading: false,
-				abortStream: null,
-				toolTrail: [],
-			};
-		}
+		if (!id) return blankSessionRuntime();
 		if (!this.stateBySession[id]) {
-			this.stateBySession[id] = {
-				messages: [],
-				isSending: false,
-				isHistoryLoading: false,
-				abortStream: null,
-				toolTrail: [],
-			};
+			this.stateBySession[id] = blankSessionRuntime();
 		}
 		return this.stateBySession[id]!;
 	}
@@ -621,23 +642,27 @@ export class EnglishAgentStore {
 	}
 
 	clearPendingProposal(): void {
-		this.pendingProposal = null;
+		const sid = this.activeSessionId;
+		if (!sid) return;
+		const st = this.stateBySession[sid];
+		if (st) st.pendingProposal = null;
 	}
 
-	/** 点确认：直提交提案，只追加助手回执 */
+	/** 点确认：直提交提案，只追加助手回执；回执与失败恢复都落在发起时的会话上 */
 	async commitProposal(proposalId: string): Promise<void> {
-		const pending = this.pendingProposal;
 		const sid = this.activeSessionId;
+		if (!sid) return;
+		const st = this.ensureSessionState(sid);
+		const pending = st.pendingProposal;
 		if (
-			!sid ||
 			!pending ||
 			pending.proposalId !== proposalId ||
-			this.proposalCommitting
+			st.proposalCommitting
 		) {
 			return;
 		}
-		this.proposalCommitting = true;
-		this.pendingProposal = null;
+		st.proposalCommitting = true;
+		st.pendingProposal = null;
 		try {
 			const res = await commitElProposal({
 				sessionId: sid,
@@ -648,7 +673,7 @@ export class EnglishAgentStore {
 				const code = (res.data as { code?: string } | undefined)?.code;
 				if (code !== 'expired') {
 					runInAction(() => {
-						this.pendingProposal = pending;
+						st.pendingProposal = pending;
 					});
 				}
 				Toast({
@@ -664,7 +689,6 @@ export class EnglishAgentStore {
 			const data = res.data;
 			const content = proposalReceiptText(data);
 			runInAction(() => {
-				const st = this.ensureSessionState(sid);
 				st.messages.push({
 					chatId: data.messageId,
 					role: 'assistant',
@@ -675,11 +699,11 @@ export class EnglishAgentStore {
 			});
 		} catch {
 			runInAction(() => {
-				if (!this.pendingProposal) this.pendingProposal = pending;
+				if (!st.pendingProposal) st.pendingProposal = pending;
 			});
 		} finally {
 			runInAction(() => {
-				this.proposalCommitting = false;
+				st.proposalCommitting = false;
 			});
 		}
 	}
@@ -907,7 +931,7 @@ export class EnglishAgentStore {
 							}
 							if (ev.phase === 'end' && ev.output != null) {
 								const proposal = parseElConfirmProposal(ev.output, ev.name);
-								if (proposal) this.pendingProposal = proposal;
+								if (proposal) st.pendingProposal = proposal;
 							}
 						});
 					},

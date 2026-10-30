@@ -253,6 +253,7 @@ export async function streamAgentSse(options: {
 									typeof parsed.libraryId === 'string'
 										? parsed.libraryId
 										: undefined,
+								filtered: parsed.filtered === true,
 								totalCount:
 									typeof parsed.totalCount === 'number' ? parsed.totalCount : 0,
 								truncated: parsed.truncated === true,

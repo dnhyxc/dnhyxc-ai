@@ -58,8 +58,8 @@ export function agentStreamRecursionLimit(
 	profile?: 'default' | 'english_learning',
 ): number {
 	if (profile !== 'english_learning') return 40;
-	// 一轮工具按模型节点 + 工具节点两步计。多出的 16 步留给收束后的正文
-	return ENGLISH_QUIET_ROUNDS * 2 + 16;
+	// 一轮含摘要、模型、两道 after_model 和工具。多出的 16 步留给收束后的正文
+	return ENGLISH_QUIET_ROUNDS * 5 + 16;
 }
 
 /** 这一句的工具来回已满仍要调工具时，不执行，只让模型作答。不 jumpTo end。 */
@@ -102,6 +102,7 @@ function quietRoundMiddleware(): AgentMiddleware {
 }
 
 const STOP_TOOLS_MARK = '"code":"stop_tools"';
+const FILTER_SHOWN_MARK = 'filter_shown';
 
 function messageText(message: BaseMessage): string {
 	const content = message.content;
@@ -132,12 +133,15 @@ function brakeAfterModel(): AgentMiddleware {
 				const ai = messages[aiIndex];
 				if (!AIMessage.isInstance(ai) || !ai.tool_calls?.length) return;
 				let stop = false;
+				let filterShown = false;
 				for (let i = aiIndex - 1; i >= 0; i -= 1) {
 					const row = messages[i];
 					if (!ToolMessage.isInstance(row)) break;
-					if (messageText(row).includes(STOP_TOOLS_MARK)) stop = true;
+					const text = messageText(row);
+					if (text.includes(STOP_TOOLS_MARK)) stop = true;
+					if (text.includes(FILTER_SHOWN_MARK)) filterShown = true;
 				}
-				if (!stop) return;
+				if (!stop && !filterShown) return;
 				const closed = ai.tool_calls.map(
 					(call) =>
 						new ToolMessage({
@@ -151,7 +155,11 @@ function brakeAfterModel(): AgentMiddleware {
 					jumpTo: 'end' as const,
 					messages: [
 						...closed,
-						new AIMessage('已有待确认提案，请直接点确认。'),
+						new AIMessage(
+							filterShown && !stop
+								? '筛选卡片已经列出。'
+								: '已有待确认提案，请直接点确认。',
+						),
 					],
 				};
 			},

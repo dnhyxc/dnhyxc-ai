@@ -3,11 +3,16 @@ import type { ConfigService } from '@nestjs/config';
 import {
 	type CreateLlmOptions,
 	createLlm,
-	GLM_THINKING_DISABLED_KWARGS,
+	DECIDE_MODEL_NAME,
 } from './create-llm';
 
-/** 决策模型不跟 GLM_MODEL_NAME。对话默认模型换大了，这里仍是 flash。 */
-export const DECIDE_MODEL_NAME = 'glm-4.7-flash';
+export { DECIDE_MODEL_NAME };
+
+/** 只放硅基认识的字段。不带智谱 thinking，避免不认识的字段让整批 400。 */
+export const DECIDE_JSON_KWARGS = {
+	enable_thinking: false,
+	response_format: { type: 'json_object' as const },
+};
 
 const DECIDE_TIMEOUT_MS = 2000;
 const DECIDE_MAX_TOKENS = 400;
@@ -27,19 +32,19 @@ export type DecideInput<T> = {
 	timeoutMs?: number;
 };
 
-/** createLlm 入参。检查用它确认没有把模型交给会员档。 */
-export function decideLlmOptions(signal: AbortSignal): CreateLlmOptions {
+/** createLlm 入参。检查用它确认没有把模型交给会员档。maxTokens 缺省 400，分类传入 65536。 */
+export function decideLlmOptions(
+	signal: AbortSignal,
+	maxTokens: number = DECIDE_MAX_TOKENS,
+): CreateLlmOptions {
 	return {
 		preset: 'decide',
 		modelName: DECIDE_MODEL_NAME,
 		streaming: false,
 		temperature: 0,
 		defaultTemperature: 0,
-		maxTokens: DECIDE_MAX_TOKENS,
-		modelKwargs: {
-			...GLM_THINKING_DISABLED_KWARGS,
-			response_format: { type: 'json_object' },
-		},
+		maxTokens,
+		modelKwargs: DECIDE_JSON_KWARGS,
 		abortSignal: signal,
 	};
 }

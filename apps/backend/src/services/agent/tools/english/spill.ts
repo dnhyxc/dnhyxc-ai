@@ -1,5 +1,9 @@
+import type { ConfigService } from '@nestjs/config';
+import { decide } from '../../../../utils/glm-decide';
 import type { ElResourceListPayload, ElResourceSource } from './artifact.store';
+import type { EnglishIntent } from './english-intent';
 import { type ElEnvelope, elOk, fitItemsByChars } from './envelope';
+import type { FavoriteIntent } from './favorite-ask';
 
 /** 条数达到则外溢，不再把全表塞进模型上下文 */
 export const EL_SPILL_MIN_ITEMS = 30;
@@ -36,10 +40,25 @@ export function listIntent(userText: string): ListIntent {
 	return 'other';
 }
 
+export type PriorLibraryCard = {
+	title: string;
+	contentKind?: 'vocab' | 'classic';
+};
+
 export type ElListSurface = {
 	userText: string;
+	/** 整库筛选用的类别句。纯收藏口令不放这里。 */
+	quoteCategoryText?: string;
+	/** 当前句之前的用户原话，近的在后。 */
+	priorUserTexts: string[];
+	/** 上一张助手消息里的库卡标题。只用于沿用，不参与整库挂卡。 */
+	priorLibraryCards: PriorLibraryCard[];
+	/** 带类别名的历史分类卡。只按库和类别查找，不参与整卡收藏。 */
+	labeledCards: ElResourceListPayload[];
 	/** 索引类 list 外溢的全量，默认不推卡片 */
 	libraryLists: ElResourceListPayload[];
+	/** 同时点名单词和语句时，回扫窗口里的单词卡。其他收藏句保持空。 */
+	vocabLists: ElResourceListPayload[];
 	presented: boolean;
 	/** 本轮已经挂出的库或 artifact，同一 id 不再挂第二张 */
 	shownLibraryIds: Set<string>;
@@ -48,7 +67,369 @@ export type ElListSurface = {
 	catalogKind?: 'vocab' | 'classic';
 	/** 本轮已挂出的确认条。收尾补收藏时用来避免再挂一条。 */
 	openProposalId?: string | null;
+	/** 本轮主意图（总路由）。收尾 / 筛选续查 / 挂条优先读 kind。 */
+	intent?: EnglishIntent;
+	/** 本轮收藏意图。propose_* 延期与轮末挂条都读它；由 intent 同步。 */
+	favoriteIntent?: FavoriteIntent;
+	/**
+	 * 本轮每个库正在进行或已经结束的分类。
+	 * 键是 kind:libraryId 或 kind:libraryId:类别。先写入再等待，同键后来者共用这一次，失败也不删除。
+	 */
+	categoryJobs: Map<
+		string,
+		Promise<Omit<ElResourceListPayload, 'artifactId'> | null>
+	>;
 };
+
+/** 用户要丢掉已记下的命中，再判一次。 */
+export function reclassifyAsked(userText: string): boolean {
+	return /重新分类/.test(userText);
+}
+
+/**
+ * 从「关于 / 有关 / 相关」后切出类别名。
+ * 「家庭的和问候的」是两类；「有关家庭的所有语句」只留家庭。
+ */
+export function categoryLabels(userText: string): string[] {
+	const labels: string[] = [];
+	const seen = new Set<string>();
+	const push = (raw: string) => {
+		const label = raw.replace(/的/gu, '').trim();
+		if (label.length < 1 || label.length > 8 || seen.has(label)) return;
+		seen.add(label);
+		labels.push(label);
+	};
+	for (const mark of userText.matchAll(/(?:关于|有关|相关)/gu)) {
+		let rest = userText.slice((mark.index ?? 0) + mark[0].length);
+		const names: string[] = [];
+		const first = rest.match(/^([^和与、及的，。；\s]{1,8})/u);
+		if (!first) continue;
+		names.push(first[1]);
+		rest = rest.slice(first[0].length);
+		while (true) {
+			const conj = rest.match(/^(?:和|与|、|以及)/u);
+			if (!conj) break;
+			const after = rest.slice(conj[0].length);
+			const next = after.match(/^([^和与、及的，。；\s]{1,8})/u);
+			if (!next) break;
+			names.push(next[1]);
+			rest = after.slice(next[0].length);
+		}
+		if (!rest.startsWith('的')) continue;
+		rest = rest.slice(1);
+		for (const name of names) push(name);
+		while (true) {
+			const conj = rest.match(/^(?:和|与|、|以及)/u);
+			if (!conj) break;
+			const after = rest.slice(conj[0].length);
+			const next = after.match(/^([^和与、及的，。；\s]{1,8})的/u);
+			if (!next) break;
+			push(next[1]);
+			rest = after.slice(next[0].length);
+		}
+	}
+	return labels;
+}
+
+/** 关于类且不是整库问法。整库句仍走 inventory，避免「列出全部」被拿去分类。 */
+export function isCategoryAsk(userText: string): boolean {
+	if (listIntent(userText) === 'inventory') return false;
+	return /关于|相关|有关|属于/.test(userText);
+}
+
+/**
+ * 自选阅读生成。主题里的「关于」不是在筛语句库。
+ * 句中点了语句库或词汇库时仍留给分类，避免「生成语句库里关于家庭的句子」被挡掉。
+ */
+export function isReadingGenerateAsk(userText: string): boolean {
+	const text = userText.trim();
+	if (!text) return false;
+	if (/语句库|语料库|词汇库|单词库|词库/.test(text)) return false;
+	const passage = /阅读资料|阅读材料|自选阅读|每日阅读|英语阅读|短文|文章|长文/;
+	const make = /生成|写一|来一|做一/;
+	const sized = /长篇|短篇|中篇|长文|短文/;
+	if (passage.test(text) && (make.test(text) || sized.test(text))) return true;
+	return sized.test(text) && make.test(text) && /阅读/.test(text);
+}
+
+/**
+ * 词书/语句生成。主题里的「关于」不是在筛已有库。
+ * 点名 *库* 时仍走分类（与 isReadingGenerateAsk 同一边界）。
+ */
+export function isPackGenerateAsk(userText: string): boolean {
+	const text = userText.trim();
+	if (!text) return false;
+	if (/语句库|语料库|词汇库|单词库|词库/.test(text)) return false;
+	if (!/生成|写一|来一|做一|出一|来份|来一份/.test(text)) return false;
+	return /语句|句子|经典句|单词资料|词书|单词|词汇/.test(text);
+}
+
+/** 原句快路径。三组词都在才扫全部词汇库，换说法交给 decide。 */
+export function isAllVocabCategory(userText: string): boolean {
+	if (!isCategoryAsk(userText)) return false;
+	if (!/词汇库|单词库/.test(userText)) return false;
+	return /所有|全部|各个/.test(userText);
+}
+
+/** 原句快路径。三组词都在才扫全部语句库，换说法交给 decide。 */
+export function isAllClassicCategory(userText: string): boolean {
+	if (!isCategoryAsk(userText)) return false;
+	if (!/语句库|语料库/.test(userText)) return false;
+	return /所有|全部|各个/.test(userText);
+}
+
+const ALL_VOCAB_TASK =
+	'只返回 JSON {"scope":"all_vocab|one_vocab|classic|none","cue":""}，不要解释。' +
+	'只有用户要把某一类单词从词汇库全体里找出来、分类或列出来时，scope 才是 all_vocab。' +
+	'点名一本库是 one_vocab，只要语句是 classic，其它是 none。' +
+	'cue 必须是原话中连续出现的一段，不要编。';
+
+/** 线索必须是原话里的连续子串。编出来的范围不能打开全库扫描。 */
+export function acceptAllVocabCue(
+	userText: string,
+	raw: unknown,
+): { scope: 'all_vocab' } | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const body = raw as { scope?: unknown; cue?: unknown };
+	if (body.scope !== 'all_vocab') return null;
+	if (typeof body.cue !== 'string') return null;
+	const cue = body.cue.trim();
+	if (cue.length < 2 || !userText.includes(cue)) return null;
+	if (!/所有|全部|各个/.test(userText)) return null;
+	if (!/词汇库|单词库/.test(userText)) return null;
+	return { scope: 'all_vocab' };
+}
+
+/** 词表能确定就直接进。不能确定时问一次 decide，失败不扫全部库。 */
+export async function resolveAllVocabAsk(
+	config: ConfigService,
+	userText: string,
+): Promise<boolean> {
+	if (isAllVocabCategory(userText)) return true;
+	const slot = await decide(config, {
+		task: ALL_VOCAB_TASK,
+		input: userText,
+		parse: (raw) =>
+			raw && typeof raw === 'object' && !Array.isArray(raw)
+				? (raw as { scope: 'all_vocab' })
+				: null,
+		accept: (_value, input) => acceptAllVocabCue(input, _value),
+	});
+	return slot?.scope === 'all_vocab';
+}
+
+const ALL_CLASSIC_TASK =
+	'只返回 JSON {"scope":"all_classic|one|none","cue":""}，不要解释。' +
+	'只有用户要把某一类句子从语句库全体里找出来、分类或列出来时，scope 才是 all_classic。' +
+	'点名一本语句库是 one，其它是 none。' +
+	'cue 必须是原话中连续出现的一段，不要编。';
+
+/** 线索必须是原话里的连续子串。编出来的范围不能打开全部语句库。 */
+export function acceptAllClassicCue(
+	userText: string,
+	raw: unknown,
+): { scope: 'all_classic' } | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const body = raw as { scope?: unknown; cue?: unknown };
+	if (body.scope !== 'all_classic') return null;
+	if (typeof body.cue !== 'string') return null;
+	const cue = body.cue.trim();
+	if (cue.length < 2 || !userText.includes(cue)) return null;
+	if (!/所有|全部|各个/.test(userText)) return null;
+	if (!/语句库|语料库/.test(userText)) return null;
+	return { scope: 'all_classic' };
+}
+
+/** 词表能确定就直接进。不能确定时问一次 decide，失败不扫全部语句库。 */
+export async function resolveAllClassicAsk(
+	config: ConfigService,
+	userText: string,
+): Promise<boolean> {
+	if (isAllClassicCategory(userText)) return true;
+	const slot = await decide(config, {
+		task: ALL_CLASSIC_TASK,
+		input: userText,
+		parse: (raw) =>
+			raw && typeof raw === 'object' && !Array.isArray(raw)
+				? (raw as { scope: 'all_classic' })
+				: null,
+		accept: (_value, input) => acceptAllClassicCue(input, _value),
+	});
+	return slot?.scope === 'all_classic';
+}
+
+type LibrarySlot = {
+	scope: 'all_vocab' | 'one_vocab' | 'classic' | 'none';
+	libraryCue: string;
+};
+
+export type NamedLibrary =
+	| { kind: 'one'; lib: { id: string; title: string } }
+	| { kind: 'ambiguous'; candidates: { id: string; title: string }[] }
+	| { kind: 'none' };
+
+const LIBRARY_CUE_TASK =
+	'只返回 JSON {"scope":"all_vocab|one_vocab|classic|none","libraryCue":""}。' +
+	'点名一本库时 scope 为 one_vocab，libraryCue 必须是原话里连续的库名，不要编。' +
+	'没有点库名时 libraryCue 为空字符串。';
+
+/** 去掉结尾泛称。「小学三年级词汇库」才能对上标题「小学三年级」。 */
+function normalizeCue(cue: string): string {
+	return cue
+		.replace(/(词汇库|单词库|语句库|语料库|经典语句|词库)$/u, '')
+		.trim();
+}
+
+/** 「所有 / 全部 / 各个」和单独的「词汇库」不是库名，空线索才允许扫全部库。 */
+function usableCue(cue: string): string {
+	const trimmed = cue.trim();
+	const key = normalizeCue(trimmed);
+	if (key.length < 2) return '';
+	if (/^(所有|全部|各个)$/.test(key)) return '';
+	return trimmed;
+}
+
+/** 整段标题恰好一本时直接用标题，不再抽槽。 */
+export function cueFromExactTitle(
+	text: string,
+	libs: { id: string; title: string }[],
+): string {
+	const hits = matchLibraries(text, libs);
+	if (hits.length !== 1) return '';
+	return hits[0].title;
+}
+
+/**
+ * 整段标题优先。否则一次 decide，线索必须是原话连续子串。
+ * 泛称线索当成没抽到，避免「词汇库」挡住未点名的全库扫描。
+ */
+export async function resolveLibraryCue(
+	config: ConfigService,
+	text: string,
+	libs: { id: string; title: string }[],
+): Promise<string> {
+	const exact = cueFromExactTitle(text, libs);
+	if (exact) return exact;
+	const slot = await decide(config, {
+		task: LIBRARY_CUE_TASK,
+		input: text,
+		parse: (raw) => {
+			if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+			const body = raw as { scope?: unknown; libraryCue?: unknown };
+			const scope = body.scope;
+			if (
+				scope !== 'all_vocab' &&
+				scope !== 'one_vocab' &&
+				scope !== 'classic' &&
+				scope !== 'none'
+			) {
+				return null;
+			}
+			const libraryCue =
+				typeof body.libraryCue === 'string' ? body.libraryCue : '';
+			return { scope, libraryCue } satisfies LibrarySlot;
+		},
+		accept: (value, input) => {
+			const libraryCue = usableCue(value.libraryCue);
+			if (!libraryCue || !input.includes(libraryCue)) return null;
+			return { ...value, libraryCue };
+		},
+	});
+	return slot?.libraryCue ?? '';
+}
+
+const GENERIC_STEM = /^(词汇|单词|英语|词库|相关|分类)$/;
+
+/** 原话里「X词汇库」的 X，和各标题共有的最长一段。泛称如「词汇」不算。 */
+function stemInCatalog(span: string, libs: { title: string }[]): string {
+	let best = '';
+	for (const lib of libs) {
+		const title = lib.title.trim();
+		let shared = '';
+		for (let i = 0; i < span.length; i++) {
+			for (let j = i + 2; j <= span.length; j++) {
+				const slice = span.slice(i, j);
+				if (slice.length <= shared.length || !title.includes(slice)) continue;
+				shared = slice;
+			}
+		}
+		if (shared.length > best.length && !GENERIC_STEM.test(shared))
+			best = shared;
+	}
+	return best;
+}
+
+const VOCAB_LIBRARY_MARK = /词汇库|单词库|词库/;
+
+/**
+ * 原话点了「X + 库后缀」时先在目录里对，不再交给「所有」去扫全部库。
+ * 不传后缀时仍认词汇库。语句工具传入语句后缀。「所有词汇库」没有具体库名，返回 absent。
+ */
+export function resolveMentionedLibrary(
+	text: string,
+	libs: { id: string; title: string }[],
+	markSource: RegExp = VOCAB_LIBRARY_MARK,
+): NamedLibrary | { kind: 'absent' } {
+	const spans: string[] = [];
+	const mark = new RegExp(markSource.source, 'gu');
+	const tail = new RegExp(`(?:${markSource.source})$`, 'u');
+	for (const match of text.matchAll(mark)) {
+		const end = match.index ?? 0;
+		let start = end;
+		while (start > 0 && end - start < 32) {
+			const ch = text[start - 1] ?? '';
+			if (!/[A-Za-z0-9\u4e00-\u9fff]/u.test(ch)) break;
+			if (tail.test(text.slice(0, start))) break;
+			start -= 1;
+		}
+		const span = text.slice(start, end);
+		if (span.length < 2 || !usableCue(`${span}词库`)) continue;
+		spans.push(span);
+	}
+	if (!spans.length) return { kind: 'absent' };
+	const picked: { id: string; title: string }[] = [];
+	let missed = false;
+	for (const span of spans) {
+		const stem = stemInCatalog(span, libs);
+		if (!stem) {
+			missed = true;
+			continue;
+		}
+		const named = resolveNamedLibrary(stem, libs);
+		if (named.kind === 'one') picked.push(named.lib);
+		else if (named.kind === 'ambiguous') return named;
+		else missed = true;
+	}
+	const uniq: { id: string; title: string }[] = [];
+	for (const lib of picked) {
+		if (!uniq.some((row) => row.id === lib.id)) uniq.push(lib);
+	}
+	if (uniq.length === 1 && !missed) return { kind: 'one', lib: uniq[0] };
+	if (uniq.length > 0)
+		return { kind: 'ambiguous', candidates: uniq.slice(0, 10) };
+	return { kind: 'none' };
+}
+
+/** 双向包含后只接受严格更长的一本。等长或落空都不猜。 */
+export function resolveNamedLibrary(
+	cue: string,
+	libs: { id: string; title: string }[],
+): NamedLibrary {
+	const key = normalizeCue(cue);
+	if (key.length < 2) return { kind: 'none' };
+	const hits = libs.filter((lib) => {
+		const title = lib.title.trim();
+		return title.length > 0 && (title.includes(key) || key.includes(title));
+	});
+	if (hits.length === 0) return { kind: 'none' };
+	const ranked = [...hits].sort((a, b) => b.title.length - a.title.length);
+	const top = ranked[0];
+	const second = ranked[1];
+	if (!second || top.title.length > second.title.length) {
+		return { kind: 'one', lib: top };
+	}
+	return { kind: 'ambiguous', candidates: ranked.slice(0, 10) };
+}
 
 /** 库名整段出现在原话里才算命中。「英语系级」对不上「英语四级单词」。 */
 export function matchLibraries(
@@ -58,6 +439,91 @@ export function matchLibraries(
 	return libs.filter(
 		(lib) => lib.title.length > 0 && userText.includes(lib.title),
 	);
+}
+
+/** 上一句点中的那一本。多本命中则停，不往更早的句子猜。 */
+export function inheritedLibrary(
+	priorUserTexts: string[],
+	priorCards: { title: string }[],
+	catalog: { id: string; title: string }[],
+	mark?: RegExp,
+): { id: string; title: string } | null {
+	for (let i = priorUserTexts.length - 1; i >= 0; i -= 1) {
+		const text = priorUserTexts[i] ?? '';
+		if (!text.trim()) continue;
+		const exact = matchLibraries(text, catalog);
+		if (exact.length > 1) return null;
+		if (exact.length === 1) return exact[0];
+		const mentioned = resolveMentionedLibrary(text, catalog, mark);
+		if (mentioned.kind === 'ambiguous') return null;
+		if (mentioned.kind === 'one') return mentioned.lib;
+	}
+	const titles = [
+		...new Set(
+			priorCards
+				.map((card) => card.title.trim())
+				.filter((title) => title.length > 0),
+		),
+	];
+	if (titles.length !== 1) return null;
+	const title = titles[0];
+	const hits = catalog.filter((lib) => {
+		const name = lib.title.trim();
+		return name.length > 0 && (title === name || title.startsWith(`${name}（`));
+	});
+	if (!hits.length) return null;
+	const ranked = [...hits].sort((a, b) => b.title.length - a.title.length);
+	const top = ranked[0];
+	const second = ranked[1];
+	if (!second || top.title.length > second.title.length) return top;
+	return null;
+}
+
+/** 沿用时先看上一句点的是语句还是词汇。两种都有则不猜。 */
+export function inheritedKind(
+	priorUserTexts: string[],
+	cards: { contentKind?: 'vocab' | 'classic' }[],
+): 'vocab' | 'classic' | null {
+	for (let i = priorUserTexts.length - 1; i >= 0; i -= 1) {
+		const text = priorUserTexts[i] ?? '';
+		const classic = /语句库|语料库|经典语句/.test(text);
+		const vocab = /词汇库|单词库|词库/.test(text);
+		if (classic && vocab) return null;
+		if (classic) return 'classic';
+		if (vocab) return 'vocab';
+	}
+	const kinds = [
+		...new Set(
+			cards
+				.map((card) => card.contentKind)
+				.filter(
+					(kind): kind is 'vocab' | 'classic' =>
+						kind === 'vocab' || kind === 'classic',
+				),
+		),
+	];
+	return kinds.length === 1 ? kinds[0] : null;
+}
+
+/** 筛选句在模型停手后是否还要由服务端拉词。已出卡、非整句「关于」返回 null。当前句不是恰好一本时，沿用上一本。 */
+export function shouldFilterContinue(
+	userText: string,
+	catalog: { id: string; title: string }[],
+	presented: boolean,
+	prior?: {
+		userTexts: string[];
+		cards: { title: string }[];
+		mark?: RegExp;
+	},
+): { id: string; title: string } | null {
+	if (presented) return null;
+	if (isReadingGenerateAsk(userText) || isPackGenerateAsk(userText))
+		return null;
+	if (!isCategoryAsk(userText)) return null;
+	const hits = matchLibraries(userText, catalog);
+	if (hits.length === 1) return hits[0];
+	if (hits.length > 1 || !prior) return null;
+	return inheritedLibrary(prior.userTexts, prior.cards, catalog, prior.mark);
 }
 
 /**
@@ -360,6 +826,7 @@ export function inventoryFallback(
 	if (listIntent(userText) !== 'inventory') return [];
 	const byId = new Map<string, ElResourceListPayload>();
 	for (const row of libraryLists) {
+		if (row.fromPrior) continue;
 		const id = row.libraryId ?? row.artifactId;
 		if (shownIds.has(id)) continue;
 		byId.set(id, row);

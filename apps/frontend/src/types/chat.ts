@@ -90,6 +90,8 @@ export interface ElResourceBlock {
 		| 'other';
 	contentKind?: 'vocab' | 'classic';
 	libraryId?: string;
+	/** 为真时 items 已是分类命中，不能按 libraryId 再拉整库 */
+	filtered?: boolean;
 	totalCount: number;
 	truncated: boolean;
 	items?: unknown[];

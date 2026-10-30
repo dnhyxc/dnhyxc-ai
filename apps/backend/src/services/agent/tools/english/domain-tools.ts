@@ -1,7 +1,7 @@
 /**
  * 英语学习侧栏领域工具（el_*）：只调 Service，统一信封，提案写，noop 触发生成。
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DynamicTool } from '@langchain/core/tools';
 import type { LoggerService } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
@@ -13,6 +13,7 @@ import type { LearningNotesService } from '../../../learning-notes/learning-note
 import { applyElProposal } from './apply-proposal';
 import type { ElArtifactStore, ElResourceListPayload } from './artifact.store';
 import { buildCategoryProposal, classifyChunk } from './category-propose';
+import { favoriteIntentFrom, resolveEnglishIntent } from './english-intent';
 import {
 	asOp,
 	asString,
@@ -24,7 +25,11 @@ import {
 	parseElArgs,
 	stringifyEnvelope,
 } from './envelope';
-import { favoriteAsk, proposeFavoriteRows } from './favorite-ask';
+import {
+	favoriteAsk,
+	favoriteAsksBoth,
+	unfavoriteFromCards,
+} from './favorite-ask';
 import { fetchAllPages } from './fetch-all-pages';
 import { type PackSide, resolvePackAsk } from './pack-ask';
 import type { ElProposalStore } from './proposal.store';
@@ -36,8 +41,14 @@ import {
 import { resolveAgentManualAsk } from './reading-ask';
 import {
 	cardAlreadyShown,
+	categoryLabels,
 	type ElListSurface,
+	inheritedKind,
+	inheritedLibrary,
 	inventoryCardDecision,
+	isAllClassicCategory,
+	isAllVocabCategory,
+	isCategoryAsk,
 	isIndexOp,
 	isSearchOp,
 	listIntent,
@@ -45,6 +56,10 @@ import {
 	noteIdFromCardItems,
 	presentRows,
 	presentTooWide,
+	reclassifyAsked,
+	resolveLibraryCue,
+	resolveMentionedLibrary,
+	resolveNamedLibrary,
 	shownTitle,
 	slimPage,
 	slimRow,
@@ -93,6 +108,8 @@ export type BuildEnglishLearningDomainToolsDeps = {
 	/** 词库 list 的整库卡由服务端按库名挂上；筛选仍等 el_present */
 	surface: ElListSurface;
 	onMutation?: (domain: ElDomainMutation) => void;
+	/** 主模型这轮的停止信号。分类请求跟着它中止。 */
+	signal?: AbortSignal;
 };
 
 type Budgets = {
@@ -478,14 +495,525 @@ export function startConfirmedReading(
 	);
 }
 
+type LibraryLoad = {
+	items: Array<Record<string, unknown>>;
+	truncated: boolean;
+};
+
+/** 全库行，带 sortOrder，供版本哈希和分类共用同一字段。 */
+async function readLibraryRows(
+	learning: EnglishLearningService,
+	userId: number,
+	libId: string,
+	kind: 'vocab' | 'classic',
+): Promise<LibraryLoad> {
+	return fetchAllPages(
+		PAGE_LIB_ITEMS,
+		async (
+			limit,
+			offset,
+		): Promise<{ items: Record<string, unknown>[]; totalCount?: number }> => {
+			if (kind === 'classic') {
+				const page = await learning.listClassicQuotesLibraryItems(
+					userId,
+					libId,
+					{
+						limit,
+						offset,
+					},
+				);
+				return {
+					items: page.items.map((item) => ({
+						sortOrder: item.sortOrder,
+						english: item.english,
+						translationZh: item.translationZh,
+						source: item.source,
+						noteZh: item.noteZh,
+					})),
+					totalCount:
+						typeof page.library.quoteCount === 'number'
+							? page.library.quoteCount
+							: undefined,
+				};
+			}
+			const page = await learning.listVocabularyLibraryItems(userId, libId, {
+				limit,
+				offset,
+			});
+			return {
+				items: page.items.map((item) => ({
+					sortOrder: item.sortOrder,
+					word: item.word,
+					ipa: item.ipa,
+					pos: item.pos,
+					segmentation: item.segmentation,
+					translationZh: item.translationZh,
+					example: item.example,
+				})),
+				totalCount:
+					typeof page.library.wordCount === 'number'
+						? page.library.wordCount
+						: undefined,
+			};
+		},
+	);
+}
+
+/**
+ * 按类别名把唯一库筛成清单。
+ * libraryId 仍要留下：收藏和按库查找靠它。前端见到 filtered 才不会按整库重拉。
+ * 零命中返回 null。失败批没有词时返回带「有批未能判断」的空清单，调用方据此不写缓存。
+ */
+export async function filterLibraryFallback(
+	learning: EnglishLearningService,
+	config: ConfigService,
+	userId: number,
+	lib: { id: string; title: string },
+	userText: string,
+	logger: LoggerService,
+	kind: 'vocab' | 'classic',
+	signal?: AbortSignal,
+): Promise<Omit<ElResourceListPayload, 'artifactId'> | null> {
+	const all = await readLibraryRows(learning, userId, lib.id, kind);
+	if (!all.items.length) {
+		logger.warn?.(`[AgentService] 库「${lib.title}」没有可筛选的行`);
+		return null;
+	}
+	if (signal?.aborted) return null;
+	const built = await buildCategoryProposal(
+		all.items,
+		userText,
+		(chunk, text) => classifyChunk(config, chunk, text, signal),
+		signal,
+	);
+	if (signal?.aborted) return null;
+	if (!built.bodies.length) {
+		if (built.failedChunks > 0) {
+			return {
+				title: `${lib.title}（有批未能判断）`,
+				source: 'library',
+				contentKind: kind,
+				libraryId: lib.id,
+				filtered: true,
+				totalCount: 0,
+				truncated: true,
+				items: [],
+			};
+		}
+		logger.warn?.(`[AgentService] 库「${lib.title}」筛选没有命中行`);
+		return null;
+	}
+	const judgedShort = built.failedChunks > 0;
+	return {
+		title: judgedShort ? `${lib.title}（有批未能判断）` : lib.title,
+		source: 'library',
+		contentKind: kind,
+		libraryId: lib.id,
+		filtered: true,
+		totalCount: built.bodies.length,
+		truncated: judgedShort || all.truncated,
+		items: built.bodies,
+	};
+}
+
+/** 一行用来做版本和缓存键的原文。语句取 english，单词取 word。 */
+export function categoryLineKey(row: Record<string, unknown>): string {
+	const english = typeof row.english === 'string' ? row.english.trim() : '';
+	if (english) return english;
+	return typeof row.word === 'string' ? row.word.trim() : '';
+}
+
+/** 库内容版本。英文或顺序变了，旧的类别命中就不能再读。译文不进版本。 */
+export function revisionOf(rows: Array<Record<string, unknown>>): string {
+	const lines: string[] = [];
+	for (const row of rows) {
+		const order = typeof row.sortOrder === 'number' ? row.sortOrder : 0;
+		const en = categoryLineKey(row);
+		if (!en) continue;
+		lines.push(`${order}\t${en}`);
+	}
+	return createHash('sha256')
+		.update(lines.join('\n'))
+		.digest('hex')
+		.slice(0, 16);
+}
+
+/** 用记下的英文键找回当前行，译文用库里的新值。 */
+export function mapKeysToRows(
+	all: Array<Record<string, unknown>>,
+	keys: string[],
+): Record<string, unknown>[] {
+	const by = new Map<string, Record<string, unknown>>();
+	for (const row of all) {
+		const key = categoryLineKey(row).toLowerCase();
+		if (!key || by.has(key)) continue;
+		const { sortOrder: _order, ...display } = row;
+		by.set(key, display);
+	}
+	const items: Record<string, unknown>[] = [];
+	for (const raw of keys) {
+		const row = by.get(raw.trim().toLowerCase());
+		if (row) items.push(row);
+	}
+	return items;
+}
+
+function englishKeys(items: unknown[] | undefined): string[] {
+	const keys: string[] = [];
+	for (const item of items ?? []) {
+		if (!item || typeof item !== 'object') continue;
+		const key = categoryLineKey(item as Record<string, unknown>);
+		if (key) keys.push(key);
+	}
+	return keys;
+}
+
+function categoryMissTitle(title: string): boolean {
+	return title.includes('有批未能判断');
+}
+
+/**
+ * 同一库版本、同一类别只判一次。三个关于类入口都调它。
+ * 未命中才把类别名送给 filterLibraryFallback，不送整句原话。
+ */
+export async function classifyLibrary(input: {
+	learning: EnglishLearningService;
+	config: ConfigService;
+	userId: number;
+	lib: { id: string; title: string };
+	label: string;
+	logger: LoggerService;
+	kind: 'vocab' | 'classic';
+	signal?: AbortSignal;
+	artifacts: ElArtifactStore;
+	jobs: Map<string, Promise<Omit<ElResourceListPayload, 'artifactId'> | null>>;
+	skipCache: boolean;
+}): Promise<Omit<ElResourceListPayload, 'artifactId'> | null> {
+	const jobKey = `${input.kind}:${input.lib.id}:${input.label}`;
+	const existing = input.jobs.get(jobKey);
+	if (existing) return existing;
+	const job = runClassifyLibrary(input);
+	input.jobs.set(jobKey, job);
+	return job;
+}
+
+async function runClassifyLibrary(input: {
+	learning: EnglishLearningService;
+	config: ConfigService;
+	userId: number;
+	lib: { id: string; title: string };
+	label: string;
+	logger: LoggerService;
+	kind: 'vocab' | 'classic';
+	signal?: AbortSignal;
+	artifacts: ElArtifactStore;
+	skipCache: boolean;
+}): Promise<Omit<ElResourceListPayload, 'artifactId'> | null> {
+	const all = await readLibraryRows(
+		input.learning,
+		input.userId,
+		input.lib.id,
+		input.kind,
+	);
+	const revision = revisionOf(all.items);
+	// sem：按类别语义筛选，不点名某个类别的成员。换口径必须改这段，否则旧命中还会被读到。
+	const key = `el_cat:${input.kind}:${input.lib.id}:${input.label}:${revision}:sem`;
+	if (!input.skipCache) {
+		const saved = await input.artifacts.getCategoryKeys(key);
+		if (saved) {
+			const items = mapKeysToRows(all.items, saved);
+			return {
+				title: input.lib.title,
+				source: 'library',
+				contentKind: input.kind,
+				libraryId: input.lib.id,
+				filtered: true,
+				categoryLabels: [input.label],
+				totalCount: items.length,
+				truncated: false,
+				items,
+			};
+		}
+	}
+	const draft = await filterLibraryFallback(
+		input.learning,
+		input.config,
+		input.userId,
+		input.lib,
+		input.label,
+		input.logger,
+		input.kind,
+		input.signal,
+	);
+	if (draft && categoryMissTitle(draft.title)) return draft;
+	const keys = englishKeys(draft?.items);
+	await input.artifacts.setCategoryKeys(key, keys);
+	if (draft) return { ...draft, categoryLabels: [input.label] };
+	return {
+		title: input.lib.title,
+		source: 'library',
+		contentKind: input.kind,
+		libraryId: input.lib.id,
+		filtered: true,
+		categoryLabels: [input.label],
+		totalCount: 0,
+		truncated: false,
+		items: [],
+	};
+}
+
+/** 筛选卡的固定正文。n 取行数。没有筛选卡时返回 null，整库说明保持原样。 */
+export function categoryReply(cards: ElResourceListPayload[]): string | null {
+	const filtered = cards.filter(
+		(card) => card.filtered && (card.categoryLabels?.length ?? 0) > 0,
+	);
+	if (!filtered.length) return null;
+	const lines: string[] = [];
+	for (const card of filtered) {
+		const n = card.items?.length ?? 0;
+		const line =
+			n > 0 ? `${card.title}：共 ${n} 条。` : `${card.title}：没有可展示的行。`;
+		lines.push(line);
+	}
+	return lines.join('\n');
+}
+
+/** 跳过纯收藏句，取最近一条带类别的用户原话。当前这句「将这些进行收藏」不能拿来筛整库。 */
+export function quoteCategoryText(userTexts: string[]): string {
+	const cue = /关于|相关|有关|属于|问候|打招呼/;
+	for (let i = userTexts.length - 1; i >= 0; i -= 1) {
+		const text = userTexts[i]?.trim() ?? '';
+		if (!text) continue;
+		if (favoriteAsk(text) && !cue.test(text)) continue;
+		if (cue.test(text)) return text;
+	}
+	return '';
+}
+
+/**
+ * 收藏「这些」时，连续几轮分类各自的语句卡都要。
+ * 从近到远，直到碰到不是分类的用户原话。不是收藏时只留最近一条助手消息。
+ * 取消收藏不是新话题，收藏时一律跨过。
+ * bridgeFavorites：再往前跳过「进行收藏」，避免把更早的分类卡挡在外面。
+ * 返回的是助手消息下标，旧的在前。
+ */
+export function quoteThreadAssistantIndexes(
+	messages: { role: string; id?: string; content?: string }[],
+	currentAssistantId: string | undefined,
+	saving: boolean,
+	bridgeFavorites = false,
+): number[] {
+	const indexes: number[] = [];
+	let seenUser = false;
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const row = messages[i];
+		if (row.role === 'user') {
+			if (!saving) continue;
+			if (!seenUser) {
+				seenUser = true;
+				continue;
+			}
+			if (!isCategoryAsk(row.content ?? '')) {
+				if (unfavoriteFromCards(row.content ?? '')) continue;
+				if (bridgeFavorites && favoriteAsk(row.content ?? '')) continue;
+				break;
+			}
+			continue;
+		}
+		if (row.role !== 'assistant') continue;
+		if (currentAssistantId && row.id === currentAssistantId) continue;
+		if (saving && !seenUser) continue;
+		indexes.push(i);
+		if (!saving) break;
+	}
+	return indexes.reverse();
+}
+
+/** 本轮和上一轮可合并的语句卡。没有句子的快照不参与。 */
+export function classicCards(
+	lists: ElResourceListPayload[],
+): ElResourceListPayload[] {
+	return lists.filter(
+		(row) => row.contentKind === 'classic' && (row.items?.length ?? 0) > 0,
+	);
+}
+
+/** 无分类标记且行数等于库内总数时，这是整库，不能直接收藏。 */
+export function quoteCardIsFull(
+	card: ElResourceListPayload,
+	quoteCount: number | null,
+): boolean {
+	if (card.filtered) return false;
+	if (!card.libraryId || quoteCount == null || quoteCount < 0) return false;
+	return (card.items?.length ?? 0) === quoteCount;
+}
+
+/** 两本库里的同一句只留一次。 */
+export function dedupeEnglish(
+	rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+	const seen = new Set<string>();
+	const items: Record<string, unknown>[] = [];
+	for (const row of rows) {
+		const english = typeof row.english === 'string' ? row.english.trim() : '';
+		const key = english.toLowerCase();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		items.push(row);
+	}
+	return items;
+}
+
+export function dedupeWord(
+	rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+	const seen = new Set<string>();
+	const items: Record<string, unknown>[] = [];
+	for (const row of rows) {
+		const word =
+			typeof row.word === 'string' ? row.word.trim().toLowerCase() : '';
+		if (!word || seen.has(word)) continue;
+		seen.add(word);
+		items.push(row);
+	}
+	return items;
+}
+
+function rowItems(items: unknown[] | undefined): Record<string, unknown>[] {
+	return (items ?? []).filter(
+		(row): row is Record<string, unknown> =>
+			!!row && typeof row === 'object' && !Array.isArray(row),
+	);
+}
+
+/** 只认恰好这一类的卡。多类合并卡不能当成其中一类，否则家庭会带出问候。 */
+function cachedLabelItems(
+	cards: ElResourceListPayload[],
+	libraryId: string,
+	label: string,
+	kind: 'vocab' | 'classic',
+): Record<string, unknown>[] | null {
+	for (let i = cards.length - 1; i >= 0; i -= 1) {
+		const card = cards[i];
+		if (card.libraryId !== libraryId || card.contentKind !== kind) continue;
+		if (!card.filtered) continue;
+		const names = card.categoryLabels ?? [];
+		if (names.length !== 1 || names[0] !== label) continue;
+		const items = rowItems(card.items);
+		if (!items.length) continue;
+		return items;
+	}
+	return null;
+}
+
+/** 类别集合相同才复用整张合并卡。 */
+function cachedLabelSet(
+	cards: ElResourceListPayload[],
+	libraryId: string,
+	labels: string[],
+	kind: 'vocab' | 'classic',
+): Record<string, unknown>[] | null {
+	const want = [...labels].sort().join('\n');
+	for (let i = cards.length - 1; i >= 0; i -= 1) {
+		const card = cards[i];
+		if (card.libraryId !== libraryId || card.contentKind !== kind) continue;
+		if (!card.filtered) continue;
+		const got = [...(card.categoryLabels ?? [])].sort().join('\n');
+		if (got !== want) continue;
+		const items = rowItems(card.items);
+		if (!items.length) continue;
+		return items;
+	}
+	return null;
+}
+
+function quoteRows(items: unknown[]): Record<string, unknown>[] {
+	return items.filter(
+		(row): row is Record<string, unknown> =>
+			!!row && typeof row === 'object' && !Array.isArray(row),
+	);
+}
+
+/**
+ * 分类卡整卡进入。整库卡只用类别原文筛选；没有类别原文则跳过，避免收进整库。
+ */
+export async function rowsFromQuoteCards(
+	learning: EnglishLearningService,
+	config: ConfigService,
+	userId: number,
+	cards: ElResourceListPayload[],
+	categoryText: string,
+	signal?: AbortSignal,
+): Promise<Record<string, unknown>[]> {
+	const rows: Record<string, unknown>[] = [];
+	const counts = new Map<string, number | null>();
+	for (const card of cards) {
+		const items = quoteRows(card.items ?? []);
+		if (!items.length) continue;
+		let quoteCount: number | null = null;
+		if (!card.filtered && card.libraryId) {
+			const cached = counts.get(card.libraryId);
+			if (cached !== undefined) {
+				quoteCount = cached;
+			} else {
+				try {
+					const page = await learning.listClassicQuotesLibraryItems(
+						userId,
+						card.libraryId,
+						{ limit: 1, offset: 0 },
+					);
+					quoteCount =
+						typeof page.library.quoteCount === 'number'
+							? page.library.quoteCount
+							: null;
+				} catch {
+					quoteCount = null;
+				}
+				counts.set(card.libraryId, quoteCount);
+			}
+		}
+		if (!quoteCardIsFull(card, quoteCount)) {
+			rows.push(...items);
+			continue;
+		}
+		if (!categoryText) continue;
+		const built = await buildCategoryProposal(
+			items,
+			categoryText,
+			(chunk, text) => classifyChunk(config, chunk, text, signal),
+			signal,
+		);
+		rows.push(...built.bodies);
+	}
+	return rows;
+}
+
 export function buildEnglishLearningDomainTools(
 	deps: BuildEnglishLearningDomainToolsDeps,
 ): DynamicTool[] {
 	const budgets: Budgets = { elWrites: 0, openProposalId: null, lastSig: '' };
+	const intent = resolveEnglishIntent(deps.surface.userText, {
+		priorUserTexts: deps.surface.priorUserTexts,
+		priorLibraryCards: deps.surface.priorLibraryCards,
+		openProposalKind: deps.surface.openProposalId ?? null,
+	});
+	deps.surface.intent = intent;
+	const favoriteIntent = favoriteIntentFrom(intent);
+	deps.surface.favoriteIntent = favoriteIntent;
 	const favorite = favoriteAsk(deps.surface.userText);
+	const bothAsk = favoriteAsksBoth(deps.surface.userText);
 	const occupy = (id: string) => {
 		budgets.openProposalId = id;
 		deps.surface.openProposalId = id;
+	};
+	const rememberQuoteCard = (payload: ElResourceListPayload) => {
+		if (payload.contentKind !== 'classic' || !payload.items?.length) return;
+		deps.surface.libraryLists.push(payload);
+	};
+	const rememberVocabCard = (payload: ElResourceListPayload) => {
+		if (!bothAsk || payload.contentKind !== 'vocab' || !payload.items?.length)
+			return;
+		deps.surface.vocabLists.push(payload);
 	};
 	const loadCatalog = async (kind: 'vocab' | 'classic') => {
 		if (deps.surface.catalogKind === kind && deps.surface.catalog.length > 0) {
@@ -613,7 +1141,9 @@ export function buildEnglishLearningDomainTools(
 							);
 							if (decision === 'hang') {
 								deps.surface.shownLibraryIds.add(libraryId);
-								deps.surface.presented = true;
+								if ((spilled.full.items?.length ?? 0) > 0) {
+									deps.surface.presented = true;
+								}
 								deps.surface.libraryLists.push(spilled.full);
 								deps.onResourceList?.(spilled.full);
 							} else if (decision === 'skip-shown') {
@@ -632,7 +1162,9 @@ export function buildEnglishLearningDomainTools(
 						}
 						if (inventory) {
 							deps.surface.libraryLists.push(spilled.full);
-							deps.surface.presented = true;
+							if ((spilled.full.items?.length ?? 0) > 0) {
+								deps.surface.presented = true;
+							}
 							deps.surface.shownLibraryIds.add(
 								spilled.full.libraryId ?? spilled.full.artifactId,
 							);
@@ -826,6 +1358,80 @@ export function buildEnglishLearningDomainTools(
 			const kind = kindOf(args);
 			const limit = clampLimit(args.limit, 10);
 			const libraryId = asString(args.libraryId)?.trim();
+
+			if (
+				libraryId &&
+				deps.surface.intent?.kind === 'category_filter' &&
+				!deps.surface.presented &&
+				(op === 'list' || op === 'search')
+			) {
+				const known = deps.surface.catalog.find((row) => row.id === libraryId);
+				const filterKind =
+					kind === 'classic' || deps.surface.catalogKind === 'classic'
+						? 'classic'
+						: 'vocab';
+				const labels = categoryLabels(deps.surface.userText);
+				if (labels.length) {
+					const listed = await presentByLabels(
+						filterKind,
+						[{ id: libraryId, title: known?.title ?? libraryId }],
+						labels,
+					);
+					return elOk(
+						{ libraryId, totalCount: listed.items.length },
+						{
+							message: listed.items.length
+								? '卡片已列出。禁止再 search 或 el_present。filter_shown'
+								: listed.failed
+									? '有批未能判断。禁止再 search。filter_shown'
+									: '没有可展示的行。禁止再 search。filter_shown',
+						},
+					);
+				}
+				const jobKey = `${filterKind}:${libraryId}`;
+				let job = deps.surface.categoryJobs.get(jobKey);
+				const owner = !job;
+				if (!job) {
+					job = filterLibraryFallback(
+						deps.learning,
+						deps.config,
+						deps.userId,
+						{ id: libraryId, title: known?.title ?? libraryId },
+						deps.surface.userText,
+						deps.logger,
+						filterKind,
+					);
+					deps.surface.categoryJobs.set(jobKey, job);
+				}
+				const draft = await job;
+				if (!owner) {
+					return elOk(
+						{ libraryId, alreadyShown: true },
+						{
+							message: '卡片已列出。禁止再 search 或 el_present。filter_shown',
+						},
+					);
+				}
+				if (!draft) {
+					return elOk(
+						{ libraryId, matched: 0 },
+						{ message: '没有可展示的行。禁止再 search。filter_shown' },
+					);
+				}
+				const artifactId = await deps.artifacts.put(deps.userId, draft);
+				const payload = { ...draft, artifactId };
+				deps.surface.presented = true;
+				deps.surface.shownLibraryIds.add(libraryId);
+				rememberQuoteCard(payload);
+				rememberVocabCard(payload);
+				deps.onResourceList?.(payload);
+				return elOk(
+					{ artifactId, totalCount: payload.totalCount },
+					{
+						message: '卡片已列出。禁止再 search 或 el_present。filter_shown',
+					},
+				);
+			}
 
 			if (op === 'list') {
 				if (!libraryId) return elFail('bad_args', 'list 需要 libraryId');
@@ -1194,65 +1800,16 @@ export function buildEnglishLearningDomainTools(
 				items: fit.items,
 			};
 			const cardId = await deps.artifacts.put(deps.userId, cardBase);
+			const shownCard = { ...cardBase, artifactId: cardId };
 			deps.surface.presented = true;
-			deps.onPresented?.({ ...cardBase, artifactId: cardId });
+			rememberQuoteCard(shownCard);
+			rememberVocabCard(shownCard);
+			deps.onPresented?.(shownCard);
 			const counted = liveLibrary
 				? `卡片已列出全部 ${artifact.totalCount} 条。不要写已列出若干条、未穷尽或展示上限。`
 				: fullCard
 					? `卡片已列出全部 ${shown} 条。禁止写尚未展示、前若干条或还有剩余。`
 					: `卡片已列出 ${shown} / 共 ${total} 条。按这个条数说明，不要改成上下文页大小。`;
-			const cardKind = artifact.contentKind;
-			const wantKind = favorite?.kind === 'card' ? cardKind : favorite?.kind;
-			if (
-				favorite &&
-				(cardKind === 'vocab' || cardKind === 'classic') &&
-				wantKind === cardKind &&
-				fit.items.length > 0 &&
-				fit.items.length <= 40 &&
-				!budgets.openProposalId
-			) {
-				const rows = fit.items.filter(
-					(row): row is Record<string, unknown> =>
-						!!row && typeof row === 'object' && !Array.isArray(row),
-				);
-				const proposed = await proposeFavoriteRows(
-					deps.learning,
-					deps.proposals,
-					deps.userId,
-					cardKind,
-					rows,
-				);
-				const proposalId =
-					proposed.data &&
-					typeof proposed.data === 'object' &&
-					'proposalId' in proposed.data &&
-					typeof (proposed.data as { proposalId?: unknown }).proposalId ===
-						'string'
-						? (proposed.data as { proposalId: string }).proposalId
-						: '';
-				if (proposed.ui && proposalId) {
-					occupy(proposalId);
-					return elOk(proposed.data, {
-						message: `${counted}${proposed.message ?? ''}`,
-						ui: proposed.ui,
-					});
-				}
-				if (proposed.message && !proposed.ui) {
-					return elOk(
-						{
-							matched: shown,
-							dropped,
-							total: artifact.items.length,
-							truncated: cardBase.truncated,
-						},
-						{
-							message: dropped.length
-								? `${counted}已忽略不在该清单中的词：${dropped.slice(0, 20).join('、')}${proposed.message}`
-								: `${counted}${proposed.message}`,
-						},
-					);
-				}
-			}
 			return elOk(
 				{
 					matched: shown,
@@ -1562,6 +2119,85 @@ export function buildEnglishLearningDomainTools(
 		else kind = inferred;
 		const artifactId = asString(args.artifactId)?.trim();
 		const userText = deps.surface.userText.trim();
+		if (
+			which === 'favorites' &&
+			deps.surface.favoriteIntent?.action === 'add' &&
+			!/[A-Za-z]{2,}/.test(userText)
+		) {
+			return elOk(
+				{ deferred: true },
+				{
+					message:
+						'确认条按上面的卡片在本轮结束时挂上。不要再 propose_add，不要列举原话里没有的句子，也不要说已经发起收藏。',
+				},
+			);
+		}
+		const labels = categoryLabels(userText);
+		if (which === 'favorites' && labels.length) {
+			let labelKind: 'vocab' | 'classic' | null =
+				favorite?.kind === 'vocab'
+					? 'vocab'
+					: favorite?.kind === 'classic'
+						? 'classic'
+						: null;
+			if (!labelKind) {
+				const fromHistory = new Set(
+					deps.surface.labeledCards
+						.map((card) => card.contentKind)
+						.filter(
+							(item): item is 'vocab' | 'classic' =>
+								item === 'vocab' || item === 'classic',
+						),
+				);
+				const inherited = inheritedKind(
+					deps.surface.priorUserTexts,
+					deps.surface.priorLibraryCards,
+				);
+				if (
+					inherited &&
+					(fromHistory.size === 0 || fromHistory.has(inherited))
+				) {
+					labelKind = inherited;
+				} else if (fromHistory.size === 1) {
+					labelKind = [...fromHistory][0];
+				}
+			}
+			if (!labelKind) {
+				return elFail('ambiguous', '没有唯一库。请让用户选定库名');
+			}
+			const picked = await pickLibraries(labelKind);
+			if (!Array.isArray(picked)) return picked;
+			const listed = await presentByLabels(labelKind, picked, labels);
+			const items = listed.items;
+			if (!items.length) {
+				return elFail(
+					'not_found',
+					labelKind === 'vocab' ? '没有可收藏的词' : '没有可收藏的语句',
+				);
+			}
+			const proposalId = await deps.proposals.put(deps.userId, {
+				kind: 'favorite_add',
+				contentKind: labelKind,
+				body: items[0] ?? {},
+				items,
+			});
+			occupy(proposalId);
+			const n = items.length;
+			const unit = labelKind === 'vocab' ? '个词' : '条语句';
+			return elOk(
+				{ proposalId, count: n },
+				{
+					message: '请用户确认后再写入',
+					ui: [
+						{
+							type: 'confirm_proposal',
+							proposalId,
+							label: `确认收藏 ${n} ${unit}`,
+						},
+					],
+				},
+			);
+		}
 		let full: ElResourceListPayload | null = null;
 		if (artifactId && kind === 'vocab') {
 			if (!userText) return elFail('bad_args', '整类筛选需要用户原话');
@@ -1640,6 +2276,44 @@ export function buildEnglishLearningDomainTools(
 					ui: [{ type: 'confirm_proposal', proposalId, label }],
 				},
 			);
+		}
+		const quoteAsk =
+			which === 'favorites' &&
+			(favorite?.kind === 'card' || favorite?.kind === 'classic');
+		if (quoteAsk) {
+			const cards = classicCards(deps.surface.libraryLists);
+			const rows = await rowsFromQuoteCards(
+				deps.learning,
+				deps.config,
+				deps.userId,
+				cards,
+				deps.surface.quoteCategoryText ?? '',
+				deps.signal,
+			);
+			const items = dedupeEnglish(rows);
+			if (items.length > 0) {
+				const proposalId = await deps.proposals.put(deps.userId, {
+					kind: 'favorite_add',
+					contentKind: 'classic',
+					body: items[0] ?? {},
+					items,
+				});
+				occupy(proposalId);
+				const n = items.length;
+				return elOk(
+					{ proposalId, count: n },
+					{
+						message: '请用户确认后再写入',
+						ui: [
+							{
+								type: 'confirm_proposal',
+								proposalId,
+								label: `确认收藏 ${n} 条语句`,
+							},
+						],
+					},
+				);
+			}
 		}
 		const built = collectProposeBodies(kind, args);
 		if (!built.ok) return built.env;
@@ -1728,7 +2402,7 @@ export function buildEnglishLearningDomainTools(
 
 	const favorites = wrap(
 		'el_favorites',
-		'收藏：list/search/propose_add/propose_remove/commit。list 返回全部瘦索引且不出整表卡；search 也不出卡，要看再 el_present。可选 q 滤词面或释义。点名几个词一次 propose_add，items 为对象数组（word 或 english），禁止逐词调用。语句收藏必须带 english，不要只传 word。整类（某一类全部收藏）先 list，再 propose_add 只传 artifactId，不要传 items，不要翻 nextOffset 凑词。多个词一次 propose_remove，传 ids（收藏记录 id）或 words（词面），禁止逐条调用。add 与 propose_add 相同，必须等用户点确认后才写入。本轮不要 commit。入参 JSON 含 op、kind。',
+		'收藏：list/search/propose_add/propose_remove/commit。list 返回全部瘦索引且不出整表卡；search 也不出卡，要看再 el_present。可选 q 滤词面或释义。点名几个词一次 propose_add，items 为对象数组（word 或 english），禁止逐词调用。语句收藏必须带 english，不要只传 word。整类（某一类全部收藏）先 list，再 propose_add 只传 artifactId，不要传 items，不要翻 nextOffset 凑词。语句整类不要传少量 items 再许诺确认后继续；有语句卡时一次提案即可。多个词一次 propose_remove，传 ids（收藏记录 id）或 words（词面），禁止逐条调用。add 与 propose_add 相同，必须等用户点确认后才写入。本轮不要 commit。入参 JSON 含 op、kind。',
 		async (args) => {
 			const op = asOp(args.op);
 			const kind = kindOf(args);
@@ -1836,6 +2510,18 @@ export function buildEnglishLearningDomainTools(
 			}
 
 			if (op === 'propose_remove') {
+				if (
+					deps.surface.favoriteIntent?.action === 'remove' ||
+					unfavoriteFromCards(deps.surface.userText)
+				) {
+					return elOk(
+						{ deferred: true },
+						{
+							message:
+								'确认条按上一次收藏挂上。不要再 propose_remove，也不要告诉用户已经取消。',
+						},
+					);
+				}
 				if (budgets.openProposalId) {
 					return elFail('stop_tools', '本轮已有待确认提案，停止工具调用', {
 						proposalId: budgets.openProposalId,
@@ -2484,7 +3170,357 @@ export function buildEnglishLearningDomainTools(
 		},
 	);
 
+	const pickLibraries = async (
+		kind: 'vocab' | 'classic',
+	): Promise<ElEnvelope | { id: string; title: string }[]> => {
+		const text = deps.surface.userText;
+		const noun = kind === 'classic' ? '语句' : '词汇';
+		if (deps.surface.intent?.kind !== 'category_filter') {
+			return elFail('not_found', `这句不是${noun}分类`);
+		}
+		const libs = await loadCatalog(kind);
+		const mark = kind === 'classic' ? /语句库|语料库|经典语句/ : undefined;
+		const exact = matchLibraries(text, libs);
+		if (exact.length === 1) return exact;
+		const mentioned = resolveMentionedLibrary(text, libs, mark);
+		if (mentioned.kind === 'one') return [mentioned.lib];
+		if (mentioned.kind === 'ambiguous' || mentioned.kind === 'none') {
+			return elFail('ambiguous', `没有唯一${noun}库。请让用户选定库名`, {
+				candidates:
+					mentioned.kind === 'ambiguous'
+						? mentioned.candidates
+						: libs.slice(0, 10),
+			});
+		}
+		const cue = await resolveLibraryCue(deps.config, text, libs);
+		const named = cue ? resolveNamedLibrary(cue, libs) : null;
+		if (named?.kind === 'one') return [named.lib];
+		if (named?.kind === 'ambiguous') {
+			return elFail('ambiguous', `没有唯一${noun}库。请让用户选定库名`, {
+				candidates: named.candidates,
+			});
+		}
+		const all =
+			kind === 'classic'
+				? isAllClassicCategory(text)
+				: isAllVocabCategory(text);
+		if (all) return libs;
+		const inherited = inheritedLibrary(
+			deps.surface.priorUserTexts,
+			deps.surface.priorLibraryCards.filter(
+				(card) => card.contentKind === kind,
+			),
+			libs,
+			mark,
+		);
+		if (!inherited) {
+			return elFail('ambiguous', `没有唯一${noun}库。请让用户选定库名`);
+		}
+		return [inherited];
+	};
+
+	const presentByLabels = async (
+		kind: 'vocab' | 'classic',
+		targets: { id: string; title: string }[],
+		labels: string[],
+	): Promise<{
+		items: Record<string, unknown>[];
+		titles: string[];
+		failed: boolean;
+	}> => {
+		const skipCache = reclassifyAsked(deps.surface.userText);
+		const mergedAll: Record<string, unknown>[] = [];
+		const titles: string[] = [];
+		let failed = false;
+		for (const lib of targets) {
+			if (deps.signal?.aborted) break;
+			let rows: Record<string, unknown>[] | null = null;
+			let used = labels.slice();
+			let truncated = false;
+			let libFailed = false;
+			let failDraft: Omit<ElResourceListPayload, 'artifactId'> | null = null;
+			if (!skipCache) {
+				rows = cachedLabelSet(deps.surface.labeledCards, lib.id, labels, kind);
+			}
+			if (!rows) {
+				const parts: Record<string, unknown>[] = [];
+				used = [];
+				for (const label of labels) {
+					let hit = skipCache
+						? null
+						: cachedLabelItems(deps.surface.labeledCards, lib.id, label, kind);
+					if (!hit) {
+						const draft = await classifyLibrary({
+							learning: deps.learning,
+							config: deps.config,
+							userId: deps.userId,
+							lib,
+							label,
+							logger: deps.logger,
+							kind,
+							signal: deps.signal,
+							artifacts: deps.artifacts,
+							jobs: deps.surface.categoryJobs,
+							skipCache,
+						}).catch(() => null);
+						if (!draft?.items?.length) {
+							if (draft && categoryMissTitle(draft.title)) {
+								libFailed = true;
+								failDraft = draft;
+							}
+							continue;
+						}
+						hit = rowItems(draft.items);
+						truncated = truncated || Boolean(draft.truncated);
+						const slice: Omit<ElResourceListPayload, 'artifactId'> = {
+							title: lib.title,
+							source: 'library',
+							contentKind: kind,
+							libraryId: lib.id,
+							filtered: true,
+							categoryLabels: [label],
+							totalCount: hit.length,
+							truncated: Boolean(draft.truncated),
+							items: hit,
+						};
+						const artifactId = await deps.artifacts.put(deps.userId, slice);
+						deps.surface.labeledCards.push({ ...slice, artifactId });
+					}
+					if (!hit.length) continue;
+					parts.push(...hit);
+					used.push(label);
+				}
+				rows = kind === 'classic' ? dedupeEnglish(parts) : dedupeWord(parts);
+			}
+			if (!rows.length || !used.length) {
+				if (libFailed && failDraft) {
+					failed = true;
+					const showKey = `${kind}:${lib.id}:fail`;
+					if (!deps.surface.shownLibraryIds.has(showKey)) {
+						const artifactId = await deps.artifacts.put(deps.userId, failDraft);
+						const payload = { ...failDraft, artifactId };
+						deps.surface.presented = true;
+						deps.surface.shownLibraryIds.add(showKey);
+						deps.surface.shownLibraryIds.add(lib.id);
+						if (deps.onPresented) deps.onPresented(payload);
+						else deps.onResourceList?.(payload);
+					}
+					continue;
+				}
+				if (!libFailed) {
+					const showKey = `${kind}:${lib.id}:${[...labels].sort().join('\n')}`;
+					if (!deps.surface.shownLibraryIds.has(showKey)) {
+						const empty: Omit<ElResourceListPayload, 'artifactId'> = {
+							title: lib.title,
+							source: 'library',
+							contentKind: kind,
+							libraryId: lib.id,
+							filtered: true,
+							categoryLabels: labels,
+							totalCount: 0,
+							truncated: false,
+							items: [],
+						};
+						const artifactId = await deps.artifacts.put(deps.userId, empty);
+						const payload = { ...empty, artifactId };
+						deps.surface.labeledCards.push(payload);
+						deps.surface.presented = true;
+						deps.surface.shownLibraryIds.add(showKey);
+						deps.surface.shownLibraryIds.add(lib.id);
+						if (kind === 'classic') rememberQuoteCard(payload);
+						rememberVocabCard(payload);
+						if (deps.onPresented) deps.onPresented(payload);
+						else deps.onResourceList?.(payload);
+					}
+				} else {
+					failed = true;
+				}
+				continue;
+			}
+			titles.push(lib.title);
+			mergedAll.push(...rows);
+			const showKey = `${kind}:${lib.id}:${[...used].sort().join('\n')}`;
+			if (deps.surface.shownLibraryIds.has(showKey)) continue;
+			if (libFailed) failed = true;
+			const draft: Omit<ElResourceListPayload, 'artifactId'> = {
+				title: libFailed ? `${lib.title}（有批未能判断）` : lib.title,
+				source: 'library',
+				contentKind: kind,
+				libraryId: lib.id,
+				filtered: true,
+				...(libFailed ? {} : { categoryLabels: used }),
+				totalCount: rows.length,
+				truncated: truncated || libFailed,
+				items: rows,
+			};
+			const artifactId = await deps.artifacts.put(deps.userId, draft);
+			const payload = { ...draft, artifactId };
+			deps.surface.labeledCards.push(payload);
+			deps.surface.presented = true;
+			deps.surface.shownLibraryIds.add(showKey);
+			deps.surface.shownLibraryIds.add(lib.id);
+			if (kind === 'classic') rememberQuoteCard(payload);
+			rememberVocabCard(payload);
+			if (deps.onPresented) deps.onPresented(payload);
+			else deps.onResourceList?.(payload);
+		}
+		const items =
+			kind === 'classic' ? dedupeEnglish(mergedAll) : dedupeWord(mergedAll);
+		return { items, titles, failed };
+	};
+
+	const vocabClassify = wrap(
+		'el_vocab_classify',
+		'从词汇库按用户原话的类别分类并列出。用户要分类、筛选或列出某一类单词时调用。参数为 {}。不要传 libraryId。',
+		async () => {
+			if (deps.signal?.aborted) {
+				return elFail('unavailable', '已停止');
+			}
+			const text = deps.surface.userText;
+			const picked = await pickLibraries('vocab');
+			if (!Array.isArray(picked)) return picked;
+			const targets = picked;
+			const labels = categoryLabels(text);
+			if (labels.length) {
+				const listed = await presentByLabels('vocab', targets, labels);
+				if (!listed.items.length) {
+					return elOk(
+						{ titles: [], count: 0 },
+						{
+							message: listed.failed
+								? '有批未能判断。禁止再分类。'
+								: '没有可展示的行。禁止再分类。',
+						},
+					);
+				}
+				return elOk(
+					{ titles: listed.titles, count: listed.items.length },
+					{ message: '卡片已列出。禁止逐条复述。' },
+				);
+			}
+			const titles: string[] = [];
+			let count = 0;
+			for (const lib of targets) {
+				if (deps.signal?.aborted) break;
+				const jobKey = `vocab:${lib.id}`;
+				let job = deps.surface.categoryJobs.get(jobKey);
+				const owner = !job;
+				if (!job) {
+					job = filterLibraryFallback(
+						deps.learning,
+						deps.config,
+						deps.userId,
+						lib,
+						text,
+						deps.logger,
+						'vocab',
+						deps.signal,
+					);
+					deps.surface.categoryJobs.set(jobKey, job);
+				}
+				const draft = await job.catch(() => null);
+				if (!draft) continue;
+				if (owner) {
+					const artifactId = await deps.artifacts.put(deps.userId, draft);
+					const payload = { ...draft, artifactId };
+					deps.surface.presented = true;
+					deps.surface.shownLibraryIds.add(artifactId);
+					deps.surface.shownLibraryIds.add(lib.id);
+					// 锚点插在模型接着写的正文之前，卡片画在开头。无锚点的卡一律落在正文后面。
+					if (deps.onPresented) deps.onPresented(payload);
+					else deps.onResourceList?.(payload);
+				}
+				titles.push(draft.title);
+				count += draft.totalCount;
+			}
+			if (!titles.length) {
+				return elOk(
+					{ titles, count },
+					{ message: '没有可展示的行。禁止再分类。' },
+				);
+			}
+			return elOk({ titles, count }, { message: '卡片已列出。禁止逐条复述。' });
+		},
+	);
+
+	const classicClassify = wrap(
+		'el_classic_classify',
+		'从语句库按用户原话的类别分类并列出。用户要分类、筛选或列出某一类语句时调用。参数为 {}。不要传 libraryId。',
+		async () => {
+			if (deps.signal?.aborted) {
+				return elFail('unavailable', '已停止');
+			}
+			const text = deps.surface.userText;
+			const picked = await pickLibraries('classic');
+			if (!Array.isArray(picked)) return picked;
+			const targets = picked;
+			const labels = categoryLabels(text);
+			if (labels.length) {
+				const listed = await presentByLabels('classic', targets, labels);
+				if (!listed.items.length) {
+					return elOk(
+						{ titles: [], count: 0 },
+						{
+							message: listed.failed
+								? '有批未能判断。禁止再分类。'
+								: '没有可展示的行。禁止再分类。',
+						},
+					);
+				}
+				return elOk(
+					{ titles: listed.titles, count: listed.items.length },
+					{ message: '卡片已列出。禁止逐条复述。' },
+				);
+			}
+			const titles: string[] = [];
+			let count = 0;
+			for (const lib of targets) {
+				if (deps.signal?.aborted) break;
+				const jobKey = `classic:${lib.id}`;
+				let job = deps.surface.categoryJobs.get(jobKey);
+				const owner = !job;
+				if (!job) {
+					job = filterLibraryFallback(
+						deps.learning,
+						deps.config,
+						deps.userId,
+						lib,
+						text,
+						deps.logger,
+						'classic',
+						deps.signal,
+					);
+					deps.surface.categoryJobs.set(jobKey, job);
+				}
+				const draft = await job.catch(() => null);
+				if (!draft) continue;
+				if (owner) {
+					const artifactId = await deps.artifacts.put(deps.userId, draft);
+					const payload = { ...draft, artifactId };
+					deps.surface.presented = true;
+					deps.surface.shownLibraryIds.add(artifactId);
+					deps.surface.shownLibraryIds.add(lib.id);
+					rememberQuoteCard(payload);
+					rememberVocabCard(payload);
+					if (deps.onPresented) deps.onPresented(payload);
+					else deps.onResourceList?.(payload);
+				}
+				titles.push(draft.title);
+				count += draft.totalCount;
+			}
+			if (!titles.length) {
+				return elOk(
+					{ titles, count },
+					{ message: '没有可展示的行。禁止再分类。' },
+				);
+			}
+			return elOk({ titles, count }, { message: '卡片已列出。禁止逐条复述。' });
+		},
+	);
+
 	return [
+		vocabClassify,
+		classicClassify,
 		libraries,
 		itemsSearch,
 		present,

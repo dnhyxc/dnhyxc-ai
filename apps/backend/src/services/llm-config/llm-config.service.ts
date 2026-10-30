@@ -297,7 +297,7 @@ export class LlmConfigService {
 		preset: SiliconFlowLlmPreset,
 		userId?: number,
 	): Promise<SiliconFlowCredentials> {
-		/** OCR 与短决策固定走 GLM_*，不受设置页自定义大模型或会员硅基覆盖 */
+		/** OCR 固定智谱视觉模型；短决策固定硅基千问。两者都不读设置页，也不跟会员对话模型。 */
 		if (preset === 'ocr' || preset === 'decide') {
 			return resolveEnvSiliconFlowCredentials(
 				config,

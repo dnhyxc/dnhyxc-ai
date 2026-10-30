@@ -60,6 +60,8 @@ import {
 import { buildAgentLangChainTools } from './tools/agent-tools';
 import {
 	applyElProposal,
+	pairedFavoriteReceipt,
+	pairedRemoveReceipt,
 	proposalReceipt,
 } from './tools/english/apply-proposal';
 import {
@@ -68,23 +70,51 @@ import {
 } from './tools/english/artifact.store';
 import {
 	buildEnglishLearningDomainTools,
+	categoryReply,
+	classifyLibrary,
+	dedupeEnglish,
+	dedupeWord,
 	type ElDomainMutation,
+	filterLibraryFallback,
 	missingNoteCard,
+	quoteCategoryText,
+	quoteThreadAssistantIndexes,
 	startConfirmedPack,
 	startConfirmedReading,
 } from './tools/english/domain-tools';
 import {
+	favoriteIntentFrom,
+	resolveEnglishIntent,
+} from './tools/english/english-intent';
+import {
+	alreadySavedReply,
+	cancelSide,
+	cardItemRows,
 	favoriteAsk,
-	pickFavoriteCard,
+	favoriteAsksBoth,
+	favoriteFilterMissReply,
+	favoriteScopeCards,
+	favoriteSet,
+	lastFavoriteScope,
+	planFavoriteHang,
 	proposeFavoriteRows,
+	proposePairedFavorites,
+	unfavoriteHangCopy,
 } from './tools/english/favorite-ask';
+import { fetchAllPages } from './tools/english/fetch-all-pages';
 import { ElProposalStore } from './tools/english/proposal.store';
 import {
+	categoryLabels,
 	type ElListSurface,
 	elCardAnchor,
 	forSse,
+	inheritedKind,
 	inventoryFallback,
+	matchLibraries,
 	placeCardHint,
+	reclassifyAsked,
+	resolveMentionedLibrary,
+	shouldFilterContinue,
 	stripDumpedList,
 } from './tools/english/spill';
 
@@ -266,6 +296,31 @@ export class AgentService {
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
+
+	/**
+	 * 本进程里正在跑的那一轮停止句柄。
+	 * stop / 客户端断开必须立刻 abort，不能等下一帧 SSE：
+	 * 工具里的 llm.invoke 不产出事件，epoch 轮询要等它自己返回。
+	 */
+	private readonly streamAborts = new Map<string, AbortController>();
+
+	private holdStreamAbort(
+		sessionId: string,
+		controller: AbortController,
+	): void {
+		const prev = this.streamAborts.get(sessionId);
+		if (prev && prev !== controller) prev.abort();
+		this.streamAborts.set(sessionId, controller);
+	}
+
+	private releaseStreamAbort(
+		sessionId: string,
+		controller: AbortController,
+	): void {
+		if (this.streamAborts.get(sessionId) === controller) {
+			this.streamAborts.delete(sessionId);
+		}
+	}
 
 	/** 按会话归属推断业务记忆（未显式传 memorySource 时）；业务表未建则当作无归属 */
 	private async inferMemorySource(
@@ -717,13 +772,18 @@ export class AgentService {
 			payload,
 		);
 		const lang = dto.lang === 'en-US' ? 'en-US' : 'zh-CN';
-		const content = proposalReceipt(
-			lang,
-			payload.kind,
-			stats,
-			Boolean(payload.truncated),
-			payload.gaps,
-		);
+		const content = stats.pairedCounts
+			? payload.kind === 'favorite_remove'
+				? pairedRemoveReceipt(lang, stats.pairedCounts)
+				: pairedFavoriteReceipt(lang, stats.pairedCounts, stats.failed)
+			: proposalReceipt(
+					lang,
+					payload.kind,
+					stats,
+					Boolean(payload.truncated),
+					payload.gaps,
+					payload.contentKind,
+				);
 		const messageId = await this.englishTableMemory.insertAssistantNote(
 			dto.sessionId,
 			content,
@@ -739,6 +799,7 @@ export class AgentService {
 			failed: stats.failed,
 			truncated: Boolean(payload.truncated),
 			gaps: payload.gaps ?? [],
+			...(stats.pairedCounts ? { mixed: true as const } : {}),
 		};
 	}
 
@@ -789,15 +850,22 @@ export class AgentService {
 	 */
 	chatStream(userId: number, dto: AgentChatDto): Observable<AgentSseChunk> {
 		return new Observable<AgentSseChunk>((subscriber) => {
-			void this.runChatStream(subscriber, userId, dto).catch((e) => {
-				// 兜底：runChatStream 内未收口时仍走 next(error)+complete，避免 Nest SSE 丢错
-				if (subscriber.closed) return;
-				subscriber.next({
-					type: 'error',
-					data: formatAgentStreamError(e),
-				});
-				subscriber.complete();
-			});
+			const abortController = new AbortController();
+			void this.runChatStream(subscriber, userId, dto, abortController).catch(
+				(e) => {
+					// 兜底：runChatStream 内未收口时仍走 next(error)+complete，避免 Nest SSE 丢错
+					if (subscriber.closed) return;
+					subscriber.next({
+						type: 'error',
+						data: formatAgentStreamError(e),
+					});
+					subscriber.complete();
+				},
+			);
+			// 客户端掐掉 SSE 时同步 abort，分类请求的 signal 才会取消在途 HTTP
+			return () => {
+				abortController.abort();
+			};
 		});
 	}
 
@@ -808,6 +876,7 @@ export class AgentService {
 		subscriber: Subscriber<AgentSseChunk>,
 		userId: number,
 		dto: AgentChatDto,
+		abortController: AbortController,
 	): Promise<void> {
 		let sessionId = dto.sessionId; // agent 运行句柄（停流/epoch）
 		let session!: AgentSession;
@@ -824,12 +893,41 @@ export class AgentService {
 		let turnAppliedSkills: AppliedSkillRef[] | null = null;
 		/** 本轮外溢清单（含全量行，落库快照） */
 		const turnElResources: ElResourceListPayload[] = [];
+		const bindIntent = (surface: ElListSurface) => {
+			const intent = resolveEnglishIntent(surface.userText, {
+				priorUserTexts: surface.priorUserTexts,
+				priorLibraryCards: surface.priorLibraryCards,
+				openProposalKind: surface.openProposalId ?? null,
+			});
+			surface.intent = intent;
+			surface.favoriteIntent = favoriteIntentFrom(intent);
+		};
 		const elSurface: ElListSurface = {
 			userText: dto.content,
+			priorUserTexts: [],
+			priorLibraryCards: [],
+			labeledCards: [],
 			libraryLists: [],
+			vocabLists: [],
 			presented: false,
 			shownLibraryIds: new Set(),
 			catalog: [],
+			categoryJobs: new Map(),
+		};
+		bindIntent(elSurface);
+		/** 筛选卡挂出后，正文固定为「库名：共 n 条。」，不再收下模型后写的自述 */
+		let categoryReplyLocked = false;
+		/** 收藏轮的正文。和确认条用同一组卡片数字，轮末盖掉模型列举。 */
+		let favoriteReplyText: string | null = null;
+		const lockCategoryReply = () => {
+			const reply = categoryReply(turnElResources);
+			if (!reply) return;
+			categoryReplyLocked = true;
+			if (reply === accumulated) return;
+			accumulated = reply;
+			if (!subscriber.closed) {
+				subscriber.next({ type: 'contentReplace', data: reply });
+			}
 		};
 		const pushInventoryCard = async () => {
 			const rows = inventoryFallback(
@@ -838,8 +936,9 @@ export class AgentService {
 				elSurface.shownLibraryIds,
 			);
 			for (const picked of rows) {
-				elSurface.presented = true;
 				let payload = picked.payload;
+				// 空卡不算已出筛选卡，避免挡住关于类补分类
+				if ((payload.items?.length ?? 0) > 0) elSurface.presented = true;
 				if (picked.restash) {
 					const { artifactId: _old, ...rest } = payload;
 					const artifactId = await this.elArtifactStore.put(userId, rest);
@@ -848,6 +947,7 @@ export class AgentService {
 				elSurface.shownLibraryIds.add(payload.libraryId ?? payload.artifactId);
 				turnElResources.push(payload);
 				subscriber.next({ type: 'elResourceList', data: forSse(payload) });
+				lockCategoryReply();
 			}
 		};
 
@@ -898,7 +998,160 @@ export class AgentService {
 				return;
 			}
 			await pushInventoryCard();
-			const text = resolvedAssistantText();
+			let continuePrior:
+				| {
+						userTexts: string[];
+						cards: { title: string }[];
+						mark?: RegExp;
+				  }
+				| undefined;
+			if (
+				!elSurface.presented &&
+				elSurface.intent?.kind === 'category_filter' &&
+				!elSurface.catalog.length
+			) {
+				const kind = inheritedKind(
+					elSurface.priorUserTexts,
+					elSurface.priorLibraryCards,
+				);
+				if (kind) {
+					const all = await fetchAllPages(100, async (limit, offset) => {
+						const page =
+							kind === 'classic'
+								? await this.englishLearningService.listClassicQuotesLibraries(
+										userId,
+										{ limit, offset },
+									)
+								: await this.englishLearningService.listVocabularyLibraries(
+										userId,
+										{ limit, offset },
+									);
+						return {
+							items: page.items.map((item) => ({
+								id: item.id,
+								title: item.title,
+							})),
+						};
+					});
+					elSurface.catalog = all.items;
+					elSurface.catalogKind = kind;
+					continuePrior = {
+						userTexts: elSurface.priorUserTexts,
+						cards: elSurface.priorLibraryCards.filter(
+							(card) => card.contentKind === kind,
+						),
+						mark: kind === 'classic' ? /语句库|语料库|经典语句/ : undefined,
+					};
+				}
+			}
+			const filterKind =
+				elSurface.catalogKind === 'classic' ? 'classic' : 'vocab';
+			// 只在 category_filter 续查；generate / favorite_* 不得继承旧库
+			const lib =
+				elSurface.intent?.kind === 'category_filter'
+					? shouldFilterContinue(
+							elSurface.userText,
+							elSurface.catalog,
+							elSurface.presented,
+							continuePrior,
+						)
+					: null;
+			const labels = categoryLabels(elSurface.userText);
+			if (lib && labels.length) {
+				try {
+					const parts: Record<string, unknown>[] = [];
+					let failed = false;
+					for (const label of labels) {
+						const draft = await classifyLibrary({
+							learning: this.englishLearningService,
+							config: this.configService,
+							userId,
+							lib,
+							label,
+							logger: this.logger,
+							kind: filterKind,
+							signal: abortController.signal,
+							artifacts: this.elArtifactStore,
+							jobs: elSurface.categoryJobs,
+							skipCache: reclassifyAsked(elSurface.userText),
+						});
+						if (draft?.title.includes('有批未能判断')) {
+							failed = true;
+							continue;
+						}
+						for (const item of draft?.items ?? []) {
+							if (item && typeof item === 'object' && !Array.isArray(item)) {
+								parts.push(item as Record<string, unknown>);
+							}
+						}
+					}
+					if (!failed) {
+						const items =
+							filterKind === 'classic'
+								? dedupeEnglish(parts)
+								: dedupeWord(parts);
+						const body: Omit<ElResourceListPayload, 'artifactId'> = {
+							title: lib.title,
+							source: 'library',
+							contentKind: filterKind,
+							libraryId: lib.id,
+							filtered: true,
+							categoryLabels: labels,
+							totalCount: items.length,
+							truncated: false,
+							items,
+						};
+						const artifactId = await this.elArtifactStore.put(userId, body);
+						const payload = { ...body, artifactId };
+						if (items.length > 0) elSurface.presented = true;
+						elSurface.shownLibraryIds.add(lib.id);
+						turnElResources.push(payload);
+						subscriber.next({
+							type: 'elResourceList',
+							data: forSse(payload),
+						});
+						lockCategoryReply();
+					}
+				} catch (e: unknown) {
+					this.logger.warn?.(
+						`[AgentService] 库内筛选续查失败: ${e instanceof Error ? e.message : e}`,
+					);
+				}
+			} else if (
+				lib &&
+				!elSurface.categoryJobs.has(`${filterKind}:${lib.id}`)
+			) {
+				try {
+					const draft = await filterLibraryFallback(
+						this.englishLearningService,
+						this.configService,
+						userId,
+						lib,
+						elSurface.userText,
+						this.logger,
+						filterKind,
+						abortController.signal,
+					);
+					if (draft) {
+						const artifactId = await this.elArtifactStore.put(userId, draft);
+						const payload = { ...draft, artifactId };
+						if ((payload.items?.length ?? 0) > 0) elSurface.presented = true;
+						elSurface.shownLibraryIds.add(lib.id);
+						turnElResources.push(payload);
+						subscriber.next({
+							type: 'elResourceList',
+							data: forSse(payload),
+						});
+						lockCategoryReply();
+					}
+				} catch (e: unknown) {
+					this.logger.warn?.(
+						`[AgentService] 库内筛选续查失败: ${e instanceof Error ? e.message : e}`,
+					);
+				}
+			}
+			const reply = favoriteReplyText ?? categoryReply(turnElResources);
+			const text = reply ?? resolvedAssistantText();
 			if (text !== accumulated) {
 				subscriber.next({ type: 'contentReplace', data: text });
 				accumulated = text;
@@ -927,9 +1180,13 @@ export class AgentService {
 			}
 			try {
 				await pushInventoryCard();
-				const text = resolvedAssistantText();
+				const reply = favoriteReplyText ?? categoryReply(turnElResources);
+				const text = reply ?? resolvedAssistantText();
 				if (text !== accumulated) {
 					accumulated = text;
+					if (!subscriber.closed) {
+						subscriber.next({ type: 'contentReplace', data: text });
+					}
 				}
 				if (accumulated.trim()) {
 					await turnMemory.updateAssistantContent(
@@ -944,6 +1201,12 @@ export class AgentService {
 			} catch (cleanupErr: unknown) {
 				this.logger.error?.('[AgentService] 本轮消息收尾失败', cleanupErr);
 			}
+		};
+		const finishStopped = async (): Promise<boolean> => {
+			if (!abortController.signal.aborted) return false;
+			await cleanupTurnOnFailure();
+			if (!subscriber.closed) subscriber.complete();
+			return true;
 		};
 
 		try {
@@ -960,6 +1223,7 @@ export class AgentService {
 			} else {
 				session = await this.assertSessionOwned(userId, sessionId);
 			}
+			this.holdStreamAbort(sessionId, abortController);
 
 			const resolved = await this.resolveTurnMemory(userId, dto, sessionId);
 			turnMemory = resolved.turnMemory;
@@ -979,6 +1243,111 @@ export class AgentService {
 					dto.content.trim(),
 				);
 			assistantMessageId = aid;
+			if (dto.assistMode === 'english_learning' && businessSessionId) {
+				const history =
+					await this.englishTableMemory.listMessagesAsc(businessSessionId);
+				const userTexts = history
+					.filter((row) => row.role === 'user')
+					.map((row) => row.content ?? '');
+				elSurface.quoteCategoryText = quoteCategoryText(userTexts);
+				elSurface.priorUserTexts = userTexts.slice(0, -1);
+				for (const row of history) {
+					if (row.role !== 'assistant' || row.id === assistantMessageId)
+						continue;
+					for (const card of row.elResources ?? []) {
+						if (
+							card.source !== 'library' ||
+							!card.filtered ||
+							!card.categoryLabels?.length
+						) {
+							continue;
+						}
+						let full = card;
+						if (!full.items?.length && full.artifactId) {
+							const stored = await this.elArtifactStore.get(
+								userId,
+								full.artifactId,
+							);
+							if (!stored?.items?.length) continue;
+							full = { ...stored, categoryLabels: card.categoryLabels };
+						}
+						if (!full.items?.length) continue;
+						elSurface.labeledCards.push(full);
+					}
+				}
+				const savingThese = Boolean(favoriteAsk(dto.content));
+				const quoteIndexes = quoteThreadAssistantIndexes(
+					history,
+					assistantMessageId,
+					savingThese,
+					favoriteAsksBoth(dto.content),
+				);
+				for (const i of quoteIndexes) {
+					const row = history[i];
+					if (!row || row.role !== 'assistant') continue;
+					for (const card of row.elResources ?? []) {
+						if (
+							card.source === 'library' &&
+							(card.contentKind === 'vocab' ||
+								card.contentKind === 'classic') &&
+							card.title.trim()
+						) {
+							elSurface.priorLibraryCards.push({
+								title: card.title,
+								contentKind: card.contentKind,
+							});
+						}
+						if (favoriteAsksBoth(dto.content) && card.contentKind === 'vocab') {
+							let vocabCard = card;
+							if (!vocabCard.items?.length && vocabCard.artifactId) {
+								const stored = await this.elArtifactStore.get(
+									userId,
+									vocabCard.artifactId,
+								);
+								if (stored?.items?.length) {
+									vocabCard = {
+										...stored,
+										categoryLabels:
+											card.categoryLabels ?? stored.categoryLabels,
+										libraryId: card.libraryId ?? stored.libraryId,
+									};
+								}
+							}
+							if (
+								vocabCard.items?.length ||
+								(vocabCard.libraryId && vocabCard.categoryLabels?.length)
+							) {
+								elSurface.vocabLists.push({ ...vocabCard, fromPrior: true });
+							}
+						}
+						if (card.contentKind !== 'classic') continue;
+						let full = card;
+						if (!full.items?.length && full.artifactId) {
+							const stored = await this.elArtifactStore.get(
+								userId,
+								full.artifactId,
+							);
+							if (stored?.items?.length) {
+								full = {
+									...stored,
+									categoryLabels: card.categoryLabels ?? stored.categoryLabels,
+									libraryId: card.libraryId ?? stored.libraryId,
+								};
+							}
+						}
+						if (
+							full.items?.length ||
+							(favoriteAsksBoth(dto.content) &&
+								full.libraryId &&
+								full.categoryLabels?.length)
+						) {
+							elSurface.libraryLists.push({ ...full, fromPrior: true });
+						}
+					}
+				}
+				// prior* 齐了再绑一次，供收尾读 kind
+				bindIntent(elSurface);
+			}
 			subscriber.next({
 				type: 'messageIds',
 				data: { userMessageId: uid, assistantMessageId: aid },
@@ -1082,13 +1451,14 @@ export class AgentService {
 			}
 
 			// （5）流式并发控制（epoch机制），每次流式启动+1，高并发终止旧流
-			const abortController = new AbortController();
+			if (await finishStopped()) return;
 			const epochAtStart = await this.incrementStreamEpoch(sessionId);
 			await this.cache.set(
 				this.streamBusyKey(sessionId),
 				String(epochAtStart),
 				AGENT_STREAM_STATE_TTL_MS,
 			);
+			if (await finishStopped()) return;
 
 			// （6）构建主模型与摘要模型
 			const { main: mainLlm, summary: summaryLlm } = await this.buildModels(
@@ -1141,12 +1511,14 @@ export class AgentService {
 							artifacts: this.elArtifactStore,
 							logger: this.logger,
 							config: this.configService,
+							signal: abortController.signal,
 							onResourceList: (payload) => {
 								turnElResources.push(payload);
 								subscriber.next({
 									type: 'elResourceList',
 									data: forSse(payload),
 								});
+								lockCategoryReply();
 							},
 							onPresented: (payload) => {
 								turnElResources.push(payload);
@@ -1157,6 +1529,7 @@ export class AgentService {
 									type: 'elResourceList',
 									data: forSse(payload),
 								});
+								lockCategoryReply();
 							},
 							whitelist: elWhitelist,
 							surface: elSurface,
@@ -1201,6 +1574,8 @@ export class AgentService {
 			});
 
 			// （9）开始流式事件主循环
+			if (await finishStopped()) return;
+
 			const eventStream = agent.streamEvents(
 				{ messages: lcMessages },
 				{
@@ -1213,10 +1588,12 @@ export class AgentService {
 
 			let finishReason: 'length' | 'stop' | undefined;
 			for await (const ev of eventStream) {
-				// 并发安全：若epoch被外部+1（如stopStream），abort终止
+				// 工具调用期间没有 SSE 帧。停止必须已经 abort 了 signal，这里只负责退出循环。
+				if (abortController.signal.aborted) break;
 				const curEpoch = await this.getStreamEpoch(sessionId);
 				if (curEpoch !== epochAtStart) {
 					abortController.abort();
+					break;
 				}
 
 				if (ev.event === 'on_chat_model_start') {
@@ -1228,7 +1605,7 @@ export class AgentService {
 					const reason = readFinishReason(chunk);
 					if (reason) finishReason = reason;
 					const text = extractChunkText(chunk);
-					if (text) {
+					if (text && !categoryReplyLocked) {
 						accumulated += text;
 						subscriber.next({ type: 'content', data: text });
 					}
@@ -1264,6 +1641,7 @@ export class AgentService {
 					});
 				}
 			}
+			if (await finishStopped()) return;
 
 			if (!accumulated.trim() && sawStopTools) {
 				accumulated = '已有待确认提案，请直接点确认。';
@@ -1293,59 +1671,95 @@ export class AgentService {
 				}
 			}
 
-			if (dto.assistMode === 'english_learning' && !elSurface.openProposalId) {
+			if (
+				dto.assistMode === 'english_learning' &&
+				elSurface.intent?.kind === 'favorite_add' &&
+				!elSurface.openProposalId &&
+				businessSessionId
+			) {
 				try {
-					const ask = favoriteAsk(dto.content);
-					let card = ask ? pickFavoriteCard(ask, turnElResources) : null;
-					if (ask && !card) {
-						const history =
-							await this.englishTableMemory.listMessagesAsc(businessSessionId);
-						for (let i = history.length - 1; i >= 0; i -= 1) {
-							const row = history[i];
-							if (row.role !== 'assistant' || row.id === assistantMessageId)
-								continue;
-							const saved = row.elResources ?? [];
-							card = pickFavoriteCard(ask, saved);
-							if (card) break;
-							const stub = [...saved]
-								.reverse()
-								.find((item) => item.artifactId && !item.items?.length);
-							if (!stub?.artifactId) continue;
-							const stored = await this.elArtifactStore.get(
-								userId,
-								stub.artifactId,
-							);
-							if (!stored) continue;
-							card = pickFavoriteCard(ask, [stored]);
-							if (card) break;
-						}
-					}
-					if (
-						ask &&
-						card?.items?.length &&
-						(card.contentKind === 'vocab' || card.contentKind === 'classic')
-					) {
-						const rows = card.items.filter(
-							(row): row is Record<string, unknown> =>
-								!!row && typeof row === 'object' && !Array.isArray(row),
+					const history = await this.hydrateScopeHistory(
+						userId,
+						await this.englishTableMemory.listMessagesAsc(businessSessionId),
+					);
+					const priorIndexes = (
+						slice: { role: string; content?: string | null }[],
+						bridge: boolean,
+					) =>
+						quoteThreadAssistantIndexes(
+							slice.map((row) => ({
+								role: row.role,
+								content: row.content ?? '',
+							})),
+							assistantMessageId,
+							true,
+							bridge,
 						);
-						const proposed = await proposeFavoriteRows(
-							this.englishLearningService,
-							this.elProposalStore,
+					const collectTurnLibraryCards = () =>
+						[
+							...turnElResources,
+							...elSurface.libraryLists.filter((card) => !card.fromPrior),
+							...elSurface.vocabLists.filter((card) => !card.fromPrior),
+						].filter((card) => card.source === 'library');
+					const needsFilter = Boolean(elSurface.intent?.needsFilterCards);
+					let turnCards = collectTurnLibraryCards();
+					let set = favoriteSet(history, dto.content, priorIndexes, turnCards);
+					let plan = set
+						? planFavoriteHang({ set, turnVocab: [], turnClassic: [] })
+						: null;
+					// 复合句缺卡：本轮补分类，禁止立刻「上面没有」
+					if (needsFilter && !plan?.hang) {
+						await this.ensureFavoriteFilterCards({
 							userId,
-							card.contentKind,
-							rows,
-						);
+							userText: dto.content,
+							side: elSurface.intent?.side ?? 'card',
+							surface: elSurface,
+							turnElResources,
+							signal: abortController.signal,
+							emit: (card) => {
+								subscriber.next({
+									type: 'elResourceList',
+									data: forSse(card),
+								});
+							},
+						});
+						turnCards = collectTurnLibraryCards();
+						set = favoriteSet(history, dto.content, priorIndexes, turnCards);
+						plan = set
+							? planFavoriteHang({ set, turnVocab: [], turnClassic: [] })
+							: null;
+					}
+					if (plan?.hang && set) {
+						const proposed =
+							set.side === 'both'
+								? await proposePairedFavorites(
+										this.englishLearningService,
+										this.elProposalStore,
+										userId,
+										cardItemRows(plan.vocab),
+										cardItemRows(plan.classic),
+									)
+								: await proposeFavoriteRows(
+										this.englishLearningService,
+										this.elProposalStore,
+										userId,
+										set.side,
+										cardItemRows(
+											set.side === 'vocab' ? plan.vocab : plan.classic,
+										),
+										true,
+									);
 						const proposalId =
-							proposed.data &&
+							proposed?.data &&
 							typeof proposed.data === 'object' &&
 							'proposalId' in proposed.data &&
 							typeof (proposed.data as { proposalId?: unknown }).proposalId ===
 								'string'
 								? (proposed.data as { proposalId: string }).proposalId
 								: '';
-						if (proposed.ui && proposalId) {
+						if (proposed?.ui && proposalId) {
 							elSurface.openProposalId = proposalId;
+							favoriteReplyText = plan.reply;
 							subscriber.next({
 								type: 'tool',
 								data: {
@@ -1354,11 +1768,51 @@ export class AgentService {
 									output: proposed,
 								},
 							});
+						} else {
+							favoriteReplyText = alreadySavedReply(plan);
 						}
+					} else if (plan && !needsFilter) {
+						favoriteReplyText = plan.reply;
+					} else if (needsFilter) {
+						favoriteReplyText = favoriteFilterMissReply(
+							categoryLabels(dto.content),
+						);
 					}
 				} catch (e: unknown) {
 					this.logger.warn?.(
-						`[AgentService] 补收藏确认失败: ${e instanceof Error ? e.message : e}`,
+						`[AgentService] 收藏确认失败: ${e instanceof Error ? e.message : e}`,
+					);
+				}
+			}
+
+			if (
+				dto.assistMode === 'english_learning' &&
+				elSurface.intent?.kind === 'favorite_remove'
+			) {
+				try {
+					const history = businessSessionId
+						? await this.englishTableMemory.listMessagesAsc(businessSessionId)
+						: [];
+					// 与添加一样：正文数字跟确认条同源，盖掉 list 全量散文
+					favoriteReplyText = await this.hangUnfavorite({
+						userId,
+						history,
+						cancelText: dto.content,
+						surface: elSurface,
+						emit: (output) => {
+							subscriber.next({
+								type: 'tool',
+								data: {
+									phase: 'end',
+									name: 'el_favorites',
+									output,
+								},
+							});
+						},
+					});
+				} catch (e: unknown) {
+					this.logger.warn?.(
+						`[AgentService] 词句一起取消失败: ${e instanceof Error ? e.message : e}`,
 					);
 				}
 			}
@@ -1374,7 +1828,8 @@ export class AgentService {
 			// 通知流结束
 			subscriber.complete();
 		} catch (err: unknown) {
-			const aborted = this.isUserAbortError(err);
+			const aborted =
+				abortController.signal.aborted || this.isUserAbortError(err);
 			if (!aborted) {
 				this.logger.error?.('[AgentService] chatStream failed', err);
 			}
@@ -1392,16 +1847,330 @@ export class AgentService {
 		} finally {
 			// 清理会话busy态，防止流式残留
 			if (sessionId) {
+				this.releaseStreamAbort(sessionId, abortController);
 				await this.cache.del(this.streamBusyKey(sessionId));
 			}
 		}
 	}
 
+	/** 复合句缺筛选卡时，按原话解析词库/语句库并分类出卡。 */
+	private async ensureFavoriteFilterCards(input: {
+		userId: number;
+		userText: string;
+		side: 'vocab' | 'classic' | 'both' | 'card';
+		surface: ElListSurface;
+		turnElResources: ElResourceListPayload[];
+		signal?: AbortSignal;
+		emit: (card: ElResourceListPayload) => void;
+	}): Promise<void> {
+		const labels = categoryLabels(input.userText);
+		if (!labels.length) return;
+		const kinds: Array<'vocab' | 'classic'> =
+			input.side === 'vocab'
+				? ['vocab']
+				: input.side === 'classic'
+					? ['classic']
+					: ['vocab', 'classic'];
+		const hasSide = (kind: 'vocab' | 'classic') =>
+			[
+				...input.turnElResources,
+				...input.surface.libraryLists,
+				...input.surface.vocabLists,
+			].some(
+				(card) =>
+					card.source === 'library' &&
+					card.contentKind === kind &&
+					(card.categoryLabels?.length ?? 0) > 0 &&
+					(card.items?.length ?? 0) > 0,
+			);
+		for (const kind of kinds) {
+			if (hasSide(kind)) continue;
+			const lib = await this.resolveLibForFavoriteFilter(
+				kind,
+				input.userText,
+				input.userId,
+			);
+			if (!lib) continue;
+			const parts: Record<string, unknown>[] = [];
+			let failed = false;
+			for (const label of labels) {
+				if (input.signal?.aborted) return;
+				const draft = await classifyLibrary({
+					learning: this.englishLearningService,
+					config: this.configService,
+					userId: input.userId,
+					lib,
+					label,
+					logger: this.logger,
+					kind,
+					signal: input.signal,
+					artifacts: this.elArtifactStore,
+					jobs: input.surface.categoryJobs,
+					skipCache: reclassifyAsked(input.userText),
+				});
+				if (draft?.title.includes('有批未能判断')) {
+					failed = true;
+					continue;
+				}
+				for (const item of draft?.items ?? []) {
+					if (item && typeof item === 'object' && !Array.isArray(item)) {
+						parts.push(item as Record<string, unknown>);
+					}
+				}
+			}
+			if (failed) continue;
+			const items =
+				kind === 'classic' ? dedupeEnglish(parts) : dedupeWord(parts);
+			if (!items.length) continue;
+			const body: Omit<ElResourceListPayload, 'artifactId'> = {
+				title: lib.title,
+				source: 'library',
+				contentKind: kind,
+				libraryId: lib.id,
+				filtered: true,
+				categoryLabels: labels,
+				totalCount: items.length,
+				truncated: false,
+				items,
+			};
+			const artifactId = await this.elArtifactStore.put(input.userId, body);
+			const payload = { ...body, artifactId };
+			input.surface.presented = true;
+			input.surface.shownLibraryIds.add(lib.id);
+			if (kind === 'vocab') input.surface.vocabLists.push(payload);
+			else input.surface.libraryLists.push(payload);
+			input.turnElResources.push(payload);
+			input.emit(payload);
+		}
+	}
+
+	private async resolveLibForFavoriteFilter(
+		kind: 'vocab' | 'classic',
+		userText: string,
+		userId: number,
+	): Promise<{ id: string; title: string } | null> {
+		const libs = await fetchAllPages(100, async (limit, offset) => {
+			const page =
+				kind === 'classic'
+					? await this.englishLearningService.listClassicQuotesLibraries(
+							userId,
+							{ limit, offset },
+						)
+					: await this.englishLearningService.listVocabularyLibraries(userId, {
+							limit,
+							offset,
+						});
+			return {
+				items: page.items.map((item) => ({
+					id: item.id,
+					title: item.title,
+				})),
+			};
+		});
+		const catalog = libs.items;
+		const exact = matchLibraries(userText, catalog);
+		if (exact.length === 1) return exact[0];
+		const mark =
+			kind === 'classic' ? /语句库|语料库|经典语句/ : /词汇库|单词库|词库/;
+		const mentioned = resolveMentionedLibrary(userText, catalog, mark);
+		if (mentioned.kind === 'one') return mentioned.lib;
+		if (mentioned.kind === 'ambiguous' && mentioned.candidates.length) {
+			const grade = userText.match(/[一二三四五六七八九十\d]+年级/)?.[0];
+			if (grade) {
+				const hit = mentioned.candidates.find((row) =>
+					row.title.includes(grade),
+				);
+				if (hit) return hit;
+			}
+			return mentioned.candidates[0];
+		}
+		return null;
+	}
+
 	/**
-	 * 主动中止指定会话的流式生成
-	 * 通过自增epoch方式，让runChatStream检测终止
-	 * @param sessionId 会话ID
-	 * @param userId 用户ID
+	 * 没点名英文时，只取消上一次收藏圈定、且现在仍在收藏表里的行。
+	 * 本轮工具拉到的收藏列表不参与。没有可取消的行就不挂确认。
+	 * 返回值供 contentReplace，与确认条同一组 id 计数。
+	 */
+	private async hangUnfavorite(input: {
+		userId: number;
+		history: {
+			role: string;
+			content?: string | null;
+			elResources?: ElResourceListPayload[] | null;
+			createdAt?: Date;
+		}[];
+		cancelText: string;
+		surface: ElListSurface;
+		emit: (output: {
+			ok?: boolean;
+			data?: unknown;
+			message?: string;
+			ui?: unknown;
+		}) => void;
+	}): Promise<string> {
+		const history = await this.hydrateScopeHistory(input.userId, input.history);
+		const scope = lastFavoriteScope(history, (slice, bridge) =>
+			quoteThreadAssistantIndexes(
+				slice.map((row) => ({
+					role: row.role,
+					content: row.content ?? '',
+				})),
+				undefined,
+				true,
+				bridge,
+			),
+		);
+		const none = {
+			ok: true,
+			data: { count: 0 },
+			message: '上一次收藏里没有还能取消的',
+		};
+		if (!scope) {
+			input.emit(none);
+			return none.message;
+		}
+		const side = cancelSide(input.cancelText, scope.side);
+		const cards =
+			side === scope.side
+				? scope.cards
+				: favoriteScopeCards(history, scope.askIndex, side, (slice, bridge) =>
+						quoteThreadAssistantIndexes(
+							slice.map((row) => ({
+								role: row.role,
+								content: row.content ?? '',
+							})),
+							undefined,
+							true,
+							bridge,
+						),
+					);
+		const texts = (
+			rows: { items?: unknown[] }[],
+			field: 'word' | 'english',
+		) => {
+			const seen = new Set<string>();
+			const out: string[] = [];
+			for (const row of cardItemRows(rows)) {
+				const value = typeof row[field] === 'string' ? row[field].trim() : '';
+				const key = value.toLowerCase();
+				if (!key || seen.has(key)) continue;
+				seen.add(key);
+				out.push(value);
+			}
+			return out;
+		};
+		const vocabCards =
+			side === 'classic'
+				? []
+				: cards.filter((card) => card.contentKind === 'vocab');
+		const quoteCards =
+			side === 'vocab'
+				? []
+				: cards.filter((card) => card.contentKind === 'classic');
+		const words = texts(vocabCards, 'word');
+		const englishes = texts(quoteCards, 'english');
+		const wordIds = words.length
+			? (
+					await this.englishLearningService.listVocabularyFavoriteRefsForWords(
+						input.userId,
+						words,
+					)
+				).map((row) => row.id)
+			: [];
+		let quoteIds = englishes.length
+			? (
+					await this.englishLearningService.listClassicQuoteFavoriteRefsForEnglishes(
+						input.userId,
+						englishes,
+					)
+				).map((row) => row.id)
+			: [];
+		// 上一轮确认写入的是模型编的句子时，卡片对不上。用收藏时间收回那几条。
+		const askAt = history[scope.askIndex]?.createdAt;
+		if (!quoteIds.length && askAt && (side === 'classic' || side === 'both')) {
+			quoteIds =
+				await this.englishLearningService.listClassicQuoteFavoriteIdsSince(
+					input.userId,
+					askAt,
+				);
+		}
+		const copy = unfavoriteHangCopy(wordIds.length, quoteIds.length);
+		if (!copy) {
+			input.emit(none);
+			return none.message;
+		}
+		const both = wordIds.length > 0 && quoteIds.length > 0;
+		const proposalId = await this.elProposalStore.put(
+			input.userId,
+			both
+				? {
+						kind: 'favorite_remove',
+						contentKind: 'classic',
+						body: {},
+						id: quoteIds[0],
+						ids: quoteIds,
+						paired: {
+							contentKind: 'vocab',
+							items: wordIds.map((id) => ({ id })),
+						},
+					}
+				: {
+						kind: 'favorite_remove',
+						contentKind: wordIds.length ? 'vocab' : 'classic',
+						body: {},
+						id: (wordIds[0] ?? quoteIds[0]) as string,
+						ids: wordIds.length ? wordIds : quoteIds,
+					},
+		);
+		input.surface.openProposalId = proposalId;
+		input.emit({
+			ok: true,
+			data: { proposalId, count: wordIds.length + quoteIds.length },
+			message: '请用户确认后再取消',
+			ui: [{ type: 'confirm_proposal', proposalId, label: copy.label }],
+		});
+		return copy.reply;
+	}
+
+	/** 卡片行被收进 artifact 时先装回来，取消才能按词面换 id。 */
+	private async hydrateScopeHistory<
+		T extends {
+			role: string;
+			elResources?: ElResourceListPayload[] | null;
+		},
+	>(userId: number, history: T[]): Promise<T[]> {
+		const out: T[] = [];
+		for (const row of history) {
+			if (row.role !== 'assistant' || !row.elResources?.length) {
+				out.push(row);
+				continue;
+			}
+			const elResources: ElResourceListPayload[] = [];
+			for (const card of row.elResources) {
+				if (card.items?.length || !card.artifactId) {
+					elResources.push(card);
+					continue;
+				}
+				const stored = await this.elArtifactStore.get(userId, card.artifactId);
+				elResources.push(
+					stored?.items?.length
+						? {
+								...stored,
+								categoryLabels: card.categoryLabels ?? stored.categoryLabels,
+								libraryId: card.libraryId ?? stored.libraryId,
+							}
+						: card,
+				);
+			}
+			out.push({ ...row, elResources });
+		}
+		return out;
+	}
+
+	/**
+	 * 主动中止指定会话的流式生成。
+	 * 先 abort 在途模型请求，再自增 epoch，避免工具里的 llm.invoke 一直等到自己返回。
 	 */
 	async stopStream(sessionId: string, userId: number) {
 		// 权限校验，避免越权stop
@@ -1412,11 +2181,17 @@ export class AgentService {
 		if (!owned) {
 			return { success: true, message: '会话已不存在，无需停止' };
 		}
+		const controller = this.streamAborts.get(sessionId);
 		const busy = await this.cache.get(this.streamBusyKey(sessionId));
-		if (!busy) {
+		if (!busy && !controller) {
 			return { success: false, message: '当前无进行中的生成' };
 		}
-		// epoch+1触发runChatStream感知并abort
+		if (controller && !controller.signal.aborted) {
+			controller.abort();
+			this.logger.log?.(
+				`[AgentService] 已中止大模型调用 sessionId=${sessionId}`,
+			);
+		}
 		await this.incrementStreamEpoch(sessionId);
 		return { success: true, message: '已停止生成' };
 	}
@@ -1438,7 +2213,8 @@ export class AgentService {
 		if (!session) {
 			throw new NotFoundException('会话不存在');
 		}
-		// 终止所有正在进行的流（epoch+1）
+		// 终止所有正在进行的流：先掐在途模型，再 epoch+1
+		this.streamAborts.get(sid)?.abort();
 		await this.incrementStreamEpoch(sid);
 		await this.cache.del(this.streamBusyKey(sid));
 		await this.englishTableMemory.deleteSummary(sid);

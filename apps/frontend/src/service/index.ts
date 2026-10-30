@@ -756,6 +756,7 @@ export type CommitElProposalResult = {
 	failed: number;
 	truncated: boolean;
 	gaps?: Array<'cap' | 'list' | 'judge'>;
+	mixed?: boolean;
 };
 
 /** 确认条直提交。过期时 success=false，data.code 为 expired */

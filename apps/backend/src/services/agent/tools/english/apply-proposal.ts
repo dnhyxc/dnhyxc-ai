@@ -7,6 +7,12 @@ export type ApplyStats = {
 	created: number;
 	existed: number;
 	failed: number;
+	pairedCounts?: {
+		vocabCreated: number;
+		vocabExisted: number;
+		classicCreated: number;
+		classicExisted: number;
+	};
 };
 
 function rowsOf(payload: ElProposalPayload): Record<string, unknown>[] {
@@ -51,6 +57,36 @@ export async function applyElProposal(
 			: payload.id
 				? [payload.id]
 				: [];
+		const pairedIds = (payload.paired?.items ?? [])
+			.map((row) => (typeof row.id === 'string' ? row.id : ''))
+			.filter((id) => id.length > 0);
+		if (
+			payload.paired?.contentKind === 'vocab' &&
+			pairedIds.length &&
+			payload.contentKind === 'classic'
+		) {
+			const vocabR = await learning.removeVocabularyFavoritesBatch(
+				userId,
+				pairedIds,
+			);
+			const classicR = ids.length
+				? await learning.removeClassicQuoteFavoritesBatch(userId, ids)
+				: { removedCount: 0 };
+			return {
+				domain: 'favorites',
+				created: vocabR.removedCount + classicR.removedCount,
+				existed:
+					Math.max(0, pairedIds.length - vocabR.removedCount) +
+					Math.max(0, ids.length - classicR.removedCount),
+				failed: 0,
+				pairedCounts: {
+					vocabCreated: vocabR.removedCount,
+					vocabExisted: Math.max(0, pairedIds.length - vocabR.removedCount),
+					classicCreated: classicR.removedCount,
+					classicExisted: Math.max(0, ids.length - classicR.removedCount),
+				},
+			};
+		}
 		if (!ids.length) {
 			return { domain: 'favorites', created: 0, existed: 0, failed: 1 };
 		}
@@ -74,6 +110,47 @@ export async function applyElProposal(
 		existed: 0,
 		failed: 0,
 	};
+	let vocabCreated = 0;
+	let vocabExisted = 0;
+	if (payload.paired?.items?.length && payload.paired.contentKind === 'vocab') {
+		let vocabRows = payload.paired.items;
+		const hints = new Map<string, string>();
+		for (const row of vocabRows) {
+			const key = String(row.word ?? '')
+				.trim()
+				.toLowerCase();
+			const zh =
+				typeof row.translationZh === 'string' ? row.translationZh.trim() : '';
+			if (key && zh) hints.set(key, zh);
+		}
+		const snaps = await learning.lookupVocabularyLibrarySnapshots(
+			userId,
+			vocabRows.map((row) => String(row.word ?? '')),
+			hints,
+		);
+		vocabRows = vocabRows.map((row) =>
+			fillFavoriteFields(
+				row,
+				snaps.get(
+					String(row.word ?? '')
+						.trim()
+						.toLowerCase(),
+				),
+			),
+		);
+		try {
+			const r = await learning.batchAddVocabularyFavorites(
+				userId,
+				vocabRows as never,
+			);
+			vocabCreated = r.created;
+			vocabExisted = r.existed;
+			stats.created += r.created;
+			stats.existed += r.existed;
+		} catch {
+			stats.failed += vocabRows.length;
+		}
+	}
 	let rows = rowsOf(payload);
 	if (payload.contentKind === 'vocab') {
 		const hints = new Map<string, string>();
@@ -121,6 +198,14 @@ export async function applyElProposal(
 			stats.failed += 1;
 		}
 	}
+	if (payload.paired?.items?.length) {
+		stats.pairedCounts = {
+			vocabCreated,
+			vocabExisted,
+			classicCreated: stats.created - vocabCreated,
+			classicExisted: stats.existed - vocabExisted,
+		};
+	}
 	return stats;
 }
 
@@ -133,6 +218,7 @@ export function proposalReceipt(
 	stats: ApplyStats,
 	truncated: boolean,
 	gaps?: Array<'cap' | 'list' | 'judge'>,
+	contentKind?: 'vocab' | 'classic',
 ): string {
 	const en = lang === 'en-US';
 	let text: string;
@@ -155,9 +241,11 @@ export function proposalReceipt(
 			? `Added ${stats.created} to mistakes. Already there: ${stats.existed}.`
 			: `已加入错题 ${stats.created} 条，已在错题中 ${stats.existed} 条。`;
 	} else {
+		const unit =
+			!en && contentKind === 'classic' && kind === 'favorite_add' ? '条' : '个';
 		text = en
 			? `Saved ${stats.created}. Already in favorites: ${stats.existed}.`
-			: `已收藏 ${stats.created} 个，已存在 ${stats.existed} 个。`;
+			: `已收藏 ${stats.created} ${unit}，已存在 ${stats.existed} ${unit}。`;
 	}
 	if (stats.failed > 0) {
 		text += en ? ` Failed: ${stats.failed}.` : `失败 ${stats.failed} 个。`;
@@ -177,4 +265,36 @@ export function proposalReceipt(
 		text += en ? ' Some batches were not judged.' : '有批未能判断。';
 	}
 	return text;
+}
+
+/** 词句同一条确认的回执。单类收藏仍走 proposalReceipt。 */
+export function pairedFavoriteReceipt(
+	lang: 'zh-CN' | 'en-US',
+	counts: NonNullable<ApplyStats['pairedCounts']>,
+	failed: number,
+): string {
+	const en = lang === 'en-US';
+	let text = en
+		? `Saved ${counts.vocabCreated} words and ${counts.classicCreated} sentences.`
+		: `已收藏 ${counts.vocabCreated} 个词、${counts.classicCreated} 条语句。`;
+	if (counts.vocabExisted > 0 || counts.classicExisted > 0) {
+		text += en
+			? ` Already in favorites: ${counts.vocabExisted} words, ${counts.classicExisted} sentences.`
+			: `已存在 ${counts.vocabExisted} 个词、${counts.classicExisted} 条语句。`;
+	}
+	if (failed > 0) {
+		text += en ? ` Failed: ${failed}.` : `失败 ${failed} 个。`;
+	}
+	return text;
+}
+
+/** 一条确认同时取消单词和语句。created 在这里是取消成功的条数。 */
+export function pairedRemoveReceipt(
+	lang: 'zh-CN' | 'en-US',
+	counts: NonNullable<ApplyStats['pairedCounts']>,
+): string {
+	if (lang === 'en-US') {
+		return `Removed ${counts.vocabCreated} words and ${counts.classicCreated} sentences from favorites.`;
+	}
+	return `已取消收藏 ${counts.vocabCreated} 个词、${counts.classicCreated} 条语句。`;
 }

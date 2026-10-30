@@ -56,6 +56,8 @@ export function stripMarkdownForTts(raw: string): string {
 	if (!raw?.trim()) return '';
 	return (
 		raw
+			// 英语 Agent 资源卡锚点，只给前端挂卡，不要念成 id
+			.replace(/\[\[el:[^\]]+\]\]/g, ' ')
 			// 移除 Markdown 代码块（``` 包围的多行内容）替换为空格，避免代码被朗读
 			.replace(/```[\s\S]*?```/g, ' ')
 			// 移除 Markdown 行内代码（`内容`）替换为空格

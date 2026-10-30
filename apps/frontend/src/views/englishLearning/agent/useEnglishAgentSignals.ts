@@ -1,7 +1,10 @@
 import { reaction } from 'mobx';
 import { useEffect, useState } from 'react';
 import { buildStreamTick } from '@/components/design/Assistant';
-import englishAgentStore, { type AgentToolChip } from '@/store/englishAgent';
+import englishAgentStore, {
+	type AgentToolChip,
+	type ElPendingProposal,
+} from '@/store/englishAgent';
 
 /** 仅条数变化；流式改 content 不触发 */
 export function useEnglishAgentMessageCount(): number {
@@ -67,11 +70,7 @@ export function useEnglishAgentToolTrail(): AgentToolChip[] {
 	return useEnglishAgentFlag(readToolTrail);
 }
 
-export function useEnglishAgentPendingProposal(): {
-	proposalId: string;
-	label: string;
-	tool?: string;
-} | null {
+export function useEnglishAgentPendingProposal(): ElPendingProposal | null {
 	return useEnglishAgentFlag(readPendingProposal);
 }
 

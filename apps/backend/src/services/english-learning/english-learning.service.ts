@@ -25,6 +25,7 @@ import {
 	DataSource,
 	In,
 	LessThanOrEqual,
+	MoreThanOrEqual,
 	Not,
 	Repository,
 	SelectQueryBuilder,
@@ -5051,6 +5052,20 @@ ${existingHintBlock}
 			select: ['id', 'contentKey'],
 		});
 		return rows.map((r) => ({ contentKey: r.contentKey, id: r.id }));
+	}
+
+	/** 某时刻之后写入的语句收藏 id。卡片对不上时，用来收回上一轮确认写入的行。 */
+	async listClassicQuoteFavoriteIdsSince(
+		userId: number,
+		since: Date,
+	): Promise<string[]> {
+		const rows = await this.classicQuoteFavoriteRepo.find({
+			where: { userId, createdAt: MoreThanOrEqual(since) },
+			select: ['id'],
+			order: { createdAt: 'ASC' },
+			take: 40,
+		});
+		return rows.map((row) => row.id);
 	}
 
 	/** 本进程内每个用户只补一次：已收藏但英标为空的词，从词库抄回音标等字段 */

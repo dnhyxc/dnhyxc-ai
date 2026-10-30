@@ -18,6 +18,14 @@ export type ElProposalPayload = {
 	body: Record<string, unknown>;
 	/** 一批词。有则 commit 按数组落库 */
 	items?: Record<string, unknown>[];
+	/**
+	 * 同一条确认里的另一类。只有原话同时点了单词和语句才写。
+	 * items 仍是 contentKind 那一侧。
+	 */
+	paired?: {
+		contentKind: 'vocab' | 'classic';
+		items: Record<string, unknown>[];
+	};
 	/** 点名超过上限、清单未取尽，或有批没判完 */
 	truncated?: boolean;
 	/** cap 点名截断；list 清单未取尽；judge 有批未能判断 */

@@ -24,6 +24,9 @@ export const DEFAULT_SILICONFLOW_RERANK_URL =
 /** 各模块未配置 SILICONFLOW_MODEL_NAME 时的默认值（有效会员） */
 export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
 
+/** 短决策和整类筛选固定模型。不读 SILICONFLOW_MODEL_NAME，避免跟着对话模型走。 */
+export const DECIDE_MODEL_NAME = 'Qwen/Qwen3.6-35B-A3B';
+
 /**
  * @description 硅基流动模型用途预设（与业务一一对应，用于选择配置）
  * - chat: 聊天
@@ -31,7 +34,7 @@ export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
  * - knowledgeQa: 知识库问答
  * - englishLearning: 英语学习
  * - ocr: 图片 OCR（固定 GLM_* 环境变量 + GLM-4.6V-Flash，不走设置页覆盖）
- * - decide: 短决策（固定 GLM_* + 调用方写死的 glm-4.7-flash，会员也不切硅基）
+ * - decide: 短决策（固定 SILICONFLOW_* + Qwen/Qwen3.6-35B-A3B，不跟对话模型，设置页也不覆盖）
  */
 export type SiliconFlowLlmPreset =
 	| 'chat'
@@ -267,6 +270,20 @@ function buildSiliconFlowEnvPresetOptions(
 }
 
 /**
+ * @description 决策档凭证：平台硅基 Key，模型固定千问。不走 buildSiliconFlowEnvPresetOptions，那个会读对话模型名。
+ */
+function buildDecideEnvPresetOptions(): ResolveSiliconFlowOptions {
+	return {
+		apiKeyEnvKeys: SILICONFLOW_ENV_API_KEY_KEYS,
+		baseUrlEnvKeys: SILICONFLOW_ENV_BASE_URL_KEYS,
+		defaultBaseUrl: DEFAULT_SILICONFLOW_BASE_URL,
+		resolveModelName: () => DECIDE_MODEL_NAME,
+		missingApiKeyMessage: '未配置 SILICONFLOW_API_KEY，无法做决策',
+		onMissingApiKey: throwSiliconFlowError,
+	};
+}
+
+/**
  * @description 构建 OCR 凭证解析 preset：GLM_API_KEY / GLM_BASE_URL + GLM-4.6V-Flash
  */
 function buildGlmOcrEnvPresetOptions(
@@ -373,11 +390,7 @@ const siliconFlowResolvePresets: Record<
 			'未配置 GLM_API_KEY，无法进行图片 OCR',
 			throwSiliconFlowError,
 		),
-	decide: () =>
-		buildGlmEnvPresetOptions(
-			'未配置 GLM_API_KEY，无法做决策',
-			throwSiliconFlowError,
-		),
+	decide: () => buildDecideEnvPresetOptions(),
 };
 
 /**
@@ -409,11 +422,7 @@ const memberSiliconFlowResolvePresets: Record<
 			'未配置 GLM_API_KEY，无法进行图片 OCR',
 			throwSiliconFlowError,
 		),
-	decide: () =>
-		buildGlmEnvPresetOptions(
-			'未配置 GLM_API_KEY，无法做决策',
-			throwSiliconFlowError,
-		),
+	decide: () => buildDecideEnvPresetOptions(),
 };
 
 /**
