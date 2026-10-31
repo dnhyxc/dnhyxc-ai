@@ -1,10 +1,24 @@
 // components/ChatTextArea.tsx
 
-import { Button, ScrollArea, Textarea } from '@ui/index';
-import React, { forwardRef, useLayoutEffect, useRef } from 'react';
+import { Button, Textarea } from '@ui/index';
+import React, {
+	forwardRef,
+	type RefObject,
+	useCallback,
+	useImperativeHandle,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { useEntry } from '@/hooks/useEntry'; // 根据实际路径调整
 import { cn } from '@/lib/utils';
 import { ChatI18nT, Message } from '@/types/chat'; // 根据实际路径调整
+
+/** ownedDraft 时供父级读写正文（发送 / 快捷意图），不经过受控 input 每键上浮 */
+export type ChatTextAreaDraftApi = {
+	getValue: () => string;
+	setValue: (value: string) => void;
+};
 
 interface ChatTextAreaProps {
 	// 状态
@@ -40,6 +54,14 @@ interface ChatTextAreaProps {
 	textareaId?: string;
 	onScrollAreaWheel?: React.WheelEventHandler<HTMLDivElement>;
 	onScrollAreaWheelCapture?: React.WheelEventHandler<HTMLDivElement>;
+	/**
+	 * 正文落在本组件本地：按键不 setInput 上浮，避免 ChatEntry 整树跟键重渲。
+	 * 发送按钮空/非空用 onArmedChange；读写走 draftApiRef。
+	 */
+	ownedDraft?: boolean;
+	draftApiRef?: RefObject<ChatTextAreaDraftApi | null>;
+	/** 仅在 trim 空↔非空 时回调，供发送钮禁用态 */
+	onArmedChange?: (armed: boolean) => void;
 }
 
 const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -62,86 +84,100 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			textareaId,
 			onScrollAreaWheel,
 			onScrollAreaWheelCapture,
+			ownedDraft = false,
+			draftApiRef,
+			onArmedChange,
 		},
 		ref,
 	) => {
-		const {
-			// isComposing,
-			handleKeyDown,
-			handleCompositionStart,
-			handleCompositionEnd,
-		} = useEntry({
-			isEdit: mode === 'edit',
-			loading,
-			input,
-			setInput,
-			editMessage,
-			setEditMessage,
-			handleEditChange,
-			sendMessage,
-			textareaRef: {
-				current: ref,
-			} as React.RefObject<HTMLTextAreaElement | null>,
-		});
+		const [draft, setDraft] = useState(input ?? '');
+		const draftRef = useRef(draft);
+		draftRef.current = draft;
+		const armedRef = useRef((input ?? '').trim().length > 0);
 
-		const scrollRef = useRef<HTMLDivElement>(null);
+		const notifyArmed = useCallback(
+			(value: string) => {
+				const armed = value.trim().length > 0;
+				if (armed === armedRef.current) return;
+				armedRef.current = armed;
+				onArmedChange?.(armed);
+			},
+			[onArmedChange],
+		);
+
+		const setOwnedDraft = useCallback(
+			(value: string) => {
+				setDraft(value);
+				draftRef.current = value;
+				notifyArmed(value);
+			},
+			[notifyArmed],
+		);
+
+		useImperativeHandle(
+			draftApiRef,
+			() => ({
+				getValue: () => draftRef.current,
+				setValue: setOwnedDraft,
+			}),
+			[setOwnedDraft],
+		);
+
+		const applyChatInput = ownedDraft ? setOwnedDraft : setInput;
+
+		const { handleKeyDown, handleCompositionStart, handleCompositionEnd } =
+			useEntry({
+				isEdit: mode === 'edit',
+				loading,
+				input: ownedDraft ? draft : input,
+				setInput: applyChatInput,
+				editMessage,
+				setEditMessage,
+				handleEditChange,
+				sendMessage,
+				textareaRef: {
+					current: ref,
+				} as React.RefObject<HTMLTextAreaElement | null>,
+			});
+
+		/** 仅换行等显式请求时递增；勿每键读 scrollHeight（会逼整页同步 layout） */
+		const [scrollNonce, setScrollNonce] = useState(0);
 
 		const isEditMode = mode === 'edit';
-		const value = isEditMode ? editMessage?.content || '' : input;
+		const value = isEditMode
+			? editMessage?.content || ''
+			: ownedDraft
+				? draft
+				: input;
 		const chatInputDisabled =
 			!isEditMode && (Boolean(loading) || Boolean(disableTextInput));
 
 		const placeholder =
 			placeholderProp ?? t?.('chat.entry.placeholder') ?? '请输入您的问题';
 
-		const scrollInputToBottom = () => {
-			const scroll = () => {
-				const viewport = scrollRef.current;
-				if (viewport) {
-					viewport.scrollTop = viewport.scrollHeight;
-				}
-				const el = typeof ref !== 'function' ? ref?.current : null;
-				if (el) {
-					el.scrollTop = el.scrollHeight;
-				}
-			};
-			requestAnimationFrame(() => {
-				scroll();
-				requestAnimationFrame(scroll);
-			});
-		};
+		const scrollInputToBottom = useCallback(() => {
+			setScrollNonce((n) => n + 1);
+		}, []);
 
-		// 受控 value 更新后（如 Shift+Enter 换行）再滚到底，避免光标被挡在视口外
+		// Shift+Enter 换行：等受控 value 提交后再滚，避免光标被挡
 		useLayoutEffect(() => {
+			if (scrollNonce === 0) return;
 			const el = typeof ref !== 'function' ? ref?.current : null;
 			if (!el || document.activeElement !== el) return;
-			const atEnd =
-				el.selectionStart === el.value.length &&
-				el.selectionEnd === el.value.length;
-			if (!atEnd) return;
-
-			const viewport = scrollRef.current;
-			if (viewport) {
-				viewport.scrollTop = viewport.scrollHeight;
-			}
 			el.scrollTop = el.scrollHeight;
 			requestAnimationFrame(() => {
-				if (viewport) {
-					viewport.scrollTop = viewport.scrollHeight;
-				}
 				el.scrollTop = el.scrollHeight;
 			});
-		}, [value, ref]);
+		}, [scrollNonce, ref]);
 
 		return (
 			<>
-				<ScrollArea
-					ref={scrollRef}
-					viewportTabIndex={-1}
-					className={cn(
-						'flex max-h-35 w-full flex-col overflow-y-auto border-0',
-						className,
-					)}
+				{/*
+				 * 不用 ScrollArea + field-sizing-content：每键长高会改 footer，
+				 * flex 挤压消息列，会话 DOM 越大输入越卡。固定高度 + 自身滚动。
+				 */}
+				<div
+					className={cn('w-full border-0', className)}
 					onWheel={onScrollAreaWheel}
 					onWheelCapture={onScrollAreaWheelCapture}
 				>
@@ -151,7 +187,9 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						value={value}
 						maxLength={maxLength}
 						onChange={
-							isEditMode ? handleEditChange : (e) => setInput?.(e.target.value)
+							isEditMode
+								? handleEditChange
+								: (e) => applyChatInput?.(e.target.value)
 						}
 						onKeyDown={(e) =>
 							handleKeyDown(
@@ -166,12 +204,14 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						spellCheck={false}
 						className={cn(
 							'flex-1 resize-none border-none shadow-none focus-visible:ring-transparent',
+							// 压过 ui/Textarea 默认 field-sizing-content，避免每键撑高 footer
+							'field-sizing-fixed max-h-35 overflow-y-auto',
 							textareaClassName ? null : 'min-h-16',
 							textareaClassName,
 						)}
 						disabled={isEditMode ? Boolean(loading) : chatInputDisabled}
 					/>
-				</ScrollArea>
+				</div>
 				{isEditMode && (
 					<div className="flex justify-end gap-2 mt-2">
 						<Button

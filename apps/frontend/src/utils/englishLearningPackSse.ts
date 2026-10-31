@@ -182,7 +182,7 @@ async function runEnglishLearningPackSseStream<TItem>(
 		api?: string;
 		body: {
 			topic: string;
-			/** 省略时由后端按单次上限拉取 */
+			/** 省略时后端默认 100 */
 			count?: number;
 		};
 		callbacks: EnglishPackStreamCallbacks<TItem>;

@@ -968,6 +968,15 @@ export class AgentService {
 					(row.contentKind === 'vocab' || row.contentKind === 'classic'),
 			);
 			text = placeCardHint(text, spilled, fullLibrary);
+			// 模型常把 list 的 artifactId 手写进 [[el:]]，但 index 未推卡 → 前端锚点空渲染；无对应资源则剥掉
+			if (spilled) {
+				const ids = new Set(turnElResources.map((row) => row.artifactId));
+				text = text.replace(/\[\[el:([^\]]+)\]\]/g, (full, id: string) =>
+					ids.has(id) ? full : '',
+				);
+			} else {
+				text = text.replace(/\[\[el:[^\]]+\]\]/g, '');
+			}
 			if (!text.trim() && spilled) {
 				text = turnElResources
 					.map(

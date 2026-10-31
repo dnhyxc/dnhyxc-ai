@@ -41,7 +41,8 @@ export const EnglishAgentMessageList = memo(
 		getSelectionContextMenuItems,
 		onSpeakContent,
 	}: EnglishAgentMessageListProps) {
-		const messages = englishAgentStore.messages;
+		// 只订 chatId 列表：正文就地 patch 不重挂整列；行内 observer 自己订 content
+		const chatIds = englishAgentStore.messages.map((m) => m.chatId);
 		/** 继续回答：从上次导语的断点接着写完，不要逐条复述清单，完整条目在下方卡片。 */
 		const continueProse = useCallback(() => {
 			void englishAgentStore.sendMessage(
@@ -49,13 +50,13 @@ export const EnglishAgentMessageList = memo(
 			);
 		}, []);
 
-		return messages.map((m, index) => (
+		return chatIds.map((chatId, index) => (
 			<AssistantMessageRow
-				key={m.chatId}
+				key={chatId}
 				selectMessageByChatId={selectEnglishMessageByChatId}
-				chatId={m.chatId}
+				chatId={chatId}
 				index={index}
-				messagesLength={messages.length}
+				messagesLength={chatIds.length}
 				isCopyedId={isCopyedId ?? ''}
 				onCopy={onCopy}
 				isLoading={isLoading}

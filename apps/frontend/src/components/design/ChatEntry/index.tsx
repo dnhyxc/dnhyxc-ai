@@ -1,5 +1,5 @@
 import ChatFileList from '@design/ChatFileList';
-import ChatTextArea from '@design/ChatTextArea';
+import ChatTextArea, { type ChatTextAreaDraftApi } from '@design/ChatTextArea';
 import MessageSendControl from '@design/MessageSendButton';
 import Upload from '@design/Upload';
 import { Button, ScrollArea, ScrollBar } from '@ui/index';
@@ -12,8 +12,10 @@ import {
 	Link,
 } from 'lucide-react';
 import {
+	type RefObject,
 	useCallback,
 	useEffect,
+	useImperativeHandle,
 	useLayoutEffect,
 	useMemo,
 	useRef,
@@ -112,6 +114,13 @@ export type ChatEntryT = (
 	params?: Record<string, unknown>,
 ) => string;
 
+/** isolateDraft 时：快捷意图 / 外部读写正文，不经由受控 input 每键上浮 */
+export type ChatEntryDraftHandle = {
+	getInput: () => string;
+	setInput: (value: string) => void;
+	focusAtEnd: () => void;
+};
+
 interface ChatEntryProps {
 	input: string;
 	setInput: (val: string) => void;
@@ -155,6 +164,12 @@ interface ChatEntryProps {
 	textareaId?: string;
 	/** 最大宽度 */
 	maxWidth?: string;
+	/**
+	 * 正文由 ChatTextArea 本地持有：按键不重渲本组件（仅空↔非空时更新发送钮）。
+	 * 外部读写走 draftHandleRef；发送时会把正文作为 content 传入 sendMessage。
+	 */
+	isolateDraft?: boolean;
+	draftHandleRef?: RefObject<ChatEntryDraftHandle | null>;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -185,28 +200,73 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	focusInputAtEndKey,
 	textareaId,
 	maxWidth = 'max-w-3xl',
+	isolateDraft = false,
+	draftHandleRef,
 }) => {
 	const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const textareaRef = chatInputRef ?? internalTextareaRef;
 	const consumedFocusAtEndKeyRef = useRef(0);
+	const textAreaDraftApiRef = useRef<ChatTextAreaDraftApi | null>(null);
+	const [draftArmed, setDraftArmed] = useState(() => input.trim().length > 0);
 
-	// 仅在 focusInputAtEndKey 递增时聚焦一次；不可依赖 input 反复 setSelectionRange（会破坏 IME/正常输入）
-	useLayoutEffect(() => {
-		if (!focusInputAtEndKey) return;
-		if (focusInputAtEndKey <= consumedFocusAtEndKeyRef.current) return;
-		if (!input.length) return;
+	const readDraft = useCallback(
+		() =>
+			isolateDraft ? (textAreaDraftApiRef.current?.getValue() ?? '') : input,
+		[input, isolateDraft],
+	);
 
+	const writeDraft = useCallback(
+		(value: string) => {
+			if (isolateDraft) {
+				textAreaDraftApiRef.current?.setValue(value);
+				return;
+			}
+			setInput(value);
+		},
+		[isolateDraft, setInput],
+	);
+
+	const focusDraftAtEnd = useCallback(() => {
 		const el = textareaRef.current;
-		if (!el?.value.length) return;
-
-		consumedFocusAtEndKeyRef.current = focusInputAtEndKey;
+		if (!el) return;
 		const len = el.value.length;
+		if (!len) return;
 		const active = document.activeElement;
 		if (active instanceof HTMLIFrameElement) active.blur();
 		el.focus({ preventScroll: true });
 		el.setSelectionRange(len, len);
 		el.scrollTop = el.scrollHeight;
-	}, [focusInputAtEndKey, input, textareaRef]);
+	}, [textareaRef]);
+
+	useImperativeHandle(
+		draftHandleRef,
+		() => ({
+			getInput: readDraft,
+			setInput: writeDraft,
+			focusAtEnd: focusDraftAtEnd,
+		}),
+		[focusDraftAtEnd, readDraft, writeDraft],
+	);
+
+	// 仅在 focusInputAtEndKey 递增时聚焦一次；不可依赖 input 反复 setSelectionRange（会破坏 IME/正常输入）
+	useLayoutEffect(() => {
+		if (!focusInputAtEndKey) return;
+		if (focusInputAtEndKey <= consumedFocusAtEndKeyRef.current) return;
+		const len = isolateDraft
+			? (textareaRef.current?.value.length ?? 0)
+			: input.length;
+		if (!len) return;
+
+		const el = textareaRef.current;
+		if (!el?.value.length) return;
+
+		consumedFocusAtEndKeyRef.current = focusInputAtEndKey;
+		const active = document.activeElement;
+		if (active instanceof HTMLIFrameElement) active.blur();
+		el.focus({ preventScroll: true });
+		el.setSelectionRange(el.value.length, el.value.length);
+		el.scrollTop = el.scrollHeight;
+	}, [focusInputAtEndKey, input, isolateDraft, textareaRef]);
 
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -361,14 +421,14 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			bumpSent();
 			const base = voiceBaseRef.current;
 			// 不用 startTransition：语音回填走高优先级更新，降低「出字慢一拍」体感
-			setInput(base ? `${base} ${text}`.trim() : text);
+			writeDraft(base ? `${base} ${text}`.trim() : text);
 		} catch {
 			tauriLiveLastSentBytesRef.current = blob.size;
 			/* 未完成容器或非完整编码时接口可能失败，静默等待更多音频后再试 */
 		} finally {
 			tauriLivePollBusyRef.current = false;
 		}
-	}, [setInput]);
+	}, [writeDraft]);
 
 	const pickRecorderMimeType = useCallback((): string => {
 		if (typeof MediaRecorder === 'undefined') return '';
@@ -407,7 +467,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		}
 
 		// 将当前输入内容作为语音识别前缀（前置文本），稍后回填时拼接使用
-		voiceBaseRef.current = input.trim();
+		voiceBaseRef.current = readDraft().trim();
 
 		// 3. 仅在支持 MediaRecorder 的环境下启动，防御 Safari/小众浏览器等兼容性问题
 		if (typeof MediaRecorder === 'undefined') {
@@ -483,7 +543,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			});
 		}
 	}, [
-		input,
+		readDraft,
 		pickRecorderMimeType,
 		runTauriLiveTranscribePoll,
 		stopMediaTracks,
@@ -572,10 +632,21 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		) => {
 			// 发送前先终止并清理录音/语音状态，保证不会有悬挂的录音会话
 			await discardActiveVoiceCapture();
-			// 调用主发送方法，完成文本/附件正式发送
+			if (isolateDraft) {
+				const body = (content ?? readDraft()).trim();
+				sendMessage(body || undefined, index, isEdit, attachments);
+				writeDraft('');
+				return;
+			}
 			sendMessage(content, index, isEdit, attachments);
 		},
-		[discardActiveVoiceCapture, sendMessage],
+		[
+			discardActiveVoiceCapture,
+			isolateDraft,
+			readDraft,
+			sendMessage,
+			writeDraft,
+		],
 	);
 
 	useEffect(() => {
@@ -642,13 +713,14 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 	/** Tauri：输入从非空变为空时停止当前录音/转写（保持语音输入模式） */
 	const prevInputTrimRef = useRef('');
+	const draftPresence = isolateDraft ? (draftArmed ? 'x' : '') : input.trim();
 	useEffect(() => {
 		if (!isTauriRuntime()) {
-			prevInputTrimRef.current = input.trim();
+			prevInputTrimRef.current = draftPresence;
 			return;
 		}
 		const prev = prevInputTrimRef.current;
-		const cur = input.trim();
+		const cur = draftPresence;
 		const hasActiveVoiceSession =
 			voiceRecordingRef.current ||
 			voiceRecording ||
@@ -658,7 +730,12 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			void discardActiveVoiceCapture();
 		}
 		prevInputTrimRef.current = cur;
-	}, [input, discardActiveVoiceCapture, voiceRecording, voiceTranscribing]);
+	}, [
+		draftPresence,
+		discardActiveVoiceCapture,
+		voiceRecording,
+		voiceTranscribing,
+	]);
 
 	/**
 	 * 主发送按钮/语音按钮的操作逻辑，细致覆盖文本与语音模式下各种情形。
@@ -668,9 +745,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		if (!isTauriRuntime() || inputMode === 'text') {
 			// 如果文本输入被禁用则直接返回，不做任何操作
 			if (disableTextInput) return;
-			// 发送消息，并重置语音相关状态
 			await sendMessageWithVoiceReset();
-			// 重新聚焦到输入框
 			textareaRef.current?.focus();
 			return;
 		}
@@ -686,10 +761,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		// 禁用文本输入时，此按钮应不可响应
 		if (disableTextInput) return;
 		// 若输入框当前已有内容（由语音识别或手动输入），主按钮视为“发送”
-		if (input.trim()) {
-			// 如果输入框中已有内容（可能来源于语音识别或手动输入），点击主按钮则发送消息，并重置语音相关状态
+		if (readDraft().trim()) {
 			await sendMessageWithVoiceReset();
-			// 发送后重新聚焦输入框，方便用户继续输入
 			textareaRef.current?.focus();
 			return;
 		}
@@ -699,28 +772,28 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		textareaRef,
 		disableTextInput,
 		finalizeVoiceAndTranscribe,
-		input,
 		inputMode,
+		isolateDraft,
+		readDraft,
 		sendMessageWithVoiceReset,
 		startVoiceCapture,
 		voiceRecording,
 		voiceTranscribing,
+		writeDraft,
 	]);
 
 	const voiceUiActive =
 		isTauriRuntime() && voiceConversionAllowed && inputMode === 'voice';
 	/** 语音模式空闲但输入框有内容时，主按钮展示为发送 */
+	const hasDraftText = isolateDraft ? draftArmed : input.trim() !== '';
 	const voicePrimaryShowsSend =
-		voiceUiActive &&
-		!voiceRecording &&
-		!voiceTranscribing &&
-		input.trim() !== '';
+		voiceUiActive && !voiceRecording && !voiceTranscribing && hasDraftText;
 
 	// 主发送钮禁用条件（分支顺序与原先嵌套三元一致，勿调换）
 	const sendDisabled = useMemo(() => {
 		const busy = loading ?? false;
 		const locked = disableTextInput ?? false;
-		const empty = !input.trim();
+		const empty = !hasDraftText;
 
 		// 非语音 UI：等同纯文本发送区
 		if (!voiceUiActive) {
@@ -738,7 +811,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		return locked || busy;
 	}, [
 		disableTextInput,
-		input,
+		hasDraftText,
 		loading,
 		voiceRecording,
 		voicePrimaryShowsSend,
@@ -850,6 +923,9 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							textareaClassName={textareaClassName}
 							disableTextInput={disableTextInput}
 							t={t}
+							ownedDraft={isolateDraft}
+							draftApiRef={textAreaDraftApiRef}
+							onArmedChange={setDraftArmed}
 						/>
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
@@ -936,7 +1012,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								sendDisabledHint={
 									sendDisabled &&
 									!voiceUiActive &&
-									(!input.trim() || disableTextInput)
+									(!hasDraftText || disableTextInput)
 										? (t?.('chat.entry.sendDisabledHintWeb') ??
 											t?.('chat.entry.sendDisabledHint') ??
 											'请先输入内容')

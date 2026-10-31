@@ -85,7 +85,7 @@ export const englishLearning = {
 	'englishLearning.classic.collapseList': 'Collapse quote list',
 	'englishLearning.classic.count': 'Count (optional)',
 	'englishLearning.classic.countHint':
-		'Leave empty for the server per-request limit; enter 1–6000, or tap a preset',
+		'Leave empty to generate 100; enter 1–6000, or tap a preset',
 	'englishLearning.classic.countInvalid': 'Use 1–6000, or leave empty',
 	'englishLearning.classic.descShort':
 		'Fetch famous quotes, phrases, etc. by theme',
@@ -818,9 +818,9 @@ export const englishLearning = {
 	'englishLearning.vocab.collapseList': 'Collapse word list',
 	'englishLearning.vocab.count': 'Count (optional)',
 	'englishLearning.vocab.countHint':
-		'Leave empty for the server per-request limit; enter 1–12000, or tap a preset',
+		'Leave empty to generate 100; enter 1–12000, or tap a preset',
 	'englishLearning.vocab.countInvalid': 'Use 1–12000, or leave empty',
-	'englishLearning.vocab.countPlaceholder': 'Empty = max per request',
+	'englishLearning.vocab.countPlaceholder': 'Empty = 100',
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
 	'englishLearning.vocab.descShort': 'Generate a word list by theme',

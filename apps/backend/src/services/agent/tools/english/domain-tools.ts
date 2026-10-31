@@ -64,6 +64,7 @@ import {
 	slimPage,
 	slimRow,
 	spillListResult,
+	wantsLibraryCatalog,
 } from './spill';
 
 /** 整类口吻才读本轮词库。点名「收藏 cat」不扫清单。 */
@@ -1088,13 +1089,18 @@ export function buildEnglishLearningDomainTools(
 						hideCard &&
 						isIndexOp(name, op) &&
 						listIntent(deps.surface.userText) === 'inventory';
+					/** 复合问「有哪些库 + 关于类」：挂库列表卡，但不标 presented，以免挡住后续 classify */
+					const catalogAsk =
+						name === 'el_libraries' &&
+						op === 'list' &&
+						wantsLibraryCatalog(deps.surface.userText);
 					const spilled = await spillListResult(
 						name,
 						env,
 						(row) => deps.artifacts.put(deps.userId, row),
 						{
 							slim: hideCard || noteOpen,
-							always: hideCard || noteOpen,
+							always: hideCard || noteOpen || catalogAsk,
 							inventory,
 						},
 					);
@@ -1169,6 +1175,16 @@ export function buildEnglishLearningDomainTools(
 								spilled.full.libraryId ?? spilled.full.artifactId,
 							);
 							deps.onResourceList?.(spilled.full);
+						} else if (catalogAsk) {
+							deps.surface.libraryLists.push(spilled.full);
+							deps.surface.shownLibraryIds.add(spilled.full.artifactId);
+							deps.onResourceList?.(spilled.full);
+							spilled.model.message = [
+								spilled.model.message,
+								'库列表卡片已列出。禁止用 Markdown 表复述库名。若还要按类别筛选，继续 classify，不要声称库卡未列出。',
+							]
+								.filter(Boolean)
+								.join(' ');
 						} else if (isIndexOp(name, op)) {
 							deps.surface.libraryLists.push(spilled.full);
 						} else if (!hideCard) deps.onResourceList?.(spilled.full);

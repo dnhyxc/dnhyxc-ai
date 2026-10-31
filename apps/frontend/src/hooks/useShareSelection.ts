@@ -110,16 +110,31 @@ export function useShareSelection<TMessage extends { chatId: string }>({
 		return Math.floor(checkedMessages.size / 2);
 	}, [enabled, checkedMessages]);
 
-	return {
-		isSharing,
-		setIsSharing,
-		checkedMessages,
-		setCheckedMessage,
-		togglePair,
-		replaceCheckedMessages,
-		setAllCheckedMessages,
-		clearAllCheckedMessages,
-		isAllChecked,
-		selectedPairCount,
-	};
+	// 稳定引用：避免父级无关重渲时 MessageList memo 因 shareSelection !== 失效
+	return useMemo(
+		() => ({
+			isSharing,
+			setIsSharing,
+			checkedMessages,
+			setCheckedMessage,
+			togglePair,
+			replaceCheckedMessages,
+			setAllCheckedMessages,
+			clearAllCheckedMessages,
+			isAllChecked,
+			selectedPairCount,
+		}),
+		[
+			isSharing,
+			setIsSharing,
+			checkedMessages,
+			setCheckedMessage,
+			togglePair,
+			replaceCheckedMessages,
+			setAllCheckedMessages,
+			clearAllCheckedMessages,
+			isAllChecked,
+			selectedPairCount,
+		],
+	);
 }

@@ -81,7 +81,7 @@ export const englishLearning = {
 	'englishLearning.classic.collapseList': '收起语句列表',
 	'englishLearning.classic.count': '条数（选填）',
 	'englishLearning.classic.countHint':
-		'留空不指定条数，由服务端按单次上限生成；填写须为 1～6000 整数，或点快捷数量',
+		'留空默认生成 100 条；填写须为 1～6000 整数，或点快捷数量',
 	'englishLearning.classic.countInvalid': '须为 1～6000 整数，或留空',
 	'englishLearning.classic.descShort': '按主题拉取名句、短语等',
 	'englishLearning.classic.empty': '未返回条目，请换主题重试',
@@ -744,9 +744,9 @@ export const englishLearning = {
 	'englishLearning.vocab.collapseList': '收起单词列表',
 	'englishLearning.vocab.count': '词数（选填）',
 	'englishLearning.vocab.countHint':
-		'留空不指定条数，由服务端按单次上限生成；填写须为 1～12000 整数，或点快捷数量',
+		'留空默认生成 100 个；填写须为 1～12000 整数，或点快捷数量',
 	'englishLearning.vocab.countInvalid': '须为 1～12000 整数，或留空',
-	'englishLearning.vocab.countPlaceholder': '留空按上限拉取',
+	'englishLearning.vocab.countPlaceholder': '留空默认 100',
 	'englishLearning.vocab.desc':
 		'按你的主题生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
 	'englishLearning.vocab.descShort': '按主题生成单词表',

@@ -27,8 +27,11 @@ export const EL_SLIM_MAX_CHARS = 12_000;
 export type ListIntent = 'inventory' | 'filter' | 'other';
 
 const FILTER_RE = /找出|筛|相关|有关|哪些是|属于|人体|挑出|主题/;
+/**
+ * 整表/盘点问法。须盖住「错题集有哪些资源」这类：旧式「有哪些错」对不上「有哪些资源」。
+ */
 const INVENTORY_RE =
-	/全部|所有单词|所有词|整个库|导出|列出全部|哪些错题|有哪些错|错题库|我的错题|列出错题|重新练习/;
+	/全部|所有单词|所有词|整个库|导出|列出全部|哪些错题|有哪些错|错题集|错题库|我的错题|列出错题|错题.{0,12}(有哪些|哪些|资源)|有哪些.{0,12}错题|重新练习/;
 /** 「所有英语四级单词库中的单词」：库名隔在「所有」和「单词」之间 */
 const ALL_WORDS_RE = /所有.{0,16}(单词|词条|的词)/;
 
@@ -362,6 +365,18 @@ function stemInCatalog(span: string, libs: { title: string }[]): string {
 const VOCAB_LIBRARY_MARK = /词汇库|单词库|词库/;
 
 /**
+ * 「我有哪些语句库」里的「我有哪些」不是库名；若当 miss 会把后面的「三年级语句库」误判成 ambiguous。
+ */
+function isCatalogAskSpan(span: string): boolean {
+	const s = span.trim();
+	if (s.length < 2) return true;
+	if (/^(我)?(有)?(哪些|什么|所有|全部|各个)$/u.test(s)) return true;
+	if (/^(我有)?(哪些|什么)/u.test(s) && !/[年级册级四五六]/.test(s))
+		return true;
+	return false;
+}
+
+/**
  * 原话点了「X + 库后缀」时先在目录里对，不再交给「所有」去扫全部库。
  * 不传后缀时仍认词汇库。语句工具传入语句后缀。「所有词汇库」没有具体库名，返回 absent。
  */
@@ -384,30 +399,33 @@ export function resolveMentionedLibrary(
 		}
 		const span = text.slice(start, end);
 		if (span.length < 2 || !usableCue(`${span}词库`)) continue;
+		if (isCatalogAskSpan(span)) continue;
 		spans.push(span);
 	}
 	if (!spans.length) return { kind: 'absent' };
 	const picked: { id: string; title: string }[] = [];
-	let missed = false;
 	for (const span of spans) {
 		const stem = stemInCatalog(span, libs);
-		if (!stem) {
-			missed = true;
-			continue;
-		}
+		if (!stem) continue;
 		const named = resolveNamedLibrary(stem, libs);
 		if (named.kind === 'one') picked.push(named.lib);
 		else if (named.kind === 'ambiguous') return named;
-		else missed = true;
 	}
 	const uniq: { id: string; title: string }[] = [];
 	for (const lib of picked) {
 		if (!uniq.some((row) => row.id === lib.id)) uniq.push(lib);
 	}
-	if (uniq.length === 1 && !missed) return { kind: 'one', lib: uniq[0] };
+	if (uniq.length === 1) return { kind: 'one', lib: uniq[0] };
 	if (uniq.length > 0)
 		return { kind: 'ambiguous', candidates: uniq.slice(0, 10) };
 	return { kind: 'none' };
+}
+
+/** 用户还要看「有哪些库」清单（可与关于类筛选同句，不走 inventory 独占）。 */
+export function wantsLibraryCatalog(userText: string): boolean {
+	return /有哪些.{0,8}(语句库|语料库|词汇库|单词库|词库)|我有哪些.{0,8}库|所有语句库|所有词汇库|所有单词库|列出.{0,6}(语句库|语料库|词汇库|单词库)|需要的是所有(语句库|词汇库)/u.test(
+		userText,
+	);
 }
 
 /** 双向包含后只接受严格更长的一本。等长或落空都不猜。 */
@@ -638,11 +656,23 @@ function collectItems(record: Record<string, unknown>): unknown[] | null {
 	return nested.length ? nested : null;
 }
 
-function artifactTitle(tool: string, items: unknown[]): string {
+function artifactTitle(tool: string, items: unknown[], kind?: string): string {
 	const first = items[0];
 	if (first && typeof first === 'object') {
 		const title = textOf((first as { libraryTitle?: unknown }).libraryTitle);
 		if (title) return title;
+	}
+	if (tool === 'el_mistakes') {
+		if (kind === 'classic') return '语句错题';
+		if (kind === 'vocab') return '单词错题';
+	}
+	if (tool === 'el_favorites') {
+		if (kind === 'classic') return '语句收藏';
+		if (kind === 'vocab') return '单词收藏';
+	}
+	if (tool === 'el_libraries') {
+		if (kind === 'classic') return '语句库';
+		if (kind === 'vocab') return '词汇库';
 	}
 	return TOOL_TITLE[tool] ?? '清单';
 }
@@ -896,8 +926,10 @@ export async function spillListResult(
 		typeof record.totalCount === 'number' ? record.totalCount : items.length;
 	const truncated = env.meta?.truncated === true;
 	const named = textOf(record.title);
+	const kindHint =
+		contentKind ?? (typeof record.kind === 'string' ? record.kind : undefined);
 	const draft: Omit<ElResourceListPayload, 'artifactId'> = {
-		title: named || artifactTitle(tool, items),
+		title: named || artifactTitle(tool, items, kindHint),
 		source: sourceOf(tool),
 		...(contentKind ? { contentKind } : {}),
 		...(libraryId ? { libraryId } : {}),

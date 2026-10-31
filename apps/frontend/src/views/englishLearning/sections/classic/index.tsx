@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	HISTORY_PAGE_SIZE,
+	PACK_COUNT_DEFAULT,
 	QUOTE_COUNT_MAX,
 	QUOTE_COUNT_MIN,
 	SCROLL_LOAD_THRESHOLD_PX,
@@ -233,8 +234,11 @@ function ClassicQuotesSectionInner() {
 			});
 			return;
 		}
-		let effectiveTarget = QUOTE_COUNT_MAX;
-		const body: { topic: string; count?: number } = { topic: req };
+		let effectiveTarget = PACK_COUNT_DEFAULT;
+		const body: { topic: string; count: number } = {
+			topic: req,
+			count: effectiveTarget,
+		};
 		if (countInput.trim() !== '') {
 			const n = Number.parseInt(countInput, 10);
 			if (!Number.isFinite(n) || n < QUOTE_COUNT_MIN || n > QUOTE_COUNT_MAX) {

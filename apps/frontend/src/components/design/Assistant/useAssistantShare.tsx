@@ -33,18 +33,28 @@ export function useAssistantShare(
 
 	const allowAiShare = enabled && Boolean(sessionId);
 
+	const listMessages = useCallback(
+		() => [...readMessages()],
+		[getAllMessages, messages],
+	);
+
+	const pairResolver = useCallback(
+		(message: Message, all?: Message[]) =>
+			resolveSharePairFromList(message, all ?? listMessages()),
+		[listMessages],
+	);
+
 	const shareFlow = useShareFlow<Message>({
 		enabled: allowAiShare,
-		getAllMessages: () => [...readMessages()],
-		pairResolver: (message, all) =>
-			resolveSharePairFromList(message, all ?? [...readMessages()]),
+		getAllMessages: listMessages,
+		pairResolver,
 	});
 
 	const { shareSelection } = shareFlow;
 	const resolveSharePair = useCallback(
 		(message: Message): [string, string] | null =>
-			resolveSharePairFromList(message, [...readMessages()]),
-		[getAllMessages, messages],
+			resolveSharePairFromList(message, listMessages()),
+		[listMessages],
 	);
 
 	const onShare = useCallback(

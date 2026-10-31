@@ -2,20 +2,24 @@
  * 英语学习页右侧 Agent 对话区：布局与交互对齐知识库「KnowledgeAssistant」
  *（贴底滚动、代码块浮动工具栏、角落上/下滚动、空态卡片、双段 footer + ChatEntry）。
  *
- * 流式时消息列与输入区解耦：streamTick 只驱动滚动壳，ChatEntry 元素引用保持稳定，避免输入卡顿。
+ * 解耦：
+ * - 流式：streamTick 只驱动滚动壳，不重挂载 ChatEntry
+ * - 输入：draft 落在 EnglishAgentComposer 本地，按键不重渲消息列 / 左侧栏
  */
-import ChatEntry from '@design/ChatEntry';
+import ChatEntry, { type ChatEntryDraftHandle } from '@design/ChatEntry';
 import { Button, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import { Atom, Vegan } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type Dispatch,
+	forwardRef,
 	type ReactNode,
 	type RefObject,
 	type SetStateAction,
 	useCallback,
 	useEffect,
+	useImperativeHandle,
 	useMemo,
 	useRef,
 	useState,
@@ -36,6 +40,11 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import englishAgentStore from '@/store/englishAgent';
 import type { Message } from '@/types/chat';
+import { stripAutoFilledIntentName } from '@/utils';
+import type { QuickIntentInputSyncPayload } from '../sidebar';
+
+const noopSetInput = (_: string) => {};
+
 import { EnglishAgentMessageList } from './EnglishAgentMessageList';
 import {
 	useEnglishAgentIsHydrating,
@@ -49,14 +58,14 @@ import {
 	useEnglishAgentToolTrail,
 } from './useEnglishAgentSignals';
 
+export type AgentPanelHandle = {
+	applyQuickIntent: (payload: QuickIntentInputSyncPayload) => void;
+};
+
 export type AgentPanelProps = {
-	input: string;
-	setInput: Dispatch<SetStateAction<string>>;
-	chatInputRef: RefObject<HTMLTextAreaElement | null>;
-	/** 递增时 ChatEntry 聚焦并将光标置于末尾（快捷意图预填） */
-	focusInputAtEndKey?: number;
-	sendMessage: () => void | Promise<void>;
 	onNewChat: () => void;
+	/** 发送成功且拿到 sessionId 后回写路由 */
+	onSessionReady?: (sessionId: string) => void;
 };
 
 const getEnglishMessages = () => englishAgentStore.messages;
@@ -364,221 +373,333 @@ function EnglishAgentScrollShell({
 	);
 }
 
-/** observer 仅用于 userStore 等非流式字段；勿在 render 读 messages / content */
-export const AgentPanel = observer(function AgentPanel({
-	input,
-	setInput,
-	chatInputRef,
-	focusInputAtEndKey = 0,
-	sendMessage,
-	onNewChat,
-}: AgentPanelProps) {
+/**
+ * 输入区：ChatEntry isolateDraft → 正文只在 ChatTextArea 本地，按键不重渲 Composer/工具条。
+ * 快捷意图走 draftHandleRef；发送在内部完成并回调 onSessionReady。
+ */
+const EnglishAgentComposer = forwardRef<
+	AgentPanelHandle,
+	{
+		isLoggedIn: boolean;
+		isHistoryDrawerOpen: boolean;
+		setIsHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
+		enableStickToBottom: () => void;
+		flushScrollToBottom: (options?: { force?: boolean }) => void;
+		onNewChat: () => void;
+		onSessionReady?: (sessionId: string) => void;
+		pendingProposal: ReturnType<typeof useEnglishAgentPendingProposal>;
+		proposalCommitting: boolean;
+		confirmPendingProposal: () => void | Promise<void>;
+	}
+>(function EnglishAgentComposer(
+	{
+		isLoggedIn,
+		isHistoryDrawerOpen,
+		setIsHistoryDrawerOpen,
+		enableStickToBottom,
+		flushScrollToBottom,
+		onNewChat,
+		onSessionReady,
+		pendingProposal,
+		proposalCommitting,
+		confirmPendingProposal,
+	},
+	ref,
+) {
 	const { t } = useI18n();
-	const navigate = useNavigate();
-	const { knowledgeStore, userStore } = useStore();
-	const isLoggedIn = Boolean(userStore.userInfo?.id);
-	const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
-	const { isCopyedId, onCopy } = useAssistantCopy();
-	const selectionSpeak = useAssistantSelectionSpeak();
+	const draftHandleRef = useRef<ChatEntryDraftHandle | null>(null);
+	const intentInputAutoFillRef = useRef<string | null>(null);
 	const isSending = useEnglishAgentIsSending();
 	const isStreaming = useEnglishAgentIsStreaming();
-	const sessionId = useEnglishAgentSessionId();
-	const pendingProposal = useEnglishAgentPendingProposal();
-	const proposalCommitting = useEnglishAgentProposalCommitting();
-	const scrollControlsRef = useRef<ScrollControls>({
-		enableStickToBottom: () => {},
-		flushScrollToBottom: () => {},
-	});
 
-	const confirmPendingProposal = useCallback(async () => {
-		const p = englishAgentStore.pendingProposal;
-		if (!p || isSending || englishAgentStore.proposalCommitting) return;
-		scrollControlsRef.current.enableStickToBottom();
-		await englishAgentStore.commitProposal(p.proposalId);
-	}, [isSending]);
-
-	useEffect(() => {
-		if (!isLoggedIn) return;
-		void englishAgentStore.refreshSessionList();
-	}, [isLoggedIn]);
-
-	useEffect(() => {
-		if (!isHistoryDrawerOpen) return;
-		void englishAgentStore.refreshSessionList();
-	}, [isHistoryDrawerOpen]);
-
-	const {
-		allowAiShare,
-		shareFlow,
-		shareSelection,
-		onShare,
-		setShareModelVisible,
-		shareChatNode,
-	} = useAssistantShare({
-		getAllMessages: getEnglishMessages,
-		sessionId,
-		sessionType: 'agent',
-		enabled: isLoggedIn && Boolean(sessionId),
-	});
-
-	const onSaveToKnowledge = useCallback(
-		(message: Message) => {
-			const body = (message.content ?? '').trim();
-			if (!body) {
-				Toast({
-					type: 'warning',
-					title: t('knowledge.assistant.noBodyToWrite'),
-				});
-				return;
-			}
-			const cur = knowledgeStore.markdown.trimEnd();
-			const next = cur ? `${cur}\n\n${body}\n` : `${body}\n`;
-			knowledgeStore.setMarkdown(next);
-			navigate('/knowledge');
-		},
-		[knowledgeStore, navigate, t],
-	);
-
-	const handleSendMessage = useCallback(async () => {
-		scrollControlsRef.current.enableStickToBottom();
-		await sendMessage();
-	}, [sendMessage]);
-
-	const handleNewChat = useCallback(() => {
-		selectionSpeak.stop();
-		onNewChat();
-	}, [onNewChat, selectionSpeak.stop]);
-
-	const enableStickToBottomStable = useCallback(() => {
-		scrollControlsRef.current.enableStickToBottom();
-	}, []);
-
-	const flushScrollToBottomStable = useCallback(
-		(options?: { force?: boolean }) => {
-			scrollControlsRef.current.flushScrollToBottom(options);
-		},
+	useImperativeHandle(
+		ref,
+		() => ({
+			applyQuickIntent(payload) {
+				if (payload.mode === 'select') {
+					intentInputAutoFillRef.current = payload.label;
+					draftHandleRef.current?.setInput(payload.label);
+					draftHandleRef.current?.focusAtEnd();
+					return;
+				}
+				const snap = intentInputAutoFillRef.current;
+				intentInputAutoFillRef.current = null;
+				if (!snap) return;
+				const prev = draftHandleRef.current?.getInput() ?? '';
+				draftHandleRef.current?.setInput(stripAutoFilledIntentName(prev, snap));
+			},
+		}),
 		[],
 	);
 
-	const footerBody = useMemo(() => {
-		if (allowAiShare && shareSelection.isSharing) {
-			return (
+	const sendMessage = useCallback(
+		async (content?: string) => {
+			const text = (content ?? draftHandleRef.current?.getInput() ?? '').trim();
+			if (!text) return;
+			intentInputAutoFillRef.current = null;
+			enableStickToBottom();
+			const sessionTitle = englishAgentStore.sessionTitle?.trim();
+			const collapsed = text.replace(/\s+/g, ' ');
+			const synopsis =
+				collapsed.length > 36 ? `${collapsed.slice(0, 36)}…` : collapsed;
+			const activeContext = JSON.stringify({
+				route: '/english-learning',
+				intent: englishAgentStore.pendingIntentPrefix || undefined,
+			});
+			await englishAgentStore.sendMessage(text, {
+				titleFallback:
+					sessionTitle || synopsis || t('route.englishLearning.title'),
+				activeContext,
+			});
+			if (englishAgentStore.sessionId) {
+				onSessionReady?.(englishAgentStore.sessionId);
+			}
+		},
+		[enableStickToBottom, onSessionReady, t],
+	);
+
+	const stopGenerating = useCallback(() => {
+		englishAgentStore.stopGenerating();
+	}, []);
+
+	const entryChildren = useMemo(
+		() => (
+			<AssistantSessionEntryToolbar
+				store="english"
+				visible={isLoggedIn}
+				showSessionActions
+				isSessionSwitcherLocked={false}
+				isHistoryDrawerOpen={isHistoryDrawerOpen}
+				setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
+				enableStreamStickToBottom={enableStickToBottom}
+				flushScrollToBottom={flushScrollToBottom}
+				onNewConversation={onNewChat}
+			/>
+		),
+		[
+			isLoggedIn,
+			isHistoryDrawerOpen,
+			setIsHistoryDrawerOpen,
+			enableStickToBottom,
+			flushScrollToBottom,
+			onNewChat,
+		],
+	);
+
+	return (
+		<div className="flex w-full flex-col gap-2">
+			{pendingProposal ? (
+				<div
+					className={cn(
+						'mx-auto flex w-full items-center justify-between gap-3 rounded-md',
+						'border border-teal-500/20 bg-teal-500/5 px-3 py-2',
+						AGENT_MAX_WIDTH,
+					)}
+				>
+					<span className="text-textcolor/80 min-w-0 truncate text-sm">
+						{pendingProposal.label}
+					</span>
+					<div className="flex shrink-0 items-center gap-2">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="h-8"
+							disabled={isSending || proposalCommitting}
+							onClick={() => englishAgentStore.clearPendingProposal()}
+						>
+							取消
+						</Button>
+						<Button
+							type="button"
+							variant="default"
+							size="sm"
+							className="h-8"
+							disabled={isSending || proposalCommitting}
+							onClick={() => void confirmPendingProposal()}
+						>
+							确认
+						</Button>
+					</div>
+				</div>
+			) : null}
+			<ChatEntry
+				t={t}
+				input=""
+				setInput={noopSetInput}
+				isolateDraft
+				draftHandleRef={draftHandleRef}
+				maxWidth={AGENT_MAX_WIDTH}
+				className="w-full px-0 pb-4.5 backdrop-blur-none"
+				textareaClassName="min-h-12 rounded-md"
+				inputWrapClassName="border-theme/5 bg-theme/5"
+				sendMessage={sendMessage}
+				placeholder={t('englishLearning.placeholder')}
+				disableTextInput={false}
+				loading={isSending}
+				stopGenerating={isStreaming ? stopGenerating : undefined}
+				entryChildren={entryChildren}
+			/>
+		</div>
+	);
+});
+
+/** observer 仅用于 userStore 等非流式字段；勿在 render 读 messages / content */
+export const AgentPanel = observer(
+	forwardRef<AgentPanelHandle, AgentPanelProps>(function AgentPanel(
+		{ onNewChat, onSessionReady },
+		ref,
+	) {
+		const { t } = useI18n();
+		const navigate = useNavigate();
+		const { knowledgeStore, userStore } = useStore();
+		const isLoggedIn = Boolean(userStore.userInfo?.id);
+		const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+		const { isCopyedId, onCopy } = useAssistantCopy();
+		const selectionSpeak = useAssistantSelectionSpeak();
+		const isSending = useEnglishAgentIsSending();
+		const sessionId = useEnglishAgentSessionId();
+		const pendingProposal = useEnglishAgentPendingProposal();
+		const proposalCommitting = useEnglishAgentProposalCommitting();
+		const scrollControlsRef = useRef<ScrollControls>({
+			enableStickToBottom: () => {},
+			flushScrollToBottom: () => {},
+		});
+		const composerRef = useRef<AgentPanelHandle>(null);
+
+		useImperativeHandle(
+			ref,
+			() => ({
+				applyQuickIntent(payload) {
+					composerRef.current?.applyQuickIntent(payload);
+				},
+			}),
+			[],
+		);
+
+		const confirmPendingProposal = useCallback(async () => {
+			const p = englishAgentStore.pendingProposal;
+			if (!p || isSending || englishAgentStore.proposalCommitting) return;
+			scrollControlsRef.current.enableStickToBottom();
+			await englishAgentStore.commitProposal(p.proposalId);
+		}, [isSending]);
+
+		useEffect(() => {
+			if (!isLoggedIn) return;
+			void englishAgentStore.refreshSessionList();
+		}, [isLoggedIn]);
+
+		useEffect(() => {
+			if (!isHistoryDrawerOpen) return;
+			void englishAgentStore.refreshSessionList();
+		}, [isHistoryDrawerOpen]);
+
+		const {
+			allowAiShare,
+			shareFlow,
+			shareSelection,
+			onShare,
+			setShareModelVisible,
+			shareChatNode,
+		} = useAssistantShare({
+			getAllMessages: getEnglishMessages,
+			sessionId,
+			sessionType: 'agent',
+			enabled: isLoggedIn && Boolean(sessionId),
+		});
+
+		const onSaveToKnowledge = useCallback(
+			(message: Message) => {
+				const body = (message.content ?? '').trim();
+				if (!body) {
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.noBodyToWrite'),
+					});
+					return;
+				}
+				const cur = knowledgeStore.markdown.trimEnd();
+				const next = cur ? `${cur}\n\n${body}\n` : `${body}\n`;
+				knowledgeStore.setMarkdown(next);
+				navigate('/knowledge');
+			},
+			[knowledgeStore, navigate, t],
+		);
+
+		const handleNewChat = useCallback(() => {
+			selectionSpeak.stop();
+			onNewChat();
+		}, [onNewChat, selectionSpeak.stop]);
+
+		const enableStickToBottomStable = useCallback(() => {
+			scrollControlsRef.current.enableStickToBottom();
+		}, []);
+
+		const flushScrollToBottomStable = useCallback(
+			(options?: { force?: boolean }) => {
+				scrollControlsRef.current.flushScrollToBottom(options);
+			},
+			[],
+		);
+
+		/** Composer 与 draft 稳定挂载；分享条单独走非 memo 路径以免勾选态过期 */
+		const composerFooter = useMemo(
+			() => (
+				<EnglishAgentComposer
+					ref={composerRef}
+					isLoggedIn={isLoggedIn}
+					isHistoryDrawerOpen={isHistoryDrawerOpen}
+					setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
+					enableStickToBottom={enableStickToBottomStable}
+					flushScrollToBottom={flushScrollToBottomStable}
+					onNewChat={handleNewChat}
+					onSessionReady={onSessionReady}
+					pendingProposal={pendingProposal}
+					proposalCommitting={proposalCommitting}
+					confirmPendingProposal={confirmPendingProposal}
+				/>
+			),
+			[
+				isLoggedIn,
+				isHistoryDrawerOpen,
+				enableStickToBottomStable,
+				flushScrollToBottomStable,
+				handleNewChat,
+				onSessionReady,
+				pendingProposal,
+				proposalCommitting,
+				confirmPendingProposal,
+			],
+		);
+
+		const footerBody =
+			allowAiShare && shareSelection.isSharing ? (
 				<EnglishAgentShareBar
 					shareSelection={shareSelection}
 					shareFlow={shareFlow}
 					setShareModelVisible={setShareModelVisible}
 				/>
+			) : (
+				composerFooter
 			);
-		}
-		return (
-			<div className="flex w-full flex-col gap-2">
-				{pendingProposal ? (
-					<div
-						className={cn(
-							'mx-auto flex w-full items-center justify-between gap-3 rounded-md',
-							'border border-teal-500/20 bg-teal-500/5 px-3 py-2',
-							AGENT_MAX_WIDTH,
-						)}
-					>
-						<span className="text-textcolor/80 min-w-0 truncate text-sm">
-							{pendingProposal.label}
-						</span>
-						<div className="flex shrink-0 items-center gap-2">
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="h-8"
-								disabled={isSending || proposalCommitting}
-								onClick={() => englishAgentStore.clearPendingProposal()}
-							>
-								取消
-							</Button>
-							<Button
-								type="button"
-								variant="default"
-								size="sm"
-								className="h-8"
-								disabled={isSending || proposalCommitting}
-								onClick={() => void confirmPendingProposal()}
-							>
-								确认
-							</Button>
-						</div>
-					</div>
-				) : null}
-				<ChatEntry
-					t={t}
-					chatInputRef={chatInputRef}
-					input={input}
-					setInput={setInput}
-					focusInputAtEndKey={focusInputAtEndKey}
-					maxWidth={AGENT_MAX_WIDTH}
-					className="w-full px-0 pb-4.5"
-					textareaClassName="min-h-12 rounded-md"
-					inputWrapClassName="border-theme/5 bg-theme/5"
-					sendMessage={handleSendMessage}
-					placeholder={t('englishLearning.placeholder')}
-					disableTextInput={false}
-					loading={isSending}
-					stopGenerating={
-						isStreaming ? () => englishAgentStore.stopGenerating() : undefined
-					}
-					entryChildren={
-						<AssistantSessionEntryToolbar
-							store="english"
-							visible={isLoggedIn}
-							showSessionActions
-							isSessionSwitcherLocked={false}
-							isHistoryDrawerOpen={isHistoryDrawerOpen}
-							setIsHistoryDrawerOpen={setIsHistoryDrawerOpen}
-							enableStreamStickToBottom={enableStickToBottomStable}
-							flushScrollToBottom={flushScrollToBottomStable}
-							onNewConversation={handleNewChat}
-						/>
-					}
-				/>
-			</div>
-		);
-	}, [
-		allowAiShare,
-		shareSelection,
-		shareFlow,
-		setShareModelVisible,
-		t,
-		chatInputRef,
-		input,
-		setInput,
-		focusInputAtEndKey,
-		handleSendMessage,
-		isSending,
-		isStreaming,
-		isLoggedIn,
-		isHistoryDrawerOpen,
-		enableStickToBottomStable,
-		flushScrollToBottomStable,
-		handleNewChat,
-		pendingProposal,
-		proposalCommitting,
-		confirmPendingProposal,
-	]);
 
-	return (
-		<EnglishAgentScrollShell
-			scrollControlsRef={scrollControlsRef}
-			footerBody={footerBody}
-			shareChatNode={shareChatNode}
-			floatAbove={selectionSpeak.floatAbove}
-			selectionSpeakGetItems={selectionSpeak.getSelectionContextMenuItems}
-			onSpeakContent={selectionSpeak.start}
-			isCopyedId={isCopyedId}
-			onCopy={onCopy}
-			onSaveToKnowledge={onSaveToKnowledge}
-			allowAiShare={allowAiShare}
-			shareSelection={shareSelection}
-			onShare={onShare}
-			isSending={isSending}
-			t={t}
-		/>
-	);
-});
+		return (
+			<EnglishAgentScrollShell
+				scrollControlsRef={scrollControlsRef}
+				footerBody={footerBody}
+				shareChatNode={shareChatNode}
+				floatAbove={selectionSpeak.floatAbove}
+				selectionSpeakGetItems={selectionSpeak.getSelectionContextMenuItems}
+				onSpeakContent={selectionSpeak.start}
+				isCopyedId={isCopyedId}
+				onCopy={onCopy}
+				onSaveToKnowledge={onSaveToKnowledge}
+				allowAiShare={allowAiShare}
+				shareSelection={shareSelection}
+				onShare={onShare}
+				isSending={isSending}
+				t={t}
+			/>
+		);
+	}),
+);

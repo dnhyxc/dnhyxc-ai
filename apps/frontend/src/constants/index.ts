@@ -148,6 +148,8 @@ export function getChatMarkdownHighlightTheme(
 export const VOCAB_COUNT_MIN = 1;
 /** 与后端 `ENGLISH_VOCAB_GENERATION_MAX` 一致 */
 export const VOCAB_COUNT_MAX = 12000;
+/** 词数/条数留空时的默认目标（与后端 ENGLISH_PACK_GENERATION_DEFAULT 对齐） */
+export const PACK_COUNT_DEFAULT = 100;
 /**
  * 单词数量、经典语句等数量的常用预设选项。
  * 用于快捷按钮，方便用户一键选择。

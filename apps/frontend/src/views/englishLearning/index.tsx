@@ -4,32 +4,23 @@
  */
 import { ScrollArea } from '@ui/index';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
 import EnglishPackStore from '@/store/englishPack';
-import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllPlayback } from '@/utils/speech';
-import { AgentPanel } from './agent';
+import { AgentPanel, type AgentPanelHandle } from './agent';
 import { EnglishSidebar, type QuickIntentInputSyncPayload } from './sidebar';
 
 const EnglishLearning = observer(function EnglishLearning() {
-	const { t } = useI18n();
 	const [searchParams, setSearchParams] = useSearchParams();
-	const [input, setInput] = useState('');
-	/** Agent 输入框（ChatTextArea），快捷意图填入后用于自动聚焦 */
-	const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
-	/** 递增后 ChatEntry 将光标置于文本末尾（Web 在已聚焦时改 value 会把光标打到开头） */
-	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
-	/** 当前由快捷意图自动填入输入框的展示名（与 chip 文案一致），用于取消选中时精确移除 */
-	const intentInputAutoFillRef = useRef<string | null>(null);
+	const agentPanelRef = useRef<AgentPanelHandle>(null);
 
 	const sessionQ = searchParams.get('session');
 
@@ -51,52 +42,22 @@ const EnglishLearning = observer(function EnglishLearning() {
 
 	const onNewChat = useCallback(() => {
 		stopAllPlayback();
-		intentInputAutoFillRef.current = null;
 		setSearchParams({}, { replace: true });
 	}, [setSearchParams]);
 
 	const onQuickIntentInputSync = useCallback(
 		(payload: QuickIntentInputSyncPayload) => {
-			if (payload.mode === 'select') {
-				intentInputAutoFillRef.current = payload.label;
-				setInput(payload.label);
-				setFocusInputAtEndKey((k) => k + 1);
-				return;
-			}
-			const snap = intentInputAutoFillRef.current;
-			intentInputAutoFillRef.current = null;
-			if (!snap) return;
-			setInput((prev) => stripAutoFilledIntentName(prev, snap));
+			agentPanelRef.current?.applyQuickIntent(payload);
 		},
 		[],
 	);
 
-	const sendMessage = useCallback(async () => {
-		const text = input.trim();
-		if (!text) return;
-		intentInputAutoFillRef.current = null;
-		setInput('');
-		// 创建会话时的 title：已有会话用服务端标题；新会话用首条消息摘要；最后才用路由默认名
-		const sessionTitle = englishAgentStore.sessionTitle?.trim();
-		const collapsed = text.replace(/\s+/g, ' ');
-		const synopsis =
-			collapsed.length > 36 ? `${collapsed.slice(0, 36)}…` : collapsed;
-		const activeContext = JSON.stringify({
-			route: '/english-learning',
-			intent: englishAgentStore.pendingIntentPrefix || undefined,
-		});
-		await englishAgentStore.sendMessage(text, {
-			titleFallback:
-				sessionTitle || synopsis || t('route.englishLearning.title'),
-			activeContext,
-		});
-		if (englishAgentStore.sessionId) {
-			setSearchParams(
-				{ session: englishAgentStore.sessionId },
-				{ replace: true },
-			);
-		}
-	}, [input, setSearchParams, t]);
+	const onSessionReady = useCallback(
+		(sessionId: string) => {
+			setSearchParams({ session: sessionId }, { replace: true });
+		},
+		[setSearchParams],
+	);
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
@@ -146,12 +107,9 @@ const EnglishLearning = observer(function EnglishLearning() {
 							className="min-h-0 min-w-0"
 						>
 							<AgentPanel
-								input={input}
-								setInput={setInput}
-								chatInputRef={chatInputRef}
-								focusInputAtEndKey={focusInputAtEndKey}
-								sendMessage={sendMessage}
+								ref={agentPanelRef}
 								onNewChat={onNewChat}
+								onSessionReady={onSessionReady}
 							/>
 						</ResizablePanel>
 					</ResizablePanelGroup>

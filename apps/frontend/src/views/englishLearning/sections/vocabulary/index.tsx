@@ -15,6 +15,7 @@ import {
 import { useLocation, useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
+	PACK_COUNT_DEFAULT,
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_COUNT_MAX,
 	VOCAB_COUNT_MIN,
@@ -235,8 +236,11 @@ function VocabularyPackSectionInner() {
 			});
 			return;
 		}
-		let effectiveTarget = VOCAB_COUNT_MAX;
-		const body: { topic: string; count?: number } = { topic: req };
+		let effectiveTarget = PACK_COUNT_DEFAULT;
+		const body: { topic: string; count: number } = {
+			topic: req,
+			count: effectiveTarget,
+		};
 		if (countInput.trim() !== '') {
 			const n = Number.parseInt(countInput, 10);
 			if (!Number.isFinite(n) || n < VOCAB_COUNT_MIN || n > VOCAB_COUNT_MAX) {
