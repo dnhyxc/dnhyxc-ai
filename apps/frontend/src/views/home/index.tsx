@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { FocusCarousel } from '@/components/design/FocusCarousel';
-import { useI18n } from '@/hooks';
+import { useHomeStageMotion, useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen, openExternalUrl } from '@/utils';
 import { getPluginDevGuideAbsoluteUrl } from '@/utils/remote-docs-url';
@@ -22,6 +22,7 @@ import { StageCard } from './StageCard';
 const Home = () => {
 	const navigate = useNavigate();
 	const { t, locale } = useI18n();
+	const { tilt, cardTilt } = useHomeStageMotion();
 
 	const SHOWCASE = useMemo(() => createShowcase(t), [t]);
 	const STEPS = useMemo(() => createSteps(t), [t, locale]);
@@ -154,6 +155,8 @@ const Home = () => {
 							entries={stageEntries}
 							entriesAriaLabel={t('home.sections.showcase')}
 							watermark="DNHYXC"
+							tilt={tilt}
+							cardTilt={cardTilt}
 						>
 							<FocusCarousel
 								slides={HERO_SLIDES}

@@ -338,6 +338,13 @@ export const setting = {
 	'setting.theme.color.red': 'Red',
 	'setting.theme.color.white': 'White',
 	'setting.theme.colorTitle': 'Color themes',
+	'setting.theme.motion.cardTiltDesc':
+		'3D rotate the whole card with the cursor; off keeps the card flat',
+	'setting.theme.motion.cardTiltLabel': 'Card tilt',
+	'setting.theme.motion.tiltDesc':
+		'Glow, header, foreground, and watermark gently follow the cursor',
+	'setting.theme.motion.tiltLabel': 'Layer parallax',
+	'setting.theme.motionTitle': 'Home stage motion',
 	'setting.theme.preview.accent.desc':
 		'Hover, selected, links, buttons, and other interactive accents.',
 	'setting.theme.preview.accent.title': 'Accent color',

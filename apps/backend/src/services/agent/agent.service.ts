@@ -82,10 +82,7 @@ import {
 	startConfirmedPack,
 	startConfirmedReading,
 } from './tools/english/domain-tools';
-import {
-	favoriteIntentFrom,
-	resolveEnglishIntent,
-} from './tools/english/english-intent';
+import { bindEnglishIntentSurface } from './tools/english/english-intent';
 import {
 	alreadySavedReply,
 	cancelSide,
@@ -102,6 +99,7 @@ import {
 	unfavoriteHangCopy,
 } from './tools/english/favorite-ask';
 import { fetchAllPages } from './tools/english/fetch-all-pages';
+import { fillLibraryCue } from './tools/english/intent-frame';
 import { ElProposalStore } from './tools/english/proposal.store';
 import {
 	categoryLabels,
@@ -894,13 +892,7 @@ export class AgentService {
 		/** 本轮外溢清单（含全量行，落库快照） */
 		const turnElResources: ElResourceListPayload[] = [];
 		const bindIntent = (surface: ElListSurface) => {
-			const intent = resolveEnglishIntent(surface.userText, {
-				priorUserTexts: surface.priorUserTexts,
-				priorLibraryCards: surface.priorLibraryCards,
-				openProposalKind: surface.openProposalId ?? null,
-			});
-			surface.intent = intent;
-			surface.favoriteIntent = favoriteIntentFrom(intent);
+			bindEnglishIntentSurface(surface);
 		};
 		const elSurface: ElListSurface = {
 			userText: dto.content,
@@ -1019,10 +1011,9 @@ export class AgentService {
 				elSurface.intent?.kind === 'category_filter' &&
 				!elSurface.catalog.length
 			) {
-				const kind = inheritedKind(
-					elSurface.priorUserTexts,
-					elSurface.priorLibraryCards,
-				);
+				const kind =
+					elSurface.priorFrame?.contentKind ??
+					inheritedKind(elSurface.priorUserTexts, elSurface.priorLibraryCards);
 				if (kind) {
 					const all = await fetchAllPages(100, async (limit, offset) => {
 						const page =
@@ -1051,6 +1042,15 @@ export class AgentService {
 						),
 						mark: kind === 'classic' ? /语句库|语料库|经典语句/ : undefined,
 					};
+					if (elSurface.frame) {
+						fillLibraryCue(
+							elSurface.frame,
+							elSurface.userText,
+							all.items,
+							continuePrior.mark,
+							elSurface.priorFrame,
+						);
+					}
 				}
 			}
 			const filterKind =
@@ -1063,9 +1063,12 @@ export class AgentService {
 							elSurface.catalog,
 							elSurface.presented,
 							continuePrior,
+							elSurface.frame,
 						)
 					: null;
-			const labels = categoryLabels(elSurface.userText);
+			const labels = elSurface.frame?.slots.filterLabels?.length
+				? elSurface.frame.slots.filterLabels
+				: categoryLabels(elSurface.userText);
 			if (lib && labels.length) {
 				try {
 					const parts: Record<string, unknown>[] = [];
@@ -1710,14 +1713,13 @@ export class AgentService {
 							...elSurface.libraryLists.filter((card) => !card.fromPrior),
 							...elSurface.vocabLists.filter((card) => !card.fromPrior),
 						].filter((card) => card.source === 'library');
-					const needsFilter = Boolean(elSurface.intent?.needsFilterCards);
+					// 关于类收藏：先补筛选卡，再选卡；禁止先用整库卡挂上 107 确认条
+					const needsFilter =
+						Boolean(elSurface.intent?.needsFilterCards) ||
+						(elSurface.intent?.kind === 'favorite_add' &&
+							categoryLabels(dto.content).length > 0);
 					let turnCards = collectTurnLibraryCards();
-					let set = favoriteSet(history, dto.content, priorIndexes, turnCards);
-					let plan = set
-						? planFavoriteHang({ set, turnVocab: [], turnClassic: [] })
-						: null;
-					// 复合句缺卡：本轮补分类，禁止立刻「上面没有」
-					if (needsFilter && !plan?.hang) {
+					if (needsFilter) {
 						await this.ensureFavoriteFilterCards({
 							userId,
 							userText: dto.content,
@@ -1733,11 +1735,16 @@ export class AgentService {
 							},
 						});
 						turnCards = collectTurnLibraryCards();
-						set = favoriteSet(history, dto.content, priorIndexes, turnCards);
-						plan = set
-							? planFavoriteHang({ set, turnVocab: [], turnClassic: [] })
-							: null;
 					}
+					const set = favoriteSet(
+						history,
+						dto.content,
+						priorIndexes,
+						turnCards,
+					);
+					const plan = set
+						? planFavoriteHang({ set, turnVocab: [], turnClassic: [] })
+						: null;
 					if (plan?.hang && set) {
 						const proposed =
 							set.side === 'both'

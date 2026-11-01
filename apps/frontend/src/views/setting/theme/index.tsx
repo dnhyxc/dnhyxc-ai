@@ -1,10 +1,13 @@
 import { Button } from '@ui/button';
+import { Label } from '@ui/label';
+import { Switch } from '@ui/switch';
 import { CircleCheckBig } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
 	ACCENT_COLORS,
 	accentBadgeStyle,
 	THEMES,
+	useHomeStageMotion,
 	useI18n,
 	useTheme,
 } from '@/hooks';
@@ -42,6 +45,7 @@ function StyleRow({
 
 const Theme = () => {
 	const { theme, changeTheme, accent, changeAccent } = useTheme();
+	const { tilt, cardTilt, changeTilt, changeCardTilt } = useHomeStageMotion();
 	const { t } = useI18n();
 
 	const colorThemes = THEMES.filter((themeItem) => themeItem.type === 'color');
@@ -129,6 +133,52 @@ const Theme = () => {
 									</button>
 								);
 							})}
+						</div>
+					</div>
+				</div>
+
+				<div className="my-3.5 w-full border-b border-theme/20 pb-4.5">
+					<div className="text-md font-bold">
+						{t('setting.theme.motionTitle')}
+					</div>
+					<div className="mt-3.5 px-8.5">
+						<div className="divide-y divide-theme-border/60 overflow-hidden rounded-xl border border-theme-border bg-theme-card">
+							<div className="flex items-center gap-3 px-3.5 py-2.5">
+								<div className="min-w-0 flex-1">
+									<Label
+										htmlFor="home-stage-tilt"
+										className="cursor-pointer text-sm font-medium text-textcolor"
+									>
+										{t('setting.theme.motion.tiltLabel')}
+									</Label>
+									<p className="mt-0.5 text-xs leading-relaxed text-textcolor/55">
+										{t('setting.theme.motion.tiltDesc')}
+									</p>
+								</div>
+								<Switch
+									id="home-stage-tilt"
+									checked={tilt}
+									onCheckedChange={(checked) => void changeTilt(checked)}
+								/>
+							</div>
+							<div className="flex items-center gap-3 px-3.5 py-2.5">
+								<div className="min-w-0 flex-1">
+									<Label
+										htmlFor="home-stage-card-tilt"
+										className="cursor-pointer text-sm font-medium text-textcolor"
+									>
+										{t('setting.theme.motion.cardTiltLabel')}
+									</Label>
+									<p className="mt-0.5 text-xs leading-relaxed text-textcolor/55">
+										{t('setting.theme.motion.cardTiltDesc')}
+									</p>
+								</div>
+								<Switch
+									id="home-stage-card-tilt"
+									checked={cardTilt}
+									onCheckedChange={(checked) => void changeCardTilt(checked)}
+								/>
+							</div>
 						</div>
 					</div>
 				</div>

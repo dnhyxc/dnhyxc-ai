@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isTauriRuntime } from '@/utils/runtime';
 
+export * from './homeStageMotion';
 export * from './i18n';
 export * from './theme';
 export * from './useDocumentShortcuts';

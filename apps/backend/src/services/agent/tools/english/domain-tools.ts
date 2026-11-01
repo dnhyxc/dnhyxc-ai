@@ -13,7 +13,7 @@ import type { LearningNotesService } from '../../../learning-notes/learning-note
 import { applyElProposal } from './apply-proposal';
 import type { ElArtifactStore, ElResourceListPayload } from './artifact.store';
 import { buildCategoryProposal, classifyChunk } from './category-propose';
-import { favoriteIntentFrom, resolveEnglishIntent } from './english-intent';
+import { bindEnglishIntentSurface } from './english-intent';
 import {
 	asOp,
 	asString,
@@ -31,6 +31,11 @@ import {
 	unfavoriteFromCards,
 } from './favorite-ask';
 import { fetchAllPages } from './fetch-all-pages';
+import {
+	fillLibraryCue,
+	libraryCueBlocksClassify,
+	planHas,
+} from './intent-frame';
 import { type PackSide, resolvePackAsk } from './pack-ask';
 import type { ElProposalStore } from './proposal.store';
 import {
@@ -993,14 +998,7 @@ export function buildEnglishLearningDomainTools(
 	deps: BuildEnglishLearningDomainToolsDeps,
 ): DynamicTool[] {
 	const budgets: Budgets = { elWrites: 0, openProposalId: null, lastSig: '' };
-	const intent = resolveEnglishIntent(deps.surface.userText, {
-		priorUserTexts: deps.surface.priorUserTexts,
-		priorLibraryCards: deps.surface.priorLibraryCards,
-		openProposalKind: deps.surface.openProposalId ?? null,
-	});
-	deps.surface.intent = intent;
-	const favoriteIntent = favoriteIntentFrom(intent);
-	deps.surface.favoriteIntent = favoriteIntent;
+	bindEnglishIntentSurface(deps.surface);
 	const favorite = favoriteAsk(deps.surface.userText);
 	const bothAsk = favoriteAsksBoth(deps.surface.userText);
 	const occupy = (id: string) => {
@@ -1037,6 +1035,16 @@ export function buildEnglishLearningDomainTools(
 		});
 		deps.surface.catalog = all.items;
 		deps.surface.catalogKind = kind;
+		if (deps.surface.frame) {
+			const mark = kind === 'classic' ? /语句库|语料库|经典语句/ : undefined;
+			fillLibraryCue(
+				deps.surface.frame,
+				deps.surface.userText,
+				all.items,
+				mark,
+				deps.surface.priorFrame,
+			);
+		}
 		return all.items;
 	};
 
@@ -1085,15 +1093,19 @@ export function buildEnglishLearningDomainTools(
 					}
 					const hideCard = isIndexOp(name, op) || isSearchOp(name, op);
 					const noteOpen = name === 'el_notes' && op === 'get';
-					const inventory =
-						hideCard &&
-						isIndexOp(name, op) &&
-						listIntent(deps.surface.userText) === 'inventory';
-					/** 复合问「有哪些库 + 关于类」：挂库列表卡，但不标 presented，以免挡住后续 classify */
+					const hangInventory = planHas(
+						deps.surface.frame,
+						'hangInventory',
+						() => listIntent(deps.surface.userText) === 'inventory',
+					);
+					const inventory = hideCard && isIndexOp(name, op) && hangInventory;
+					/** plan hangCatalog：挂库列表卡且不标 presented */
 					const catalogAsk =
 						name === 'el_libraries' &&
 						op === 'list' &&
-						wantsLibraryCatalog(deps.surface.userText);
+						planHas(deps.surface.frame, 'hangCatalog', () =>
+							wantsLibraryCatalog(deps.surface.userText),
+						);
 					const spilled = await spillListResult(
 						name,
 						env,
@@ -1241,7 +1253,22 @@ export function buildEnglishLearningDomainTools(
 					title: it.title,
 				}));
 				deps.surface.catalogKind = kind;
-				const inventoryAsk = listIntent(deps.surface.userText) === 'inventory';
+				if (deps.surface.frame) {
+					const mark =
+						kind === 'classic' ? /语句库|语料库|经典语句/ : undefined;
+					fillLibraryCue(
+						deps.surface.frame,
+						deps.surface.userText,
+						deps.surface.catalog,
+						mark,
+						deps.surface.priorFrame,
+					);
+				}
+				const inventoryAsk = planHas(
+					deps.surface.frame,
+					'hangInventory',
+					() => listIntent(deps.surface.userText) === 'inventory',
+				);
 				const inventoryHits = inventoryAsk
 					? matchLibraries(deps.surface.userText, deps.surface.catalog)
 					: [];
@@ -1451,7 +1478,13 @@ export function buildEnglishLearningDomainTools(
 
 			if (op === 'list') {
 				if (!libraryId) return elFail('bad_args', 'list 需要 libraryId');
-				if (listIntent(deps.surface.userText) === 'inventory') {
+				if (
+					planHas(
+						deps.surface.frame,
+						'hangInventory',
+						() => listIntent(deps.surface.userText) === 'inventory',
+					)
+				) {
 					const head = 5;
 					if (kind === 'vocab') {
 						const page = await deps.learning.listVocabularyLibraryItems(
@@ -3196,6 +3229,20 @@ export function buildEnglishLearningDomainTools(
 		}
 		const libs = await loadCatalog(kind);
 		const mark = kind === 'classic' ? /语句库|语料库|经典语句/ : undefined;
+		const frameCue = deps.surface.frame?.slots.libraryCue;
+		if (frameCue?.status === 'one' && frameCue.libraryId) {
+			const hit = libs.find((lib) => lib.id === frameCue.libraryId);
+			if (hit) return [hit];
+		}
+		if (libraryCueBlocksClassify(deps.surface.frame)) {
+			const mentioned = resolveMentionedLibrary(text, libs, mark);
+			return elFail('ambiguous', `没有唯一${noun}库。请让用户选定库名`, {
+				candidates:
+					mentioned.kind === 'ambiguous'
+						? mentioned.candidates.slice(0, 10)
+						: [],
+			});
+		}
 		const exact = matchLibraries(text, libs);
 		if (exact.length === 1) return exact;
 		const mentioned = resolveMentionedLibrary(text, libs, mark);

@@ -30,8 +30,10 @@ export type StageCardProps = {
 	entriesAriaLabel?: string;
 	/** 底部水印文案；`false` 关闭。默认 "DNHYXC" */
 	watermark?: string | false;
-	/** 鼠标跟随 3D 倾斜。默认 true */
+	/** 鼠标跟随分层视差（光晕/顶栏/近景/水印）。默认 true */
 	tilt?: boolean;
+	/** 卡片本体 3D 旋转；关则卡片不动，内部视差仍可跟鼠标。默认 false */
+	cardTilt?: boolean;
 	/** 远景氛围光晕。默认 true */
 	glow?: boolean;
 	/** 底栏毛玻璃遮罩。默认 true */
@@ -52,6 +54,7 @@ export function StageCard({
 	entriesAriaLabel,
 	watermark = 'DNHYXC',
 	tilt = true,
+	cardTilt = false,
 	glow = true,
 	mask = true,
 }: StageCardProps) {
@@ -214,8 +217,7 @@ export function StageCard({
 				className,
 			)}
 			style={{
-				rotateX: tilt ? rotateX : 0,
-				rotateY: tilt ? rotateY : 0,
+				...(cardTilt ? { rotateX, rotateY } : null),
 				transformPerspective: 1000,
 				transformStyle: 'preserve-3d',
 				// 圆角裁剪：避免开启 3D 倾斜后圆角失效

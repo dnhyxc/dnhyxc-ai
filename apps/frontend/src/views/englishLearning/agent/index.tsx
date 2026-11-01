@@ -610,7 +610,11 @@ export const AgentPanel = observer(
 
 		const onSaveToKnowledge = useCallback(
 			(message: Message) => {
-				const body = (message.content ?? '').trim();
+				// 清单卡锚点只给前端挂 ResourceListBlock，进知识库编辑器无意义
+				const body = (message.content ?? '')
+					.replace(/\[\[el:[^\]]+\]\]/g, '')
+					.replace(/\n{3,}/g, '\n\n')
+					.trim();
 				if (!body) {
 					Toast({
 						type: 'warning',

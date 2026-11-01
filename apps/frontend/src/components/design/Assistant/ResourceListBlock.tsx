@@ -41,8 +41,12 @@ export function calmFullLibraryCopy(text: string): string {
 		.replace(/（未穷尽，已达硬顶）/g, '');
 }
 
-/** 只朗读词面或英文句子，库名、标题不播。 */
-function speakOf(item: unknown): { text: string; sentence: boolean } | null {
+/** 只朗读词面或英文句子，库名、标题、笔记正文不播。 */
+function speakOf(
+	item: unknown,
+	source?: ElResourceBlock['source'],
+): { text: string; sentence: boolean } | null {
+	if (source === 'notes') return null;
 	if (!item || typeof item !== 'object') return null;
 	const o = item as Record<string, unknown>;
 	const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -53,7 +57,10 @@ function speakOf(item: unknown): { text: string; sentence: boolean } | null {
 	return null;
 }
 
-function rowOf(item: unknown): {
+function rowOf(
+	item: unknown,
+	source?: ElResourceBlock['source'],
+): {
 	en: string;
 	zh?: string;
 	ipa?: string;
@@ -64,6 +71,10 @@ function rowOf(item: unknown): {
 	}
 	const o = item as Record<string, unknown>;
 	const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+	// 笔记卡只亮标题；english 是去标签正文，不能当行文案或副标题
+	if (source === 'notes') {
+		return { en: text(o.titleZh) || text(o.title) || text(o.lead) };
+	}
 	const en =
 		text(o.english) ||
 		text(o.word) ||
@@ -79,7 +90,7 @@ function rowOf(item: unknown): {
 	return zh ? { en, zh, ipa, pos } : { en, ipa, pos };
 }
 
-/** 日推行 → 阅读详情；词句生成历史行 → stream 页。词条行本身不跳。 */
+/** 日推行 → 阅读详情；笔记行 → 笔记页；词句生成历史行 → stream 页。词条行本身不跳。 */
 function hrefOf(block: ElResourceBlock, item: unknown): string | null {
 	if (!item || typeof item !== 'object') return null;
 	const o = item as Record<string, unknown>;
@@ -94,6 +105,9 @@ function hrefOf(block: ElResourceBlock, item: unknown): string | null {
 		const q = params.toString();
 		return `/english-learning/daily-reading/${encodeURIComponent(id)}${q ? `?${q}` : ''}`;
 	}
+	if (block.source === 'notes') {
+		return `/english-learning/notes?noteId=${encodeURIComponent(id)}`;
+	}
 	if (block.source === 'pack') {
 		const topic = text(o.topic);
 		if (!topic || text(o.word) || text(o.english)) return null;
@@ -106,6 +120,7 @@ function hrefOf(block: ElResourceBlock, item: unknown): string | null {
 function ListRow({
 	index,
 	item,
+	source,
 	last,
 	playingKey,
 	onPlay,
@@ -116,6 +131,7 @@ function ListRow({
 }: {
 	index: number;
 	item: unknown;
+	source?: ElResourceBlock['source'];
 	last: boolean;
 	playingKey: string | null;
 	onPlay: (text: string) => void;
@@ -124,8 +140,8 @@ function ListRow({
 	playQuoteLabel: string;
 	stopLabel: string;
 }) {
-	const row = rowOf(item);
-	const speak = speakOf(item);
+	const row = rowOf(item, source);
+	const speak = speakOf(item, source);
 	const playing = speak != null && playingKey === speak.text;
 	return (
 		<div
@@ -330,7 +346,22 @@ export function ResourceListBlock({
 	const openItem = useCallback(
 		(item: unknown) => {
 			const href = hrefOf(block, item);
-			if (href) navigate(href);
+			if (!href) return;
+			if (block.source === 'notes' && item && typeof item === 'object') {
+				const id =
+					typeof (item as { id?: unknown }).id === 'string'
+						? (item as { id: string }).id.trim()
+						: '';
+				// 插件挂载时 consumeInitialNoteId → openEditById
+				if (id) {
+					try {
+						sessionStorage.setItem('dnhyxc_ln_popout_note_id', id);
+					} catch {
+						/* ignore */
+					}
+				}
+			}
+			navigate(href);
 		},
 		[block, navigate],
 	);
@@ -340,13 +371,13 @@ export function ResourceListBlock({
 		const needle = q.trim().toLowerCase();
 		if (!needle) return rows;
 		return rows.filter((item) => {
-			const row = rowOf(item);
+			const row = rowOf(item, block.source);
 			return (
 				row.en.toLowerCase().includes(needle) ||
 				(row.zh ?? '').toLowerCase().includes(needle)
 			);
 		});
-	}, [items, q]);
+	}, [items, q, block.source]);
 
 	return (
 		<div
@@ -435,6 +466,7 @@ export function ResourceListBlock({
 										<ListRow
 											index={i}
 											item={item}
+											source={block.source}
 											last={i === filtered.length - 1}
 											playingKey={playing}
 											onPlay={onPlay}
@@ -472,6 +504,7 @@ export function ResourceListBlock({
 								key={`${block.artifactId}-${i}`}
 								index={i}
 								item={item}
+								source={block.source}
 								last={i === filtered.length - 1}
 								playingKey={playing}
 								onPlay={onPlay}

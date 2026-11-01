@@ -804,9 +804,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		diffModifiedModelPath,
 	]);
 
-	// 换篇时退出分屏对照，避免沿用上一篇快照
+	// 换篇/新建时退出分屏对照与纯预览，避免沿用上一篇 Diff 快照，或停在「预览内容为空」
 	useEffect(() => {
-		setViewMode((vm) => (vm === 'splitDiff' ? 'edit' : vm));
+		setViewMode((vm) => (vm === 'splitDiff' || vm === 'preview' ? 'edit' : vm));
 	}, [documentIdentity]);
 
 	// 换篇时关闭右侧 AI 助手（受控模式由外部自行同步）

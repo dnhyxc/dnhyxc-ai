@@ -1,7 +1,7 @@
 import { type ElEnvelope, elOk } from './envelope';
 import type { ElProposalPayload } from './proposal.store';
 import { collectProposeBodies } from './propose-bodies';
-import { isCategoryAsk } from './spill';
+import { categoryLabels, isCategoryAsk } from './spill';
 
 export type FavoriteAsk = {
 	action: 'add';
@@ -367,6 +367,7 @@ type ScopeCard = {
 	libraryId?: string;
 	categoryLabels?: string[];
 	artifactId?: string;
+	filtered?: boolean;
 };
 
 export type FavoriteSet = {
@@ -477,13 +478,21 @@ function dropFullLibraryCards(cards: ScopeCard[]): ScopeCard[] {
 	const hasFiltered = (kind: string) =>
 		cards.some(
 			(card) =>
-				card.contentKind === kind && (card.categoryLabels?.length ?? 0) > 0,
+				card.contentKind === kind &&
+				(card.filtered || (card.categoryLabels?.length ?? 0) > 0),
 		);
 	return cards.filter((card) => {
 		const kind = card.contentKind ?? '';
 		if (!hasFiltered(kind)) return true;
-		return (card.categoryLabels?.length ?? 0) > 0;
+		return card.filtered || (card.categoryLabels?.length ?? 0) > 0;
 	});
+}
+
+/** 关于类收藏：只留带类别的筛选卡，丢掉整库「词条」卡。 */
+function onlyCategoryFilterCards(cards: ScopeCard[]): ScopeCard[] {
+	return cards.filter(
+		(card) => card.filtered === true && (card.categoryLabels?.length ?? 0) > 0,
+	);
 }
 
 /** 这句要收藏的卡。历史窗口与本轮库卡同一池再 richest。 */
@@ -510,7 +519,15 @@ export function favoriteSet(
 		),
 	);
 	const fromTurn = turnCards.filter((card) => favoriteEligibleCard(card));
-	const full = dropFullLibraryCards(richest([...fromHistory, ...fromTurn]));
+	let full = dropFullLibraryCards(richest([...fromHistory, ...fromTurn]));
+	// 「收藏…关于家庭…」：有筛选卡则只用筛选卡，确认条不能变成整库 107
+	if (
+		favoriteNeedsFilterCards(userText) ||
+		categoryLabels(userText).length > 0
+	) {
+		const labeled = onlyCategoryFilterCards(full);
+		if (labeled.length) full = labeled;
+	}
 	return {
 		side,
 		vocab:

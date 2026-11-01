@@ -4,6 +4,11 @@ import type { ElResourceListPayload, ElResourceSource } from './artifact.store';
 import type { EnglishIntent } from './english-intent';
 import { type ElEnvelope, elOk, fitItemsByChars } from './envelope';
 import type { FavoriteIntent } from './favorite-ask';
+import type { IntentFrame, PriorFrameSummary } from './intent-frame.types';
+import {
+	inventoryPhraseHit,
+	wantsLibraryCatalog as wantsLibraryCatalogFromPhrases,
+} from './intent-phrases';
 
 /** 条数达到则外溢，不再把全表塞进模型上下文 */
 export const EL_SPILL_MIN_ITEMS = 30;
@@ -26,19 +31,15 @@ export const EL_SLIM_MAX_CHARS = 12_000;
 
 export type ListIntent = 'inventory' | 'filter' | 'other';
 
-const FILTER_RE = /找出|筛|相关|有关|哪些是|属于|人体|挑出|主题/;
-/**
- * 整表/盘点问法。须盖住「错题集有哪些资源」这类：旧式「有哪些错」对不上「有哪些资源」。
- */
-const INVENTORY_RE =
-	/全部|所有单词|所有词|整个库|导出|列出全部|哪些错题|有哪些错|错题集|错题库|我的错题|列出错题|错题.{0,12}(有哪些|哪些|资源)|有哪些.{0,12}错题|重新练习/;
+/** 含「关于」：避免「所有关于家庭的单词」被 ALL_WORDS_RE 打成整库盘点。 */
+const FILTER_RE = /找出|筛|相关|有关|关于|哪些是|属于|人体|挑出|主题/;
 /** 「所有英语四级单词库中的单词」：库名隔在「所有」和「单词」之间 */
 const ALL_WORDS_RE = /所有.{0,16}(单词|词条|的词)/;
 
-/** 只看用户原话。筛选词优先于「列出 / 全部」。 */
+/** 只看用户原话。筛选词优先于「列出 / 全部」。盘点短语见 intent-phrases。 */
 export function listIntent(userText: string): ListIntent {
 	if (FILTER_RE.test(userText)) return 'filter';
-	if (INVENTORY_RE.test(userText) || ALL_WORDS_RE.test(userText))
+	if (inventoryPhraseHit(userText) || ALL_WORDS_RE.test(userText))
 		return 'inventory';
 	return 'other';
 }
@@ -72,6 +73,10 @@ export type ElListSurface = {
 	openProposalId?: string | null;
 	/** 本轮主意图（总路由）。收尾 / 筛选续查 / 挂条优先读 kind。 */
 	intent?: EnglishIntent;
+	/** 本轮槽位帧 + 计划；出卡副作用以 plan 为准。 */
+	frame?: IntentFrame;
+	/** 上一轮槽位摘要（M3 继承库/域）。 */
+	priorFrame?: PriorFrameSummary;
 	/** 本轮收藏意图。propose_* 延期与轮末挂条都读它；由 intent 同步。 */
 	favoriteIntent?: FavoriteIntent;
 	/**
@@ -102,8 +107,11 @@ export function categoryLabels(userText: string): string[] {
 		seen.add(label);
 		labels.push(label);
 	};
-	for (const mark of userText.matchAll(/(?:关于|有关|相关)/gu)) {
+	// 「所有关于家庭」里「有关」会咬住「有+关」，须 (?<!所) 且 关于 优先
+	for (const mark of userText.matchAll(/关于|相关|(?<!所)有关/gu)) {
 		let rest = userText.slice((mark.index ?? 0) + mark[0].length);
+		// 误切到「关|于…」时丢掉
+		if (mark[0] === '有关' && rest.startsWith('于')) continue;
 		const names: string[] = [];
 		const first = rest.match(/^([^和与、及的，。；\s]{1,8})/u);
 		if (!first) continue;
@@ -134,10 +142,14 @@ export function categoryLabels(userText: string): string[] {
 	return labels;
 }
 
-/** 关于类且不是整库问法。整库句仍走 inventory，避免「列出全部」被拿去分类。 */
+/**
+ * 关于类筛选。句内有「关于/有关…」即分类；
+ * 仅当整库盘点且没有关于类标记时才让路（「列出全部」不当分类）。
+ */
 export function isCategoryAsk(userText: string): boolean {
+	if (!/关于|相关|有关|属于/.test(userText)) return false;
 	if (listIntent(userText) === 'inventory') return false;
-	return /关于|相关|有关|属于/.test(userText);
+	return true;
 }
 
 /**
@@ -423,9 +435,7 @@ export function resolveMentionedLibrary(
 
 /** 用户还要看「有哪些库」清单（可与关于类筛选同句，不走 inventory 独占）。 */
 export function wantsLibraryCatalog(userText: string): boolean {
-	return /有哪些.{0,8}(语句库|语料库|词汇库|单词库|词库)|我有哪些.{0,8}库|所有语句库|所有词汇库|所有单词库|列出.{0,6}(语句库|语料库|词汇库|单词库)|需要的是所有(语句库|词汇库)/u.test(
-		userText,
-	);
+	return wantsLibraryCatalogFromPhrases(userText);
 }
 
 /** 双向包含后只接受严格更长的一本。等长或落空都不猜。 */
@@ -523,7 +533,11 @@ export function inheritedKind(
 	return kinds.length === 1 ? kinds[0] : null;
 }
 
-/** 筛选句在模型停手后是否还要由服务端拉词。已出卡、非整句「关于」返回 null。当前句不是恰好一本时，沿用上一本。 */
+/**
+ * 筛选句在模型停手后是否还要由服务端拉词。
+ * 优先读 frame.slots（M3）；无 frame 或 cue 未就绪时回退 prior 继承。
+ * 已出卡、生成问法返回 null。
+ */
 export function shouldFilterContinue(
 	userText: string,
 	catalog: { id: string; title: string }[],
@@ -533,11 +547,35 @@ export function shouldFilterContinue(
 		cards: { title: string }[];
 		mark?: RegExp;
 	},
+	frame?: IntentFrame,
 ): { id: string; title: string } | null {
 	if (presented) return null;
 	if (isReadingGenerateAsk(userText) || isPackGenerateAsk(userText))
 		return null;
-	if (!isCategoryAsk(userText)) return null;
+	// M3：以 frame.categoryAsk 为准（含「再筛家庭」续问）
+	if (frame) {
+		if (!frame.slots.categoryAsk) return null;
+		const cue = frame.slots.libraryCue;
+		if (cue?.status === 'one') {
+			if (cue.libraryId) {
+				const byId = catalog.find((lib) => lib.id === cue.libraryId);
+				if (byId) return byId;
+			}
+			const key = cue.raw.trim();
+			if (key) {
+				const byTitle = catalog.filter(
+					(lib) =>
+						lib.title.trim() === key ||
+						lib.title.includes(key) ||
+						key.includes(lib.title.trim()),
+				);
+				if (byTitle.length === 1) return byTitle[0];
+			}
+		}
+		// cue 未消歧完：再走命中 / 继承
+	} else if (!isCategoryAsk(userText)) {
+		return null;
+	}
 	const hits = matchLibraries(userText, catalog);
 	if (hits.length === 1) return hits[0];
 	if (hits.length > 1 || !prior) return null;
