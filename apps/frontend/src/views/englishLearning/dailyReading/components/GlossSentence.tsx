@@ -117,7 +117,7 @@ export function GlossSentence({
 	let at = 0;
 
 	return (
-		<span onPointerLeave={() => setHoverKey(null)}>
+		<span className="select-text" onPointerLeave={() => setHoverKey(null)}>
 			{tokens.map((token, index) => {
 				if (!token.trim()) return <span key={index}>{token}</span>;
 				if (/https?:\/\//i.test(token)) {
@@ -140,22 +140,30 @@ export function GlossSentence({
 					<Popover
 						key={index}
 						open={open}
-						onOpenChange={(next) => onOpen(next ? key : null, key)}
+						onOpenChange={(next) => {
+							// 拖选复制时勿打开释义；button 不可跨词选中，故用 span
+							if (next) {
+								const sel = window.getSelection();
+								if (sel && !sel.isCollapsed) return;
+							}
+							onOpen(next ? key : null, key);
+						}}
 					>
 						<PopoverTrigger asChild>
-							<button
-								type="button"
+							<span
+								role="button"
+								tabIndex={0}
 								onPointerEnter={() => setHoverKey(key)}
 								onPointerLeave={() =>
 									setHoverKey((current) => (current === key ? null : current))
 								}
 								className={cn(
-									'cursor-pointer bg-transparent p-0 text-inherit',
+									'cursor-pointer select-text bg-transparent p-0 text-inherit',
 									open ? 'text-teal-500' : hoverKey === key && 'text-teal-400',
 								)}
 							>
 								{token}
-							</button>
+							</span>
 						</PopoverTrigger>
 						<PopoverContent
 							side="top"
