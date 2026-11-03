@@ -554,7 +554,7 @@ export default function DailyReadingDetailPage() {
 																{sourceList(row).map((source) => (
 																	<a
 																		key={source.url}
-																		className="text-teal-500 underline"
+																		className="text-teal-500 underline w-fit"
 																		href={source.url}
 																		target="_blank"
 																		rel="noreferrer"
