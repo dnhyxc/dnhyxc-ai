@@ -44,6 +44,7 @@ import {
 	buildPlaySentences,
 	type PlaySentence,
 	playSentenceCount,
+	resolveArticleSiFromSelection,
 	resolveSentenceZh,
 } from './utils/playSentences';
 
@@ -214,18 +215,31 @@ export default function DailyReadingDetailPage() {
 		'idle' | 'article' | 'selection'
 	>('idle');
 
-	/** 开播前清点词高亮；句高亮由 article 的 onSentenceIndex / idle effect 管 */
+	/** 开播前清点词高亮；句高亮由 onSentenceIndex / idle effect 管 */
 	const resetBeforeSpeak = useCallback(() => {
 		setWordKey(null);
 	}, []);
 
 	const selectionSpeak = useAssistantSelectionSpeak(resetBeforeSpeak);
+	/** playBlocks 在下方才算好；选区朗读用 ref 读最新句表 */
+	const playSentencesRef = useRef<PlaySentence[]>([]);
 
 	const startSelectionSpeak = useCallback(
 		(text: string) => {
 			setSpeakSource('selection');
-			setActiveSentenceIndex(null);
-			return selectionSpeak.start(text);
+			const syncSi = (selSi: number) => {
+				const si = resolveArticleSiFromSelection(
+					playSentencesRef.current,
+					text,
+					selSi,
+				);
+				if (si != null) setActiveSentenceIndex(si);
+			};
+			const ok = selectionSpeak.start(text, {
+				onSentenceIndex: syncSi,
+			});
+			if (ok) syncSi(0);
+			return ok;
 		},
 		[selectionSpeak.start],
 	);
@@ -390,6 +404,8 @@ export default function DailyReadingDetailPage() {
 			}),
 		);
 	}, [row]);
+
+	playSentencesRef.current = playBlocks.flat();
 
 	const hasSentenceZh = useMemo(
 		() => playBlocks.some((block) => block.some((s) => !!s.zh?.trim())),

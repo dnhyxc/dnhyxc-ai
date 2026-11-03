@@ -50,6 +50,29 @@ function norm(text: string): string {
 }
 
 /**
+ * 选区朗读的切句下标 → 正文全局 si。
+ * 用当前选区纯文本的第 selectionSentenceIndex 句，在正文句列表里找包含关系。
+ */
+export function resolveArticleSiFromSelection(
+	sentences: PlaySentence[],
+	selectedText: string,
+	selectionSentenceIndex: number,
+): number | null {
+	const plain = stripMarkdownForTts(selectedText) || norm(selectedText);
+	if (!plain || !sentences.length) return null;
+	const spans = buildSentenceOffsetSpans(plain);
+	const span = spans[selectionSentenceIndex];
+	if (!span) return null;
+	const chunk = norm(plain.slice(span.start, span.end));
+	if (!chunk) return null;
+	const hit = sentences.find((s) => {
+		const en = norm(s.en);
+		return en.includes(chunk) || chunk.includes(en);
+	});
+	return hit?.si ?? null;
+}
+
+/**
  * 与 cloudSingleUtterance 路径一致：先 stripMarkdownForTts 再切句。
  * 段界仍按原文空行；gloss 只挂词不定义句界。
  */
