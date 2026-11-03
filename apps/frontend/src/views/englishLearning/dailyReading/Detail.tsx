@@ -1,7 +1,12 @@
 /**
  * 每日阅读详情：英文在上，中文在下，只朗读英文。
  */
+import { useSelectionContextMenu } from '@design/ContextMenu';
 import Loading from '@design/Loading';
+import {
+	createSelectionSpeakMenu,
+	useAssistantSelectionSpeak,
+} from '@design/SelectionSpeak';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { CircleChevronDown, CircleChevronRight } from 'lucide-react';
 import {
@@ -25,17 +30,13 @@ import {
 	type EnglishDailyReadingItem,
 	getEnglishDailyReading,
 } from '@/service';
-import {
-	pausePlaybackSoft,
-	playPreferred,
-	resumePlaybackSoft,
-	stopAllPlayback,
-} from '@/utils/speech';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ttsCacheScopeDailyReading } from '../utils/ttsCacheFolder';
 import { ArticleHeader } from './components/ArticleHeader';
-import { GlossSentence, WordLine } from './components/GlossSentence';
+import { GlossSentence } from './components/GlossSentence';
 import { Quiz } from './components/Quiz';
 import { ReadingList } from './components/ReadingList';
+import { WordLine } from './components/WordLine';
 import { paragraphs, renderText, sourceList } from './utils/body';
 import { parseOrigin, type ReadingOrigin } from './utils/origin';
 import {
@@ -45,8 +46,6 @@ import {
 	playSentenceCount,
 	resolveSentenceZh,
 } from './utils/playSentences';
-
-type PlayStatus = 'idle' | 'playing' | 'paused';
 
 /**
  * - 默认/播放：一段连续 text-justify；当前句译 float 全宽挂在该句后。
@@ -169,10 +168,6 @@ export default function DailyReadingDetailPage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [row, setRow] = useState<EnglishDailyReadingItem | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [playStatus, setPlayStatus] = useState<PlayStatus>('idle');
-	const playGenRef = useRef(0);
-	/** 全文 playPreferred 仍在 await（含软暂停挂起） */
-	const articlePlayActiveRef = useRef(false);
 	/** 当前播放句；暂停保留，idle/打断/换篇清空 */
 	const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(
 		null,
@@ -211,6 +206,40 @@ export default function DailyReadingDetailPage() {
 		};
 	}, [glossKey]);
 	const [error, setError] = useState<string | null>(null);
+
+	/**
+	 * 朗读来源：header 全文 vs 选区菜单。共用一条底部条，但 header 图标只跟 article 联动。
+	 */
+	const [speakSource, setSpeakSource] = useState<
+		'idle' | 'article' | 'selection'
+	>('idle');
+
+	/** 开播前清点词高亮；句高亮由 article 的 onSentenceIndex / idle effect 管 */
+	const resetBeforeSpeak = useCallback(() => {
+		setWordKey(null);
+	}, []);
+
+	const selectionSpeak = useAssistantSelectionSpeak(resetBeforeSpeak);
+
+	const startSelectionSpeak = useCallback(
+		(text: string) => {
+			setSpeakSource('selection');
+			setActiveSentenceIndex(null);
+			return selectionSpeak.start(text);
+		},
+		[selectionSpeak.start],
+	);
+
+	const selectionMenuItems = useMemo(
+		() => createSelectionSpeakMenu(t, startSelectionSpeak),
+		[t, startSelectionSpeak],
+	);
+
+	const {
+		onContextMenuCapture: onSelectionContextMenuCapture,
+		onPointerDownCapture: onSelectionPointerDownCapture,
+		menu: selectionContextMenu,
+	} = useSelectionContextMenu(selectionMenuItems);
 
 	useEffect(() => {
 		if (!id) {
@@ -253,14 +282,13 @@ export default function DailyReadingDetailPage() {
 
 	useEffect(() => {
 		scrollerRef.current?.scrollTo(0, 0);
-		playGenRef.current += 1;
-		articlePlayActiveRef.current = false;
-		setPlayStatus('idle');
+		selectionSpeak.stop();
+		setSpeakSource('idle');
 		setActiveSentenceIndex(null);
 		setWordKey(null);
 		setShowSentenceZh(false);
 		setShowPlaySentenceZh(true);
-	}, [id]);
+	}, [id, selectionSpeak.stop]);
 
 	useEffect(() => {
 		// 切换时 row 还是上一篇，不能拿它把地址栏标题盖回去
@@ -272,6 +300,12 @@ export default function DailyReadingDetailPage() {
 		setSearchParams(next, { replace: true });
 	}, [id, row, searchParams, setSearchParams]);
 
+	useEffect(() => {
+		if (selectionSpeak.status !== 'idle') return;
+		setSpeakSource('idle');
+		setActiveSentenceIndex(null);
+	}, [selectionSpeak.status]);
+
 	useLayoutEffect(() => {
 		if (activeSentenceIndex == null) return;
 		const root = scrollerRef.current;
@@ -279,62 +313,24 @@ export default function DailyReadingDetailPage() {
 		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 	}, [activeSentenceIndex]);
 
-	const startArticlePlay = useCallback(async () => {
+	/** 右上角：仅全文开播/停止；与选区朗读互斥，互不抢对方的 header 态 */
+	const toggleHeaderPlay = useCallback(() => {
 		if (!row?.bodyEn) return;
-		const gen = ++playGenRef.current;
-		stopAllPlayback();
-		setWordKey(null);
-		articlePlayActiveRef.current = true;
-		setPlayStatus('playing');
-		// 首包等待期也亮首句，避免正文无反馈
-		setActiveSentenceIndex(0);
-		try {
-			// ponytail: 句级高亮需要 progress cadence；leadThenParagraphs 只在块边界回调。
-			// cloudSingleUtterance 下软暂停/persistDisk 仍可用，首声可能略晚于旧分段策略。
-			await playPreferred(row.bodyEn, {
-				cloudSingleUtterance: true,
-				persistDisk: true,
-				cacheFolder: ttsCacheScopeDailyReading(row.id),
-				cacheTitle: row.titleEn,
-				onCadenceChunk: (event) => {
-					if (event.phase !== 'start') return;
-					if (gen !== playGenRef.current) return;
-					setActiveSentenceIndex(event.sentenceIndex);
-				},
-			});
-		} catch {
-			if (gen === playGenRef.current) {
-				Toast({ type: 'warning', title: t('assistant.tts.unsupported') });
-			}
-		} finally {
-			// 勿在 finally 里 return（no-unsafe-finally）；过期世代只跳过清理
-			if (gen === playGenRef.current) {
-				articlePlayActiveRef.current = false;
-				// 软暂停时 await 仍挂起；promise 结束说明已播完或被 stop
-				setPlayStatus('idle');
-				setActiveSentenceIndex(null);
-			}
-		}
-	}, [row, t]);
-
-	const togglePlay = useCallback(async () => {
-		if (!row?.bodyEn) return;
-		if (playStatus === 'playing') {
-			pausePlaybackSoft();
-			setPlayStatus('paused');
+		if (speakSource === 'article') {
+			selectionSpeak.stop();
 			return;
 		}
-		if (playStatus === 'paused') {
-			if (articlePlayActiveRef.current) {
-				// 软续播：唤醒 wait / 从 currentTime 继续；勿 stopAll 重头播
-				resumePlaybackSoft();
-				setPlayStatus('playing');
-				return;
-			}
-			// 会话已结束（例如暂停空操作期间播完）：重新开播
+		setSpeakSource('article');
+		const ok = selectionSpeak.start(row.bodyEn, {
+			onSentenceIndex: (si) => setActiveSentenceIndex(si),
+		});
+		if (!ok) {
+			setSpeakSource('idle');
+			Toast({ type: 'warning', title: t('assistant.tts.unsupported') });
+			return;
 		}
-		await startArticlePlay();
-	}, [playStatus, row, startArticlePlay]);
+		setActiveSentenceIndex(0);
+	}, [row, selectionSpeak, speakSource, t]);
 
 	const onOrigin = useCallback((next: ReadingOrigin) => {
 		originSeeded.current = true;
@@ -356,13 +352,10 @@ export default function DailyReadingDetailPage() {
 			if (wordKey === word) {
 				stopAllPlayback();
 				setWordKey(null);
-				setActiveSentenceIndex(null);
 				return;
 			}
-			playGenRef.current += 1;
-			articlePlayActiveRef.current = false;
+			selectionSpeak.stop();
 			stopAllPlayback();
-			setPlayStatus('idle');
 			setActiveSentenceIndex(null);
 			setWordKey(word);
 			try {
@@ -377,7 +370,7 @@ export default function DailyReadingDetailPage() {
 				setWordKey((current) => (current === word ? null : current));
 			}
 		},
-		[row, t, wordKey],
+		[row, selectionSpeak.stop, t, wordKey],
 	);
 
 	const playBlocks = useMemo(() => {
@@ -448,19 +441,18 @@ export default function DailyReadingDetailPage() {
 							defaultSize={listOpen ? '65%' : '100%'}
 							className="min-h-0 min-w-0"
 						>
-							<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
+							<div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
 								{row ? (
 									<div className="shrink-0 px-4 pt-2.5">
 										<div className="mx-auto w-full max-w-2xl">
 											<ArticleHeader
 												row={row}
-												playing={playStatus !== 'idle'}
-												paused={playStatus === 'paused'}
+												playing={speakSource === 'article'}
 												listOpen={listOpen}
 												hasSentenceZh={hasSentenceZh}
 												sentenceZhOpen={showSentenceZh}
 												playSentenceZhOpen={showPlaySentenceZh}
-												onPlay={() => void togglePlay()}
+												onPlay={toggleHeaderPlay}
 												onToggleList={() => setListOpen((open) => !open)}
 												onToggleSentenceZh={() =>
 													setShowSentenceZh((open) => !open)
@@ -494,21 +486,34 @@ export default function DailyReadingDetailPage() {
 												) : null}
 												{row ? (
 													<article className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-														{playBlocks.map((block, blockIndex) => (
-															<PlaySentenceRun
-																key={blockIndex}
-																sentences={block}
-																activeSentenceIndex={activeSentenceIndex}
-																glossKey={glossKey}
-																openGloss={openGloss}
-																wordKey={wordKey}
-																onPlayWord={(word) => void playWord(word)}
-																playLabel={t('englishLearning.vocab.playWord')}
-																stopLabel={t('englishLearning.tts.stop')}
-																showSentenceZh={showSentenceZh}
-																showPlaySentenceZh={showPlaySentenceZh}
-															/>
-														))}
+														{/* 英文正文：选区右键 → 朗读 / 复制 */}
+														<div
+															onContextMenuCapture={
+																onSelectionContextMenuCapture
+															}
+															onPointerDownCapture={
+																onSelectionPointerDownCapture
+															}
+														>
+															{playBlocks.map((block, blockIndex) => (
+																<PlaySentenceRun
+																	key={blockIndex}
+																	sentences={block}
+																	activeSentenceIndex={activeSentenceIndex}
+																	glossKey={glossKey}
+																	openGloss={openGloss}
+																	wordKey={wordKey}
+																	onPlayWord={(word) => void playWord(word)}
+																	playLabel={t(
+																		'englishLearning.vocab.playWord',
+																	)}
+																	stopLabel={t('englishLearning.tts.stop')}
+																	showSentenceZh={showSentenceZh}
+																	showPlaySentenceZh={showPlaySentenceZh}
+																/>
+															))}
+															{selectionContextMenu}
+														</div>
 														<Button
 															type="button"
 															variant="link"
@@ -637,6 +642,11 @@ export default function DailyReadingDetailPage() {
 										</ScrollArea>
 									)}
 								</div>
+								{selectionSpeak.floatAbove ? (
+									<div className="relative mx-auto mb-3 w-full max-w-2xl shrink-0 px-4">
+										{selectionSpeak.floatAbove}
+									</div>
+								) : null}
 							</div>
 						</ResizablePanel>
 					</ResizablePanelGroup>

@@ -20,7 +20,6 @@ const HEADER_ICON_BTN =
 export function ArticleHeader({
 	row,
 	playing,
-	paused = false,
 	listOpen,
 	hasSentenceZh = false,
 	sentenceZhOpen = false,
@@ -31,8 +30,8 @@ export function ArticleHeader({
 	onTogglePlaySentenceZh,
 }: {
 	row: EnglishDailyReadingItem;
+	/** 朗读中（含 loading/paused）：图标为停止，再点即停 */
 	playing: boolean;
-	paused?: boolean;
 	listOpen: boolean;
 	/** 有逐句中文数据时才渲染相关开关 */
 	hasSentenceZh?: boolean;
@@ -47,9 +46,7 @@ export function ArticleHeader({
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const playLabel = playing
-		? paused
-			? t('englishLearning.tts.resume')
-			: t('englishLearning.tts.pause')
+		? t('englishLearning.tts.stop')
 		: t('englishLearning.dailyReading.play');
 	const sentenceZhLabel = sentenceZhOpen
 		? t('englishLearning.dailyReading.hideSentenceZh')
@@ -66,9 +63,7 @@ export function ArticleHeader({
 				<div className="flex shrink-0 items-center -mr-[9px]">
 					{row.bodyEn ? (
 						<DailyPlayIconButton
-							mode="pause"
 							playing={playing}
-							paused={paused}
 							playLabel={playLabel}
 							onPlay={onPlay}
 						/>

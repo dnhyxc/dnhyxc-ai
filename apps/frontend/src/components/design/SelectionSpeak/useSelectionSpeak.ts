@@ -17,6 +17,11 @@ import { playListenPlainText } from '@/views/ebook/utils/epub/listen/playListenP
 /** 选区朗读状态机：空闲 / 等 TTS / 播放中 / 已暂停 */
 export type SelectionSpeakStatus = 'idle' | 'loading' | 'playing' | 'paused';
 
+/** start 可选回调：句下标变化（全文朗读高亮等） */
+export type SelectionSpeakStartOptions = {
+	onSentenceIndex?: (sentenceIndex: number) => void;
+};
+
 /** 语速下限（与播放器可设范围对齐） */
 const RATE_MIN = 0.5;
 /** 语速上限 */
@@ -66,6 +71,9 @@ export function useSelectionSpeak() {
 	const waitingRef = useRef(false);
 	/** 无真实进度时，延迟应用 onSentence 的定时器句柄 */
 	const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	/** 本轮 start 的句下标回调（全文朗读高亮） */
+	const onSentenceIndexRef =
+		useRef<SelectionSpeakStartOptions['onSentenceIndex']>(undefined);
 
 	// 每次 render 把最新 status 写入 ref，供异步路径读取
 	statusRef.current = status;
@@ -77,6 +85,7 @@ export function useSelectionSpeak() {
 		if (si === shownSiRef.current) return;
 		shownSiRef.current = si;
 		setPreview(previewOf(plainRef.current.slice(span.start, span.end)));
+		onSentenceIndexRef.current?.(si);
 	}, []);
 
 	/** 清掉 cadence 补偿用的延迟定时器，防止停/切会话后仍改 preview */
@@ -93,6 +102,7 @@ export function useSelectionSpeak() {
 		audioClockRef.current = false;
 		waitingRef.current = false;
 		shownSiRef.current = 0;
+		onSentenceIndexRef.current = undefined;
 		clearDelay();
 		textRef.current = '';
 		plainRef.current = '';
@@ -112,7 +122,7 @@ export function useSelectionSpeak() {
 	 * @returns false 表示文本无效或播放能力不可用；true 表示已发起异步播放
 	 */
 	const start = useCallback(
-		(rawText: string) => {
+		(rawText: string, opts?: SelectionSpeakStartOptions) => {
 			const text = rawText.trim();
 			if (!text) return false;
 			if (!isPlaybackAvailable()) return false;
@@ -127,6 +137,7 @@ export function useSelectionSpeak() {
 			pausedRef.current = false;
 			audioClockRef.current = false;
 			waitingRef.current = false;
+			onSentenceIndexRef.current = opts?.onSentenceIndex;
 			// -1 使 applySentence(0) 一定会写入首句预览
 			shownSiRef.current = -1;
 			clearDelay();

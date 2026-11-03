@@ -90,7 +90,8 @@ export function PositionedQuickMenu({
 	if (!state) return null;
 
 	return (
-		<DropdownMenu open={state.open} onOpenChange={onOpenChange} modal>
+		// modal=false + 禁止自动聚焦：避免抢焦把页面选区高亮清掉（选区右键复制/朗读）
+		<DropdownMenu open={state.open} onOpenChange={onOpenChange} modal={false}>
 			<DropdownMenuTrigger asChild>
 				<span aria-hidden style={anchorStyle} />
 			</DropdownMenuTrigger>
@@ -98,6 +99,8 @@ export function PositionedQuickMenu({
 				className={contentClassName}
 				align="start"
 				side="right"
+				// DropdownMenu Content 类型不含 onOpenAutoFocus（Menu 私有）；关焦即可，开菜单选区靠 hook 写回
+				onCloseAutoFocus={(event) => event.preventDefault()}
 			>
 				<MenuEntries entries={items} />
 			</DropdownMenuContent>

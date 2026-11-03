@@ -9,6 +9,7 @@ export {
 	useAssistantSelectionSpeak,
 } from './useAssistantSelectionSpeak';
 export {
+	type SelectionSpeakStartOptions,
 	type SelectionSpeakStatus,
 	useSelectionSpeak,
 } from './useSelectionSpeak';

@@ -1,11 +1,11 @@
-import { Square, SquarePause, SquarePlay, Volume2 } from 'lucide-react';
+import { SquarePause, SquarePlay, SquareStop, Volume2 } from 'lucide-react';
 import Tooltip from '@/components/design/Tooltip';
 import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 type DailyPlayIconButtonProps = {
 	playing: boolean;
-	/** pause：与播放条一致用 SquarePlay/SquarePause；默认 stop（方块=停止） */
+	/** pause：与播放条一致用 SquarePlay/SquarePause；默认 stop（SquareStop，与选区朗读条一致） */
 	mode?: 'stop' | 'pause';
 	paused?: boolean;
 	playLabel: string;
@@ -24,7 +24,7 @@ export function DailyPlayIconButton({
 	onPlay,
 }: DailyPlayIconButtonProps) {
 	const active = mode === 'pause' ? playing && !paused : playing;
-	// pause 模式图标对齐听书/划词播放条（SquarePlay / SquarePause）
+	// 图标对齐选区朗读条：SquarePlay / SquarePause / SquareStop
 	const icon =
 		mode === 'pause' ? (
 			active ? (
@@ -33,7 +33,7 @@ export function DailyPlayIconButton({
 				<SquarePlay className="size-4" aria-hidden />
 			)
 		) : playing ? (
-			<Square className="size-4.5 fill-current" aria-hidden />
+			<SquareStop className="size-4" aria-hidden />
 		) : (
 			<Volume2 className="size-4.5" aria-hidden />
 		);

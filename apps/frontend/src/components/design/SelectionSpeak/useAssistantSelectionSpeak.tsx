@@ -5,7 +5,10 @@ import {
 	SelectionSpeakBar,
 	type SelectionSpeakBarSizeProps,
 } from './SelectionSpeakBar';
-import { useSelectionSpeak } from './useSelectionSpeak';
+import {
+	type SelectionSpeakStartOptions,
+	useSelectionSpeak,
+} from './useSelectionSpeak';
 
 export type AssistantSelectionSpeakOptions = SelectionSpeakBarSizeProps & {
 	/** 开播前钩子（如听书页先停章节听书） */
@@ -33,9 +36,9 @@ export function useAssistantSelectionSpeak(
 	const resizeHandles = normalized.resizeHandles;
 
 	const start = useCallback(
-		(text: string) => {
+		(text: string, startOpts?: SelectionSpeakStartOptions) => {
 			onBeforeStartRef.current?.();
-			return speak.start(text);
+			return speak.start(text, startOpts);
 		},
 		[speak.start],
 	);
@@ -75,11 +78,13 @@ export function useAssistantSelectionSpeak(
 	);
 
 	return {
-		/** 朗读任意文本（选区菜单 / 消息操作条整条朗读共用） */
+		/** 朗读任意文本（选区菜单 / 消息操作条整条朗读 / 每日阅读全文共用） */
 		start,
 		getSelectionContextMenuItems,
 		floatAbove,
 		stop: speak.stop,
 		visible: speak.visible,
+		status: speak.status,
+		togglePlay: speak.togglePlay,
 	};
 }
