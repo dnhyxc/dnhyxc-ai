@@ -1,7 +1,6 @@
 import ChatEntry from '@design/ChatEntry';
 import ShareChat from '@design/Share';
 import { Button, Checkbox, Label } from '@ui/index';
-import { History, Waypoints } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -9,7 +8,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { useI18n } from '@/hooks';
 import { useChatCore } from '@/hooks/useChatCore';
-import { cn } from '@/lib/utils';
 import { uploadCosChatFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
@@ -18,7 +16,7 @@ import SessionList from './session-list';
 // Chat 主组件
 const Chat = observer(() => {
 	const { chatStore } = useStore();
-	const { t, locale } = useI18n();
+	const { t } = useI18n();
 	const {
 		input,
 		setInput,
@@ -147,34 +145,6 @@ const Chat = observer(() => {
 
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden rounded-b-md">
-			<div
-				className={cn(
-					'absolute top-4 left-29 z-50 flex items-center gap-3 text-theme',
-					locale === 'zh-CN' ? 'left-29.5' : 'left-34.5',
-				)}
-			>
-				<div className="lucide-stroke-draw-hover">
-					{open ? (
-						<History size={20} className="cursor-pointer text-teal-500 mt-px" />
-					) : (
-						<History
-							size={20}
-							className="cursor-pointer hover:text-teal-500 mt-px"
-							onClick={() => setOpen(true)}
-						/>
-					)}
-				</div>
-				{params?.id && !chatStore.isCurrentSessionLoading && !isSharing && (
-					<div className="lucide-stroke-draw-hover">
-						<Waypoints
-							size={20}
-							className="cursor-pointer hover:text-teal-500"
-							onClick={onShare}
-						/>
-					</div>
-				)}
-			</div>
-
 			<Outlet />
 
 			{isSharing ? (
@@ -236,6 +206,12 @@ const Chat = observer(() => {
 					stopGenerating={stopGenerating}
 					webSearchEnabled={webSearchEnabled}
 					onWebSearchEnabledChange={setWebSearchEnabled}
+					onHistoryClick={() => setOpen(true)}
+					historyActive={open}
+					onShareClick={onShare}
+					showShare={Boolean(
+						params?.id && !chatStore.isCurrentSessionLoading && !isSharing,
+					)}
 				/>
 			)}
 

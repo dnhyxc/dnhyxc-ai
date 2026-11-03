@@ -9,7 +9,9 @@ import {
 	ChevronLast,
 	CirclePlus,
 	Globe,
+	History,
 	Link,
+	Waypoints,
 } from 'lucide-react';
 import {
 	type RefObject,
@@ -149,6 +151,14 @@ interface ChatEntryProps {
 	/** 是否启用 Serper 联网搜索（由后端注入检索上下文） */
 	webSearchEnabled?: boolean;
 	onWebSearchEnabledChange?: (enabled: boolean) => void;
+	/** 打开历史会话列表（渲染在「新对话」后） */
+	onHistoryClick?: () => void;
+	/** 历史抽屉已打开时高亮且不可再点 */
+	historyActive?: boolean;
+	/** 进入分享勾选（渲染在「联网搜索」后） */
+	onShareClick?: () => void;
+	/** 是否展示分享按钮（如需已有会话） */
+	showShare?: boolean;
 	/** 文本域样式 */
 	textareaClassName?: string;
 	/** 为 true 时禁用底部输入框（知识库：左侧编辑器无正文时禁止在助手框输入） */
@@ -192,6 +202,10 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	uploadLoading,
 	webSearchEnabled = false,
 	onWebSearchEnabledChange,
+	onHistoryClick,
+	historyActive = false,
+	onShareClick,
+	showShare = false,
 	textareaClassName,
 	disableTextInput = false,
 	placeholder: placeholderProp,
@@ -941,6 +955,25 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										{t?.('common.newChat') ?? '新对话'}
 									</Button>
 								) : null}
+								{onHistoryClick ? (
+									<Button
+										type="button"
+										variant="ghost"
+										aria-label={t?.('chat.sessionList.title') ?? '历史对话'}
+										aria-pressed={historyActive}
+										disabled={historyActive}
+										onClick={onHistoryClick}
+										className={cn(
+											'lucide-stroke-draw-hover mb-1 h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-sm [&_svg]:overflow-visible',
+											historyActive
+												? 'border border-teal-600/50 bg-teal-600/20 text-teal-400'
+												: 'border border-transparent bg-theme/5 text-textcolor',
+										)}
+									>
+										<History className="h-3.5 w-3.5 shrink-0" />
+										{t?.('chat.sessionList.title') ?? '历史对话'}
+									</Button>
+								) : null}
 								{entryChildren && clearChat ? entryChildren : null}
 								{onUploadFile && (
 									<Upload
@@ -1000,6 +1033,19 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									>
 										<Globe className="h-3.5 w-3.5 shrink-0" />
 										{t?.('chat.entry.webSearch') ?? '联网搜索'}
+									</Button>
+								) : null}
+								{showShare && onShareClick ? (
+									<Button
+										type="button"
+										variant="ghost"
+										aria-label={t?.('chat.share.action') ?? '分享'}
+										disabled={loading}
+										onClick={onShareClick}
+										className="lucide-stroke-draw-hover mb-1 h-8 shrink-0 gap-1.5 rounded-md border border-transparent bg-theme/5 px-2.5 text-sm text-textcolor [&_svg]:overflow-visible"
+									>
+										<Waypoints className="h-3.5 w-3.5 shrink-0" />
+										{t?.('chat.share.action') ?? '分享'}
 									</Button>
 								) : null}
 							</div>

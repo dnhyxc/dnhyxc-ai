@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useTheme } from '@/hooks/theme';
 import { useMarkdownHashLinkViewportScroll } from '@/hooks/useMarkdownHashLinkViewportScroll';
+import { cn } from '@/lib/utils';
 import { uploadFile } from '@/service';
 import { isValidImageUrl } from '@/utils';
 import { streamFetch } from '@/utils/sse';
@@ -287,7 +288,10 @@ const DocumentProcessor = () => {
 											<Button
 												key={format.id}
 												onClick={() => onSelectFormat(format.id)}
-												className="relative cursor-pointer px-4 py-2 rounded-md font-medium transition-all duration-300 bg-theme-white/5 hover:bg-theme-white/10 text-textcolor"
+												className={cn(
+													'relative cursor-pointer px-4 py-2 rounded-md font-medium transition-all duration-300 bg-theme-white/5 hover:bg-theme-white/10',
+													isActive ? 'text-white' : 'text-textcolor',
+												)}
 											>
 												{isActive && (
 													<motion.div
@@ -296,7 +300,12 @@ const DocumentProcessor = () => {
 													/>
 												)}
 												<div className="flex items-center gap-2">
-													<Icon className="w-4 h-4 text-textcolor" />
+													<Icon
+														className={cn(
+															'w-4 h-4',
+															isActive ? 'text-white' : 'text-textcolor',
+														)}
+													/>
 													{format.label}
 												</div>
 											</Button>
@@ -309,12 +318,12 @@ const DocumentProcessor = () => {
 										!uploadFileInfo?.url &&
 										(!onlineUrl || onlineUrlError !== '')
 									}
-									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-teal-500 to-cyan-600"
+									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-teal-500 to-cyan-600 text-white hover:text-white"
 									onClick={handleStart}
 								>
 									{loading ? (
 										<span className="flex items-center">
-											<Spinner className="text-textcolor mr-2" />
+											<Spinner className="text-white mr-2" />
 											停止分析
 										</span>
 									) : (

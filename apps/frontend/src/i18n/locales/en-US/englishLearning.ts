@@ -315,7 +315,7 @@ export const englishLearning = {
 		'### Intent: Focus on vocabulary: meaning, collocations, and example sentences; confirm my level if needed.',
 	'englishLearning.intentSection': 'Select intent',
 	'englishLearning.intro':
-		'On the left, pick a quick intent to steer each turn—vocabulary, morphology, collocations, confusable words, pronunciation, speaking, translation, close reading, literature guidance, or grammar. Click the same chip again to clear; your choice is attached to the next message.',
+		'Ask about vocabulary, translation, grammar, speaking, or reading. You can also ask the assistant to look up or organize items from the left panel (libraries, daily reading, favorites, mistakes, review, word/quote packs, notes); favorites and mistake-book adds need your confirmation. Use Quick intents on the left to steer this turn—click again to clear; the choice is attached to your next message.',
 	'englishLearning.library.classic.bank': 'Corpus',
 	'englishLearning.library.classic.descShort': 'Import quotes, view corpus',
 	'englishLearning.library.classic.title': 'Quotes library',

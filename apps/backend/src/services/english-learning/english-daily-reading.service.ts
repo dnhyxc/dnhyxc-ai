@@ -15,6 +15,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Not, QueryFailedError, Repository } from 'typeorm';
+import { ModelEnum } from '../../enum/config.enum';
 import { createLlm } from '../../utils/create-llm';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { UserService } from '../user/user.service';
@@ -79,6 +80,11 @@ import {
 } from './entity/english-daily-reading-gen.entity';
 import { EnglishDailyReadingSetting } from './entity/english-daily-reading-setting.entity';
 import { EnglishDailyReadingUserSetting } from './entity/english-daily-reading-user-setting.entity';
+import {
+	isRateLimit,
+	resolveReadingFallback,
+	withModelFallback,
+} from './reading-llm-limit';
 
 // 定时篇由队列写 slot=day；手动篇由设置页 SSE 另插一行，slot 等于该行 id。两条路径不共用失败清空。
 
@@ -204,40 +210,6 @@ function tokenUnits(text: string): number {
 	return units;
 }
 
-/** 认出账户限流。只看状态码和 LangChain 错误码，不按文案猜。 */
-function isRateLimit(err: unknown, depth = 0): boolean {
-	if (!err || typeof err !== 'object' || depth > 3) return false;
-	const o = err as {
-		status?: number;
-		lc_error_code?: string;
-		cause?: unknown;
-	};
-	if (o.status === 429 || o.lc_error_code === 'MODEL_RATE_LIMIT') return true;
-	return isRateLimit(o.cause, depth + 1);
-}
-
-/** 退避等待。停止信号一到就结束，不再发下一次请求。 */
-function wait(ms: number, signal?: AbortSignal): Promise<void> {
-	if (signal?.aborted) {
-		const err = new Error('aborted');
-		err.name = 'AbortError';
-		return Promise.reject(err);
-	}
-	return new Promise((resolve, reject) => {
-		const timer = setTimeout(() => {
-			signal?.removeEventListener('abort', onAbort);
-			resolve();
-		}, ms);
-		const onAbort = () => {
-			clearTimeout(timer);
-			const err = new Error('aborted');
-			err.name = 'AbortError';
-			reject(err);
-		};
-		signal?.addEventListener('abort', onAbort, { once: true });
-	});
-}
-
 function attemptReason(e: unknown): string {
 	if (e instanceof Error && e.message.trim()) return e.message.slice(0, 500);
 	return '生成失败';
@@ -256,6 +228,9 @@ function isPublishDate(value: string): boolean {
 
 @Injectable()
 export class EnglishDailyReadingService implements OnApplicationBootstrap {
+	/** ponytail: 进程内模型冷却；多实例要搬 Redis。key=modelName → 冷却到期 ms */
+	private readonly modelCoolUntil = new Map<string, number>();
+
 	constructor(
 		@InjectRepository(EnglishDailyReading)
 		private readonly repo: Repository<EnglishDailyReading>,
@@ -1032,31 +1007,6 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return signal.aborted || (runId != null && this.stoppedRuns.has(runId));
 	}
 
-	/** 只重试这一次流。成功不等待。429 才等 2 秒、4 秒，连同首次最多 3 次。 */
-	private async withRateRetry<T>(
-		run: () => Promise<T>,
-		signal?: AbortSignal,
-	): Promise<T> {
-		for (let attempt = 0; attempt < 3; attempt += 1) {
-			try {
-				return await run();
-			} catch (err) {
-				if (
-					signal?.aborted ||
-					this.isAbort(err, signal) ||
-					attempt === 2 ||
-					!isRateLimit(err)
-				) {
-					throw err;
-				}
-				const delay = 2000 * 2 ** attempt;
-				this.logger.warn(`[EnglishDailyReading] 限流，${delay / 1000}秒后重试`);
-				await wait(delay, signal);
-			}
-		}
-		throw new Error('rate limit');
-	}
-
 	private isAbort(e: unknown, signal?: AbortSignal): boolean {
 		if (signal?.aborted) return true;
 		if (!e || typeof e !== 'object') return false;
@@ -1623,6 +1573,77 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		return { ...extras, sentenceZh };
 	}
 
+	/** 单次阅读出站：同模型 jitter 退避；1305 冷却后降级到同 Key flash。 */
+	private async callReadingStream(opts: {
+		signal?: AbortSignal;
+		userId?: number;
+		messages: Array<SystemMessage | HumanMessage>;
+		onDelta?: (piece: string) => void;
+		onUsage?: (total: number, done?: boolean, paint?: boolean) => void;
+	}): Promise<{ text: string; modelName: string }> {
+		const signal = opts.signal;
+		if (signal?.aborted) {
+			const err = new Error('aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		const creds = await this.llmConfigService.resolveSiliconFlowCredentials(
+			this.configService,
+			'englishLearning',
+			opts.userId,
+		);
+		const fbRaw = this.configService.get<string>(
+			ModelEnum.GLM_FALLBACK_MODEL_NAME,
+		);
+		const fallback = resolveReadingFallback(
+			creds.modelName,
+			creds.baseURL,
+			typeof fbRaw === 'string' ? fbRaw : undefined,
+		);
+		const { value: text, modelName } = await withModelFallback({
+			primaryModel: creds.modelName,
+			fallbackModel: fallback,
+			signal,
+			coolUntil: this.modelCoolUntil,
+			onRetry: (delayMs, kind) => {
+				this.logger.warn(
+					`[EnglishDailyReading] ${kind}，${Math.round(delayMs / 1000)}秒后重试`,
+				);
+			},
+			onDegraded: (from, to) => {
+				this.logger.warn(
+					`[EnglishDailyReading] 主模型过载，降级 ${from} → ${to}`,
+				);
+			},
+			runWithModel: async (modelName) => {
+				const llm = await createLlm(
+					this.configService,
+					{
+						preset: 'englishLearning',
+						userId: opts.userId,
+						modelName,
+						streaming: true,
+						temperature: 0.7,
+						defaultTemperature: 0.7,
+						maxTokens: 8192,
+						maxTokensPolicy: 'default',
+						maxRetries: 0,
+						modelKwargs: { response_format: { type: 'json_object' } },
+					},
+					this.llmConfigService,
+				);
+				return this.readStream(
+					llm,
+					opts.messages,
+					signal,
+					opts.onDelta,
+					opts.onUsage,
+				);
+			},
+		});
+		return { text, modelName };
+	}
+
 	private async askModel(
 		publishDate: string,
 		theme: string,
@@ -1640,27 +1661,6 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		payload: Record<string, unknown> | null;
 		modelName: string;
 	}> {
-		const signal = opts?.signal;
-		if (signal?.aborted) {
-			// 停止发生在创建客户端之前。不再发这次 HTTP。
-			const err = new Error('aborted');
-			err.name = 'AbortError';
-			throw err;
-		}
-		const llm = await createLlm(
-			this.configService,
-			{
-				preset: 'englishLearning',
-				userId: opts?.userId,
-				streaming: true,
-				temperature: 0.7,
-				defaultTemperature: 0.7,
-				maxTokens: 8192,
-				maxTokensPolicy: 'default',
-				modelKwargs: { response_format: { type: 'json_object' } },
-			},
-			this.llmConfigService,
-		);
 		const lengthLine =
 			profile.length === 'short'
 				? 'bodyEn is about 100 English words (80-120), 2-3 paragraphs separated by a blank line. Each paragraph has several sentences. Do not put a blank line after every sentence.'
@@ -1692,21 +1692,15 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		]
 			.filter(Boolean)
 			.join('\n\n');
-		const text = await this.withRateRetry(
-			() =>
-				this.readStream(
-					llm,
-					[new SystemMessage(system), new HumanMessage(user)],
-					signal,
-					opts?.onDelta,
-					opts?.onUsage,
-				),
-			signal,
-		);
+		const { text, modelName } = await this.callReadingStream({
+			signal: opts?.signal,
+			userId: opts?.userId,
+			messages: [new SystemMessage(system), new HumanMessage(user)],
+			onDelta: opts?.onDelta,
+			onUsage: opts?.onUsage,
+		});
 		const payload = parseModelObject(text);
 		const draft = parsePassageJson(text);
-		const named = llm as { model?: string; modelName?: string };
-		const modelName = named.modelName ?? named.model ?? '';
 		// 流式过程只累积原文。整篇 JSON 不完整时当废稿，由调用方决定是否重试。模型名仍要带回去，第二次才能接在下面。
 		if (!payload || !draft) return { draft: null, payload: null, modelName };
 		return { draft, payload, modelName };
@@ -1832,27 +1826,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 		payload: Record<string, unknown> | null;
 		raw: string;
 	}> {
-		const signal = opts?.signal;
-		if (signal?.aborted) {
-			const err = new Error('aborted');
-			err.name = 'AbortError';
-			throw err;
-		}
 		const keys = opts?.keys?.length ? opts.keys : requestedExtraKeys(profile);
-		const llm = await createLlm(
-			this.configService,
-			{
-				preset: 'englishLearning',
-				userId: opts?.userId,
-				streaming: true,
-				temperature: 0.7,
-				defaultTemperature: 0.7,
-				maxTokens: 8192,
-				maxTokensPolicy: 'default',
-				modelKwargs: { response_format: { type: 'json_object' } },
-			},
-			this.llmConfigService,
-		);
 		const lines = keys.map((key) => {
 			if (key === 'glossary') {
 				return `glossary: up to ${glossaryLimit(profile.length)} objects {word, zh}; each word must appear in the passage; pick advanced, precise, high-value words a learner would look up, not basic everyday words`;
@@ -1868,17 +1842,13 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			'Do not include titleEn, titleZh, bodyEn, bodyZh, or wordGloss.',
 			...lines,
 		].join('\n');
-		const text = await this.withRateRetry(
-			() =>
-				this.readStream(
-					llm,
-					[new SystemMessage(system), new HumanMessage(bodyEn)],
-					signal,
-					opts?.onDelta,
-					opts?.onUsage,
-				),
-			signal,
-		);
+		const { text } = await this.callReadingStream({
+			signal: opts?.signal,
+			userId: opts?.userId,
+			messages: [new SystemMessage(system), new HumanMessage(bodyEn)],
+			onDelta: opts?.onDelta,
+			onUsage: opts?.onUsage,
+		});
 		const payload = parseModelObject(text);
 		return { ok: Boolean(payload), payload, raw: text };
 	}
@@ -1960,26 +1930,6 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			gaps?: { sentence: string; words: string[] }[];
 		},
 	): Promise<{ gloss: ReadingExtras['wordGloss']; raw: string }> {
-		const signal = opts?.signal;
-		if (signal?.aborted) {
-			const err = new Error('aborted');
-			err.name = 'AbortError';
-			throw err;
-		}
-		const llm = await createLlm(
-			this.configService,
-			{
-				preset: 'englishLearning',
-				userId: opts?.userId,
-				streaming: true,
-				temperature: 0.7,
-				defaultTemperature: 0.7,
-				maxTokens: 8192,
-				maxTokensPolicy: 'default',
-				modelKwargs: { response_format: { type: 'json_object' } },
-			},
-			this.llmConfigService,
-		);
 		const gaps = opts?.gaps ?? [];
 		const numbered = gaps.length
 			? glossGapText(bodyEn, gaps)
@@ -1992,17 +1942,16 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				? 'wordGloss: one object per numbered line, {i, words}. i is the number. words lists only the words on that line, in the same order, as {w, zh}. zh is a short Chinese gloss within 8 Chinese characters. Do not add words that are not on the line.'
 				: 'wordGloss: one object per numbered sentence, {i, words}. i is the number before the sentence. words lists every word in that sentence in order as {w, zh}. Skip punctuation. zh is a short Chinese gloss of w as used in that sentence, within 8 Chinese characters, including small words such as a, the, of.',
 		].join('\n');
-		const text = await this.withRateRetry(
-			() =>
-				this.readStream(
-					llm,
-					[new SystemMessage(system), new HumanMessage(numbered || bodyEn)],
-					signal,
-					opts?.onDelta,
-					opts?.onUsage,
-				),
-			signal,
-		);
+		const { text } = await this.callReadingStream({
+			signal: opts?.signal,
+			userId: opts?.userId,
+			messages: [
+				new SystemMessage(system),
+				new HumanMessage(numbered || bodyEn),
+			],
+			onDelta: opts?.onDelta,
+			onUsage: opts?.onUsage,
+		});
 		const payload = parseModelObject(text);
 		// 缺词批不信模型自己写的序号。它经常把第 9 句改成 i:1，挂错句后整句被丢掉。
 		const gloss = gaps.length

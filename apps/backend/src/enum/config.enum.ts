@@ -105,6 +105,8 @@ export enum ModelEnum {
 	GLM_API_KEY = 'GLM_API_KEY',
 	GLM_BASE_URL = 'GLM_BASE_URL',
 	GLM_MODEL_NAME = 'GLM_MODEL_NAME',
+	/** 每日阅读主模型 1305 过载时的同 Key 备用，默认 glm-4-flash */
+	GLM_FALLBACK_MODEL_NAME = 'GLM_FALLBACK_MODEL_NAME',
 	/** 图片 OCR 视觉模型名，未配置时默认 GLM-4.6V-Flash */
 	GLM_OCR_MODEL_NAME = 'GLM_OCR_MODEL_NAME',
 	/**

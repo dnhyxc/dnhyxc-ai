@@ -53,6 +53,7 @@ export const chat = {
 	'chat.sessionList.empty': 'No conversations yet',
 	'chat.sessionList.title': 'History',
 	'chat.sessionList.toast.titleUpdated': 'Chat title updated.',
+	'chat.share.action': 'Share',
 	'chat.share.createLink': 'Create share link',
 	'chat.share.selectedPairs': 'Selected {count} pairs',
 };

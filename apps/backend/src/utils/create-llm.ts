@@ -569,6 +569,8 @@ export type CreateLlmOptions = {
 	defaultMaxTokens?: number;
 	abortSignal?: AbortSignal;
 	modelKwargs?: Record<string, unknown>;
+	/** LangChain 内置重试次数；阅读出站自管 429 时传 0，避免 nested retry */
+	maxRetries?: number;
 };
 
 /**
@@ -592,6 +594,7 @@ export async function createLlm(
 		defaultMaxTokens = 4096,
 		abortSignal,
 		modelKwargs,
+		maxRetries,
 	} = options;
 
 	// 第一优先：使用自定义凭证（resolver eg. UI DB），否则用 env preset
@@ -625,6 +628,7 @@ export async function createLlm(
 			...maxTokensField,
 			configuration: { baseURL: credentials.baseURL },
 			...(modelKwargs && { modelKwargs }),
+			...(maxRetries !== undefined && { maxRetries }),
 			...(abortSignal && {
 				callOptions: { signal: abortSignal },
 			}),
@@ -641,6 +645,7 @@ export async function createLlm(
 		...maxTokensField,
 		configuration: { baseURL: credentials.baseURL },
 		...(modelKwargs && { modelKwargs }),
+		...(maxRetries !== undefined && { maxRetries }),
 		...(abortSignal && {
 			callOptions: { signal: abortSignal },
 		}),

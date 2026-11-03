@@ -48,6 +48,7 @@ export const chat = {
 	'chat.sessionList.empty': '暂无历史对话',
 	'chat.sessionList.title': '历史对话',
 	'chat.sessionList.toast.titleUpdated': '会话标题更新成功',
+	'chat.share.action': '分享',
 	'chat.share.createLink': '创建分享链接',
 	'chat.share.selectedPairs': '已选 {count} 组',
 };

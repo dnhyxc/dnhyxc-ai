@@ -42,9 +42,9 @@ export function EnglishSidebar({
 				title={t('englishLearning.library.classic.title')}
 				description={t('englishLearning.library.classic.descShort')}
 			/>
-			<DailyReadingSession />
 			<FavoriteSession />
 			<MistakeBookSession />
+			<DailyReadingSession />
 			<ReviewSession />
 			<PracticeReportSession />
 			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />

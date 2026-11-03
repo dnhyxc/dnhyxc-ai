@@ -111,10 +111,13 @@ export function GlossSentence({
 	playLabel: string;
 	stopLabel: string;
 }) {
+	// ponytail: CSS :hover 在 ScrollArea / 两端对齐正文里易粘住；指针态可随 leave 清掉
+	const [hoverKey, setHoverKey] = useState<string | null>(null);
 	const tokens = en.split(/(\s+)/);
 	let at = 0;
+
 	return (
-		<span>
+		<span onPointerLeave={() => setHoverKey(null)}>
 			{tokens.map((token, index) => {
 				if (!token.trim()) return <span key={index}>{token}</span>;
 				if (/https?:\/\//i.test(token)) {
@@ -142,9 +145,13 @@ export function GlossSentence({
 						<PopoverTrigger asChild>
 							<button
 								type="button"
+								onPointerEnter={() => setHoverKey(key)}
+								onPointerLeave={() =>
+									setHoverKey((current) => (current === key ? null : current))
+								}
 								className={cn(
-									'cursor-pointer bg-transparent p-0 text-inherit hover:text-teal-400',
-									open && 'text-teal-500',
+									'cursor-pointer bg-transparent p-0 text-inherit',
+									open ? 'text-teal-500' : hoverKey === key && 'text-teal-400',
 								)}
 							>
 								{token}
