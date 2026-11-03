@@ -118,6 +118,8 @@ export type ReadingExtras = {
 	glossary?: { word: string; zh: string }[];
 	/** 按句列出正文里的词，zh 是该词在这一句里的意思。 */
 	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
+	/** 与英文句序对齐的句译；前端按 spans 下标读取，条数不对会被忽略 */
+	sentenceZh?: string[];
 	grammarNotes?: GrammarNote[];
 	questions?: { q: string; options: string[]; answer: number }[];
 	/** 这次联网取材用到的条目，详情全部展示。 */
@@ -672,6 +674,23 @@ export function missingGlossCount(
 /** 一批缺句的句数。四句的逐词 JSON 停在 8192 的一半以下。 */
 export const GLOSS_BATCH = 4;
 
+/**
+ * 中英句数全等时写入句译。前端还会按 TTS spans 条数校验，对不上会忽略。
+ * ponytail: 英文切句近似前端 buildSentenceOffsetSpans；升级可抽共享切句。
+ */
+export function pickSentenceZh(
+	bodyEn: string,
+	bodyZh: string,
+): string[] | undefined {
+	const en = passageSentences(bodyEn);
+	const zh = stripZw(bodyZh)
+		.split(/(?<=[。！？；])\s*/)
+		.map((s) => s.trim())
+		.filter(Boolean);
+	if (!en.length || en.length !== zh.length) return undefined;
+	return zh;
+}
+
 // ponytail: 句号后的大写才切句。Mr. / U.S. 可能被切开；用 includesEither 兜住，不引入分句库。
 function passageSentences(bodyEn: string): string[] {
 	return stripZw(bodyEn)
@@ -1206,10 +1225,14 @@ export function mergeExtras(
 	const wordGloss = first.wordGloss?.length
 		? first.wordGloss
 		: second.wordGloss;
+	const sentenceZh = first.sentenceZh?.length
+		? first.sentenceZh
+		: second.sentenceZh;
 	if (glossary?.length) extras.glossary = glossary;
 	if (grammarNotes?.length) extras.grammarNotes = grammarNotes;
 	if (questions?.length) extras.questions = questions;
 	if (wordGloss?.length) extras.wordGloss = wordGloss;
+	if (sentenceZh?.length) extras.sentenceZh = sentenceZh;
 	return extras;
 }
 

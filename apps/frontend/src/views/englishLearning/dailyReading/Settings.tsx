@@ -75,7 +75,7 @@ export default observer(function DailyReadingSettingsPage() {
 	const [records, setRecords] = useState<DailyReadingGen[]>([]);
 	const historyRev = englishDailyReadingStore.historyRev;
 
-	useEffect(() => {
+	const fetchGens = useCallback(() => {
 		let cancelled = false;
 		void listEnglishDailyReadingGens()
 			.then((res) => {
@@ -85,7 +85,16 @@ export default observer(function DailyReadingSettingsPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [historyRev]);
+	}, []);
+
+	// 生成结束 / stop：刷新列表，避免历史按钮因 records 空而消失
+	useEffect(() => fetchGens(), [historyRev, fetchGens]);
+
+	// 每次打开历史 pop 再拉，保证列表为最新
+	useEffect(() => {
+		if (!historyOpen) return;
+		return fetchGens();
+	}, [historyOpen, fetchGens]);
 
 	useEffect(() => {
 		englishDailyReadingStore.setOnReady(() => {

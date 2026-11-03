@@ -51,6 +51,7 @@ import {
 	parsePassageJson,
 	pickExtras,
 	pickManualTheme,
+	pickSentenceZh,
 	pickWordGloss,
 	placeGapGloss,
 	type ReadingExtraKey,
@@ -414,6 +415,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				return;
 			}
 			const bodyEn = stripZw(draft.bodyEn);
+			const bodyZh = stripZw(draft.bodyZh);
 			const extras = await this.finishReading(bodyEn, profile, { onUsage });
 			await this.repo.update(
 				{ publishDate, slot: DAY_SLOT },
@@ -422,12 +424,16 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 					titleEn: stripZw(draft.titleEn).slice(0, 80),
 					titleZh: stripZw(draft.titleZh).slice(0, 80),
 					bodyEn,
-					bodyZh: stripZw(draft.bodyZh),
+					bodyZh,
 					sourceKind: material.snippet ? 'web' : 'llm',
 					sourceUrl: material.sourceUrl,
 					sourceTitle: material.sourceTitle,
 					theme,
-					extras: this.withSources(extras, material.sources),
+					extras: this.withSentenceZh(
+						this.withSources(extras, material.sources),
+						bodyEn,
+						bodyZh,
+					),
 				},
 			);
 			await this.recordSuccess(publishDate, started, enqueuedAt, spent());
@@ -833,6 +839,7 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 			if (this.shouldStop(id, ac.signal))
 				throw new BadRequestException('已停止');
 			const bodyEn = stripZw(draft.bodyEn);
+			const bodyZh = stripZw(draft.bodyZh);
 			const extras = await this.finishReading(bodyEn, profile, {
 				signal: ac.signal,
 				userId,
@@ -845,12 +852,16 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 				titleEn: stripZw(draft.titleEn).slice(0, 80),
 				titleZh: stripZw(draft.titleZh).slice(0, 80),
 				bodyEn,
-				bodyZh: stripZw(draft.bodyZh),
+				bodyZh,
 				sourceKind: material.snippet ? 'web' : 'llm',
 				sourceUrl: material.sourceUrl,
 				sourceTitle: material.sourceTitle,
 				theme,
-				extras: this.withSources(extras, material.sources),
+				extras: this.withSentenceZh(
+					this.withSources(extras, material.sources),
+					bodyEn,
+					bodyZh,
+				),
 			});
 			if (!saved.affected) {
 				// 行已不是 pending（被停止或已发布）。不能改写，也不发 complete。
@@ -1599,6 +1610,17 @@ export class EnglishDailyReadingService implements OnApplicationBootstrap {
 	): ReadingExtras {
 		if (!sources.length) return extras;
 		return { ...extras, sources };
+	}
+
+	/** 中英句数对齐时挂 sentenceZh，供详情播放句下译文 */
+	private withSentenceZh(
+		extras: ReadingExtras,
+		bodyEn: string,
+		bodyZh: string,
+	): ReadingExtras {
+		const sentenceZh = pickSentenceZh(bodyEn, bodyZh);
+		if (!sentenceZh) return extras;
+		return { ...extras, sentenceZh };
 	}
 
 	private async askModel(

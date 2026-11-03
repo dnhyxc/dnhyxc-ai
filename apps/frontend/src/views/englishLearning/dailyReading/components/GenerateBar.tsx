@@ -169,7 +169,7 @@ export const GenerateBar = observer(function GenerateBar({
 												}}
 												onClick={(event) => event.preventDefault()}
 											>
-												<History className="size-4" aria-hidden />
+												<History className="size-4.5" aria-hidden />
 											</Button>
 										</PopoverTrigger>
 										<PopoverContent
@@ -294,7 +294,7 @@ export const GenerateBar = observer(function GenerateBar({
 											}}
 											onClick={(event) => event.preventDefault()}
 										>
-											<ScrollText className="size-4" aria-hidden />
+											<ScrollText className="size-4.5" aria-hidden />
 										</Button>
 									</PopoverTrigger>
 								) : null}

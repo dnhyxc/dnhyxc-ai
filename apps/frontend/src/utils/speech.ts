@@ -1031,8 +1031,8 @@ function notifyAwaitingPlayback(
 	cb: ((waiting: boolean) => void) | undefined,
 	waiting: boolean,
 ): void {
-	// 先于 hook：loading 期立刻锁系统键，避免连点抢在 suppress 之前
-	if (waiting) systemMediaControlsLocked = true;
+	// loading 锁系统键；出声后立刻解锁，否则无 MediaSession 接线的调用方（如每日阅读）会一直 pause 空操作
+	systemMediaControlsLocked = waiting;
 	cb?.(waiting);
 }
 
@@ -1459,9 +1459,10 @@ export function stopAllPlayback(): void {
 /**
  * 听书底栏软暂停：只 pause 介质，不递增世代、不 abort wait。
  * 续播走 resumePlaybackSoft，从 currentTime 继续。
+ * Touch Bar 误触由 registerPlaybackMediaHandlers 包装层拦截；此处不因 loading 锁直接 return，
+ * 否则应用内暂停只改了 UI、介质仍在跑，或段间暂停无法卡住后续 waitWhileSoftPaused。
  */
 export function pausePlaybackSoft(): void {
-	if (systemMediaControlsLocked) return;
 	playbackSoftPaused = true;
 	if (isSpeechSupported()) {
 		try {
@@ -1478,12 +1479,12 @@ export function pausePlaybackSoft(): void {
 	setPlaybackMediaState('paused');
 }
 
-/** @returns 是否已从暂停的 Audio / speechSynthesis 续上（含合成已就绪待播） */
+/** @returns 是否已续上介质，或已唤醒软暂停等待（段间/合成未挂源时循环会继续） */
 export function resumePlaybackSoft(): boolean {
-	if (systemMediaControlsLocked) return false;
 	const audio = cloudAudio;
 	const hasSrc = Boolean(audio?.currentSrc || audio?.getAttribute('src'));
 	const canResumeAudio = !!(audio && hasSrc && !audio.ended);
+	const hadSoftPause = playbackSoftPaused || softResumeWaiters.length > 0;
 
 	playbackSoftPaused = false;
 	const waiters = softResumeWaiters;
@@ -1513,6 +1514,8 @@ export function resumePlaybackSoft(): boolean {
 			// ignore
 		}
 	}
+	// 段间软暂停：无未结束的 <audio>，但 waiters / 标志已清，播放循环会接着走
+	if (hadSoftPause) resumed = true;
 	if (resumed) setPlaybackMediaState('playing');
 	return resumed;
 }

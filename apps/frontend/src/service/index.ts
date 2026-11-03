@@ -2057,6 +2057,8 @@ export type EnglishDailyReadingExtras = {
 	focus: Exclude<EnglishDailyReadingProfile['focus'], 'random'>;
 	glossary?: { word: string; zh: string }[];
 	wordGloss?: { en: string; words: { w: string; zh: string }[] }[];
+	/** 与正文英文句序对齐的句译；缺省时详情页启发式对齐 bodyZh */
+	sentenceZh?: string[];
 	grammarNote?: string;
 	grammarNotes?: Array<
 		string | { point: string; excerpt: string; explain: string }

@@ -4,7 +4,15 @@
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { CircleChevronDown, CircleChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	Fragment,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
 	ResizableHandle,
@@ -17,19 +25,126 @@ import {
 	type EnglishDailyReadingItem,
 	getEnglishDailyReading,
 } from '@/service';
-import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import {
+	pausePlaybackSoft,
+	playPreferred,
+	resumePlaybackSoft,
+	stopAllPlayback,
+} from '@/utils/speech';
 import { ttsCacheScopeDailyReading } from '../utils/ttsCacheFolder';
 import { ArticleHeader } from './components/ArticleHeader';
 import { GlossSentence, WordLine } from './components/GlossSentence';
 import { Quiz } from './components/Quiz';
 import { ReadingList } from './components/ReadingList';
-import {
-	glossParagraphs,
-	paragraphs,
-	renderText,
-	sourceList,
-} from './utils/body';
+import { paragraphs, renderText, sourceList } from './utils/body';
 import { parseOrigin, type ReadingOrigin } from './utils/origin';
+import {
+	alignBodyZhHeuristic,
+	buildPlaySentences,
+	type PlaySentence,
+	playSentenceCount,
+	resolveSentenceZh,
+} from './utils/playSentences';
+
+type PlayStatus = 'idle' | 'playing' | 'paused';
+
+/**
+ * - 默认/播放：一段连续 text-justify；当前句译 float 全宽挂在该句后。
+ * - 逐句释义：仍按句展示（一句英文 + 一句中文），中文普通换行（一行摆不下再折），
+ *   不再把整段中文捏成一块。
+ */
+function PlaySentenceRun({
+	sentences,
+	activeSentenceIndex,
+	glossKey,
+	openGloss,
+	wordKey,
+	onPlayWord,
+	playLabel,
+	stopLabel,
+	showSentenceZh = false,
+	showPlaySentenceZh = true,
+}: {
+	sentences: PlaySentence[];
+	activeSentenceIndex: number | null;
+	glossKey: string | null;
+	openGloss: (key: string | null, from?: string) => void;
+	wordKey: string | null;
+	onPlayWord: (word: string) => void;
+	playLabel: string;
+	stopLabel: string;
+	showSentenceZh?: boolean;
+	/** 朗读时在当前句下挂中文；默认开 */
+	showPlaySentenceZh?: boolean;
+}) {
+	const renderEn = (sentence: PlaySentence, indexInRun: number) => (
+		<span
+			data-si={sentence.si}
+			className={
+				activeSentenceIndex === sentence.si
+					? 'rounded-sm bg-[rgba(135,207,92,0.15)]'
+					: undefined
+			}
+		>
+			{indexInRun > 0 ? ' ' : null}
+			{sentence.words ? (
+				<GlossSentence
+					en={sentence.en}
+					words={sentence.words}
+					sentenceIndex={sentence.si}
+					openKey={glossKey}
+					onOpen={openGloss}
+					playingWord={wordKey}
+					onPlay={onPlayWord}
+					playLabel={playLabel}
+					stopLabel={stopLabel}
+				/>
+			) : (
+				renderText(sentence.en)
+			)}
+		</span>
+	);
+
+	if (showSentenceZh) {
+		return (
+			<div className="flex flex-col gap-3">
+				{sentences.map((sentence) => (
+					<div key={sentence.si} className="flex flex-col gap-1">
+						<p className="text-justify text-lg leading-7">
+							{renderEn(sentence, 0)}
+						</p>
+						{sentence.zh?.trim() ? (
+							<p className="text-sm font-normal leading-6 text-textcolor/80">
+								{sentence.zh}
+							</p>
+						) : null}
+					</div>
+				))}
+			</div>
+		);
+	}
+
+	return (
+		<p className="text-justify text-lg leading-7">
+			{sentences.map((sentence, index) => {
+				const playZhBelow =
+					showPlaySentenceZh &&
+					!!sentence.zh?.trim() &&
+					activeSentenceIndex === sentence.si;
+				return (
+					<Fragment key={sentence.si}>
+						{renderEn(sentence, index)}
+						{playZhBelow ? (
+							<span className="float-left clear-both w-full text-sm font-normal leading-6 text-textcolor/80">
+								{sentence.zh}
+							</span>
+						) : null}
+					</Fragment>
+				);
+			})}
+		</p>
+	);
+}
 
 /** 语法说明里的英文跟正文同一字号、字重和颜色。 */
 function articleEnglish(text: string) {
@@ -54,9 +169,20 @@ export default function DailyReadingDetailPage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [row, setRow] = useState<EnglishDailyReadingItem | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [playing, setPlaying] = useState(false);
+	const [playStatus, setPlayStatus] = useState<PlayStatus>('idle');
+	const playGenRef = useRef(0);
+	/** 全文 playPreferred 仍在 await（含软暂停挂起） */
+	const articlePlayActiveRef = useRef(false);
+	/** 当前播放句；暂停保留，idle/打断/换篇清空 */
+	const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(
+		null,
+	);
 	const [wordKey, setWordKey] = useState<string | null>(null);
 	const [showZh, setShowZh] = useState(false);
+	/** 逐句中文：一句英文下一句中文 */
+	const [showSentenceZh, setShowSentenceZh] = useState(false);
+	/** 朗读时展示当前句中文；默认开 */
+	const [showPlaySentenceZh, setShowPlaySentenceZh] = useState(true);
 	const [glossKey, setGlossKey] = useState<string | null>(null);
 	const [listOpen, setListOpen] = useState(false);
 	const [origin, setOrigin] = useState<ReadingOrigin>(() =>
@@ -127,6 +253,13 @@ export default function DailyReadingDetailPage() {
 
 	useEffect(() => {
 		scrollerRef.current?.scrollTo(0, 0);
+		playGenRef.current += 1;
+		articlePlayActiveRef.current = false;
+		setPlayStatus('idle');
+		setActiveSentenceIndex(null);
+		setWordKey(null);
+		setShowSentenceZh(false);
+		setShowPlaySentenceZh(true);
 	}, [id]);
 
 	useEffect(() => {
@@ -139,30 +272,69 @@ export default function DailyReadingDetailPage() {
 		setSearchParams(next, { replace: true });
 	}, [id, row, searchParams, setSearchParams]);
 
-	const togglePlay = useCallback(async () => {
+	useLayoutEffect(() => {
+		if (activeSentenceIndex == null) return;
+		const root = scrollerRef.current;
+		const el = root?.querySelector(`[data-si="${activeSentenceIndex}"]`);
+		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+	}, [activeSentenceIndex]);
+
+	const startArticlePlay = useCallback(async () => {
 		if (!row?.bodyEn) return;
-		if (playing) {
-			stopAllPlayback();
-			setPlaying(false);
-			return;
-		}
+		const gen = ++playGenRef.current;
 		stopAllPlayback();
 		setWordKey(null);
-		setPlaying(true);
+		articlePlayActiveRef.current = true;
+		setPlayStatus('playing');
+		// 首包等待期也亮首句，避免正文无反馈
+		setActiveSentenceIndex(0);
 		try {
+			// ponytail: 句级高亮需要 progress cadence；leadThenParagraphs 只在块边界回调。
+			// cloudSingleUtterance 下软暂停/persistDisk 仍可用，首声可能略晚于旧分段策略。
 			await playPreferred(row.bodyEn, {
-				cloudSingleUtterance: false,
-				leadThenParagraphs: true,
+				cloudSingleUtterance: true,
 				persistDisk: true,
 				cacheFolder: ttsCacheScopeDailyReading(row.id),
 				cacheTitle: row.titleEn,
+				onCadenceChunk: (event) => {
+					if (event.phase !== 'start') return;
+					if (gen !== playGenRef.current) return;
+					setActiveSentenceIndex(event.sentenceIndex);
+				},
 			});
 		} catch {
-			Toast({ type: 'warning', title: t('assistant.tts.unsupported') });
+			if (gen === playGenRef.current) {
+				Toast({ type: 'warning', title: t('assistant.tts.unsupported') });
+			}
 		} finally {
-			setPlaying(false);
+			// 勿在 finally 里 return（no-unsafe-finally）；过期世代只跳过清理
+			if (gen === playGenRef.current) {
+				articlePlayActiveRef.current = false;
+				// 软暂停时 await 仍挂起；promise 结束说明已播完或被 stop
+				setPlayStatus('idle');
+				setActiveSentenceIndex(null);
+			}
 		}
-	}, [playing, row, t]);
+	}, [row, t]);
+
+	const togglePlay = useCallback(async () => {
+		if (!row?.bodyEn) return;
+		if (playStatus === 'playing') {
+			pausePlaybackSoft();
+			setPlayStatus('paused');
+			return;
+		}
+		if (playStatus === 'paused') {
+			if (articlePlayActiveRef.current) {
+				// 软续播：唤醒 wait / 从 currentTime 继续；勿 stopAll 重头播
+				resumePlaybackSoft();
+				setPlayStatus('playing');
+				return;
+			}
+			// 会话已结束（例如暂停空操作期间播完）：重新开播
+		}
+		await startArticlePlay();
+	}, [playStatus, row, startArticlePlay]);
 
 	const onOrigin = useCallback((next: ReadingOrigin) => {
 		originSeeded.current = true;
@@ -184,10 +356,14 @@ export default function DailyReadingDetailPage() {
 			if (wordKey === word) {
 				stopAllPlayback();
 				setWordKey(null);
+				setActiveSentenceIndex(null);
 				return;
 			}
+			playGenRef.current += 1;
+			articlePlayActiveRef.current = false;
 			stopAllPlayback();
-			setPlaying(false);
+			setPlayStatus('idle');
+			setActiveSentenceIndex(null);
 			setWordKey(word);
 			try {
 				await playPreferred(word, {
@@ -202,6 +378,29 @@ export default function DailyReadingDetailPage() {
 			}
 		},
 		[row, t, wordKey],
+	);
+
+	const playBlocks = useMemo(() => {
+		if (!row?.bodyEn) return [];
+		const enCount = playSentenceCount(row.bodyEn);
+		const aligned = alignBodyZhHeuristic(row.bodyZh, enCount);
+		// 条数对不上时不信 extras，避免错句译文
+		const sentenceZh =
+			row.extras?.sentenceZh?.length === enCount
+				? row.extras.sentenceZh
+				: undefined;
+		return buildPlaySentences(row.bodyEn, row.extras?.wordGloss, (si) =>
+			resolveSentenceZh({
+				si,
+				sentenceZh,
+				alignedHeuristic: aligned,
+			}),
+		);
+	}, [row]);
+
+	const hasSentenceZh = useMemo(
+		() => playBlocks.some((block) => block.some((s) => !!s.zh?.trim())),
+		[playBlocks],
 	);
 
 	return (
@@ -255,10 +454,20 @@ export default function DailyReadingDetailPage() {
 										<div className="mx-auto w-full max-w-2xl">
 											<ArticleHeader
 												row={row}
-												playing={playing}
+												playing={playStatus !== 'idle'}
+												paused={playStatus === 'paused'}
 												listOpen={listOpen}
+												hasSentenceZh={hasSentenceZh}
+												sentenceZhOpen={showSentenceZh}
+												playSentenceZhOpen={showPlaySentenceZh}
 												onPlay={() => void togglePlay()}
 												onToggleList={() => setListOpen((open) => !open)}
+												onToggleSentenceZh={() =>
+													setShowSentenceZh((open) => !open)
+												}
+												onTogglePlaySentenceZh={() =>
+													setShowPlaySentenceZh((open) => !open)
+												}
 											/>
 										</div>
 									</div>
@@ -285,53 +494,21 @@ export default function DailyReadingDetailPage() {
 												) : null}
 												{row ? (
 													<article className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-														{row.extras?.wordGloss?.length
-															? glossParagraphs(
-																	row.bodyEn,
-																	row.extras.wordGloss,
-																).map((block, blockIndex) => (
-																	<p
-																		key={blockIndex}
-																		className="text-justify text-lg leading-7"
-																	>
-																		{block.map((sentence, index) => (
-																			<span key={`${blockIndex}-${index}`}>
-																				{index > 0 ? ' ' : null}
-																				{sentence.words ? (
-																					<GlossSentence
-																						en={sentence.en}
-																						words={sentence.words}
-																						sentenceIndex={
-																							blockIndex * 100 + index
-																						}
-																						openKey={glossKey}
-																						onOpen={openGloss}
-																						playingWord={wordKey}
-																						onPlay={(word) =>
-																							void playWord(word)
-																						}
-																						playLabel={t(
-																							'englishLearning.vocab.playWord',
-																						)}
-																						stopLabel={t(
-																							'englishLearning.tts.stop',
-																						)}
-																					/>
-																				) : (
-																					renderText(sentence.en)
-																				)}
-																			</span>
-																		))}
-																	</p>
-																))
-															: paragraphs(row.bodyEn).map((part, index) => (
-																	<p
-																		key={index}
-																		className="text-justify text-lg leading-7"
-																	>
-																		{renderText(part)}
-																	</p>
-																))}
+														{playBlocks.map((block, blockIndex) => (
+															<PlaySentenceRun
+																key={blockIndex}
+																sentences={block}
+																activeSentenceIndex={activeSentenceIndex}
+																glossKey={glossKey}
+																openGloss={openGloss}
+																wordKey={wordKey}
+																onPlayWord={(word) => void playWord(word)}
+																playLabel={t('englishLearning.vocab.playWord')}
+																stopLabel={t('englishLearning.tts.stop')}
+																showSentenceZh={showSentenceZh}
+																showPlaySentenceZh={showPlaySentenceZh}
+															/>
+														))}
 														<Button
 															type="button"
 															variant="link"

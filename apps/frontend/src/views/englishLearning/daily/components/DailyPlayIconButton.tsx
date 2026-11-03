@@ -1,10 +1,13 @@
-import { Square, Volume2 } from 'lucide-react';
+import { Square, SquarePause, SquarePlay, Volume2 } from 'lucide-react';
 import Tooltip from '@/components/design/Tooltip';
 import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 type DailyPlayIconButtonProps = {
 	playing: boolean;
+	/** pause：与播放条一致用 SquarePlay/SquarePause；默认 stop（方块=停止） */
+	mode?: 'stop' | 'pause';
+	paused?: boolean;
 	playLabel: string;
 	onPlay: () => void;
 };
@@ -15,9 +18,25 @@ const PLAY_ICON_BTN =
 
 export function DailyPlayIconButton({
 	playing,
+	mode = 'stop',
+	paused = false,
 	playLabel,
 	onPlay,
 }: DailyPlayIconButtonProps) {
+	const active = mode === 'pause' ? playing && !paused : playing;
+	// pause 模式图标对齐听书/划词播放条（SquarePlay / SquarePause）
+	const icon =
+		mode === 'pause' ? (
+			active ? (
+				<SquarePause className="size-4" aria-hidden />
+			) : (
+				<SquarePlay className="size-4" aria-hidden />
+			)
+		) : playing ? (
+			<Square className="size-4.5 fill-current" aria-hidden />
+		) : (
+			<Volume2 className="size-4.5" aria-hidden />
+		);
 	return (
 		<Tooltip side="top" content={playLabel}>
 			<Button
@@ -30,14 +49,10 @@ export function DailyPlayIconButton({
 					e.currentTarget.blur();
 				}}
 				aria-label={playLabel}
-				aria-pressed={playing}
+				aria-pressed={active}
 				className={cn(PLAY_ICON_BTN, 'text-teal-500 hover:text-teal-400')}
 			>
-				{playing ? (
-					<Square className="size-4.5 fill-current" aria-hidden />
-				) : (
-					<Volume2 className="size-4.5" aria-hidden />
-				)}
+				{icon}
 			</Button>
 		</Tooltip>
 	);

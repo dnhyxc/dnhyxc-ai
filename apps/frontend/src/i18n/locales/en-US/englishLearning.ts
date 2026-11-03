@@ -412,6 +412,12 @@ export const englishLearning = {
 	'englishLearning.dailyReading.listHide': 'Hide reading list',
 	'englishLearning.dailyReading.showZh': 'Show Chinese',
 	'englishLearning.dailyReading.hideZh': 'Hide Chinese',
+	'englishLearning.dailyReading.showSentenceZh': 'Show sentence Chinese',
+	'englishLearning.dailyReading.hideSentenceZh': 'Hide sentence Chinese',
+	'englishLearning.dailyReading.showPlaySentenceZh':
+		'Show Chinese for current sentence while playing',
+	'englishLearning.dailyReading.hidePlaySentenceZh':
+		'Hide Chinese for current sentence while playing',
 	'englishLearning.dailyReading.sourceHint': 'Source',
 	'englishLearning.library.deleteAction': 'Delete library',
 	'englishLearning.library.deleteActionClassic': 'Delete quotes library',
@@ -812,7 +818,9 @@ export const englishLearning = {
 	'englishLearning.tts.cloudXfyunFailed': 'iFlytek cloud playback failed',
 	'englishLearning.tts.hint':
 		'Cloud TTS is tried first; browser speech is the fallback. Vocabulary cards play each word.',
+	'englishLearning.tts.pause': 'Pause',
 	'englishLearning.tts.play': 'Read aloud',
+	'englishLearning.tts.resume': 'Resume',
 	'englishLearning.tts.stop': 'Stop',
 	'englishLearning.vocab.aborted': 'Fetch cancelled',
 	'englishLearning.vocab.collapseList': 'Collapse word list',
