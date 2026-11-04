@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import { isAuthClearedError } from '@/router/authSession';
 import {
 	batchAddEnglishClassicQuoteMistakes,
 	batchAddEnglishVocabularyMistakes,
@@ -69,13 +70,15 @@ export default function PracticeReportDetailPage() {
 			try {
 				const res = await getEnglishPracticeReport(id.trim(), { silent: true });
 				if (!cancelled) setReport(res.data ?? null);
-			} catch {
+			} catch (err) {
 				if (!cancelled) {
 					setReport(null);
-					Toast({
-						type: 'warning',
-						title: t('englishLearning.practice.reportDetailLoadFailed'),
-					});
+					if (!isAuthClearedError(err)) {
+						Toast({
+							type: 'warning',
+							title: t('englishLearning.practice.reportDetailLoadFailed'),
+						});
+					}
 				}
 			} finally {
 				if (!cancelled) setLoading(false);

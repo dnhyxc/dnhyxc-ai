@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { HISTORY_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
+import { isAuthClearedError } from '@/router/authSession';
 import {
 	type EnglishDailyReadingItem,
 	listEnglishDailyReadings,
@@ -91,6 +92,7 @@ export default function DailyReadingListPage() {
 				setItems(list);
 				started.current = true;
 			} catch (e) {
+				if (isAuthClearedError(e)) return;
 				const message =
 					e instanceof Error
 						? e.message

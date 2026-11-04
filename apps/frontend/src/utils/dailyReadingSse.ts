@@ -1,5 +1,8 @@
 import { BASE_URL } from '@/constants';
-import { notifyUnauthorized } from '@/router/authSession';
+import {
+	notifyUnauthorized,
+	readUnauthorizedReason,
+} from '@/router/authSession';
 import { getPlatformFetch } from '@/utils/fetch';
 
 export type ReadingFrame = {
@@ -46,9 +49,10 @@ export async function openDailyReadingStream(options: {
 	let terminal = false;
 	let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
-	const failOpen = (status: number) => {
+	const failOpen = async (response: Response, requestToken: string) => {
+		const status = response.status;
 		if (status === 401) {
-			notifyUnauthorized();
+			notifyUnauthorized(await readUnauthorizedReason(response), requestToken);
 			options.onFrame({ type: 'reading.error', message: '请先登录后再试' });
 			return;
 		}
@@ -64,17 +68,18 @@ export async function openDailyReadingStream(options: {
 
 	try {
 		const platformFetch = await getPlatformFetch();
+		const requestToken = readToken();
 		const response = await platformFetch(BASE_URL + options.path, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${readToken()}`,
+				Authorization: `Bearer ${requestToken}`,
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify(options.body),
 			signal: controller.signal,
 		});
 		if (!response.ok) {
-			failOpen(response.status);
+			await failOpen(response, requestToken);
 		} else {
 			reader = response.body?.getReader();
 			if (!reader) {

@@ -28,7 +28,39 @@ export function requiresAuthForPath(pathname: string): boolean {
 	return !isPublicPath(pathname);
 }
 
+/** 本 tab 被踢下线标记（sessionStorage，不影响其他 tab 的 localStorage token） */
+export const AUTH_KICKED_KEY = 'auth-kicked';
+
+export function isAuthKicked(): boolean {
+	if (typeof window === 'undefined') return false;
+	try {
+		return sessionStorage.getItem(AUTH_KICKED_KEY) === '1';
+	} catch {
+		return false;
+	}
+}
+
+export function markAuthKicked(): void {
+	if (typeof window === 'undefined') return;
+	try {
+		sessionStorage.setItem(AUTH_KICKED_KEY, '1');
+	} catch {
+		// 隐私模式等忽略
+	}
+}
+
+export function clearAuthKicked(): void {
+	if (typeof window === 'undefined') return;
+	try {
+		sessionStorage.removeItem(AUTH_KICKED_KEY);
+	} catch {
+		// ignore
+	}
+}
+
 export function hasValidAuthToken(): boolean {
 	if (typeof window === 'undefined') return false;
+	// 本 tab 已踢下线：即使 localStorage 仍有他 tab 新票，也视为未登录以便跳转登录页
+	if (isAuthKicked()) return false;
 	return Boolean(localStorage.getItem('token')?.trim());
 }

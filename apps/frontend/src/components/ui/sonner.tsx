@@ -16,6 +16,7 @@ import {
 	toast,
 } from 'sonner';
 import { cn } from '@/lib/utils';
+import { shouldMuteAuthClearToast } from '@/router/authToastMute';
 
 /** 高于 Dialog/Sheet 等 `z-50`；须挂在 body（见 Toaster），勿困在 `#root` 的 fixed 层叠上下文内 */
 const TOASTER_Z_INDEX = 999999999;
@@ -78,6 +79,7 @@ const Toast = ({
 	position,
 	expand: _expand,
 	offset,
+	force = false,
 }: {
 	type: ToastType;
 	title: string;
@@ -86,7 +88,18 @@ const Toast = ({
 	position?: ToastPosition;
 	expand?: boolean;
 	offset?: ToastOffset;
+	/** 鉴权清退静默窗口内仍要展示（踢下线 / Layout 请先登录） */
+	force?: boolean;
 }) => {
+	// 401/踢下线后业务 catch 常再弹「加载失败」；静默 error/warning，force 放行鉴权专用提示
+	if (
+		!force &&
+		(type === 'error' || type === 'warning') &&
+		shouldMuteAuthClearToast()
+	) {
+		return;
+	}
+
 	const colors: Record<ToastType, string> = {
 		success: 'text-green-500',
 		error: 'text-rose-500',

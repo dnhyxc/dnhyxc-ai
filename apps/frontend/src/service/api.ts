@@ -4,6 +4,9 @@ export const LOGIN = '/auth/login';
 // 登录
 export const LOGIN_BY_EMAIL = '/auth/loginByEmail';
 
+// 主动登出（清服务端本通道会话槽）
+export const LOGOUT = '/auth/logout';
+
 // 发送邮件获取验证码
 export const SEND_EMAIL = '/auth/sendEmail';
 

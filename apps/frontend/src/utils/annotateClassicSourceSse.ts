@@ -2,7 +2,10 @@
  * 经典句整集标注预热 SSE 客户端（库 / Pack）
  */
 import { BASE_URL } from '@/constants';
-import { notifyUnauthorized } from '@/router/authSession';
+import {
+	notifyUnauthorized,
+	readUnauthorizedReason,
+} from '@/router/authSession';
 import {
 	ENGLISH_LEARNING_CLASSIC_LIBRARY_ANNOTATE_SENTENCE_WORDS_STREAM,
 	ENGLISH_LEARNING_CLASSIC_PACK_ANNOTATE_SENTENCE_WORDS_STREAM,
@@ -99,10 +102,11 @@ export function streamAnnotateClassicSource(options: {
 
 	const done = (async (): Promise<AnnotateSourceStreamResult> => {
 		const platformFetch = await getPlatformFetch();
+		const requestToken = readToken();
 		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${readToken()}`,
+				Authorization: `Bearer ${requestToken}`,
 				'Content-Type': 'application/json',
 				Accept: 'text/event-stream',
 			},
@@ -112,7 +116,10 @@ export function streamAnnotateClassicSource(options: {
 
 		if (!response.ok) {
 			if (response.status === 401) {
-				notifyUnauthorized();
+				notifyUnauthorized(
+					await readUnauthorizedReason(response),
+					requestToken,
+				);
 				throw new Error('请先登录后再试');
 			}
 			throw new Error(`HTTP ${response.status}`);

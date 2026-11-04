@@ -3,7 +3,10 @@
  */
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constants';
-import { notifyUnauthorized } from '@/router/authSession';
+import {
+	notifyUnauthorized,
+	readUnauthorizedReason,
+} from '@/router/authSession';
 import { AGENT_SSE } from '@/service/api';
 import type { ElResourceBlock, SearchOrganicItem } from '@/types/chat';
 import { ASSISTANT_SSE_USER_ABORT_MARKER } from '@/utils/assistantSse';
@@ -98,10 +101,11 @@ export async function streamAgentSse(options: {
 	try {
 		onStart?.();
 		const platformFetch = await getPlatformFetch();
+		const requestToken = readToken();
 		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${readToken()}`,
+				Authorization: `Bearer ${requestToken}`,
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify(body),
@@ -110,7 +114,10 @@ export async function streamAgentSse(options: {
 
 		if (!response.ok) {
 			if (response.status === 401) {
-				notifyUnauthorized();
+				notifyUnauthorized(
+					await readUnauthorizedReason(response),
+					requestToken,
+				);
 				throw new Error('请先登录后再试');
 			}
 			throw new Error(`HTTP error! status: ${response.statusText}`);

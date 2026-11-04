@@ -1,6 +1,9 @@
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constants';
-import { notifyUnauthorized } from '@/router/authSession';
+import {
+	notifyUnauthorized,
+	readUnauthorizedReason,
+} from '@/router/authSession';
 import { FinishInfo, SearchOrganic, SearchOrganicItem } from '@/types/chat';
 import { getPlatformFetch, http } from '@/utils/fetch';
 
@@ -47,10 +50,11 @@ export const streamFetch = async ({
 		onStart?.();
 
 		const platformFetch = await getPlatformFetch();
+		const requestToken = readToken();
 		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${readToken()}`,
+				Authorization: `Bearer ${requestToken}`,
 				'Content-Type': 'application/json',
 			},
 			...options,
@@ -59,7 +63,10 @@ export const streamFetch = async ({
 		if (!response.ok) {
 			if (response.status === 401) {
 				http.setAuthToken('');
-				notifyUnauthorized();
+				notifyUnauthorized(
+					await readUnauthorizedReason(response),
+					requestToken,
+				);
 				throw new Error('请先登录后再试');
 			} else {
 				throw new Error(`HTTP error! status: ${response.statusText}`);

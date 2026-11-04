@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { isAuthClearedError } from '@/router/authSession';
 import {
 	type EnglishPracticeReportListEntry,
 	listEnglishPracticeReports,
@@ -85,11 +86,13 @@ export default function PracticeReportsListPage() {
 				const total = res.data?.totalCount ?? 0;
 				setTotalCount(total);
 				setItems((prev) => (append ? [...prev, ...next] : next));
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.practice.reportsLoadFailed'),
-				});
+			} catch (err) {
+				if (!isAuthClearedError(err)) {
+					Toast({
+						type: 'warning',
+						title: t('englishLearning.practice.reportsLoadFailed'),
+					});
+				}
 			} finally {
 				setLoading(false);
 				setLoadingMore(false);

@@ -23,6 +23,7 @@ import {
 	resolveDemoLoginPassword,
 } from '@/constants';
 import { useI18n } from '@/hooks';
+import { clearAuthKicked } from '@/router/authPaths';
 import { createVerifyCode, login } from '@/service';
 import useStore from '@/store';
 import { encrypt, setStorage } from '@/utils';
@@ -153,6 +154,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 				captchaId: captchaInfo.captchaId,
 			});
 			if (res.success) {
+				clearAuthKicked();
 				setStorage('token', res.data.access_token);
 				http.setAuthToken(res.data.access_token);
 				userStore.setUserInfo(res.data);

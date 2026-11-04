@@ -24,6 +24,7 @@ import {
 import { useDocumentShortcuts, useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
+import { consumeSuppressAuthRedirectToast } from '@/router/authSession';
 import { formatRoutePageLabel } from '@/router/routeMeta';
 import { isTauriRuntime } from '@/utils/runtime';
 
@@ -46,6 +47,13 @@ const Layout = () => {
 	}, [location.pathname, location.search]);
 
 	const needAuth = requiresAuthForPath(location.pathname);
+	const [, setAuthEpoch] = useState(0);
+	// userInfoChanged / 踢下线后重读 token，避免仍停在需登录页
+	useEffect(() => {
+		const bump = () => setAuthEpoch((n) => n + 1);
+		window.addEventListener('userInfoChanged', bump);
+		return () => window.removeEventListener('userInfoChanged', bump);
+	}, []);
 	const authed = hasValidAuthToken();
 
 	useLayoutEffect(() => {
@@ -55,13 +63,17 @@ const Layout = () => {
 		if (!needAuth || authed) return;
 		if (!authRedirectToastShownRef.current) {
 			authRedirectToastShownRef.current = true;
-			Toast({
-				type: 'warning',
-				title: t('route.guard.needLoginTitle'),
-				message: t('route.guard.needLoginMessage', {
-					page: formatRoutePageLabel(location.pathname, t, locale),
-				}),
-			});
+			// 踢下线已由 notifyUnauthorized 提示，此处勿再叠「请先登录后再访问」
+			if (!consumeSuppressAuthRedirectToast()) {
+				Toast({
+					type: 'warning',
+					title: t('route.guard.needLoginTitle'),
+					message: t('route.guard.needLoginMessage', {
+						page: formatRoutePageLabel(location.pathname, t, locale),
+					}),
+					force: true,
+				});
+			}
 		}
 		navigate('/login', {
 			replace: true,

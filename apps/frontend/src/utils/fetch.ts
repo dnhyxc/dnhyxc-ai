@@ -207,6 +207,12 @@ class HttpClient {
 		}
 	}
 
+	/** 当前内存里的 Bearer token（多 tab 时可能与 localStorage 不一致） */
+	public getAuthToken(): string {
+		const auth = this.defaultConfig.headers?.Authorization || '';
+		return auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+	}
+
 	// 处理 GET Param URL 参数
 	private handleUrlParams(url: string, params?: any[]): string {
 		if (!params || params.length === 0) {
@@ -578,10 +584,21 @@ class HttpClient {
 
 				const isUnauthorized =
 					response?.status === 401 || requestError.code === 401;
+				const unauthorizedReason =
+					typeof requestError.message === 'string'
+						? requestError.message
+						: normalizeErrorMessage(
+								requestError.message as UnknownErrorMessage,
+							) || '';
 
-				if (isUnauthorized && !finalConfig.silent) {
+				// silent 只禁业务 Toast；401 仍须清登录态（否则业务 catch 会盖成「加载失败」）
+				if (isUnauthorized) {
+					const authHdr = finalConfig.headers?.Authorization || '';
+					const failedToken = authHdr.startsWith('Bearer ')
+						? authHdr.slice(7).trim()
+						: this.getAuthToken();
 					this.setAuthToken('');
-					notifyUnauthorized();
+					notifyUnauthorized(unauthorizedReason, failedToken);
 				}
 
 				const canRetry =
@@ -598,14 +615,27 @@ class HttpClient {
 					continue;
 				}
 
-				if (!finalConfig.silent) {
+				// 401 由 notifyUnauthorized 负责提示/跳转，此处不再弹笼统错误
+				if (!finalConfig.silent && !isUnauthorized) {
 					Toast({
 						type: 'error',
 						title: resolveRequestErrorToastTitle(requestError),
 					});
 				}
 
-				throw requestError.data?.data || requestError;
+				const thrown = requestError.data?.data || requestError;
+				if (isUnauthorized && thrown && typeof thrown === 'object') {
+					Object.assign(thrown, {
+						__authCleared: true,
+						code: 401,
+						message:
+							unauthorizedReason ||
+							(typeof (thrown as { message?: unknown }).message === 'string'
+								? (thrown as { message: string }).message
+								: '请先登录后再试'),
+					});
+				}
+				throw thrown;
 			}
 		}
 

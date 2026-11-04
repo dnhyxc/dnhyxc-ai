@@ -20,6 +20,7 @@ import {
 } from '../user/dto/update-user.dto';
 import { SwaggerUpdateUser } from '../user/user.swagger';
 import { AuthService } from './auth.service';
+import { type AuthClient, isAuthClient } from './auth-session';
 import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
@@ -28,7 +29,9 @@ import { WechatBindDto } from './dto/wechat-bind.dto';
 import { WechatLoginDto } from './dto/wechat-login.dto';
 import { WechatAuthService } from './wechat/wechat-auth.service';
 
-type AuthedRequest = Request & { user?: { userId?: number } };
+type AuthedRequest = Request & {
+	user?: { userId?: number; sid?: string; cli?: AuthClient };
+};
 
 function requireUserId(req: AuthedRequest): number {
 	const userId = req.user?.userId;
@@ -56,6 +59,18 @@ export class AuthController {
 	@Post('/loginByEmail')
 	async loginByEmail(@Body() dto: LoginByEmailDTO) {
 		return await this.authService.loginByEmail(dto);
+	}
+
+	@Post('/logout')
+	@UseGuards(JwtGuard)
+	async logout(@Req() req: AuthedRequest) {
+		const userId = requireUserId(req);
+		const sid = req.user?.sid;
+		const cli = req.user?.cli;
+		if (!sid || !isAuthClient(cli)) {
+			return { success: true };
+		}
+		return await this.authService.clearSession(userId, sid, cli);
 	}
 
 	@Post('/wechat/login')

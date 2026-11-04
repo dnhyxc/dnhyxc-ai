@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { VOCAB_LIBRARY_ITEMS_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
+import { isAuthClearedError } from '@/router/authSession';
 import { retryAsync } from '@/utils/retryAsync';
 import {
 	type ElResumeModuleKey,
@@ -342,14 +343,16 @@ export function useEnglishLearningList<TItem, TLibrary>({
 				const hasMore =
 					(lastPage?.items.length ?? 0) === (lastChunk?.limit ?? 0);
 				applyWindow(id, 0, list, lib, scrollIndex, hasMore, nextTotalCount);
-			} catch {
+			} catch (err) {
 				if (gen !== loadGenRef.current) return;
 				setItems([]);
 				hasMoreRef.current = false;
-				Toast({
-					type: 'error',
-					title: tRef.current('englishLearning.library.wordsLoadFailed'),
-				});
+				if (!isAuthClearedError(err)) {
+					Toast({
+						type: 'error',
+						title: tRef.current('englishLearning.library.wordsLoadFailed'),
+					});
+				}
 			} finally {
 				if (gen === loadGenRef.current) {
 					setLoading(false);
@@ -398,13 +401,15 @@ export function useEnglishLearningList<TItem, TLibrary>({
 				return next;
 			});
 			setResume(offset);
-		} catch {
+		} catch (err) {
 			lastMoreOffsetRef.current = -1;
 			if (gen !== loadGenRef.current) return;
-			Toast({
-				type: 'error',
-				title: tRef.current('englishLearning.library.wordsLoadMoreFailed'),
-			});
+			if (!isAuthClearedError(err)) {
+				Toast({
+					type: 'error',
+					title: tRef.current('englishLearning.library.wordsLoadMoreFailed'),
+				});
+			}
 		} finally {
 			if (gen === loadGenRef.current) {
 				fetchingMoreRef.current = false;

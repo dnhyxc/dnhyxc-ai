@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router';
 import { HISTORY_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { isAuthClearedError } from '@/router/authSession';
 import {
 	type EnglishDailyReadingItem,
 	listEnglishDailyReadings,
@@ -73,6 +74,7 @@ export function ReadingList({
 				setHasMore(more);
 			} catch (e) {
 				if (ticket !== gen.current) return;
+				if (isAuthClearedError(e)) return;
 				const message =
 					e instanceof Error
 						? e.message

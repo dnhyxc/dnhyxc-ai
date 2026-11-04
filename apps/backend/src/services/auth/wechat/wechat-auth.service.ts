@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { comparePassword } from '../../../utils';
 import { User } from '../../user/user.entity';
 import { UserService } from '../../user/user.service';
+import { AuthService } from '../auth.service';
 import { wechatUnbindCacheKey } from '../auth.strategy';
 import { WechatBindDto } from '../dto/wechat-bind.dto';
 import { WechatLoginDto } from '../dto/wechat-login.dto';
@@ -49,7 +49,7 @@ function isPlaceholderWxUser(user: User): boolean {
 export class WechatAuthService {
 	constructor(
 		private readonly userService: UserService,
-		private readonly jwt: JwtService,
+		private readonly authService: AuthService,
 		private readonly cache: Cache,
 		private readonly wechatMiniProgramService: WechatMiniProgramService,
 		@InjectRepository(UserWechat)
@@ -224,18 +224,11 @@ export class WechatAuthService {
 		return { success: true };
 	}
 
-	private issueToken(user: User, webLinked: boolean) {
-		const { password, ...userInfo } = user;
-		return this.jwt
-			.signAsync({
-				username: userInfo.username,
-				sub: userInfo.id,
-				wechat: true,
-			})
-			.then((token) => ({
-				access_token: token,
-				web_linked: webLinked,
-				...userInfo,
-			}));
+	private async issueToken(user: User, webLinked: boolean) {
+		const issued = await this.authService.issueAccessToken(user, {
+			cli: 'mini',
+			wechat: true,
+		});
+		return { ...issued, web_linked: webLinked };
 	}
 }

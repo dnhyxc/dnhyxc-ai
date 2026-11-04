@@ -18,8 +18,15 @@ import {
 	SendResetPasswordEmailDTO,
 	UpdatePasswordDTO,
 } from '../user/dto/update-user.dto';
+import { User } from '../user/user.entity';
 import { UserService } from '../user/user.service';
 import { SwaggerUpdateUser } from '../user/user.swagger';
+import {
+	AUTH_SESSION_TTL_MS,
+	type AuthClient,
+	authSessionCacheKey,
+	isAuthClient,
+} from './auth-session';
 import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
@@ -34,6 +41,42 @@ export class AuthService {
 		private mailerService: MailerService,
 		private configService: ConfigService,
 	) {}
+
+	/** 签发含 sid/cli 的 JWT，并覆盖本通道 Redis 当前会话 */
+	async issueAccessToken(
+		user: User,
+		opts: { cli: AuthClient; wechat?: boolean },
+	) {
+		const sid = randomUUID();
+		await this.cache.set(
+			authSessionCacheKey(user.id, opts.cli),
+			sid,
+			AUTH_SESSION_TTL_MS,
+		);
+		const { password: _pw, ...userInfo } = user;
+		const access_token = await this.jwt.signAsync({
+			username: userInfo.username,
+			sub: user.id,
+			sid,
+			cli: opts.cli,
+			...(opts.wechat ? { wechat: true } : {}),
+		});
+		return { access_token, ...userInfo };
+	}
+
+	/** 主动登出：仅当 Redis 本槽仍是本票 sid 时删除，避免误删新会话 */
+	async clearSession(userId: number, sid: string, cli: AuthClient) {
+		if (!isAuthClient(cli) || !sid) {
+			return { success: true };
+		}
+		const key = authSessionCacheKey(userId, cli);
+		const current = await this.cache.get<string>(key);
+		if (current === sid) {
+			await this.cache.del(key);
+		}
+		return { success: true };
+	}
+
 	async login(dto: LoginUserDTO) {
 		const { username, password, captchaId, captchaText } = dto;
 		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
@@ -51,22 +94,7 @@ export class AuthService {
 		// const isPasswordValid = await argon2.verify(user.password, password);
 		const isPasswordValid = await comparePassword(password, user.password);
 		if (isPasswordValid) {
-			const { password, ...userInfo } = user; // 使用解构赋值排除password
-			const token = await this.jwt.signAsync(
-				{
-					username: userInfo.username,
-					sub: userInfo.id,
-				},
-				// 局部设置 token 过期时间，一般用在 refreshToken 上
-				// {
-				// 	expiresIn: '1d',
-				// },
-			);
-			// 返回根据用户的用户名及密码生成的 token
-			return {
-				access_token: token,
-				...userInfo,
-			};
+			return this.issueAccessToken(user, { cli: 'web' });
 		} else {
 			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
 		}
@@ -83,16 +111,7 @@ export class AuthService {
 		}
 		const vertifyEmailCode = await this.verifyEmail(verifyCodeKey, verifyCode);
 		if (vertifyEmailCode) {
-			const { password, ...userInfo } = user; // 使用解构赋值排除password
-			const token = await this.jwt.signAsync({
-				username: userInfo.username,
-				sub: userInfo.id,
-			});
-			// 返回根据用户的用户名及密码生成的 token
-			return {
-				access_token: token,
-				...userInfo,
-			};
+			return this.issueAccessToken(user, { cli: 'web' });
 		} else {
 			throw new HttpException('邮箱或邮箱验证码错误', HttpStatus.BAD_REQUEST);
 		}
@@ -192,9 +211,10 @@ export class AuthService {
 			return {
 				key: REDIS_KEY,
 			};
-		} catch (error) {
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : '发送邮件失败';
 			throw new HttpException(
-				error?.message || '发送邮件失败',
+				message || '发送邮件失败',
 				HttpStatus.BAD_REQUEST,
 			);
 		}

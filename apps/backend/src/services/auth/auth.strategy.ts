@@ -5,6 +5,11 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { Cache } from 'cache-manager';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigEnum } from '../../enum/config.enum';
+import {
+	type AuthClient,
+	assertSessionActive,
+	isAuthClient,
+} from './auth-session';
 
 export const wechatUnbindCacheKey = (userId: number) =>
 	`wechat-unbind:${userId}`;
@@ -23,7 +28,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 		});
 	}
 
-	async validate(payload: { sub: number; username: string; wechat?: boolean }) {
+	async validate(payload: {
+		sub: number;
+		username: string;
+		wechat?: boolean;
+		sid?: string;
+		cli?: string;
+	}) {
 		if (payload.wechat) {
 			const revoked = await this.cache.get(wechatUnbindCacheKey(payload.sub));
 			if (revoked) {
@@ -31,9 +42,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 			}
 		}
 
+		await assertSessionActive(this.cache, payload);
+
+		const cli: AuthClient | undefined = isAuthClient(payload.cli)
+			? payload.cli
+			: undefined;
+
 		return {
 			userId: payload.sub,
 			username: payload.username,
+			sid: payload.sid,
+			cli,
 		};
 	}
 }

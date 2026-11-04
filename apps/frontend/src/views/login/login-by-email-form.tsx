@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useCountdown, useI18n } from '@/hooks';
+import { clearAuthKicked } from '@/router/authPaths';
 import { loginByEmail, sendEmail } from '@/service';
 import useStore from '@/store';
 import { formatTime, removeStorage, setStorage } from '@/utils';
@@ -66,6 +67,7 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 			verifyCodeKey,
 		});
 		if (res.success) {
+			clearAuthKicked();
 			setStorage('token', res.data.access_token);
 			http.setAuthToken(res.data.access_token);
 			userStore.setUserInfo(res.data);
