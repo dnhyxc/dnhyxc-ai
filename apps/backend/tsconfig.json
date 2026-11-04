@@ -9,6 +9,8 @@
 		"removeComments": true,
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
+		// Nest/TypeORM 旧式装饰器：esnext 默认 strictPropertyInitialization=true 会触发 TS1240
+		"strictPropertyInitialization": false,
 		"allowSyntheticDefaultImports": true,
 		"target": "esnext",
 		"sourceMap": true,

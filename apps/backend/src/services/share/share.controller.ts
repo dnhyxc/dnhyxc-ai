@@ -12,10 +12,12 @@ import {
 	HttpStatus,
 	Param,
 	Post,
+	Req,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import {
@@ -24,6 +26,8 @@ import {
 	GetShareResponseDto,
 } from './dto/share.dto';
 import { ShareService } from './share.service';
+
+type AuthedRequest = Request & { user?: { userId?: number } };
 
 @ApiTags('分享')
 @Controller('/share')
@@ -40,7 +44,7 @@ export class ShareController {
 	@UseGuards(JwtGuard)
 	@ApiOperation({
 		summary: '创建分享',
-		description: '创建分享链接，只存储参数到Redis',
+		description: '创建分享链接：写入 shares 表（含快照）并旁路缓存 Redis',
 	})
 	@ApiResponse({
 		status: HttpStatus.CREATED,
@@ -48,8 +52,11 @@ export class ShareController {
 		type: CreateShareResponseDto,
 	})
 	@ApiResponse({ status: HttpStatus.BAD_REQUEST, description: '参数错误' })
-	async create(@Body() dto: CreateShareDto): Promise<CreateShareResponseDto> {
-		return this.shareService.createShare(dto);
+	async create(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateShareDto,
+	): Promise<CreateShareResponseDto> {
+		return this.shareService.createShare(dto, req.user?.userId);
 	}
 
 	/**
@@ -59,7 +66,7 @@ export class ShareController {
 	@Get('/get/:shareId')
 	@ApiOperation({
 		summary: '获取分享',
-		description: '获取分享内容，从Redis获取参数后查询数据库',
+		description: 'DB/缓存取元数据，活读正文，失败回退快照；累计 view_count',
 	})
 	@ApiParam({
 		name: 'shareId',

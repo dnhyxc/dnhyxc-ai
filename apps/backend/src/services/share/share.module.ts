@@ -16,6 +16,7 @@ import { Knowledge } from '../knowledge/knowledge.entity';
 import { SkillTryMessage } from '../skill/skill-try-message.entity';
 import { SkillTrySession } from '../skill/skill-try-session.entity';
 import { ShareController } from './share.controller';
+import { Share } from './share.entity';
 import { ShareService } from './share.service';
 
 @Module({
@@ -24,6 +25,7 @@ import { ShareService } from './share.service';
 		ChatModule,
 		// 注册 TypeORM 实体
 		TypeOrmModule.forFeature([
+			Share,
 			ChatMessages,
 			ChatSessions,
 			Attachments,

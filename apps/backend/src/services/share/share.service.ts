@@ -1,7 +1,5 @@
 /**
- * 分享服务 - NestJS + Redis
- * 使用 Cache (Redis) 存储分享数据，过期自动清理
- * 根据 chat_session_id 和 message_ids 从数据库查询消息
+ * 分享服务：AI 库 shares 权威 + Redis 旁路；创建时写正文快照；公开读可活读回退快照。
  */
 
 import { randomUUID } from 'node:crypto';
@@ -37,6 +35,7 @@ import {
 	GetShareResponseDto,
 	ShareCacheData,
 } from './dto/share.dto';
+import { Share } from './share.entity';
 
 // 默认过期时间：7天（毫秒）
 const DEFAULT_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000;
@@ -44,6 +43,10 @@ const DEFAULT_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000;
 const MIN_EXPIRES_IN = 60 * 60 * 1000;
 // 最长 30 天，避免分享键一直占着
 const MAX_EXPIRES_IN = 30 * 24 * 60 * 60 * 1000;
+/** 快照最多保留消息条数，避免 json 过大 */
+const MAX_SNAPSHOT_MESSAGES = 80;
+/** 单条消息正文截断上限 */
+const MAX_SNAPSHOT_CONTENT_CHARS = 20_000;
 
 /** 缺省 7 天；越界拒绝，避免静默改成另一个时长 */
 function resolveExpiresIn(expiresInMs?: number): number {
@@ -68,6 +71,8 @@ export class ShareService {
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 		private readonly messageService: MessageService,
+		@InjectRepository(Share)
+		private readonly shareRepo: Repository<Share>,
 		@InjectRepository(AssistantSession)
 		private readonly assistantSessionRepo: Repository<AssistantSession>,
 		@InjectRepository(AssistantMessage)
@@ -409,18 +414,222 @@ export class ShareService {
 		return '对话分享';
 	}
 
+	private ms(v: string | number | null | undefined): number {
+		if (v == null) return 0;
+		const n = typeof v === 'number' ? v : Number(v);
+		return Number.isFinite(n) ? n : 0;
+	}
+
+	/** 创建时 resolve 一次，供 Admin 台账与公开回退 */
+	private async buildSnapshot(dto: CreateShareDto): Promise<{
+		title: string;
+		payload: Record<string, unknown>;
+		truncated: boolean;
+	}> {
+		const shareType = dto.shareType ?? 'session';
+		if (shareType === 'knowledge') {
+			const id = (dto.chatSessionId ?? '').trim();
+			const row = await this.knowledgeRepo.findOne({
+				where: { id },
+				select: ['id', 'title', 'content'],
+			});
+			if (!row) throw new NotFoundException('知识文章不存在');
+			let content = row.content ?? '';
+			let truncated = false;
+			if (content.length > MAX_SNAPSHOT_CONTENT_CHARS) {
+				content = content.slice(0, MAX_SNAPSHOT_CONTENT_CHARS);
+				truncated = true;
+			}
+			const title = row.title?.trim() || '知识分享';
+			return {
+				title,
+				truncated,
+				payload: {
+					kind: 'knowledge',
+					id: row.id,
+					title: row.title,
+					content,
+				},
+			};
+		}
+
+		const resolved = await this.resolveShareMessagesBySessionId({
+			sessionId: dto.chatSessionId,
+			sessionType: dto.sessionType ?? 'chat',
+			messageIds: dto.messageIds,
+		});
+		let truncated = false;
+		let messages = resolved.messages;
+		if (messages.length > MAX_SNAPSHOT_MESSAGES) {
+			messages = messages.slice(0, MAX_SNAPSHOT_MESSAGES);
+			truncated = true;
+		}
+		const slim = messages.map((m) => {
+			let content = m.content ?? '';
+			if (content.length > MAX_SNAPSHOT_CONTENT_CHARS) {
+				content = content.slice(0, MAX_SNAPSHOT_CONTENT_CHARS);
+				truncated = true;
+			}
+			return {
+				id: m.id,
+				chatId: m.chatId,
+				role: m.role,
+				content,
+				timestamp: m.timestamp,
+			};
+		});
+		return {
+			title: resolved.title,
+			truncated,
+			payload: { kind: 'session', messages: slim },
+		};
+	}
+
+	private async loadShareMeta(shareId: string): Promise<ShareCacheData> {
+		const key = this.getCacheKey(shareId);
+		let meta = await this.cache.get<ShareCacheData>(key);
+		if (!meta) {
+			const row = await this.shareRepo.findOne({ where: { shareId } });
+			if (!row || row.revokedAt != null) {
+				throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
+			}
+			meta = {
+				shareId: row.shareId,
+				chatSessionId: row.chatSessionId,
+				shareType: row.shareType,
+				sessionType: row.sessionType ?? undefined,
+				messageIds: row.messageIds ?? undefined,
+				createdAt: this.ms(row.createdAt),
+				expiresAt: this.ms(row.expiresAt),
+			};
+		}
+		if (meta.expiresAt && Date.now() > meta.expiresAt) {
+			await this.cache.del(key);
+			throw new HttpException('分享已失效', HttpStatus.BAD_REQUEST);
+		}
+		const remain = Math.max(0, (meta.expiresAt ?? 0) - Date.now());
+		if (remain > 0) {
+			try {
+				await this.cache.set(key, meta, remain);
+			} catch (e) {
+				this.logger.warn(`分享缓存回填失败 ${shareId}: ${String(e)}`);
+			}
+		}
+		return meta;
+	}
+
+	private async loadLiveContent(
+		meta: ShareCacheData,
+	): Promise<GetShareResponseDto> {
+		if ((meta.shareType ?? 'session') === 'knowledge') {
+			const id = (meta.chatSessionId ?? '').trim();
+			const row = await this.knowledgeRepo.findOne({
+				where: { id },
+				select: ['id', 'title', 'content', 'createdAt', 'updatedAt'],
+			});
+			if (!row) throw new NotFoundException('知识文章不存在');
+			if (!(row.content ?? '').trim()) {
+				throw new NotFoundException('知识文章内容为空');
+			}
+			return {
+				shareId: meta.shareId,
+				shareType: 'knowledge',
+				title: row.title?.trim() || '知识分享',
+				createdAt: meta.createdAt,
+				expiresAt: meta.expiresAt,
+				knowledge: {
+					id: row.id,
+					title: row.title,
+					content: row.content ?? '',
+					createdAt: row.createdAt,
+					updatedAt: row.updatedAt,
+				},
+			} as unknown as GetShareResponseDto;
+		}
+
+		const resolved = await this.resolveShareMessagesBySessionId({
+			sessionId: meta.chatSessionId,
+			sessionType: meta.sessionType ?? 'chat',
+			messageIds: meta.messageIds,
+		});
+		if (!resolved.messages?.length) {
+			throw new NotFoundException('分享消息为空');
+		}
+		return {
+			...(resolved.session ? resolved.session : {}),
+			messages: resolved.messages,
+			shareMessageIds: meta.messageIds,
+			shareId: meta.shareId,
+			shareType: 'session',
+			title: resolved.title,
+			createdAt: meta.createdAt,
+			expiresAt: meta.expiresAt,
+		} as unknown as GetShareResponseDto;
+	}
+
+	private dtoFromSnapshot(row: Share, viewCount: number): GetShareResponseDto {
+		const snap = row.contentSnapshot ?? {};
+		const kind = snap.kind as string | undefined;
+		if (kind === 'knowledge' || row.shareType === 'knowledge') {
+			return {
+				shareId: row.shareId,
+				shareType: 'knowledge',
+				title: row.title || '知识分享',
+				createdAt: this.ms(row.createdAt),
+				expiresAt: this.ms(row.expiresAt),
+				viewCount,
+				knowledge: {
+					id: row.chatSessionId,
+					title: (snap.title as string | null) ?? row.title,
+					content: String(snap.content ?? ''),
+					createdAt: this.ms(row.createdAt),
+					updatedAt: this.ms(row.createdAt),
+				},
+			} as unknown as GetShareResponseDto;
+		}
+		const messages = Array.isArray(snap.messages) ? snap.messages : [];
+		return {
+			messages,
+			shareMessageIds: row.messageIds ?? undefined,
+			shareId: row.shareId,
+			shareType: 'session',
+			title: row.title || '对话分享',
+			createdAt: this.ms(row.createdAt),
+			expiresAt: this.ms(row.expiresAt),
+			viewCount,
+		} as unknown as GetShareResponseDto;
+	}
+
 	/**
-	 * 创建分享
-	 * 只存储参数到 Redis，不查询数据库
+	 * 创建分享：先 DB（含快照）再 Redis meta
 	 */
-	async createShare(dto: CreateShareDto): Promise<CreateShareResponseDto> {
+	async createShare(
+		dto: CreateShareDto,
+		userId?: number,
+	): Promise<CreateShareResponseDto> {
 		const shareId = randomUUID().replace(/-/g, '');
 		const now = Date.now();
 		const ttl = resolveExpiresIn(dto.expiresInMs);
 		const expiresAt = now + ttl;
 		const shareType = dto.shareType ?? 'session';
+		const snap = await this.buildSnapshot(dto);
 
-		// 存储到 Redis
+		await this.shareRepo.insert({
+			shareId,
+			chatSessionId: dto.chatSessionId,
+			shareType,
+			sessionType: dto.sessionType ?? null,
+			messageIds: dto.messageIds ?? null,
+			title: snap.title.slice(0, 500),
+			contentSnapshot: snap.payload as any,
+			snapshotTruncated: snap.truncated,
+			createdBy: userId ?? null,
+			createdAt: String(now),
+			expiresAt: String(expiresAt),
+			revokedAt: null,
+			viewCount: 0,
+		});
+
 		const cacheData: ShareCacheData = {
 			shareId,
 			chatSessionId: dto.chatSessionId,
@@ -430,8 +639,11 @@ export class ShareService {
 			createdAt: now,
 			expiresAt,
 		};
-
-		await this.cache.set(this.getCacheKey(shareId), cacheData, ttl);
+		try {
+			await this.cache.set(this.getCacheKey(shareId), cacheData, ttl);
+		} catch (e) {
+			this.logger.warn(`分享缓存写入失败 ${shareId}: ${String(e)}`);
+		}
 
 		this.logger.log(
 			`创建分享: ${shareId}, 会话: ${dto.chatSessionId} ${dto?.messageIds?.length ? `, 消息: ${dto?.messageIds?.length} 条` : ''}`,
@@ -448,92 +660,54 @@ export class ShareService {
 	}
 
 	/**
-	 * 获取分享
-	 * 从 Redis 获取参数，再查询数据库
+	 * 获取分享：meta 回源 → 计数 → 活读，空则快照回退
 	 */
 	async getShare(shareId: string): Promise<GetShareResponseDto> {
-		const key = this.getCacheKey(shareId);
-		const cacheData = await this.cache.get<ShareCacheData>(key);
+		const meta = await this.loadShareMeta(shareId);
 
-		if (!cacheData) {
-			throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
-		}
-
-		// 检查过期
-		if (cacheData.expiresAt && Date.now() > cacheData.expiresAt) {
-			await this.cache.del(key);
-			throw new HttpException('分享已失效', HttpStatus.BAD_REQUEST);
-		}
-
-		// 1) 分享知识文章：chatSessionId 复用为 knowledgeId（保持接口兼容）
-		if ((cacheData.shareType ?? 'session') === 'knowledge') {
-			const id = (cacheData.chatSessionId ?? '').trim();
-			const row = await this.knowledgeRepo.findOne({
-				where: { id },
-				select: ['id', 'title', 'content', 'createdAt', 'updatedAt'],
+		let viewCount = 0;
+		try {
+			await this.shareRepo.increment({ shareId }, 'viewCount', 1);
+			const counted = await this.shareRepo.findOne({
+				where: { shareId },
+				select: ['viewCount'],
 			});
-			if (!row) {
-				throw new NotFoundException('知识文章不存在');
-			}
-			return {
-				shareId: cacheData.shareId,
-				shareType: 'knowledge',
-				title: row.title?.trim() || '知识分享',
-				createdAt: cacheData.createdAt,
-				expiresAt: cacheData.expiresAt,
-				knowledge: {
-					id: row.id,
-					title: row.title,
-					content: row.content ?? '',
-					// 与知识库列表一致：JSON 序列化 Date → ISO 字符串，前端 formatDate 按本地时区展示
-					createdAt: row.createdAt,
-					updatedAt: row.updatedAt,
-				},
-			} as any;
+			viewCount = counted?.viewCount ?? 0;
+		} catch (e) {
+			this.logger.warn(`分享计数失败 ${shareId}: ${String(e)}`);
 		}
 
-		// 2) 分享会话（chat / assistant）
-		const resolved = await this.resolveShareMessagesBySessionId({
-			sessionId: cacheData.chatSessionId,
-			sessionType: cacheData.sessionType ?? 'chat',
-			messageIds: cacheData.messageIds,
-		});
-
-		return {
-			...(resolved.session ? resolved.session : {}),
-			// assistant 回退分支没有 chat session 实体，这里直接透传 messages 即可
-			messages: resolved.messages,
-			// 与创建分享时 ChatBot getDisplayMessages 顺序一致（前端按此对齐展示）
-			shareMessageIds: cacheData.messageIds,
-			shareId: cacheData.shareId,
-			shareType: 'session',
-			title: resolved.title,
-			createdAt: cacheData.createdAt,
-			expiresAt: cacheData.expiresAt,
-		} as any;
+		try {
+			const live = await this.loadLiveContent(meta);
+			return { ...live, viewCount };
+		} catch (e) {
+			this.logger.warn(
+				`分享活读失败，回退快照 ${shareId}: ${e instanceof Error ? e.message : String(e)}`,
+			);
+			const row = await this.shareRepo.findOne({ where: { shareId } });
+			if (!row?.contentSnapshot) {
+				throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
+			}
+			return this.dtoFromSnapshot(row, viewCount);
+		}
 	}
-	/**
-	 * 删除分享
-	 */
+
 	async deleteShare(shareId: string): Promise<void> {
-		const key = this.getCacheKey(shareId);
-		const exists = await this.cache.get(key);
-		if (!exists) throw new NotFoundException('分享不存在');
-		await this.cache.del(key);
+		const row = await this.shareRepo.findOne({ where: { shareId } });
+		if (!row || row.revokedAt != null) {
+			throw new NotFoundException('分享不存在');
+		}
+		await this.shareRepo.update({ shareId }, { revokedAt: String(Date.now()) });
+		await this.cache.del(this.getCacheKey(shareId));
 		this.logger.log(`删除分享: ${shareId}`);
 	}
 
-	/**
-	 * 检查分享是否存在
-	 */
 	async existsShare(shareId: string): Promise<boolean> {
-		const key = this.getCacheKey(shareId);
-		const data = await this.cache.get<ShareCacheData>(key);
-		if (!data) return false;
-		if (data.expiresAt && Date.now() > data.expiresAt) {
-			await this.cache.del(key);
+		try {
+			await this.loadShareMeta(shareId);
+			return true;
+		} catch {
 			return false;
 		}
-		return true;
 	}
 }
