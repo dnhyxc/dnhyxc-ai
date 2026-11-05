@@ -549,7 +549,7 @@ const KnowledgeAssistantInner = observer(
 								</div>
 							) : null}
 							{showPostStreamActions ? (
-								<div className="mb-3 flex justify-between min-w-0 gap-1.5 mr-10">
+								<div className="-mb-1 flex justify-between min-w-0 gap-1.5 mr-10">
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
 										<Button
 											key={item.kind}

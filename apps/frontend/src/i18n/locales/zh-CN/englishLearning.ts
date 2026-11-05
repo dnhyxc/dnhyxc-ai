@@ -285,7 +285,7 @@ export const englishLearning = {
 		'### 意图：请侧重词汇：释义、搭配与例句；如需可先了解我的大致基础。',
 	'englishLearning.intentSection': '选择意图',
 	'englishLearning.intro':
-		'直接提问即可：查词、翻译、语法、口语与阅读讲解。也可让助手查询或整理左侧学习内容（词库/语料、每日阅读、收藏、错题、复习、单词与语句资料、笔记）；收藏与加错题会先弹出确认。左侧「快捷意图」可设定本轮方向，再点同一项取消，下次发送时自动附带。',
+		'查词、翻译、语法、口语、阅读，纠错、改写、搭配、发音、词根都可问；也可让助手看左侧学习内容。收藏或加错题会先确认。点左侧「快捷意图」后随下次发送带上，再点取消。长句可分句对照，回复可点朗读。',
 	'englishLearning.library.classic.bank': '语料库',
 	'englishLearning.library.classic.descShort': '可导入语句，查看语料库',
 	'englishLearning.library.classic.title': '语句库',

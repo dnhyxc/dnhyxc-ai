@@ -116,6 +116,7 @@ export const AssistantSessionEntryToolbar = observer(
 					enableStreamStickToBottom={enableStreamStickToBottom}
 					flushScrollToBottom={flushScrollToBottom}
 					layout={layout ?? 'knowledge'}
+					iconOnlyActions
 					historyAriaLabel={t('chat.sessionList.title')}
 					historyLockedToast={t('knowledge.assistant.sessionSavingViewHistory')}
 					newConversationLockedToast={t('knowledge.assistant.sessionSaving')}

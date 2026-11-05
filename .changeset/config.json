@@ -10,6 +10,7 @@
 	"ignore": [
 		"@dnhyxc-ai/backend",
 		"@dnhyxc-ai/frontend",
-		"@dnhyxc-ai/release-run"
+		"@dnhyxc-ai/release-run",
+		"@dnhyxc-ai/richtext-kit-demo"
 	]
 }

@@ -293,7 +293,7 @@ const SkillTryPanel = observer(function SkillTryPanel({
 				))}
 				footer={
 					<AssistantFooter
-						containerClassName="pb-4"
+						containerClassName={cn('pb-4', aiMessages.length > 0 ? 'mt-4' : '')}
 						maxWidth="max-w-3xl"
 						showScrollFab={
 							conversationColumnActive && scrollFabMode !== 'hidden'
@@ -322,7 +322,7 @@ const SkillTryPanel = observer(function SkillTryPanel({
 								setInput={setInput}
 								className="w-full p-0"
 								maxWidth="max-w-none"
-								textareaClassName="min-h-12 rounded-md"
+								textareaClassName="min-h-9"
 								inputWrapClassName="border-theme/5 bg-theme/5"
 								sendMessage={sendMessage}
 								placeholder={

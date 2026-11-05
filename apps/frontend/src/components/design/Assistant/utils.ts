@@ -36,12 +36,12 @@ export function messageRowClass(
 ): string {
 	if (variant === 'panel') {
 		return cn(
-			'relative flex w-full min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 group last:pb-8.5',
+			'relative flex w-full min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 group last:pb-4.5',
 			isUser ? 'items-end' : 'items-stretch',
 		);
 	}
 	return cn(
-		'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-8.5',
+		'relative flex w-full min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 group last:pb-4.5',
 		isUser ? 'items-end' : '',
 	);
 }

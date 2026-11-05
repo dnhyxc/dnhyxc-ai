@@ -410,6 +410,7 @@ const KnowledgeAssistantChatFooterInner = forwardRef<
 				toBottomLabel: t('common.scrollToBottom'),
 				toTopLabel: t('common.scrollToTop'),
 			}}
+			containerClassName="mt-4"
 		>
 			{allowAiShare && shareSelection.isSharing ? (
 				<AssistantShareBar

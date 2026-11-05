@@ -41,7 +41,7 @@
 		"changeset": "changeset",
 		"changeset:version": "changeset version",
 		"changeset:publish": "changeset publish",
-		"test": "pnpm --filter @dnhyxc-ai/markdown-kit test"
+		"test": "pnpm --filter @dnhyxc-ai/markdown-kit test && pnpm --filter @dnhyxc-ai/richtext-kit test"
 	},
 	"keywords": [],
 	"author": "dnhyxc <dnhyxc@163.com>",

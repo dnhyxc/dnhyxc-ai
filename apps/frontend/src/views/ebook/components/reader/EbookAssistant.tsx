@@ -210,6 +210,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 				variant: 'panel',
 			}}
 			floatAbove={selectionSpeak.floatAbove}
+			containerClassName={`${aiMessages.length > 0 ? 'mt-4' : ''}`}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
 				<AssistantShareBar

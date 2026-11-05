@@ -313,7 +313,7 @@ function EnglishAgentScrollShell({
 						<div
 							className={cn(
 								AGENT_MAX_WIDTH,
-								'flex-1 w-full mb-4.5 pb-8 bg-theme/3 border-l border-r border-b border-theme/5 rounded-b-md',
+								'flex-1 w-full pb-8 bg-theme/3 border-l border-r',
 							)}
 						>
 							<EnglishAgentLogo />
@@ -345,7 +345,7 @@ function EnglishAgentScrollShell({
 				footer={
 					<AssistantFooter
 						embedded={conversationColumnActive}
-						containerClassName="px-4.5"
+						containerClassName={cn('px-4.5', messageCount ? 'mt-4.5' : '')}
 						maxWidth={AGENT_MAX_WIDTH}
 						showScrollFab={
 							conversationColumnActive && scrollFabMode !== 'hidden'
@@ -390,6 +390,7 @@ const EnglishAgentComposer = forwardRef<
 		pendingProposal: ReturnType<typeof useEnglishAgentPendingProposal>;
 		proposalCommitting: boolean;
 		confirmPendingProposal: () => void | Promise<void>;
+		roundedTop: boolean;
 	}
 >(function EnglishAgentComposer(
 	{
@@ -403,6 +404,7 @@ const EnglishAgentComposer = forwardRef<
 		pendingProposal,
 		proposalCommitting,
 		confirmPendingProposal,
+		roundedTop = true,
 	},
 	ref,
 ) {
@@ -532,7 +534,10 @@ const EnglishAgentComposer = forwardRef<
 				maxWidth={AGENT_MAX_WIDTH}
 				className="w-full px-0 pb-4.5 backdrop-blur-none"
 				textareaClassName="min-h-12 rounded-md"
-				inputWrapClassName="border-theme/5 bg-theme/5"
+				inputWrapClassName={cn(
+					'border-theme/5 bg-theme/5',
+					roundedTop ? 'rounded-t-none' : '',
+				)}
 				sendMessage={sendMessage}
 				placeholder={t('englishLearning.placeholder')}
 				disableTextInput={false}
@@ -559,6 +564,7 @@ export const AgentPanel = observer(
 		const selectionSpeak = useAssistantSelectionSpeak();
 		const isSending = useEnglishAgentIsSending();
 		const sessionId = useEnglishAgentSessionId();
+		const messageCount = useEnglishAgentMessageCount();
 		const pendingProposal = useEnglishAgentPendingProposal();
 		const proposalCommitting = useEnglishAgentProposalCommitting();
 		const scrollControlsRef = useRef<ScrollControls>({
@@ -650,6 +656,7 @@ export const AgentPanel = observer(
 		const composerFooter = useMemo(
 			() => (
 				<EnglishAgentComposer
+					roundedTop={!messageCount}
 					ref={composerRef}
 					isLoggedIn={isLoggedIn}
 					isHistoryDrawerOpen={isHistoryDrawerOpen}
@@ -673,6 +680,7 @@ export const AgentPanel = observer(
 				pendingProposal,
 				proposalCommitting,
 				confirmPendingProposal,
+				messageCount,
 			],
 		);
 

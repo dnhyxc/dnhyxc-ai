@@ -184,6 +184,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					<Textarea
 						ref={ref}
 						id={textareaId}
+						rows={1}
 						value={value}
 						maxLength={maxLength}
 						onChange={
