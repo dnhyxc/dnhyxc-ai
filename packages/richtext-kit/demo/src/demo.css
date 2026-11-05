@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/*
+ * 对齐宿主 theme token，使 kit 内 bg-theme / text-textcolor / border-theme 生效。
+ */
+:root {
+	--theme-color: #14b8a6;
+	--theme-background: #ffffff;
+	--theme-textcolor: #111827;
+	--theme-border: #e5e7eb;
+	--theme-muted: #f3f4f6;
+	--theme-foreground: #111827;
+	--theme-secondary: #f9fafb;
+	--destructive: #ef4444;
+	--background: var(--theme-background);
+	--foreground: var(--theme-textcolor);
+	--border: var(--theme-border);
+	--radius: 0.5rem;
+}
+
+@theme inline {
+	--color-theme: var(--theme-color);
+	--color-theme-background: var(--theme-background);
+	--color-textcolor: var(--theme-textcolor);
+	--color-theme-border: var(--theme-border);
+	--color-destructive: var(--destructive);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-border: var(--border);
+	--radius-md: var(--radius);
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--theme-background);
+	color: var(--theme-textcolor);
+	font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+	overflow: hidden;
+}
+
+.rich-editor,
+.note-preview,
+input,
+textarea,
+[contenteditable="true"] {
+	-webkit-user-select: text;
+	user-select: text;
+}

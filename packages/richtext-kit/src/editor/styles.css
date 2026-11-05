@@ -1,0 +1,860 @@
+.rich-editor {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	height: 100%;
+	overflow: hidden;
+	/* border: 1px solid var(--theme-border, var(--border)); */
+	/* border-radius: var(--radius, 0.625rem); */
+	/* background: var(--theme-background, var(--background)); */
+	/* color: var(--theme-textcolor, var(--foreground)); */
+}
+
+.rich-editor-toolbar {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.125rem;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	position: relative;
+	flex-shrink: 0;
+	z-index: 1;
+}
+
+.rich-editor-toolbar-measure {
+	position: absolute;
+	left: -9999px;
+	top: 0;
+	visibility: hidden;
+	pointer-events: none;
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	white-space: nowrap;
+}
+
+.rich-editor-toolbar-start {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+}
+
+.rich-editor-toolbar-main {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	min-width: 0;
+	/* 不抢剩余空间，让 More 紧跟最后一个可见按钮 */
+	flex: 0 1 auto;
+	overflow: hidden;
+}
+
+.rich-editor-toolbar-more {
+	flex-shrink: 0;
+}
+
+.rich-editor-toolbar-extra {
+	display: flex;
+	align-items: center;
+	margin-left: 0.25rem;
+	flex-shrink: 0;
+}
+
+.rich-editor-toolbar-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.125rem;
+	flex-shrink: 0;
+}
+
+.rich-editor-toolbar-sep {
+	width: 1px;
+	height: 1.25rem;
+	margin: 0 0.25rem;
+	background: var(--theme-border, var(--border));
+}
+
+.rich-editor-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border: none;
+	border-radius: 0.375rem;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	opacity: 0.75;
+}
+
+/* 表格 +列 / +行 / 删表：文字按钮勿锁死 28px，否则字竖排重叠 */
+.rich-editor-btn:has(> .rich-editor-btn-label),
+.rich-editor-btn:has(> span) {
+	width: auto;
+	min-width: 28px;
+	padding-inline: 0.35rem;
+	white-space: nowrap;
+	gap: 0;
+}
+
+.rich-editor-btn-label {
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.rich-editor-btn:hover:not(:disabled) {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 10%,
+		transparent
+	);
+	opacity: 1;
+}
+
+.rich-editor-btn.is-active {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 18%,
+		transparent
+	);
+	opacity: 1;
+}
+
+.rich-editor-btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.35;
+}
+
+/*
+ * Dropdown 挂在 Portal（body）上，不能依赖宿主 Tailwind 扫到 kit 源码。
+ * 用 data-slot 写死基础样式，无 Tailwind 时也有背景 / 层级 / 内边距。
+ */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+	z-index: 50;
+	min-width: 8rem;
+	max-height: var(--radix-dropdown-menu-content-available-height, 70vh);
+	overflow-x: hidden;
+	overflow-y: auto;
+	border-radius: 0.375rem;
+	border: 1px solid
+		color-mix(
+			in oklab,
+			var(--theme-color, var(--rtk-accent, #14b8a6)) 8%,
+			var(--theme-border, var(--border, #e5e5e5))
+		);
+	background: var(--theme-background, var(--rtk-bg, #fff));
+	color: var(--theme-textcolor, var(--rtk-text, #111));
+	padding: 0.25rem;
+	box-shadow:
+		0 4px 6px -1px rgb(0 0 0 / 0.1),
+		0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+[data-slot="dropdown-menu-item"],
+[data-slot="dropdown-menu-checkbox-item"],
+[data-slot="dropdown-menu-radio-item"],
+[data-slot="dropdown-menu-sub-trigger"] {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	cursor: pointer;
+	user-select: none;
+	align-items: center;
+	gap: 0.5rem;
+	border-radius: 0.25rem;
+	padding: 0.375rem 0.5rem;
+	font-size: 0.875rem;
+	line-height: 1.25;
+	outline: none;
+	white-space: nowrap;
+}
+
+[data-slot="dropdown-menu-item"]:focus,
+[data-slot="dropdown-menu-item"][data-highlighted],
+[data-slot="dropdown-menu-checkbox-item"]:focus,
+[data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+[data-slot="dropdown-menu-radio-item"]:focus,
+[data-slot="dropdown-menu-radio-item"][data-highlighted],
+[data-slot="dropdown-menu-sub-trigger"]:focus,
+[data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+[data-slot="dropdown-menu-sub-trigger"][data-state="open"] {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--rtk-accent, #14b8a6)) 8%,
+		transparent
+	);
+}
+
+[data-slot="dropdown-menu-label"] {
+	padding: 0.375rem 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: color-mix(
+		in oklab,
+		var(--theme-textcolor, var(--rtk-text, #111)) 90%,
+		transparent
+	);
+}
+
+[data-slot="dropdown-menu-separator"] {
+	height: 1px;
+	margin: 0.25rem -0.25rem;
+	background: var(--theme-border, var(--border, #e5e5e5));
+}
+
+/*
+ * 标题菜单：宽度跟内容走（覆盖 dropdown 默认 min-w-32），
+ * 每行图标靠左、文案靠右（space-between）。
+ */
+.rich-editor-heading-menu {
+	width: max-content;
+	min-width: max-content !important;
+}
+
+.rich-editor-menu-item {
+	display: flex !important;
+	flex-direction: row !important;
+	flex-wrap: nowrap !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	gap: 0.75rem;
+	width: 100%;
+	box-sizing: border-box;
+	white-space: nowrap;
+}
+
+.rich-editor-menu-item > svg {
+	display: block;
+	flex: 0 0 auto;
+	width: 15px;
+	height: 15px;
+}
+
+.rich-editor-menu-item-label {
+	display: inline-block;
+	flex: 0 0 auto;
+	margin-left: auto;
+	font-size: 0.875rem;
+	line-height: 1.25;
+	white-space: nowrap;
+	color: color-mix(
+		in oklab,
+		var(--theme-textcolor, var(--rtk-text, #111)) 90%,
+		transparent
+	);
+}
+
+.rich-editor-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	/* 滚动由 ScrollArea 接管，与左侧列表滚动条一致 */
+	padding: 0.75rem;
+	font-size: 16px;
+}
+
+.rich-editor-body .tiptap {
+	outline: none;
+	min-height: 8rem;
+}
+
+.rich-editor-body .tiptap ::selection {
+	background-color: var(
+		--theme-selection-bg,
+		color-mix(
+			in oklab,
+			var(--theme-color, oklch(0.55 0.18 250)) 42%,
+			transparent
+		)
+	);
+	color: var(--theme-selection-fg, inherit);
+}
+
+.rich-editor-body .tiptap p {
+	/* margin: 0.75em 0; */
+	line-height: 1.9;
+}
+
+.rich-editor-body .tiptap h1 {
+	font-size: 1.8em;
+	font-weight: 700;
+	margin: 0.5em 0;
+	line-height: 1.3;
+}
+
+.rich-editor-body .tiptap h2 {
+	font-size: 1.7em;
+	font-weight: 700;
+	margin: 0.5em 0;
+	/* margin: 0.9em 0 0.45em; */
+	line-height: 1.35;
+}
+
+.rich-editor-body .tiptap h3 {
+	font-size: 1.5em;
+	font-weight: 600;
+	margin: 0.5em 0;
+	/* margin: 0.8em 0 0.4em; */
+	line-height: 1.4;
+}
+
+.rich-editor-body .tiptap h4 {
+	font-size: 1.35em;
+	font-weight: 600;
+	margin: 0.5em 0;
+	/* margin: 0.75em 0 0.35em; */
+	line-height: 1.4;
+}
+
+.rich-editor-body .tiptap h5 {
+	font-size: 1.2em;
+	font-weight: 600;
+	margin: 0.5em 0;
+	/* margin: 0.7em 0 0.3em; */
+	line-height: 1.45;
+}
+
+.rich-editor-body .tiptap ul,
+.rich-editor-body .tiptap ol {
+	padding-left: 1.5em;
+	/* margin: 0.75em 0; */
+}
+
+.rich-editor-body .tiptap blockquote {
+	border-left: 3px solid var(--theme-border, var(--border));
+	padding-left: 1em;
+	/* margin: 0.75em 0; */
+	opacity: 0.8;
+}
+
+.rich-editor-body .tiptap pre {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 8%,
+		transparent
+	);
+	color: var(--theme-textcolor);
+	border-radius: 0.5rem;
+	padding: 0.75em 1em;
+	margin: 0.6em 0;
+	overflow-x: auto;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.875em;
+}
+
+.rich-editor-body .tiptap code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+	border-radius: 0.25rem;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 10%,
+		transparent
+	);
+}
+
+.rich-editor-body .tiptap pre code {
+	padding: 0;
+	background: none;
+	color: inherit;
+}
+
+.rich-editor-body .tiptap a {
+	color: var(--theme-color, var(--primary));
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.rich-editor-body .tiptap img:not(.ProseMirror-separator),
+.rich-editor-body .tiptap .rich-editor-image {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.5rem;
+	display: block;
+	/* 与 img 内联 style 一致；stylesheet 失效时仍靠内联 */
+	margin: 0.75em 0;
+}
+
+/* 悬停时仍锁圆角（防 WebKit 重绘后 stylesheet 丢失） */
+.rich-editor-body .tiptap img:not(.ProseMirror-separator):hover,
+.rich-editor-body .tiptap .rich-editor-image:hover {
+	border-radius: 0.5rem;
+}
+
+.rich-editor-body .tiptap [data-resize-container][data-node="image"] {
+	margin: 0.75em 0;
+}
+.rich-editor-body .tiptap [data-resize-container][data-node="image"] img {
+	margin: 0;
+}
+
+/* 块级图片前后的间隙光标（点进图前/图后） */
+.rich-editor-body .tiptap .ProseMirror-gapcursor {
+	display: none;
+	pointer-events: none;
+	position: absolute;
+}
+.rich-editor-body .tiptap .ProseMirror-gapcursor::after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: -2px;
+	width: 20px;
+	border-top: 1px solid var(--theme-textcolor, var(--foreground));
+	animation: rich-editor-gapcursor-blink 1.1s steps(2, start) infinite;
+}
+@keyframes rich-editor-gapcursor-blink {
+	to {
+		visibility: hidden;
+	}
+}
+
+.rich-editor-body .tiptap hr {
+	border: none;
+	border-top: 1px solid var(--theme-border, var(--border));
+	margin: 1.25em 0;
+}
+
+.rich-editor-body .tiptap mark {
+	background-color: #fef08a;
+	border-radius: 0.15em;
+	padding: 0.05em 0.15em;
+}
+
+.rich-editor-body .tiptap table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 0.75em 0;
+	table-layout: fixed;
+	overflow: hidden;
+}
+
+.rich-editor-body .tiptap table td,
+.rich-editor-body .tiptap table th {
+	border: 1px solid var(--theme-border, var(--border));
+	padding: 0.4em 0.6em;
+	vertical-align: top;
+	min-width: 3em;
+	position: relative;
+}
+
+.rich-editor-body .tiptap table th {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 8%,
+		transparent
+	);
+	font-weight: 600;
+	text-align: left;
+}
+
+.rich-editor-body .tiptap .selectedCell::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 12%,
+		transparent
+	);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.rich-editor-body .tiptap .column-resize-handle {
+	position: absolute;
+	right: -1px;
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	background: var(--theme-color, var(--primary));
+	pointer-events: none;
+}
+
+.rich-editor-body .tiptap ul[data-type="taskList"] {
+	list-style: none;
+	padding-left: 0;
+}
+
+.rich-editor-body .tiptap ul[data-type="taskList"] li {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.rich-editor-body .tiptap ul[data-type="taskList"] li > label {
+	flex-shrink: 0;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* margin-top: 0.3rem; */
+}
+
+.rich-editor-body .tiptap ul[data-type="taskList"] li > div {
+	flex: 1;
+	min-width: 0;
+}
+
+.rich-editor-body .tiptap p.is-editor-empty:first-child::before,
+.rich-editor-body .tiptap .is-empty:not(.rich-editor-note-title)::before {
+	color: color-mix(
+		in oklab,
+		var(--theme-textcolor, var(--foreground)) 40%,
+		transparent
+	);
+	content: attr(data-placeholder);
+	float: left;
+	height: 0;
+	pointer-events: none;
+}
+
+/*
+ * 笔记标题卡：浅底 + 左上角标 + 右下字数（不依赖宿主 Tailwind）。
+ * 对齐学习笔记 NoteTitleField 视觉。
+ */
+.rich-editor-note-title {
+	margin-bottom: 0.5rem;
+}
+
+.rich-editor-note-title-shell {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	/* 角标占位 + 适中上下距（介于过松/过紧之间） */
+	padding: 1.75rem 0.75rem 0.55rem;
+	border: 1px solid
+		color-mix(
+			in oklab,
+			var(--theme-color, var(--rtk-accent, #14b8a6)) 8%,
+			transparent
+		);
+	border-radius: 0.375rem;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--rtk-accent, #14b8a6)) 6%,
+		transparent
+	);
+}
+
+.rich-editor-note-title-badge {
+	position: absolute;
+	top: -0.125rem;
+	left: -0.125rem;
+	z-index: 1;
+	display: inline-flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.5rem;
+	box-sizing: border-box;
+	height: 1.5rem;
+	padding: 0 0.75rem;
+	border-radius: 0.375rem 0 0.375rem 0;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--rtk-accent, #14b8a6)) 85%,
+		transparent
+	);
+	color: #fff;
+	white-space: nowrap;
+}
+
+.rich-editor-note-title-badge svg {
+	display: block;
+	flex: 0 0 auto;
+	width: 1rem;
+	height: 1rem;
+}
+
+.rich-editor-note-title-badge span {
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.rich-editor-note-title-input.rtk-input,
+.rich-editor-note-title .rtk-input {
+	height: 2.25rem;
+	min-height: 2.25rem;
+	border: 0;
+	border-radius: 0;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	font-size: 1.2rem;
+	line-height: 1.4;
+	color: var(--theme-textcolor, var(--rtk-text, #111));
+	outline: none;
+}
+
+.rich-editor-note-title .rtk-input::placeholder {
+	font-size: 1.05rem;
+	color: color-mix(
+		in oklab,
+		var(--theme-textcolor, var(--rtk-text, #111)) 35%,
+		transparent
+	);
+}
+
+.rich-editor-note-title .rtk-input:focus,
+.rich-editor-note-title .rtk-input:focus-visible {
+	border: 0;
+	outline: none;
+	box-shadow: none;
+}
+
+.rich-editor-note-title .rtk-input-counted {
+	padding-right: 3.5rem;
+}
+
+.rich-editor-note-title .rtk-input-count {
+	top: auto;
+	right: 0.65rem;
+	bottom: 0.25rem;
+	transform: none;
+	font-size: 0.75rem;
+	opacity: 0.45;
+	color: var(--theme-textcolor, var(--rtk-text, #111));
+}
+
+.rich-editor-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	padding: 0.35rem 0.75rem;
+	border-top: 1px solid var(--theme-border, var(--border));
+	font-size: 0.75rem;
+	opacity: 0.55;
+	flex-shrink: 0;
+}
+
+.rich-editor-footer.is-limit {
+	color: var(--destructive, #dc2626);
+	opacity: 1;
+}
+
+.rich-editor-bubble {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.125rem;
+	padding: 0.25rem;
+	border: 1px solid var(--theme-border, var(--border));
+	border-radius: 0.5rem;
+	background: var(--theme-background, var(--background));
+	box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
+}
+
+.rich-editor-link-form {
+	display: flex;
+	/* flex-wrap: wrap; */
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.45rem 0.6rem;
+	border-bottom: 1px solid var(--theme-border, var(--border));
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 4%,
+		transparent
+	);
+	flex-shrink: 0;
+}
+
+.rich-editor-link-label {
+	font-size: 0.7rem;
+	opacity: 0.65;
+	white-space: nowrap;
+}
+
+.rich-editor-link-hint {
+	flex-basis: 100%;
+	font-size: 0.7rem;
+	opacity: 0.65;
+	color: var(--destructive, #dc2626);
+}
+
+.rich-editor-link-action {
+	height: 1.75rem;
+	padding: 0 0.55rem;
+	border: none;
+	border-radius: 0.375rem;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 16%,
+		transparent
+	);
+	color: inherit;
+	font-size: 0.7rem;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.rich-editor-link-action:hover {
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 28%,
+		transparent
+	);
+}
+
+.rich-editor-link-action:disabled {
+	cursor: not-allowed;
+	opacity: 0.4;
+}
+
+.rich-editor-link-action.ghost {
+	background: transparent;
+	opacity: 0.7;
+}
+
+.rich-editor-link-action.ghost:hover {
+	opacity: 1;
+	background: color-mix(
+		in oklab,
+		var(--theme-color, var(--primary)) 10%,
+		transparent
+	);
+}
+
+.rich-editor-lang {
+	height: 1.75rem;
+	max-width: 7.5rem;
+	margin-left: 0.125rem;
+	padding: 0 0.35rem;
+	border: 1px solid var(--theme-border, var(--border));
+	border-radius: 0.375rem;
+	background: transparent;
+	color: inherit;
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+
+.rich-editor-body .tiptap pre .hljs-comment,
+.rich-editor-body .tiptap pre .hljs-quote {
+	color: #6a9955;
+	font-style: italic;
+}
+
+.rich-editor-body .tiptap pre .hljs-keyword,
+.rich-editor-body .tiptap pre .hljs-selector-tag,
+.rich-editor-body .tiptap pre .hljs-built_in,
+.rich-editor-body .tiptap pre .hljs-name,
+.rich-editor-body .tiptap pre .hljs-tag {
+	color: #c586c0;
+}
+
+.rich-editor-body .tiptap pre .hljs-string,
+.rich-editor-body .tiptap pre .hljs-title,
+.rich-editor-body .tiptap pre .hljs-section,
+.rich-editor-body .tiptap pre .hljs-attribute,
+.rich-editor-body .tiptap pre .hljs-literal,
+.rich-editor-body .tiptap pre .hljs-template-tag,
+.rich-editor-body .tiptap pre .hljs-template-variable,
+.rich-editor-body .tiptap pre .hljs-type,
+.rich-editor-body .tiptap pre .hljs-addition {
+	color: #ce9178;
+}
+
+.rich-editor-body .tiptap pre .hljs-number,
+.rich-editor-body .tiptap pre .hljs-selector-attr,
+.rich-editor-body .tiptap pre .hljs-selector-pseudo,
+.rich-editor-body .tiptap pre .hljs-variable,
+.rich-editor-body .tiptap pre .hljs-template-variable,
+.rich-editor-body .tiptap pre .hljs-attr,
+.rich-editor-body .tiptap pre .hljs-literal {
+	color: #b5cea8;
+}
+
+.rich-editor-body .tiptap pre .hljs-function,
+.rich-editor-body .tiptap pre .hljs-title.function_,
+.rich-editor-body .tiptap pre .hljs-title.function_ .hljs-params {
+	color: #dcdcaa;
+}
+
+.rich-editor-body .tiptap pre .hljs-class .hljs-title,
+.rich-editor-body .tiptap pre .hljs-class .hljs-title.function_ {
+	color: #4ec9b0;
+}
+
+.rich-editor-body .tiptap pre .hljs-operator,
+.rich-editor-body .tiptap pre .hljs-entity,
+.rich-editor-body .tiptap pre .hljs-url,
+.rich-editor-body .tiptap pre .hljs-attr {
+	color: #d4d4d4;
+}
+
+.rich-editor-body .tiptap pre .hljs-symbol,
+.rich-editor-body .tiptap pre .hljs-bullet,
+.rich-editor-body .tiptap pre .hljs-link {
+	color: #ce9178;
+}
+
+.rich-editor-body .tiptap pre .hljs-deletion,
+.rich-editor-body .tiptap pre .hljs-meta {
+	color: #808080;
+}
+
+.rich-editor-body .tiptap pre .hljs-meta .hljs-keyword,
+.rich-editor-body .tiptap pre .hljs-meta .hljs-string {
+	color: #cdcd00;
+}
+
+/* kit default chrome (no host Tailwind required for basics) */
+.rtk-btn {
+	cursor: pointer;
+	border: 1px solid var(--rtk-border, #e5e5e5);
+	background: var(--rtk-bg, #fff);
+	color: var(--rtk-text, #111);
+	border-radius: 6px;
+	padding: 0.35rem 0.65rem;
+	font-size: 0.875rem;
+}
+.rtk-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.rtk-btn-default {
+	background: color-mix(in srgb, var(--rtk-accent, #14b8a6) 80%, transparent);
+	color: #fff;
+	border-color: transparent;
+}
+.rtk-input {
+	width: 100%;
+	min-width: 0;
+	border: 1px solid var(--rtk-border, #e5e5e5);
+	border-radius: 6px;
+	padding: 0.4rem 0.65rem;
+	background: transparent;
+	color: var(--rtk-text, #111);
+}
+.rtk-input-wrap {
+	position: relative;
+	width: 100%;
+}
+.rtk-input-counted {
+	padding-right: 3.5rem;
+}
+.rtk-input-count {
+	position: absolute;
+	right: 0.75rem;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 0.75rem;
+	opacity: 0.45;
+	pointer-events: none;
+}

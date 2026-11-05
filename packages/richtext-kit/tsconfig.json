@@ -1,0 +1,24 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"target": "ES2022",
+		"rootDir": "./src",
+		"outDir": "./dist",
+		"declaration": true,
+		"declarationDir": "./dist",
+		"emitDeclarationOnly": false,
+		"sourceMap": true,
+		"noEmit": false,
+		"allowImportingTsExtensions": false,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"experimentalDecorators": false,
+		"emitDecoratorMetadata": false,
+		"noUnusedLocals": false,
+		"noUnusedParameters": false
+	},
+	"include": ["./src/**/*"],
+	"exclude": ["node_modules", "dist"]
+}

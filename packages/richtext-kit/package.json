@@ -1,0 +1,88 @@
+{
+	"name": "@dnhyxc-ai/richtext-kit",
+	"version": "0.0.3",
+	"type": "module",
+	"description": "TipTap-based rich text editor and static note preview kit (edit + preview + windowed long docs)",
+	"author": "dnhyxc <dnhyxc@163.com>",
+	"license": "MIT",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": [
+		"**/*.css"
+	],
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"keywords": [
+		"react",
+		"tiptap",
+		"richtext",
+		"editor",
+		"preview",
+		"richtext-kit"
+	],
+	"scripts": {
+		"clean": "rm -rf dist",
+		"build:css": "node scripts/build-css.mjs",
+		"build": "pnpm clean && tsup && pnpm build:css",
+		"prepack": "pnpm build",
+		"demo": "pnpm --filter @dnhyxc-ai/richtext-kit-demo dev",
+		"check:self": "node scripts/selfcheck.mjs",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./preview": {
+			"types": "./dist/preview/index.d.ts",
+			"import": "./dist/preview/index.js",
+			"require": "./dist/preview/index.cjs"
+		},
+		"./windowed": {
+			"types": "./dist/windowed/index.d.ts",
+			"import": "./dist/windowed/index.js",
+			"require": "./dist/windowed/index.cjs"
+		},
+		"./styles.css": "./dist/styles/richtext-kit.css"
+	},
+	"peerDependencies": {
+		"react": ">=18.0.0",
+		"react-dom": ">=18.0.0"
+	},
+	"dependencies": {
+		"@tiptap/core": "^3.28.0",
+		"@tiptap/extension-code-block-lowlight": "^3.28.0",
+		"@tiptap/extension-document": "^3.28.0",
+		"@tiptap/extension-highlight": "^3.28.0",
+		"@tiptap/extension-image": "^3.28.0",
+		"@tiptap/extension-list": "^3.28.0",
+		"@tiptap/extension-placeholder": "^3.28.0",
+		"@tiptap/extension-table": "^3.28.0",
+		"@tiptap/extension-text-align": "^3.28.0",
+		"@tiptap/extensions": "^3.28.0",
+		"@tiptap/pm": "^3.28.0",
+		"@tiptap/react": "^3.28.0",
+		"@tiptap/starter-kit": "^3.28.0",
+		"clsx": "^2.1.1",
+		"lowlight": "^3.3.0",
+		"lucide-react": "^0.563.0",
+		"radix-ui": "^1.4.3",
+		"tailwind-merge": "^3.4.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.1.8",
+		"@types/react-dom": "^19.1.6",
+		"happy-dom": "^20.0.10",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"tsup": "^8.5.1",
+		"typescript": "^5.8.3",
+		"vitest": "^3.2.4"
+	}
+}
