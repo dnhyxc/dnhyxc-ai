@@ -20,6 +20,8 @@ export function AssistantShell({
 	afterScroll,
 	messageContainerClassName,
 	scrollAreaClassName,
+	viewportClassName,
+	scrollbarClassName,
 	footer,
 	maxWidth = 'max-w-3xl',
 }: AssistantShellProps) {
@@ -48,7 +50,11 @@ export function AssistantShell({
 								'min-h-0 min-w-0 w-full flex-1 mb-0.5',
 								scrollAreaClassName,
 							)}
-							viewportClassName="pb-1 [overflow-anchor:none]"
+							viewportClassName={cn(
+								'pb-1 [overflow-anchor:none]',
+								viewportClassName,
+							)}
+							scrollbarClassName={scrollbarClassName}
 							{...scrollAreaHandlers}
 						>
 							<div

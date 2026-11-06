@@ -211,6 +211,16 @@ body {
 		background-color: var(--theme-muted);
 	}
 
+	/*
+	 * 宽表横向/纵向滚动时四角保持圆角（对齐英语学习侧栏 ScrollArea）：
+	 * 不改 cell padding / 间距；滚动条轨道从角上内缩，避免切成直角。
+	 */
+	.markdown-body table {
+		border-radius: 0.375rem;
+		overflow: auto;
+		clip-path: inset(0 round 0.375rem);
+	}
+
 	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
 	.chat-md-code-block {
 		position: relative;

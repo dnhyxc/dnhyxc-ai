@@ -291,7 +291,7 @@ function EnglishAgentScrollShell({
 					<div
 						className={cn(
 							AGENT_MAX_WIDTH,
-							'text-textcolor/70 mx-auto flex w-full flex-1 flex-col justify-between self-stretch px-4.5 text-sm',
+							'text-textcolor/70 mx-auto flex w-full flex-1 flex-col justify-between self-stretch px-4.5 pt-4.5 text-sm',
 						)}
 					>
 						{/* 上段：Atom 介绍卡（保留原独立卡片样式） */}
@@ -322,8 +322,10 @@ function EnglishAgentScrollShell({
 				}
 				viewportRef={scrollViewportRef}
 				scrollAreaHandlers={scrollAreaHandlers}
-				className="mt-4.5"
-				messageContainerClassName="px-4.5 pt-0"
+				messageContainerClassName="px-0 pt-0"
+				scrollAreaClassName="p-4.5"
+				viewportClassName="rounded-md"
+				scrollbarClassName="!top-4.5 !bottom-4.5 h-auto"
 				messageList={
 					<EnglishAgentMessageList
 						isCopyedId={isCopyedId}
@@ -345,7 +347,7 @@ function EnglishAgentScrollShell({
 				footer={
 					<AssistantFooter
 						embedded={conversationColumnActive}
-						containerClassName={cn('px-4.5', messageCount ? 'mt-4.5' : '')}
+						containerClassName="px-4.5"
 						maxWidth={AGENT_MAX_WIDTH}
 						showScrollFab={
 							conversationColumnActive && scrollFabMode !== 'hidden'

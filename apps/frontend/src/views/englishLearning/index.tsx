@@ -104,7 +104,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 						<ResizablePanel
 							id="english-chat"
 							defaultSize="65%"
-							className="min-h-0 min-w-0"
+							className="min-h-0 min-w-0 overflow-hidden"
 						>
 							<AgentPanel
 								ref={agentPanelRef}

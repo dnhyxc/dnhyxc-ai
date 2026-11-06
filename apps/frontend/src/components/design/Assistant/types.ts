@@ -81,6 +81,8 @@ export type AssistantShellProps = {
 	afterScroll?: ReactNode;
 	messageContainerClassName?: string;
 	scrollAreaClassName?: string;
+	viewportClassName?: string;
+	scrollbarClassName?: string;
 	/** 底部输入区（单一挂载点，避免空态/有消息切换时 remount 历史抽屉） */
 	footer?: ReactNode;
 	maxWidth?: string;
