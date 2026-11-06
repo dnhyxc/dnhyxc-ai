@@ -659,8 +659,12 @@ export default function DailyReadingDetailPage() {
 									)}
 								</div>
 								{selectionSpeak.floatAbove ? (
-									<div className="relative mx-auto mb-3 w-full max-w-2xl shrink-0 px-4">
-										{selectionSpeak.floatAbove}
+									// 播放条用 bottom-full 贴在这个锚点上。锚点必须脱离文档流，
+									// 否则 bottom 间距会变成 margin，把正文底边一起撑高。
+									<div className="absolute inset-x-0 bottom-[7px]">
+										<div className="relative mx-auto w-full max-w-2xl px-4">
+											{selectionSpeak.floatAbove}
+										</div>
 									</div>
 								) : null}
 							</div>

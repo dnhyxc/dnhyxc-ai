@@ -1,5 +1,11 @@
 # @dnhyxc-ai/richtext-kit
 
+## 0.0.4
+
+### Patch Changes
+
+- 优化图片预览操作
+
 ## 0.0.3
 
 ### Patch Changes

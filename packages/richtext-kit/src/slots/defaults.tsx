@@ -166,6 +166,10 @@ export function DefaultImagePreview({
 	const zoomOut = t?.('imagePreview.zoomOut') ?? '缩小';
 	const rotateLabel = t?.('imagePreview.rotate') ?? '旋转';
 	const resetLabel = t?.('imagePreview.reset') ?? '复原';
+	const prevLabel = t?.('imagePreview.prev') ?? '上一张';
+	const nextLabel = t?.('imagePreview.next') ?? '下一张';
+	const viewChanged =
+		scale !== 1 || rotate % 360 !== 0 || pos.x !== 0 || pos.y !== 0;
 
 	useEffect(() => {
 		if (!visible) return;
@@ -380,7 +384,7 @@ export function DefaultImagePreview({
 								resetView();
 							}}
 						>
-							上一张
+							{prevLabel}
 						</Button>
 						<Button
 							type="button"
@@ -391,7 +395,7 @@ export function DefaultImagePreview({
 								resetView();
 							}}
 						>
-							下一张
+							{nextLabel}
 						</Button>
 					</>
 				) : null}
@@ -421,17 +425,16 @@ export function DefaultImagePreview({
 				>
 					{rotateLabel}
 				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					title={resetLabel}
-					disabled={
-						scale === 1 && rotate % 360 === 0 && pos.x === 0 && pos.y === 0
-					}
-					onClick={resetView}
-				>
-					{resetLabel}
-				</Button>
+				{viewChanged ? (
+					<Button
+						type="button"
+						variant="outline"
+						title={resetLabel}
+						onClick={resetView}
+					>
+						{resetLabel}
+					</Button>
+				) : null}
 				{showDownload ? (
 					<Button
 						type="button"

@@ -1,6 +1,6 @@
 {
 	"name": "@dnhyxc-ai/richtext-kit",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"type": "module",
 	"description": "TipTap-based rich text editor and static note preview kit (edit + preview + windowed long docs)",
 	"author": "dnhyxc <dnhyxc@163.com>",
