@@ -8,6 +8,7 @@
 import React, { createElement, lazy } from 'react';
 import { Navigate } from 'react-router';
 import Layout from '@/layout';
+import { isTauriRuntime } from '@/utils/runtime';
 import Home from '@/views/home';
 import Login from '@/views/login';
 
@@ -493,7 +494,10 @@ const routes: RouteConfig[] = [
 					},
 					{
 						path: '/setting/about',
-						Component: AboutApp,
+						Component: () =>
+							isTauriRuntime()
+								? createElement(AboutApp)
+								: createElement(Navigate, { to: '/setting', replace: true }),
 						meta: {
 							titleKey: 'setting.menu.about',
 						},

@@ -216,34 +216,44 @@ export function ResourceListBlock({
 	block,
 	hasAbove = false,
 	hasBelow = false,
+	snapshot = false,
 }: {
 	block: ElResourceBlock;
 	/** 卡片上方还有正文或另一张卡 */
 	hasAbove?: boolean;
 	/** 卡片下方还有正文或另一张卡 */
 	hasBelow?: boolean;
+	/** 分享页：用块内行，不再请求需登录的词库或 artifact */
+	snapshot?: boolean;
 }) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const live = isLiveLibrary(block);
+	const fetchLive = live && !snapshot;
 	const title = shownTitle(block.title);
 	const [playing, setPlaying] = useState<string | null>(null);
 	const [items, setItems] = useState<unknown[] | null>(
-		live ? null : (block.items ?? null),
+		fetchLive ? null : (block.items ?? null),
 	);
-	const [phase, setPhase] = useState<'ready' | 'loading' | 'expired'>(
-		live ? 'loading' : block.items ? 'ready' : 'loading',
-	);
-	const [filled, setFilled] = useState(!live);
+	const [phase, setPhase] = useState<'ready' | 'loading' | 'expired'>(() => {
+		if (fetchLive) return 'loading';
+		if (block.items) return 'ready';
+		return snapshot ? 'expired' : 'loading';
+	});
+	const [filled, setFilled] = useState(!fetchLive);
 	const [reload, setReload] = useState(0);
 	const [q, setQ] = useState('');
 	const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null);
 
 	useEffect(() => {
-		if (live) return;
+		if (fetchLive) return;
 		if (block.items) {
 			setItems(block.items);
 			setPhase('ready');
+			return;
+		}
+		if (snapshot) {
+			setPhase('expired');
 			return;
 		}
 		let cancelled = false;
@@ -264,10 +274,10 @@ export function ResourceListBlock({
 		return () => {
 			cancelled = true;
 		};
-	}, [live, block.artifactId, block.items]);
+	}, [fetchLive, snapshot, block.artifactId, block.items]);
 
 	useEffect(() => {
-		if (!live || !block.libraryId) return;
+		if (!fetchLive || !block.libraryId) return;
 		const libraryId = block.libraryId;
 		const kind = block.contentKind;
 		let cancelled = false;
@@ -317,7 +327,7 @@ export function ResourceListBlock({
 		return () => {
 			cancelled = true;
 		};
-	}, [live, block.libraryId, block.contentKind, block.totalCount, reload]);
+	}, [fetchLive, block.libraryId, block.contentKind, block.totalCount, reload]);
 
 	const onPlay = useCallback(
 		(text: string) => {
@@ -420,30 +430,32 @@ export function ResourceListBlock({
 			{phase === 'expired' ? (
 				<div className="flex items-center gap-2 px-2 py-3 text-textcolor/70">
 					<span>{live ? '库不可用。' : '清单已过期。'}</span>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => {
-							if (live) {
-								setReload((n) => n + 1);
-								return;
-							}
-							setPhase('loading');
-							void getElArtifact(block.artifactId)
-								.then((res) => {
-									if (!res.success || !res.data?.items) {
-										setPhase('expired');
-										return;
-									}
-									setItems(res.data.items);
-									setPhase('ready');
-								})
-								.catch(() => setPhase('expired'));
-						}}
-					>
-						重新获取
-					</Button>
+					{snapshot ? null : (
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={() => {
+								if (live) {
+									setReload((n) => n + 1);
+									return;
+								}
+								setPhase('loading');
+								void getElArtifact(block.artifactId)
+									.then((res) => {
+										if (!res.success || !res.data?.items) {
+											setPhase('expired');
+											return;
+										}
+										setItems(res.data.items);
+										setPhase('ready');
+									})
+									.catch(() => setPhase('expired'));
+							}}
+						>
+							重新获取
+						</Button>
+					)}
 				</div>
 			) : null}
 			{phase === 'ready' && live ? (

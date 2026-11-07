@@ -121,6 +121,8 @@ export class ShareService {
 				mimetype: string;
 				size: number;
 			}>;
+			/** 英语 Agent 清单卡；分享页靠它画 [[el:]]，不走需登录的词库接口 */
+			elResources?: EnglishAgentMessage['elResources'];
 		}>;
 		// share 页还会透传 session（chat 分支为 ChatSessions；assistant 分支不需要）
 		session?: any;
@@ -216,6 +218,7 @@ export class ShareService {
 					role: string;
 					content: string;
 					createdAt: Date;
+					elResources?: EnglishAgentMessage['elResources'];
 				}>,
 			) => {
 				let orderedRows = rows;
@@ -243,6 +246,7 @@ export class ShareService {
 						| 'assistant',
 					content: m.content ?? '',
 					timestamp: this.toEpochMs(m.createdAt),
+					...(m.elResources?.length ? { elResources: m.elResources } : {}),
 				}));
 				return {
 					title:
@@ -256,10 +260,17 @@ export class ShareService {
 				T extends EnglishAgentMessage | SkillTryMessage | AgentMessage,
 			>(
 				messageRepo: Repository<T>,
+				extraSelect: string[] = [],
 			) => {
 				const qb = messageRepo
 					.createQueryBuilder('m')
-					.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
+					.select([
+						'm.id',
+						'm.role',
+						'm.content',
+						'm.createdAt',
+						...extraSelect,
+					])
 					.where('m.session_id = :sid', { sid: params.sessionId });
 				if (params.messageIds?.length) {
 					qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
@@ -276,7 +287,9 @@ export class ShareService {
 				select: ['id', 'title'],
 			});
 			if (engSession) {
-				const rows = await loadFromRepo(this.englishAgentMessageRepo);
+				const rows = await loadFromRepo(this.englishAgentMessageRepo, [
+					'm.elResources',
+				]);
 				return mapAgentLikeRows(engSession, rows);
 			}
 
@@ -476,6 +489,7 @@ export class ShareService {
 				role: m.role,
 				content,
 				timestamp: m.timestamp,
+				...(m.elResources?.length ? { elResources: m.elResources } : {}),
 			};
 		});
 		return {

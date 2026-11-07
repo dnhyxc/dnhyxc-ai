@@ -14,6 +14,13 @@ import {
 import { isTauriRuntime } from '@/utils/runtime';
 import { DEFAULT_INFO, type ShortcutSettingItem } from './config';
 
+/** 网页没有「关于应用」窗口，快捷键列表里也不展示 */
+function visibleShortcuts(): ShortcutSettingItem[] {
+	return isTauriRuntime()
+		? DEFAULT_INFO
+		: DEFAULT_INFO.filter((item) => item.action !== 'file_about');
+}
+
 /** 仅在桌面壳内调用 Rust 命令 */
 async function desktopInvoke<T>(
 	cmd: string,
@@ -30,7 +37,7 @@ const System = () => {
 	const [closeType, setCloseType] = useState('1');
 	const [checkShortcut, setCheckShortcut] = useState<number | null>(null);
 	const [shortcutInfo, setShortcutInfo] = useState<ShortcutSettingItem[]>(() =>
-		DEFAULT_INFO.map((i) => ({ ...i })),
+		visibleShortcuts().map((i) => ({ ...i })),
 	);
 	const shortcutInfoRef = useRef(shortcutInfo);
 	shortcutInfoRef.current = shortcutInfo;
@@ -71,7 +78,7 @@ const System = () => {
 
 	const getShortCutInfo = useCallback(async () => {
 		const next = await Promise.all(
-			DEFAULT_INFO.map(async (i) => {
+			visibleShortcuts().map(async (i) => {
 				const stored = await getValue<string>(`shortcut_${i.key}`);
 				const resolved =
 					stored != null && String(stored).trim() !== ''

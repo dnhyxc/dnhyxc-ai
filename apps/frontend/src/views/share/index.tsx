@@ -368,7 +368,7 @@ const SessionShare = () => {
 													className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
 												/>
 											) : (
-												<ChatAssistantMessage message={message} />
+												<ChatAssistantMessage message={message} snapshotCards />
 											)}
 
 											<div

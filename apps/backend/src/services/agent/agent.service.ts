@@ -2068,7 +2068,8 @@ export class AgentService {
 			const seen = new Set<string>();
 			const out: string[] = [];
 			for (const row of cardItemRows(rows)) {
-				const value = typeof row[field] === 'string' ? row[field].trim() : '';
+				const raw = row[field];
+				const value = typeof raw === 'string' ? raw.trim() : '';
 				const key = value.toLowerCase();
 				if (!key || seen.has(key)) continue;
 				seen.add(key);

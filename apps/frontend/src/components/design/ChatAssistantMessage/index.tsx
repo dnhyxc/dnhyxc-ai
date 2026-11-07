@@ -167,6 +167,10 @@ interface AssistantMessageProps {
 	 * 菜单能力由使用方传入（如英语 Agent 的朗读/复制）。
 	 */
 	getSelectionContextMenuItems?: SelectionContextMenuItemsFn;
+	/**
+	 * 分享页：卡片用消息里的 items，不再请求需登录的词库或 artifact。
+	 */
+	snapshotCards?: boolean;
 }
 
 function ChatAssistantMessageInner({
@@ -180,6 +184,7 @@ function ChatAssistantMessageInner({
 	scrollViewportRef,
 	className,
 	getSelectionContextMenuItems,
+	snapshotCards,
 }: AssistantMessageProps) {
 	const { theme: appTheme } = useTheme();
 	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
@@ -615,6 +620,7 @@ function ChatAssistantMessageInner({
 								block={block}
 								hasAbove={edge.hasAbove}
 								hasBelow={edge.hasBelow}
+								snapshot={snapshotCards}
 							/>
 						);
 					}
@@ -708,6 +714,7 @@ function ChatAssistantMessageInner({
 						block={block}
 						hasAbove={edge.hasAbove}
 						hasBelow={edge.hasBelow}
+						snapshot={snapshotCards}
 					/>
 				);
 			})}
@@ -873,7 +880,8 @@ function areChatAssistantMessageMemoPropsEqual(
 		prev.onContinueAnswering === next.onContinueAnswering &&
 		prev.getSelectionContextMenuItems === next.getSelectionContextMenuItems &&
 		prev.className === next.className &&
-		prev.t === next.t
+		prev.t === next.t &&
+		prev.snapshotCards === next.snapshotCards
 	);
 }
 

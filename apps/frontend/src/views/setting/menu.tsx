@@ -6,14 +6,15 @@ import {
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
+import { isTauriRuntime } from '@/utils/runtime';
 
 const NavigationMenus = () => {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
 	const { t } = useI18n();
 
-	const menus = useMemo(
-		() => [
+	const menus = useMemo(() => {
+		const items = [
 			{
 				name: t('setting.menu.system'),
 				key: 'system',
@@ -44,9 +45,12 @@ const NavigationMenus = () => {
 				path: '/setting/about',
 				icon: 'icon-about',
 			},
-		],
-		[t],
-	);
+		];
+		// 关于应用是桌面更新/缓存，网页设置里不出现
+		return isTauriRuntime()
+			? items
+			: items.filter((item) => item.key !== 'about');
+	}, [t]);
 
 	return (
 		<nav className="w-full relative border-b border-theme/35 after:content-[''] after:absolute after:bottom-0 after:right-0 after:w-full after:h-[8px] after:rounded-tr-[25px] after:bg-linear-to-r after:from-transparent after:to-theme after:max-w-[42vw]">
