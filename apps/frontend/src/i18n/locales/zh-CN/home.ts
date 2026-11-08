@@ -29,6 +29,9 @@ export const home = {
 	'home.hero.plugins.subtitle': '可扩展架构',
 	'home.hero.product': '智能工作台',
 	'home.hero.quickStart': '快速开始',
+	'home.hero.skills.desc':
+		'用 Markdown 编写 Skill，可由对话起草或改写后写入编辑器。保存即可在侧栏试跑，并在对话中按需选用，把常用提示沉淀成可复用的技能。',
+	'home.hero.skills.subtitle': '编写与试跑',
 	'home.hero.subtitle':
 		'桌面端一站式集成智能对话、知识库、书架、英语学习与插件扩展。流式问答可沉淀为笔记，阅读与背词同屏可用，问、记、学在同一应用内闭环。',
 	'home.hero.welcome': '欢迎使用',
@@ -73,6 +76,6 @@ export const home = {
 	'home.steps.pluginDev.guide': '开发指南',
 	'home.steps.pluginDev.title': '插件开发',
 	'home.steps.register.desc': '创建您的个人账户',
-	'home.steps.start.desc': '享受智能助手服务',
-	'home.steps.start.title': '开始使用',
+	'home.steps.note.desc': '把问答或想法写成一条笔记',
+	'home.steps.note.title': '记下第一条',
 };

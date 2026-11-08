@@ -9,20 +9,18 @@ import {
 	Code2,
 	Download,
 	Earth,
-	Feather,
 	FileText,
 	Flower,
-	Globe,
 	LayoutDashboard,
 	LibraryBig,
 	MessageSquare,
 	Monitor,
+	NotebookPen,
 	NotebookTabs,
 	Puzzle,
 	Sparkles,
 	UserPlus,
 	Vegan,
-	Zap,
 } from 'lucide-react';
 import type { NavigateFunction } from 'react-router';
 import type { Locale } from '@/i18n';
@@ -99,40 +97,24 @@ export const HUE_TEXT_GRADIENT: Record<string, string> = {
 	violet: 'from-violet-400 to-purple-400',
 };
 
+/** 特色功能文案：标题 + 一句说明，供首屏单行展示 */
 export function createShowcase(t: TFn) {
 	return [
 		{
-			icon: Puzzle,
 			title: t('home.showcase.plugin.title'),
 			desc: t('home.showcase.plugin.desc'),
-			color: 'from-violet-400 to-purple-500',
-			/* 复用首屏 HUE_STYLES 色系：图标渐变 / hover 光晕 / 文字色 */
-			hue: 'violet',
-			navigatePlugins: true,
 		},
 		{
-			icon: Zap,
 			title: t('home.showcase.fast.title'),
 			desc: t('home.showcase.fast.desc'),
-			color: 'from-sky-400 to-cyan-400',
-			hue: 'teal',
-			navigateChat: true,
 		},
 		{
-			icon: Globe,
 			title: t('home.showcase.i18n.title'),
 			desc: t('home.showcase.i18n.desc'),
-			color: 'from-green-400 to-cyan-400',
-			hue: 'emerald',
-			navigateEnglish: true,
 		},
 		{
-			icon: Feather,
 			title: t('home.showcase.lightweight.title'),
 			desc: t('home.showcase.lightweight.desc'),
-			color: 'from-green-400 to-emerald-400',
-			hue: 'rose',
-			navigateAbout: true,
 		},
 	];
 }
@@ -163,13 +145,13 @@ export function createSteps(t: TFn) {
 		},
 		{
 			step: '3',
-			title: t('home.steps.start.title'),
-			desc: t('home.steps.start.desc'),
-			icon: Sparkles,
+			title: t('home.steps.note.title'),
+			desc: t('home.steps.note.desc'),
+			icon: NotebookTabs,
 			color: 'from-orange-500 to-amber-500',
 			hue: 'amber',
-			/** 点击后进入智能对话 */
-			navigateChat: true,
+			/** 点击后进入知识库，写下第一条笔记 */
+			navigateKnowledge: true,
 		},
 		{
 			step: '4',
@@ -336,9 +318,31 @@ export function createHeroSlides(opts: {
 			tags: [],
 		},
 		{
+			id: 'skills',
+			badge: t('home.hero.skills.subtitle'),
+			number: '03',
+			icon: NotebookPen,
+			titleMain: t('nav.skills'),
+			titleAccent: t('home.hero.skills.subtitle'),
+			subtitle: t('home.hero.skills.desc'),
+			spotlightA: 'from-cyan-500/25',
+			spotlightB: 'via-teal-400/18',
+			spotlightC: 'to-sky-300/0',
+			accent: 'text-teal-500/80',
+			hue: 'teal',
+			cta: [
+				{
+					label: t('home.features.enter'),
+					primary: true,
+					onClick: () => navigate('/skills'),
+				},
+			],
+			tags: [],
+		},
+		{
 			id: 'ebook',
 			badge: t('home.hero.ebook.subtitle'),
-			number: '03',
+			number: '04',
 			icon: LibraryBig,
 			titleMain: t('nav.ebook'),
 			titleAccent: t('home.hero.ebook.subtitle'),
@@ -360,7 +364,7 @@ export function createHeroSlides(opts: {
 		{
 			id: 'english',
 			badge: t('home.hero.english.subtitle'),
-			number: '04',
+			number: '05',
 			icon: Vegan,
 			titleMain: t('home.hero.english.title'),
 			titleAccent: t('home.hero.english.subtitle'),
@@ -382,7 +386,7 @@ export function createHeroSlides(opts: {
 		{
 			id: 'plugins',
 			badge: t('home.hero.plugins.subtitle'),
-			number: '05',
+			number: '06',
 			icon: Flower,
 			titleMain: t('nav.plugins'),
 			titleAccent: t('home.hero.plugins.subtitle'),

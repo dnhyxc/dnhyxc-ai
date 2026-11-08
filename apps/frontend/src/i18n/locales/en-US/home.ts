@@ -30,6 +30,9 @@ export const home = {
 	'home.hero.plugins.subtitle': 'Extensible',
 	'home.hero.product': 'Smart Workspace',
 	'home.hero.quickStart': 'Get started',
+	'home.hero.skills.desc':
+		'Write skills in Markdown, draft or revise them in chat, then save into the editor. Try a saved skill beside the editor and apply it in conversation, so reusable prompts stay in one library.',
+	'home.hero.skills.subtitle': 'Write and try',
 	'home.hero.subtitle':
 		'One desktop app for AI chat, knowledge notes, bookshelf, English learning, and plugins. Stream answers into notes, read and practice side by side—ask, save, and learn in one place.',
 	'home.hero.welcome': 'Welcome',
@@ -75,6 +78,6 @@ export const home = {
 	'home.steps.pluginDev.guide': 'Development guide',
 	'home.steps.pluginDev.title': 'Plugin development',
 	'home.steps.register.desc': 'Create your own personal account',
-	'home.steps.start.desc': 'Enjoy the smart assistant experience',
-	'home.steps.start.title': 'Start',
+	'home.steps.note.desc': 'Turn an answer or an idea into a note',
+	'home.steps.note.title': 'Write the first note',
 };

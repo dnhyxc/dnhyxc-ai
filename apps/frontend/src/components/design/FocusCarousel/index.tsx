@@ -390,13 +390,13 @@ const FocusCarouselBase = forwardRef<
 					)}
 				>
 					{typeof leftHint === 'string' ? (
-						<p className="hidden text-xs text-textcolor/35 md:block md:max-w-xs">
+						<p className="min-w-0 flex-1 truncate text-xs text-textcolor/35">
 							{leftHint}
 						</p>
 					) : leftHint != null ? (
-						<div className="hidden md:block md:max-w-xs">{leftHint}</div>
+						<div className="min-w-0 flex-1 overflow-hidden">{leftHint}</div>
 					) : (
-						<div className="hidden md:block md:max-w-xs" />
+						<div className="min-w-0 flex-1" />
 					)}
 					<div className="flex items-center gap-3">
 						<button

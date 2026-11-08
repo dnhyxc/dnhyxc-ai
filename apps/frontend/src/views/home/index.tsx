@@ -24,7 +24,13 @@ const Home = () => {
 	const { t, locale } = useI18n();
 	const { tilt, cardTilt } = useHomeStageMotion();
 
-	const SHOWCASE = useMemo(() => createShowcase(t), [t]);
+	const featureLine = useMemo(
+		() =>
+			createShowcase(t)
+				.map((item) => `${item.title} ${item.desc}`)
+				.join(' · '),
+		[t],
+	);
 	const STEPS = useMemo(() => createSteps(t), [t, locale]);
 	const FEATURES = useMemo(() => createFeatures(navigate, t), [navigate, t]);
 	const QUICKLINKS = useMemo(() => createQuicklinks(t), [t]);
@@ -79,19 +85,6 @@ const Home = () => {
 		[FEATURES],
 	);
 
-	const showcaseItems: ItemCardProps[] = useMemo(
-		() =>
-			SHOWCASE.map((feature) => ({
-				itemKey: feature.title,
-				hue: feature.hue as HueKey,
-				icon: feature.icon,
-				title: feature.title,
-				desc: feature.desc,
-				delay: 0,
-			})),
-		[SHOWCASE, t, navigate],
-	);
-
 	const stepItems: ItemCardProps[] = useMemo(
 		() =>
 			STEPS.map((item) => ({
@@ -107,8 +100,8 @@ const Home = () => {
 						void openExternalUrl(getDesktopDownloadAbsoluteUrl(locale));
 					} else if (item.navigateRegister) {
 						navigate('/login?mode=register');
-					} else if (item.navigateChat) {
-						navigate('/chat');
+					} else if (item.navigateKnowledge) {
+						navigate('/knowledge');
 					} else if (item.openPluginDevGuide) {
 						void openExternalUrl(getPluginDevGuideAbsoluteUrl(locale));
 					}
@@ -160,7 +153,7 @@ const Home = () => {
 						>
 							<FocusCarousel
 								slides={HERO_SLIDES}
-								leftHint={t('home.stage.services')}
+								leftHint={featureLine}
 								style={{ touchAction: 'pan-y' }}
 								className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-7 py-8 md:px-12 md:py-10 lg:px-16"
 								renderSlide={(s) => {
@@ -222,13 +215,6 @@ const Home = () => {
 
 					{/* 下方内容 */}
 					<div className="relative mx-auto w-full space-y-5.5 px-5.5 pb-5.5">
-						<SectionCards
-							id="home-showcase"
-							title={t('home.sections.showcase')}
-							items={showcaseItems}
-							delayStep={0.05}
-							status={t('home.sections.showcaseStatus')}
-						/>
 						<SectionCards
 							title={t('home.sections.steps')}
 							items={stepItems}
