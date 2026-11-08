@@ -5,11 +5,11 @@ import { type ThemeName, useTheme } from '@/hooks/theme';
 import type { Locale } from '@/i18n';
 import { onListen } from '@/utils/event';
 import { openExternalUrl } from '@/utils/open-external';
-import { isTauriRuntime } from '@/utils/runtime';
 import {
-	getLegalPageAbsoluteUrl,
-	LEGAL_PAGE_PATHS,
-} from '@/views/legal/legalPageUrls';
+	getServicePolicyAbsoluteUrl,
+	getUserAgreementAbsoluteUrl,
+} from '@/utils/remote-docs-url';
+import { isTauriRuntime } from '@/utils/runtime';
 
 function readVersionFromSearch(): string {
 	try {
@@ -72,12 +72,7 @@ const About = () => {
 						<Button
 							variant="link"
 							onClick={() => {
-								void openExternalUrl(
-									getLegalPageAbsoluteUrl(
-										LEGAL_PAGE_PATHS.servicePolicy,
-										locale,
-									),
-								);
+								void openExternalUrl(getServicePolicyAbsoluteUrl(locale));
 							}}
 							className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 						>
@@ -86,12 +81,7 @@ const About = () => {
 						<Button
 							variant="link"
 							onClick={() => {
-								void openExternalUrl(
-									getLegalPageAbsoluteUrl(
-										LEGAL_PAGE_PATHS.userAgreement,
-										locale,
-									),
-								);
+								void openExternalUrl(getUserAgreementAbsoluteUrl(locale));
 							}}
 							className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 						>

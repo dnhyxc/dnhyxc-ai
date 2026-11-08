@@ -70,7 +70,7 @@ export const home = {
 	'home.stage.stat.localValue': '100%',
 	'home.stage.stat.modules': 'Modules',
 	'home.stage.statsLink': 'Learn more',
-	'home.stage.status': 'Desktop AI workspace',
+	'home.stage.status': 'AI workspace ready',
 	'home.stage.users': 'Curated modules',
 	'home.steps.install.desc': 'Download and install the desktop app',
 	'home.steps.install.title': 'Install',

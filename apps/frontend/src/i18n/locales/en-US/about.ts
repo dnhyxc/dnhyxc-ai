@@ -7,5 +7,4 @@ export const about = {
 	'about.links.terms': 'Terms of service',
 	'about.links.updateInfo': 'Release notes',
 	'about.rightsReserved': 'All Rights Reserved',
-	'legal.userAgreement.title': 'User service agreement',
 };

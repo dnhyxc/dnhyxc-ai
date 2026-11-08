@@ -338,7 +338,7 @@ export function StageCard({
 				<motion.nav
 					style={{ x: midX, y: midY }}
 					aria-label={entriesAriaLabel}
-					className="relative z-10 h-16 shrink-0"
+					className="relative z-10 h-16 shrink-0 px-5.5"
 				>
 					<div
 						className="grid h-full"
@@ -352,13 +352,13 @@ export function StageCard({
 								type="button"
 								onClick={feature.onClick}
 								className={cn(
-									'group flex h-full cursor-pointer items-center justify-center gap-2 px-5.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35',
+									'group flex h-full cursor-pointer items-center justify-center gap-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400/35',
 									i === 0 && 'justify-start text-left',
 									i > 0 && i < entryCount - 1 && 'justify-center text-center',
 									i === entryCount - 1 &&
 										entryCount > 1 &&
 										'justify-end text-right',
-									entryCount === 3 && i === 1 && 'justify-end pr-5 text-center',
+									entryCount === 3 && i === 1 && 'justify-end text-center',
 								)}
 							>
 								<span className="text-sm font-semibold tracking-normal text-textcolor transition-colors group-hover:text-teal-500">

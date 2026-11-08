@@ -13,6 +13,8 @@ import { withAppLangInSearch } from '@/utils/public-doc-url';
 export const UPDATE_INFO_PATH = '/update-info';
 export const PROJECT_GUIDE_PATH = '/project-guide';
 export const PLUGIN_DEV_GUIDE_PATH = '/plugin-dev-guide';
+export const SERVICE_POLICY_PATH = '/service-policy';
+export const USER_AGREEMENT_PATH = '/user-agreement';
 
 /**
  * remote-docs 独立站 origin。
@@ -57,4 +59,12 @@ export function getProjectGuideAbsoluteUrl(locale?: Locale): string {
 
 export function getPluginDevGuideAbsoluteUrl(locale?: Locale): string {
 	return getRemoteDocsAbsoluteUrl(PLUGIN_DEV_GUIDE_PATH, locale);
+}
+
+export function getServicePolicyAbsoluteUrl(locale?: Locale): string {
+	return getRemoteDocsAbsoluteUrl(SERVICE_POLICY_PATH, locale);
+}
+
+export function getUserAgreementAbsoluteUrl(locale?: Locale): string {
+	return getRemoteDocsAbsoluteUrl(USER_AGREEMENT_PATH, locale);
 }

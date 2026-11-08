@@ -155,7 +155,7 @@ const Home = () => {
 								slides={HERO_SLIDES}
 								leftHint={featureLine}
 								style={{ touchAction: 'pan-y' }}
-								className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-7 py-8 md:px-12 md:py-10 lg:px-16"
+								className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-7 py-8 md:px-12 md:py-10 lg:px-14.5"
 								renderSlide={(s) => {
 									const hue = HUE_STYLES[s.hue] ?? HUE_STYLES.teal;
 									return (

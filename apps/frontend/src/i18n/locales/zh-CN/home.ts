@@ -68,7 +68,7 @@ export const home = {
 	'home.stage.stat.localValue': '100%',
 	'home.stage.stat.modules': '精选模块',
 	'home.stage.statsLink': '查看介绍',
-	'home.stage.status': '桌面 AI 工作台',
+	'home.stage.status': '智能工作台已就绪',
 	'home.stage.users': '模块精选',
 	'home.steps.install.desc': '下载并安装桌面版应用',
 	'home.steps.install.title': '安装应用',

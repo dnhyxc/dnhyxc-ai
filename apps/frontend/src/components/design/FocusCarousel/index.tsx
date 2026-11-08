@@ -348,7 +348,7 @@ const FocusCarouselBase = forwardRef<
 		>
 			<div
 				className={cn(
-					'relative mx-auto grid w-full max-w-3xl overflow-hidden',
+					'relative mx-auto grid w-full max-w-4xl overflow-hidden',
 					contentClassName,
 				)}
 			>
@@ -385,7 +385,7 @@ const FocusCarouselBase = forwardRef<
 			{showControls && (
 				<div
 					className={cn(
-						'mx-auto mt-10 flex w-full max-w-3xl items-center justify-between gap-4 md:mt-12',
+						'mx-auto mt-10 flex w-full max-w-4xl items-center justify-between gap-4 md:mt-12',
 						controlsClassName,
 					)}
 				>

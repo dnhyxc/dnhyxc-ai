@@ -1,7 +1,7 @@
 /**
  * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
- * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
- * `/update-info`、`/project-guide`、`/plugin-dev-guide` 由 plugins-registry remoteDocs* 注入（文案在 micro-apps/remote-docs）。
+ * 首页 `/`、`/login`、`/win`、`/about`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
+ * `/update-info`、`/project-guide`、`/plugin-dev-guide`、`/service-policy`、`/user-agreement` 由 plugins-registry remoteDocs* 注入（文案在 micro-apps/remote-docs）。
  *
  * Layout / Home / Login 保持 eager；其余页面 React.lazy，避免主包打进全站视图。
  */
@@ -88,8 +88,6 @@ const EnglishMorphologyReferencePage = lazy(
 );
 const Knowledge = lazy(() => import('@/views/knowledge'));
 const Skills = lazy(() => import('@/views/skills'));
-const LegalServicePolicy = lazy(() => import('@/views/legal/servicePolicy'));
-const LegalUserAgreement = lazy(() => import('@/views/legal/userAgreement'));
 const Pay = lazy(() => import('@/views/pay'));
 const PluginsPage = lazy(() => import('@/views/plugins'));
 const PluginsLayout = lazy(() => import('@/views/plugins/Layout'));
@@ -546,21 +544,7 @@ const routes: RouteConfig[] = [
 		path: '/about',
 		Component: About,
 	},
-	{
-		path: '/service-policy',
-		Component: LegalServicePolicy,
-		meta: {
-			titleKey: 'about.links.policy',
-		},
-	},
-	{
-		path: '/user-agreement',
-		Component: LegalUserAgreement,
-		meta: {
-			titleKey: 'legal.userAgreement.title',
-		},
-	},
-	// /update-info、/project-guide、/plugin-dev-guide → plugins-registry remoteDocs*
+	// /update-info、/project-guide、/plugin-dev-guide、/service-policy、/user-agreement → plugins-registry remoteDocs*
 	{
 		path: '/download-desktop',
 		Component: DesktopDownloadPage,
