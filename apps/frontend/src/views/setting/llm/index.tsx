@@ -54,7 +54,7 @@ function readEnvSiliconflowBaseUrl(): string {
 }
 
 function readEnvSiliconflowModelName(): string {
-	return readEnvTrimmed('VITE_SILICONFLOW_MODEL_NAME') || 'Pro/zai-org/GLM-5.1';
+	return readEnvTrimmed('VITE_SILICONFLOW_MODEL_NAME') || 'zai-org/GLM-5.3';
 }
 
 type LlmProviderDefaults = {
@@ -86,9 +86,9 @@ const LLM_PROVIDER_PRESETS = [
 	},
 	{
 		baseUrl: 'https://api.siliconflow.cn/v1',
-		modelName: 'Pro/zai-org/GLM-5.1',
+		modelName: 'zai-org/GLM-5.3',
 		baseUrlLabelKey: 'setting.llm.baseUrlOption.siliconflow' as const,
-		modelLabelKey: 'setting.llm.modelOption.glm51' as const,
+		modelLabelKey: 'setting.llm.modelOption.glm53' as const,
 	},
 	{
 		baseUrl: 'https://api.deepseek.com',

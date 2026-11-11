@@ -22,7 +22,7 @@ export const DEFAULT_SILICONFLOW_RERANK_URL =
 	'https://api.siliconflow.cn/v1/rerank';
 
 /** 各模块未配置 SILICONFLOW_MODEL_NAME 时的默认值（有效会员） */
-export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
+export const DEFAULT_SILICONFLOW_MODEL_NAME = 'zai-org/GLM-5.3';
 
 /** 短决策和整类筛选固定模型。不读 SILICONFLOW_MODEL_NAME，避免跟着对话模型走。 */
 export const DECIDE_MODEL_NAME = 'Qwen/Qwen3.6-35B-A3B';

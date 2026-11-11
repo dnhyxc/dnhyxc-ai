@@ -7,6 +7,7 @@ export const TTS_CACHE_FOLDER = {
 	daily: '今日记词',
 	review: '复习',
 	morphology: '词根词缀',
+	vocabDetail: '单词解析',
 } as const;
 
 /** 稳定 scope：改库名不改目录 */

@@ -425,6 +425,9 @@ export const englishLearning = {
 	'englishLearning.library.vocab.descShort': '可导入单词，查看词汇库',
 	'englishLearning.library.vocab.title': '单词库',
 	'englishLearning.library.wordsHeading': '共 {count} 个单词',
+	'englishLearning.vocabDetailList.heading': '单词解析列表',
+	'englishLearning.vocabDetailList.summary':
+		'共 {total} 条 / 已加载 {loaded} 条',
 	'englishLearning.library.wordsLoadFailed': '加载词条失败，请稍后重试',
 	'englishLearning.library.wordsLoading': '加载单词…',
 	'englishLearning.library.wordsLoadMoreFailed':

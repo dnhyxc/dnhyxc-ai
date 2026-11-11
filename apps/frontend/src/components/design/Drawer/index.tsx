@@ -90,7 +90,7 @@ export function Drawer({
 				</div>
 
 				{(title || description) && (
-					<SheetHeader className="px-4 py-4 border-b border-theme/10 shrink-0">
+					<SheetHeader className="px-3.5 py-4 border-b border-theme/10 shrink-0">
 						{title && (
 							<SheetTitle>
 								<div className="flex justify-between items-center">

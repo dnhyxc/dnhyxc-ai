@@ -154,7 +154,7 @@ export const setting = {
 	'setting.llm.modelName': 'Model name',
 	'setting.llm.modelNamePlaceholder': 'Enter model name',
 	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
-	'setting.llm.modelOption.glm51': 'Pro/zai-org/GLM-5.1',
+	'setting.llm.modelOption.glm53': 'zai-org/GLM-5.3',
 	'setting.llm.modelOption.glmFlash': 'glm-4.7-flash',
 	'setting.llm.openPresets': 'Choose preset',
 	'setting.llm.presetOrCustomHint':

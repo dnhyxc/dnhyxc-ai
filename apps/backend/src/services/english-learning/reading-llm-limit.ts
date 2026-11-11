@@ -236,7 +236,7 @@ export function assertReadingLlmLimitSelfCheck(): void {
 	}
 	if (
 		resolveReadingFallback(
-			'Pro/zai-org/GLM-5.1',
+			'zai-org/GLM-5.3',
 			'https://api.siliconflow.cn/v1',
 		) != null
 	) {

@@ -9,6 +9,7 @@ import { Square, Volume2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
+import { VocabCardPluginActions } from './PluginActions';
 import { Segment } from './Segment';
 
 export type CardVariant = 'library' | 'selectable';
@@ -93,12 +94,14 @@ function WordHeader({
 }
 
 function CardActionButtons({
+	card,
 	playing,
 	playDisabled,
 	onTogglePlay,
 	playLabels,
 	trailingActions,
 }: {
+	card: CardData;
 	playing: boolean;
 	playDisabled: boolean;
 	onTogglePlay?: () => void;
@@ -134,6 +137,7 @@ function CardActionButtons({
 				</Button>
 			) : null}
 			{trailingActions}
+			<VocabCardPluginActions card={card} />
 		</div>
 	);
 }
@@ -168,6 +172,7 @@ export function Card({
 				<WordHeader word={word} pos={pos} controlId={controlId} />
 				{hasActions ? (
 					<CardActionButtons
+						card={data}
 						playing={playing}
 						playDisabled={playDisabled}
 						onTogglePlay={onTogglePlay}

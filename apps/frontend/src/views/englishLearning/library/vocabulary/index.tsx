@@ -4,8 +4,28 @@
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	type CSSProperties,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import { useNavigate } from 'react-router';
+import {
+	PluginHostSurface,
+	PluginIcon,
+	pickPluginLocaleText,
+	useHostSurfacePlugins,
+} from '@/federation';
+import {
+	closeVocabDetail,
+	markVocabDetailReplacedByList,
+	readVocabDetailListStats,
+	readVocabDetailSession,
+	subscribeVocabDetail,
+	subscribeVocabDetailListStats,
+} from '@/federation/modules/vocabDetail/session';
 import { useI18n } from '@/hooks';
 import { useIncrementalVocabFavoriteStatus } from '@/hooks/useIncrementalVocabFavoriteStatus';
 import { cn } from '@/lib/utils';
@@ -30,6 +50,7 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { Entry } from '../../components/entry';
 import { CornerFab } from '../../components/list';
 import { Card } from '../../components/vocab';
+import { vocabDrawerWidth } from '../../components/vocab/DetailDrawer';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
@@ -52,8 +73,47 @@ export function VocabularyLibrarySection({
 	libraryMeta,
 	onResumeOffsetChange,
 }: VocabularyLibrarySectionProps) {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	const navigate = useNavigate();
+	const [openPluginId, setOpenPluginId] = useState<string | null>(null);
+	// 顶替详解抽屉时不要再从右侧滑入，否则开场那一帧 Loading 落在槽位右边
+	const [listStill, setListStill] = useState(false);
+	const listPlugin = useHostSurfacePlugins('english.vocab.library').find(
+		(plugin) => plugin.host?.slot === 'drawer',
+	);
+	const openPluginIdRef = useRef(openPluginId);
+	openPluginIdRef.current = openPluginId;
+	const listPluginIdRef = useRef(listPlugin?.id ?? null);
+	listPluginIdRef.current = listPlugin?.id ?? null;
+	const suspendedListId = useRef<string | null>(null);
+	const [listStats, setListStats] = useState(readVocabDetailListStats);
+
+	useEffect(
+		() =>
+			subscribeVocabDetailListStats(() =>
+				setListStats(readVocabDetailListStats()),
+			),
+		[],
+	);
+
+	useEffect(() => {
+		return subscribeVocabDetail(() => {
+			const next = readVocabDetailSession();
+			if (next.open) {
+				const current = openPluginIdRef.current;
+				if (!current) return;
+				suspendedListId.current = current;
+				setOpenPluginId(null);
+				return;
+			}
+			const restore = suspendedListId.current;
+			if (!restore || listPluginIdRef.current !== restore) return;
+			suspendedListId.current = null;
+			markVocabDetailReplacedByList();
+			setListStill(true);
+			setOpenPluginId(restore);
+		});
+	}, []);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
@@ -302,8 +362,62 @@ export function VocabularyLibrarySection({
 						<Star className="size-4.5" />
 						{t('englishLearning.practice.favorites')}
 					</button>
+					{listPlugin ? (
+						<button
+							type="button"
+							className="flex cursor-pointer items-center gap-1 text-sm text-teal-500 hover:text-teal-400"
+							onClick={() => {
+								if (readVocabDetailSession().open) {
+									suspendedListId.current = null;
+									markVocabDetailReplacedByList();
+									closeVocabDetail();
+									setListStill(true);
+									setOpenPluginId(listPlugin.id);
+									return;
+								}
+								setListStill(false);
+								setOpenPluginId((id) =>
+									id === listPlugin.id ? null : listPlugin.id,
+								);
+							}}
+						>
+							<PluginIcon
+								name={listPlugin.menu?.icon ?? listPlugin.host?.icon}
+								className="size-4.5"
+							/>
+							{pickPluginLocaleText(listPlugin.title, locale) || '单词解析'}
+						</button>
+					) : null}
 				</div>
 			</div>
+			<PluginHostSurface
+				surface="english.vocab.library"
+				part="drawer"
+				openPluginId={openPluginId}
+				onOpenPluginIdChange={(id) => {
+					if (!id) setListStill(false);
+					setOpenPluginId(id);
+				}}
+				drawerWidth={vocabDrawerWidth}
+				chromeStyle={
+					listStill
+						? ({ '--tw-enter-translate-x': '0px' } as CSSProperties)
+						: undefined
+				}
+				drawerTitle={
+					<span className="flex min-w-0 items-baseline gap-2">
+						<span className="shrink-0">
+							{t('englishLearning.vocabDetailList.heading')}
+						</span>
+						<span className="text-textcolor/50 truncate text-sm font-normal">
+							{t('englishLearning.vocabDetailList.summary', {
+								total: listStats?.total ?? 0,
+								loaded: listStats?.loaded ?? 0,
+							})}
+						</span>
+					</span>
+				}
+			/>
 			{showInitialLoading ? (
 				<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center p-4 text-center text-sm">
 					<Loading text={t('englishLearning.library.wordsLoading')} />

@@ -33,6 +33,7 @@ import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.ent
 import { EnglishPracticeReport } from './entity/english-practice-report.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
+import { EnglishVocabDetailCache } from './entity/english-vocab-detail-cache.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
@@ -40,6 +41,7 @@ import { EnglishVocabularyLibraryItem } from './entity/english-vocabulary-librar
 import { EnglishVocabularyMistake } from './entity/english-vocabulary-mistake.entity';
 import { EnglishVocabularyPackItem } from './entity/english-vocabulary-pack-item.entity';
 import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-session.entity';
+import { VocabDetailService } from './vocab-detail.service';
 
 @Module({
 	imports: [
@@ -74,6 +76,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishLibraryItemsResume,
 			EnglishLearningResumeModuleSetting,
 			EnglishSentenceWordAnnotationCache,
+			EnglishVocabDetailCache,
 			EnglishAnnotateSourceTask,
 		]),
 	],
@@ -85,6 +88,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 		EnglishDocxExportJobService,
 		EnglishLearningStreamAbortRegistry,
 		AnnotateSourceTaskService,
+		VocabDetailService,
 	],
 	exports: [
 		EnglishLearningService,

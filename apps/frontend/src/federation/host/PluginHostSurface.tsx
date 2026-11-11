@@ -13,7 +13,7 @@ import {
 } from '@dnhyxc-ai/federation-kit';
 import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
 import { Button } from '@ui/index';
-import { type CSSProperties, useEffect } from 'react';
+import { type CSSProperties, type ReactNode, useEffect } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { PluginHostPage } from './PluginHostPage';
@@ -38,6 +38,10 @@ export type PluginHostSurfaceProps = {
 	className?: string;
 	triggerClassName?: string;
 	drawerBodyClassName?: string;
+	/** 覆盖抽屉默认宽度，例如与单词详解抽屉对齐 */
+	drawerWidth?: string;
+	/** 覆盖抽屉标题。缺省用插件 title */
+	drawerTitle?: ReactNode;
 };
 
 /**
@@ -54,6 +58,8 @@ export function PluginHostSurface({
 	className,
 	triggerClassName,
 	drawerBodyClassName = 'py-2 pl-0',
+	drawerWidth,
+	drawerTitle,
 }: PluginHostSurfaceProps) {
 	const { locale } = useI18n();
 	const listed = useHostSurfacePlugins(surface);
@@ -161,7 +167,10 @@ export function PluginHostSurface({
 
 	return (
 		<Drawer
-			title={pickPluginLocaleText(openMeta.title, locale) || openMeta.id}
+			title={
+				drawerTitle ??
+				(pickPluginLocaleText(openMeta.title, locale) || openMeta.id)
+			}
 			open={!!openPluginId}
 			onOpenChange={(open) => {
 				if (!open) {
@@ -169,6 +178,7 @@ export function PluginHostSurface({
 					onOpenPluginIdChange?.(null);
 				}
 			}}
+			width={drawerWidth}
 			bodyClassName={drawerBodyClassName}
 			contentStyle={chromeStyle}
 		>

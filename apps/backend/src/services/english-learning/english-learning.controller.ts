@@ -108,6 +108,7 @@ import {
 	annotateTaskAbortKey,
 	EnglishLearningStreamAbortRegistry,
 } from './english-learning-stream-abort.registry';
+import { VocabDetailService } from './vocab-detail.service';
 
 /** 长任务 SSE 心跳，避免库内加载/向量匹配期间被代理或客户端判为断流 */
 function startEnglishPackSseKeepalive(
@@ -460,6 +461,7 @@ export class EnglishLearningController {
 		private readonly dailyReadingService: EnglishDailyReadingService,
 		private readonly docxExportJobService: EnglishDocxExportJobService,
 		private readonly annotateSourceTaskService: AnnotateSourceTaskService,
+		private readonly vocabDetailService: VocabDetailService,
 		private readonly streamAbortRegistry: EnglishLearningStreamAbortRegistry,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
@@ -1182,6 +1184,36 @@ export class EnglishLearningController {
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 		res.setHeader('Content-Length', String(buffer.length));
 		res.end(buffer);
+	}
+
+	/** 已生成详解的词：游标分页，每页 50，不触发生成 */
+	@Get('vocab-detail/list')
+	async vocabDetailList(
+		@Req() req: AuthedRequest,
+		@Query('cursor') cursor?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		return this.vocabDetailService.listCached(
+			typeof cursor === 'string' && cursor.length > 0 ? cursor : undefined,
+		);
+	}
+
+	/** 单词卡详解：命中全局缓存则直接返回，否则生成一次 JSON */
+	@Get('vocab-detail')
+	async vocabDetail(@Req() req: AuthedRequest, @Query('word') word?: string) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const wordText = typeof word === 'string' ? word : '';
+		const [detail, head] = await Promise.all([
+			this.vocabDetailService.getOrCreateVocabDetail(wordText, userId),
+			this.vocabDetailService.lookupHead(userId, wordText),
+		]);
+		return { detail, ipa: head.ipa, pos: head.pos };
 	}
 
 	/** 经典句看中写：按分词标注词性 / IPA / 释义 */

@@ -6,6 +6,7 @@ import {
 	createFederation,
 	DEFAULT_HOST_THEME_CUSTOM_PROP,
 	type HostHttpClient,
+	listHostSurfacePlugins,
 	type PluginDescriptor,
 } from '@dnhyxc-ai/federation-kit';
 import { Toast } from '@ui/sonner';
@@ -14,6 +15,8 @@ import { getActiveLocale, type Locale, translateSync } from '@/i18n';
 import type { RouteConfig } from '@/router/routes';
 import { downloadBlob, isTauriRuntime, onListen } from '@/utils';
 import { http } from '@/utils/fetch';
+import { playPreferred, stopAllPlayback } from '@/utils/speech';
+import { TTS_CACHE_FOLDER } from '@/views/englishLearning/utils/ttsCacheFolder';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
 import {
 	readHostChromeTheme,
@@ -28,6 +31,13 @@ import {
 } from '../enabled/prefs';
 import { createEbookModulesApi } from '../modules/ebook/hostApi';
 import { createLearningNotesModulesApi } from '../modules/learningNotes/hostApi';
+import {
+	getSnapshot,
+	setVocabDetailListStats,
+	setVocabDetailPending,
+	showVocabDetail,
+	subscribeVocabDetail,
+} from '../modules/vocabDetail/session';
 import {
 	fetchPluginRegistry,
 	PLUGIN_REGISTRY_CACHE_KEY,
@@ -148,6 +158,47 @@ export const mf = createFederation<RouteConfig>({
 			}
 			if (allow.has('modules:ebook')) {
 				modules.ebook = createEbookModulesApi();
+			}
+			if (allow.has('modules:vocabDetail')) {
+				modules.vocabDetail = {
+					getSnapshot,
+					subscribeVocabDetail,
+					setPending: setVocabDetailPending,
+					open: (word: unknown): boolean => {
+						if (typeof word !== 'string' || !word.trim()) return false;
+						const enabled = listHostSurfacePlugins('english.vocab.card').some(
+							(plugin) =>
+								plugin.id === 'vocabDetail' &&
+								plugin.host?.slot === 'card-action',
+						);
+						if (!enabled) return false;
+						showVocabDetail('vocabDetail', { word });
+						return true;
+					},
+					setListStats: (stats: unknown) => {
+						if (!stats || typeof stats !== 'object') {
+							setVocabDetailListStats(null);
+							return;
+						}
+						const row = stats as { total?: unknown; loaded?: unknown };
+						const total = Number(row.total);
+						const loaded = Number(row.loaded);
+						if (!Number.isFinite(total) || !Number.isFinite(loaded)) return;
+						setVocabDetailListStats({
+							total: Math.max(0, Math.floor(total)),
+							loaded: Math.max(0, Math.floor(loaded)),
+						});
+					},
+					play: (text: unknown) => {
+						if (typeof text !== 'string' || !text.trim())
+							return Promise.resolve();
+						return playPreferred(text, {
+							persistDisk: true,
+							cacheFolder: TTS_CACHE_FOLDER.vocabDetail,
+						});
+					},
+					stop: () => stopAllPlayback(),
+				};
 			}
 			return Object.keys(modules).length > 0 ? modules : undefined;
 		},

@@ -466,6 +466,8 @@ export const englishLearning = {
 	'englishLearning.library.vocab.descShort': 'Import words, view word library',
 	'englishLearning.library.vocab.title': 'Vocabulary library',
 	'englishLearning.library.wordsHeading': '{count} words',
+	'englishLearning.vocabDetailList.heading': 'Word analysis list',
+	'englishLearning.vocabDetailList.summary': '{total} total / {loaded} loaded',
 	'englishLearning.library.wordsLoadFailed':
 		'Failed to load items. Please try again later.',
 	'englishLearning.library.wordsLoading': 'Loading words…',

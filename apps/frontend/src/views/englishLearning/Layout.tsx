@@ -3,7 +3,9 @@
  */
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router';
+import { closeVocabDetail } from '@/federation/modules/vocabDetail/session';
 import { stopAllPlayback } from '@/utils/speech';
+import { VocabDetailDrawer } from './components/vocab/DetailDrawer';
 
 export default function Layout() {
 	const { pathname, search } = useLocation();
@@ -13,9 +15,15 @@ export default function Layout() {
 		return () => stopAllPlayback();
 	}, [pathname, search]);
 
+	// 只在离开英语学习时关抽屉。子页之间切换保持当前词。
+	useEffect(() => {
+		return () => closeVocabDetail();
+	}, []);
+
 	return (
 		<div className="h-full min-h-0 w-full min-w-0">
 			<Outlet />
+			<VocabDetailDrawer />
 		</div>
 	);
 }
