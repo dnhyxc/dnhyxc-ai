@@ -14,6 +14,7 @@ import { EnglishVocabularyLibrary } from './english-vocabulary-library.entity';
 @Entity('english_vocabulary_library_item')
 @Index('idx_evli_library_sort', ['libraryId', 'sortOrder'])
 @Index('idx_evli_user_library', ['userId', 'libraryId'])
+@Index('idx_evli_lemma_library', ['lemma', 'libraryId'])
 export class EnglishVocabularyLibraryItem {
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;
@@ -40,6 +41,10 @@ export class EnglishVocabularyLibraryItem {
 
 	@Column({ type: 'varchar', length: 500 })
 	word!: string;
+
+	/** normalizeVocabLemma(word)。列表和导入按这一列对齐，不在 SQL 里再写一套。 */
+	@Column({ type: 'varchar', length: 120, default: '' })
+	lemma!: string;
 
 	@Column({ type: 'varchar', length: 2000, default: '' })
 	ipa!: string;

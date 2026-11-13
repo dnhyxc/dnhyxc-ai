@@ -9,7 +9,7 @@ import {
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
 import { ScrollArea } from '@ui/index';
-import { FileBracesCorner } from 'lucide-react';
+import { FileQuestionMark } from 'lucide-react';
 import { useMemo } from 'react';
 import { useI18n } from '@/hooks';
 
@@ -93,7 +93,7 @@ export function RegistryFieldsHelp({ dirty }: { dirty?: boolean }) {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<div className="relative flex items-center mr-1.5 pl-1.5 cursor-pointer hover:text-teal-500 lucide-stroke-draw-hover">
-					<FileBracesCorner className="size-4" aria-hidden />
+					<FileQuestionMark className="size-4" aria-hidden />
 					{dirty ? (
 						<span
 							className="pointer-events-none absolute -right-1 -top-1 size-2 rounded-full bg-orange-500"

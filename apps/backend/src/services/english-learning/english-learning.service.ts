@@ -123,6 +123,14 @@ import {
 	elItemsVerKey,
 	elLibsPageKey,
 } from './english-learning-library.cache';
+import { normalizeVocabLemma } from './vocab-detail.parse';
+import { VocabDetailService } from './vocab-detail.service';
+
+function storedLemma(word: string): string {
+	const lemma = normalizeVocabLemma(word);
+	return lemma.length > 120 ? '' : lemma;
+}
+
 import { ENGLISH_LEARNING_LIST_RESUME_LIBRARY_ID } from './english-learning-list-resume.constants';
 import {
 	ENGLISH_LEARNING_RESUME_MODULE_KEYS,
@@ -410,6 +418,7 @@ export class EnglishLearningService {
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
 		@InjectRepository(EnglishSentenceWordAnnotationCache)
 		private readonly sentenceWordAnnotationCacheRepo: Repository<EnglishSentenceWordAnnotationCache>,
+		private readonly vocabDetail: VocabDetailService,
 	) {
 		this.libraryCache = new EnglishLearningLibraryCache(cache, this.logger);
 	}
@@ -2547,6 +2556,7 @@ ${existingHintBlock}
 						userId,
 						sortOrder: index,
 						word: item.word,
+						lemma: storedLemma(item.word),
 						ipa: item.ipa,
 						pos: item.pos ?? '',
 						segmentation: item.segmentation ?? '',
@@ -2587,6 +2597,7 @@ ${existingHintBlock}
 			libraryId,
 			wasPublic,
 		);
+		await this.vocabDetail.dropLibraryListCache(libraryId);
 		return { deleted: true };
 	}
 

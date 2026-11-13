@@ -46,13 +46,27 @@ function SheetContent({
 	className,
 	children,
 	side = 'right',
+	overlayClassName,
+	plainOverlay,
 	...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
 	side?: 'top' | 'right' | 'bottom' | 'left';
+	overlayClassName?: string;
+	/** 不用 Radix 遮罩。非模态抽屉也要有一层能藏起来的遮罩 */
+	plainOverlay?: boolean;
 }) {
 	return (
 		<SheetPortal>
-			<SheetOverlay />
+			{plainOverlay ? (
+				<div
+					className={cn(
+						'fixed inset-0 z-50 bg-theme-background/80',
+						overlayClassName,
+					)}
+				/>
+			) : (
+				<SheetOverlay className={overlayClassName} />
+			)}
 			<SheetPrimitive.Content
 				data-slot="sheet-content"
 				className={cn(

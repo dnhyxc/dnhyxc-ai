@@ -1,3 +1,11 @@
+/**
+ * 单词解析在主站侧的会话。插件不能直接改抽屉，卡片、列表和顶栏都通过这里对齐。
+ *
+ * 解析抽屉：记下当前词和打开来源。卡片上再点同一个词会关掉；从列表或导入列表点词只打开。
+ * 列表顶替详解时做标记，详解抽屉不再播退场，避免和列表的滑入叠在一起。
+ * 生成中的词单独记着，关抽屉或换词都不清，请求结束才清，卡片上的状态才能对上。
+ * 解析列表：记下当前词库，以及「共 n 条 / 已加载 m 条」，供列表插件拉数据和顶栏展示。
+ */
 export type VocabDetailSource = 'card' | 'list';
 
 export type VocabCardSnapshot = {
@@ -139,4 +147,39 @@ export function subscribeVocabDetailListStats(
 ): () => void {
 	listStatsListeners.add(listener);
 	return () => listStatsListeners.delete(listener);
+}
+
+// 解析列表当前词库；插件只需要 id，标题由主站抽屉自己拿
+export type VocabDetailListLibrary = { libraryId: string };
+
+// 词汇库页选中的库；没进词库页或已离开时为 null
+let listLibrary: VocabDetailListLibrary | null = null;
+// 列表插件订阅词库切换，用来清空并重拉第一页
+const listLibraryListeners = new Set<() => void>();
+
+// 词汇库页随路由 libraryId 写入或清空；离开页面时在清理函数里传 null
+export function setVocabDetailListLibrary(
+	target: VocabDetailListLibrary | null,
+): void {
+	// 空白 id 当成没有词库，避免插件用空串去请求列表
+	const id = target?.libraryId.trim() ?? '';
+	// 只保留 trim 后的 id，丢掉调用方多带的字段
+	const next = id ? { libraryId: id } : null;
+	// 同一本库重复写入不通知，否则列表插件会把已加载的页清掉重来
+	if ((listLibrary?.libraryId ?? '') === (next?.libraryId ?? '')) return;
+	listLibrary = next;
+	// 拷贝一份再通知，避免某个监听器退订时改到正在遍历的 Set
+	for (const listener of [...listLibraryListeners]) listener();
+}
+
+// 给列表插件读当前词库；返回副本，插件改返回值不会写回这里
+export function getListLibrary(): VocabDetailListLibrary | null {
+	return listLibrary ? { libraryId: listLibrary.libraryId } : null;
+}
+
+// 词库变化时回调；返回的函数在插件卸载时退订
+export function subscribeListLibrary(listener: () => void): () => void {
+	listLibraryListeners.add(listener);
+	// 退订只删这一个监听，不影响其它仍开着的列表抽屉
+	return () => listLibraryListeners.delete(listener);
 }

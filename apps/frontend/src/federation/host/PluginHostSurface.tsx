@@ -42,6 +42,16 @@ export type PluginHostSurfaceProps = {
 	drawerWidth?: string;
 	/** 覆盖抽屉标题。缺省用插件 title */
 	drawerTitle?: ReactNode;
+	/** 为 false 时不锁焦点，方便上面再叠详解抽屉 */
+	drawerModal?: boolean;
+	/** 自己画遮罩，避免和详解抽屉抢滚动锁 */
+	drawerPlainOverlay?: boolean;
+	drawerOverlayClassName?: string;
+	onDrawerInteractOutside?: (event: Event) => void;
+	/** 详解盖在上面时，忽略这次关闭 */
+	drawerPreventDismiss?: boolean;
+	/** 加在抽屉面板上。详解开着时用来藏起这一层 */
+	drawerClassName?: string;
 };
 
 /**
@@ -60,6 +70,12 @@ export function PluginHostSurface({
 	drawerBodyClassName = 'py-2 pl-0',
 	drawerWidth,
 	drawerTitle,
+	drawerModal,
+	drawerPlainOverlay,
+	drawerOverlayClassName,
+	onDrawerInteractOutside,
+	drawerPreventDismiss,
+	drawerClassName,
 }: PluginHostSurfaceProps) {
 	const { locale } = useI18n();
 	const listed = useHostSurfacePlugins(surface);
@@ -172,12 +188,18 @@ export function PluginHostSurface({
 				(pickPluginLocaleText(openMeta.title, locale) || openMeta.id)
 			}
 			open={!!openPluginId}
+			modal={drawerModal}
+			plainOverlay={drawerPlainOverlay}
+			overlayClassName={drawerOverlayClassName}
+			onInteractOutside={onDrawerInteractOutside}
 			onOpenChange={(open) => {
 				if (!open) {
+					if (drawerPreventDismiss) return;
 					clearPluginPortalClaim(openPluginId);
 					onOpenPluginIdChange?.(null);
 				}
 			}}
+			className={drawerClassName}
 			width={drawerWidth}
 			bodyClassName={drawerBodyClassName}
 			contentStyle={chromeStyle}

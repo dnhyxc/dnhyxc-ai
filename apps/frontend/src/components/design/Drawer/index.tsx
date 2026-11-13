@@ -42,6 +42,13 @@ export interface DrawerProps {
 	width?: string;
 	/** Sheet 内容区 inline 样式（如 EPUB 阅读 chrome CSS 变量） */
 	contentStyle?: React.CSSProperties;
+	/** 为 false 时不锁焦点，方便上面再叠一个抽屉 */
+	modal?: boolean;
+	/** 自己画遮罩，不走 Radix。避免和上面的抽屉抢滚动锁 */
+	plainOverlay?: boolean;
+	/** 遮罩额外类名。详解开着时用来拿掉这层遮罩 */
+	overlayClassName?: string;
+	onInteractOutside?: (event: Event) => void;
 }
 
 /**
@@ -64,12 +71,24 @@ export function Drawer({
 	onOpenAutoFocus,
 	width,
 	contentStyle,
+	modal = true,
+	plainOverlay,
+	overlayClassName,
+	onInteractOutside,
 }: DrawerProps) {
 	return (
-		<Sheet open={open} onOpenChange={onOpenChange} defaultOpen={defaultOpen}>
+		<Sheet
+			open={open}
+			modal={modal}
+			onOpenChange={onOpenChange}
+			defaultOpen={defaultOpen}
+		>
 			{trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
 			<SheetContent
 				side={side}
+				plainOverlay={plainOverlay}
+				overlayClassName={overlayClassName}
+				onInteractOutside={onInteractOutside}
 				className={cn(
 					'flex flex-col gap-0 outline-none', // gap-0 to manually control spacing via padding
 					width,

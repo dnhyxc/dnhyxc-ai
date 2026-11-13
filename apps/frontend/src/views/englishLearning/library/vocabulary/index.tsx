@@ -23,6 +23,7 @@ import {
 	markVocabDetailReplacedByList,
 	readVocabDetailListStats,
 	readVocabDetailSession,
+	setVocabDetailListLibrary,
 	subscribeVocabDetail,
 	subscribeVocabDetailListStats,
 } from '@/federation/modules/vocabDetail/session';
@@ -76,16 +77,14 @@ export function VocabularyLibrarySection({
 	const { t, locale } = useI18n();
 	const navigate = useNavigate();
 	const [openPluginId, setOpenPluginId] = useState<string | null>(null);
-	// 顶替详解抽屉时不要再从右侧滑入，否则开场那一帧 Loading 落在槽位右边
+	// 从词卡切到列表时不要再从右侧滑入，否则开场那一帧 Loading 落在槽位右边
 	const [listStill, setListStill] = useState(false);
+	const [detailOpen, setDetailOpen] = useState(
+		() => readVocabDetailSession().open,
+	);
 	const listPlugin = useHostSurfacePlugins('english.vocab.library').find(
 		(plugin) => plugin.host?.slot === 'drawer',
 	);
-	const openPluginIdRef = useRef(openPluginId);
-	openPluginIdRef.current = openPluginId;
-	const listPluginIdRef = useRef(listPlugin?.id ?? null);
-	listPluginIdRef.current = listPlugin?.id ?? null;
-	const suspendedListId = useRef<string | null>(null);
 	const [listStats, setListStats] = useState(readVocabDetailListStats);
 
 	useEffect(
@@ -97,23 +96,29 @@ export function VocabularyLibrarySection({
 	);
 
 	useEffect(() => {
-		return subscribeVocabDetail(() => {
-			const next = readVocabDetailSession();
-			if (next.open) {
-				const current = openPluginIdRef.current;
-				if (!current) return;
-				suspendedListId.current = current;
-				setOpenPluginId(null);
-				return;
-			}
-			const restore = suspendedListId.current;
-			if (!restore || listPluginIdRef.current !== restore) return;
-			suspendedListId.current = null;
-			markVocabDetailReplacedByList();
-			setListStill(true);
-			setOpenPluginId(restore);
-		});
-	}, []);
+		if (libraryId) setVocabDetailListLibrary({ libraryId });
+		else setVocabDetailListLibrary(null);
+		return () => setVocabDetailListLibrary(null);
+	}, [libraryId]);
+
+	useEffect(
+		() =>
+			subscribeVocabDetail(() => {
+				const next = readVocabDetailSession().open;
+				setDetailOpen((prev) => (prev === next ? prev : next));
+			}),
+		[],
+	);
+
+	// 列表不跟详解抢滚动锁，只在自己打开时把页面滚定住
+	useEffect(() => {
+		if (!openPluginId) return;
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = prev;
+		};
+	}, [openPluginId]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
@@ -368,7 +373,6 @@ export function VocabularyLibrarySection({
 							className="flex cursor-pointer items-center gap-1 text-sm text-teal-500 hover:text-teal-400"
 							onClick={() => {
 								if (readVocabDetailSession().open) {
-									suspendedListId.current = null;
 									markVocabDetailReplacedByList();
 									closeVocabDetail();
 									setListStill(true);
@@ -398,12 +402,25 @@ export function VocabularyLibrarySection({
 					if (!id) setListStill(false);
 					setOpenPluginId(id);
 				}}
+				drawerBodyClassName="overflow-hidden p-0"
 				drawerWidth={vocabDrawerWidth}
 				chromeStyle={
 					listStill
 						? ({ '--tw-enter-translate-x': '0px' } as CSSProperties)
 						: undefined
 				}
+				drawerModal={false}
+				drawerPlainOverlay
+				drawerOverlayClassName={
+					openPluginId && detailOpen
+						? 'pointer-events-none opacity-0'
+						: undefined
+				}
+				drawerPreventDismiss={Boolean(openPluginId) && detailOpen}
+				drawerClassName={openPluginId && detailOpen ? 'invisible' : undefined}
+				onDrawerInteractOutside={(event) => {
+					if (openPluginId && detailOpen) event.preventDefault();
+				}}
 				drawerTitle={
 					<span className="flex min-w-0 items-baseline gap-2">
 						<span className="shrink-0">

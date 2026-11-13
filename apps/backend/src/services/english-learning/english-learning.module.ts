@@ -34,6 +34,8 @@ import { EnglishPracticeReport } from './entity/english-practice-report.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishSentenceWordAnnotationCache } from './entity/english-sentence-word-annotation-cache.entity';
 import { EnglishVocabDetailCache } from './entity/english-vocab-detail-cache.entity';
+import { EnglishVocabDetailManual } from './entity/english-vocab-detail-manual.entity';
+import { EnglishVocabDetailRegen } from './entity/english-vocab-detail-regen.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
@@ -77,6 +79,8 @@ import { VocabDetailService } from './vocab-detail.service';
 			EnglishLearningResumeModuleSetting,
 			EnglishSentenceWordAnnotationCache,
 			EnglishVocabDetailCache,
+			EnglishVocabDetailManual,
+			EnglishVocabDetailRegen,
 			EnglishAnnotateSourceTask,
 		]),
 	],

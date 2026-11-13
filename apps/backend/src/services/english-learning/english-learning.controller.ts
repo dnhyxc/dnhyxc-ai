@@ -109,6 +109,7 @@ import {
 	EnglishLearningStreamAbortRegistry,
 } from './english-learning-stream-abort.registry';
 import { VocabDetailService } from './vocab-detail.service';
+import { VocabDetailCancelledError } from './vocab-detail-run';
 
 /** 长任务 SSE 心跳，避免库内加载/向量匹配期间被代理或客户端判为断流 */
 function startEnglishPackSseKeepalive(
@@ -1186,34 +1187,164 @@ export class EnglishLearningController {
 		res.end(buffer);
 	}
 
-	/** 已生成详解的词：游标分页，每页 50，不触发生成 */
+	/** 当前词库里已有详解的词：游标每页 50，不触发生成 */
 	@Get('vocab-detail/list')
 	async vocabDetailList(
 		@Req() req: AuthedRequest,
+		@Query('libraryId') libraryId?: string,
 		@Query('cursor') cursor?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		if (typeof libraryId !== 'string' || !libraryId.trim()) {
+			throw new BadRequestException('libraryId');
+		}
+		return this.vocabDetailService.listForLibrary(
+			userId,
+			libraryId.trim(),
+			typeof cursor === 'string' && cursor.length > 0 ? cursor : undefined,
+		);
+	}
+
+	/** 单词卡详解：重新生成、手动导入、全站缓存；都没有才生成进缓存。peek=1 只读已有，不生成。 */
+	@Get('vocab-detail')
+	async vocabDetail(
+		@Req() req: AuthedRequest,
+		@Query('word') word?: string,
+		@Query('peek') peek?: string,
 	) {
 		const userId = req.user?.userId;
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		return this.vocabDetailService.listCached(
-			typeof cursor === 'string' && cursor.length > 0 ? cursor : undefined,
-		);
+		const wordText = typeof word === 'string' ? word : '';
+		const peekOnly = peek === '1' || peek === 'true';
+		try {
+			if (peekOnly) {
+				const opened = await this.vocabDetailService.peekVocabDetail(
+					wordText,
+					userId,
+				);
+				if (!opened) return { miss: true };
+				const head = await this.vocabDetailService.lookupHead(userId, wordText);
+				return {
+					detail: opened.detail,
+					source: opened.source,
+					versions: opened.versions,
+					ipa: head.ipa,
+					pos: head.pos,
+				};
+			}
+			const [opened, head] = await Promise.all([
+				this.vocabDetailService.openVocabDetail(wordText, userId),
+				this.vocabDetailService.lookupHead(userId, wordText),
+			]);
+			return {
+				detail: opened.detail,
+				source: opened.source,
+				versions: opened.versions,
+				ipa: head.ipa,
+				pos: head.pos,
+			};
+		} catch (error) {
+			if (error instanceof VocabDetailCancelledError) {
+				return { cancelled: true };
+			}
+			throw error;
+		}
 	}
 
-	/** 单词卡详解：命中全局缓存则直接返回，否则生成一次 JSON */
-	@Get('vocab-detail')
-	async vocabDetail(@Req() req: AuthedRequest, @Query('word') word?: string) {
+	/** 再打一次模型，只写入该用户的重新生成行。 */
+	@Post('vocab-detail/regenerate')
+	async regenerateVocabDetail(
+		@Req() req: AuthedRequest,
+		@Query('word') word?: string,
+	) {
 		const userId = req.user?.userId;
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
 		const wordText = typeof word === 'string' ? word : '';
-		const [detail, head] = await Promise.all([
-			this.vocabDetailService.getOrCreateVocabDetail(wordText, userId),
-			this.vocabDetailService.lookupHead(userId, wordText),
-		]);
-		return { detail, ipa: head.ipa, pos: head.pos };
+		try {
+			const detail = await this.vocabDetailService.regenerateVocabDetail(
+				wordText,
+				userId,
+			);
+			return { detail };
+		} catch (error) {
+			if (error instanceof VocabDetailCancelledError) {
+				return { cancelled: true };
+			}
+			throw error;
+		}
+	}
+
+	/** 停止这一词正在进行的详解，并断开已经发出的模型请求。 */
+	@Post('vocab-detail/cancel')
+	async cancelVocabDetail(
+		@Req() req: AuthedRequest,
+		@Query('word') word?: string,
+		@Query('scope') scope?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const wordText = typeof word === 'string' ? word : '';
+		return this.vocabDetailService.cancelVocabDetail(wordText, userId, scope);
+	}
+
+	/** 本库已导入的手动详解。不打模型，非所有者 403。 */
+	@Get('vocab-detail/import')
+	async listVocabDetailImport(
+		@Req() req: AuthedRequest,
+		@Query('libraryId') libraryId?: string,
+		@Query('cursor') cursor?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		if (typeof libraryId !== 'string' || !libraryId.trim()) {
+			throw new BadRequestException('libraryId');
+		}
+		const pageCursor = typeof cursor === 'string' ? cursor.trim() : '';
+		return this.vocabDetailService.listImportedWords(
+			userId,
+			libraryId.trim(),
+			pageCursor || undefined,
+		);
+	}
+
+	/** 手动导入详解。不写全站缓存，非所有者 403。 */
+	@Post('vocab-detail/import')
+	async importVocabDetail(
+		@Req() req: AuthedRequest,
+		@Body()
+		body: { libraryId?: unknown; items?: unknown },
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		if (typeof body?.libraryId !== 'string' || !Array.isArray(body.items)) {
+			throw new BadRequestException('文件无效');
+		}
+		return this.vocabDetailService.importManualDetails(
+			userId,
+			body.libraryId,
+			body.items,
+		);
+	}
+
+	/** 按当前库词面删除该用户的手动详解，不删全站缓存。 */
+	@Delete('vocab-detail/import')
+	async deleteVocabDetailImport(
+		@Req() req: AuthedRequest,
+		@Query('libraryId') libraryId?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		if (typeof libraryId !== 'string' || !libraryId.trim()) {
+			throw new BadRequestException('文件无效');
+		}
+		return this.vocabDetailService.deleteManualDetails(userId, libraryId);
 	}
 
 	/** 经典句看中写：按分词标注词性 / IPA / 释义 */

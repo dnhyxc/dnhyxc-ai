@@ -63,7 +63,7 @@ function pluginIconUrl(p: PluginDescriptor) {
 function trustLabel(trust: string, t: (k: string) => string) {
 	const key = `plugins.card.trust.${trust}`;
 	const gloss = t(key);
-	return gloss === key ? trust : `${trust}（${gloss}）`;
+	return gloss === key ? trust : gloss;
 }
 
 export default function PluginsPage() {
