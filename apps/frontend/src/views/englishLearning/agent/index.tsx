@@ -313,7 +313,7 @@ function EnglishAgentScrollShell({
 						<div
 							className={cn(
 								AGENT_MAX_WIDTH,
-								'flex-1 w-full pb-8 bg-theme/3 border-l border-r',
+								'flex-1 w-full pb-8 bg-theme/3 border-l border-r border-theme/5',
 							)}
 						>
 							<EnglishAgentLogo />
