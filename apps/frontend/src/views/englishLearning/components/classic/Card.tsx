@@ -7,6 +7,7 @@ import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Square, Volume2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { HostPoint, POINT } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,8 @@ export type CardProps = {
 	playDisabled?: boolean;
 	onTogglePlay?: () => void;
 	playLabels: { play: string; stop: string };
+	/** 当前列表页的扩展点。句子本身的动作另走 english.classic.card。 */
+	pagePointId?: string;
 	trailingActions?: ReactNode;
 	footer?: ReactNode;
 	/** selectable 或 forceNote 时始终展示赏析行（即使为空） */
@@ -75,17 +78,17 @@ function CardActionButtons({
 	onTogglePlay,
 	playLabels,
 	trailingActions,
+	pagePointId,
+	payload,
 }: {
 	playing: boolean;
 	playDisabled: boolean;
 	onTogglePlay?: () => void;
 	playLabels: { play: string; stop: string };
 	trailingActions?: ReactNode;
+	pagePointId?: string;
+	payload: Record<string, unknown>;
 }) {
-	if (!onTogglePlay && !trailingActions) {
-		return null;
-	}
-
 	return (
 		<div className="flex shrink-0 items-center gap-1">
 			{onTogglePlay ? (
@@ -111,6 +114,14 @@ function CardActionButtons({
 				</Button>
 			) : null}
 			{trailingActions}
+			<HostPoint
+				pointId={POINT.classicCard}
+				slot="card-action"
+				payload={payload}
+			/>
+			{pagePointId ? (
+				<HostPoint pointId={pagePointId} slot="item-action" payload={payload} />
+			) : null}
 		</div>
 	);
 }
@@ -124,6 +135,7 @@ export function Card({
 	playDisabled = false,
 	onTogglePlay,
 	playLabels,
+	pagePointId,
 	trailingActions,
 	footer,
 	forceNote = false,
@@ -133,7 +145,12 @@ export function Card({
 	const controlId = selection?.controlId;
 	const showNote =
 		variant === 'selectable' || forceNote || Boolean(noteZh?.trim());
-	const hasActions = Boolean(onTogglePlay || trailingActions);
+	const payload = {
+		english,
+		translationZh,
+		source: source ?? null,
+		noteZh: noteZh ?? null,
+	};
 
 	const cardBody = (
 		<div
@@ -144,15 +161,15 @@ export function Card({
 		>
 			<div className="flex items-start justify-between gap-2">
 				<QuoteHeader english={english} controlId={controlId} />
-				{hasActions ? (
-					<CardActionButtons
-						playing={playing}
-						playDisabled={playDisabled}
-						onTogglePlay={onTogglePlay}
-						playLabels={playLabels}
-						trailingActions={trailingActions}
-					/>
-				) : null}
+				<CardActionButtons
+					playing={playing}
+					playDisabled={playDisabled}
+					onTogglePlay={onTogglePlay}
+					playLabels={playLabels}
+					trailingActions={trailingActions}
+					pagePointId={pagePointId}
+					payload={payload}
+				/>
 			</div>
 			<div className="text-textcolor/95 text-sm leading-snug">
 				{translationZh}

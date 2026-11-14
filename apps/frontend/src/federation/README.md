@@ -5,6 +5,8 @@
 ```ts
 import {
   mf,
+  HostPoint,
+  POINT,
   PluginHostPage,
   PluginHostSurface,
   usePluginEnabled,
@@ -22,11 +24,12 @@ import {
 | [`host/`](./host/README.md) | 挂载模版 | Page / Surface / Shell |
 | [`capabilities/`](./capabilities/README.md) | 通用 UI 能力 | `appFullscreen`、`pickLocalFiles` |
 | [`sync/`](./sync/README.md) | 跨窗 sync | BC + Tauri 工厂 |
-| [`modules/`](./modules/README.md) | 插件 Host 模块 | `api.modules.*` |
+| [`points/`](./points/catalog.ts) | 扩展点目录与会话 | `api.modules.point`、`HostPoint` |
+| [`modules/`](./modules/README.md) | 学习笔记专属模块 | `api.modules.learningNotes` |
 
 入口 re-export：[`index.ts`](./index.ts)
 
-**新插件逐步接入**：见 [`新插件接入指南.md`](./新插件接入指南.md)
+**新插件接入**：形态和要改的文件见 [`guide.md`](./guide.md)。扩展点的逐步代码见 [`access.md`](./access.md)。
 
 实现细节见 [`packages/federation-kit/README`](../../../../packages/federation-kit/README.md)。
 
@@ -35,7 +38,8 @@ import {
 | 场景 | 模版 |
 |------|------|
 | 路由全页 / 业务树内嵌 | `PluginHostPage` |
-| 抽屉 / 顶栏触发器 / toolbar | `PluginHostSurface` |
+| 已登记扩展点的顶栏、行按钮、抽屉 | `HostPoint` |
+| 阅读页自己画的触发器和抽屉 | `PluginHostSurface` |
 
 ```ts
 await mf.start();
@@ -43,5 +47,6 @@ mf.setNavigate(nav);
 mf.onRoutesChange(rebuild);
 
 <PluginHostPage pluginId="learningNotes" />
-<PluginHostSurface surface="ebook.read" part="drawer-triggers" … />
+<HostPoint pointId={POINT.dailyReading} slot="toolbar" />
+<PluginHostSurface surface="ebook.read" part="drawer-triggers" />
 ```

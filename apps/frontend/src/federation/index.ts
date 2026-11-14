@@ -54,6 +54,11 @@ export {
 	prefetchPluginEnabledPrefs,
 	setPluginEnabledPref,
 } from './enabled/prefs';
+export {
+	HostPoint,
+	type HostPointProps,
+	pointDrawerWidth,
+} from './host/HostPoint';
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
 export {
@@ -73,13 +78,6 @@ export {
 	type PluginIconTheme,
 } from './host/pluginIconUrl';
 export {
-	createEbookModulesApi,
-	type EbookHostHandlers,
-	type EbookHostThought,
-	getEbookHostHandlers,
-	setEbookHostHandlers,
-} from './modules/ebook/hostApi';
-export {
 	createLearningNotesModulesApi,
 	type LearningNotesHostModule,
 	runLearningNotesBeforeCloseHandlers,
@@ -91,6 +89,18 @@ export {
 	publishLearningNotesSync,
 	subscribeLearningNotesSync,
 } from './modules/learningNotes/syncBus';
+export { layoutDrawerSlots, POINT } from './points/catalog';
+export {
+	bindPointCommand,
+	closePoint,
+	openPoint,
+	publishPointContext,
+	readSlot,
+	readStats,
+	subscribeSignals,
+	subscribeSlot,
+} from './points/session';
+export { usePointContext } from './points/usePointContext';
 export {
 	assertRegistryHostApiCompatible,
 	clearPluginRegistryCache,

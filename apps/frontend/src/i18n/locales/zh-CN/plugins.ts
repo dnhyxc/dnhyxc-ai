@@ -56,7 +56,7 @@ export const plugins = {
 		'侧栏入口（可选）：有则注入侧栏；省略则仅路由/内嵌，不出现在左侧菜单。order 排序；icon 为 SVG 图片 URL。',
 	'plugins.registry.help.panelTitle': 'plugins-registry 字段说明',
 	'plugins.registry.help.permissions':
-		'权限声明，如 ui:toast、nav:subtree、http:plugin-api、modules:ebook。',
+		'权限声明，如 ui:toast、nav:subtree、http:plugin-api、modules:point。',
 	'plugins.registry.help.plugins': '插件描述符数组；每一项对应一个可上架插件。',
 	'plugins.registry.help.preload':
 		'加载时机：route/idle（默认懒加载）或 eager（启动后后台预拉，一般勿用）。',

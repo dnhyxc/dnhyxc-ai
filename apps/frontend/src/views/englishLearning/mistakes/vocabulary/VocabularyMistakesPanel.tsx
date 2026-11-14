@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { POINT, usePointContext } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -80,6 +81,8 @@ export function VocabularyMistakesPanel({
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const [gridReady, setGridReady] = useState(false);
 	const isReview = listMode === 'review';
+	const pointId = isReview ? POINT.review : POINT.mistakes;
+	usePointContext(pointId, { kind: 'vocab' });
 	const LIST_RESUME_ID = isReview
 		? '__el-vocab-review__'
 		: elFixedListResumeId(LIST_SCOPE);
@@ -487,6 +490,7 @@ export function VocabularyMistakesPanel({
 							practiceSource={isReview ? 'review' : 'mistakes'}
 							practiceDisabled={practiceDisabled}
 							practicePoolTotal={totalCount}
+							pointId={pointId}
 						/>
 					}
 					trailing={headerTrailing}
@@ -550,6 +554,7 @@ export function VocabularyMistakesPanel({
 														play: t('englishLearning.vocab.playWord'),
 														stop: t('englishLearning.tts.stop'),
 													}}
+													pagePointId={pointId}
 													trailingActions={
 														<Button
 															type="button"

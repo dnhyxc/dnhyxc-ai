@@ -5,6 +5,7 @@ import { Checkbox } from '@ui/checkbox';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { FileDown, Trash2 } from 'lucide-react';
+import { HostPoint } from '@/federation';
 import { useI18n } from '@/hooks';
 import { Entry } from '../../components/entry';
 import type { PracticeContentKind, PracticeSource } from '../../practice/types';
@@ -32,6 +33,8 @@ export type MistakesPanelFooterProps = {
 	practiceSourceTitle?: string;
 	practiceDisabled?: boolean;
 	practicePoolTotal?: number;
+	/** 顶栏扩展点。没有已启用插件时不占位。 */
+	pointId?: string;
 };
 
 export function MistakesPanelFooter({
@@ -54,6 +57,7 @@ export function MistakesPanelFooter({
 	practiceSourceTitle,
 	practiceDisabled = false,
 	practicePoolTotal,
+	pointId,
 }: MistakesPanelFooterProps) {
 	const { t } = useI18n();
 
@@ -69,6 +73,7 @@ export function MistakesPanelFooter({
 
 	return (
 		<div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
+			{pointId ? <HostPoint pointId={pointId} slot="toolbar" /> : null}
 			{showSelection ? (
 				<div className="flex shrink-0 items-center gap-2">
 					<Checkbox

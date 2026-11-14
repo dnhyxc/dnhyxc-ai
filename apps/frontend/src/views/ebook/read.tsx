@@ -22,9 +22,10 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
-	type EbookHostThought,
+	bindPointCommand,
 	PluginHostSurface,
-	setEbookHostHandlers,
+	POINT,
+	publishPointContext,
 } from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -1090,7 +1091,18 @@ function EbookReadPage() {
 
 	// 打开主机想法
 	const openHostThought = useCallback(
-		(raw: EbookHostThought) => {
+		(raw: {
+			id: string;
+			userId: number | string;
+			cfiRange: string;
+			quote: string;
+			content: string;
+			username?: string;
+			avatar?: string;
+			createdAt?: string;
+			updatedAt?: string;
+			isPublic?: boolean;
+		}) => {
 			const userId =
 				typeof raw.userId === 'number'
 					? raw.userId
@@ -1116,19 +1128,28 @@ function EbookReadPage() {
 
 	useEffect(() => {
 		if (book?.fmt !== 'epub') {
-			setEbookHostHandlers(null);
+			publishPointContext(POINT.ebookRead, null);
 			return;
 		}
 		const bookId = book.id;
 		const bookTitle = book.title;
-		setEbookHostHandlers({
-			getBookId: () => bookId,
-			getBookTitle: () => bookTitle,
-			navigateToCfi: (cfi) => ensureQuoteCfiInViewport(cfi),
-			openThought: openHostThought,
-			closeIdeasList: () => setHostDrawerPluginId(null),
-		});
-		return () => setEbookHostHandlers(null);
+		publishPointContext(POINT.ebookRead, { bookId, bookTitle });
+		const unbind = [
+			bindPointCommand(POINT.ebookRead, 'navigateToCfi', (cfi) =>
+				ensureQuoteCfiInViewport(typeof cfi === 'string' ? cfi : ''),
+			),
+			bindPointCommand(POINT.ebookRead, 'openThought', (thought) => {
+				if (!thought || typeof thought !== 'object') return;
+				openHostThought(thought as Parameters<typeof openHostThought>[0]);
+			}),
+			bindPointCommand(POINT.ebookRead, 'closeIdeasList', () => {
+				setHostDrawerPluginId(null);
+			}),
+		];
+		return () => {
+			for (const off of unbind) off();
+			publishPointContext(POINT.ebookRead, null);
+		};
 	}, [
 		book?.fmt,
 		book?.id,

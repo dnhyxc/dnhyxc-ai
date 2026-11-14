@@ -7,9 +7,9 @@ import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Square, Volume2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { HostPoint, POINT } from '@/federation';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import { VocabCardPluginActions } from './PluginActions';
 import { Segment } from './Segment';
 
 export type CardVariant = 'library' | 'selectable';
@@ -45,6 +45,8 @@ export type CardProps = {
 	playDisabled?: boolean;
 	onTogglePlay?: () => void;
 	playLabels: { play: string; stop: string };
+	/** 当前列表页的扩展点。词卡动作另走 english.vocab.card。 */
+	pagePointId?: string;
 	trailingActions?: ReactNode;
 	footer?: ReactNode;
 	/** library 变体下仍展示例句行（如单词包） */
@@ -100,6 +102,7 @@ function CardActionButtons({
 	onTogglePlay,
 	playLabels,
 	trailingActions,
+	pagePointId,
 }: {
 	card: CardData;
 	playing: boolean;
@@ -107,11 +110,15 @@ function CardActionButtons({
 	onTogglePlay?: () => void;
 	playLabels: { play: string; stop: string };
 	trailingActions?: ReactNode;
+	pagePointId?: string;
 }) {
-	if (!onTogglePlay && !trailingActions) {
-		return null;
-	}
-
+	const payload = {
+		word: card.word,
+		pos: card.pos ?? null,
+		ipa: card.ipa,
+		translationZh: card.translationZh,
+		example: card.example ?? null,
+	};
 	return (
 		<div className="row-span-3 flex shrink-0 items-center gap-1 self-start">
 			{onTogglePlay ? (
@@ -137,7 +144,14 @@ function CardActionButtons({
 				</Button>
 			) : null}
 			{trailingActions}
-			<VocabCardPluginActions card={card} />
+			<HostPoint
+				pointId={POINT.vocabCard}
+				slot="card-action"
+				payload={payload}
+			/>
+			{pagePointId ? (
+				<HostPoint pointId={pagePointId} slot="item-action" payload={payload} />
+			) : null}
 		</div>
 	);
 }
@@ -151,6 +165,7 @@ export function Card({
 	playDisabled = false,
 	onTogglePlay,
 	playLabels,
+	pagePointId,
 	trailingActions,
 	footer,
 	forceExample = false,
@@ -159,7 +174,6 @@ export function Card({
 	const controlId = selection?.controlId;
 	const showExample =
 		variant === 'selectable' || forceExample || Boolean(example?.trim());
-	const hasActions = Boolean(onTogglePlay || trailingActions);
 
 	const cardBody = (
 		<div
@@ -170,16 +184,15 @@ export function Card({
 		>
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-0">
 				<WordHeader word={word} pos={pos} controlId={controlId} />
-				{hasActions ? (
-					<CardActionButtons
-						card={data}
-						playing={playing}
-						playDisabled={playDisabled}
-						onTogglePlay={onTogglePlay}
-						playLabels={playLabels}
-						trailingActions={trailingActions}
-					/>
-				) : null}
+				<CardActionButtons
+					card={data}
+					playing={playing}
+					playDisabled={playDisabled}
+					onTogglePlay={onTogglePlay}
+					playLabels={playLabels}
+					trailingActions={trailingActions}
+					pagePointId={pagePointId}
+				/>
 			</div>
 			{ipa.trim() ? (
 				<div className="min-w-0 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">

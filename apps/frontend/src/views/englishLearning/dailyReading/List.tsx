@@ -8,6 +8,7 @@ import { BookOpen, WandSparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { HISTORY_PAGE_SIZE } from '@/constants';
+import { HostPoint, POINT, usePointContext } from '@/federation';
 import { useI18n } from '@/hooks';
 import { isAuthClearedError } from '@/router/authSession';
 import {
@@ -35,6 +36,7 @@ export default function DailyReadingListPage() {
 		() => parseOrigin(searchParams.get('origin')),
 		[searchParams],
 	);
+	usePointContext(POINT.dailyReading, { origin });
 	const [items, setItems] = useState<EnglishDailyReadingItem[]>([]);
 	const [todayStatus, setTodayStatus] = useState<
 		'ready' | 'generating' | 'failed' | 'exhausted' | null
@@ -217,6 +219,7 @@ export default function DailyReadingListPage() {
 			}
 			headerRight={
 				<div className="flex items-center gap-3">
+					<HostPoint pointId={POINT.dailyReading} slot="toolbar" />
 					<button
 						type="button"
 						className={LINK_CLASS}
@@ -280,36 +283,49 @@ export default function DailyReadingListPage() {
 			{items.length > 0 ? (
 				<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4">
 					{items.map((item) => (
-						<button
-							key={item.id}
-							type="button"
-							className={CARD}
-							onClick={() => {
-								const params = new URLSearchParams({ title: item.titleEn });
-								if (origin === 'manual') params.set('origin', 'manual');
-								navigate(
-									`/english-learning/daily-reading/${item.id}?${params}`,
-								);
-							}}
-						>
-							<span className="text-textcolor truncate text-sm font-semibold sm:text-base">
-								{item.titleEn}
-							</span>
-							<span className="text-textcolor/50 truncate text-xs sm:text-sm">
-								{item.publishDate}
-								{item.level ? ` · ${item.level}` : ''}
-								{item.length
-									? ` · ${t(
-											item.length === 'short'
-												? 'englishLearning.dailyReading.lengthShort'
-												: item.length === 'long'
-													? 'englishLearning.dailyReading.lengthLong'
-													: 'englishLearning.dailyReading.lengthMedium',
-										)}`
-									: ''}
-								{item.titleZh ? ` · ${item.titleZh}` : ''}
-							</span>
-						</button>
+						<div key={item.id} className="flex min-w-0 items-start gap-1">
+							<button
+								type="button"
+								className={`${CARD} min-w-0 flex-1`}
+								onClick={() => {
+									const params = new URLSearchParams({
+										title: item.titleEn,
+									});
+									if (origin === 'manual') params.set('origin', 'manual');
+									navigate(
+										`/english-learning/daily-reading/${item.id}?${params}`,
+									);
+								}}
+							>
+								<span className="text-textcolor truncate text-sm font-semibold sm:text-base">
+									{item.titleEn}
+								</span>
+								<span className="text-textcolor/50 truncate text-xs sm:text-sm">
+									{item.publishDate}
+									{item.level ? ` · ${item.level}` : ''}
+									{item.length
+										? ` · ${t(
+												item.length === 'short'
+													? 'englishLearning.dailyReading.lengthShort'
+													: item.length === 'long'
+														? 'englishLearning.dailyReading.lengthLong'
+														: 'englishLearning.dailyReading.lengthMedium',
+											)}`
+										: ''}
+									{item.titleZh ? ` · ${item.titleZh}` : ''}
+								</span>
+							</button>
+							<HostPoint
+								pointId={POINT.dailyReading}
+								slot="item-action"
+								payload={{
+									id: item.id,
+									titleEn: item.titleEn,
+									publishDate: item.publishDate,
+									origin,
+								}}
+							/>
+						</div>
 					))}
 				</div>
 			) : null}

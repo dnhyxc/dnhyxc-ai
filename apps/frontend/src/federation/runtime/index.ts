@@ -6,7 +6,6 @@ import {
 	createFederation,
 	DEFAULT_HOST_THEME_CUSTOM_PROP,
 	type HostHttpClient,
-	listHostSurfacePlugins,
 	type PluginDescriptor,
 } from '@dnhyxc-ai/federation-kit';
 import { Toast } from '@ui/sonner';
@@ -15,9 +14,6 @@ import { getActiveLocale, type Locale, translateSync } from '@/i18n';
 import type { RouteConfig } from '@/router/routes';
 import { downloadBlob, isTauriRuntime, onListen } from '@/utils';
 import { http } from '@/utils/fetch';
-import { playPreferred, stopAllPlayback } from '@/utils/speech';
-import { pickEnglishLearningJsonFile } from '@/views/englishLearning/import/englishLearningImportFile';
-import { TTS_CACHE_FOLDER } from '@/views/englishLearning/utils/ttsCacheFolder';
 import { setAppFullscreen } from '../capabilities/appFullscreen';
 import {
 	readHostChromeTheme,
@@ -30,21 +26,10 @@ import {
 	getPluginEnabledPref,
 	setPluginEnabledPref,
 } from '../enabled/prefs';
-import { createEbookModulesApi } from '../modules/ebook/hostApi';
 import { createLearningNotesModulesApi } from '../modules/learningNotes/hostApi';
-import {
-	getListLibrary,
-	getSnapshot,
-	setVocabDetailListStats,
-	setVocabDetailPending,
-	showVocabDetail,
-	subscribeListLibrary,
-	subscribeVocabDetail,
-} from '../modules/vocabDetail/session';
-import {
-	getTarget,
-	subscribeVocabImport,
-} from '../modules/vocabDetailImport/session';
+import { createPointApi } from '../points/api';
+import { getHostPoint } from '../points/catalog';
+import '../points/commands';
 import {
 	fetchPluginRegistry,
 	PLUGIN_REGISTRY_CACHE_KEY,
@@ -93,19 +78,20 @@ function createPluginRoute(meta: PluginDescriptor): RouteConfig {
 }
 
 /** 列表和导入抽屉点词都走这里。详解插件没开时返回 false，由插件自己提示。 */
-function openVocabDetailWord(word: unknown): boolean {
-	if (typeof word !== 'string' || !word.trim()) return false;
-	const enabled = listHostSurfacePlugins('english.vocab.card').some(
-		(plugin) =>
-			plugin.id === 'vocabDetail' && plugin.host?.slot === 'card-action',
-	);
-	if (!enabled) return false;
-	showVocabDetail('vocabDetail', { word });
-	return true;
-}
-
 /** 全局 MF Host（asDefault，供 <Plugin /> / FederationPlugin 使用） */
 // 把清单拉取、路由注入、插件 api 裁剪和 iframe 代调收成一个宿主实例
+function ebookPoint(bridge: {
+	api: { modules?: Readonly<Record<string, unknown>> };
+}) {
+	const point = bridge.api.modules?.point as
+		| {
+				getContext: () => Record<string, unknown> | null;
+				command: (name: string, arg?: unknown) => unknown;
+		  }
+		| undefined;
+	return point ?? null;
+}
+
 export const mf = createFederation<RouteConfig>({
 	// 插件 hostApiRange 必须覆盖此版本；未配置环境变量时用 1.0.0，破缓存只改插件 version
 	hostApiVersion: import.meta.env.VITE_HOST_API_VERSION?.trim() || '1.0.0',
@@ -224,7 +210,7 @@ export const mf = createFederation<RouteConfig>({
 			// 结束 downloadBlob
 		},
 		// 按该插件 permissions 组装 api.modules，没声明的模块不挂
-		buildModules: (allow) => {
+		buildModules: (allow, plugin) => {
 			// 先攒允许暴露的模块，最后空对象就不下发
 			const modules: Record<string, unknown> = {};
 			// 学习笔记插件才拿得到笔记上下文读写
@@ -245,91 +231,10 @@ export const mf = createFederation<RouteConfig>({
 				};
 				// 结束聊天权限分支
 			}
-			// 阅读页插件：书 id、跳转 CFI、开关想法列表
-			if (allow.has('modules:ebook')) {
-				// 挂上阅读页模块，供同页插件和下面的 iframe 代调使用
-				modules.ebook = createEbookModulesApi();
-				// 结束阅读页权限分支
-			}
-			// 导入单词解析面板：当前词库、点词开解析、选 JSON 文件
-			if (allow.has('modules:vocabDetailImport')) {
-				// 导入面板用的四个方法
-				modules.vocabDetailImport = {
-					// 当前打开的词库 id 和标题；抽屉没开时为 null
-					getTarget,
-					// 词库切换或抽屉开关时通知导入面板刷新
-					subscribe: subscribeVocabImport,
-					// 点已导入词打开单词解析；解析插件未启用时返回 false
-					open: openVocabDetailWord,
-					// 选一个 JSON 文件交给导入面板；取消返回 null，非 json 抛 accept
-					pickJsonFile: () => pickEnglishLearningJsonFile(),
-					// 结束导入面板模块
-				};
-				// 结束导入权限分支
-			}
-			// 单词解析面板和解析列表：快照、播放、把列表条数写回顶栏
-			if (allow.has('modules:vocabDetail')) {
-				// 解析面板和解析列表共用这一组方法
-				modules.vocabDetail = {
-					// 面板初次渲染用这份快照对齐主站已经打开的词
-					getSnapshot,
-					// 换词或开关抽屉时让解析面板重渲染
-					subscribeVocabDetail,
-					// 面板把生成中或停止中写回主站，卡片状态和抽屉一致
-					setPending: setVocabDetailPending,
-					// 与导入面板共用；解析插件没开就返回 false，由插件自己提示
-					open: openVocabDetailWord,
-					// 解析列表当前词库，列表插件用来拉这一库的词
-					getListLibrary,
-					// 从卡片切到列表、或列表词库变化时通知列表插件
-					subscribeListLibrary,
-					// 列表把「共 n 条 / 已加载 m 条」写回主站顶栏
-					setListStats: (stats: unknown) => {
-						// 空值或非对象当成没有统计，清掉顶栏数字
-						if (!stats || typeof stats !== 'object') {
-							// 顶栏不再显示条数
-							setVocabDetailListStats(null);
-							// 清掉后不再往下解析字段
-							return;
-							// 结束非法统计分支
-						}
-						// 插件传入的 total、loaded 类型不受约束，先按未知字段取出
-						const row = stats as { total?: unknown; loaded?: unknown };
-						// 转成数字，缺字段会得到 NaN，留给下一行丢掉
-						const total = Number(row.total);
-						// 已加载条数同样先转数字，和 total 一起校验
-						const loaded = Number(row.loaded);
-						// 缺字段或 NaN 时保留上次统计，避免顶栏闪成 0
-						if (!Number.isFinite(total) || !Number.isFinite(loaded)) return;
-						// 非负整数写回顶栏；小数向下取整
-						setVocabDetailListStats({
-							// 总数不能为负，小数向下取整
-							total: Math.max(0, Math.floor(total)),
-							// 已加载条数同样取非负整数
-							loaded: Math.max(0, Math.floor(loaded)),
-							// 结束写回顶栏的统计
-						});
-						// 结束 setListStats
-					},
-					// 解析面板点播放；空文本不打 TTS
-					play: (text: unknown) => {
-						// 非字符串或只有空白时直接结束，避免空朗读请求
-						if (typeof text !== 'string' || !text.trim())
-							// 空文本视为已播完，调用方不用处理拒绝
-							return Promise.resolve();
-						// 优先本机音色，并落到单词解析缓存目录，同一词下次不重新合成
-						return playPreferred(text, {
-							// 合成结果写入磁盘缓存
-							persistDisk: true,
-							// 与其它业务的语音缓存分开目录
-							cacheFolder: TTS_CACHE_FOLDER.vocabDetail,
-							// 结束朗读参数
-						});
-						// 结束 play
-					},
-					// 停掉正在播的解析朗读，关抽屉时面板也会调
-					stop: () => stopAllPlayback(),
-				};
+			if (allow.has('modules:point')) {
+				const pointId = plugin.host?.surface;
+				const spec = pointId ? getHostPoint(pointId) : null;
+				if (spec) modules.point = createPointApi(spec);
 			}
 			// 一个权限都没挂上就不要给 api.modules，避免空对象被插件当成模块已就绪
 			return Object.keys(modules).length > 0 ? modules : undefined;
@@ -428,73 +333,36 @@ export const mf = createFederation<RouteConfig>({
 			};
 		},
 	},
-	// 不可信 iframe 拿不到页面内的 modules，改由主站按方法名代为调用阅读页 API
+	// 不可信 iframe 拿不到页面内的扩展点，仍用原来的方法名，由主站转到 ebook.read
 	iframeRpcHandlers: {
-		// iframe 问当前书 id；阅读模块没挂上时回 null
 		'ebook.getBookId': (bridge) => {
-			// modules 是未知表，收窄到 getBookId 再调用
-			const ebook = bridge.api.modules?.ebook as
-				// 只保留取书 id 这一个方法
-					| { getBookId: () => string | null }
-					// 阅读模块没挂上时是 undefined
-					| undefined;
-			// 没有模块或没有书时回 null，iframe 据此显示空态
-			return ebook?.getBookId() ?? null;
+			const id = ebookPoint(bridge)?.getContext()?.bookId;
+			return typeof id === 'string' ? id : null;
 		},
-		// iframe 问当前书名；没有阅读模块时回 null
 		'ebook.getBookTitle': (bridge) => {
-			// 收窄到取书名
-			const ebook = bridge.api.modules?.ebook as
-				// 只保留取书名
-					| { getBookTitle: () => string | null }
-					// 阅读模块没挂上时是 undefined
-					| undefined;
-			// 没有模块或没有书名时回 null
-			return ebook?.getBookTitle() ?? null;
+			const title = ebookPoint(bridge)?.getContext()?.bookTitle;
+			return typeof title === 'string' ? title : null;
 		},
-		// iframe 要求跳到某个 CFI；参数缺失时传空串，由阅读页自己忽略
 		'ebook.navigateToCfi': async (bridge, args) => {
-			// 收窄到按 CFI 跳转，跳转本身可能是异步的
-			const ebook = bridge.api.modules?.ebook as
-				// 跳转可能返回 Promise，调用处会 await
-					| { navigateToCfi: (cfi: string) => void | Promise<void> }
-					// 阅读模块没挂上时跳过跳转
-					| undefined;
-			// 等跳转结束再回应 iframe，避免列表先关、阅读位置还没到
-			await ebook?.navigateToCfi(String(args[0] ?? ''));
-			// 这个 RPC 没有返回值，固定回 null 让 iframe 侧的 Promise 结束
+			const point = ebookPoint(bridge);
+			if (!point) return null;
+			await point.command('navigateToCfi', String(args[0] ?? ''));
 			return null;
-			// 结束 navigateToCfi 代调
 		},
-		// iframe 打开某条想法；整条记录原样交给阅读页
 		'ebook.openThought': (bridge, args) => {
-			// 收窄到打开想法；记录结构由阅读页自己校验
-			const ebook = bridge.api.modules?.ebook as
-				// 想法记录保持 unknown，由阅读页自己认结构
-					| { openThought: (t: unknown) => void }
-					// 阅读模块没挂上时不打开
-					| undefined;
-			// 第一个参数就是想法记录
-			ebook?.openThought(args[0]);
-			// 无返回值
+			ebookPoint(bridge)?.command('openThought', args[0]);
 			return null;
-			// 结束 openThought 代调
 		},
-		// iframe 关掉想法列表；方法可选，旧宿主没有也不报错
 		'ebook.closeIdeasList': (bridge) => {
-			// closeIdeasList 是后加的，类型上可选
-			const ebook = bridge.api.modules?.ebook as
-				// 方法可选：旧的阅读模块没有这个函数
-					| { closeIdeasList?: () => void }
-					// 阅读模块没挂上时不调用
-					| undefined;
-			// 模块或方法不存在就跳过
-			ebook?.closeIdeasList?.();
-			// 无返回值
+			const point = ebookPoint(bridge);
+			if (!point) return null;
+			try {
+				point.command('closeIdeasList', undefined);
+			} catch {
+				// 阅读页还没绑上命令时跳过，抽屉本来就没开
+			}
 			return null;
-			// 结束 closeIdeasList 代调
 		},
-		// 结束 iframe 代调表
 	},
 	// 结束 createFederation 配置
 });

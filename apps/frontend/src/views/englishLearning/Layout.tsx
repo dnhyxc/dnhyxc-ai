@@ -3,11 +3,8 @@
  */
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router';
-import { closeVocabDetail } from '@/federation/modules/vocabDetail/session';
-import { closeVocabImport } from '@/federation/modules/vocabDetailImport/session';
+import { closePoint, HostPoint, layoutDrawerSlots } from '@/federation';
 import { stopAllPlayback } from '@/utils/speech';
-import { VocabDetailDrawer } from './components/vocab/DetailDrawer';
-import { VocabImportDrawer } from './components/vocab/ImportDrawer';
 
 export default function Layout() {
 	const { pathname, search } = useLocation();
@@ -20,17 +17,24 @@ export default function Layout() {
 	// 只在离开英语学习时关抽屉。子页之间切换保持当前词。
 	useEffect(() => {
 		return () => {
-			closeVocabDetail();
-			closeVocabImport();
+			for (const { pointId, slot } of layoutDrawerSlots) {
+				closePoint(pointId, slot.name);
+			}
 		};
 	}, []);
 
 	return (
 		<div className="h-full min-h-0 w-full min-w-0">
 			<Outlet />
-			{/* 导入在前，详解后挂到 body，同一层叠时详解盖在上面 */}
-			<VocabImportDrawer />
-			<VocabDetailDrawer />
+			{layoutDrawerSlots.map(({ pointId, slot }) =>
+				slot.layout?.page ? null : (
+					<HostPoint
+						key={`${pointId}:${slot.name}`}
+						pointId={pointId}
+						slot={slot.name}
+					/>
+				),
+			)}
 		</div>
 	);
 }

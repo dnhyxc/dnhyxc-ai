@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { POINT, usePointContext } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -75,6 +76,7 @@ export function VocabularyFavoritesSection({
 	headerTrailing,
 }: VocabularyFavoritesSectionProps) {
 	const { t } = useI18n();
+	usePointContext(POINT.favorites, { kind: 'vocab' });
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const [gridReady, setGridReady] = useState(false);
 
@@ -449,6 +451,7 @@ export function VocabularyFavoritesSection({
 					actions={
 						<FavoritesPanelFooter
 							selectAllId="vocab-fav-select-all"
+							pointId={POINT.favorites}
 							showSelection={!showInitialLoading && entries.length > 0}
 							selectAllCheckboxState={selectAllCheckboxState}
 							selectionDisabled={selectionDisabled}
@@ -524,6 +527,7 @@ export function VocabularyFavoritesSection({
 														play: t('englishLearning.vocab.playWord'),
 														stop: t('englishLearning.tts.stop'),
 													}}
+													pagePointId={POINT.favorites}
 													trailingActions={
 														<Button
 															type="button"

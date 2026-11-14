@@ -60,7 +60,7 @@ export function createHostBridge(
 	}
 
 	if (capabilities.buildModules) {
-		const built = capabilities.buildModules(allow);
+		const built = capabilities.buildModules(allow, d);
 		if (built && Object.keys(built).length > 0) {
 			api.modules = Object.freeze(built);
 		}

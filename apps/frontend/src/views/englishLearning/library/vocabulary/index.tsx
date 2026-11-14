@@ -10,23 +10,25 @@ import {
 	useEffect,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from 'react';
 import { useNavigate } from 'react-router';
 import {
+	closePoint,
+	HostPoint,
+	openPoint,
 	PluginHostSurface,
 	PluginIcon,
+	POINT,
 	pickPluginLocaleText,
+	pointDrawerWidth,
+	readSlot,
+	readStats,
+	subscribeSignals,
+	subscribeSlot,
 	useHostSurfacePlugins,
+	usePointContext,
 } from '@/federation';
-import {
-	closeVocabDetail,
-	markVocabDetailReplacedByList,
-	readVocabDetailListStats,
-	readVocabDetailSession,
-	setVocabDetailListLibrary,
-	subscribeVocabDetail,
-	subscribeVocabDetailListStats,
-} from '@/federation/modules/vocabDetail/session';
 import { useI18n } from '@/hooks';
 import { useIncrementalVocabFavoriteStatus } from '@/hooks/useIncrementalVocabFavoriteStatus';
 import { cn } from '@/lib/utils';
@@ -51,7 +53,6 @@ import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { Entry } from '../../components/entry';
 import { CornerFab } from '../../components/list';
 import { Card } from '../../components/vocab';
-import { vocabDrawerWidth } from '../../components/vocab/DetailDrawer';
 import { useEnglishLearningList } from '../../hooks/useEnglishLearningList';
 import {
 	composeViewportScroll,
@@ -79,34 +80,26 @@ export function VocabularyLibrarySection({
 	const [openPluginId, setOpenPluginId] = useState<string | null>(null);
 	// 从词卡切到列表时不要再从右侧滑入，否则开场那一帧 Loading 落在槽位右边
 	const [listStill, setListStill] = useState(false);
-	const [detailOpen, setDetailOpen] = useState(
-		() => readVocabDetailSession().open,
+	const libraryKey = libraryId?.trim() ?? '';
+	usePointContext(
+		POINT.vocabLibrary,
+		libraryKey ? { libraryId: libraryKey } : null,
 	);
-	const listPlugin = useHostSurfacePlugins('english.vocab.library').find(
+	const detail = useSyncExternalStore(
+		(listener) => subscribeSlot(POINT.vocabCard, 'drawer', listener),
+		() => readSlot(POINT.vocabCard, 'drawer'),
+		() => readSlot(POINT.vocabCard, 'drawer'),
+	);
+	const detailOpen = detail.open && !detail.covered;
+	const listPlugin = useHostSurfacePlugins(POINT.vocabLibrary).find(
 		(plugin) => plugin.host?.slot === 'drawer',
 	);
-	const [listStats, setListStats] = useState(readVocabDetailListStats);
-
-	useEffect(
-		() =>
-			subscribeVocabDetailListStats(() =>
-				setListStats(readVocabDetailListStats()),
-			),
-		[],
+	const [listStats, setListStats] = useState(() =>
+		readStats(POINT.vocabLibrary),
 	);
 
-	useEffect(() => {
-		if (libraryId) setVocabDetailListLibrary({ libraryId });
-		else setVocabDetailListLibrary(null);
-		return () => setVocabDetailListLibrary(null);
-	}, [libraryId]);
-
 	useEffect(
-		() =>
-			subscribeVocabDetail(() => {
-				const next = readVocabDetailSession().open;
-				setDetailOpen((prev) => (prev === next ? prev : next));
-			}),
+		() => subscribeSignals(() => setListStats(readStats(POINT.vocabLibrary))),
 		[],
 	);
 
@@ -347,6 +340,7 @@ export function VocabularyLibrarySection({
 					</span>
 				</div>
 				<div className="flex shrink-0 flex-nowrap items-center gap-3">
+					<HostPoint pointId={POINT.vocabLibrary} slot="toolbar" />
 					<Entry
 						variant="text"
 						disabled={total <= 0}
@@ -372,17 +366,23 @@ export function VocabularyLibrarySection({
 							type="button"
 							className="flex cursor-pointer items-center gap-1 text-sm text-teal-500 hover:text-teal-400"
 							onClick={() => {
-								if (readVocabDetailSession().open) {
-									markVocabDetailReplacedByList();
-									closeVocabDetail();
-									setListStill(true);
-									setOpenPluginId(listPlugin.id);
+								const opening = openPluginId !== listPlugin.id;
+								if (!opening) {
+									setListStill(false);
+									closePoint(POINT.vocabLibrary, 'drawer');
+									setOpenPluginId(null);
 									return;
 								}
-								setListStill(false);
-								setOpenPluginId((id) =>
-									id === listPlugin.id ? null : listPlugin.id,
+								const detailWasOpen = readSlot(POINT.vocabCard, 'drawer').open;
+								const opened = openPoint(
+									POINT.vocabLibrary,
+									listPlugin.id,
+									'drawer',
+									{},
 								);
+								if (!opened) return;
+								setListStill(detailWasOpen);
+								setOpenPluginId(listPlugin.id);
 							}}
 						>
 							<PluginIcon
@@ -399,11 +399,14 @@ export function VocabularyLibrarySection({
 				part="drawer"
 				openPluginId={openPluginId}
 				onOpenPluginIdChange={(id) => {
-					if (!id) setListStill(false);
+					if (!id) {
+						setListStill(false);
+						closePoint(POINT.vocabLibrary, 'drawer');
+					}
 					setOpenPluginId(id);
 				}}
 				drawerBodyClassName="overflow-hidden p-0"
-				drawerWidth={vocabDrawerWidth}
+				drawerWidth={pointDrawerWidth}
 				chromeStyle={
 					listStill
 						? ({ '--tw-enter-translate-x': '0px' } as CSSProperties)
@@ -489,6 +492,7 @@ export function VocabularyLibrarySection({
 														play: t('englishLearning.vocab.playWord'),
 														stop: t('englishLearning.tts.stop'),
 													}}
+													pagePointId={POINT.vocabLibrary}
 													trailingActions={
 														<Button
 															type="button"

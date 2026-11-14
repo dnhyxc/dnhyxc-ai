@@ -60,7 +60,7 @@ export const plugins = {
 		'Sidebar entry (optional): present → inject sidebar; omit → route/embed only, no left-nav item. order; icon is an SVG image URL.',
 	'plugins.registry.help.panelTitle': 'plugins-registry field reference',
 	'plugins.registry.help.permissions':
-		'Permission list, e.g. ui:toast, nav:subtree, http:plugin-api, modules:ebook.',
+		'Permission list, e.g. ui:toast, nav:subtree, http:plugin-api, modules:point.',
 	'plugins.registry.help.plugins':
 		'Array of plugin descriptors; each item is one listable plugin.',
 	'plugins.registry.help.preload':

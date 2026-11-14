@@ -3,7 +3,6 @@
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
 import { SquareArrowRight, SquarePen, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -20,12 +19,7 @@ import {
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_LIBRARY_LIST_PAGE_SIZE,
 } from '@/constants';
-import {
-	PluginIcon,
-	pickPluginLocaleText,
-	useHostSurfacePlugins,
-} from '@/federation';
-import { openVocabImport } from '@/federation/modules/vocabDetailImport/session';
+import { HostPoint, POINT, useHostSurfacePlugins } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -107,12 +101,10 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 	onSelect,
 	onLibraryDeleted,
 }: LibraryListPanelProps) {
-	const { t, locale } = useI18n();
-	const importPlugin = useHostSurfacePlugins('english.vocab.library').find(
-		(plugin) =>
-			plugin.id === 'vocabDetailImport' &&
-			plugin.host?.slot === 'library-card-action',
-	);
+	const { t } = useI18n();
+	const cardActionPlugins = useHostSurfacePlugins(
+		kind === 'vocab' ? POINT.vocabLibrary : POINT.classicLibrary,
+	).filter((plugin) => plugin.host?.slot === 'library-card-action');
 	const navigate = useNavigate();
 
 	const [entries, setEntries] = useState<EnglishLibraryListItem[]>([]);
@@ -407,8 +399,7 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 									? 2
 									: 1
 								: 0;
-							const showImport =
-								kind === 'vocab' && showEdit && Boolean(importPlugin);
+							const showImport = showEdit && cardActionPlugins.length > 0;
 							const actionCount =
 								practiceActions +
 								1 +
@@ -579,45 +570,25 @@ export const LibraryListPanel = observer(function LibraryListPanel({
 													<SquarePen className="size-3.5 mt-0.5" />
 												</Button>
 											) : null}
-											{showImport && importPlugin && vocabLib ? (
-												<Tooltip
-													content={
-														pickPluginLocaleText(importPlugin.title, locale) ||
-														importPlugin.id
-													}
-													side="top"
-													disableHoverableContent
+											{showImport ? (
+												<span
+													className="contents"
+													onClick={(event) => event.stopPropagation()}
+													onPointerDown={(event) => event.stopPropagation()}
 												>
-													<Button
-														variant="ghost"
-														size="sm"
-														onClick={(e) => {
-															e.stopPropagation();
-															openVocabImport({
-																libraryId: vocabLib.id,
-																title: vocabLib.title?.trim() || '',
-															});
-														}}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-															'text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500',
-														)}
-														aria-label={
-															pickPluginLocaleText(
-																importPlugin.title,
-																locale,
-															) || importPlugin.id
+													<HostPoint
+														pointId={
+															kind === 'vocab'
+																? POINT.vocabLibrary
+																: POINT.classicLibrary
 														}
-													>
-														<PluginIcon
-															name={
-																importPlugin.menu?.icon ??
-																importPlugin.host?.icon
-															}
-															className="size-3.5"
-														/>
-													</Button>
-												</Tooltip>
+														slot="library-card-action"
+														payload={{
+															libraryId: lib.id,
+															title: lib.title?.trim() || '',
+														}}
+													/>
+												</span>
 											) : null}
 											{canDelete ? (
 												<Button

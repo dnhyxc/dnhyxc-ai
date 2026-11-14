@@ -5,6 +5,7 @@ import { Checkbox } from '@ui/checkbox';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { FileDown, Trash2 } from 'lucide-react';
+import { HostPoint } from '@/federation';
 import { useI18n } from '@/hooks';
 import { Entry } from '../../components/entry';
 import type { PracticeContentKind } from '../../practice/types';
@@ -30,6 +31,8 @@ export type FavoritesPanelFooterProps = {
 	practiceContentKind?: PracticeContentKind;
 	practiceDisabled?: boolean;
 	practicePoolTotal?: number;
+	/** 顶栏扩展点。没有已启用插件时不占位。 */
+	pointId?: string;
 };
 
 export function FavoritesPanelFooter({
@@ -50,11 +53,13 @@ export function FavoritesPanelFooter({
 	practiceContentKind = 'vocab',
 	practiceDisabled = false,
 	practicePoolTotal,
+	pointId,
 }: FavoritesPanelFooterProps) {
 	const { t } = useI18n();
 
 	return (
 		<div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
+			{pointId ? <HostPoint pointId={pointId} slot="toolbar" /> : null}
 			{showSelection ? (
 				<div className="flex shrink-0 items-center gap-2">
 					<Checkbox

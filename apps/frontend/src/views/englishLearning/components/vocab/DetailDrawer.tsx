@@ -1,19 +1,17 @@
 import { Drawer } from '@design/Drawer';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
 	claimPluginPortalTarget,
 	clearPluginPortalClaim,
+	closePoint,
+	POINT,
 	pickPluginLocaleText,
+	readSlot,
 	styleRealmKey,
+	subscribeSlot,
 	useHostSurfacePlugins,
 } from '@/federation';
 import { PluginHostPage } from '@/federation/host/PluginHostPage';
-import {
-	closeVocabDetail,
-	readVocabDetailSession,
-	subscribeVocabDetail,
-	vocabDetailReplacedByList,
-} from '@/federation/modules/vocabDetail/session';
 import { useI18n } from '@/hooks';
 
 /** 详解抽屉与详解列表抽屉共用，避免两层宽度不一致。 */
@@ -22,12 +20,11 @@ export const vocabDrawerWidth = 'w-full sm:max-w-[420px]';
 /** 英语学习布局上唯一的详解抽屉。插件正文只加载一次。 */
 export function VocabDetailDrawer() {
 	const { locale } = useI18n();
-	const plugins = useHostSurfacePlugins('english.vocab.card');
-	const [session, setSession] = useState(readVocabDetailSession);
-
-	useEffect(
-		() => subscribeVocabDetail(() => setSession(readVocabDetailSession())),
-		[],
+	const plugins = useHostSurfacePlugins(POINT.vocabCard);
+	const session = useSyncExternalStore(
+		(listener) => subscribeSlot(POINT.vocabCard, 'drawer', listener),
+		() => readSlot(POINT.vocabCard, 'drawer'),
+		() => readSlot(POINT.vocabCard, 'drawer'),
 	);
 
 	const plugin = plugins.find(
@@ -48,11 +45,13 @@ export function VocabDetailDrawer() {
 	}
 
 	useEffect(() => {
-		if (session.open && session.pluginId && !plugin) closeVocabDetail();
+		if (session.open && session.pluginId && !plugin) {
+			closePoint(POINT.vocabCard, 'drawer');
+		}
 	}, [plugin, session.open, session.pluginId]);
 
 	// 列表同时打开时，退场滑出的这层会把新抽屉的 Loading 挤到右边
-	if (!open && vocabDetailReplacedByList()) return null;
+	if (!open && session.covered) return null;
 
 	const title = plugin
 		? pickPluginLocaleText(plugin.title, locale) || plugin.id
@@ -64,13 +63,14 @@ export function VocabDetailDrawer() {
 			title={title}
 			width={vocabDrawerWidth}
 			bodyClassName="overflow-hidden p-0"
+			className={session.covered ? 'pointer-events-none invisible' : undefined}
 			onOpenChange={(next) => {
 				if (!next) {
 					if (claimedId.current) {
 						clearPluginPortalClaim(claimedId.current);
 						claimedId.current = null;
 					}
-					closeVocabDetail();
+					closePoint(POINT.vocabCard, 'drawer');
 				}
 			}}
 		>

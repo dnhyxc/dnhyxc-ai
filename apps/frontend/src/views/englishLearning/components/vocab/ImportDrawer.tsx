@@ -1,47 +1,35 @@
 import { Drawer } from '@design/Drawer';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
 	claimPluginPortalTarget,
 	clearPluginPortalClaim,
+	closePoint,
+	POINT,
 	pickPluginLocaleText,
+	readSlot,
 	styleRealmKey,
+	subscribeSlot,
 	useHostSurfacePlugins,
 } from '@/federation';
 import { PluginHostPage } from '@/federation/host/PluginHostPage';
-import {
-	readVocabDetailSession,
-	subscribeVocabDetail,
-} from '@/federation/modules/vocabDetail/session';
-import {
-	closeVocabImport,
-	readVocabImportSession,
-	subscribeVocabImport,
-} from '@/federation/modules/vocabDetailImport/session';
 import { useI18n } from '@/hooks';
 import { vocabDrawerWidth } from './DetailDrawer';
 
 /** 词库列表上唯一的导入抽屉。插件正文只加载一次。 */
 export function VocabImportDrawer() {
 	const { locale } = useI18n();
-	const plugins = useHostSurfacePlugins('english.vocab.library');
-	const [session, setSession] = useState(readVocabImportSession);
-	const [detailOpen, setDetailOpen] = useState(
-		() => readVocabDetailSession().open,
+	const plugins = useHostSurfacePlugins(POINT.vocabLibrary);
+	const session = useSyncExternalStore(
+		(listener) => subscribeSlot(POINT.vocabLibrary, 'import-drawer', listener),
+		() => readSlot(POINT.vocabLibrary, 'import-drawer'),
+		() => readSlot(POINT.vocabLibrary, 'import-drawer'),
 	);
-
-	useEffect(
-		() => subscribeVocabImport(() => setSession(readVocabImportSession())),
-		[],
+	const detail = useSyncExternalStore(
+		(listener) => subscribeSlot(POINT.vocabCard, 'drawer', listener),
+		() => readSlot(POINT.vocabCard, 'drawer'),
+		() => readSlot(POINT.vocabCard, 'drawer'),
 	);
-
-	useEffect(
-		() =>
-			subscribeVocabDetail(() => {
-				const next = readVocabDetailSession().open;
-				setDetailOpen((prev) => (prev === next ? prev : next));
-			}),
-		[],
-	);
+	const detailOpen = detail.open && !detail.covered;
 
 	const plugin = plugins.find(
 		(item) =>
@@ -62,7 +50,8 @@ export function VocabImportDrawer() {
 	}
 
 	useEffect(() => {
-		if (session.open && !plugin) closeVocabImport();
+		if (session.open && !plugin)
+			closePoint(POINT.vocabLibrary, 'import-drawer');
 	}, [plugin, session.open]);
 
 	// 不跟详解抽屉抢滚动锁，只在导入自己打开时把页面滚定住
@@ -100,7 +89,7 @@ export function VocabImportDrawer() {
 						clearPluginPortalClaim(claimedId.current);
 						claimedId.current = null;
 					}
-					closeVocabImport();
+					closePoint(POINT.vocabLibrary, 'import-drawer');
 				}
 			}}
 		>

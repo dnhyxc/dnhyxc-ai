@@ -1,623 +1,357 @@
 # 新插件接入指南（Host 侧）
 
-> 面向：要在主项目（`apps/frontend`）里挂载一个 **Module Federation Remote 插件** 的开发者。  
-> 约定：业务代码只从 `@/federation` 导入；Remote 工程独立构建部署（如 `:9008`）。
+> 面向要在主项目里挂载 Module Federation Remote 插件的开发者。  
+> 业务代码只从 `@/federation` 导入。Remote 独立构建，本地默认 `http://127.0.0.1:9008/mf-manifest.json`。
+
+页面内嵌插件的逐步文件、逐行代码和验收画面见 [`access.md`](./access.md)。本文负责选定形态，并说明每种形态要改哪些文件。
 
 ---
 
 ## 0. 先选接入形态
 
-接入前先确定插件出现在 Host 的哪种「槽位」：
-
-| 形态 | 适用场景 | Host 要做的事 | 参考 |
-|------|----------|---------------|------|
-| **A. 业务页内嵌** | 固定业务路由下的功能区（如学习笔记） | 静态路由 + 宿主页 + `<PluginHostPage />` | `learningNotes` |
-| **B. Surface 槽位** | 嵌在某个业务面（阅读页 drawer/toolbar） | registry 写 `host.surface` + 业务页 `<PluginHostSurface />` | `ebookIdeas` |
-| **C. 顶层独立路由** | 插件自带完整页面、进全局侧栏 | registry `injectRoute: true` + `menu` | 部分 demo 插件 |
+| 形态 | 插件出现在哪 | 主项目要改什么 | 插件拿到的模块 |
+|------|----------------|----------------|----------------|
+| **A. 已登记扩展点** | 单词卡、词库、错题、收藏、复习、每日阅读、阅读页等已经登记的槽 | 通常不改代码。注册表写 `host.surface`、`host.slot`、`modules:point` | `api.modules.point` |
+| **B. 新的扩展点** | 某个页面上还没有可挂的槽 | `points/catalog.ts` + 该页面放 `HostPoint`（阅读页这类自己画按钮的，继续用 `PluginHostSurface`） | `api.modules.point` |
+| **C. 业务页整页内嵌** | 学习笔记这种独立页面，含 Popout、跨窗同步 | 静态路由 + `<PluginHostPage pluginId="…" />`。专属能力仍走 `modules/learningNotes` | `api.modules.learningNotes` |
+| **D. 顶层独立路由** | 插件自己占侧栏一项，例如视频播放器 | 注册表 `injectRoute: true` + `menu`。不必手写路由 | 按它声明的 permissions |
 
 ```mermaid
 flowchart TD
-  Start[新插件需求] --> Q1{出现在哪？}
-  Q1 -->|业务子路由内| A[形态 A: PluginHostPage]
-  Q1 -->|阅读页/工具栏/抽屉| B[形态 B: PluginHostSurface]
-  Q1 -->|全局插件菜单| C[形态 C: injectRoute + menu]
-  A --> Remote[Remote expose 组件]
-  B --> Remote
-  C --> Remote
-  Remote --> Registry[registry 条目]
-  Registry --> Optional{需要 Host 专有 API？}
-  Optional -->|否| Done[挂载验收]
-  Optional -->|是| Modules[modules/ + runtime buildModules]
-  Modules --> Done
+  Start[新插件] --> Q1{出现在哪}
+  Q1 -->|已有扩展点的槽| A[只改注册表和 Remote]
+  Q1 -->|页面上还没有槽| B[catalog.ts 加 HostPoint]
+  Q1 -->|独立业务页| C[PluginHostPage 加静态路由]
+  Q1 -->|全局侧栏| D[injectRoute 与 menu]
+  A --> Point[api.modules.point]
+  B --> Point
+  C --> Notes[学习笔记仍用 modules:learningNotes]
+  D --> Remote[Remote expose]
+  Point --> Remote
 ```
 
----
+聊天只暴露 `modules:chat` 的 `openThread`。新的页面内嵌插件不要再仿照它新建 `modules/<pluginId>`。
 
-## 1. `federation/` 目录：什么情况下改什么
-
-业务侧**只从 `@/federation` 导入**；下面表格说明接入新插件时，各目录**是否必须改**、**改什么**。
-
-| 目录 / 文件 | 职责 | 新插件通常要不要改 | 改什么 |
-|-------------|------|-------------------|--------|
-| [`index.ts`](./index.ts) | 统一 re-export | **可选** | 若业务页需直接 import 你的 `hostApi` / `syncBus` 符号，在此追加 export |
-| [`runtime/index.ts`](./runtime/index.ts) | **唯一装配点**：toast、http、全屏、选文件、`buildModules`、iframe RPC | **按需** | 新增 `modules:<id>` 时在 `buildModules` 注册；iframe 插件加 `iframeRpcHandlers` |
-| [`registry/`](./registry/README.md) | 拉取 `plugins-registry.json`、缓存 | **一般不改代码** | 在 registry JSON（管理端 / COS）加插件条目 |
-| [`enabled/`](./enabled/README.md) | 账号维度上架偏好 | **不改** | 已有通用逻辑；宿主页用 `usePluginEnabled` + `ensurePluginEnabledPrefsLoaded` |
-| [`host/`](./host/README.md) | `PluginHostPage` / `PluginHostSurface` 挂载模版 | **不改** | 业务页直接 `<PluginHostPage pluginId="…" />` |
-| [`capabilities/`](./capabilities/README.md) | 通用 UI（全屏、选文件） | **一般不改** | 已在 runtime 装配；registry 声明 `ui:toast` 即可用 |
-| [`modules/<pluginId>/`](./modules/README.md) | 插件专属 `api.modules.*` | **按需** | 新建 `hostApi.ts`（+ 可选 `syncBus.ts`） |
-| [`sync/`](./sync/README.md) | 跨窗 sync 工厂 | **一般不改** | 插件 bus 写在 `modules/<pluginId>/syncBus.ts`，复用 `createHostPluginSyncBus` |
-
-**最小接入（只调 toast、不走 Host 专有 API）**：Remote + registry + 业务宿主页 + 静态路由 —— **`federation/` 内零代码改动**。
+已发布、只声明 `modules:ebook`、`modules:vocabDetail`、`modules:vocabDetailImport` 的包加载不到模块。改成 `modules:point` 后重新发布。`hostApiRange` 仍是 `^1.0.0`。
 
 ---
 
-## 2. 总览：逐步 checklist
+## 1. `federation/` 里什么时候改
 
-按顺序勾选；带 `*` 为必做，其余按需求。
+| 目录 / 文件 | 职责 | 新插件要不要改 |
+|-------------|------|----------------|
+| [`points/catalog.ts`](./points/catalog.ts) | 点、槽、上下文键、信号、命令 | **新槽位要改**。挂已有槽不改 |
+| [`points/api.ts`](./points/api.ts) | 按目录冻结 `api.modules.point` | 不改 |
+| [`points/session.ts`](./points/session.ts) | 槽会话、上下文、信号、命令表 | 不改 |
+| [`points/commands.ts`](./points/commands.ts) | 不依赖某一页状态的命令：朗读、选 JSON、打开详解 | 只有这种命令才加 |
+| [`host/HostPoint.tsx`](./host/HostPoint.tsx) | 按目录画顶栏、行按钮、抽屉 | 不改。业务页放 `<HostPoint />` |
+| [`host/PluginHostSurface.tsx`](./host/PluginHostSurface.tsx) | 页面自己画的触发器和抽屉，当前是阅读页和词库列表 | 不改组件。新页面若要自己画，直接使用 |
+| [`host/PluginHostPage.tsx`](./host/PluginHostPage.tsx) | 整页或业务路由内嵌 | 不改 |
+| [`runtime/index.ts`](./runtime/index.ts) | `buildModules`、iframe RPC | **不为新扩展点插件改**。`modules:point` 已按 `host.surface` 装配 |
+| [`modules/`](./modules/README.md) | 学习笔记专属 API | 新扩展点插件不建子目录 |
+| [`registry/`](./registry/README.md) | 拉 `plugins-registry.json` | 不改代码，改 JSON |
+| [`enabled/`](./enabled/README.md) | 账号上架开关 | 不改 |
+| [`index.ts`](./index.ts) | 业务侧唯一出口 | 不改，除非业务页要新的已有符号 |
 
-| 步骤 | 位置 | 动作 | 必做 |
-|------|------|------|------|
-| 1 | Remote 工程 | expose 组件 + 样式 + 本地 MF dev | * |
-| 2 | `plugins-registry.json` | 增加插件 descriptor | * |
-| 3 | `views/.../XxxPage.tsx` | 宿主页：prefs 门闩 + `PluginHostPage` / `PluginHostSurface` | * |
-| 4 | `router/routes.ts` | 形态 A/C 注册静态路由 | 形态 A/C |
-| 5 | 业务 layout / 侧栏 | 导航入口（可选） | 可选 |
-| 6 | `federation/modules/<id>/hostApi.ts` | 实现 `createXxxModulesApi` | 需 Host API 时 |
-| 7 | `federation/runtime/index.ts` | `buildModules` 注册 + permission 门闩 | 需 Host API 时 |
-| 8 | `federation/index.ts` | re-export 模块符号（供业务页 bind） | 按需 |
-| 9 | 业务宿主页 `useEffect` | `setXxxHostHandlers(...)` 绑定页内状态 | handler 穿透模式 |
-| 10 | `modules/<id>/syncBus.ts` + Relay 组件 | 跨窗 sync | Popout / 多窗时 |
-| 11 | `runtime/index.ts` → `iframeRpcHandlers` | iframe 插件 RPC | iframe 形态 |
-| 12 | 插件管理 / 账号上架 | 用户勾选可用 | 验收 |
-
-形态 B（Surface）可跳过步骤 4（无独立路由），步骤 3 改为在宿主业务面渲染 `PluginHostSurface`。
+`buildModules` 看到 `modules:point` 时，用该插件的 `host.surface` 查目录。对得上才挂上 `modules.point`。`surface` 写错时，插件没有这个对象。
 
 ---
 
-## 3. Remote 插件工程（Remote 仓）
+## 2. 按形态勾选
 
-> 若 Remote 已在独立仓库 / `apps/remote-plugins`，在本机确保 MF dev 服务可访问（默认 `http://127.0.0.1:9008/mf-manifest.json`）。
+### 形态 A：挂到已有点
 
-### 3.1 暴露入口
+| 步骤 | 位置 | 动作 |
+|------|------|------|
+| 1 | Remote | expose 组件，用 `api.modules.point` 读上下文和载荷 |
+| 2 | 注册表 | `host.surface` = 点 id，`host.slot` = 槽名，`permissions` 含 `modules:point`，`injectRoute: false` |
+| 3 | 插件中心 | 重新拉取注册表并启用 |
 
-Remote 的 `exposes` 须有一个 React 组件作为 **default export**，签名：
+已有点和槽见 [`access.md` 第 2 节](./access.md)。主项目源码不用改。
+
+### 形态 B：新开一个点
+
+| 步骤 | 位置 | 动作 |
+|------|------|------|
+| 1 | `points/catalog.ts` | `POINT` 与 `hostPoints` 增加一项 |
+| 2 | 目标页面 | `usePointContext`、`<HostPoint>`；需要页内能力时 `bindPointCommand` |
+| 3 | `router/routes.ts` | 页面若不在 `/english-learning` 下，要自己挂抽屉并在离开时 `closePoint` |
+| 4 | Remote + 注册表 | 与形态 A 相同 |
+
+逐文件代码和「点一次按钮之后发生什么」见 [`access.md` 第 10 节](./access.md)。英语学习里的普通抽屉由 [`Layout.tsx`](../views/englishLearning/Layout.tsx) 扫描 `layoutDrawerSlots` 挂上，不要为每个新抽屉改布局。
+
+### 形态 C：学习笔记这类整页
+
+| 步骤 | 位置 | 动作 |
+|------|------|------|
+| 1 | Remote | expose 整页组件 |
+| 2 | 注册表 | `injectRoute: false`，`permissions` 含 `ui:toast`、`http:plugin-api`、`modules:learningNotes` |
+| 3 | 业务页 | `usePluginEnabled` + `PluginHostPage` |
+| 4 | `router/routes.ts` | 静态子路由，例如 `/english-learning/notes` |
+
+不要把这条路径套到单词卡、阅读页或新的列表页上。
+
+### 形态 D：顶层路由
+
+注册表 `injectRoute: true`（缺省就是 true）并写 `menu`。`mf.start()` 之后路由注入器会加上该路由，`router/index.tsx` 已订阅 `mf.onRoutesChange`。不必在 `routes.ts` 再写一遍。
+
+---
+
+## 3. Remote
+
+入口是 default export 的 React 组件，宿主把桥放在 `props.api` 上。样式在入口文件顶部 `import '@/styles.css'`，Host 不会执行 Remote 的 `main.ts`。
+
+扩展点插件只使用 `api.modules.point` 的五个方法。点 id 不在参数里，由注册表 `host.surface` 固定。
 
 ```ts
-import type { HostBridgeProps } from '@dnhyxc-ai/federation-kit';
+const point = props.api.modules?.point;
 
-export default function MyPluginApp(props: HostBridgeProps) {
-  const { api, plugin } = props;
-  // ...
-}
-
-// 可选生命周期（单独文件 export，勿与组件同文件空 export 触发 HMR 问题）
-export async function activate(api: HostBridgeProps['api']) { /* ... */ }
-export async function deactivate() { /* ... */ }
+const ctx = point?.getContext();
+const row = point?.getPayload('drawer');
+const off = point?.subscribe(() => {
+  // 上下文变了，或这个点任意槽开关了。publishSignal 不会进这里
+});
+point?.command('markDone', rowId);
+point?.command('closeIdeasList', undefined);
 ```
 
-### 3.2 样式
+| 方法 | 作用 |
+|------|------|
+| `getContext()` | 页面用 `usePointContext` / `publishPointContext` 发布的对象。只含目录 `contextKeys`。离开页面或键是空串时为 `null` |
+| `getPayload(slot)` | 该抽屉槽上的点击载荷。按钮插件读 `opens` 指向的槽，例如行按钮读 `'drawer'`，不要读 `'item-action'` |
+| `subscribe(listener)` | 返回退订函数 |
+| `publishSignal(name, value)` | 只接受该点 `signals` 里的 `pending` 或 `stats`。其它名字被丢掉 |
+| `command(name, arg)` | 第二个参数必须传。名字不在目录里抛 `UNKNOWN_POINT_COMMAND`。页面还没绑定或已经卸载抛 `POINT_COMMAND_UNBOUND` |
 
-每个 expose 入口文件顶部：
-
-```ts
-import '@/styles.css'; // Remote 自己的样式；Host 不会跑 Remote 的 main.ts
-```
-
-### 3.3 本地调试
-
-Remote dev 服务启动后，浏览器能直接打开 `mf-manifest.json`。
+`vite.config.ts` 的 `exposes` 键要和注册表 `expose` 一致，例如 `'./PracticeNote': './src/views/practice-note/index.tsx'`。
 
 ---
 
-## 4. Registry 条目（必做）
+## 4. 注册表
 
-在管理端保存，或写入 COS / 静态路径的 `plugins-registry.json`（开发时也可放 `apps/backend/uploads/remotes/plugins-registry.json`）。
+开发清单在 `apps/backend/uploads/remotes/plugins-registry.json`。保存后到插件中心重新拉取。仍是旧数据时清掉 `dnhyxc.plugin.registry.dev.v1`。
 
-### 4.1 最小字段（形态 A · 内嵌页）
+### 4.1 扩展点插件
 
 ```json
 {
-  "id": "myPlugin",
-  "remoteName": "remotePlugins-myPlugin",
-  "expose": "./MyPlugin",
-  "title": { "zh-CN": "我的插件", "en-US": "My plugin" },
-  "description": { "zh-CN": "……", "en-US": "……" },
-  "routePath": "/my-area/my-plugin",
+  "id": "practiceNote",
+  "title": { "zh-CN": "练习笔记", "en-US": "Practice note" },
+  "routePath": "/plugins/practice-note",
   "entry": "http://127.0.0.1:9008/mf-manifest.json",
-  "version": "1.0.0",
+  "expose": "./PracticeNote",
+  "remoteName": "dnhyxc-ai-practice-note",
+  "version": "0.0.1",
   "hostApiRange": "^1.0.0",
   "injectRoute": false,
-  "permissions": ["ui:toast"],
-  "preload": "route",
-  "enabled": true,
+  "host": {
+    "surface": "english.practice",
+    "slot": "item-action",
+    "icon": "notebook"
+  },
+  "permissions": ["modules:point"],
+  "enabled": false,
   "trust": "first-party"
 }
 ```
 
-### 4.2 字段说明
+`host.surface` 等于 `points/catalog.ts` 里的点 id。`host.slot` 等于该点某个槽的 `name`。
 
-| 字段 | 说明 |
-|------|------|
-| `id` | Host 侧 `pluginId`，与 `<PluginHostPage pluginId="…" />` **完全一致** |
-| `remoteName` / `expose` | MF 加载键：`loadRemote('remoteName/expose')` |
-| `routePath` | 逻辑路由前缀；`nav:subtree` 导航不能越界 |
-| `entry` | 生产改为 CDN 上的 `mf-manifest.json` |
-| `hostApiRange` | 须覆盖 Host 的 `VITE_HOST_API_VERSION`（默认 `1.0.0`） |
-| `injectRoute: false` | **业务内嵌时设为 false**，避免重复注入顶层路由 |
-| `permissions` | 见 [§8 权限](#8-权限与-bridge-api) |
+- 行按钮、卡片按钮：`slot` 写按钮槽（`item-action`、`card-action`、`library-card-action`）。`HostPoint` 画按钮，并把同一个插件画进 `opens` 指向的抽屉。
+- 顶栏：`slot` 写 `toolbar`。
+- 页面自己打开的抽屉（阅读页、词库列表）：`slot` 写那个抽屉槽，例如 `drawer`。
 
-### 4.3 形态 B · Surface 额外字段
+`remoteName` 不写时用 `id`。同一份 manifest 里的多个插件要写成不同的远程名。`expose` 缺省是 `./App`。`injectRoute: false` 避免再注入一条顶层路由。
 
-```json
-"host": {
-  "surface": "ebook.read",
-  "slot": "drawer",
-  "icon": "https://…/icon.svg",
-  "order": 10
-}
-```
+单词详解这类还要请求后端的插件，在 `permissions` 里加上 `http:plugin-api` 和 `ui:toast`。这三项和 `modules:point` 同时存在。
 
-业务页对应渲染：
+### 4.2 整页内嵌
 
-```tsx
-<PluginHostSurface surface="ebook.read" part="drawer-triggers" />
-<PluginHostSurface surface="ebook.read" part="drawer" />
-<PluginHostSurface surface="ebook.read" part="toolbar" />
-```
+`injectRoute: false`，不写 `host`。`id` 与 `<PluginHostPage pluginId="…" />` 一致。学习笔记的 permissions 是 `ui:toast`、`http:plugin-api`、`modules:learningNotes`。
 
-`surface` 字符串由 Host 业务面约定；registry 里 `host.surface` 与 `PluginHostSurface` 的 `surface` prop 一致即可。
-
-### 4.4 形态 C · 顶层独立路由
+### 4.3 顶层路由
 
 ```json
 "injectRoute": true,
 "menu": { "order": 50, "icon": "https://…/icon.svg" }
 ```
 
-此时**不必**在 `routes.ts` 手写该插件路由；`mf.start()` 后 `routeInjector` 会注入，`router/index.tsx` 已订阅 `mf.onRoutesChange` 重建路由。
-
-### 4.5 刷新 registry
-
-开发时清 localStorage 缓存或管理端保存后，Host 会 `fetchRegistry({ force: true })`。  
-缓存 key 见 [`registry/README.md`](./registry/README.md)（`PLUGIN_REGISTRY_CACHE_KEY`）。
-
 ---
 
-## 5. Host 业务页挂载
+## 5. 主项目页面怎么挂
 
-### 5.1 形态 A：新建宿主页（逐步）
+### 5.1 已有扩展点
 
-**步骤 5.1.1** — 新建文件，例如 `apps/frontend/src/views/myArea/MyPluginPage.tsx`：
-
-```tsx
-import { useEffect, useState } from 'react';
-import {
-  ensurePluginEnabledPrefsLoaded,
-  PluginHostPage,
-  usePluginEnabled,
-} from '@/federation';
-import { useI18n } from '@/hooks';
-
-export default function MyPluginPage() {
-  const { t } = useI18n();
-  const enabled = usePluginEnabled('myPlugin'); // 与 registry id 一致
-  const [prefsReady, setPrefsReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void ensurePluginEnabledPrefsLoaded().finally(() => {
-      if (!cancelled) setPrefsReady(true);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      {prefsReady && !enabled ? (
-        <p className="text-textcolor/55 p-4.5">{t('plugins.host.delisted')}</p>
-      ) : (
-        <PluginHostPage pluginId="myPlugin" className="h-full min-h-0" />
-      )}
-    </div>
-  );
-}
-```
-
-要点：
-
-- **`prefsReady`**：避免偏好未加载时误显示「已下架」（`enabled/` 未就绪前 `get` 为 false）
-- **`pluginId`** 与 registry `id` 完全一致
-- 壳层 / layout 由业务页负责；插件 UI 由 Remote 渲染
-- **`federation/` 无需改代码**，直接用已有 `PluginHostPage`
-
-**步骤 5.1.2** — 注册静态路由 `apps/frontend/src/router/routes.ts`：
-
-```ts
-const MyPluginPage = lazy(() => import('@/views/myArea/MyPluginPage'));
-
-// 在合适 layout 的 children 下：
-{
-  path: 'my-plugin',           // 或绝对 path
-  Component: MyPluginPage,
-  meta: { titleKey: 'route.myPlugin.title' },
-},
-```
-
-参考：`learningNotes` → `/english-learning/notes`，[`routes.ts`](../../router/routes.ts) 约 230 行。
-
-**步骤 5.1.3**（可选）— 业务侧栏 / 菜单加跳转链接，指向上述静态路由。
-
-**步骤 5.1.4**（可选）— 若插件有 Popout 子路由，另建 popout 页 + 顶层路由（参考 `/english-learning/notes/popout`）。
-
-### 5.2 形态 B：Surface 宿主页（逐步）
-
-**步骤 5.2.1** — registry 写 `host.surface` / `host.slot`（见 §4.3）。
-
-**步骤 5.2.2** — 在宿主业务面 JSX 中挂载（参考 [`views/ebook/read.tsx`](../../views/ebook/read.tsx)）：
+页面上已经有对应的 `HostPoint` 或 `PluginHostSurface`。新插件只改注册表。例如每日阅读的顶栏和行按钮：
 
 ```tsx
-import { PluginHostSurface } from '@/federation';
-
-// drawer 开关状态由宿主页维护
-const [hostDrawerPluginId, setHostDrawerPluginId] = useState<string | null>(null);
-
-<PluginHostSurface
-  surface="ebook.read"
-  part="drawer-triggers"
-  openPluginId={hostDrawerPluginId}
-  onOpenPluginIdChange={setHostDrawerPluginId}
-/>
-<PluginHostSurface surface="ebook.read" part="toolbar" />
-<PluginHostSurface
-  surface="ebook.read"
-  part="drawer"
-  openPluginId={hostDrawerPluginId}
-  onOpenPluginIdChange={setHostDrawerPluginId}
+<HostPoint pointId={POINT.dailyReading} slot="toolbar" />
+<HostPoint
+  pointId={POINT.dailyReading}
+  slot="item-action"
+  payload={{ id: item.id, titleEn: item.titleEn, publishDate: item.publishDate, origin }}
 />
 ```
 
-**步骤 5.2.3** — 若插件需读当前页上下文，在宿主页 `useEffect` 里绑定 handler（见 §7.2 ebook 模式）。
+行插件的 `host.slot` 写 `item-action`，组件里 `getPayload('drawer')`。
 
-**`federation/host/` 无需改代码**。
+### 5.2 新扩展点
 
-### 5.3 形态 C：顶层独立路由
-
-**步骤 5.3.1** — registry `injectRoute: true`（或省略，默认为 true）+ `menu`。
-
-**步骤 5.3.2** — 确认 App 已启动 federation（§6）；无需在 `routes.ts` 手写该路由。
-
-**步骤 5.3.3**（可选）— 自定义外壳：动态路由 factory 会使用已注册的 `PluginHostPage`（`pageShell: true` 时套 [`PluginPageShell`](./host/PluginPageShell.tsx)）。
-
----
-
-## 6. 启动 Federation（App 级，通常已有）
-
-[`router/index.tsx`](../../router/index.tsx) 已在挂载时执行：
-
-```ts
-import { mf } from '@/federation';
-
-// useEffect 内：
-const unsub = mf.onRoutesChange(() => setRouteEpoch((n) => n + 1));
-void mf.start().finally(() => setPluginsReady(true));
-
-// router 创建后：
-mf.setNavigate((to) => void r.navigate(to));
-```
-
-新插件接入**一般不必改此文件**；只有首次引入 federation 或改 navigate 行为时才动。
-
----
-
-## 7. 需要 Host 专有 API 时（`modules/` + `runtime`）
-
-当插件需要 Host 环境能力（当前书籍 ID、跨窗 sync、Popout 窗口等），按下面步骤在 `federation/` 增加模块。
-
-### 7.1 步骤一：新建 `modules/<pluginId>/hostApi.ts`
-
-目录示例：
-
-```text
-federation/modules/myPlugin/
-  hostApi.ts      # 必做
-  syncBus.ts      # 跨窗 sync 时
-  README.md       # 建议：写清 API 与 Host 绑定方式
-```
-
-**模式 A — 自包含 API**（参考 learningNotes）：模块内自己管窗口、storage、sync。
-
-```ts
-// federation/modules/myPlugin/hostApi.ts
-export function createMyPluginModulesApi() {
-  return Object.freeze({
-    getSomething: () => '…',
-    doAction: (payload: unknown) => { /* … */ },
-  });
-}
-```
-
-**模式 B — handler 穿透**（参考 ebook）：Host 业务页在运行时注入实现。
-
-```ts
-// federation/modules/myPlugin/hostApi.ts
-export type MyPluginHostHandlers = {
-  getContextId: () => string | null;
-  doHostAction: (payload: unknown) => void;
-};
-
-let handlers: MyPluginHostHandlers | null = null;
-
-export function setMyPluginHostHandlers(next: MyPluginHostHandlers | null) {
-  handlers = next;
-}
-
-export function createMyPluginModulesApi() {
-  return Object.freeze({
-    getContextId: () => handlers?.getContextId() ?? null,
-    doHostAction: (payload: unknown) => {
-      const fn = handlers?.doHostAction;
-      if (!fn) throw new Error('MY_PLUGIN_API_UNBOUND');
-      fn(payload);
-    },
-  });
-}
-```
-
-Host 业务页绑定（ebook 同款）：
+目录用 `listPoint(id, contextKeys)` 生成顶栏、行按钮和抽屉。第二个参数是上下文键名，不是每个点都写 `kind`。然后在页面发布上下文并放上入口：
 
 ```tsx
-import { setMyPluginHostHandlers } from '@/federation';
+usePointContext(POINT.practice, { kind });
+
+<HostPoint pointId={POINT.practice} slot="toolbar" />
+<HostPoint
+  pointId={POINT.practice}
+  slot="item-action"
+  payload={{ id: item.id, title: item.title }}
+/>
+```
+
+页面要给插件调用的能力，在 effect 里绑定，卸载时解绑：
+
+```tsx
+useEffect(() => {
+  return bindPointCommand(POINT.practice, 'markDone', (arg) => {
+    const id = typeof arg === 'string' ? arg.trim() : '';
+    if (!id) return false;
+    return true;
+  });
+}, []);
+```
+
+命令名必须先写进该点的 `commands`。不依赖页面 state 的命令写在 `points/commands.ts`，应用启动时注册一次，现成的有词卡 `play` / `stop` 和词库 `pickJsonFile` / `openCard`。
+
+新页面若挂在 `/english-learning` 的子路由上，普通抽屉不用自己画。阅读页不在这个布局里，抽屉标了 `layout.page: true`，按钮和抽屉仍是 `PluginHostSurface`，上下文和命令在 `views/ebook/read.tsx` 里发布：
+
+```tsx
+publishPointContext(POINT.ebookRead, { bookId, bookTitle });
+bindPointCommand(POINT.ebookRead, 'navigateToCfi', (cfi) => { /* 滚到这个 CFI */ });
+bindPointCommand(POINT.ebookRead, 'openThought', (thought) => { /* 打开想法 */ });
+bindPointCommand(POINT.ebookRead, 'closeIdeasList', () => { /* 关掉当前插件抽屉 */ });
+```
+
+PDF 或离开页面时 `publishPointContext(POINT.ebookRead, null)` 并解绑。插件侧仍然调用 `api.modules.point`，不再有 `api.modules.ebook`。
+
+### 5.3 整页内嵌
+
+```tsx
+const enabled = usePluginEnabled('learningNotes');
+const [prefsReady, setPrefsReady] = useState(false);
 
 useEffect(() => {
-  if (!ready) {
-    setMyPluginHostHandlers(null);
-    return;
-  }
-  setMyPluginHostHandlers({
-    getContextId: () => contextId,
-    doHostAction: (payload) => { /* … */ },
+  let cancelled = false;
+  void ensurePluginEnabledPrefsLoaded().finally(() => {
+    if (!cancelled) setPrefsReady(true);
   });
-  return () => setMyPluginHostHandlers(null);
-}, [ready, contextId]);
+  return () => {
+    cancelled = true;
+  };
+}, []);
 ```
 
-### 7.2 步骤二：在 `runtime/index.ts` → `buildModules` 注册
+偏好还没加载完时 `usePluginEnabled` 是 false。等 `prefsReady` 再判断，避免误显示「已下架」。然后渲染 `<PluginHostPage pluginId="learningNotes" className="h-full min-h-0" />`。
 
-打开 [`runtime/index.ts`](./runtime/index.ts)，在文件顶部 import，并在 `capabilities.buildModules` 内按 permission 门闩装配：
+### 5.4 应用启动
 
-```ts
-import { createMyPluginModulesApi } from '../modules/myPlugin/hostApi';
-
-// buildModules 内（与 learningNotes / ebook 并列）：
-if (allow.has('modules:myPlugin')) {
-  modules.myPlugin = createMyPluginModulesApi();
-}
-```
-
-Remote 侧调用：`api.modules?.myPlugin?.getSomething()`。
-
-> **learningNotes**：须同时声明 `http:plugin-api`（调后端）与 `modules:learningNotes`（Host 模块）；二者职责分离。
-
-### 7.3 步骤三：registry 增加 permission
-
-```json
-"permissions": ["ui:toast", "modules:myPlugin"]
-```
-
-`permissions` 与 `buildModules` 门闩必须一致，否则 `api.modules.myPlugin` 为 `undefined`。
-
-### 7.4 步骤四（可选）：在 `federation/index.ts` re-export
-
-若业务页需要 `setMyPluginHostHandlers` 等符号，追加 export（参考 ebook / learningNotes）：
-
-```ts
-export {
-  createMyPluginModulesApi,
-  setMyPluginHostHandlers,
-  type MyPluginHostHandlers,
-} from './modules/myPlugin/hostApi';
-```
-
-### 7.5 步骤五（可选）：更新 `modules/README.md`
-
-在子目录表格中登记新插件，方便后续维护。
+[`router/index.tsx`](../router/index.tsx) 已经 `mf.start()`、`mf.onRoutesChange` 和 `mf.setNavigate`。新插件不用改这个文件。
 
 ---
 
-## 8. 权限与 bridge API
+## 6. 专属模块还剩哪些
 
-插件在 registry 声明的 `permissions` 决定 `props.api` 里有哪些字段（见 kit [`宿主桥接API.md`](../../../../packages/federation-kit/docs/plugin-guide/宿主桥接API.md)）。
+`runtime/index.ts` 的 `buildModules` 现在只有三条：
 
-| permission | 插件可用 API |
-|------------|----------------|
-| （无） | `api.theme` / `api.locale` / `api.event` |
-| `ui:toast` | + `api.ui.showToast` / `setAppFullscreen` / `pickLocalFiles` / `downloadBlob` |
-| `nav:subtree` | + `api.navigate`（限定 `routePath` 前缀） |
-| `http:plugin-api` | + `api.http.*`（走 Host `@/utils/fetch`） |
-| `modules:ebook` | + `api.modules.ebook.*` |
-| `modules:learningNotes` | + `api.modules.learningNotes.*` |
-| `modules:<你的插件>` | + `api.modules.<你的插件>.*`（须 Host 注册） |
+| permission | 挂上的 API | 用途 |
+|------------|------------|------|
+| `modules:point` | `api.modules.point` | 所有扩展点插件 |
+| `modules:learningNotes` | `api.modules.learningNotes` | 笔记上下文、Popout、关窗保存、跨窗 sync |
+| `modules:chat` | `api.modules.openThread` | 只打开一个会话 |
 
-Remote 侧使用示例：
-
-```ts
-api.ui?.showToast?.({ message: 'OK', type: 'success' });
-const data = await api.http?.get('/api/…');
-const id = api.modules?.myPlugin?.getContextId?.();
-```
-
-通用 UI 能力已在 [`runtime/index.ts`](./runtime/index.ts) 的 `capabilities` 装配，**不必**在 `capabilities/` 下为新插件加文件。
+学习笔记的跨窗同步仍在 `modules/learningNotes/syncBus.ts`，复用 `sync/hostSyncBus.ts`。新扩展点插件不要为了读页面数据再加一套 `setXxxHostHandlers`。
 
 ---
 
-## 9. 跨窗 sync（可选）
+## 7. 权限
 
-多窗口 / Popout 需要状态同步时，按顺序：
+| permission | 插件可用 |
+|------------|----------|
+| （无） | `api.theme`、`api.locale`、`api.event` |
+| `ui:toast` | `api.ui.showToast`、全屏、选文件、下载 |
+| `nav:subtree` | `api.navigate`，不能超出 `routePath` |
+| `http:plugin-api` | `api.http.get/post/put/delete`，走主项目的 fetch |
+| `modules:point` | `api.modules.point` 五个方法 |
+| `modules:learningNotes` | `api.modules.learningNotes` |
+| `modules:chat` | `api.modules.openThread` |
 
-### 9.1 步骤一：建 `modules/<pluginId>/syncBus.ts`
-
-基于 [`sync/hostSyncBus.ts`](./sync/hostSyncBus.ts) 工厂（**不要**改 `sync/` 基础设施本身）：
-
-```ts
-import { createHostPluginSyncBus } from '../../sync/hostSyncBus';
-
-export const MY_PLUGIN_SYNC_CHANNEL = 'dnhyxc-my-plugin-sync-v1';
-
-export type MyPluginSyncMessage =
-  | { type: 'draft'; payload: string; windowId: string }
-  | { type: 'saved'; id: string; windowId: string };
-
-const bus = createHostPluginSyncBus<MyPluginSyncMessage>({
-  channel: MY_PLUGIN_SYNC_CHANNEL,
-  windowIdKey: 'dnhyxc_my_plugin_window_id',
-  tauriEvent: MY_PLUGIN_SYNC_CHANNEL, // Tauri 多 WebView 时用
-});
-
-export const publishMyPluginSync = bus.publish;
-export const subscribeMyPluginSync = bus.subscribe;
-export const getMyPluginWindowId = bus.getWindowId;
-```
-
-### 9.2 步骤二：在 `hostApi.ts` 暴露 `sync.*`
-
-```ts
-import { publishMyPluginSync, subscribeMyPluginSync, getMyPluginWindowId } from './syncBus';
-
-export function createMyPluginModulesApi() {
-  return Object.freeze({
-    getWindowId: () => getMyPluginWindowId(),
-    sync: Object.freeze({
-      publishDraft: (payload: string) =>
-        publishMyPluginSync({ type: 'draft', payload, windowId: getMyPluginWindowId() }),
-      subscribe: subscribeMyPluginSync,
-    }),
-  });
-}
-```
-
-### 9.3 步骤三：Popout 关窗钩子（按需）
-
-插件跨窗同步走 `api.modules.<id>.sync.subscribe`（直连 Host sync 总线），无需再桥接到 kit `eventBus`。
-
-关窗保存参考 learningNotes：`registerBeforeClose` + Host 侧 `runXxxBeforeCloseHandlers`，在 Tauri 关窗前 await 保存。
-
-详见 [`modules/learningNotes/README.md`](./modules/learningNotes/README.md)。
+`modules:ebook`、`modules:vocabDetail`、`modules:vocabDetailImport` 已经不再装配。
 
 ---
 
-## 10. iframe RPC（可选）
+## 8. 阅读页 iframe
 
-Untrusted iframe 嵌入插件时，在 [`runtime/index.ts`](./runtime/index.ts) 的 `iframeRpcHandlers` 增加方法名映射（参考 ebook）：
+不可信 iframe 的插件如果 `host.surface` 是 `ebook.read` 且带 `modules:point`，主项目仍接受原来的 RPC 名字，并转到该插件自己的 `api.modules.point`：
 
-```ts
-iframeRpcHandlers: {
-  'myPlugin.getContextId': (bridge) => {
-    const mod = bridge.api.modules?.myPlugin as { getContextId?: () => string | null } | undefined;
-    return mod?.getContextId?.() ?? null;
-  },
-},
-```
+| RPC | 转到 |
+|-----|------|
+| `ebook.getBookId` / `ebook.getBookTitle` | `getContext()` 的对应字段 |
+| `ebook.navigateToCfi` | `command('navigateToCfi', cfi)` |
+| `ebook.openThought` | `command('openThought', thought)` |
+| `ebook.closeIdeasList` | `command('closeIdeasList', undefined)`。未绑定时返回 `null` |
 
----
-
-## 11. 上架与验收清单
-
-### 11.1 开发自检
-
-- [ ] Remote `mf-manifest.json` 可访问，CORS 含 Host 源（Web + `tauri://localhost`）
-- [ ] registry `id` / `remoteName` / `expose` / `pluginId` 一致
-- [ ] `hostApiRange` 与 `VITE_HOST_API_VERSION` 兼容
-- [ ] 宿主页 `usePluginEnabled` + `prefsReady` 门闩正确
-- [ ] 插件 `permissions` 与代码中使用的 `api.*` 一致
-- [ ] 新增 `modules:*` 已在 `buildModules` 注册
-- [ ] handler 穿透模式：离开页面时 `setXxxHostHandlers(null)`
-
-### 11.2 运行时验证
-
-```text
-1. mf.start() 无报错
-2. 打开宿主页 → PluginHostPage loading → 插件 UI 出现
-3. 控制台无 MF 加载 / 权限 / hostApiRange 错误
-4. 下架插件 → 显示 plugins.host.delisted
-5. （如有 modules）api.modules.xxx 可调通
-6. （Surface）drawer-triggers / toolbar / drawer 三块 part 行为正常
-```
-
-### 11.3 生产
-
-- [ ] `entry` 改为生产 manifest URL  
-- [ ] registry 上传 COS / 管理端保存  
-- [ ] 账号维度上架（[`enabled/`](./enabled/README.md)）
+页面内的可信插件直接调 `api.modules.point`，不走这些 RPC 名字。
 
 ---
 
-## 12. 完整 walkthrough 示例
+## 9. 验收
 
-### 12.1 最小插件：`helloPanel`（零 federation 改动）
+- [ ] Remote 的 `mf-manifest.json` 能打开，CORS 放行主站源和 `tauri://localhost`
+- [ ] `expose`、`remoteName` 与 vite `exposes` 一致
+- [ ] `hostApiRange` 为 `^1.0.0`
+- [ ] 扩展点插件的 `host.surface`、`host.slot` 能在 `points/catalog.ts` 里对上
+- [ ] `permissions` 含 `modules:point`；用了 toast 或后端再加对应权限
+- [ ] 按钮插件的 `host.slot` 是按钮槽，组件读的是 `opens` 指向的抽屉槽
+- [ ] 新页面在英语学习布局下时，没有再手写一个重复抽屉
+- [ ] 页面级命令在卸载时解绑
+- [ ] 插件中心启用后，未启用时入口不占位
 
-目标：在 `/demo/hello` 内嵌一个只调 toast 的演示插件。
+运行时：
 
-| 步骤 | 文件 / 位置 | 动作 |
-|------|-------------|------|
-| 1 | Remote 工程 | expose `./HelloPanel`，default 组件接收 `HostBridgeProps` |
-| 2 | registry | `id: "helloPanel"`，`permissions: ["ui:toast"]`，`injectRoute: false` |
-| 3 | `views/demo/HelloPanelPage.tsx` | 内嵌 `<PluginHostPage pluginId="helloPanel" />` + prefs 门闩 |
-| 4 | `router/routes.ts` | 注册 `/demo/hello` |
-| 5 | — | 启动 Remote :9008 + Host dev，打开路由验收 |
+1. 打开宿主页，插件从 loading 到内容出现。
+2. 控制台没有 manifest、权限或 `hostApiRange` 错误。
+3. 扩展点插件能读到当前上下文；点击行按钮后 `getPayload` 是这一行。
+4. 下架后入口消失。整页插件显示 `plugins.host.delisted`。
+5. 未知命令是 `UNKNOWN_POINT_COMMAND`，页面已离开是 `POINT_COMMAND_UNBOUND`。
 
-**`federation/` 内无需改任何文件。**
-
-### 12.2 带 Host API：`myPlugin`（handler 穿透，Surface）
-
-目标：阅读页 toolbar 插件，需知道当前 `bookId`。
-
-| 步骤 | 文件 | 动作 |
-|------|------|------|
-| 1 | Remote | 使用 `api.modules.myPlugin.getContextId()` |
-| 2 | registry | `host.surface: "ebook.read"`，`permissions: ["ui:toast","modules:myPlugin"]` |
-| 3 | `federation/modules/myPlugin/hostApi.ts` | handler 穿透 + `createMyPluginModulesApi` |
-| 4 | `federation/runtime/index.ts` | `buildModules` 注册 `modules:myPlugin` |
-| 5 | `federation/index.ts` | export `setMyPluginHostHandlers` |
-| 6 | `views/ebook/read.tsx` | `PluginHostSurface` + `setMyPluginHostHandlers` in `useEffect` |
-
-### 12.3 完整模式：`learningNotes`（内嵌 + Popout + sync）
-
-| 步骤 | 文件 | 动作 |
-|------|------|------|
-| 1 | registry | `id: "learningNotes"`，`injectRoute: false`，`permissions` 含 `ui:toast`、`http:plugin-api`、`modules:learningNotes` |
-| 2 | `federation/modules/learningNotes/hostApi.ts` | Popout、关窗钩子、`sync.*` |
-| 3 | `federation/modules/learningNotes/syncBus.ts` | 消息类型 + publish/subscribe |
-| 4 | `federation/runtime/index.ts` | `buildModules` → `learningNotes` |
-| 5 | `federation/index.ts` | export 模块与 sync 符号 |
-| 6 | `views/englishLearning/notes/index.tsx` | `PluginHostPage` |
-| 7 | `views/englishLearning/notes/popout.tsx` | Popout 宿主页 |
-| 8 | `router/routes.ts` | `/english-learning/notes` + `/english-learning/notes/popout` |
+生产把 `entry` 换成发布后的 manifest，并用管理端保存注册表。账号开关见 [`enabled/README.md`](./enabled/README.md)。
 
 ---
 
-## 13. 常见问题
+## 10. 常见问题
 
-| 现象 | 排查 |
+| 现象 | 原因 |
 |------|------|
-| 白屏 / Remote 加载失败 | `entry` URL、CORS、remoteName/expose 是否与 manifest 一致 |
-| `api.ui` 为 undefined | registry 是否含 `ui:toast` |
-| `api.modules.xxx` 为 undefined | permission 是否声明 + `buildModules` 是否注册 |
-| `MY_PLUGIN_API_UNBOUND` | handler 穿透：宿主页是否 `setXxxHostHandlers`，离开是否置 null |
-| `NAV_OUT_OF_SCOPE` | `navigate` 目标须以 `routePath` 开头 |
-| 刷新后 404 | 静态路由是否已注册；`injectRoute: false` 时不能指望 MF 注入路由 |
-| hostApiRange 拒绝加载 | 提高插件 `hostApiRange` 或升级 Host `VITE_HOST_API_VERSION` |
-| 误显示「已下架」 | 是否等 `ensurePluginEnabledPrefsLoaded` 后再判 `usePluginEnabled` |
+| 行上没有按钮 | `host.slot` 写成了抽屉槽。`HostPoint` 只在按钮槽上找插件 |
+| 有按钮，抽屉是空的 | 插件读了按钮槽名。载荷在 `opens` 指向的槽上，错题和每日阅读是 `drawer`，词库行是 `item-drawer` |
+| `api.modules.point` 是 `undefined` | 没有 `modules:point`，或 `host.surface` 不在目录里 |
+| `getContext()` 一直是 `null` | 页面没有 `usePointContext`，键不在 `contextKeys` 里，或值是空串 |
+| `UNKNOWN_POINT_COMMAND` | 目录 `commands` 没有这个名字 |
+| `POINT_COMMAND_UNBOUND` | 名字合法，但页面 effect 还没绑定或已经清理 |
+| 顶栏数字不变 | 该点 `signals` 没有 `stats`，或 `total` / `loaded` 不是有限数字 |
+| 刷新后 404 | `injectRoute: false` 时必须有静态路由。扩展点插件挂在已有页面上，不需要自己的业务路由 |
+| 改了注册表仍是旧插件 | 清 `dnhyxc.plugin.registry.dev.v1` 后重新拉取 |
+| 误显示已下架 | 整页插件要等 `ensurePluginEnabledPrefsLoaded` 完成再读 `usePluginEnabled` |
 
 ---
 
-## 14. 相关文档
+## 11. 相关文档
 
 | 文档 | 内容 |
 |------|------|
-| [`README.md`](./README.md) | federation 目录总览 |
-| [`host/README.md`](./host/README.md) | Page / Surface 模版 |
-| [`modules/README.md`](./modules/README.md) | 插件模块 checklist |
-| [`runtime/README.md`](./runtime/README.md) | createFederation 装配说明 |
-| [`packages/federation-kit/docs/plugin-guide/`](../../../../packages/federation-kit/docs/plugin-guide/) | Remote 侧开发、权限、样式隔离 |
-| [`docs/plugins/宿主插件集成指南.md`](../../../../docs/plugins/宿主插件集成指南.md) | 历史集成指南（细节更丰富） |
+| [`access.md`](./access.md) | 扩展点参数、从零示例、逐步代码 |
+| [`README.md`](./README.md) | `federation/` 目录索引 |
+| [`points/catalog.ts`](./points/catalog.ts) | 当前全部点和槽 |
+| [`modules/README.md`](./modules/README.md) | 学习笔记专属模块；扩展点不要往这里加 |
+| [`packages/federation-kit/docs/plugin-guide/`](../../../../packages/federation-kit/docs/plugin-guide/) | Remote 桥、权限、样式隔离 |

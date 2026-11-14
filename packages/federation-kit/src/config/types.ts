@@ -76,6 +76,7 @@ export interface HostCapabilities {
 	 */
 	buildModules?: (
 		permissions: ReadonlySet<string>,
+		plugin: PluginDescriptor,
 	) => Record<string, unknown> | undefined;
 	/** 监听 Host locale 变化；返回取消订阅 */
 	onLocaleChange?: (handler: (locale: HostLocale) => void) => () => void;

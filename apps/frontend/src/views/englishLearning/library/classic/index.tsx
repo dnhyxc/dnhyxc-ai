@@ -6,6 +6,7 @@ import { Button, ScrollArea, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { HostPoint, POINT, usePointContext } from '@/federation';
 import { useI18n } from '@/hooks';
 import { useIncrementalClassicQuoteFavoriteStatus } from '@/hooks/useIncrementalClassicQuoteFavoriteStatus';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,7 @@ export function ClassicQuotesLibrarySection({
 }: ClassicQuotesLibrarySectionProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
+	usePointContext(POINT.classicLibrary, libraryId ? { libraryId } : null);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
@@ -284,6 +286,7 @@ export function ClassicQuotesLibrarySection({
 					</span>
 				</div>
 				<div className="flex shrink-0 flex-nowrap items-center gap-3">
+					<HostPoint pointId={POINT.classicLibrary} slot="toolbar" />
 					<Entry
 						variant="text"
 						disabled={total <= 0}
@@ -373,6 +376,7 @@ export function ClassicQuotesLibrarySection({
 														play: t('englishLearning.classic.playQuote'),
 														stop: t('englishLearning.tts.stop'),
 													}}
+													pagePointId={POINT.classicLibrary}
 													trailingActions={
 														<Button
 															type="button"

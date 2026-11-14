@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { POINT, usePointContext } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -70,6 +71,7 @@ export function ClassicQuotesFavoritesSection({
 	headerTrailing,
 }: ClassicQuotesFavoritesSectionProps) {
 	const { t } = useI18n();
+	usePointContext(POINT.favorites, { kind: 'classic' });
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
 	const [gridReady, setGridReady] = useState(false);
 
@@ -456,6 +458,7 @@ export function ClassicQuotesFavoritesSection({
 					actions={
 						<FavoritesPanelFooter
 							selectAllId="classic-fav-select-all"
+							pointId={POINT.favorites}
 							showEntry
 							practiceContentKind="classic"
 							practiceDisabled={loading || totalCount === 0}
@@ -537,6 +540,7 @@ export function ClassicQuotesFavoritesSection({
 														play: t('englishLearning.classic.playQuote'),
 														stop: t('englishLearning.tts.stop'),
 													}}
+													pagePointId={POINT.favorites}
 													trailingActions={
 														<Button
 															type="button"
