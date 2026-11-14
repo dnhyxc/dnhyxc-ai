@@ -96,6 +96,8 @@ export function HostPoint({
 			: undefined;
 
 	const claimedId = useRef<string | null>(null);
+	// 曾经让位或被盖住。收回来时滑入距离为 0，避免 animation 从 none 恢复后又从右侧进一次
+	const parked = useRef(false);
 	const targetSlot = slotSpec?.opens ?? slot;
 	const matched = plugins.filter((plugin) => plugin.host?.slot === slot);
 
@@ -119,15 +121,20 @@ export function HostPoint({
 		slot,
 	]);
 
+	// 让位时也保持锁滚动。这里解开再等详解去锁，中间一帧页面会跳
 	useEffect(() => {
-		if (layout?.modal !== false || !session.open || yielded) return;
+		if (layout?.modal !== false || !session.open) return;
 		const prev = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return () => {
 			document.body.style.overflow = prev;
 		};
-	}, [layout?.modal, session.open, yielded]);
+	}, [layout?.modal, session.open]);
 
+	const conceal = Boolean(session.covered || yielded);
+	// 关掉之后下次再开仍要滑入。让位期间记下，收回来的那一帧用 0 位移
+	if (!session.open) parked.current = false;
+	else if (conceal) parked.current = true;
 	if (!spec || !slotSpec) return null;
 
 	if (slotSpec.kind === 'toolbar') {
@@ -222,21 +229,44 @@ export function HostPoint({
 	const title = plugin
 		? pickPluginLocaleText(plugin.title, locale) || plugin.id
 		: '';
+	// 列表和导入的 openCard 带 source:list。这一帧详解直接出现，遮罩不要从 0 淡入
+	const fromList =
+		session.open && !session.covered && session.payload?.source === 'list';
+	// opacity 写在 inline 上，压过 Sheet 打开态的 500ms transition。只加 invisible 时卡片层还会再画一帧
+	const sheetStyle: CSSProperties = conceal
+		? {
+				...drawerStyle,
+				animation: 'none',
+				transition: 'none',
+				opacity: 0,
+				visibility: 'hidden',
+			}
+		: fromList || parked.current
+			? ({
+					...drawerStyle,
+					'--tw-enter-translate-x': '0px',
+					opacity: 1,
+					transition: 'none',
+				} as CSSProperties)
+			: { ...drawerStyle };
 
 	return (
 		<Drawer
 			open={Boolean(session.open && plugin)}
 			modal={layout?.modal !== false}
 			plainOverlay={layout?.modal === false}
-			overlayClassName={yielded ? 'pointer-events-none opacity-0' : undefined}
+			overlayClassName={
+				yielded
+					? 'pointer-events-none opacity-0'
+					: fromList
+						? '![--tw-enter-opacity:1]'
+						: undefined
+			}
 			title={title}
 			width={pointDrawerWidth}
 			bodyClassName="overflow-hidden p-0"
-			className={cn(
-				(session.covered || yielded) && 'pointer-events-none invisible',
-				drawerClassName,
-			)}
-			contentStyle={drawerStyle}
+			className={cn(conceal && 'pointer-events-none', drawerClassName)}
+			contentStyle={sheetStyle}
 			onInteractOutside={(event) => {
 				if (yielded) event.preventDefault();
 			}}

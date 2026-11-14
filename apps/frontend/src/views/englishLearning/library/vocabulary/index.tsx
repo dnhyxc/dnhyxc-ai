@@ -91,6 +91,7 @@ export function VocabularyLibrarySection({
 		() => readSlot(POINT.vocabCard, 'drawer'),
 	);
 	const detailOpen = detail.open && !detail.covered;
+	const tucked = Boolean(openPluginId && detailOpen);
 	const listPlugin = useHostSurfacePlugins(POINT.vocabLibrary).find(
 		(plugin) => plugin.host?.slot === 'drawer',
 	);
@@ -102,6 +103,11 @@ export function VocabularyLibrarySection({
 		() => subscribeSignals(() => setListStats(readStats(POINT.vocabLibrary))),
 		[],
 	);
+
+	// 详解开着时记下。关掉详解后列表还在 data-state=open，animation 恢复时位移必须是 0
+	useEffect(() => {
+		if (tucked) setListStill(true);
+	}, [tucked]);
 
 	// 列表不跟详解抢滚动锁，只在自己打开时把页面滚定住
 	useEffect(() => {
@@ -408,19 +414,28 @@ export function VocabularyLibrarySection({
 				drawerBodyClassName="overflow-hidden p-0"
 				drawerWidth={pointDrawerWidth}
 				chromeStyle={
-					listStill
-						? ({ '--tw-enter-translate-x': '0px' } as CSSProperties)
-						: undefined
+					tucked
+						? {
+								animation: 'none',
+								transition: 'none',
+								opacity: 0,
+								visibility: 'hidden',
+							}
+						: listStill
+							? ({
+									'--tw-enter-translate-x': '0px',
+									opacity: 1,
+									transition: 'none',
+								} as CSSProperties)
+							: undefined
 				}
 				drawerModal={false}
 				drawerPlainOverlay
 				drawerOverlayClassName={
-					openPluginId && detailOpen
-						? 'pointer-events-none opacity-0'
-						: undefined
+					tucked ? 'pointer-events-none opacity-0' : undefined
 				}
-				drawerPreventDismiss={Boolean(openPluginId) && detailOpen}
-				drawerClassName={openPluginId && detailOpen ? 'invisible' : undefined}
+				drawerPreventDismiss={tucked}
+				drawerClassName={tucked ? 'pointer-events-none' : undefined}
 				onDrawerInteractOutside={(event) => {
 					if (openPluginId && detailOpen) event.preventDefault();
 				}}
