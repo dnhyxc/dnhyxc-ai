@@ -127,7 +127,16 @@ export const hostPoints: Record<string, HostPointSpec> = {
 		slots: [],
 		contextKeys: [],
 		signals: [],
-		commands: ['openReading', 'play', 'stop'],
+		commands: [
+			'openReading',
+			'play',
+			'stop',
+			'detailEntries',
+			'openDetail',
+			'openDetailList',
+			'openDetailImport',
+			'exportWords',
+		],
 	},
 	[POINT.ebookRead]: {
 		id: POINT.ebookRead,

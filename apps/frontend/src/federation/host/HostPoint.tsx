@@ -90,6 +90,16 @@ export function HostPoint({
 		() => NO_SLOT,
 	);
 	const yielded = Boolean(yieldTo && upper.open && !upper.covered);
+	const upperOpen = () => {
+		if (!yieldTo) return false;
+		const live = readSlot(yieldTo.point, yieldTo.slot);
+		return live.open && !live.covered;
+	};
+	const keepUnderDetail = (event?: Event) => {
+		if (!yielded && !upperOpen()) return false;
+		event?.preventDefault();
+		return true;
+	};
 	const drawerPlugin =
 		slotSpec?.kind === 'drawer'
 			? plugins.find((item) => item.id === session.pluginId)
@@ -175,7 +185,7 @@ export function HostPoint({
 							)}
 							aria-label={label}
 							aria-busy={pending}
-							className="h-7 w-7 shrink-0 rounded-md border border-theme/10 p-0 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600"
+							className="h-7 w-7 shrink-0 rounded-md border border-theme/10 p-0 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-500"
 							onPointerDown={(event) => event.stopPropagation()}
 							onClick={(event) => {
 								event.stopPropagation();
@@ -267,12 +277,11 @@ export function HostPoint({
 			bodyClassName="overflow-hidden p-0"
 			className={cn(conceal && 'pointer-events-none', drawerClassName)}
 			contentStyle={sheetStyle}
-			onInteractOutside={(event) => {
-				if (yielded) event.preventDefault();
-			}}
+			onInteractOutside={keepUnderDetail}
+			onFocusOutside={keepUnderDetail}
 			onOpenChange={(next) => {
 				if (!next) {
-					if (yielded) return;
+					if (keepUnderDetail()) return;
 					if (claimedId.current) {
 						clearPluginPortalClaim(claimedId.current);
 						claimedId.current = null;

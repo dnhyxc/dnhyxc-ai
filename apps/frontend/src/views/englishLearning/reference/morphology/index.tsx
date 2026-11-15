@@ -230,8 +230,8 @@ export default function EnglishMorphologyReferencePage() {
 																	className={cn(
 																		'mt-0.5 h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
 																		playing
-																			? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-																			: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+																			? 'border-teal-500/40 bg-teal-500/15 text-teal-500'
+																			: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-500',
 																	)}
 																	aria-label={
 																		playing

@@ -9,15 +9,17 @@ import {
 	Put,
 	Query,
 	Req,
+	Res,
 	UnauthorizedException,
 	UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import {
 	type CollectReadingWordInput,
 	EnglishDailyReadingWordService,
 } from './english-daily-reading-word.service';
+import { READING_EXPORT_TITLE } from './reading-word-export';
 
 type AuthedRequest = Request & { user?: { userId: number } };
 
@@ -34,6 +36,41 @@ export class EnglishDailyReadingWordController {
 	@Get('sources')
 	sources(@Req() req: AuthedRequest) {
 		return this.words.sources(this.userId(req));
+	}
+
+	@Get('export')
+	async exportJson(
+		@Req() req: AuthedRequest,
+		@Query('readingId') readingId?: string,
+		@Query('q') q?: string,
+	) {
+		const items = await this.words.exportItems(this.userId(req), {
+			readingId,
+			q,
+		});
+		return { title: READING_EXPORT_TITLE, items };
+	}
+
+	@Post('export-docx')
+	async exportDocx(
+		@Req() req: AuthedRequest,
+		@Body() body: { readingId?: unknown; q?: unknown },
+		@Res() res: Response,
+	): Promise<void> {
+		const buf = await this.words.exportDocxBuffer(this.userId(req), {
+			readingId: typeof body?.readingId === 'string' ? body.readingId : '',
+			q: typeof body?.q === 'string' ? body.q : '',
+		});
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="daily-reading-words.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
 	}
 
 	@Get('words')

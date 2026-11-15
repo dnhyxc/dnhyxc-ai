@@ -2208,6 +2208,50 @@ export const uncollectEnglishDailyReadingWord = async (body: {
 	);
 };
 
+export type DailyReadingWordExportItem = {
+	word: string;
+	ipa: string;
+	pos: string;
+	segmentation: string;
+	translationZh: string;
+	example: string;
+};
+
+export const getEnglishDailyReadingWordExport = async (query?: {
+	readingId?: string;
+	q?: string;
+}) => {
+	return await http.get<{
+		title: string;
+		items: DailyReadingWordExportItem[];
+	}>(`${ENGLISH_LEARNING_DAILY_READING_WORDS}/export`, {
+		querys: {
+			...(query?.readingId?.trim()
+				? { readingId: query.readingId.trim() }
+				: {}),
+			...(query?.q?.trim() ? { q: query.q.trim() } : {}),
+		},
+		silent: true,
+	});
+};
+
+export const downloadEnglishDailyReadingWordsDocx = async (
+	fileName: string,
+	query?: { readingId?: string; q?: string },
+) => {
+	await downloadEnglishAuthorizedDocx(
+		`${ENGLISH_LEARNING_DAILY_READING_WORDS}/export-docx`,
+		fileName,
+		{
+			...(query?.readingId?.trim()
+				? { readingId: query.readingId.trim() }
+				: {}),
+			...(query?.q?.trim() ? { q: query.q.trim() } : {}),
+		},
+		{ timeout: ENGLISH_DOCX_TIMEOUT_MS },
+	);
+};
+
 export const getEnglishDailyReadingWordKeys = async (readingId: string) => {
 	return await http.get<{ keys: string[] }>(
 		`${ENGLISH_LEARNING_DAILY_READING_WORDS}/status`,

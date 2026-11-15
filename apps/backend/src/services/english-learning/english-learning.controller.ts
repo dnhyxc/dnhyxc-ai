@@ -1193,16 +1193,22 @@ export class EnglishLearningController {
 		@Req() req: AuthedRequest,
 		@Query('libraryId') libraryId?: string,
 		@Query('cursor') cursor?: string,
+		@Query('scope') scope?: string,
 	) {
 		const userId = req.user?.userId;
 		if (userId == null) throw new UnauthorizedException('未授权');
+		const pageCursor =
+			typeof cursor === 'string' && cursor.length > 0 ? cursor : undefined;
+		if (scope === 'dailyReading') {
+			return this.vocabDetailService.listForDailyReading(userId, pageCursor);
+		}
 		if (typeof libraryId !== 'string' || !libraryId.trim()) {
 			throw new BadRequestException('libraryId');
 		}
 		return this.vocabDetailService.listForLibrary(
 			userId,
 			libraryId.trim(),
-			typeof cursor === 'string' && cursor.length > 0 ? cursor : undefined,
+			pageCursor,
 		);
 	}
 
@@ -1295,18 +1301,38 @@ export class EnglishLearningController {
 	}
 
 	/** 本库已导入的手动详解。不打模型，非所有者 403。 */
+	@Get('vocab-detail/prompt')
+	async vocabDetailPrompt(
+		@Req() req: AuthedRequest,
+		@Query('scope') scope?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) throw new UnauthorizedException('未授权');
+		if (scope !== 'dailyReading') throw new BadRequestException('scope');
+		return this.vocabDetailService.dailyReadingPrompt(userId);
+	}
+
 	@Get('vocab-detail/import')
 	async listVocabDetailImport(
 		@Req() req: AuthedRequest,
 		@Query('libraryId') libraryId?: string,
 		@Query('cursor') cursor?: string,
+		@Query('scope') scope?: string,
 	) {
 		const userId = req.user?.userId;
 		if (userId == null) throw new UnauthorizedException('未授权');
+		const pageCursor = typeof cursor === 'string' ? cursor.trim() : '';
+		if (scope === 'dailyReading') {
+			return this.vocabDetailService.listImportedWords(
+				userId,
+				undefined,
+				pageCursor || undefined,
+				'dailyReading',
+			);
+		}
 		if (typeof libraryId !== 'string' || !libraryId.trim()) {
 			throw new BadRequestException('libraryId');
 		}
-		const pageCursor = typeof cursor === 'string' ? cursor.trim() : '';
 		return this.vocabDetailService.listImportedWords(
 			userId,
 			libraryId.trim(),
@@ -1319,11 +1345,20 @@ export class EnglishLearningController {
 	async importVocabDetail(
 		@Req() req: AuthedRequest,
 		@Body()
-		body: { libraryId?: unknown; items?: unknown },
+		body: { libraryId?: unknown; items?: unknown; scope?: unknown },
 	) {
 		const userId = req.user?.userId;
 		if (userId == null) throw new UnauthorizedException('未授权');
-		if (typeof body?.libraryId !== 'string' || !Array.isArray(body.items)) {
+		if (!Array.isArray(body?.items)) throw new BadRequestException('文件无效');
+		if (body.scope === 'dailyReading') {
+			return this.vocabDetailService.importManualDetails(
+				userId,
+				undefined,
+				body.items,
+				'dailyReading',
+			);
+		}
+		if (typeof body.libraryId !== 'string') {
 			throw new BadRequestException('文件无效');
 		}
 		return this.vocabDetailService.importManualDetails(
@@ -1338,9 +1373,17 @@ export class EnglishLearningController {
 	async deleteVocabDetailImport(
 		@Req() req: AuthedRequest,
 		@Query('libraryId') libraryId?: string,
+		@Query('scope') scope?: string,
 	) {
 		const userId = req.user?.userId;
 		if (userId == null) throw new UnauthorizedException('未授权');
+		if (scope === 'dailyReading') {
+			return this.vocabDetailService.deleteManualDetails(
+				userId,
+				undefined,
+				'dailyReading',
+			);
+		}
 		if (typeof libraryId !== 'string' || !libraryId.trim()) {
 			throw new BadRequestException('文件无效');
 		}

@@ -49,6 +49,8 @@ export interface DrawerProps {
 	/** 遮罩额外类名。详解开着时用来拿掉这层遮罩 */
 	overlayClassName?: string;
 	onInteractOutside?: (event: Event) => void;
+	/** 焦点被上面的抽屉拿走时，不要因此把这一层关掉 */
+	onFocusOutside?: (event: Event) => void;
 }
 
 /**
@@ -75,6 +77,7 @@ export function Drawer({
 	plainOverlay,
 	overlayClassName,
 	onInteractOutside,
+	onFocusOutside,
 }: DrawerProps) {
 	return (
 		<Sheet
@@ -89,6 +92,7 @@ export function Drawer({
 				plainOverlay={plainOverlay}
 				overlayClassName={overlayClassName}
 				onInteractOutside={onInteractOutside}
+				onFocusOutside={onFocusOutside}
 				className={cn(
 					'flex flex-col gap-0 outline-none', // gap-0 to manually control spacing via padding
 					width,

@@ -17,12 +17,14 @@ import { createLlm } from 'src/utils/create-llm';
 import { In, Not, Repository } from 'typeorm';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { EL_LIB_LIST_TTL_MS } from './english-learning-library.cache';
+import { EnglishDailyReadingWord } from './entity/english-daily-reading-word.entity';
 import { EnglishVocabDetailCache } from './entity/english-vocab-detail-cache.entity';
 import { EnglishVocabDetailManual } from './entity/english-vocab-detail-manual.entity';
 import { EnglishVocabDetailRegen } from './entity/english-vocab-detail-regen.entity';
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
 import { EnglishVocabularyLibraryItem } from './entity/english-vocabulary-library-item.entity';
+import { READING_EXPORT_TITLE, readingExportItem } from './reading-word-export';
 import {
 	normalizeVocabLemma,
 	parseVocabDetail,
@@ -190,6 +192,16 @@ function listReadyKey(userId: number, libraryId: string): string {
 function listViewersKey(libraryId: string): string {
 	return `el:vocabDetailList:viewers:${libraryId}`;
 }
+const READING_LIST = 'src:dailyReading';
+function readingZsetKey(userId: number): string {
+	return `el:vocabDetailList:z:u:${userId}:${READING_LIST}`;
+}
+function readingHashKey(userId: number): string {
+	return `el:vocabDetailList:h:u:${userId}:${READING_LIST}`;
+}
+function readingReadyKey(userId: number): string {
+	return `el:vocabDetailList:ready:u:${userId}:${READING_LIST}`;
+}
 
 @Injectable()
 export class VocabDetailService {
@@ -214,6 +226,8 @@ export class VocabDetailService {
 		private readonly regenRepo: Repository<EnglishVocabDetailRegen>,
 		@InjectRepository(EnglishVocabularyLibrary)
 		private readonly libraries: Repository<EnglishVocabularyLibrary>,
+		@InjectRepository(EnglishDailyReadingWord)
+		private readonly readingWords: Repository<EnglishDailyReadingWord>,
 	) {}
 
 	/** 只读已有详解，不触发生成。没有则 null。 */
@@ -477,7 +491,12 @@ export class VocabDetailService {
 		if (ready === epoch) {
 			try {
 				await this.touchListKeys(client, userId, libraryId);
-				return await this.pageListZset(client, userId, libraryId, parsed);
+				return await this.pageListZset(
+					client,
+					listZsetKey(userId, libraryId),
+					listHashKey(userId, libraryId),
+					parsed,
+				);
 			} catch (e) {
 				this.logger.warn(
 					`vocab detail list page failed: ${
@@ -489,7 +508,63 @@ export class VocabDetailService {
 		}
 		const rows = await this.buildListOnce(userId, libraryId);
 		await this.writeListZset(client, userId, libraryId, rows, epoch);
-		return this.pageListZset(client, userId, libraryId, parsed);
+		return this.pageListZset(
+			client,
+			listZsetKey(userId, libraryId),
+			listHashKey(userId, libraryId),
+			parsed,
+		);
+	}
+
+	/** 当前用户生词 word_key ∩ 已有详解。不读 libraryId。 */
+	async listForDailyReading(
+		userId: number,
+		cursor?: string,
+	): Promise<VocabDetailListPage> {
+		const parsed = readListCursor(cursor);
+		const client = await this.lockClient();
+		if (!client) {
+			return pageMergedDetails(
+				await this.buildDailyReadingDetailRows(userId),
+				parsed,
+			);
+		}
+		const epoch = String((await client.get(LIST_EPOCH_KEY)) ?? '0');
+		const ready = await client.get(readingReadyKey(userId));
+		if (ready === epoch) {
+			try {
+				await this.touchReadingKeys(client, userId);
+				return await this.pageListZset(
+					client,
+					readingZsetKey(userId),
+					readingHashKey(userId),
+					parsed,
+				);
+			} catch (e) {
+				this.logger.warn(
+					`daily reading detail list page failed: ${
+						e instanceof Error ? e.message.slice(0, 200) : String(e)
+					}`,
+				);
+				await client.del(readingReadyKey(userId));
+			}
+		}
+		const rows = await this.buildReadingListOnce(userId);
+		await this.writeTagList(
+			client,
+			readingZsetKey(userId),
+			readingHashKey(userId),
+			readingReadyKey(userId),
+			rows,
+			epoch,
+		);
+		await this.touchReadingKeys(client, userId);
+		return this.pageListZset(
+			client,
+			readingZsetKey(userId),
+			readingHashKey(userId),
+			parsed,
+		);
 	}
 
 	/** 全站缓存未命中时的那一次生成。先挂上在途，停止才能在 arm 之前认到这一轮。 */
@@ -538,6 +613,7 @@ export class VocabDetailService {
 			['cacheKey'],
 		);
 		await this.patchLemmaForViewers(lemma);
+		await this.dropDailyReadingList(userId);
 		return parsed;
 	}
 
@@ -732,10 +808,15 @@ export class VocabDetailService {
 	/** 本库已导入的手动详解。按更新时间倒序，每页 50 条。 */
 	async listImportedWords(
 		userId: number,
-		libraryId: string,
+		libraryId?: string,
 		cursor?: string,
+		scope?: string,
 	): Promise<ImportedWordPage> {
-		await this.assertOwner(userId, libraryId);
+		const reading = scope === 'dailyReading';
+		if (!reading) {
+			if (!libraryId) throw new BadRequestException('libraryId');
+			await this.assertOwner(userId, libraryId);
+		}
 		// 首页没有游标；有游标时拆成「上一页最后一条的更新时间 + 词形」，格式不对直接 400
 		const parsed = cursor ? parseImportCursor(cursor) : null;
 		// 释义抽取语句按当前连接的数据库写，MySQL 和 Postgres 的 JSON 路径不一样
@@ -748,17 +829,22 @@ export class VocabDetailService {
 			gloss = `m.detail->'senses'->0->>'glossZh'`;
 		}
 		// 子查询只收集这本库里的词形，用来把「用户的全部手动详解」收窄到当前词库
-		const lemmaSub = this.libraryItems
-			// 词条表别名 i，后面的库 id 和空词形条件都写在这张表上
-			.createQueryBuilder('i')
-			// 同一个词在库里有多条时只保留一个 lemma，避免和详解连接后一行变多行
-			.distinct(true)
-			// 子查询只拿出词形这一列，作为和手动详解连接的键
-			.select('i.lemma', 'lemma')
-			// 限定当前打开的这本库，其它库的同形词不参与
-			.where('i.libraryId = :libraryId', { libraryId })
-			// lemma 仍为空的词条没有可对齐的词形，不参与这本库的已导入列表
-			.andWhere("i.lemma <> ''");
+		const lemmaSub = reading
+			? this.readingWords
+					.createQueryBuilder('i')
+					.select('i.wordKey', 'lemma')
+					.where('i.userId = :userId', { userId })
+			: this.libraryItems
+					// 词条表别名 i，后面的库 id 和空词形条件都写在这张表上
+					.createQueryBuilder('i')
+					// 同一个词在库里有多条时只保留一个 lemma，避免和详解连接后一行变多行
+					.distinct(true)
+					// 子查询只拿出词形这一列，作为和手动详解连接的键
+					.select('i.lemma', 'lemma')
+					// 限定当前打开的这本库，其它库的同形词不参与
+					.where('i.libraryId = :libraryId', { libraryId })
+					// lemma 仍为空的词条没有可对齐的词形，不参与这本库的已导入列表
+					.andWhere("i.lemma <> ''");
 		// 从手动详解表出发，别名 m，后面的用户、版本、排序都落在这张表上
 		const qb = this.manualRepo
 			// 手动详解表别名 m，用户、版本和排序条件都写在 m 上
@@ -840,8 +926,9 @@ export class VocabDetailService {
 
 	async importManualDetails(
 		userId: number,
-		libraryId: string,
+		libraryId: string | undefined,
 		items: unknown[],
+		scope?: string,
 	): Promise<{
 		imported: number;
 		overwritten: number;
@@ -854,8 +941,11 @@ export class VocabDetailService {
 		if (items.length > 2000) {
 			throw new BadRequestException('一次最多导入 2000 条');
 		}
-		await this.assertOwner(userId, libraryId);
-		const allowed = new Set(await this.lemmasInLibrary(libraryId));
+		const reading = scope === 'dailyReading';
+		const allowed = reading
+			? new Set(await this.readingWordKeys(userId))
+			: new Set(await this.lemmasInLibrary(libraryId ?? ''));
+		if (!reading) await this.assertOwner(userId, libraryId ?? '');
 		const latest = new Map<string, VocabDetail>();
 		let skippedNotInLibrary = 0;
 		let skippedInvalid = 0;
@@ -935,8 +1025,20 @@ export class VocabDetailService {
 
 	async deleteManualDetails(
 		userId: number,
-		libraryId: string,
+		libraryId?: string,
+		scope?: string,
 	): Promise<{ deleted: number }> {
+		if (scope === 'dailyReading') {
+			const lemmas = await this.readingWordKeys(userId);
+			if (lemmas.length === 0) return { deleted: 0 };
+			const result = await this.manualRepo.delete({
+				userId,
+				lemma: In(lemmas),
+			});
+			for (const lemma of lemmas) await this.patchLemmaForUser(userId, lemma);
+			return { deleted: result.affected ?? 0 };
+		}
+		if (!libraryId) throw new BadRequestException('libraryId');
 		await this.assertOwner(userId, libraryId);
 		const lemmas = await this.lemmasInLibrary(libraryId);
 		if (lemmas.length === 0) return { deleted: 0 };
@@ -946,6 +1048,32 @@ export class VocabDetailService {
 		});
 		for (const lemma of lemmas) await this.patchLemmaForUser(userId, lemma);
 		return { deleted: result.affected ?? 0 };
+	}
+
+	/** 生词导入提示词。与导出 JSON 同形，超过 2000 条只留较新的。 */
+	async dailyReadingPrompt(userId: number): Promise<{
+		title: string;
+		items: Array<{
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+		}>;
+		omitted: number;
+	}> {
+		const rows = await this.readingWords.find({
+			where: { userId },
+			order: { updatedAt: 'DESC' },
+		});
+		const cap = 2000;
+		const items = rows.slice(0, cap).map((row) => readingExportItem(row));
+		return {
+			title: READING_EXPORT_TITLE,
+			items,
+			omitted: Math.max(0, rows.length - cap),
+		};
 	}
 
 	/** 与 assertVocabularyLibraryReadable 相同：所有者或公开库，否则 404。 */
@@ -960,6 +1088,41 @@ export class VocabDetailService {
 			],
 		});
 		if (!lib) throw new NotFoundException('单词库不存在或无权访问');
+	}
+
+	private async readingWordKeys(userId: number): Promise<string[]> {
+		const rows = await this.readingWords.find({
+			where: { userId },
+			select: { wordKey: true },
+		});
+		return rows.map((row) => row.wordKey).filter((key) => key.length > 0);
+	}
+
+	private async buildDailyReadingDetailRows(
+		userId: number,
+	): Promise<MergedRow[]> {
+		const lemmas = [...new Set(await this.readingWordKeys(userId))].filter(
+			(lemma) => lemma.length <= 120,
+		);
+		if (lemmas.length === 0) return [];
+		const hits: ListHit[] = [];
+		for (let i = 0; i < lemmas.length; i += 1000) {
+			hits.push(
+				...(await this.loadListHits(userId, lemmas.slice(i, i + 1000))),
+			);
+		}
+		return mergeLibraryDetailHits(hits);
+	}
+
+	private async buildReadingListOnce(userId: number): Promise<MergedRow[]> {
+		const key = `${userId}:${READING_LIST}`;
+		const pending = this.listBuilds.get(key);
+		if (pending) return pending;
+		const job = this.buildDailyReadingDetailRows(userId).finally(() => {
+			this.listBuilds.delete(key);
+		});
+		this.listBuilds.set(key, job);
+		return job;
 	}
 
 	private async buildLibraryDetailRows(
@@ -1008,8 +1171,26 @@ export class VocabDetailService {
 		rows: MergedRow[],
 		epoch: string,
 	): Promise<void> {
-		const zkey = listZsetKey(userId, libraryId);
-		const hkey = listHashKey(userId, libraryId);
+		await this.writeTagList(
+			client,
+			listZsetKey(userId, libraryId),
+			listHashKey(userId, libraryId),
+			listReadyKey(userId, libraryId),
+			rows,
+			epoch,
+		);
+		await client.sAdd(listViewersKey(libraryId), String(userId));
+		await this.touchListKeys(client, userId, libraryId);
+	}
+
+	private async writeTagList(
+		client: RedisLockClient,
+		zkey: string,
+		hkey: string,
+		readyKey: string,
+		rows: MergedRow[],
+		epoch: string,
+	): Promise<void> {
 		await client.del([zkey, hkey]);
 		for (let i = 0; i < rows.length; i += 1000) {
 			const group = rows.slice(i, i + 1000);
@@ -1030,9 +1211,7 @@ export class VocabDetailService {
 			}
 			await client.hSet(hkey, payload);
 		}
-		await client.set(listReadyKey(userId, libraryId), epoch);
-		await client.sAdd(listViewersKey(libraryId), String(userId));
-		await this.touchListKeys(client, userId, libraryId);
+		await client.set(readyKey, epoch);
 	}
 
 	private async touchListKeys(
@@ -1080,20 +1259,14 @@ export class VocabDetailService {
 
 	private async pageListZset(
 		client: RedisLockClient,
-		userId: number,
-		libraryId: string,
+		zkey: string,
+		hkey: string,
 		cursor: ListCursor | null,
 	): Promise<VocabDetailListPage> {
-		const members = await this.pageMembers(
-			client,
-			listZsetKey(userId, libraryId),
-			cursor,
-		);
+		const members = await this.pageMembers(client, zkey, cursor);
 		const hasMore = members.length > LIST_PAGE_SIZE;
 		const page = hasMore ? members.slice(0, LIST_PAGE_SIZE) : members;
-		const raw = page.length
-			? await client.hmGet(listHashKey(userId, libraryId), page)
-			: [];
+		const raw = page.length ? await client.hmGet(hkey, page) : [];
 		const items = page.map((lemma, index) => {
 			const cell = raw[index];
 			if (!cell) throw new Error('list cache thin row missing');
@@ -1109,7 +1282,7 @@ export class VocabDetailService {
 				source: parsed.source,
 			};
 		});
-		const total = await client.zCard(listZsetKey(userId, libraryId));
+		const total = await client.zCard(zkey);
 		const last = items.at(-1);
 		const nextCursor =
 			hasMore && last
@@ -1246,10 +1419,38 @@ export class VocabDetailService {
 		}
 	}
 
+	private async dropDailyReadingList(userId: number): Promise<void> {
+		try {
+			const client = await this.lockClient();
+			if (!client) return;
+			await client.del(readingReadyKey(userId));
+		} catch (e) {
+			this.logger.warn(
+				`daily reading detail list drop failed: ${
+					e instanceof Error ? e.message.slice(0, 200) : String(e)
+				}`,
+			);
+		}
+	}
+
+	private async touchReadingKeys(
+		client: RedisLockClient,
+		userId: number,
+	): Promise<void> {
+		for (const key of [
+			readingZsetKey(userId),
+			readingHashKey(userId),
+			readingReadyKey(userId),
+		]) {
+			await client.pExpire(key, EL_LIB_LIST_TTL_MS);
+		}
+	}
+
 	private async patchLemmaForUser(
 		userId: number,
 		lemma: string,
 	): Promise<void> {
+		await this.dropDailyReadingList(userId);
 		const libraryIds = await this.libraryIdsForLemma(lemma);
 		for (const libraryId of libraryIds) {
 			await this.patchListLemma(userId, libraryId, lemma);

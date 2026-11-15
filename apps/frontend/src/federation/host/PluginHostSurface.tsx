@@ -48,8 +48,8 @@ export type PluginHostSurfaceProps = {
 	drawerPlainOverlay?: boolean;
 	drawerOverlayClassName?: string;
 	onDrawerInteractOutside?: (event: Event) => void;
-	/** 详解盖在上面时，忽略这次关闭 */
-	drawerPreventDismiss?: boolean;
+	/** 详解盖在上面时，忽略这次关闭。函数在关闭那一刻再读，避免状态还没刷新就关了 */
+	drawerPreventDismiss?: boolean | (() => boolean);
 	/** 加在抽屉面板上。详解开着时用来藏起这一层 */
 	drawerClassName?: string;
 };
@@ -192,9 +192,14 @@ export function PluginHostSurface({
 			plainOverlay={drawerPlainOverlay}
 			overlayClassName={drawerOverlayClassName}
 			onInteractOutside={onDrawerInteractOutside}
+			onFocusOutside={onDrawerInteractOutside}
 			onOpenChange={(open) => {
 				if (!open) {
-					if (drawerPreventDismiss) return;
+					const stay =
+						typeof drawerPreventDismiss === 'function'
+							? drawerPreventDismiss()
+							: drawerPreventDismiss;
+					if (stay) return;
 					clearPluginPortalClaim(openPluginId);
 					onOpenPluginIdChange?.(null);
 				}

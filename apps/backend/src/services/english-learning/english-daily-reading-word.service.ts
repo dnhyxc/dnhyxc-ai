@@ -5,12 +5,19 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import { ENGLISH_VOCAB_GENERATION_MAX } from './dto/generate-vocabulary.dto';
+import { buildVocabularyFavoritesDocxBuffer } from './english-favorites-docx.builder';
 import { EnglishDailyReading } from './entity/english-daily-reading.entity';
 import {
 	EnglishDailyReadingWord,
 	type ReadingWordSource,
 	type ReadingWordSurface,
 } from './entity/english-daily-reading-word.entity';
+import {
+	READING_EXPORT_TITLE,
+	type ReadingWordExportItem,
+	readingExportItem,
+} from './reading-word-export';
 import { readingWordKey } from './reading-word-key';
 
 const PAGE = 100;
@@ -153,17 +160,10 @@ export class EnglishDailyReadingWordService {
 		userId: number,
 		query: { readingId?: string; q?: string; cursor?: string },
 	) {
-		const readingId = query.readingId?.trim() ?? '';
-		const q = query.q?.trim() ?? '';
 		const qb = this.words
 			.createQueryBuilder('w')
 			.where('w.userId = :userId', { userId });
-		if (readingId) qb.andWhere(this.readingMatch(), { readingId });
-		if (q) {
-			qb.andWhere('(w.word LIKE :like OR w.zh LIKE :like)', {
-				like: `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`,
-			});
-		}
+		this.applyListFilter(qb, query);
 		const total = await qb.clone().getCount();
 		const cursor = this.cursorOf(query.cursor);
 		if (cursor) {
@@ -187,6 +187,36 @@ export class EnglishDailyReadingWordService {
 			total,
 			nextCursor: hasMore && last ? `${last.updatedAt}|${last.id}` : null,
 		};
+	}
+
+	async exportItems(
+		userId: number,
+		query: { readingId?: string; q?: string } = {},
+	): Promise<ReadingWordExportItem[]> {
+		const qb = this.words
+			.createQueryBuilder('w')
+			.where('w.userId = :userId', { userId });
+		this.applyListFilter(qb, query);
+		const rows = await qb
+			.orderBy('w.updatedAt', 'DESC')
+			.addOrderBy('w.id', 'DESC')
+			.getMany();
+		return rows.map((row) => readingExportItem(row));
+	}
+
+	async exportDocxBuffer(
+		userId: number,
+		query: { readingId?: string; q?: string } = {},
+	): Promise<Buffer> {
+		const items = (await this.exportItems(userId, query)).slice(
+			0,
+			ENGLISH_VOCAB_GENERATION_MAX,
+		);
+		if (!items.length) throw new BadRequestException('无可导出词条');
+		return buildVocabularyFavoritesDocxBuffer(items, {
+			title: READING_EXPORT_TITLE,
+			subtitle: `共 ${items.length} 条`,
+		});
 	}
 
 	async editZh(userId: number, id: string, zh: unknown) {
@@ -258,6 +288,20 @@ export class EnglishDailyReadingWordService {
 
 	private sourcesOf(row: EnglishDailyReadingWord): ReadingWordSource[] {
 		return Array.isArray(row.sources) ? row.sources : [];
+	}
+
+	private applyListFilter(
+		qb: ReturnType<Repository<EnglishDailyReadingWord>['createQueryBuilder']>,
+		query: { readingId?: string; q?: string },
+	) {
+		const readingId = query.readingId?.trim() ?? '';
+		const q = query.q?.trim() ?? '';
+		if (readingId) qb.andWhere(this.readingMatch(), { readingId });
+		if (q) {
+			qb.andWhere('(w.word LIKE :like OR w.zh LIKE :like)', {
+				like: `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`,
+			});
+		}
 	}
 
 	private readingMatch(): string {

@@ -190,7 +190,7 @@ export function Entry({
 				aria-label={ariaLabel}
 				className={cn(
 					'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-					'text-textcolor/65 hover:border hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+					'text-textcolor/65 hover:border hover:border-theme/20 hover:bg-theme/10 hover:text-teal-500',
 					className,
 				)}
 				onClick={handleClick}

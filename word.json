@@ -1,0 +1,778 @@
+{
+	"items": [
+		{
+			"word": "steadfast",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "steadfast",
+							"kind": "base",
+							"meaningZh": "坚定的；稳固的；忠实的"
+						}
+					],
+					"storyZh": "可联想为“站得稳、抓得牢”，引申为信念或支持长期不动摇。"
+				},
+				"memory": { "hookZh": "stead（稳住）+ fast（抓牢）→ 坚定不动摇。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "坚定的，不动摇的",
+						"nuanceZh": "强调信念、立场或决心长期不变。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "稳固的，牢靠的",
+						"nuanceZh": "偏重结构、位置或关系稳定。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "忠实的，始终如一的",
+						"nuanceZh": "常修饰支持、朋友或盟友。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "坚持不懈的",
+						"nuanceZh": "常修饰努力、行动或追求。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "坚贞的",
+						"nuanceZh": "文学语境中可指感情或承诺坚定。"
+					}
+				],
+				"examples": [
+					{
+						"en": "Her steadfast support helped him finish the marathon.",
+						"zh": "她坚定的支持帮助他跑完了马拉松。"
+					},
+					{
+						"en": "The old bridge remained steadfast despite years of storms.",
+						"zh": "尽管历经多年风暴，那座老桥依然稳固。"
+					},
+					{
+						"en": "He is steadfast in his promise to protect the village.",
+						"zh": "他坚守保护村庄的承诺。"
+					},
+					{
+						"en": "Steadfast effort, not sudden enthusiasm, often wins the day.",
+						"zh": "往往是坚持不懈的努力而不是一时热情赢得成功。"
+					},
+					{
+						"en": "They remained steadfast friends through difficult times.",
+						"zh": "他们在困难时期仍是始终如一的朋友。"
+					}
+				],
+				"family": [
+					{ "word": "steadfastly", "pos": "adv.", "glossZh": "坚定地" },
+					{ "word": "steadfastness", "pos": "n.", "glossZh": "坚定；忠实" }
+				],
+				"collocations": [
+					{ "phrase": "steadfast support", "glossZh": "坚定的支持" },
+					{ "phrase": "steadfast friend", "glossZh": "忠实的朋友" },
+					{ "phrase": "remain steadfast", "glossZh": "保持坚定" }
+				],
+				"synonyms": [
+					{ "word": "firm", "pos": "adj.", "glossZh": "坚定的" },
+					{ "word": "resolute", "pos": "adj.", "glossZh": "坚决的" },
+					{ "word": "unwavering", "pos": "adj.", "glossZh": "不动摇的" },
+					{ "word": "loyal", "pos": "adj.", "glossZh": "忠诚的" }
+				],
+				"tags": ["品质", "坚持", "形容词"]
+			}
+		},
+		{
+			"word": "modest",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "modest",
+							"kind": "base",
+							"meaningZh": "谦逊的；适度的；朴素的"
+						}
+					],
+					"storyZh": "核心含义是“不过分、不张扬”，可指人谦逊，也可指数量或规模适中。"
+				},
+				"memory": { "hookZh": "不摆架子、不夸规模：谦逊又适度。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "谦逊的，不炫耀的",
+						"nuanceZh": "形容人不自夸、态度低调。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "适度的，不太大的",
+						"nuanceZh": "常修饰目标、数量、增长或要求。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "朴素的，不奢华的",
+						"nuanceZh": "常修饰住房、衣着、生活方式。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "羞怯的，保守的",
+						"nuanceZh": "可指言行谨慎、不愿引人注意。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "（成绩、表现）尚可的",
+						"nuanceZh": "含谨慎评价，表示不算差但也不突出。"
+					}
+				],
+				"examples": [
+					{
+						"en": "She gave a modest smile when her work was praised.",
+						"zh": "当她的工作受到赞扬时，她谦逊地笑了笑。"
+					},
+					{
+						"en": "The company reported a modest increase in sales.",
+						"zh": "公司报告销售额有小幅增长。"
+					},
+					{
+						"en": "They live in a modest apartment near the station.",
+						"zh": "他们住在车站附近一套朴素的公寓里。"
+					},
+					{
+						"en": "He was modest about his role in the rescue.",
+						"zh": "他对自己在救援中的作用很谦逊。"
+					},
+					{
+						"en": "A modest budget can still produce a memorable trip.",
+						"zh": "预算不高也能成就一次难忘的旅行。"
+					}
+				],
+				"family": [
+					{ "word": "modestly", "pos": "adv.", "glossZh": "谦逊地；适度地" },
+					{ "word": "modesty", "pos": "n.", "glossZh": "谦逊；适度" }
+				],
+				"collocations": [
+					{ "phrase": "modest goal", "glossZh": "适度的目标" },
+					{ "phrase": "modest income", "glossZh": "不高的收入" },
+					{ "phrase": "be modest about", "glossZh": "对……很谦逊" }
+				],
+				"synonyms": [
+					{ "word": "humble", "pos": "adj.", "glossZh": "谦逊的" },
+					{ "word": "moderate", "pos": "adj.", "glossZh": "适度的" },
+					{ "word": "unassuming", "pos": "adj.", "glossZh": "不张扬的" },
+					{ "word": "small", "pos": "adj.", "glossZh": "不大的" }
+				],
+				"tags": ["态度", "程度", "形容词"]
+			}
+		},
+		{
+			"word": "athletic",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "athletic",
+							"kind": "base",
+							"meaningZh": "运动的；健壮的；运动员的"
+						}
+					],
+					"storyZh": "与 athlete（运动员）同源，核心是“与体育运动或运动体格相关”。"
+				},
+				"memory": { "hookZh": "athlete 的形容词：运动员的、健壮的。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "体育运动的",
+						"nuanceZh": "常修饰比赛、项目、活动或设施。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "健壮的，体格好的",
+						"nuanceZh": "形容人有运动型体格或体能好。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "运动员的",
+						"nuanceZh": "强调属于运动员或适合运动员。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "有运动天赋的",
+						"nuanceZh": "可指人擅长体育运动。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "运动用的",
+						"nuanceZh": "常修饰服装、鞋类或装备。"
+					}
+				],
+				"examples": [
+					{
+						"en": "She joined the athletic club to improve her stamina.",
+						"zh": "她加入运动俱乐部来提高耐力。"
+					},
+					{
+						"en": "His athletic build made him a natural runner.",
+						"zh": "他健壮的体格使他天生适合跑步。"
+					},
+					{
+						"en": "The school built a new athletic field last year.",
+						"zh": "学校去年建了一个新的运动场。"
+					},
+					{
+						"en": "Athletic shoes are designed for comfort and support.",
+						"zh": "运动鞋是为舒适和支撑而设计的。"
+					},
+					{
+						"en": "She showed athletic talent from an early age.",
+						"zh": "她从小就展现出运动天赋。"
+					}
+				],
+				"family": [
+					{ "word": "athlete", "pos": "n.", "glossZh": "运动员" },
+					{ "word": "athletics", "pos": "n.", "glossZh": "体育运动；田径" },
+					{
+						"word": "athletically",
+						"pos": "adv.",
+						"glossZh": "在运动方面；健壮地"
+					}
+				],
+				"collocations": [
+					{ "phrase": "athletic ability", "glossZh": "运动能力" },
+					{ "phrase": "athletic event", "glossZh": "体育赛事" },
+					{ "phrase": "athletic shoes", "glossZh": "运动鞋" }
+				],
+				"synonyms": [
+					{ "word": "sporty", "pos": "adj.", "glossZh": "运动型的" },
+					{ "word": "fit", "pos": "adj.", "glossZh": "健康的；体格好的" },
+					{ "word": "muscular", "pos": "adj.", "glossZh": "肌肉发达的" },
+					{ "word": "strong", "pos": "adj.", "glossZh": "强壮的" }
+				],
+				"tags": ["运动", "体格", "形容词"]
+			}
+		},
+		{
+			"word": "professional",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{ "form": "pro", "kind": "prefix", "meaningZh": "向前；公开" },
+						{ "form": "fess", "kind": "root", "meaningZh": "说；声明" },
+						{
+							"form": "ion",
+							"kind": "suffix",
+							"meaningZh": "名词后缀，表示行为或状态"
+						},
+						{
+							"form": "al",
+							"kind": "suffix",
+							"meaningZh": "形容词后缀，表示……的"
+						}
+					],
+					"storyZh": "原指公开声明自己以此行为业，后来引申为职业的、专业的。"
+				},
+				"memory": { "hookZh": "公开声明以此为业 → 职业的、专业的。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "专业的，内行的",
+						"nuanceZh": "强调达到行业标准、技术娴熟。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "职业的，以此谋生的",
+						"nuanceZh": "与业余相对，强调职业身份。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "专业人士",
+						"nuanceZh": "指受过专门训练并从事某职业的人。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "职业选手",
+						"nuanceZh": "体育等语境中与业余选手相对。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "职业性的，业务上的",
+						"nuanceZh": "常修饰行为、建议、关系或责任。"
+					}
+				],
+				"examples": [
+					{
+						"en": "She gave me professional advice about the contract.",
+						"zh": "她就合同给了我专业建议。"
+					},
+					{
+						"en": "He became a professional photographer after years of practice.",
+						"zh": "经过多年练习，他成为了一名职业摄影师。"
+					},
+					{
+						"en": "The event was organized in a highly professional way.",
+						"zh": "活动组织得非常专业。"
+					},
+					{
+						"en": "Professionals in the field need continuous training.",
+						"zh": "该领域的专业人士需要持续培训。"
+					},
+					{
+						"en": "Please keep the discussion professional and respectful.",
+						"zh": "请保持讨论的专业性和尊重。"
+					}
+				],
+				"family": [
+					{ "word": "profession", "pos": "n.", "glossZh": "职业；行业" },
+					{
+						"word": "professionally",
+						"pos": "adv.",
+						"glossZh": "专业地；职业地"
+					},
+					{
+						"word": "professionalism",
+						"pos": "n.",
+						"glossZh": "专业精神；职业水准"
+					}
+				],
+				"collocations": [
+					{ "phrase": "professional advice", "glossZh": "专业建议" },
+					{ "phrase": "professional career", "glossZh": "职业生涯" },
+					{ "phrase": "highly professional", "glossZh": "高度专业的" }
+				],
+				"synonyms": [
+					{ "word": "expert", "pos": "adj.", "glossZh": "专家的；熟练的" },
+					{ "word": "skilled", "pos": "adj.", "glossZh": "熟练的" },
+					{ "word": "occupational", "pos": "adj.", "glossZh": "职业的" },
+					{ "word": "qualified", "pos": "adj.", "glossZh": "合格的；有资质的" }
+				],
+				"tags": ["职业", "专业", "形容词"]
+			}
+		},
+		{
+			"word": "brown",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "brown",
+							"kind": "base",
+							"meaningZh": "棕色的；棕色；使变成棕色"
+						}
+					],
+					"storyZh": "基础颜色词，也可作动词表示“煎烤至棕色”。"
+				},
+				"memory": { "hookZh": "咖啡、面包和木头都常是 brown。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "棕色的，褐色的",
+						"nuanceZh": "最常用义，描述颜色。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "晒黑的",
+						"nuanceZh": "指皮肤被阳光晒成棕色。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "棕色，褐色",
+						"nuanceZh": "作名词表示颜色本身。"
+					},
+					{
+						"pos": "v.",
+						"glossZh": "煎烤至棕色",
+						"nuanceZh": "烹饪语境中使食物表面变褐。"
+					},
+					{
+						"pos": "v.",
+						"glossZh": "变成棕色",
+						"nuanceZh": "指颜色自然或加工后变褐。"
+					}
+				],
+				"examples": [
+					{
+						"en": "She wore a brown coat and a red scarf.",
+						"zh": "她穿着一件棕色外套，围着一条红围巾。"
+					},
+					{
+						"en": "The bread should brown evenly in the oven.",
+						"zh": "面包在烤箱里应该均匀地烤成棕色。"
+					},
+					{
+						"en": "His skin turned brown after a week at the beach.",
+						"zh": "在海滩待了一周后，他的皮肤晒黑了。"
+					},
+					{
+						"en": "Brown is a warm color often used in autumn designs.",
+						"zh": "棕色是一种暖色，常用于秋季设计。"
+					},
+					{
+						"en": "Brown the onions before adding the soup.",
+						"zh": "加入汤之前先把洋葱煎至棕色。"
+					}
+				],
+				"family": [
+					{ "word": "brownish", "pos": "adj.", "glossZh": "微棕色的" },
+					{ "word": "browning", "pos": "n.", "glossZh": "褐变；煎烤上色" },
+					{ "word": "brownness", "pos": "n.", "glossZh": "棕色；褐色" },
+					{ "word": "brownie", "pos": "n.", "glossZh": "布朗尼蛋糕" }
+				],
+				"collocations": [
+					{ "phrase": "brown sugar", "glossZh": "红糖" },
+					{ "phrase": "brown bread", "glossZh": "黑面包；全麦面包" },
+					{ "phrase": "brown eyes", "glossZh": "棕色眼睛" },
+					{ "phrase": "brown paper", "glossZh": "牛皮纸" }
+				],
+				"synonyms": [
+					{ "word": "hazel", "pos": "adj.", "glossZh": "榛色的；淡褐色的" },
+					{ "word": "tan", "pos": "adj.", "glossZh": "棕褐色的" },
+					{ "word": "chestnut", "pos": "adj.", "glossZh": "栗色的" },
+					{ "word": "chocolate", "pos": "adj.", "glossZh": "巧克力色的" }
+				],
+				"tags": ["颜色", "烹饪", "基础词"]
+			}
+		},
+		{
+			"word": "distinct",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "distinct",
+							"kind": "base",
+							"meaningZh": "清晰的；不同的；独特的"
+						}
+					],
+					"storyZh": "核心是“能被区分开来”，因此既可指清楚明显，也可指彼此不同。"
+				},
+				"memory": { "hookZh": "能分得清 → 清晰的；区分开 → 不同的。" },
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "清晰的，明显的",
+						"nuanceZh": "指感官上容易辨认或理解上明确。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "不同的，有区别的",
+						"nuanceZh": "强调彼此分开、不等同。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "独特的，特有的",
+						"nuanceZh": "强调某种特征鲜明。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "确定无疑的",
+						"nuanceZh": "常修饰可能性、印象或优势。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "清楚的，明确的",
+						"nuanceZh": "常修饰声音、气味、记忆或感觉。"
+					}
+				],
+				"examples": [
+					{
+						"en": "There was a distinct smell of mint in the room.",
+						"zh": "房间里有一股明显的薄荷味。"
+					},
+					{
+						"en": "The two species are distinct in size and color.",
+						"zh": "这两个物种在大小和颜色上不同。"
+					},
+					{
+						"en": "She has a distinct way of telling stories.",
+						"zh": "她讲故事的方式很独特。"
+					},
+					{
+						"en": "There is a distinct possibility that it will rain.",
+						"zh": "下雨的可能性很明显。"
+					},
+					{
+						"en": "His voice was distinct even in the crowded hall.",
+						"zh": "即使在拥挤的大厅里，他的声音也很清晰。"
+					}
+				],
+				"family": [
+					{ "word": "distinctly", "pos": "adv.", "glossZh": "清楚地；明显地" },
+					{ "word": "distinctness", "pos": "n.", "glossZh": "清晰；独特性" },
+					{ "word": "distinction", "pos": "n.", "glossZh": "区别；卓越" },
+					{ "word": "distinguish", "pos": "v.", "glossZh": "区分；辨别" }
+				],
+				"collocations": [
+					{ "phrase": "distinct from", "glossZh": "与……不同" },
+					{ "phrase": "distinct advantage", "glossZh": "明显优势" },
+					{ "phrase": "distinct possibility", "glossZh": "明显的可能性" }
+				],
+				"synonyms": [
+					{ "word": "clear", "pos": "adj.", "glossZh": "清楚的" },
+					{ "word": "obvious", "pos": "adj.", "glossZh": "明显的" },
+					{ "word": "separate", "pos": "adj.", "glossZh": "分开的" },
+					{ "word": "different", "pos": "adj.", "glossZh": "不同的" }
+				],
+				"tags": ["区别", "清晰", "形容词"]
+			}
+		},
+		{
+			"word": "transformative",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "transformative",
+							"kind": "base",
+							"meaningZh": "带来转变的；有改造作用的"
+						}
+					],
+					"storyZh": "可拆解联想为 trans（转变）+ form（形态）+ -ative（有……性质的），表示能带来深刻改变。"
+				},
+				"memory": {
+					"hookZh": "trans（变）+ form（形）+ ative → 能改变形态的。"
+				},
+				"senses": [
+					{
+						"pos": "adj.",
+						"glossZh": "带来变革的",
+						"nuanceZh": "强调引起较大范围或根本性的改变。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "有改造作用的",
+						"nuanceZh": "常修饰经历、技术、政策或教育。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "转变性的",
+						"nuanceZh": "强调从一种状态转向另一种状态。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "使人蜕变的",
+						"nuanceZh": "常修饰学习、旅行、领导力等个人成长经历。"
+					},
+					{
+						"pos": "adj.",
+						"glossZh": "革新的",
+						"nuanceZh": "强调推动旧模式发生改变。"
+					}
+				],
+				"examples": [
+					{
+						"en": "The trip was a transformative experience for her.",
+						"zh": "那次旅行对她来说是一次带来蜕变的经历。"
+					},
+					{
+						"en": "Education can have a transformative effect on communities.",
+						"zh": "教育能对社区产生变革性影响。"
+					},
+					{
+						"en": "They are looking for transformative ideas, not small fixes.",
+						"zh": "他们在寻找变革性的想法，而不是小修小补。"
+					},
+					{
+						"en": "The new technology proved transformative for the industry.",
+						"zh": "这项新技术被证明对该行业具有变革作用。"
+					},
+					{
+						"en": "Her mentor played a transformative role in her career.",
+						"zh": "她的导师在她的职业生涯中发挥了改变性的作用。"
+					}
+				],
+				"family": [
+					{ "word": "transform", "pos": "v.", "glossZh": "改变；转变" },
+					{ "word": "transformation", "pos": "n.", "glossZh": "转变；变革" },
+					{
+						"word": "transformer",
+						"pos": "n.",
+						"glossZh": "变压器；促使改变者"
+					}
+				],
+				"collocations": [
+					{
+						"phrase": "transformative experience",
+						"glossZh": "带来蜕变的经历"
+					},
+					{ "phrase": "transformative power", "glossZh": "变革力量" },
+					{ "phrase": "transformative change", "glossZh": "变革性改变" }
+				],
+				"synonyms": [
+					{ "word": "life-changing", "pos": "adj.", "glossZh": "改变人生的" },
+					{ "word": "revolutionary", "pos": "adj.", "glossZh": "革命性的" },
+					{ "word": "influential", "pos": "adj.", "glossZh": "有影响力的" },
+					{ "word": "altering", "pos": "adj.", "glossZh": "改变性的" }
+				],
+				"tags": ["改变", "成长", "形容词"]
+			}
+		},
+		{
+			"word": "companion",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "companion",
+							"kind": "base",
+							"meaningZh": "伴侣；同伴；指南；配对物"
+						}
+					],
+					"storyZh": "可联想 com（共同）+ pan（面包）+ ion，原指一起分享面包的人，引申为同伴。"
+				},
+				"memory": { "hookZh": "一起分面包的人 → 同伴、伴侣。" },
+				"senses": [
+					{
+						"pos": "n.",
+						"glossZh": "伴侣，同伴",
+						"nuanceZh": "指陪伴在身边的人或动物。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "陪伴者",
+						"nuanceZh": "强调提供陪伴或支持。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "指南，手册",
+						"nuanceZh": "常指某类书籍，如旅行指南。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "配对物，配套物",
+						"nuanceZh": "指与另一物相配或互补的东西。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "朋友",
+						"nuanceZh": "较正式或文学化地指朋友。"
+					}
+				],
+				"examples": [
+					{
+						"en": "The dog became his closest companion during lonely winters.",
+						"zh": "在孤独的冬天里，那只狗成了他最亲密的伴侣。"
+					},
+					{
+						"en": "She was a cheerful companion on the long train ride.",
+						"zh": "在漫长的火车旅途中，她是个愉快的同伴。"
+					},
+					{
+						"en": "This book is a useful companion for language learners.",
+						"zh": "这本书是语言学习者的实用指南。"
+					},
+					{
+						"en": "The vase has a smaller companion piece on the shelf.",
+						"zh": "架子上有一个与这只花瓶配套的较小物件。"
+					},
+					{
+						"en": "Old friends can be lifelong companions.",
+						"zh": "老朋友可以成为一生的伙伴。"
+					}
+				],
+				"family": [
+					{ "word": "companionship", "pos": "n.", "glossZh": "陪伴；友谊" },
+					{
+						"word": "companionable",
+						"pos": "adj.",
+						"glossZh": "友善的；好相处的"
+					},
+					{
+						"word": "companionably",
+						"pos": "adv.",
+						"glossZh": "友善地；亲切地"
+					}
+				],
+				"collocations": [
+					{ "phrase": "constant companion", "glossZh": "常伴身边的人或物" },
+					{ "phrase": "travel companion", "glossZh": "旅伴" },
+					{ "phrase": "companion volume", "glossZh": "配套卷册" }
+				],
+				"synonyms": [
+					{ "word": "partner", "pos": "n.", "glossZh": "伙伴" },
+					{ "word": "friend", "pos": "n.", "glossZh": "朋友" },
+					{ "word": "escort", "pos": "n.", "glossZh": "陪同者" },
+					{ "word": "guide", "pos": "n.", "glossZh": "指南；向导" }
+				],
+				"tags": ["人物", "陪伴", "名词"]
+			}
+		},
+		{
+			"word": "journey",
+			"detail": {
+				"morphology": {
+					"parts": [
+						{
+							"form": "journey",
+							"kind": "base",
+							"meaningZh": "旅程；历程；旅行"
+						}
+					],
+					"storyZh": "原与“一天的路程”相关，后泛指从一个地方到另一个地方的过程，也可比喻人生或成长历程。"
+				},
+				"memory": { "hookZh": "一天一天走出来的路 → 旅程、历程。" },
+				"senses": [
+					{
+						"pos": "n.",
+						"glossZh": "旅程，行程",
+						"nuanceZh": "指从一地到另一地的旅行过程。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "历程，过程",
+						"nuanceZh": "比喻个人成长、学习或项目发展的过程。"
+					},
+					{
+						"pos": "v.",
+						"glossZh": "旅行，长途行进",
+						"nuanceZh": "较正式或文学化，表示长途旅行。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "行程距离",
+						"nuanceZh": "可指一段旅行所需的路程。"
+					},
+					{
+						"pos": "n.",
+						"glossZh": "探索经历",
+						"nuanceZh": "强调带有发现或体验意味的过程。"
+					}
+				],
+				"examples": [
+					{
+						"en": "The journey to the mountain village took six hours.",
+						"zh": "到那个山村的路程花了六个小时。"
+					},
+					{
+						"en": "Learning a language is a long but rewarding journey.",
+						"zh": "学习一门语言是一段漫长但有收获的历程。"
+					},
+					{
+						"en": "They journeyed across the desert by camel.",
+						"zh": "他们骑骆驼穿越了沙漠。"
+					},
+					{
+						"en": "Her journey from fear to confidence inspired many.",
+						"zh": "她从恐惧走向自信的历程激励了许多人。"
+					},
+					{
+						"en": "We rested halfway through our journey.",
+						"zh": "我们在旅程中途休息了。"
+					}
+				],
+				"family": [
+					{ "word": "journeying", "pos": "n.", "glossZh": "旅行；旅程" },
+					{ "word": "journeyer", "pos": "n.", "glossZh": "旅行者" }
+				],
+				"collocations": [
+					{ "phrase": "long journey", "glossZh": "长途旅行" },
+					{ "phrase": "emotional journey", "glossZh": "情感历程" },
+					{ "phrase": "start a journey", "glossZh": "开始旅程" }
+				],
+				"synonyms": [
+					{ "word": "trip", "pos": "n.", "glossZh": "旅行" },
+					{ "word": "voyage", "pos": "n.", "glossZh": "航行；远行" },
+					{ "word": "travel", "pos": "n.", "glossZh": "旅行" },
+					{ "word": "expedition", "pos": "n.", "glossZh": "远征；探险" }
+				],
+				"tags": ["旅行", "历程", "名词"]
+			}
+		}
+	]
+}
