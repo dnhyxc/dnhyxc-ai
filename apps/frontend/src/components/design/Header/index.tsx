@@ -275,15 +275,15 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		}
 
 		// 每日阅读详情：英语学习 > 每日阅读 > 篇目标题。点「每日阅读」回列表。
+		// words / settings 是固定子路由，不能当成篇目 id，否则生词页会落到「短文」。
 		const dailyReadingDetail = matchPath(
 			{ path: '/english-learning/daily-reading/:id', end: true },
 			location.pathname,
 		);
-		if (
-			dailyReadingDetail &&
-			dailyReadingDetail.params.id !== 'settings' &&
-			trail.length > 0
-		) {
+		const dailyReadingStatic =
+			dailyReadingDetail?.params.id === 'settings' ||
+			dailyReadingDetail?.params.id === 'words';
+		if (dailyReadingDetail && !dailyReadingStatic && trail.length > 0) {
 			const origin = new URLSearchParams(location.search).get('origin');
 			trail[trail.length - 1] = {
 				label: t('route.englishLearning.dailyReading.title'),
@@ -297,6 +297,21 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 				?.trim();
 			trail.push({
 				label: passageTitle || t('englishLearning.dailyReading.passage'),
+				path: `${location.pathname}${location.search}`,
+			});
+		}
+
+		// 生词页：英语学习 > 每日阅读 > 生词。默认链只有「英语学习 > 生词」。
+		if (
+			location.pathname === '/english-learning/daily-reading/words' &&
+			trail.length > 0
+		) {
+			trail[trail.length - 1] = {
+				label: t('route.englishLearning.dailyReading.title'),
+				path: '/english-learning/daily-reading',
+			};
+			trail.push({
+				label: t('englishLearning.dailyReading.words'),
 				path: `${location.pathname}${location.search}`,
 			});
 		}

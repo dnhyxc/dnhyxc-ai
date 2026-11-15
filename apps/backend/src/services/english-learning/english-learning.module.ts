@@ -9,6 +9,8 @@ import { DAILY_READING_QUEUE } from './daily-reading.constants';
 import { DailyReadingInternalController } from './daily-reading-internal.controller';
 import { EnglishDailyReadingProcessor } from './english-daily-reading.processor';
 import { EnglishDailyReadingService } from './english-daily-reading.service';
+import { EnglishDailyReadingWordController } from './english-daily-reading-word.controller';
+import { EnglishDailyReadingWordService } from './english-daily-reading-word.service';
 import { EnglishDocxExportJobService } from './english-docx-export-job.service';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
@@ -27,6 +29,7 @@ import { EnglishDailyReadingAttempt } from './entity/english-daily-reading-attem
 import { EnglishDailyReadingGen } from './entity/english-daily-reading-gen.entity';
 import { EnglishDailyReadingSetting } from './entity/english-daily-reading-setting.entity';
 import { EnglishDailyReadingUserSetting } from './entity/english-daily-reading-user-setting.entity';
+import { EnglishDailyReadingWord } from './entity/english-daily-reading-word.entity';
 import { EnglishLearningResumeModuleSetting } from './entity/english-learning-resume-module-setting.entity';
 import { EnglishLibraryItemsResume } from './entity/english-library-items-resume.entity';
 import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.entity';
@@ -65,6 +68,7 @@ import { VocabDetailService } from './vocab-detail.service';
 			EnglishPracticeReport,
 			EnglishDailyMemorizeRecord,
 			EnglishDailyReading,
+			EnglishDailyReadingWord,
 			EnglishDailyReadingAttempt,
 			EnglishDailyReadingGen,
 			EnglishDailyReadingSetting,
@@ -84,10 +88,15 @@ import { VocabDetailService } from './vocab-detail.service';
 			EnglishAnnotateSourceTask,
 		]),
 	],
-	controllers: [EnglishLearningController, DailyReadingInternalController],
+	controllers: [
+		EnglishLearningController,
+		DailyReadingInternalController,
+		EnglishDailyReadingWordController,
+	],
 	providers: [
 		EnglishLearningService,
 		EnglishDailyReadingService,
+		EnglishDailyReadingWordService,
 		EnglishDailyReadingProcessor,
 		EnglishDocxExportJobService,
 		EnglishLearningStreamAbortRegistry,

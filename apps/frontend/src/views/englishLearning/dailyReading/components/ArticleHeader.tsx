@@ -3,6 +3,7 @@ import { Button } from '@ui/index';
 import {
 	Ban,
 	Circle,
+	FolderBookmark,
 	Globe,
 	GlobeOff,
 	PanelLeftClose,
@@ -10,6 +11,7 @@ import {
 	WandSparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { usePluginEnabledState } from '@/federation';
 import { useI18n } from '@/hooks';
 import type { EnglishDailyReadingItem } from '@/service';
 import { DailyPlayIconButton } from '../../daily/components/DailyPlayIconButton';
@@ -45,6 +47,8 @@ export function ArticleHeader({
 }) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
+	const wordsPlugin = usePluginEnabledState('dailyReadingWords');
+	const wordsOn = wordsPlugin.ready && wordsPlugin.enabled;
 	const playLabel = playing
 		? t('englishLearning.tts.stop')
 		: t('englishLearning.dailyReading.play');
@@ -133,6 +137,35 @@ export function ArticleHeader({
 							<WandSparkles className="size-4" aria-hidden />
 						</Button>
 					</Tooltip>
+					{wordsOn ? (
+						<Tooltip
+							side="top"
+							content={t('englishLearning.dailyReading.words')}
+						>
+							<Button
+								type="button"
+								variant="link"
+								size="sm"
+								tabIndex={-1}
+								aria-label={t('englishLearning.dailyReading.words')}
+								className={HEADER_ICON_BTN}
+								onClick={(event) => {
+									const params = new URLSearchParams({
+										readingId: row.id,
+									});
+									// 这篇还没有收集记录时，生词页的篇目列表里没有它，标题要跟着走
+									if (row.titleEn.trim())
+										params.set('titleEn', row.titleEn.trim());
+									if (row.titleZh.trim())
+										params.set('titleZh', row.titleZh.trim());
+									navigate(`/english-learning/daily-reading/words?${params}`);
+									event.currentTarget.blur();
+								}}
+							>
+								<FolderBookmark className="size-4" aria-hidden />
+							</Button>
+						</Tooltip>
+					) : null}
 					<Tooltip
 						side="top"
 						content={t(

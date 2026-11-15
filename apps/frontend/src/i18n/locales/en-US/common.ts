@@ -3,6 +3,7 @@ export const common = {
 	'common.appTitle': 'Smart Chat',
 	'common.backHome': 'Back to home',
 	'common.cancel': 'Cancel',
+	'common.clear': 'Clear',
 	'common.confirm': 'Confirm',
 	'common.copied': 'Copied',
 	'common.copy': 'Copy',

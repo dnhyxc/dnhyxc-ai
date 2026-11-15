@@ -40,6 +40,7 @@ export const POINT = {
 	review: 'english.review',
 	favorites: 'english.favorites',
 	dailyReading: 'english.dailyReading',
+	dailyReadingArticle: 'english.dailyReading.article',
 	ebookRead: 'ebook.read',
 } as const;
 
@@ -121,6 +122,13 @@ export const hostPoints: Record<string, HostPointSpec> = {
 	[POINT.review]: listPoint(POINT.review, ['kind']),
 	[POINT.favorites]: listPoint(POINT.favorites, ['kind']),
 	[POINT.dailyReading]: listPoint(POINT.dailyReading, ['origin']),
+	[POINT.dailyReadingArticle]: {
+		id: POINT.dailyReadingArticle,
+		slots: [],
+		contextKeys: [],
+		signals: [],
+		commands: ['openReading', 'play', 'stop'],
+	},
 	[POINT.ebookRead]: {
 		id: POINT.ebookRead,
 		slots: [

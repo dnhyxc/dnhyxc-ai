@@ -88,6 +88,7 @@ import {
 	ENGLISH_LEARNING_DAILY_READING_MANUAL,
 	ENGLISH_LEARNING_DAILY_READING_MANUAL_HISTORY,
 	ENGLISH_LEARNING_DAILY_READING_SETTINGS,
+	ENGLISH_LEARNING_DAILY_READING_WORDS,
 	ENGLISH_LEARNING_DAILY_READINGS,
 	ENGLISH_LEARNING_DOCX_EXPORT_JOBS,
 	ENGLISH_LEARNING_ITEMS_RESUME_MODULES,
@@ -2181,6 +2182,36 @@ export const stopEnglishDailyReading = async (options?: {
 		`${ENGLISH_LEARNING_DAILY_READING_MANUAL}/stop`,
 		{ runId: options?.runId },
 		{ silent: options?.silent },
+	);
+};
+
+export const collectEnglishDailyReadingWord = async (body: {
+	word: string;
+	readingId: string;
+	zh: string;
+	sentence: string;
+	surface: 'selection' | 'gloss' | 'glossary';
+}) => {
+	return await http.post<{ wordKey: string; collected: boolean }>(
+		ENGLISH_LEARNING_DAILY_READING_WORDS,
+		body,
+	);
+};
+
+export const uncollectEnglishDailyReadingWord = async (body: {
+	word: string;
+	readingId: string;
+}) => {
+	return await http.delete<{ collected: boolean }>(
+		ENGLISH_LEARNING_DAILY_READING_WORDS,
+		{ data: body },
+	);
+};
+
+export const getEnglishDailyReadingWordKeys = async (readingId: string) => {
+	return await http.get<{ keys: string[] }>(
+		`${ENGLISH_LEARNING_DAILY_READING_WORDS}/status`,
+		{ querys: { readingId }, silent: true },
 	);
 };
 

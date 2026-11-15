@@ -1,6 +1,6 @@
 import { Button } from '@ui/index';
 import { CheckCircle, Copy, Square, Volume2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -14,6 +14,7 @@ export function WordLine({
 	playLabel,
 	stopLabel,
 	copy = false,
+	extra,
 }: {
 	word: string;
 	zh: string;
@@ -22,6 +23,7 @@ export function WordLine({
 	playLabel: string;
 	stopLabel: string;
 	copy?: boolean;
+	extra?: ReactNode;
 }) {
 	const { t } = useI18n();
 	const [copied, setCopied] = useState(false);
@@ -57,9 +59,9 @@ export function WordLine({
 					onClick={onPlay}
 				>
 					{playing ? (
-						<Square className="size-3.5 fill-current" aria-hidden />
+						<Square className="size-4 fill-current" aria-hidden />
 					) : (
-						<Volume2 className="size-3.5" aria-hidden />
+						<Volume2 className="size-4" aria-hidden />
 					)}
 				</Button>
 				{copy ? (
@@ -84,6 +86,7 @@ export function WordLine({
 						)}
 					</Button>
 				) : null}
+				{extra}
 			</div>
 			<span className="text-textcolor/80 text-sm leading-7">{zh}</span>
 		</div>

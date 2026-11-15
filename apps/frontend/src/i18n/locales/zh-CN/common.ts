@@ -3,6 +3,7 @@ export const common = {
 	'common.appTitle': '智能对话',
 	'common.backHome': '返回首页',
 	'common.cancel': '取消',
+	'common.clear': '清空',
 	'common.confirm': '确定',
 	'common.copied': '已复制',
 	'common.copy': '复制',

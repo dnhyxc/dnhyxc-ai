@@ -235,6 +235,8 @@ export const ENGLISH_LEARNING_PRACTICE_REVIEW =
 	'/english-learning/practice/review';
 export const ENGLISH_LEARNING_DAILY_READINGS =
 	'/english-learning/daily-readings';
+export const ENGLISH_LEARNING_DAILY_READING_WORDS =
+	'/english-learning/daily-reading-words';
 export const ENGLISH_LEARNING_DAILY_READING_MANUAL =
 	'/english-learning/daily-readings/manual';
 export const ENGLISH_LEARNING_DAILY_READING_MANUAL_STREAM =

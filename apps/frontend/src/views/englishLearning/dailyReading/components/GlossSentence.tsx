@@ -1,5 +1,5 @@
 import { Popover, PopoverAnchor, PopoverContent } from '@ui/index';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { WordLine } from './WordLine';
 
@@ -20,6 +20,7 @@ export function GlossSentence({
 	onPlay,
 	playLabel,
 	stopLabel,
+	mark,
 }: {
 	en: string;
 	words: { w: string; zh: string }[];
@@ -30,6 +31,7 @@ export function GlossSentence({
 	onPlay: (word: string) => void;
 	playLabel: string;
 	stopLabel: string;
+	mark?: (word: string, zh: string) => ReactNode;
 }) {
 	// ponytail: CSS :hover 在 ScrollArea / 两端对齐正文里易粘住；指针态可随 leave 清掉
 	const [hoverKey, setHoverKey] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export function GlossSentence({
 								playLabel={playLabel}
 								stopLabel={stopLabel}
 								copy
+								extra={mark?.(gloss.w, gloss.zh)}
 							/>
 						</PopoverContent>
 					</Popover>

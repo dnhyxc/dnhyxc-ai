@@ -35,6 +35,9 @@ const EnglishDailyReadingListPage = lazy(
 const EnglishDailyReadingSettingsPage = lazy(
 	() => import('@/views/englishLearning/dailyReading/Settings'),
 );
+const EnglishDailyReadingWordsPage = lazy(
+	() => import('@/views/englishLearning/dailyReading/Words'),
+);
 const EnglishDailyReadingDetailPage = lazy(
 	() => import('@/views/englishLearning/dailyReading/Detail'),
 );
@@ -366,6 +369,13 @@ const routes: RouteConfig[] = [
 						Component: EnglishDailyReadingSettingsPage,
 						meta: {
 							titleKey: 'route.englishLearning.dailyReading.settings',
+						},
+					},
+					{
+						path: 'daily-reading/words',
+						Component: EnglishDailyReadingWordsPage,
+						meta: {
+							titleKey: 'englishLearning.dailyReading.words',
 						},
 					},
 					{

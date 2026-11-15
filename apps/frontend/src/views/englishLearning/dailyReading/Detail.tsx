@@ -1,7 +1,10 @@
 /**
  * 每日阅读详情：英文在上，中文在下，只朗读英文。
  */
-import { useSelectionContextMenu } from '@design/ContextMenu';
+import {
+	type SelectionContextMenuCtx,
+	useSelectionContextMenu,
+} from '@design/ContextMenu';
 import Loading from '@design/Loading';
 import {
 	createSelectionSpeakMenu,
@@ -11,6 +14,7 @@ import { Button, ScrollArea, Toast } from '@ui/index';
 import { CircleChevronDown, CircleChevronRight } from 'lucide-react';
 import {
 	Fragment,
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useLayoutEffect,
@@ -24,20 +28,30 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { usePluginEnabledState } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	collectEnglishDailyReadingWord,
 	type EnglishDailyReadingItem,
 	getEnglishDailyReading,
+	getEnglishDailyReadingWordKeys,
+	uncollectEnglishDailyReadingWord,
 } from '@/service';
 import { playPreferred, stopAllPlayback } from '@/utils/speech';
 import { ttsCacheScopeDailyReading } from '../utils/ttsCacheFolder';
 import { ArticleHeader } from './components/ArticleHeader';
+import { CollectMark } from './components/CollectMark';
 import { GlossSentence } from './components/GlossSentence';
 import { Quiz } from './components/Quiz';
 import { ReadingList } from './components/ReadingList';
 import { WordLine } from './components/WordLine';
 import { paragraphs, renderText, sourceList } from './utils/body';
+import {
+	type CollectSurface,
+	wordKey as readingWordKey,
+	resolveCollectTarget,
+} from './utils/collectTarget';
 import { parseOrigin, type ReadingOrigin } from './utils/origin';
 import {
 	alignBodyZhHeuristic,
@@ -64,6 +78,7 @@ function PlaySentenceRun({
 	stopLabel,
 	showSentenceZh = false,
 	showPlaySentenceZh = true,
+	mark,
 }: {
 	sentences: PlaySentence[];
 	activeSentenceIndex: number | null;
@@ -76,6 +91,7 @@ function PlaySentenceRun({
 	showSentenceZh?: boolean;
 	/** 朗读时在当前句下挂中文；默认开 */
 	showPlaySentenceZh?: boolean;
+	mark?: (word: string, zh: string, sentence: string) => ReactNode;
 }) {
 	const renderEn = (sentence: PlaySentence, indexInRun: number) => (
 		<span
@@ -98,6 +114,7 @@ function PlaySentenceRun({
 					onPlay={onPlayWord}
 					playLabel={playLabel}
 					stopLabel={stopLabel}
+					mark={mark ? (word, zh) => mark(word, zh, sentence.en) : undefined}
 				/>
 			) : (
 				renderText(sentence.en)
@@ -223,6 +240,12 @@ export default function DailyReadingDetailPage() {
 	const selectionSpeak = useAssistantSelectionSpeak(resetBeforeSpeak);
 	/** playBlocks 在下方才算好；选区朗读用 ref 读最新句表 */
 	const playSentencesRef = useRef<PlaySentence[]>([]);
+	const wordsPlugin = usePluginEnabledState('dailyReadingWords');
+	const wordsOn = wordsPlugin.ready && wordsPlugin.enabled;
+	const [collectedKeys, setCollectedKeys] = useState<Set<string>>(new Set());
+	const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
+	const inflightRef = useRef(new Set<string>());
+	const collectGen = useRef(0);
 
 	const startSelectionSpeak = useCallback(
 		(text: string) => {
@@ -244,10 +267,115 @@ export default function DailyReadingDetailPage() {
 		[selectionSpeak.start],
 	);
 
-	const selectionMenuItems = useMemo(
-		() => createSelectionSpeakMenu(t, startSelectionSpeak),
-		[t, startSelectionSpeak],
+	const toggleCollect = useCallback(
+		async (input: {
+			word: string;
+			zh: string;
+			sentence: string;
+			surface: CollectSurface;
+		}) => {
+			if (!row) return;
+			const key = readingWordKey(input.word);
+			const sentence =
+				input.surface === 'selection'
+					? key
+						? (playSentencesRef.current.find((item) =>
+								item.en
+									.toLowerCase()
+									.split(/[^a-z']+/)
+									.includes(key),
+							)?.en ?? '')
+						: ''
+					: input.sentence;
+			const target = resolveCollectTarget(
+				input.word,
+				input.zh,
+				row.extras ?? null,
+				input.surface,
+				sentence,
+			);
+			if (!target.ok) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.dailyReading.pickWord'),
+				});
+				return;
+			}
+			// 同一个词还在请求时忽略下一次点击，避免连点打出两次合并
+			if (inflightRef.current.has(target.key)) return;
+			inflightRef.current.add(target.key);
+			setPendingKeys(new Set(inflightRef.current));
+			const had = collectedKeys.has(target.key);
+			try {
+				if (had) {
+					await uncollectEnglishDailyReadingWord({
+						word: target.word,
+						readingId: row.id,
+					});
+				} else {
+					await collectEnglishDailyReadingWord({
+						word: target.word,
+						readingId: row.id,
+						zh: target.zh,
+						sentence: target.sentence,
+						surface: target.surface,
+					});
+				}
+				setCollectedKeys((prev) => {
+					const next = new Set(prev);
+					if (had) next.delete(target.key);
+					else next.add(target.key);
+					return next;
+				});
+				collectGen.current += 1;
+			} catch {
+				// 请求失败时图标保持点击前。http 客户端已经弹出错误
+			} finally {
+				inflightRef.current.delete(target.key);
+				setPendingKeys(new Set(inflightRef.current));
+			}
+		},
+		[collectedKeys, row, t],
 	);
+
+	const selectionMenuItems = useMemo(() => {
+		const base = createSelectionSpeakMenu(t, startSelectionSpeak);
+		if (!wordsOn) return base;
+		return (selectedText: string, ctx: SelectionContextMenuCtx) => {
+			const items = base(selectedText, ctx);
+			if (!items) return items;
+			const key = readingWordKey(selectedText);
+			const saved = key ? collectedKeys.has(key) : false;
+			return [
+				...items,
+				{
+					type: 'item' as const,
+					id: 'collect',
+					disabled: key ? pendingKeys.has(key) : false,
+					label: t(
+						saved
+							? 'englishLearning.dailyReading.uncollect'
+							: 'englishLearning.dailyReading.collect',
+					),
+					onSelect: () => {
+						void toggleCollect({
+							word: selectedText,
+							zh: '',
+							sentence: '',
+							surface: 'selection',
+						});
+					},
+				},
+			];
+		};
+	}, [
+		collectedKeys,
+		pendingKeys,
+		startSelectionSpeak,
+		t,
+		toggleCollect,
+		wordsOn,
+	]);
 
 	const {
 		onContextMenuCapture: onSelectionContextMenuCapture,
@@ -302,7 +430,26 @@ export default function DailyReadingDetailPage() {
 		setWordKey(null);
 		setShowSentenceZh(false);
 		setShowPlaySentenceZh(true);
+		setCollectedKeys(new Set());
+		inflightRef.current.clear();
+		setPendingKeys(new Set());
 	}, [id, selectionSpeak.stop]);
+
+	useEffect(() => {
+		if (!wordsOn || !id) return;
+		let cancelled = false;
+		const gen = collectGen.current;
+		void getEnglishDailyReadingWordKeys(id)
+			.then((res) => {
+				if (!cancelled && gen === collectGen.current) {
+					setCollectedKeys(new Set(res.data?.keys ?? []));
+				}
+			})
+			.catch(() => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [id, wordsOn]);
 
 	useEffect(() => {
 		// 切换时 row 还是上一篇，不能拿它把地址栏标题盖回去
@@ -526,6 +673,35 @@ export default function DailyReadingDetailPage() {
 																	stopLabel={t('englishLearning.tts.stop')}
 																	showSentenceZh={showSentenceZh}
 																	showPlaySentenceZh={showPlaySentenceZh}
+																	mark={
+																		wordsOn
+																			? (word, zh, sentence) => (
+																					<CollectMark
+																						pressed={collectedKeys.has(
+																							readingWordKey(word) ?? '',
+																						)}
+																						disabled={pendingKeys.has(
+																							readingWordKey(word) ?? '',
+																						)}
+																						label={t(
+																							collectedKeys.has(
+																								readingWordKey(word) ?? '',
+																							)
+																								? 'englishLearning.dailyReading.uncollect'
+																								: 'englishLearning.dailyReading.collect',
+																						)}
+																						onClick={() => {
+																							void toggleCollect({
+																								word,
+																								zh,
+																								sentence,
+																								surface: 'gloss',
+																							});
+																						}}
+																					/>
+																				)
+																			: undefined
+																	}
 																/>
 															))}
 															{selectionContextMenu}
@@ -591,25 +767,51 @@ export default function DailyReadingDetailPage() {
 																	{t('englishLearning.dailyReading.glossary')}
 																</h2>
 																<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-3">
-																	{row.extras.glossary.map((item) => (
-																		<div
-																			key={item.word}
-																			className="border-theme/10 bg-theme/5 rounded-md border px-3 py-2.5"
-																		>
-																			<WordLine
-																				word={item.word}
-																				zh={item.zh}
-																				playing={wordKey === item.word}
-																				onPlay={() => void playWord(item.word)}
-																				playLabel={t(
-																					'englishLearning.vocab.playWord',
-																				)}
-																				stopLabel={t(
-																					'englishLearning.tts.stop',
-																				)}
-																			/>
-																		</div>
-																	))}
+																	{row.extras.glossary.map((item) => {
+																		const key = readingWordKey(item.word) ?? '';
+																		const saved = collectedKeys.has(key);
+																		return (
+																			<div
+																				key={item.word}
+																				className="border-theme/10 bg-theme/5 relative rounded-md border px-3 py-2.5 pr-8"
+																			>
+																				{wordsOn ? (
+																					<CollectMark
+																						pressed={saved}
+																						disabled={pendingKeys.has(key)}
+																						label={t(
+																							saved
+																								? 'englishLearning.dailyReading.uncollect'
+																								: 'englishLearning.dailyReading.collect',
+																						)}
+																						className="absolute right-2 top-2"
+																						onClick={() => {
+																							void toggleCollect({
+																								word: item.word,
+																								zh: item.zh,
+																								sentence: '',
+																								surface: 'glossary',
+																							});
+																						}}
+																					/>
+																				) : null}
+																				<WordLine
+																					word={item.word}
+																					zh={item.zh}
+																					playing={wordKey === item.word}
+																					onPlay={() =>
+																						void playWord(item.word)
+																					}
+																					playLabel={t(
+																						'englishLearning.vocab.playWord',
+																					)}
+																					stopLabel={t(
+																						'englishLearning.tts.stop',
+																					)}
+																				/>
+																			</div>
+																		);
+																	})}
 																</div>
 															</section>
 														) : null}
