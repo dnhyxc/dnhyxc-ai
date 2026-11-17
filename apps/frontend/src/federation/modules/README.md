@@ -14,7 +14,7 @@
 
 **新的挂载位置**要先在 `points/catalog.ts` 登记，并在对应页面放上 `HostPoint`。权限用 `modules:point`，运行时得到 `api.modules.point`。
 
-阅读页 `ebook.read` 已是扩展点：上下文是 `bookId`、`bookTitle`，命令是 `navigateToCfi`、`openThought`、`closeIdeasList`。按钮和抽屉仍由阅读页自己挂。笔记还没有扩展点，仍走下面的专属模块：
+阅读页 `ebook.read` 已是扩展点：上下文是 `bookId`、`bookTitle`。`navigateToCfi`、`openThought` 由阅读页绑定，`closeIdeasList` 在 `points/command.ts` 启动时绑定。图标和抽屉由阅读页上的 `HostPoint` 画。笔记还没有扩展点，仍走下面的专属模块：
 
 1. 建 `modules/<pluginId>/hostApi.ts`，export `createXxxModulesApi()`
 2. 在 `runtime/index.ts` → `buildModules` 注册（permission 如 `modules:<pluginId>`）

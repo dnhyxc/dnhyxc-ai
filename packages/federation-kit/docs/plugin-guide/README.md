@@ -33,7 +33,7 @@
 | 13 | [发布到注册中心.md](./发布到注册中心.md) | 构建、部署、Nginx、Registry 注册、缓存破坏、验收清单 | 发布 |
 
 > **生命周期 Host 实现专章**（`pickPluginLifecycle` / 缺钩子 `console.info` / `runLoad`）：[../implements-guide/生命周期钩子.md](../implements-guide/生命周期钩子.md)。  
-> **动态插件图标**（`menu.icon` / `host.icon` = SVG URL → `PluginIcon`）：[../implements-guide/插件图标.md](../implements-guide/插件图标.md)。
+> **动态插件图标**（`menu.icon` / `host.icon` = SVG URL → 主项目 `PluginIcon`；插件页面自己画时用 `api.ui.readIconSvg`）：[../implements-guide/插件图标.md](../implements-guide/插件图标.md) §4.7。
 
 > 时间紧只看：README 速览 → [02](./插件脚手架.md) → [03](./Vite配置.md) → [04](./暴露契约.md) → 选一种接入方式（[06](./自动路由接入.md) / [07](./表面槽位接入.md) / [08](./iframe隔离接入.md)），即可跑通 MVP。
 

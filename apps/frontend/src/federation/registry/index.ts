@@ -53,6 +53,13 @@ function readCache(): PluginRegistry | null {
 	}
 }
 
+/** 插件中心写入的图标：有菜单图标用菜单，否则用宿主槽图标。 */
+export function readPluginIcon(id: string): string | undefined {
+	const plugin = readCache()?.plugins.find((p) => p.id === id);
+	const icon = plugin?.menu?.icon ?? plugin?.host?.icon;
+	return icon?.trim() || undefined;
+}
+
 function writeCache(data: PluginRegistry) {
 	try {
 		localStorage.setItem(CACHE_KEY, JSON.stringify(data));

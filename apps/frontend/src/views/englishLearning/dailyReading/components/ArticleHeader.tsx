@@ -3,7 +3,6 @@ import { Button } from '@ui/index';
 import {
 	Ban,
 	Circle,
-	FolderBookmark,
 	Globe,
 	GlobeOff,
 	PanelLeftClose,
@@ -11,7 +10,11 @@ import {
 	WandSparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { usePluginEnabledState } from '@/federation';
+import {
+	PluginIcon,
+	readPluginIcon,
+	usePluginEnabledState,
+} from '@/federation';
 import { useI18n } from '@/hooks';
 import type { EnglishDailyReadingItem } from '@/service';
 import { DailyPlayIconButton } from '../../daily/components/DailyPlayIconButton';
@@ -49,6 +52,7 @@ export function ArticleHeader({
 	const navigate = useNavigate();
 	const wordsPlugin = usePluginEnabledState('dailyReadingWords');
 	const wordsOn = wordsPlugin.ready && wordsPlugin.enabled;
+	const wordsIcon = readPluginIcon('dailyReadingWords');
 	const playLabel = playing
 		? t('englishLearning.tts.stop')
 		: t('englishLearning.dailyReading.play');
@@ -162,7 +166,7 @@ export function ArticleHeader({
 									event.currentTarget.blur();
 								}}
 							>
-								<FolderBookmark className="size-4" aria-hidden />
+								<PluginIcon name={wordsIcon} className="size-4" />
 							</Button>
 						</Tooltip>
 					) : null}

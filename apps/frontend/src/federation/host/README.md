@@ -6,27 +6,27 @@
 
 | 文件 | 场景 |
 |------|------|
+| `HostPoint.tsx` | 已登记扩展点：顶栏、行按钮、图标触发器、抽屉 |
 | `PluginHostPage.tsx` | 全页 / 业务树内嵌；包装 `<FederationPlugin />` |
-| `PluginHostSurface.tsx` | 阅读页 drawer / toolbar / 顶栏触发器（`host.surface` + `slot`） |
 | `PluginPageShell.tsx` | 插件**独立路由**外层边距与圆角；影院全屏时收边距 |
 | `PluginErrorBoundary.tsx` | Remote 渲染错误边界 |
-| `PluginIcon.tsx` / `pluginIconUrl.ts` | registry 图标 URL / SVG 主题色适配 |
+| `PluginIcon.tsx` / `pluginIconUrl.ts` | registry 图标 URL / SVG 主题色适配。`loadPluginIconMarkup` 同时给 `PluginIcon` 和 `api.ui.readIconSvg` 用 |
 
 ## 挂载对照
 
 | 场景 | 组件 |
 |------|------|
 | `/english-learning/notes` 等业务路由内嵌 | `<PluginHostPage pluginId="…" />` |
-| EPUB 阅读页 drawer | `<PluginHostSurface surface="ebook.read" part="drawer" … />` |
+| EPUB 阅读页图标和抽屉 | `<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />` 与同槽的正文 |
 | registry 独立 `routePath` 全页 | `PluginHostPage` + `pageShell` / `PluginPageShell` |
 
 ## 常用
 
 ```tsx
-import { PluginHostPage, PluginHostSurface } from '@/federation';
+import { HostPoint, PluginHostPage, POINT } from '@/federation';
 
 <PluginHostPage pluginId="learningNotes" />
-<PluginHostSurface surface="ebook.read" part="drawer-triggers" />
+<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />
 ```
 
 ## 关联

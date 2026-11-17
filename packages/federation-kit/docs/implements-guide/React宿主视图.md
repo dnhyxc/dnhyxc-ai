@@ -1128,4 +1128,4 @@ export {
 
 ### 7.3 文档范围外的相邻能力
 
-`createFederation`、registry、enabled 存储、style-isolation 内部、本仓 `PluginHostPage` / `PluginHostSurface` 见其他文档（含 `宿主适配层.md`）。
+`createFederation`、registry、enabled 存储、style-isolation 内部、本仓 `PluginHostPage` / `HostPoint` 见其他文档（含 `宿主适配层.md`）。页面组件 `PluginHostSurface` 已删除；kit 里同名的 `PluginHostSurface` 仍是 surface 字符串类型。

@@ -43,11 +43,11 @@ import { Plugin } from '@dnhyxc-ai/federation-kit/react';
 本仓业务代码**统一从** [`@/federation`](../../apps/frontend/src/federation) 导入（`index.ts` 再导出本包常用符号），不要直接依赖 `@dnhyxc-ai/federation-kit`。
 
 ```ts
-import { mf, PluginHostPage, PluginHostSurface, usePluginEnabled } from '@/federation';
+import { mf, HostPoint, PluginHostPage, POINT, usePluginEnabled } from '@/federation';
 await mf.start();
 
 <PluginHostPage pluginId="learningNotes" />
-<PluginHostSurface surface="ebook.read" part="drawer" openPluginId={id} onOpenPluginIdChange={setId} />
+<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />
 ```
 
 ## 文档

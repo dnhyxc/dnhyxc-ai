@@ -61,11 +61,6 @@ export {
 } from './host/HostPoint';
 export { PluginErrorBoundary } from './host/PluginErrorBoundary';
 export { PluginHostPage } from './host/PluginHostPage';
-export {
-	PluginHostSurface,
-	type PluginHostSurfacePart,
-	type PluginHostSurfaceProps,
-} from './host/PluginHostSurface';
 export { PluginIcon, type PluginIconProps } from './host/PluginIcon';
 export { PluginPageShell } from './host/PluginPageShell';
 export {
@@ -112,6 +107,7 @@ export {
 	PLUGIN_REGISTRY_FILENAME,
 	PLUGIN_REGISTRY_STATIC_PATH,
 	persistPluginEnabled,
+	readPluginIcon,
 	savePluginRegistry,
 } from './registry';
 export {

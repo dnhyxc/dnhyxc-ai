@@ -26,10 +26,11 @@ import {
 	getPluginEnabledPref,
 	setPluginEnabledPref,
 } from '../enabled/prefs';
+import { loadPluginIconMarkup } from '../host/PluginIcon';
 import { createLearningNotesModulesApi } from '../modules/learningNotes/hostApi';
 import { createPointApi } from '../points/api';
 import { getHostPoint } from '../points/catalog';
-import '../points/commands';
+import '../points/command';
 import {
 	fetchPluginRegistry,
 	PLUGIN_REGISTRY_CACHE_KEY,
@@ -161,6 +162,7 @@ export const mf = createFederation<RouteConfig>({
 		setAppFullscreen,
 		// 选本地文件：Web 得到 blob URL，Tauri 走系统对话框得到 asset URL
 		pickLocalFiles: pickLocalFilesForPlugins,
+		readIconSvg: (url) => loadPluginIconMarkup(url),
 		// 插件把内存中的文件字节交给主站下载（笔记导出 docx 等）
 		downloadBlob: async (options) => {
 			// 未传 MIME 时按 docx，与笔记导出的默认格式一致

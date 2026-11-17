@@ -37,6 +37,9 @@ export function createHostBridge(
 		if (capabilities.downloadBlob) {
 			ui.downloadBlob = (options) => capabilities.downloadBlob!({ ...options, pluginId: d.id });
 		}
+		if (capabilities.pickLocalFiles) ui.pickLocalFiles = capabilities.pickLocalFiles;
+		// 插件中心图标：宿主下载并上色，返回整段 <svg>
+		if (capabilities.readIconSvg) ui.readIconSvg = capabilities.readIconSvg;
 		api.ui = Object.freeze(ui);
 	}
 
@@ -88,6 +91,7 @@ export function createHostBridge(
 | `api.ui.setAppFullscreen` | `ui:toast` | 应用级影院全屏（藏 Host 壳） | 按权限 + Host 能力 |
 | `api.ui.downloadBlob` | `ui:toast` | 统一落盘下载 | 按权限 + Host 能力 |
 | `api.ui.pickLocalFiles` | `ui:toast` | 选本地文件（`{ path, name, src }[]`） | 按权限 + Host 能力 |
+| `api.ui.readIconSvg` | `ui:toast` | 插件中心图标地址 → 已上色的整段 `<svg>` 字符串；失败 `null` | 按权限 + Host 能力 |
 | `api.modules.*` | `modules:xxx` | 业务模块（如 `modules:chat` → `openThread`） | 按权限 |
 
 ---
@@ -96,7 +100,7 @@ export function createHostBridge(
 
 | 权限 | 说明 | 解锁的 api |
 |------|------|------------|
-| `ui:toast` | 允许使用 `api.ui` | `showToast`、`setAppFullscreen`、`downloadBlob` |
+| `ui:toast` | 允许使用 `api.ui` | `showToast`、`setAppFullscreen`、`downloadBlob`、`pickLocalFiles`、`readIconSvg` |
 | `nav:subtree` | 允许子路由导航 | `navigate` |
 | `http:plugin-api` | 允许 HTTP 请求 | `http.get/post/put/delete` |
 | `modules:chat` | 允许聊天模块 | `api.modules.openThread(id)` |
@@ -140,6 +144,17 @@ export default function App({ api, plugin }: HostBridgeProps) {
 	// Toast（需 ui:toast）
 	const handleToast = () => {
 		api.ui?.showToast({ message: t('common.success'), type: 'success' });
+	};
+
+	// 插件中心图标（需 ui:toast，且宿主实现了 readIconSvg）
+	// 地址从注册表缓存来，不要在插件里 fetch COS。完整组件见 implements-guide/插件图标.md §4.7
+	const paintIcon = async (pluginId: string) => {
+		const url = registryIcon(pluginId); // menu.icon ?? host.icon
+		if (!url || !api.ui?.readIconSvg) return;
+		const markup = await api.ui.readIconSvg(url); // 整段 <svg> 或 null
+		if (markup) {
+			// 放进 dangerouslySetInnerHTML，容器用 text-current，颜色跟按钮文字
+		}
 	};
 
 	// 打开聊天线程（需 modules:chat）

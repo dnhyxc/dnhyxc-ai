@@ -4,28 +4,19 @@
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Star } from 'lucide-react';
-import {
-	type CSSProperties,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
 	closePoint,
 	HostPoint,
 	openPoint,
-	PluginHostSurface,
 	PluginIcon,
 	POINT,
 	pickPluginLocaleText,
-	pointDrawerWidth,
+	readPluginIcon,
 	readSlot,
 	readStats,
 	subscribeSignals,
-	subscribeSlot,
 	useHostSurfacePlugins,
 	usePointContext,
 } from '@/federation';
@@ -77,21 +68,11 @@ export function VocabularyLibrarySection({
 }: VocabularyLibrarySectionProps) {
 	const { t, locale } = useI18n();
 	const navigate = useNavigate();
-	const [openPluginId, setOpenPluginId] = useState<string | null>(null);
-	// 从词卡切到列表时不要再从右侧滑入，否则开场那一帧 Loading 落在槽位右边
-	const [listStill, setListStill] = useState(false);
 	const libraryKey = libraryId?.trim() ?? '';
 	usePointContext(
 		POINT.vocabLibrary,
 		libraryKey ? { libraryId: libraryKey } : null,
 	);
-	const detail = useSyncExternalStore(
-		(listener) => subscribeSlot(POINT.vocabCard, 'drawer', listener),
-		() => readSlot(POINT.vocabCard, 'drawer'),
-		() => readSlot(POINT.vocabCard, 'drawer'),
-	);
-	const detailOpen = detail.open && !detail.covered;
-	const tucked = Boolean(openPluginId && detailOpen);
 	const listPlugin = useHostSurfacePlugins(POINT.vocabLibrary).find(
 		(plugin) => plugin.host?.slot === 'drawer',
 	);
@@ -104,20 +85,6 @@ export function VocabularyLibrarySection({
 		[],
 	);
 
-	// 详解开着时记下。关掉详解后列表还在 data-state=open，animation 恢复时位移必须是 0
-	useEffect(() => {
-		if (tucked) setListStill(true);
-	}, [tucked]);
-
-	// 列表不跟详解抢滚动锁，只在自己打开时把页面滚定住
-	useEffect(() => {
-		if (!openPluginId) return;
-		const prev = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		return () => {
-			document.body.style.overflow = prev;
-		};
-	}, [openPluginId]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
@@ -372,27 +339,16 @@ export function VocabularyLibrarySection({
 							type="button"
 							className="flex cursor-pointer items-center gap-1 text-sm text-teal-500 hover:text-teal-400"
 							onClick={() => {
-								const opening = openPluginId !== listPlugin.id;
-								if (!opening) {
-									setListStill(false);
+								const current = readSlot(POINT.vocabLibrary, 'drawer');
+								if (current.open && current.pluginId === listPlugin.id) {
 									closePoint(POINT.vocabLibrary, 'drawer');
-									setOpenPluginId(null);
 									return;
 								}
-								const detailWasOpen = readSlot(POINT.vocabCard, 'drawer').open;
-								const opened = openPoint(
-									POINT.vocabLibrary,
-									listPlugin.id,
-									'drawer',
-									{},
-								);
-								if (!opened) return;
-								setListStill(detailWasOpen);
-								setOpenPluginId(listPlugin.id);
+								openPoint(POINT.vocabLibrary, listPlugin.id, 'drawer', {});
 							}}
 						>
 							<PluginIcon
-								name={listPlugin.menu?.icon ?? listPlugin.host?.icon}
+								name={readPluginIcon(listPlugin.id)}
 								className="size-4.5"
 							/>
 							{pickPluginLocaleText(listPlugin.title, locale) || '单词解析'}
@@ -400,46 +356,10 @@ export function VocabularyLibrarySection({
 					) : null}
 				</div>
 			</div>
-			<PluginHostSurface
-				surface="english.vocab.library"
-				part="drawer"
-				openPluginId={openPluginId}
-				onOpenPluginIdChange={(id) => {
-					if (!id) {
-						setListStill(false);
-						closePoint(POINT.vocabLibrary, 'drawer');
-					}
-					setOpenPluginId(id);
-				}}
-				drawerBodyClassName="overflow-hidden p-0"
-				drawerWidth={pointDrawerWidth}
-				chromeStyle={
-					tucked
-						? {
-								animation: 'none',
-								transition: 'none',
-								opacity: 0,
-								visibility: 'hidden',
-							}
-						: listStill
-							? ({
-									'--tw-enter-translate-x': '0px',
-									opacity: 1,
-									transition: 'none',
-								} as CSSProperties)
-							: undefined
-				}
-				drawerModal={false}
-				drawerPlainOverlay
-				drawerOverlayClassName={
-					tucked ? 'pointer-events-none opacity-0' : undefined
-				}
-				drawerPreventDismiss={tucked}
-				drawerClassName={tucked ? 'pointer-events-none' : undefined}
-				onDrawerInteractOutside={(event) => {
-					if (openPluginId && detailOpen) event.preventDefault();
-				}}
-				drawerTitle={
+			<HostPoint
+				pointId={POINT.vocabLibrary}
+				slot="drawer"
+				title={
 					<span className="flex min-w-0 items-baseline gap-2">
 						<span className="shrink-0">
 							{t('englishLearning.vocabDetailList.heading')}

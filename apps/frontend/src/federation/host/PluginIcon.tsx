@@ -35,6 +35,38 @@ async function fetchIconText(src: string): Promise<string> {
 	return res.text();
 }
 
+/** 插件和宿主按钮共用同一份缓存。地址换算、桌面端直链、上色都在这里完成。 */
+export async function loadPluginIconMarkup(
+	name: string,
+): Promise<string | null> {
+	const key = name.trim();
+	if (!isPluginIconUrl(key)) return null;
+	let parts = svgCache.get(cacheKey(key)) ?? null;
+	if (!parts) {
+		const text = await fetchIconText(resolveCosUrlForWebDisplay(key));
+		parts = normalizeSvgForHostIcon(text);
+		if (!parts) return null;
+		svgCache.set(cacheKey(key), parts);
+	}
+	const attrs = [
+		'xmlns="http://www.w3.org/2000/svg"',
+		`viewBox="${parts.viewBox}"`,
+		'class="size-4"',
+		`fill="${parts.rootProps.fill ?? 'none'}"`,
+		`stroke="${parts.rootProps.stroke ?? 'currentColor'}"`,
+	];
+	if (parts.rootProps.strokeWidth != null) {
+		attrs.push(`stroke-width="${parts.rootProps.strokeWidth}"`);
+	}
+	if (parts.rootProps.strokeLinecap) {
+		attrs.push(`stroke-linecap="${parts.rootProps.strokeLinecap}"`);
+	}
+	if (parts.rootProps.strokeLinejoin) {
+		attrs.push(`stroke-linejoin="${parts.rootProps.strokeLinejoin}"`);
+	}
+	return `<svg ${attrs.join(' ')}>${parts.innerHTML}</svg>`;
+}
+
 /**
  * 内联 SVG：近黑灰单色（含 iconfont #2c2c2c）跟侧栏 text-* / 选中 text-teal-500；
  * 品牌多色保留上传色；填充/描边分流动画。
@@ -68,14 +100,11 @@ export function PluginIcon({ name, className }: PluginIconProps) {
 		setFailed(false);
 		setParts(null);
 
-		// 与侧栏头像同一套展示 URL：dev/Web 生产走 /ext-cos/；Tauri 生产保留 COS 直链
-		const src = resolveCosUrlForWebDisplay(key);
 		void (async () => {
 			try {
-				const text = await fetchIconText(src);
-				const next = normalizeSvgForHostIcon(text);
-				if (!next) throw new Error('invalid svg');
-				svgCache.set(cacheKey(key), next);
+				const markup = await loadPluginIconMarkup(key);
+				const next = svgCache.get(cacheKey(key)) ?? null;
+				if (!markup || !next) throw new Error('invalid svg');
 				if (!cancelled) setParts(next);
 			} catch {
 				if (!cancelled) {

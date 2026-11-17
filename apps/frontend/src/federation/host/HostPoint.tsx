@@ -3,6 +3,7 @@
  * action 画按钮，toolbar 内联正文，drawer 在会话打开时画抽屉。
  */
 import { Drawer } from '@design/Drawer';
+import Tooltip from '@design/Tooltip';
 import {
 	claimPluginPortalTarget,
 	clearPluginPortalClaim,
@@ -13,7 +14,9 @@ import { useHostSurfacePlugins } from '@dnhyxc-ai/federation-kit/react';
 import { Button, Spinner } from '@ui/index';
 import {
 	type CSSProperties,
+	type ReactNode,
 	useEffect,
+	useMemo,
 	useRef,
 	useSyncExternalStore,
 } from 'react';
@@ -22,10 +25,13 @@ import { cn } from '@/lib/utils';
 import { getHostPoint } from '../points/catalog';
 import {
 	closePoint,
+	concealOf,
+	coversOpenTarget,
 	isPointPending,
 	openPoint,
 	readSignalRev,
 	readSlot,
+	stackPeers,
 	subscribeSignals,
 	subscribeSlot,
 } from '../points/session';
@@ -34,13 +40,6 @@ import { PluginIcon } from './PluginIcon';
 
 const pointDrawerWidth = 'w-full sm:max-w-[420px]';
 
-const NO_SLOT = Object.freeze({
-	pluginId: null,
-	open: false,
-	payload: null,
-	covered: false,
-});
-
 export { pointDrawerWidth };
 
 export type HostPointProps = {
@@ -48,6 +47,10 @@ export type HostPointProps = {
 	slot: string;
 	/** 动作槽点击时写入打开槽的载荷 */
 	payload?: Record<string, unknown>;
+	/** page 角色的图标按钮。缺省只画抽屉正文 */
+	part?: 'trigger' | 'body';
+	/** 盖过插件标题。词库列表用来放统计 */
+	title?: ReactNode;
 	className?: string;
 	drawerClassName?: string;
 	drawerStyle?: CSSProperties;
@@ -67,6 +70,8 @@ export function HostPoint({
 	pointId,
 	slot,
 	payload,
+	part = 'body',
+	title: titleProp,
 	className,
 	drawerClassName,
 	drawerStyle,
@@ -81,22 +86,28 @@ export function HostPoint({
 		() => readSlot(pointId, slot),
 	);
 	useSyncExternalStore(subscribeSignals, readSignalRev, () => 0);
-	const layout = slotSpec?.layout;
-	const yieldTo = layout?.yieldTo;
-	const upper = useSyncExternalStore(
-		(listener) =>
-			yieldTo ? subscribeSlot(yieldTo.point, yieldTo.slot, listener) : () => {},
-		() => (yieldTo ? readSlot(yieldTo.point, yieldTo.slot) : NO_SLOT),
-		() => NO_SLOT,
+	const peers = useMemo(() => stackPeers(pointId, slot), [pointId, slot]);
+	useSyncExternalStore(
+		(listener) => {
+			const offs = peers.map((peer) =>
+				subscribeSlot(peer.point, peer.slot, listener),
+			);
+			return () => {
+				for (const off of offs) off();
+			};
+		},
+		() =>
+			peers
+				.map((peer) => {
+					const row = readSlot(peer.point, peer.slot);
+					return row.open && !row.covered ? '1' : '0';
+				})
+				.join(''),
+		() => '',
 	);
-	const yielded = Boolean(yieldTo && upper.open && !upper.covered);
-	const upperOpen = () => {
-		if (!yieldTo) return false;
-		const live = readSlot(yieldTo.point, yieldTo.slot);
-		return live.open && !live.covered;
-	};
+	const layout = slotSpec?.layout;
 	const keepUnderDetail = (event?: Event) => {
-		if (!yielded && !upperOpen()) return false;
+		if (!concealOf(pointId, slot)) return false;
 		event?.preventDefault();
 		return true;
 	};
@@ -118,12 +129,13 @@ export function HostPoint({
 	}, []);
 
 	useEffect(() => {
-		if (!layout?.persist) return;
+		if (!layout?.persist && !layout?.page) return;
 		if (session.open && session.pluginId && !drawerPlugin) {
 			closePoint(pointId, slot);
 		}
 	}, [
 		layout?.persist,
+		layout?.page,
 		drawerPlugin,
 		session.open,
 		session.pluginId,
@@ -141,7 +153,7 @@ export function HostPoint({
 		};
 	}, [layout?.modal, session.open]);
 
-	const conceal = Boolean(session.covered || yielded);
+	const conceal = concealOf(pointId, slot);
 	// 关掉之后下次再开仍要滑入。让位期间记下，收回来的那一帧用 0 位移
 	if (!session.open) parked.current = false;
 	else if (conceal) parked.current = true;
@@ -159,6 +171,57 @@ export function HostPoint({
 						className="h-auto! min-h-0 w-full max-w-full"
 					/>
 				))}
+			</div>
+		);
+	}
+
+	if (part === 'trigger' && slotSpec.kind === 'drawer') {
+		if (matched.length === 0) return null;
+		return (
+			<div className={cn('contents', className)}>
+				{matched.map((plugin) => {
+					const label = pickPluginLocaleText(plugin.title, locale) || plugin.id;
+					const open = session.open && session.pluginId === plugin.id;
+					return (
+						<Tooltip
+							key={plugin.id}
+							side="bottom"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={label}
+						>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								className={cn(
+									'lucide-stroke-draw-hover [&_svg]:overflow-visible',
+									open
+										? 'bg-theme/15 text-teal-500'
+										: 'text-textcolor/80 hover:text-teal-500',
+								)}
+								aria-pressed={open}
+								aria-label={label}
+								onClick={() => {
+									if (open) {
+										clearPluginPortalClaim(plugin.id);
+										closePoint(pointId, slot);
+										return;
+									}
+									claimPluginPortalTarget(
+										plugin.id,
+										styleRealmKey(plugin.entry, plugin.remoteName, plugin.id),
+									);
+									const opened = openPoint(pointId, plugin.id, slot, {});
+									if (!opened) clearPluginPortalClaim(plugin.id);
+								}}
+							>
+								<PluginIcon name={plugin.host?.icon} className="size-4" />
+							</Button>
+						</Tooltip>
+					);
+				})}
 			</div>
 		);
 	}
@@ -236,12 +299,13 @@ export function HostPoint({
 		clearPluginPortalClaim(claimedId.current);
 		claimedId.current = null;
 	}
-	const title = plugin
-		? pickPluginLocaleText(plugin.title, locale) || plugin.id
-		: '';
+	const title =
+		titleProp ??
+		(plugin ? pickPluginLocaleText(plugin.title, locale) || plugin.id : '');
 	// 列表和导入的 openCard 带 source:list。这一帧详解直接出现，遮罩不要从 0 淡入
 	const fromList =
 		session.open && !session.covered && session.payload?.source === 'list';
+	const overOpen = coversOpenTarget(pointId, slot);
 	// opacity 写在 inline 上，压过 Sheet 打开态的 500ms transition。只加 invisible 时卡片层还会再画一帧
 	const sheetStyle: CSSProperties = conceal
 		? {
@@ -251,7 +315,7 @@ export function HostPoint({
 				opacity: 0,
 				visibility: 'hidden',
 			}
-		: fromList || parked.current
+		: fromList || parked.current || overOpen
 			? ({
 					...drawerStyle,
 					'--tw-enter-translate-x': '0px',
@@ -266,9 +330,9 @@ export function HostPoint({
 			modal={layout?.modal !== false}
 			plainOverlay={layout?.modal === false}
 			overlayClassName={
-				yielded
+				conceal
 					? 'pointer-events-none opacity-0'
-					: fromList
+					: fromList || overOpen
 						? '![--tw-enter-opacity:1]'
 						: undefined
 			}

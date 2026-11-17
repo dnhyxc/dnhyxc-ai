@@ -12,7 +12,7 @@
 | 形态 | 插件出现在哪 | 主项目要改什么 | 插件拿到的模块 |
 |------|----------------|----------------|----------------|
 | **A. 已登记扩展点** | 单词卡、词库、错题、收藏、复习、每日阅读、阅读页等已经登记的槽 | 通常不改代码。注册表写 `host.surface`、`host.slot`、`modules:point` | `api.modules.point` |
-| **B. 新的扩展点** | 某个页面上还没有可挂的槽 | `points/catalog.ts` + 该页面放 `HostPoint`（阅读页这类自己画按钮的，继续用 `PluginHostSurface`） | `api.modules.point` |
+| **B. 新的扩展点** | 某个页面上还没有可挂的槽 | `points/catalog.ts` 加一种角色，页面放 `HostPoint` | `api.modules.point` |
 | **C. 业务页整页内嵌** | 学习笔记这种独立页面，含 Popout、跨窗同步 | 静态路由 + `<PluginHostPage pluginId="…" />`。专属能力仍走 `modules/learningNotes` | `api.modules.learningNotes` |
 | **D. 顶层独立路由** | 插件自己占侧栏一项，例如视频播放器 | 注册表 `injectRoute: true` + `menu`。不必手写路由 | 按它声明的 permissions |
 
@@ -40,12 +40,11 @@ flowchart TD
 
 | 目录 / 文件 | 职责 | 新插件要不要改 |
 |-------------|------|----------------|
-| [`points/catalog.ts`](./points/catalog.ts) | 点、槽、上下文键、信号、命令 | **新槽位要改**。挂已有槽不改 |
+| [`points/catalog.ts`](./points/catalog.ts) | 四种角色、叠放表、上下文键、信号、命令名 | **新页面或新命令名要改**。挂已有槽不改 |
 | [`points/api.ts`](./points/api.ts) | 按目录冻结 `api.modules.point` | 不改 |
-| [`points/session.ts`](./points/session.ts) | 槽会话、上下文、信号、命令表 | 不改 |
-| [`points/commands.ts`](./points/commands.ts) | 不依赖某一页状态的命令：朗读、选 JSON、打开详解 | 只有这种命令才加 |
-| [`host/HostPoint.tsx`](./host/HostPoint.tsx) | 按目录画顶栏、行按钮、抽屉 | 不改。业务页放 `<HostPoint />` |
-| [`host/PluginHostSurface.tsx`](./host/PluginHostSurface.tsx) | 页面自己画的触发器和抽屉，当前是阅读页和词库列表 | 不改组件。新页面若要自己画，直接使用 |
+| [`points/session.ts`](./points/session.ts) | 槽会话、上下文、信号、命令表、叠放显隐 | 不改 |
+| [`points/command.ts`](./points/command.ts) | 启动时绑定的命令：朗读、选 JSON、打开详解、关掉阅读页抽屉 | 只有不依赖某一页闭包的命令才加 |
+| [`host/HostPoint.tsx`](./host/HostPoint.tsx) | 按编译出的槽画顶栏、按钮、图标触发器和抽屉 | 不改。业务页放 `<HostPoint />` |
 | [`host/PluginHostPage.tsx`](./host/PluginHostPage.tsx) | 整页或业务路由内嵌 | 不改 |
 | [`runtime/index.ts`](./runtime/index.ts) | `buildModules`、iframe RPC | **不为新扩展点插件改**。`modules:point` 已按 `host.surface` 装配 |
 | [`modules/`](./modules/README.md) | 学习笔记专属 API | 新扩展点插件不建子目录 |
@@ -73,7 +72,7 @@ flowchart TD
 
 | 步骤 | 位置 | 动作 |
 |------|------|------|
-| 1 | `points/catalog.ts` | `POINT` 与 `hostPoints` 增加一项 |
+| 1 | `points/catalog.ts` | `POINT` 与 `pointDefs` 增加一项。列表页用 `listPoint` |
 | 2 | 目标页面 | `usePointContext`、`<HostPoint>`；需要页内能力时 `bindPointCommand` |
 | 3 | `router/routes.ts` | 页面若不在 `/english-learning` 下，要自己挂抽屉并在离开时 `closePoint` |
 | 4 | Remote + 注册表 | 与形态 A 相同 |
@@ -182,7 +181,7 @@ point?.command('closeIdeasList', undefined);
 
 ### 5.1 已有扩展点
 
-页面上已经有对应的 `HostPoint` 或 `PluginHostSurface`。新插件只改注册表。例如每日阅读的顶栏和行按钮：
+页面上已经有对应的 `HostPoint`。新插件只改注册表。例如每日阅读的顶栏和行按钮：
 
 ```tsx
 <HostPoint pointId={POINT.dailyReading} slot="toolbar" />
@@ -222,18 +221,21 @@ useEffect(() => {
 }, []);
 ```
 
-命令名必须先写进该点的 `commands`。不依赖页面 state 的命令写在 `points/commands.ts`，应用启动时注册一次，现成的有词卡 `play` / `stop` 和词库 `pickJsonFile` / `openCard`。
+命令名必须先写进该点的 `commands`。不依赖页面闭包的命令写在 `points/command.ts`，由 `runtime/index.ts` 在启动时导入。现成的有词卡 `play` / `stop`、词库 `pickJsonFile` / `openCard`、文章点的朗读和打开详解，以及阅读页的 `closeIdeasList`。
 
-新页面若挂在 `/english-learning` 的子路由上，普通抽屉不用自己画。阅读页不在这个布局里，抽屉标了 `layout.page: true`，按钮和抽屉仍是 `PluginHostSurface`，上下文和命令在 `views/ebook/read.tsx` 里发布：
+新页面若挂在 `/english-learning` 的子路由上，普通抽屉不用自己画。阅读页不在这个布局里，抽屉角色写 `owner: 'page'`，图标和抽屉都是 `HostPoint`。`navigateToCfi` 和 `openThought` 要当前这本书，在 `views/ebook/read.tsx` 里绑定：
 
 ```tsx
 publishPointContext(POINT.ebookRead, { bookId, bookTitle });
 bindPointCommand(POINT.ebookRead, 'navigateToCfi', (cfi) => { /* 滚到这个 CFI */ });
 bindPointCommand(POINT.ebookRead, 'openThought', (thought) => { /* 打开想法 */ });
-bindPointCommand(POINT.ebookRead, 'closeIdeasList', () => { /* 关掉当前插件抽屉 */ });
+
+<HostPoint pointId={POINT.ebookRead} slot="toolbar" />
+<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />
+<HostPoint pointId={POINT.ebookRead} slot="drawer" />
 ```
 
-PDF 或离开页面时 `publishPointContext(POINT.ebookRead, null)` 并解绑。插件侧仍然调用 `api.modules.point`，不再有 `api.modules.ebook`。
+`closeIdeasList` 在启动时绑定，只关掉阅读页抽屉，不读页面 state。PDF 或离开页面时 `publishPointContext(POINT.ebookRead, null)`、解绑上面两条，并 `closePoint(POINT.ebookRead, 'drawer')`。插件侧仍然调用 `api.modules.point`，不再有 `api.modules.ebook`。
 
 ### 5.3 整页内嵌
 
@@ -279,7 +281,7 @@ useEffect(() => {
 | permission | 插件可用 |
 |------------|----------|
 | （无） | `api.theme`、`api.locale`、`api.event` |
-| `ui:toast` | `api.ui.showToast`、全屏、选文件、下载 |
+| `ui:toast` | `api.ui.showToast`、全屏、选文件、下载、`readIconSvg`（插件页面画插件中心图标） |
 | `nav:subtree` | `api.navigate`，不能超出 `routePath` |
 | `http:plugin-api` | `api.http.get/post/put/delete`，走主项目的 fetch |
 | `modules:point` | `api.modules.point` 五个方法 |

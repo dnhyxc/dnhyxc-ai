@@ -572,7 +572,7 @@ resolvePluginBust
 | `fetchPluginRegistry` | 拉 COS/本地清单 | 产品 registry |
 | `persistPluginEnabled` | 写账号上架偏好 | 多端同步 |
 | `PluginHostPage` | slots 包装 `FederationPlugin` | Loading/错误/外壳皮肤 |
-| `PluginHostSurface` | 按 surface+slot 挂插件 | ebook 抽屉/工具栏 |
+| `HostPoint` | 按目录里的点 id 和槽名挂插件 | 顶栏、行按钮、阅读页抽屉 |
 | `setAppFullscreen` | 影院全屏 | 藏壳 + Tauri/Web 全屏 |
 | ebook host api 绑定 | 可变绑定阅读器能力 | 插件跳 CFI 等 |
 

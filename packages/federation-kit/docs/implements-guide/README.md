@@ -16,7 +16,7 @@
 | 6 | [宿主适配层.md](./宿主适配层.md) | 本仓 `@/federation` 适配层（Toast/COS/偏好/ebook/全屏/design slots） | Host 接线 |
 | 7 | [复刻方案.md](./复刻方案.md) | **跨项目复刻**：前置条件、建造顺序、MVP、验收清单、常见失误 | 可落地手册 |
 | 8 | [生命周期钩子.md](./生命周期钩子.md) | **生命周期变更**：`pickPluginLifecycle`、缺钩子 `console.info`、`runLoad`/`unload`、React/Vue 导出（逐行注释） | 生命周期 |
-| 9 | [插件图标.md](./插件图标.md) | **动态插件图标**：registry SVG URL → `PluginIcon` fetch/消毒/内联；侧栏与 Surface 接线；上传写回；画线 CSS（逐行注释） | Host 适配层 |
+| 9 | [插件图标.md](./插件图标.md) | **动态插件图标**：registry SVG URL → `PluginIcon` 内联；插件页面用 `api.ui.readIconSvg`（§4.7） | Host 适配层 |
 
 ## 三层心智模型（30 秒）
 

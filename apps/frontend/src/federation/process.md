@@ -897,6 +897,8 @@ export function CollectMark({
 
 同名英文标题在选项上加上最近收集日期，值仍然是 `readingId`。点来源标题调用 `command('openReading', readingId)`，不使用 `nav:subtree`。
 
+工具栏上「单词解析」「导入解析」用插件中心的图标。插件从 `dnhyxc.plugin.registry.dev.v1`（生产是 `prod`）读出目标插件的 `menu.icon ?? host.icon`，再调用 `api.ui.readIconSvg`。返回的是已经上色的整段 `<svg>`。下载、桌面端直链和 `currentColor` 都在主项目的 `loadPluginIconMarkup` 里，插件不再自己请求 COS。
+
 ```typescript
 export type ReadingWordSource = {
 	readingId: string;

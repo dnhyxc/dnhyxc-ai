@@ -95,6 +95,8 @@ Host 侧内置的 RPC 方法（`dispatchRpc`）：
 | `ui.showToast` | `api.ui.showToast` | `api.ui` 存在 |
 | `ui.downloadBlob` | `api.ui.downloadBlob` | `api.ui.downloadBlob` 存在 |
 
+`api.ui.readIconSvg` 目前只挂在模块联邦桥上，`dispatchRpc` 没有 `ui.readIconSvg`。iframe 插件要显示插件中心图标时，还不能调用这个方法。
+
 > Host 还可以通过 `iframeRpcHandlers` 扩展任意 RPC（见第 13 章 registry 说明）。**iframe 模式下 `api.event` 是 no-op**——语言热更新靠 `locale` 消息，不靠事件总线。
 
 ---

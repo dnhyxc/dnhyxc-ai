@@ -205,6 +205,7 @@ export function createFederation<
 		downloadBlob: userCaps.downloadBlob,
 		setAppFullscreen: userCaps.setAppFullscreen,
 		pickLocalFiles: userCaps.pickLocalFiles,
+		readIconSvg: userCaps.readIconSvg,
 		modules: userCaps.modules,
 		buildModules: userCaps.buildModules,
 		onLocaleChange: userCaps.onLocaleChange,

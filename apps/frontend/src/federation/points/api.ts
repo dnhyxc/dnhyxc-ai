@@ -1,6 +1,6 @@
 import type { HostPointSpec } from './catalog';
+import { runCommand } from './command';
 import {
-	getPointCommand,
 	publishSignal,
 	readContext,
 	readPayload,
@@ -21,16 +21,6 @@ export function createPointApi(spec: HostPointSpec) {
 			// 未声明的名字在 session 里直接丢掉，不会通知界面
 			publishSignal(spec.id, name, value),
 		// 第二个参数必须传。插件没有参数时传 undefined，漏传会在类型检查阶段失败
-		command: (name: string, arg: unknown) => {
-			// 目录没声明的命令不往下找实现，避免插件调到别的点的能力
-			if (!spec.commands.includes(name))
-				throw new Error('UNKNOWN_POINT_COMMAND');
-			// 目录有名字，但当前页面还没 bind，或离开页面后已经解绑
-			const fn = getPointCommand(spec.id, name);
-			// 和「名字不存在」分开抛，插件能区分写错命令和页面还没挂上
-			if (!fn) throw new Error('POINT_COMMAND_UNBOUND');
-			// 参数原样交给页面注册的实现，返回值也原样交回插件
-			return fn(arg);
-		},
+		command: (name: string, arg: unknown) => runCommand(spec.id, name, arg),
 	});
 }

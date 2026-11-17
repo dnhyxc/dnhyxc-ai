@@ -23,7 +23,8 @@ import {
 import { useNavigate, useParams } from 'react-router';
 import {
 	bindPointCommand,
-	PluginHostSurface,
+	closePoint,
+	HostPoint,
 	POINT,
 	publishPointContext,
 } from '@/federation';
@@ -379,9 +380,6 @@ function EbookReadPage() {
 	>('create');
 	const [thoughtSaving, setThoughtSaving] = useState(false);
 	const [thoughtListOpen, setThoughtListOpen] = useState(false);
-	const [hostDrawerPluginId, setHostDrawerPluginId] = useState<string | null>(
-		null,
-	);
 	const [thoughtComposeScrollKey, setThoughtComposeScrollKey] = useState(0);
 
 	const focusThoughtCompose = useCallback(() => {
@@ -1129,6 +1127,7 @@ function EbookReadPage() {
 	useEffect(() => {
 		if (book?.fmt !== 'epub') {
 			publishPointContext(POINT.ebookRead, null);
+			closePoint(POINT.ebookRead, 'drawer');
 			return;
 		}
 		const bookId = book.id;
@@ -1142,13 +1141,11 @@ function EbookReadPage() {
 				if (!thought || typeof thought !== 'object') return;
 				openHostThought(thought as Parameters<typeof openHostThought>[0]);
 			}),
-			bindPointCommand(POINT.ebookRead, 'closeIdeasList', () => {
-				setHostDrawerPluginId(null);
-			}),
 		];
 		return () => {
 			for (const off of unbind) off();
 			publishPointContext(POINT.ebookRead, null);
+			closePoint(POINT.ebookRead, 'drawer');
 		};
 	}, [
 		book?.fmt,
@@ -2578,14 +2575,8 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
-				{/* PluginHostSurface drawer-triggers 渲染图标插件开关 */}
-				<PluginHostSurface
-					surface="ebook.read"
-					part="drawer-triggers"
-					openPluginId={hostDrawerPluginId}
-					onOpenPluginIdChange={setHostDrawerPluginId}
-				/>
-				<PluginHostSurface surface="ebook.read" part="toolbar" />
+				<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />
+				<HostPoint pointId={POINT.ebookRead} slot="toolbar" />
 				{canSetPublic && book ? (
 					<EbookBookVisibilitySwitch
 						book={book}
@@ -3069,14 +3060,11 @@ function EbookReadPage() {
 				/>
 			) : null}
 
-			{/* drawer 渲染抽屉插件 */}
 			{book?.fmt === 'epub' ? (
-				<PluginHostSurface
-					surface="ebook.read"
-					part="drawer"
-					openPluginId={hostDrawerPluginId}
-					onOpenPluginIdChange={setHostDrawerPluginId}
-					chromeStyle={epubSurfaceProps?.chromeStyle}
+				<HostPoint
+					pointId={POINT.ebookRead}
+					slot="drawer"
+					drawerStyle={epubSurfaceProps?.chromeStyle}
 				/>
 			) : null}
 		</EbookPageShell>

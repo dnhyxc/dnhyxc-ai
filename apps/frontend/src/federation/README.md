@@ -8,7 +8,6 @@ import {
   HostPoint,
   POINT,
   PluginHostPage,
-  PluginHostSurface,
   usePluginEnabled,
   pickPluginLocaleText,
 } from '@/federation';
@@ -21,7 +20,7 @@ import {
 | [`runtime/`](./runtime/README.md) | `createFederation` 门面 | `mf` / `pluginManager` / injectors |
 | [`registry/`](./registry/README.md) | 插件清单 | COS 拉取、缓存、落盘 |
 | [`enabled/`](./enabled/README.md) | 账号上架偏好 | 用户级插件开关 |
-| [`host/`](./host/README.md) | 挂载模版 | Page / Surface / Shell |
+| [`host/`](./host/README.md) | 挂载模版 | Page / HostPoint / Shell |
 | [`capabilities/`](./capabilities/README.md) | 通用 UI 能力 | `appFullscreen`、`pickLocalFiles` |
 | [`sync/`](./sync/README.md) | 跨窗 sync | BC + Tauri 工厂 |
 | [`points/`](./points/catalog.ts) | 扩展点目录与会话 | `api.modules.point`、`HostPoint` |
@@ -38,8 +37,7 @@ import {
 | 场景 | 模版 |
 |------|------|
 | 路由全页 / 业务树内嵌 | `PluginHostPage` |
-| 已登记扩展点的顶栏、行按钮、抽屉 | `HostPoint` |
-| 阅读页自己画的触发器和抽屉 | `PluginHostSurface` |
+| 已登记扩展点的顶栏、行按钮、图标触发器、抽屉 | `HostPoint` |
 
 ```ts
 await mf.start();
@@ -48,5 +46,5 @@ mf.onRoutesChange(rebuild);
 
 <PluginHostPage pluginId="learningNotes" />
 <HostPoint pointId={POINT.dailyReading} slot="toolbar" />
-<PluginHostSurface surface="ebook.read" part="drawer-triggers" />
+<HostPoint pointId={POINT.ebookRead} slot="drawer" part="trigger" />
 ```

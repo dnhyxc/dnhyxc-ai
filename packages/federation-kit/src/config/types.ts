@@ -68,6 +68,8 @@ export interface HostCapabilities {
 	pickLocalFiles?: (
 		options?: PickLocalFilesOptions,
 	) => Promise<HostPickedLocalFile[] | null>;
+	/** 把插件中心的图标地址换成可内联的 SVG。桌面端直链和上色由宿主完成。 */
+	readIconSvg?: (url: string) => Promise<string | null>;
 	/** 业务模块挂载点（如 ebook）；按 permission `modules:xxx` 装配 */
 	modules?: Record<string, unknown>;
 	/**

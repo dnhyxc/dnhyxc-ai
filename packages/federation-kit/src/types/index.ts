@@ -91,6 +91,8 @@ export interface HostBridgeProps {
 				  }[]
 				| null
 			>;
+			/** 插件中心图标地址 → 已上色的 SVG 标记 */
+			readIconSvg?: (url: string) => Promise<string | null>;
 		};
 		modules?: Readonly<Record<string, unknown>>;
 	}>;

@@ -43,6 +43,9 @@ export function createHostBridge(
 		if (capabilities.pickLocalFiles) {
 			ui.pickLocalFiles = capabilities.pickLocalFiles;
 		}
+		if (capabilities.readIconSvg) {
+			ui.readIconSvg = capabilities.readIconSvg;
+		}
 		api.ui = Object.freeze(ui);
 	}
 

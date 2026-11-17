@@ -15,6 +15,7 @@
 - **appFullscreen**：应用级影院态 + Tauri/Web 系统全屏；Layout / `PluginPageShell` 订阅显隐
 - **pickLocalFiles**：Tauri 系统对话框 / Web 隐藏 input；返回 `path` + 可播放 `src`
 - **iframeAppearance**：只下发 `--brand-accent*` + theme；背景等由 iframe 本地 `.dark` 处理（避免内联盖住主题）
+- **readIconSvg** 不在本目录。`runtime/index.ts` 把 `loadPluginIconMarkup` 放进 capabilities，插件用 `api.ui.readIconSvg` 拿已上色的 SVG。做法见 `packages/federation-kit/docs/implements-guide/插件图标.md` §4.7
 
 ## 常用
 

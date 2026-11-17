@@ -3,7 +3,7 @@
  * 冷启动时插件还没下载，打开载荷必须先落在这里。
  */
 import { listHostSurfacePlugins } from '@dnhyxc-ai/federation-kit';
-import { getHostPoint } from './catalog';
+import { getHostPoint, stacks } from './catalog';
 
 export type SlotSession = {
 	pluginId: string | null;
@@ -195,12 +195,8 @@ export function openPoint(
 	});
 	// 让抽屉和订了这个点的界面读到新会话
 	emitSlot(pointId, slot);
-	// 词库的 drawer 会盖住词卡抽屉；打开别的槽不会去盖
-	if (spec.covers?.slot === slot) {
-		// 被盖的抽屉保持 open，只是加上 covered，这样没有退场动画
-		coverPoint(spec.covers.targetPoint, spec.covers.targetSlot);
-		// 结束「这个槽负责覆盖别的抽屉」
-	}
+	// 盖住规则在会话写下之后跑。被盖的抽屉保持 open，不播退场
+	applyStack(pointId, slot, true);
 	// 会话已经写下，调用方可以认为抽屉打开了
 	return true;
 	// 结束 openPoint
@@ -208,8 +204,6 @@ export function openPoint(
 
 // 关掉一个槽。若这个槽盖着别的抽屉，把被盖的那层重新露出来，但不关掉它
 export function closePoint(pointId: string, slot: string): void {
-	// 用来判断这个槽是不是「盖住别人」的那一个
-	const spec = getHostPoint(pointId);
 	// 没有这条会话时，下面的 cur 是 undefined
 	const key = slotKey(pointId, slot);
 	// 从未打开、也没被盖住时，cur 是空的
@@ -230,13 +224,68 @@ export function closePoint(pointId: string, slot: string): void {
 	});
 	// 通知这个槽收起
 	emitSlot(pointId, slot);
-	// 关掉词库列表抽屉时，把词卡抽屉的 covered 拿掉，详解还开着
-	if (spec?.covers?.slot === slot) {
-		// 只取消覆盖，不调用 closePoint，词卡里的词还在
-		uncoverPoint(spec.covers.targetPoint, spec.covers.targetSlot);
-		// 结束揭开被盖抽屉
-	}
+	// 关掉盖住别人的槽时只揭开，不把被盖的那层一起关掉
+	applyStack(pointId, slot, false);
 	// 结束 closePoint
+}
+
+// 打开时盖住目标，关闭时只揭开。yield 不在这里改 open
+function applyStack(pointId: string, slot: string, opened: boolean): void {
+	for (const rule of stacks) {
+		if (rule.op !== 'cover') continue;
+		if (rule.whenOpen.point !== pointId || rule.whenOpen.slot !== slot)
+			continue;
+		if (opened) coverPoint(rule.target.point, rule.target.slot);
+		else uncoverPoint(rule.target.point, rule.target.slot);
+	}
+}
+
+/** 被盖住，或让位规则的上层正可见。open 不变，外壳只把这一帧画成透明。 */
+export function concealOf(pointId: string, slot: string): boolean {
+	if (readSlot(pointId, slot).covered) return true;
+	for (const rule of stacks) {
+		if (rule.op !== 'yield') continue;
+		if (rule.self.point !== pointId || rule.self.slot !== slot) continue;
+		const upper = readSlot(rule.whileVisible.point, rule.whileVisible.slot);
+		if (upper.open && !upper.covered) return true;
+	}
+	return false;
+}
+
+/** 这个抽屉的显隐还取决于哪些槽。HostPoint 订阅它们，让位才会跟着重画。 */
+export function stackPeers(
+	pointId: string,
+	slot: string,
+): { point: string; slot: string }[] {
+	const peers: { point: string; slot: string }[] = [];
+	for (const rule of stacks) {
+		if (
+			rule.op === 'yield' &&
+			rule.self.point === pointId &&
+			rule.self.slot === slot
+		) {
+			peers.push(rule.whileVisible);
+		}
+		if (
+			rule.op === 'cover' &&
+			rule.whenOpen.point === pointId &&
+			rule.whenOpen.slot === slot
+		) {
+			peers.push(rule.target);
+		}
+	}
+	return peers;
+}
+
+/** 本次打开盖住了一个已经开着的抽屉。列表不要再从右侧滑进来。 */
+export function coversOpenTarget(pointId: string, slot: string): boolean {
+	for (const rule of stacks) {
+		if (rule.op !== 'cover') continue;
+		if (rule.whenOpen.point !== pointId || rule.whenOpen.slot !== slot)
+			continue;
+		if (readSlot(rule.target.point, rule.target.slot).open) return true;
+	}
+	return false;
 }
 
 // 把一个槽标成被盖住。open 和载荷保持原样，抽屉组件只是看不见
