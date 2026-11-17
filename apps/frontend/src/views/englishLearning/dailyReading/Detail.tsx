@@ -96,11 +96,11 @@ function PlaySentenceRun({
 	const renderEn = (sentence: PlaySentence, indexInRun: number) => (
 		<span
 			data-si={sentence.si}
-			className={
-				activeSentenceIndex === sentence.si
-					? 'rounded-sm bg-[rgba(135,207,92,0.15)]'
-					: undefined
-			}
+			className={cn(
+				'select-text',
+				activeSentenceIndex === sentence.si &&
+					'rounded-sm bg-[rgba(135,207,92,0.15)]',
+			)}
 		>
 			{indexInRun > 0 ? ' ' : null}
 			{sentence.words ? (

@@ -376,7 +376,7 @@ export const englishLearning = {
 	'englishLearning.dailyReading.continueGenerate': '继续生成',
 	'englishLearning.dailyReading.words': '生词',
 	'englishLearning.dailyReading.collect': '收集单词',
-	'englishLearning.dailyReading.uncollect': '从本篇移除',
+	'englishLearning.dailyReading.uncollect': '移出收集',
 	'englishLearning.dailyReading.pickWord': '请选中一个英文单词',
 	'englishLearning.dailyReading.listShow': '打开阅读列表',
 	'englishLearning.dailyReading.listHide': '关闭阅读列表',

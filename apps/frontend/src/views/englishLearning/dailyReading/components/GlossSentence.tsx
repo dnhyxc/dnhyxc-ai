@@ -41,10 +41,18 @@ export function GlossSentence({
 	return (
 		<span className="select-text" onPointerLeave={() => setHoverKey(null)}>
 			{tokens.map((token, index) => {
-				if (!token.trim()) return <span key={index}>{token}</span>;
+				// 正文祖先是 user-select:none。WebKit 里 select-text 不会传到子元素，
+				// 没挂上释义的词若不再写一遍，就拖选不了、也无法复制。
+				if (!token.trim()) {
+					return (
+						<span key={index} className="select-text">
+							{token}
+						</span>
+					);
+				}
 				if (/https?:\/\//i.test(token)) {
 					return (
-						<span key={index} className="break-all">
+						<span key={index} className="break-all select-text">
 							{token}
 						</span>
 					);
@@ -52,7 +60,11 @@ export function GlossSentence({
 				const bare = token.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '');
 				const gloss = words[at];
 				if (!bare || !gloss || bare.toLowerCase() !== gloss.w.toLowerCase()) {
-					return <span key={index}>{token}</span>;
+					return (
+						<span key={index} className="select-text">
+							{token}
+						</span>
+					);
 				}
 				at += 1;
 				const key = `${sentenceIndex}-${at}`;

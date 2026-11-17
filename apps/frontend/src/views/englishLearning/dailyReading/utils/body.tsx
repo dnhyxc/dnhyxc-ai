@@ -19,7 +19,7 @@ export function renderText(text: string): ReactNode {
 		const at = match.index ?? 0;
 		if (at > last) out.push(text.slice(last, at));
 		out.push(
-			<span key={n} className="break-all">
+			<span key={n} className="break-all select-text">
 				{match[0]}
 			</span>,
 		);
