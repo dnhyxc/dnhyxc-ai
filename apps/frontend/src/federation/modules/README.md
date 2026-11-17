@@ -4,8 +4,8 @@
 
 ## 子目录
 
-| 插件 | 目录 | README |
-|------|------|--------|
+| 插件          | 目录             | README                              |
+| ------------- | ---------------- | ----------------------------------- |
 | learningNotes | `learningNotes/` | [README](./learningNotes/README.md) |
 
 ## 新增插件 checklist
@@ -24,8 +24,8 @@
 
 ## 与 capabilities 的区别
 
-| | `capabilities/` | `modules/` |
-|--|-----------------|------------|
+|        | `capabilities/`       | `modules/`                 |
+| ------ | --------------------- | -------------------------- |
 | bridge | `api.ui.*` 等通用能力 | `api.modules.<pluginId>.*` |
-| 范围 | 所有插件共享 | 单插件专属 |
-| 示例 | 全屏、选文件 | ebook 导航、笔记 sync |
+| 范围   | 所有插件共享          | 单插件专属                 |
+| 示例   | 全屏、选文件          | ebook 导航、笔记 sync      |
