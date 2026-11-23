@@ -118,6 +118,7 @@ import {
 	IMAGE_OCR,
 	KNOWLEDGE_CATEGORIES,
 	KNOWLEDGE_CATEGORIES_SUMMARY,
+	KNOWLEDGE_COMMENTS,
 	KNOWLEDGE_DELETE,
 	KNOWLEDGE_DETAIL,
 	KNOWLEDGE_ITEM_CATEGORY,
@@ -3312,6 +3313,27 @@ export const setKnowledgeVisibility = async (id: string, isPublic: boolean) => {
 		KNOWLEDGE_VISIBILITY,
 		{ isPublic },
 		{ params: [id] },
+	);
+};
+
+export type KnowledgeCommentSummary = {
+	readerCount: number;
+	ownerOnlyCount: number;
+};
+
+/** GET /knowledge/:id/comments/summary */
+export const getKnowledgeCommentSummary = async (id: string) => {
+	return await http.get<KnowledgeCommentSummary>(KNOWLEDGE_COMMENTS, {
+		params: [id, 'comments', 'summary'],
+	});
+};
+
+/** POST /knowledge/:id/comments/release */
+export const releaseKnowledgeComments = async (id: string) => {
+	return await http.post<{ released: number }>(
+		KNOWLEDGE_COMMENTS,
+		{},
+		{ params: [id, 'comments', 'release'] },
 	);
 };
 

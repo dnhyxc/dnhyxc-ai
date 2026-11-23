@@ -41,7 +41,8 @@ const DOCX_MIME =
 	'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 const hostHttp: HostHttpClient = {
-	get: ((url: string) => http.get(url)) as HostHttpClient['get'],
+	get: ((url: string, config?: { silent?: boolean }) =>
+		http.get(url, config)) as HostHttpClient['get'],
 	post: ((url: string, body?: unknown) =>
 		http.post(url, body)) as HostHttpClient['post'],
 	put: ((url: string, body?: unknown) =>

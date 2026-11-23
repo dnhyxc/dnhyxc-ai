@@ -183,6 +183,13 @@ const KnowledgeAssistantInner = observer(
 
 			const onSaveToKnowledge = useCallback(
 				(message: Message) => {
+					if (knowledgeStore.viewingOthersPublic) {
+						Toast({
+							type: 'info',
+							title: t('knowledge.readonly.othersPublic'),
+						});
+						return;
+					}
 					const body = (message.content ?? '').trim();
 					if (!body) {
 						Toast({
@@ -374,6 +381,13 @@ const KnowledgeAssistantInner = observer(
 					return;
 				}
 				pendingOutlineTocApplyRef.current = false;
+				if (knowledgeStore.viewingOthersPublic) {
+					Toast({
+						type: 'info',
+						title: t('knowledge.readonly.othersPublic'),
+					});
+					return;
+				}
 
 				const assistant = findCompletedOutlineAssistantReply(
 					assistantStore.messages,

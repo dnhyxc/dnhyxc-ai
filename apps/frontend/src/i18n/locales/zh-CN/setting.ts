@@ -262,6 +262,8 @@ export const setting = {
 	'setting.system.shortcuts.item.knowledge.import': '知识库：导入文件',
 	'setting.system.shortcuts.item.knowledge.openList': '知识库：打开列表',
 	'setting.system.shortcuts.item.knowledge.openTrash': '知识库：打开回收站',
+	'setting.system.shortcuts.item.knowledge.toggleVisibility':
+		'知识库：公开或取消公开',
 	'setting.system.shortcuts.item.knowledge.save': '通用：保存',
 	'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant':
 		'知识库：发送选中内容到助手输入框',

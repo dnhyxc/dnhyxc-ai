@@ -1,5 +1,6 @@
 /** zh-CN · knowledge */
 export const knowledge = {
+	'knowledge.comments.summary': '共 {total} 条 / 已加载 {loaded} 条',
 	'knowledge.assistant.aiIntro':
 		'Hi，我是您的专属知识库助手！从日常的资料查阅、流程指引，到棘手难题的排查与解答，我都会为您提供即时、精准的信息支持。您可以把我当作随时在线的业务智囊，帮您大幅节省检索时间，提升工作效能。',
 	'knowledge.assistant.appendedToCurrentDoc': '已追加到当前知识文档',
@@ -85,11 +86,14 @@ export const knowledge = {
 	'knowledge.list.openFailed': '打开失败',
 	'knowledge.list.openInEditor': '在 Cursor 或 Trae 中打开',
 	'knowledge.list.pickFolder': '选择文件夹',
-	'knowledge.list.privateConfirmDesc': '取消后仅你本人可以查看该文档',
+	'knowledge.list.privateConfirmDesc':
+		'取消后仅你本人可以查看该文档。其他人也不能再看到其中已经公开的讨论；留言仍会保留，再次公开后，已释放的讨论会重新出现，未释放的仍只有你能看见',
 	'knowledge.list.privateConfirmTitle': '确定取消公开？',
 	'knowledge.list.publicConfirmDesc':
 		'公开后，所有登录用户都可以在列表中拉取并查看该文档',
 	'knowledge.list.publicConfirmTitle': '确定公开这条知识文档？',
+	'knowledge.list.releaseHistory': '一并公开已有留言（{count} 条）',
+	'knowledge.list.releaseFailed': '文档已公开，历史留言未能公开',
 	'knowledge.list.readFailed': '读取失败',
 	'knowledge.list.revealInFolder': '在访达中显示',
 	'knowledge.list.revealInFolderFailed': '无法在访达中显示',
@@ -104,6 +108,7 @@ export const knowledge = {
 	'knowledge.overwrite.saveAs': '另存为',
 	'knowledge.overwrite.saveAsTip': '也可选择「另存为」将文件保存为新文件',
 	'knowledge.overwrite.title': '覆盖已有文件？',
+	'knowledge.readonly.othersPublic': '这是他人公开的文档，只能查看',
 	'knowledge.save.createFailedTryLater': '新建知识失败，请稍后重试',
 	'knowledge.save.failed': '保存失败',
 	'knowledge.save.fileSaved': '文件已保存',
@@ -119,6 +124,7 @@ export const knowledge = {
 	'knowledge.shortcuts.import': 'Meta + I',
 	'knowledge.shortcuts.openLibrary': 'Meta + Shift + L',
 	'knowledge.shortcuts.openTrash': 'Meta + Shift + T',
+	'knowledge.shortcuts.toggleVisibility': 'Meta + Shift + P',
 	'knowledge.shortcuts.save': 'Meta + S / Control + S',
 	'knowledge.shortcuts.share': 'Meta + Shift + O',
 	'knowledge.title.aria': '知识标题',
@@ -128,6 +134,7 @@ export const knowledge = {
 	'knowledge.toolbar.import': '导入',
 	'knowledge.toolbar.library': '知识库',
 	'knowledge.toolbar.share': '分享',
+	'knowledge.toolbar.comments': '留言',
 	'knowledge.trash.batchDelete': '批量删除',
 	'knowledge.trash.batchDeleteDone': '批量删除完成',
 	'knowledge.trash.batchDeleteDoneMessage': '已删除 {count} 条',

@@ -7,6 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Raw, Repository } from 'typeorm';
 import { AssistantSession } from '../assistant/assistant-session.entity';
+import { KnowledgeComment } from '../knowledge-comment/knowledge-comment.entity';
+import { KnowledgeCommentLike } from '../knowledge-comment/knowledge-comment-like.entity';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
 import { CreateKnowledgeCategoryDto } from './dto/create-knowledge-category.dto';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
@@ -157,7 +159,7 @@ export class KnowledgeService {
 				where: { id, authorId: userId },
 			});
 			if (!row) {
-				throw new NotFoundException('知识库条目不存在');
+				throw new NotFoundException('文档不存在或文档已取消公开');
 			}
 
 			const trash = trashRepo.create({
@@ -173,6 +175,18 @@ export class KnowledgeService {
 			await trashRepo.save(trash);
 			// 助手会话按知识条目 uuid 绑定，主表删除前一并清理（消息随 session CASCADE）
 			await assistantSessionRepo.delete({ knowledgeArticleId: row.id });
+			const commentRepo = manager.getRepository(KnowledgeComment);
+			const likeRepo = manager.getRepository(KnowledgeCommentLike);
+			const commentRows = await commentRepo.find({
+				where: { knowledgeId: row.id },
+				select: { id: true },
+			});
+			if (commentRows.length > 0) {
+				await likeRepo.delete({
+					commentId: In(commentRows.map((item) => item.id)),
+				});
+			}
+			await commentRepo.delete({ knowledgeId: row.id });
 			await knowledgeRepo.delete({ id });
 		});
 	}
@@ -262,7 +276,7 @@ export class KnowledgeService {
 			where: { id, isPublic: true },
 		});
 		if (!pub) {
-			throw new NotFoundException('知识库条目不存在');
+			throw new NotFoundException('文档不存在或文档已取消公开');
 		}
 		return Object.assign(pub, { isOwned: false });
 	}
@@ -610,7 +624,7 @@ export class KnowledgeService {
 			where: { id, authorId: userId },
 		});
 		if (!row) {
-			throw new NotFoundException('知识库条目不存在');
+			throw new NotFoundException('文档不存在或文档已取消公开');
 		}
 		return row;
 	}

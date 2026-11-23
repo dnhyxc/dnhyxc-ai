@@ -30,7 +30,10 @@ export type ContextKey =
 	| 'kind'
 	| 'origin'
 	| 'bookId'
-	| 'bookTitle';
+	| 'bookTitle'
+	| 'knowledgeId'
+	| 'docPublic'
+	| 'docOwned';
 
 export type CommandName =
 	| 'play'
@@ -99,6 +102,7 @@ export const POINT = {
 	dailyReading: 'english.dailyReading',
 	dailyReadingArticle: 'english.dailyReading.article',
 	ebookRead: 'ebook.read',
+	knowledgeArticle: 'knowledge.article',
 } as const;
 
 const DEFAULT_CHROME: DrawerChrome = {
@@ -303,6 +307,21 @@ export const pointDefs: readonly PointDef[] = [
 		contextKeys: ['bookId', 'bookTitle'],
 		signals: [],
 		commands: ['navigateToCfi', 'openThought', 'closeIdeasList'],
+	},
+	{
+		id: POINT.knowledgeArticle,
+		roles: [
+			{
+				kind: 'page',
+				slot: 'drawer',
+				payload: 'none',
+				trigger: 'icons',
+				drawer: { owner: 'page', modal: false, persist: false },
+			},
+		],
+		contextKeys: ['knowledgeId', 'docPublic', 'docOwned'],
+		signals: ['stats'],
+		commands: [],
 	},
 ];
 

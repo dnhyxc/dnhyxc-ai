@@ -25,6 +25,7 @@ import { EbookModule } from './services/ebook/ebook.module';
 import { EbookAssistantModule } from './services/ebook-assistant/ebook-assistant.module';
 import { EnglishLearningModule } from './services/english-learning/english-learning.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
+import { KnowledgeCommentModule } from './services/knowledge-comment/knowledge-comment.module';
 import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
 import { LearningNotesModule } from './services/learning-notes/learning-notes.module';
 import { LlmConfigModule } from './services/llm-config/llm-config.module';
@@ -109,6 +110,7 @@ const connections = new Map();
 		ChatModule,
 		QdrantModule,
 		KnowledgeModule,
+		KnowledgeCommentModule,
 		KnowledgeQaModule,
 		SkillModule,
 		ShareModule,

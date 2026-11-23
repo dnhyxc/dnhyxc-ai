@@ -276,6 +276,8 @@ export const setting = {
 	'setting.system.shortcuts.item.knowledge.import': 'Knowledge: Import file',
 	'setting.system.shortcuts.item.knowledge.openList': 'Knowledge: Open list',
 	'setting.system.shortcuts.item.knowledge.openTrash': 'Knowledge: Open trash',
+	'setting.system.shortcuts.item.knowledge.toggleVisibility':
+		'Knowledge: Publish or unpublish',
 	'setting.system.shortcuts.item.knowledge.save': 'General: Save',
 	'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant':
 		'Knowledge: Send selection to assistant input',

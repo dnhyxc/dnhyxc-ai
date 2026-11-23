@@ -6,6 +6,7 @@ import SearchInput from '@design/SearchInput';
 import Tooltip from '@design/Tooltip';
 import {
 	Button,
+	Checkbox,
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
@@ -30,7 +31,11 @@ import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { deleteKnowledge } from '@/service';
+import {
+	deleteKnowledge,
+	getKnowledgeCommentSummary,
+	releaseKnowledgeComments,
+} from '@/service';
 import useStore from '@/store';
 import type {
 	KnowledgeCategory,
@@ -555,9 +560,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const [selectKnowledge, setSelectKnowledge] =
 			useState<KnowledgeListItem | null>(null);
 		const [visibilityConfirmOpen, setVisibilityConfirmOpen] = useState(false);
+		const [releaseHistory, setReleaseHistory] = useState(false);
 		const [pendingVisibility, setPendingVisibility] = useState<{
 			id: string;
 			isPublic: boolean;
+			ownerOnlyCount: number;
 		} | null>(null);
 
 		/** false：云端列表；true：本地文件夹树（仅展开含 .md 的目录） */
@@ -975,11 +982,28 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const onVisibilityClick = useCallback(
 			(e: React.MouseEvent, knowledge: KnowledgeListItem) => {
 				e.stopPropagation();
+				const nextPublic = !knowledge.isPublic;
+				setReleaseHistory(false);
 				setPendingVisibility({
 					id: knowledge.id,
-					isPublic: !knowledge.isPublic,
+					isPublic: nextPublic,
+					ownerOnlyCount: 0,
 				});
 				setVisibilityConfirmOpen(true);
+				if (nextPublic && knowledge.isOwned !== false) {
+					void getKnowledgeCommentSummary(knowledge.id)
+						.then((res) => {
+							const count = res.success ? (res.data?.ownerOnlyCount ?? 0) : 0;
+							setPendingVisibility((cur) =>
+								cur?.id === knowledge.id && cur.isPublic
+									? { ...cur, ownerOnlyCount: count }
+									: cur,
+							);
+						})
+						.catch(() => {
+							// 摘要失败就不提供释放勾选，历史留言保持仅作者可见
+						});
+				}
 			},
 			[],
 		);
@@ -990,17 +1014,28 @@ const KnowledgeList: React.FC<IProps> = observer(
 				pendingVisibility.id,
 				pendingVisibility.isPublic,
 			);
-			if (ok) {
-				Toast({
-					type: 'success',
-					title: pendingVisibility.isPublic
-						? t('knowledge.list.madePublic')
-						: t('knowledge.list.madePrivate'),
-				});
+			if (!ok) return;
+			if (pendingVisibility.isPublic && releaseHistory) {
+				try {
+					await releaseKnowledgeComments(pendingVisibility.id);
+				} catch (e) {
+					Toast({
+						type: 'error',
+						title: t('knowledge.list.releaseFailed'),
+						message: getRequestErrorMessage(e),
+					});
+				}
 			}
+			Toast({
+				type: 'success',
+				title: pendingVisibility.isPublic
+					? t('knowledge.list.madePublic')
+					: t('knowledge.list.madePrivate'),
+			});
 			setVisibilityConfirmOpen(false);
 			setPendingVisibility(null);
-		}, [knowledgeStore, pendingVisibility, t]);
+			setReleaseHistory(false);
+		}, [knowledgeStore, pendingVisibility, releaseHistory, t]);
 
 		const onMoveCategory = useCallback(
 			async (id: string, categoryId: string | null) => {
@@ -1102,7 +1137,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 					open={visibilityConfirmOpen}
 					onOpenChange={(v) => {
 						setVisibilityConfirmOpen(v);
-						if (!v) setPendingVisibility(null);
+						if (!v) {
+							setPendingVisibility(null);
+							setReleaseHistory(false);
+						}
 					}}
 					title={
 						pendingVisibility?.isPublic
@@ -1110,9 +1148,30 @@ const KnowledgeList: React.FC<IProps> = observer(
 							: t('knowledge.list.privateConfirmTitle')
 					}
 					description={
-						pendingVisibility?.isPublic
-							? t('knowledge.list.publicConfirmDesc')
-							: t('knowledge.list.privateConfirmDesc')
+						pendingVisibility?.isPublic ? (
+							<div className="space-y-3">
+								<p>{t('knowledge.list.publicConfirmDesc')}</p>
+								{pendingVisibility.ownerOnlyCount > 0 ? (
+									<label
+										htmlFor="knowledge-list-release-history"
+										className="flex items-start gap-2 text-left"
+									>
+										<Checkbox
+											id="knowledge-list-release-history"
+											checked={releaseHistory}
+											onCheckedChange={(v) => setReleaseHistory(v === true)}
+										/>
+										<span>
+											{t('knowledge.list.releaseHistory', {
+												count: pendingVisibility.ownerOnlyCount,
+											})}
+										</span>
+									</label>
+								) : null}
+							</div>
+						) : (
+							t('knowledge.list.privateConfirmDesc')
+						)
 					}
 					cancelText={t('common.cancel')}
 					confirmText={t('common.confirm')}

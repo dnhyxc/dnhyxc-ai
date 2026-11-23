@@ -121,6 +121,19 @@ class KnowledgeStore {
 	/** 正在编辑的云端知识 id；null 表示新建草稿 */
 	knowledgeEditingKnowledgeId: string | null = null;
 
+	/** 当前正文来自哪篇云端文档。和编辑 id 分开，读者打开公开文档时讨论仍挂在原文上。 */
+	knowledgeViewing: {
+		id: string;
+		isPublic: boolean;
+		isOwned: boolean;
+	} | null = null;
+
+	/** 正在看别人的公开文档：只读，不能改正文，也不能另存成自己的新文档 */
+	get viewingOthersPublic(): boolean {
+		const viewing = this.knowledgeViewing;
+		return viewing != null && viewing.isOwned === false;
+	}
+
 	/**
 	 * 从回收站仅预览打开时：回收站行 id（与云端知识 id 不同），用于助手按「预览条目」隔离会话；
 	 * 从列表打开正式条目或非回收站场景时应为 null。
@@ -228,6 +241,16 @@ class KnowledgeStore {
 		}
 	}
 
+	setKnowledgeViewing(
+		next: { id: string; isPublic: boolean; isOwned: boolean } | null,
+	) {
+		this.knowledgeViewing = next;
+	}
+
+	clearKnowledgeViewing() {
+		this.knowledgeViewing = null;
+	}
+
 	setKnowledgeTrashPreviewId(id: string | null) {
 		this.knowledgeTrashPreviewId = id;
 	}
@@ -311,6 +334,7 @@ class KnowledgeStore {
 	clearKnowledgeDraft() {
 		this.knowledgeTitle = '';
 		this.knowledgeEditingKnowledgeId = null;
+		this.knowledgeViewing = null;
 		this.knowledgeTrashPreviewId = null;
 		this.knowledgeLocalDiskTitle = null;
 		this.knowledgeLocalDirPath = null;
@@ -331,6 +355,7 @@ class KnowledgeStore {
 		if (!body) return;
 		this.setKnowledgeOverwriteOpen(false);
 		this.knowledgeEditingKnowledgeId = null;
+		this.knowledgeViewing = null;
 		this.knowledgeTrashPreviewId = null;
 		this.knowledgeLocalDiskTitle = null;
 		this.knowledgeLocalDirPath = null;
@@ -458,6 +483,12 @@ class KnowledgeStore {
 					: item,
 			);
 			this.list = sortKnowledgeByPublic(next);
+			if (this.knowledgeViewing?.id === updated.id) {
+				this.knowledgeViewing = {
+					...this.knowledgeViewing,
+					isPublic: updated.isPublic,
+				};
+			}
 		});
 		return true;
 	}

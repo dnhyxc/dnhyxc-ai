@@ -33,6 +33,8 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	share: 23,
 	/** 从本地文件导入到编辑器 */
 	import: 24,
+	/** 公开 / 取消公开当前已保存文档 */
+	toggleVisibility: 34,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
@@ -48,6 +50,8 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	toggleMarkdownBottomBar: 'Meta + Shift + B',
 	/** Command（Meta）+ Shift + T：打开回收站 */
 	openTrash: 'Meta + Shift + T',
+	/** Command（Meta）+ Shift + P：公开或取消公开当前文档 */
+	toggleVisibility: 'Meta + Shift + P',
 	/** Command（Meta）+ Shift + V：将编辑器选中的内容发送到助手输入框 */
 	pasteToAssistant: 'Meta + Shift + V',
 	/**
@@ -243,6 +247,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	openLibrary: string;
 	toggleMarkdownBottomBar: string;
 	openTrash: string;
+	toggleVisibility: string;
 	pasteToAssistant: string;
 	markdownBarAction1: string;
 	markdownBarAction2: string;
@@ -276,6 +281,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 		a9,
 		a0,
 		aReset,
+		vis,
 	] = await Promise.all([
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.import}`),
@@ -320,6 +326,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 		getValue<string>(
 			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition}`,
 		),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleVisibility}`),
 	]);
 	const { value: openLibrary, didMigrate: libMigrated } =
 		normalizeLegacyOpenLibraryChord(o);
@@ -345,6 +352,8 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 		openLibrary,
 		toggleMarkdownBottomBar,
 		openTrash: t?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+		toggleVisibility:
+			vis?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleVisibility,
 		pasteToAssistant:
 			v?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
 		markdownBarAction1:

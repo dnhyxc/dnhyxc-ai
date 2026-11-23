@@ -31,6 +31,7 @@ import {
 	openPoint,
 	readSignalRev,
 	readSlot,
+	readStats,
 	stackPeers,
 	subscribeSignals,
 	subscribeSlot,
@@ -49,6 +50,8 @@ export type HostPointProps = {
 	payload?: Record<string, unknown>;
 	/** page 角色的图标按钮。缺省只画抽屉正文 */
 	part?: 'trigger' | 'body';
+	/** 顶栏与旁边的文字按钮同一套：图标加标题，不再只放一个图标 */
+	labeled?: boolean;
 	/** 盖过插件标题。词库列表用来放统计 */
 	title?: ReactNode;
 	className?: string;
@@ -71,12 +74,13 @@ export function HostPoint({
 	slot,
 	payload,
 	part = 'body',
+	labeled = false,
 	title: titleProp,
 	className,
 	drawerClassName,
 	drawerStyle,
 }: HostPointProps) {
-	const { locale } = useI18n();
+	const { locale, t } = useI18n();
 	const spec = getHostPoint(pointId);
 	const slotSpec = spec?.slots.find((item) => item.name === slot);
 	const plugins = useHostSurfacePlugins(pointId);
@@ -180,8 +184,42 @@ export function HostPoint({
 		return (
 			<div className={cn('contents', className)}>
 				{matched.map((plugin) => {
-					const label = pickPluginLocaleText(plugin.title, locale) || plugin.id;
+					const label =
+						(typeof titleProp === 'string' ? titleProp : '') ||
+						pickPluginLocaleText(plugin.title, locale) ||
+						plugin.id;
 					const open = session.open && session.pluginId === plugin.id;
+					const toggle = () => {
+						if (open) {
+							clearPluginPortalClaim(plugin.id);
+							closePoint(pointId, slot);
+							return;
+						}
+						claimPluginPortalTarget(
+							plugin.id,
+							styleRealmKey(plugin.entry, plugin.remoteName, plugin.id),
+						);
+						const opened = openPoint(pointId, plugin.id, slot, {});
+						if (!opened) clearPluginPortalClaim(plugin.id);
+					};
+					if (labeled) {
+						return (
+							<Button
+								key={plugin.id}
+								type="button"
+								variant="link"
+								className="lucide-stroke-draw-hover flex items-center gap-1 px-0! text-textcolor transition-none hover:text-teal-500 has-[>svg]:px-0!"
+								aria-pressed={open}
+								aria-label={label}
+								onClick={toggle}
+							>
+								<span className="relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden [&_svg]:size-4">
+									<PluginIcon name={plugin.host?.icon} />
+								</span>
+								<span>{label}</span>
+							</Button>
+						);
+					}
 					return (
 						<Tooltip
 							key={plugin.id}
@@ -203,19 +241,7 @@ export function HostPoint({
 								)}
 								aria-pressed={open}
 								aria-label={label}
-								onClick={() => {
-									if (open) {
-										clearPluginPortalClaim(plugin.id);
-										closePoint(pointId, slot);
-										return;
-									}
-									claimPluginPortalTarget(
-										plugin.id,
-										styleRealmKey(plugin.entry, plugin.remoteName, plugin.id),
-									);
-									const opened = openPoint(pointId, plugin.id, slot, {});
-									if (!opened) clearPluginPortalClaim(plugin.id);
-								}}
+								onClick={toggle}
 							>
 								<PluginIcon name={plugin.host?.icon} className="size-4" />
 							</Button>
@@ -299,9 +325,25 @@ export function HostPoint({
 		clearPluginPortalClaim(claimedId.current);
 		claimedId.current = null;
 	}
-	const title =
+	const titleText =
 		titleProp ??
 		(plugin ? pickPluginLocaleText(plugin.title, locale) || plugin.id : '');
+	const commentStats =
+		pointId === 'knowledge.article' ? readStats(pointId) : null;
+	const title =
+		commentStats == null ? (
+			titleText
+		) : (
+			<span className="inline-flex min-w-0 items-baseline gap-2">
+				<span className="shrink-0">{titleText}</span>
+				<span className="truncate text-sm font-normal text-textcolor/50">
+					{t('knowledge.comments.summary', {
+						total: commentStats.total,
+						loaded: commentStats.loaded,
+					})}
+				</span>
+			</span>
+		);
 	// 列表和导入的 openCard 带 source:list。这一帧详解直接出现，遮罩不要从 0 淡入
 	const fromList =
 		session.open && !session.covered && session.payload?.source === 'list';

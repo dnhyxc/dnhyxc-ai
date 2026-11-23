@@ -236,6 +236,17 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
+		labelKey: 'setting.system.shortcuts.item.knowledge.toggleVisibility',
+		label: '知识库：公开或取消公开',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.toggleVisibility,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleVisibility,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_toggle_visibility',
+		registerGlobally: false,
+	},
+	{
 		labelKey:
 			'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant',
 		label: '知识库：发送选中内容到助手输入框',

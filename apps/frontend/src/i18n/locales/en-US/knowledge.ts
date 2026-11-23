@@ -1,5 +1,6 @@
 /** en-US · knowledge */
 export const knowledge = {
+	'knowledge.comments.summary': '{total} total / {loaded} loaded',
 	'knowledge.assistant.aiIntro':
 		"Hi, I'm your knowledge assistant. From daily lookup and process guidance to tricky problem-solving, I'll provide fast and accurate support—saving you time and boosting productivity.",
 	'knowledge.assistant.appendedToCurrentDoc': 'Appended to current document.',
@@ -96,11 +97,14 @@ export const knowledge = {
 	'knowledge.list.openInEditor': 'Open in Cursor or Trae',
 	'knowledge.list.pickFolder': 'Choose folder',
 	'knowledge.list.privateConfirmDesc':
-		'Only you will be able to view this document',
+		'Only you will be able to view this document. Others will also stop seeing comments that were already public. Comments stay saved: released ones show again the next time you publish, and unreleased ones stay visible only to you',
 	'knowledge.list.privateConfirmTitle': 'Make this document private?',
 	'knowledge.list.publicConfirmDesc':
 		'Once public, all signed-in users can find and open it in the list',
 	'knowledge.list.publicConfirmTitle': 'Make this knowledge document public?',
+	'knowledge.list.releaseHistory': 'Also publish existing comments ({count})',
+	'knowledge.list.releaseFailed':
+		'The document is public, but older comments were not published',
 	'knowledge.list.readFailed': 'Read failed',
 	'knowledge.list.revealInFolder': 'Reveal in Finder',
 	'knowledge.list.revealInFolderFailed': 'Could not reveal in Finder',
@@ -116,6 +120,8 @@ export const knowledge = {
 	'knowledge.overwrite.saveAsTip':
 		'You can also choose “Save as” to create a new file.',
 	'knowledge.overwrite.title': 'Overwrite existing file?',
+	'knowledge.readonly.othersPublic':
+		'This public document belongs to someone else. View only.',
 	'knowledge.save.createFailedTryLater':
 		'Failed to create knowledge. Please try again later.',
 	'knowledge.save.failed': 'Save failed',
@@ -135,6 +141,7 @@ export const knowledge = {
 	'knowledge.shortcuts.import': 'Meta + I',
 	'knowledge.shortcuts.openLibrary': 'Meta + Shift + L',
 	'knowledge.shortcuts.openTrash': 'Meta + Shift + T',
+	'knowledge.shortcuts.toggleVisibility': 'Meta + Shift + P',
 	'knowledge.shortcuts.save': 'Meta + S / Control + S',
 	'knowledge.shortcuts.share': 'Meta + Shift + O',
 	'knowledge.title.aria': 'Knowledge title',
@@ -144,6 +151,7 @@ export const knowledge = {
 	'knowledge.toolbar.import': 'Import',
 	'knowledge.toolbar.library': 'Library',
 	'knowledge.toolbar.share': 'Share',
+	'knowledge.toolbar.comments': 'Comments',
 	'knowledge.trash.batchDelete': 'Batch delete',
 	'knowledge.trash.batchDeleteDone': 'Batch delete completed',
 	'knowledge.trash.batchDeleteDoneMessage': 'Deleted {count}',

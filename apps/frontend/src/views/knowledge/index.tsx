@@ -14,18 +14,24 @@ import {
 } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import Share from '@/components/design/Share';
-import { Input } from '@/components/ui';
+import { Checkbox, Input } from '@/components/ui';
+import { closePoint, HostPoint, POINT, usePointContext } from '@/federation';
 import { useI18n, useTheme } from '@/hooks';
 import { useAssistantPaneBusy } from '@/hooks/useAssistantPaneBusy';
 import { bindDocumentShortcutHandlers } from '@/hooks/useDocumentShortcuts';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
-import { saveKnowledge } from '@/service';
+import {
+	getKnowledgeCommentSummary,
+	releaseKnowledgeComments,
+	saveKnowledge,
+} from '@/service';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import skillStore from '@/store/skill';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
+import { getRequestErrorMessage } from '@/utils/fetch';
 import {
 	buildAuthorMeta,
 	dirnameFs,
@@ -103,10 +109,14 @@ const KnowledgeTitleField = observer(function KnowledgeTitleField({
 			<Input
 				value={knowledgeStore.knowledgeTitle}
 				maxLength={100}
-				onChange={(e) => knowledgeStore.setKnowledgeTitle(e.target.value)}
+				readOnly={knowledgeStore.viewingOthersPublic}
+				onChange={(e) => {
+					if (knowledgeStore.viewingOthersPublic) return;
+					knowledgeStore.setKnowledgeTitle(e.target.value);
+				}}
 				placeholder={t('knowledge.title.placeholder')}
 				aria-label={t('knowledge.title.aria')}
-				className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
+				className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0 read-only:cursor-default"
 			/>
 		</div>
 	);
@@ -148,6 +158,7 @@ const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
 	const assistantPaneBusy = useAssistantPaneBusy(markdownAssistantOpen);
 	const handleMarkdownChange = useCallback(
 		(value: string) => {
+			if (knowledgeStore.viewingOthersPublic) return;
 			knowledgeStore.setMarkdown(value);
 		},
 		[knowledgeStore],
@@ -159,6 +170,7 @@ const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
 
 	return (
 		<MarkdownEditor
+			readOnly={knowledgeStore.viewingOthersPublic}
 			stickyScrollEnabled={false}
 			stickyScrollScrollWithEditor={false}
 			diffBaselineSource="persisted"
@@ -227,6 +239,13 @@ const Knowledge = observer(() => {
 
 	const [listOpen, setListOpen] = useState(false);
 	const [trashOpen, setTrashOpen] = useState(false);
+	const [visibilityConfirmOpen, setVisibilityConfirmOpen] = useState(false);
+	const [releaseHistory, setReleaseHistory] = useState(false);
+	const [pendingVisibility, setPendingVisibility] = useState<{
+		id: string;
+		isPublic: boolean;
+		ownerOnlyCount: number;
+	} | null>(null);
 	const [saveLoading, setSaveLoading] = useState(false);
 	const [importLoading, setImportLoading] = useState(false);
 	/**
@@ -237,6 +256,23 @@ const Knowledge = observer(() => {
 	const [trashOpenNonce, setTrashOpenNonce] = useState(0);
 	/** 仅用于 Monaco `documentIdentity`：清空草稿时递增，与助手 `documentKey` 解耦，避免清空后助手会话被重置 */
 	const [clearDocumentNonce, setClearDocumentNonce] = useState(0);
+	const viewing = knowledgeStore.knowledgeViewing;
+	usePointContext(
+		POINT.knowledgeArticle,
+		viewing
+			? {
+					knowledgeId: viewing.id,
+					docPublic: viewing.isPublic,
+					docOwned: viewing.isOwned,
+				}
+			: null,
+	);
+	useEffect(() => {
+		if (!viewing?.id) closePoint(POINT.knowledgeArticle, 'drawer');
+	}, [viewing?.id]);
+	useEffect(() => {
+		return () => closePoint(POINT.knowledgeArticle, 'drawer');
+	}, []);
 	/** 受控：避免 `documentIdentity` 因清空而变时 Monaco 内部把助手关掉并切回「纯分屏预览」 */
 	const [markdownAssistantOpen, setMarkdownAssistantOpen] = useState(false);
 	const markdownAssistantOpenRef = useRef(markdownAssistantOpen);
@@ -275,6 +311,7 @@ const Knowledge = observer(() => {
 		openLibrary: string;
 		toggleMarkdownBottomBar: string;
 		openTrash: string;
+		toggleVisibility: string;
 		pasteToAssistant: string;
 	}>({
 		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
@@ -285,6 +322,7 @@ const Knowledge = observer(() => {
 		toggleMarkdownBottomBar:
 			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
 		openTrash: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+		toggleVisibility: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleVisibility,
 		pasteToAssistant: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
 	});
 
@@ -681,6 +719,11 @@ const Knowledge = observer(() => {
 				}
 				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 				knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
+				knowledgeStore.setKnowledgeViewing({
+					id: res.data.id,
+					isPublic: false,
+					isOwned: true,
+				});
 				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 				const sid = assistantStore.getSessionIdForDocumentKey(toKey);
 				if (sid) {
@@ -746,6 +789,11 @@ const Knowledge = observer(() => {
 			}
 			assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
+			knowledgeStore.setKnowledgeViewing({
+				id: res.data.id,
+				isPublic: false,
+				isOwned: true,
+			});
 		},
 		[knowledgeStore, getUserInfo, isCloudLoggedIn, trashOpenNonce],
 	);
@@ -769,6 +817,15 @@ const Knowledge = observer(() => {
 	 */
 	const performSave = useCallback(
 		async (mode: KnowledgeSaveMode) => {
+			if (knowledgeStore.viewingOthersPublic) {
+				if (mode === 'normal') {
+					Toast({
+						type: 'info',
+						title: t('knowledge.readonly.othersPublic'),
+					});
+				}
+				return;
+			}
 			const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 			if (!trimmedTitle) {
 				if (mode === 'normal') {
@@ -875,6 +932,7 @@ const Knowledge = observer(() => {
 			persistKnowledgeApi,
 			runTauriSave,
 			syncSnapshotAfterPersist,
+			t,
 		],
 	);
 
@@ -883,6 +941,13 @@ const Knowledge = observer(() => {
 	}, [performSave]);
 
 	const onImport = useCallback(() => {
+		if (knowledgeStore.viewingOthersPublic) {
+			Toast({
+				type: 'info',
+				title: t('knowledge.readonly.othersPublic'),
+			});
+			return;
+		}
 		if (importLoading) return;
 		setImportLoading(true);
 		void (async () => {
@@ -980,8 +1045,77 @@ const Knowledge = observer(() => {
 		knowledgeStore.knowledgePersistedSnapshot.content,
 	]);
 
+	const editingKnowledgeId = knowledgeStore.knowledgeEditingKnowledgeId;
+	/** 已保存的本人云端文档才能公开；未保存草稿、本地文件、他人公开文档都不展示 */
+	const canToggleVisibility =
+		isCloudLoggedIn &&
+		viewing?.isOwned === true &&
+		!!editingKnowledgeId &&
+		editingKnowledgeId === viewing.id &&
+		!isKnowledgeLocalMarkdownId(editingKnowledgeId);
+
+	const openVisibilityConfirm = useCallback(() => {
+		const current = knowledgeStore.knowledgeViewing;
+		const id = knowledgeStore.knowledgeEditingKnowledgeId;
+		if (
+			!isCloudLoggedIn ||
+			current?.isOwned !== true ||
+			!id ||
+			id !== current.id ||
+			isKnowledgeLocalMarkdownId(id)
+		) {
+			return;
+		}
+		const nextPublic = !current.isPublic;
+		setReleaseHistory(false);
+		setPendingVisibility({ id, isPublic: nextPublic, ownerOnlyCount: 0 });
+		setVisibilityConfirmOpen(true);
+		if (!nextPublic) return;
+		void getKnowledgeCommentSummary(id)
+			.then((res) => {
+				const count = res.success ? (res.data?.ownerOnlyCount ?? 0) : 0;
+				setPendingVisibility((cur) =>
+					cur?.id === id && cur.isPublic
+						? { ...cur, ownerOnlyCount: count }
+						: cur,
+				);
+			})
+			.catch(() => {
+				// 摘要失败就不提供释放勾选，历史留言保持仅作者可见
+			});
+	}, [isCloudLoggedIn, knowledgeStore]);
+
+	const onConfirmVisibility = useCallback(async () => {
+		if (!pendingVisibility) return;
+		const ok = await knowledgeStore.setItemVisibility(
+			pendingVisibility.id,
+			pendingVisibility.isPublic,
+		);
+		if (!ok) return;
+		if (pendingVisibility.isPublic && releaseHistory) {
+			try {
+				await releaseKnowledgeComments(pendingVisibility.id);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('knowledge.list.releaseFailed'),
+					message: getRequestErrorMessage(e),
+				});
+			}
+		}
+		Toast({
+			type: 'success',
+			title: pendingVisibility.isPublic
+				? t('knowledge.list.madePublic')
+				: t('knowledge.list.madePrivate'),
+		});
+		setVisibilityConfirmOpen(false);
+		setPendingVisibility(null);
+		setReleaseHistory(false);
+	}, [knowledgeStore, pendingVisibility, releaseHistory, t]);
+
 	/**
-	 * 知识库专属快捷键（导入/分享/列表/回收站/粘贴到助手）；保存/新建由 Layout 统一监听。
+	 * 知识库专属快捷键（导入/分享/列表/回收站/公开/粘贴到助手）；保存/新建由 Layout 统一监听。
 	 * 捕获阶段优先于 Monaco 默认行为。
 	 */
 	useEffect(() => {
@@ -989,7 +1123,8 @@ const Knowledge = observer(() => {
 			if (
 				saveLoading ||
 				importLoading ||
-				knowledgeStore.knowledgeOverwriteOpen
+				knowledgeStore.knowledgeOverwriteOpen ||
+				visibilityConfirmOpen
 			) {
 				return;
 			}
@@ -1015,6 +1150,12 @@ const Knowledge = observer(() => {
 				setTrashOpen((open) => !open);
 				return;
 			}
+			if (chordMatchesStored(knowledgeChords.toggleVisibility, e)) {
+				if (!canToggleVisibility) return;
+				e.preventDefault();
+				openVisibilityConfirm();
+				return;
+			}
 			if (chordMatchesStored(knowledgeChords.pasteToAssistant, e)) {
 				/**
 				 * 语义：将“编辑器当前非空选区”送入助手输入框。
@@ -1036,7 +1177,10 @@ const Knowledge = observer(() => {
 		saveLoading,
 		importLoading,
 		knowledgeStore.knowledgeOverwriteOpen,
+		visibilityConfirmOpen,
 		isCloudLoggedIn,
+		canToggleVisibility,
+		openVisibilityConfirm,
 	]);
 
 	/** 注册应用内「通用：保存 / 新建」到 Layout 统一监听 */
@@ -1201,9 +1345,19 @@ const Knowledge = observer(() => {
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
 			skillStore.clearSelected();
-			// 他人公开文档：按新草稿打开（保存走新建），避免误改对方条目
-			const editable = record.isOwned !== false;
-			const editingId = editable ? record.id : null;
+			// 他人公开文档只读查看：editingId 置空，避免更新对方条目；保存入口会直接拒绝
+			const local = isKnowledgeLocalMarkdownId(record.id);
+			if (local) {
+				knowledgeStore.clearKnowledgeViewing();
+			} else {
+				knowledgeStore.setKnowledgeViewing({
+					id: record.id,
+					isPublic: record.isPublic === true,
+					isOwned: record.isOwned !== false,
+				});
+			}
+			const editable = !local && record.isOwned !== false;
+			const editingId = local || editable ? record.id : null;
 			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
 			const nextAssistantKey = knowledgeAssistantDocumentKey(
 				knowledgeAssistantArticleBinding({
@@ -1241,6 +1395,7 @@ const Knowledge = observer(() => {
 			trashItemId: string;
 		}) => {
 			skillStore.clearSelected();
+			knowledgeStore.clearKnowledgeViewing();
 			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
 			const nextAssistantKey = knowledgeAssistantDocumentKey(
 				knowledgeAssistantArticleBinding({
@@ -1299,6 +1454,13 @@ const Knowledge = observer(() => {
 
 	/** 分享文档 */
 	const onShareKnowledge = useCallback(() => {
+		if (knowledgeStore.viewingOthersPublic) {
+			Toast({
+				type: 'info',
+				title: t('knowledge.readonly.othersPublic'),
+			});
+			return;
+		}
 		const id = (knowledgeStore.knowledgeEditingKnowledgeId ?? '').trim();
 		if (!id) {
 			Toast({
@@ -1342,6 +1504,51 @@ const Knowledge = observer(() => {
 				onSecondaryAction={onSaveAsFromOverwrite}
 				onConfirm={onConfirmOverwrite}
 			/>
+			<Confirm
+				open={visibilityConfirmOpen}
+				onOpenChange={(v) => {
+					setVisibilityConfirmOpen(v);
+					if (!v) {
+						setPendingVisibility(null);
+						setReleaseHistory(false);
+					}
+				}}
+				title={
+					pendingVisibility?.isPublic
+						? t('knowledge.list.publicConfirmTitle')
+						: t('knowledge.list.privateConfirmTitle')
+				}
+				description={
+					pendingVisibility?.isPublic ? (
+						<div className="space-y-3">
+							<p>{t('knowledge.list.publicConfirmDesc')}</p>
+							{pendingVisibility.ownerOnlyCount > 0 ? (
+								<label
+									htmlFor="knowledge-editor-release-history"
+									className="flex items-start gap-2 text-left"
+								>
+									<Checkbox
+										id="knowledge-editor-release-history"
+										checked={releaseHistory}
+										onCheckedChange={(v) => setReleaseHistory(v === true)}
+									/>
+									<span>
+										{t('knowledge.list.releaseHistory', {
+											count: pendingVisibility.ownerOnlyCount,
+										})}
+									</span>
+								</label>
+							) : null}
+						</div>
+					) : (
+						t('knowledge.list.privateConfirmDesc')
+					)
+				}
+				cancelText={t('common.cancel')}
+				confirmText={t('common.confirm')}
+				closeOnConfirm={false}
+				onConfirm={onConfirmVisibility}
+			/>
 
 			<ScrollArea className="h-full min-w-0 w-full overflow-y-auto p-5.5 pt-0 rounded-none">
 				<KnowledgeMarkdownPane
@@ -1365,6 +1572,7 @@ const Knowledge = observer(() => {
 							onSave={onSave}
 							onImport={onImport}
 							onShareKnowledge={onShareKnowledge}
+							readOnly={knowledgeStore.viewingOthersPublic}
 							saveLoading={saveLoading}
 							importLoading={importLoading}
 							isCloudLoggedIn={isCloudLoggedIn}
@@ -1374,6 +1582,21 @@ const Knowledge = observer(() => {
 							shortcutHintShare={knowledgeChords.share}
 							shortcutHintOpenLibrary={knowledgeChords.openLibrary}
 							shortcutHintOpenTrash={knowledgeChords.openTrash}
+							showVisibility={canToggleVisibility}
+							isPublic={viewing?.isPublic === true}
+							onToggleVisibility={openVisibilityConfirm}
+							shortcutHintVisibility={knowledgeChords.toggleVisibility}
+							extra={
+								viewing ? (
+									<HostPoint
+										pointId={POINT.knowledgeArticle}
+										slot="drawer"
+										part="trigger"
+										labeled
+										title={t('knowledge.toolbar.comments')}
+									/>
+								) : null
+							}
 						/>
 					}
 				/>
@@ -1403,6 +1626,9 @@ const Knowledge = observer(() => {
 				shareType="knowledge"
 				articleTitle={knowledgeStore.knowledgeTitle}
 			/>
+			{viewing ? (
+				<HostPoint pointId={POINT.knowledgeArticle} slot="drawer" />
+			) : null}
 		</div>
 	);
 });
