@@ -63,6 +63,16 @@ const VOCAB_DETAIL_TASK = `你是英语单词详解助手。只输出一个 JSON
 const vocabDetailInflight = new Map<string, Promise<VocabDetail>>();
 /** 重新生成按用户分开，不加入可能返回缓存的全站在途。 */
 const vocabDetailRegenInflight = new Map<string, Promise<VocabDetail>>();
+/** runKey → lemma，刷新后卡片还能认出哪一个词正在重标。 */
+const regenLemmaByRun = new Map<string, string>();
+/** 重新生成结束（成功或失败）。停止不记。查询时取走。 */
+const regenOutcomes = new Map<number, { id: string; ok: boolean }[]>();
+
+function pushRegenOutcome(userId: number, lemma: string, ok: boolean): void {
+	const list = regenOutcomes.get(userId) ?? [];
+	list.push({ id: lemma, ok });
+	regenOutcomes.set(userId, list);
+}
 /** 这一轮模型调用的 AbortSignal。停止时 abort，OpenAI 客户端会断开上游 HTTP。 */
 const vocabRuns = createVocabRuns();
 const CANCEL_MARK_MS = 60_000;
@@ -259,6 +269,22 @@ export class VocabDetailService {
 		};
 	}
 
+	/** 当前用户正在重标的词。进程重启后为空，旧详解行还在。 */
+	listRegenLemmas(userId: number): string[] {
+		const prefix = `regen:${userId}:`;
+		const out: string[] = [];
+		for (const [key, lemma] of regenLemmaByRun) {
+			if (key.startsWith(prefix)) out.push(lemma);
+		}
+		return out;
+	}
+
+	takeRegenOutcomes(userId: number): { id: string; ok: boolean }[] {
+		const list = regenOutcomes.get(userId) ?? [];
+		regenOutcomes.delete(userId);
+		return list;
+	}
+
 	/** 再打一次模型，只 upsert 该用户该词的重新生成行。 */
 	async regenerateVocabDetail(
 		word: string,
@@ -268,21 +294,30 @@ export class VocabDetailService {
 		if (!lemma) throw new BadRequestException('单词为空');
 		if (word.trim().length > 120) throw new BadRequestException('单词过长');
 		const runKey = regenRunKey(userId, lemma);
-		const pending = vocabDetailRegenInflight.get(runKey);
-		const detail = pending
-			? await pending
-			: await this.startRegen(lemma, userId, runKey);
-		await this.regenRepo.upsert(
-			{
-				userId,
-				lemma,
-				schemaVersion: VOCAB_DETAIL_CACHE_VERSION,
-				detail,
-			},
-			['userId', 'lemma'],
-		);
-		await this.patchLemmaForUser(userId, lemma);
-		return detail;
+		try {
+			const pending = vocabDetailRegenInflight.get(runKey);
+			const detail = pending
+				? await pending
+				: await this.startRegen(lemma, userId, runKey);
+			await this.regenRepo.upsert(
+				{
+					userId,
+					lemma,
+					schemaVersion: VOCAB_DETAIL_CACHE_VERSION,
+					detail,
+				},
+				['userId', 'lemma'],
+			);
+			await this.patchLemmaForUser(userId, lemma);
+			pushRegenOutcome(userId, lemma, true);
+			return detail;
+		} catch (e) {
+			if (e instanceof VocabDetailCancelledError) throw e;
+			if (!(e instanceof BadRequestException)) {
+				pushRegenOutcome(userId, lemma, false);
+			}
+			throw e;
+		}
 	}
 
 	/**
@@ -587,10 +622,12 @@ export class VocabDetailService {
 		userId: number,
 		runKey: string,
 	): Promise<VocabDetail> {
+		regenLemmaByRun.set(runKey, lemma);
 		const job = this.callModel(lemma, userId, runKey).finally(() => {
 			if (vocabDetailRegenInflight.get(runKey) === job) {
 				vocabDetailRegenInflight.delete(runKey);
 			}
+			regenLemmaByRun.delete(runKey);
 			vocabRuns.finish(runKey);
 		});
 		vocabDetailRegenInflight.set(runKey, job);

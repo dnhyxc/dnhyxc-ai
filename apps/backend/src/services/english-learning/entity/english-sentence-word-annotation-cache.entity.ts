@@ -13,6 +13,8 @@ export type SentenceWordAnnotationRow = {
 	posZh: string;
 	ipa: string;
 	meaningZh: string;
+	/** 句子成分；旧行缺此键。空串表示不展示 */
+	roleZh?: string;
 };
 
 /**

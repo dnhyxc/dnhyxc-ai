@@ -7,7 +7,83 @@ export type SentenceWordMeta = {
 	posZh: string;
 	ipa: string;
 	meaningZh: string;
+	/** 句子成分；空或缺失则不画色块 */
+	roleZh?: string;
 };
+
+/** 与后端 normalizeRoleZh 同一顺序，下标对应 ACCENT_COLORS */
+const ROLE_ZH = [
+	'主语',
+	'谓语',
+	'主语和谓语',
+	'宾语',
+	'表语',
+	'定语',
+	'状语',
+	'补语',
+	'同位语',
+	'其他成分',
+] as const;
+
+export type ConstituentSpan = {
+	start: number;
+	end: number;
+	roleZh: string;
+};
+
+/** 相邻且非空、文本相同的成分收成左闭右开区间 */
+export function groupConstituentSpans(
+	roles: readonly string[],
+): ConstituentSpan[] {
+	const spans: ConstituentSpan[] = [];
+	let i = 0;
+	while (i < roles.length) {
+		const role = roles[i]?.trim() ?? '';
+		if (!role) {
+			i += 1;
+			continue;
+		}
+		let end = i + 1;
+		while (end < roles.length && (roles[end]?.trim() ?? '') === role) {
+			end += 1;
+		}
+		spans.push({ start: i, end, roleZh: role });
+		i = end;
+	}
+	return spans;
+}
+
+/** 揭示/全对必画；作答只跟词性开关 */
+export function showConstituentChrome(
+	reveal: boolean,
+	showPos: boolean,
+): boolean {
+	if (reveal) return true;
+	return showPos;
+}
+
+/** 成分色块与块底标签。未知名字用色板最后一色 */
+export function roleToneStyle(roleZh: string): {
+	backgroundColor: string;
+	color: string;
+} {
+	const i = ROLE_ZH.indexOf(roleZh as (typeof ROLE_ZH)[number]);
+	const item =
+		ACCENT_COLORS[i >= 0 ? i : ACCENT_COLORS.length - 1] ?? ACCENT_COLORS[0]!;
+	return accentBadgeStyle(item.hex);
+}
+
+function assertSpanCount(roles: readonly string[], want: number) {
+	const n = groupConstituentSpans(roles).length;
+	if (n !== want) {
+		throw new Error(
+			`groupConstituentSpans(${roles.join(',')}) => ${n}, want ${want}`,
+		);
+	}
+}
+assertSpanCount(['状语', '', '状语'], 2);
+assertSpanCount(['主语和谓语', '主语和谓语'], 1);
+assertSpanCount(['', ''], 0);
 
 /** 词性徽章色调（与 ACCENT_COLORS 下标一一对应） */
 export type PosTone =

@@ -168,20 +168,32 @@ ${VOCABULARY_SEGMENTATION_RULES_BLOCK}
  */
 export const SENTENCE_WORDS_ANNOTATE_SYSTEM = `
 # Role
-英语教学助手：为「看中写」标注句中每个词的 posZh / 英式 IPA / meaningZh。
+英语教学助手：为「看中写」标注句中每个词的 posZh / 英式 IPA / meaningZh / roleZh。
 
 # Task
 按输入 english 与 words，为每一个词填写标注。
 
 # Output
 仅输出一个 JSON 对象，无 Markdown/解释：
-{"words":[{"posZh":"","ipa":"","meaningZh":""}]}
+{"words":[{"posZh":"","ipa":"","meaningZh":"","roleZh":""}]}
 - words 长度与顺序必须与输入 words 一致；不要输出 word 字段（服务端按下标对齐）
 - posZh 只能是：冠词、限定词、名词、动词、助动词、形容词、副词、介词、代词、连词、数词、感叹词、短语
 - ipa：英式 RP，Unicode，无 // []；例 dance→dɑːns，water→ˈwɔːtə，car→kɑː（词尾 r 不发音）
 - th：清音 θ（think/with/three）vs 浊音 ð（this/that/the）；**with 单独标 wɪθ（勿 wɪð）**
 - meaningZh：按**本句搭配/语法功能**释义（2～12 字），禁止只抄词典第一义
   - 例：agree with you 中 with →「表示同意对象」或「与…一致」，勿空泛「与；和」
+- roleZh 按该词在本句中的句法功能标注。先分析句子结构再落标签，必须准确，符合严格句法分析，禁止按词性猜测
+- roleZh 只能是：主语、谓语、主语和谓语、宾语、表语、定语、状语、补语、同位语、其他成分
+- 每个词只标它所在分句里的功能。主语是句法主语中心词（含形式主语 it、there）。谓语是助动词、情态动词和主要动词，含疑问句提前的助动词；主语与谓语分开标
+- 「主语和谓语」只用于一个词内的缩合，如 I'm、he's、that's。分开的词禁止用这个标签
+- 宾语是动词或介词的宾语中心词。表语是系动词后的表语中心词或作表语的介词。补语是宾补或主补的中心词
+- 定语是修饰名词的冠词、限定词、形容词、名词和作定语的介词；中心词仍标短语的句法功能
+- 状语是修饰动词、形容词、副词或全句的副词和介词，含句首疑问副词。状语内部的宾语、定语按内部功能标，不要整段都标状语
+- 同位语是复指说明的中心词。并列连词、从属连词、感叹词标「其他成分」
+- 连续同一成分写同一个 roleZh；中间隔了别的成分就分开。禁止把词性写入 roleZh
+- 能确定就必须填写。只有残缺到无法判断时留空字符串 ""
+- 例：Why are you smiling? → Why=状语，are=谓语，you=主语，smiling=谓语
+- 例：The old man made him happy. → The=定语，old=定语，man=主语，made=谓语，him=宾语，happy=补语
 - 禁止跳词/合并；助动词标「助动词」；the/a/an「冠词」；this/that/my/your「限定词」
 - 字符串内禁止未转义英文半角双引号 "
 `;
@@ -192,7 +204,7 @@ export const SENTENCE_WORDS_ANNOTATE_SYSTEM = `
  */
 export const SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM = `
 # Role
-英语教学助手：批量标注多句中每个词的 posZh / 英式 IPA / meaningZh。
+英语教学助手：批量标注多句中每个词的 posZh / 英式 IPA / meaningZh / roleZh。
 
 # Task
 用户给出 items（id、words；长句可能含 english）。为每一句每一个词填写标注。
@@ -200,7 +212,7 @@ export const SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM = `
 
 # Output
 仅输出一个 JSON 对象，无 Markdown/解释：
-{"items":[{"id":0,"words":[{"posZh":"","ipa":"","meaningZh":""}]}]}
+{"items":[{"id":0,"words":[{"posZh":"","ipa":"","meaningZh":"","roleZh":""}]}]}
 - 必须覆盖本轮每一个 id；每句 words 长度与顺序与输入 words 一致
 - 不要输出 word 字段（服务端按下标用输入 words 回填）
 - posZh：冠词、限定词、名词、动词、助动词、形容词、副词、介词、代词、连词、数词、感叹词、短语 之一
@@ -208,6 +220,18 @@ export const SENTENCE_WORDS_ANNOTATE_BATCH_SYSTEM = `
 - th：清 θ（think/with/three）vs 浊 ð（this/that/the）；**with → wɪθ（勿 wɪð）**
 - meaningZh：按本句搭配/语法功能释义（2～12 字），勿只给词典第一义
   - 例：agree with … 中 with →「同意对象 / 与…一致」，勿空泛「与；和」
+- roleZh 按该词在本句中的句法功能标注。先分析句子结构再落标签，必须准确，符合严格句法分析，禁止按词性猜测
+- roleZh 只能是：主语、谓语、主语和谓语、宾语、表语、定语、状语、补语、同位语、其他成分
+- 每个词只标它所在分句里的功能。主语是句法主语中心词（含形式主语 it、there）。谓语是助动词、情态动词和主要动词，含疑问句提前的助动词；主语与谓语分开标
+- 「主语和谓语」只用于一个词内的缩合，如 I'm、he's、that's。分开的词禁止用这个标签
+- 宾语是动词或介词的宾语中心词。表语是系动词后的表语中心词或作表语的介词。补语是宾补或主补的中心词
+- 定语是修饰名词的冠词、限定词、形容词、名词和作定语的介词；中心词仍标短语的句法功能
+- 状语是修饰动词、形容词、副词或全句的副词和介词，含句首疑问副词。状语内部的宾语、定语按内部功能标，不要整段都标状语
+- 同位语是复指说明的中心词。并列连词、从属连词、感叹词标「其他成分」
+- 连续同一成分写同一个 roleZh；不相邻不要合并。禁止把词性写入 roleZh
+- 能确定就必须填写。只有残缺到无法判断时留空字符串 ""
+- 例：Why are you smiling? → Why=状语，are=谓语，you=主语，smiling=谓语
+- 例：For lack of a better word. → For=状语，lack=宾语，of=定语，a=定语，better=定语，word=宾语
 - 禁止跳词/漏句；助动词标「助动词」；the/a/an「冠词」；this/that/my/your「限定词」
 - 字符串内禁止未转义英文半角双引号 "
 `;

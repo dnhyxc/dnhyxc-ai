@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import { HostPoint, POINT } from '@/federation';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
+import { AnnotateButton } from '../annotate/Button';
 import { Segment } from './Segment';
 
 export type CardVariant = 'library' | 'selectable';
@@ -143,6 +144,7 @@ function CardActionButtons({
 					)}
 				</Button>
 			) : null}
+			<AnnotateButton kind="word" text={card.word} />
 			{trailingActions}
 			<HostPoint
 				pointId={POINT.vocabCard}

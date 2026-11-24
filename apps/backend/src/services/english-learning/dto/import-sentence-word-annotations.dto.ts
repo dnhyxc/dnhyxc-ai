@@ -27,6 +27,12 @@ export class ImportSentenceWordAnnotationWordDto {
 	@IsString()
 	@MaxLength(500)
 	meaningZh!: string;
+
+	/** 句子成分；旧文件可缺。缺省按空串入库 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(32)
+	roleZh?: string;
 }
 
 /** 单句：english + words 对象数组；id 等多余字段由校验管线丢掉 */

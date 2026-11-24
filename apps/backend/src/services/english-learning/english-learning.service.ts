@@ -188,11 +188,23 @@ import {
 	SENTENCE_WORDS_ANNOTATE_SYSTEM,
 	VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC,
 } from './prompt';
+import {
+	armSentenceAnnotate,
+	claimSentenceAnnotate,
+	listSentenceAnnotateEnglish,
+	pushSentenceAnnotateOutcome,
+	releaseSentenceAnnotateClaim,
+	sentenceAnnotateRunKey,
+	stopSentenceAnnotate,
+	takeSentenceAnnotateOutcomes,
+	trackSentenceAnnotate,
+} from './sentence-annotate-run';
 import { segmentEnglishSentenceWords } from './sentence-segment.util';
 import {
 	buildSentenceWordAnnotationCacheKey,
 	isUsableSentenceWordAnnotations,
 } from './sentence-word-annotation-cache.util';
+import { VocabDetailCancelledError } from './vocab-detail-run';
 /** 同主题匹配索引：一次生成内复用，避免重复调 embedding */
 export type PackTopicMatchIndex = {
 	isRelated: (sourceLabel: string) => boolean;
@@ -211,6 +223,8 @@ export type SentenceWordAnnotationDto = {
 	posZh: string;
 	ipa: string;
 	meaningZh: string;
+	/** 句子成分；空串或旧行缺键表示不展示 */
+	roleZh?: string;
 };
 
 /** 整集预热 SSE / 回调进度 */
@@ -7401,6 +7415,7 @@ ${existingHintBlock}
 				posZh: string;
 				ipa: string;
 				meaningZh: string;
+				roleZh?: string;
 			}>;
 		}>;
 	}): Promise<{ accepted: number; skipped: number; overwritten: number }> {
@@ -7437,6 +7452,7 @@ ${existingHintBlock}
 					posZh: (w.posZh ?? '').trim(),
 					ipa: (w.ipa ?? '').trim(),
 					meaningZh: (w.meaningZh ?? '').trim(),
+					roleZh: this.normalizeRoleZh(w.roleZh ?? ''),
 				}),
 			);
 			const tokenWords = annotations.map((a) => a.word);
@@ -7995,7 +8011,78 @@ ${existingHintBlock}
 	}
 
 	/**
-	 * 经典句看中写：对已分词列表生成逐词 posZh / IPA / meaningZh。
+	 * 卡片单条重标。不读缓存命中，模型成功且可用后才 upsert。
+	 * 立刻返回；调用挂在进程内，不跟这次 HTTP 的断开走。
+	 */
+	beginReannotateSentenceWords(params: { userId: number; english: string }): {
+		running: boolean;
+	} {
+		const english = params.english.trim();
+		const words = segmentEnglishSentenceWords(english);
+		if (!english || words.length === 0) {
+			throw new BadRequestException('english 不能为空');
+		}
+		if (words.length > 80) {
+			throw new BadRequestException('words 过多');
+		}
+		const englishNorm = english.toLowerCase();
+		const cacheKey = buildSentenceWordAnnotationCacheKey(englishNorm, words);
+		const key = sentenceAnnotateRunKey(params.userId, cacheKey);
+		if (!claimSentenceAnnotate(key, params.userId, english)) {
+			return { running: true };
+		}
+		let ac: AbortController;
+		try {
+			ac = armSentenceAnnotate(key);
+		} catch (e) {
+			releaseSentenceAnnotateClaim(key);
+			if (e instanceof VocabDetailCancelledError) return { running: false };
+			throw e;
+		}
+		const job = this.annotateSentenceWordsViaLlmAndCache({
+			userId: params.userId,
+			english,
+			englishNorm,
+			words,
+			cacheKey,
+			signal: ac.signal,
+		})
+			.then(() => {
+				pushSentenceAnnotateOutcome(params.userId, english, true);
+			})
+			.catch((e: unknown) => {
+				if (e instanceof Error && e.name === 'AbortError') return;
+				pushSentenceAnnotateOutcome(params.userId, english, false);
+				const message = e instanceof Error ? e.message : String(e);
+				this.logger.warn(
+					`[EnglishLearning] reannotateSentenceWords failed: ${message.slice(0, 200)}`,
+				);
+			});
+		trackSentenceAnnotate(key, job, ac);
+		return { running: true };
+	}
+
+	cancelReannotateSentenceWords(userId: number, english: string): boolean {
+		const text = english.trim();
+		const words = segmentEnglishSentenceWords(text);
+		if (!text || words.length === 0) return false;
+		const cacheKey = buildSentenceWordAnnotationCacheKey(
+			text.toLowerCase(),
+			words,
+		);
+		return stopSentenceAnnotate(sentenceAnnotateRunKey(userId, cacheKey));
+	}
+
+	listReannotateSentenceEnglish(userId: number): string[] {
+		return listSentenceAnnotateEnglish(userId);
+	}
+
+	takeReannotateOutcomes(userId: number) {
+		return takeSentenceAnnotateOutcomes(userId);
+	}
+
+	/**
+	 * 经典句看中写：对已分词列表生成逐词 posZh / IPA / meaningZh / roleZh。
 	 * 先查全局落库缓存，miss 再调子模型；同 key 进程内单飞。
 	 */
 	async annotateSentenceWords(params: {
@@ -8473,6 +8560,11 @@ ${existingHintBlock}
 		if (!isUsableSentenceWordAnnotations(annotated, words.length)) {
 			throw new BadGatewayException('句内词标注不完整或条数与分词不一致');
 		}
+		if (signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
 
 		try {
 			await this.sentenceWordAnnotationCacheRepo.upsert(
@@ -8536,11 +8628,13 @@ ${existingHintBlock}
 					: typeof r.translationZh === 'string'
 						? r.translationZh.trim()
 						: '';
+			const roleRaw = typeof r.roleZh === 'string' ? r.roleZh : '';
 			byIndex.push({
 				word,
 				posZh: this.normalizePosZhLabel(posZhRaw),
 				ipa,
 				meaningZh: meaningZh.slice(0, 64),
+				roleZh: this.normalizeRoleZh(roleRaw),
 			});
 		}
 		return isUsableSentenceWordAnnotations(byIndex, expectedWords.length)
@@ -8596,5 +8690,27 @@ ${existingHintBlock}
 			phr: '短语',
 		};
 		return map[p] ?? s.slice(0, 12);
+	}
+
+	/** 句子成分闭集。闭集外存空串，避免界面画出生造词；不参与入库验收 */
+	private normalizeRoleZh(raw: string): string {
+		const allowed = new Set([
+			'主语',
+			'谓语',
+			'主语和谓语',
+			'宾语',
+			'表语',
+			'定语',
+			'状语',
+			'补语',
+			'同位语',
+			'其他成分',
+		]);
+		const s = raw.trim();
+		if (!s) return '';
+		if (allowed.has(s)) return s;
+		if (s === '其他') return '其他成分';
+		if (s === '状语成分') return '状语';
+		return '';
 	}
 }

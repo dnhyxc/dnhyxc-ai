@@ -39,6 +39,18 @@ export function clearSentenceWordAnnotationCache(): void {
 	inflight.clear();
 }
 
+/** 这一句重标结束后丢掉练习内存，下次开局向服务端要新结果 */
+export function dropSentenceWordAnnotationCache(english: string): void {
+	const prefix = `${english.trim().toLowerCase()}::`;
+	if (!prefix || prefix === '::') return;
+	for (const key of cache.keys()) {
+		if (key.startsWith(prefix)) cache.delete(key);
+	}
+	for (const key of inflight.keys()) {
+		if (key.startsWith(prefix)) inflight.delete(key);
+	}
+}
+
 function writeAlignedCache(
 	english: string,
 	words: string[],
@@ -51,6 +63,7 @@ function writeAlignedCache(
 			posZh: w?.posZh?.trim() ?? '',
 			ipa: w?.ipa?.trim() ?? '',
 			meaningZh: w?.meaningZh?.trim() ?? '',
+			roleZh: w?.roleZh?.trim() ?? '',
 		};
 	});
 	setSentenceWordAnnotationCache(
@@ -120,7 +133,7 @@ export function ensureSentenceWordAnnotation(params: {
 			}
 			const aligned =
 				writeAlignedCache(english, words, res.data?.words ?? []) ??
-				words.map(() => ({ posZh: '', ipa: '', meaningZh: '' }));
+				words.map(() => ({ posZh: '', ipa: '', meaningZh: '', roleZh: '' }));
 			return aligned;
 		})
 		.finally(() => {

@@ -7,6 +7,8 @@ export type AnnotationImportWord = {
 	posZh: string;
 	ipa: string;
 	meaningZh: string;
+	/** 旧文件可缺；空串由服务端当「不展示」 */
+	roleZh?: string;
 };
 
 export type AnnotationImportItem = {
@@ -33,7 +35,8 @@ function parseWord(raw: unknown): AnnotationImportWord | null {
 	const meaningZh =
 		typeof raw.meaningZh === 'string' ? raw.meaningZh.trim() : '';
 	if (!word || !posZh || !ipa || !meaningZh) return null;
-	return { word, posZh, ipa, meaningZh };
+	const roleZh = typeof raw.roleZh === 'string' ? raw.roleZh.trim() : '';
+	return { word, posZh, ipa, meaningZh, ...(roleZh ? { roleZh } : {}) };
 }
 
 /**

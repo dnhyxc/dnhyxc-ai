@@ -256,6 +256,16 @@ export const ENGLISH_LEARNING_PRACTICE_DAILY =
 /** 经典句看中写：句内词性 / IPA / 释义标注 */
 export const ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS =
 	'/english-learning/practice/annotate-sentence-words';
+export const ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS =
+	'/english-learning/practice/reannotate-sentence-words';
+export const ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS_CANCEL =
+	'/english-learning/practice/reannotate-sentence-words/cancel';
+export const ENGLISH_LEARNING_PRACTICE_CARD_ANNOTATE_RUNNING =
+	'/english-learning/practice/card-annotate/running';
+export const ENGLISH_LEARNING_VOCAB_DETAIL_REGENERATE =
+	'/english-learning/vocab-detail/regenerate';
+export const ENGLISH_LEARNING_VOCAB_DETAIL_CANCEL =
+	'/english-learning/vocab-detail/cancel';
 export const ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH =
 	'/english-learning/practice/annotate-sentence-words/batch';
 /** 手动导入词标注 JSON（无 LLM，cache_key upsert） */

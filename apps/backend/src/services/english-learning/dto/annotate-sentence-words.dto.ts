@@ -11,6 +11,13 @@ import {
 } from 'class-validator';
 import { ENGLISH_PRACTICE_SESSION_MAX } from '../constant';
 
+/** 卡片单条重标：服务端自己分词，不走缓存命中 */
+export class ReannotateSentenceWordsDto {
+	@IsString()
+	@MaxLength(2000)
+	english!: string;
+}
+
 /** 经典句看中写：请求按已分词列表标注词性 / IPA / 释义 */
 export class AnnotateSentenceWordsDto {
 	@IsString()

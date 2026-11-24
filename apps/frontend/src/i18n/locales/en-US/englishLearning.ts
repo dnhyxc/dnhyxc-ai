@@ -11,6 +11,10 @@ export const englishLearning = {
 	'englishLearning.agentTool.skillChip': 'Skill · {title}',
 	'englishLearning.annotateSource.aborted': 'Stopped (partial results kept)',
 	'englishLearning.annotateSource.action': 'Annotate',
+	'englishLearning.cardAnnotate.action': 'Annotate',
+	'englishLearning.cardAnnotate.failed': 'Annotation failed. Please try again.',
+	'englishLearning.cardAnnotate.stop': 'Stop annotation',
+	'englishLearning.cardAnnotate.success': 'Annotation complete',
 	'englishLearning.annotateSource.confirmAction': 'Start',
 	'englishLearning.annotateSource.confirmDesc':
 		'Missing sentences will be sent to the model for POS / IPA / gloss and cached. This may take a while. Continue?',
@@ -31,6 +35,11 @@ export const englishLearning = {
 	'englishLearning.annotateSource.importInvalid': 'Invalid annotation file',
 	'englishLearning.annotateSource.importSuccess':
 		'Imported {accepted} (partial OK); skipped {skipped}, overwritten {overwritten}',
+	'englishLearning.annotateSource.importPromptCopyFailed':
+		'Copy failed. Please try again.',
+	'englishLearning.annotateSource.importPromptTitle':
+		'Prompt for generating annotations',
+	'englishLearning.annotateSource.importTitle': 'Import annotations',
 	'englishLearning.annotateSource.menuImport': 'Import JSON',
 	'englishLearning.annotateSource.menuOnline': 'Online annotate',
 	'englishLearning.annotateSource.preparing': 'Connecting and checking cache…',

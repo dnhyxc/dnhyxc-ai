@@ -2,6 +2,7 @@
  * 经典句看中写 — 一词一槽下划线输入（绿对 / 红错 + 光晕）
  */
 import {
+	Fragment,
 	type KeyboardEvent,
 	useEffect,
 	useLayoutEffect,
@@ -14,9 +15,13 @@ import { markPracticeImeCompositionEnd } from '../../utils/keyboard';
 import type { SentenceWordToken } from '../../utils/segmentSentence';
 import { matchSlotInput } from '../../utils/segmentSentence';
 import {
+	type ConstituentSpan,
+	groupConstituentSpans,
 	posTone,
 	posToneStyle,
+	roleToneStyle,
 	type SentenceWordMeta,
+	showConstituentChrome,
 } from '../../utils/wordMeta';
 
 export type SentenceWordSlotsProps = {
@@ -56,6 +61,36 @@ function underlineClass(
 		return 'border-teal-500 shadow-[0_6px_14px_-2px_rgba(20,184,166,0.55)]';
 	}
 	return 'border-textcolor/35';
+}
+
+type WordChunk = {
+	key: string;
+	indexes: number[];
+	roleZh?: string;
+};
+
+/** 有成分区间时按块排，没有则一词一块，和原来的横排一致 */
+function wordChunks(
+	count: number,
+	spans: readonly ConstituentSpan[],
+): WordChunk[] {
+	const out: WordChunk[] = [];
+	let i = 0;
+	let s = 0;
+	while (i < count) {
+		const span = spans[s];
+		if (span && span.start === i) {
+			const indexes: number[] = [];
+			for (let k = span.start; k < span.end; k += 1) indexes.push(k);
+			out.push({ key: `r${span.start}`, indexes, roleZh: span.roleZh });
+			i = span.end;
+			s += 1;
+			continue;
+		}
+		out.push({ key: `w${i}`, indexes: [i] });
+		i += 1;
+	}
+	return out;
 }
 
 function stripSpaces(raw: string): string {
@@ -269,6 +304,119 @@ export function SentenceWordSlots({
 		reveal && tokens.length > 1 && filledMeaning.length === 1
 			? filledMeaning[0]!
 			: '';
+	const roleSpans = showConstituentChrome(reveal, showPos)
+		? groupConstituentSpans(metas.map((m) => m?.roleZh?.trim() ?? ''))
+		: [];
+	const chunks = wordChunks(tokens.length, roleSpans);
+
+	const renderWord = (i: number) => {
+		const token = tokens[i]!;
+		const value = values[i] ?? '';
+		const kind = locked
+			? matchSlotInput(value, token.expect) === 'correct'
+				? 'correct'
+				: value.trim()
+					? 'wrong'
+					: 'wrong'
+			: matchSlotInput(value, token.expect);
+		const active = !reveal && !disabled && i === activeIndex;
+		const meta = metaByIndex?.[i] ?? null;
+		const displayWord = reveal ? token.raw : value;
+		const punctTone =
+			reveal || kind === 'correct' ? 'text-emerald-500' : 'text-textcolor/70';
+
+		const wordEl = reveal ? (
+			<span
+				className={cn(
+					'inline-block px-1 text-lg font-semibold leading-snug whitespace-nowrap sm:text-xl',
+					'[font-family:var(--font-family)]',
+					kind === 'wrong' && !locked ? 'text-textcolor' : 'text-emerald-500',
+				)}
+			>
+				{displayWord}
+			</span>
+		) : (
+			<SlotWordInput
+				index={i}
+				expect={token.expect}
+				value={value}
+				values={values}
+				tokens={tokens}
+				disabled={disabled}
+				active={active}
+				kind={kind}
+				inputRef={(el) => {
+					refs.current[i] = el;
+				}}
+				onFocus={() => onActiveChange(i)}
+				onCommit={onChange}
+				onAdvance={onAdvance}
+				onSubmitAll={onSubmitAll}
+				onActiveChange={onActiveChange}
+			/>
+		);
+
+		return (
+			<div
+				key={`${token.expect}-${i}`}
+				className="flex w-max max-w-full shrink-0 flex-col items-center gap-1"
+			>
+				{!sharedPos && showPos && meta?.posZh ? (
+					<span
+						className="inline-flex items-center rounded px-1.5 pt-1 pb-[5px] text-[13px] leading-none font-medium whitespace-nowrap"
+						style={posToneStyle(posTone(meta.posZh))}
+					>
+						{meta.posZh}
+					</span>
+				) : !sharedPos && showPos ? (
+					<span className="h-5" aria-hidden />
+				) : null}
+
+				<div className="flex items-end gap-1">
+					<div className="flex w-max flex-col items-center gap-1">
+						{wordEl}
+						<div
+							className={cn(
+								'h-0 w-full border-b-2 transition-[border-color,box-shadow]',
+								underlineClass(kind, active),
+							)}
+						/>
+					</div>
+					{token.after ? (
+						<span
+							className={cn(
+								'shrink-0 -mb-2 text-xl font-semibold leading-snug select-none',
+								'[font-family:var(--font-family)]',
+								punctTone,
+							)}
+							aria-hidden
+						>
+							{token.after}
+						</span>
+					) : null}
+				</div>
+
+				{!sharedIpa && showIpa && meta?.ipa ? (
+					<span className="text-textcolor/65 px-0.5 my-1 font-mono text-xs leading-snug whitespace-nowrap">
+						{displayIpaWrapped(meta.ipa)}
+					</span>
+				) : !sharedIpa && showIpa ? (
+					<span className="h-3" aria-hidden />
+				) : null}
+
+				{reveal && !sharedMeaning && meta?.meaningZh ? (
+					<span
+						className={cn(
+							'text-textcolor/80 px-0.5 text-center text-sm leading-snug',
+							compactMeaning && 'max-w-32',
+						)}
+					>
+						{meta.meaningZh}
+					</span>
+				) : null}
+			</div>
+		);
+	};
 
 	return (
 		<div className="flex w-full flex-col items-center gap-2 px-2 py-1">
@@ -281,114 +429,29 @@ export function SentenceWordSlots({
 				</span>
 			) : null}
 			<div className="flex w-full flex-wrap items-start justify-center gap-x-4 gap-y-4">
-				{tokens.map((token, i) => {
-					const value = values[i] ?? '';
-					const kind = locked
-						? matchSlotInput(value, token.expect) === 'correct'
-							? 'correct'
-							: value.trim()
-								? 'wrong'
-								: 'wrong'
-						: matchSlotInput(value, token.expect);
-					const active = !reveal && !disabled && i === activeIndex;
-					const meta = metaByIndex?.[i] ?? null;
-					const displayWord = reveal ? token.raw : value;
-					const punctTone =
-						reveal || kind === 'correct'
-							? 'text-emerald-500'
-							: 'text-textcolor/70';
-
-					const wordEl = reveal ? (
-						<span
-							className={cn(
-								'inline-block px-1 text-lg font-semibold leading-snug whitespace-nowrap sm:text-xl',
-								'[font-family:var(--font-family)]',
-								kind === 'wrong' && !locked
-									? 'text-textcolor'
-									: 'text-emerald-500',
-							)}
-						>
-							{displayWord}
-						</span>
-					) : (
-						<SlotWordInput
-							index={i}
-							expect={token.expect}
-							value={value}
-							values={values}
-							tokens={tokens}
-							disabled={disabled}
-							active={active}
-							kind={kind}
-							inputRef={(el) => {
-								refs.current[i] = el;
-							}}
-							onFocus={() => onActiveChange(i)}
-							onCommit={onChange}
-							onAdvance={onAdvance}
-							onSubmitAll={onSubmitAll}
-							onActiveChange={onActiveChange}
-						/>
-					);
-
+				{chunks.map((chunk) => {
+					const cols = chunk.indexes.map((i) => renderWord(i));
+					if (!chunk.roleZh) {
+						return <Fragment key={chunk.key}>{cols}</Fragment>;
+					}
+					const tone = roleToneStyle(chunk.roleZh);
 					return (
 						<div
-							key={`${token.expect}-${i}`}
-							className="flex w-max max-w-full shrink-0 flex-col items-center gap-1"
+							key={chunk.key}
+							className="flex w-max max-w-full shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5"
+							style={{
+								backgroundColor: `color-mix(in srgb, ${tone.backgroundColor} 18%, transparent)`,
+							}}
 						>
-							{!sharedPos && showPos && meta?.posZh ? (
-								<span
-									className="inline-flex items-center rounded px-1.5 pt-1 pb-[5px] text-[13px] leading-none font-medium whitespace-nowrap"
-									style={posToneStyle(posTone(meta.posZh))}
-								>
-									{meta.posZh}
-								</span>
-							) : !sharedPos && showPos ? (
-								<span className="h-5" aria-hidden />
-							) : null}
-
-							<div className="flex items-end gap-1">
-								<div className="flex w-max flex-col items-center gap-1">
-									{wordEl}
-									<div
-										className={cn(
-											'h-0 w-full border-b-2 transition-[border-color,box-shadow]',
-											underlineClass(kind, active),
-										)}
-									/>
-								</div>
-								{token.after ? (
-									<span
-										className={cn(
-											'shrink-0 -mb-2 text-xl font-semibold leading-snug select-none',
-											'[font-family:var(--font-family)]',
-											punctTone,
-										)}
-										aria-hidden
-									>
-										{token.after}
-									</span>
-								) : null}
+							<div className="flex flex-wrap items-start justify-center gap-x-4 gap-y-2">
+								{cols}
 							</div>
-
-							{!sharedIpa && showIpa && meta?.ipa ? (
-								<span className="text-textcolor/65 px-0.5 my-1 font-mono text-xs leading-snug whitespace-nowrap">
-									{displayIpaWrapped(meta.ipa)}
-								</span>
-							) : !sharedIpa && showIpa ? (
-								<span className="h-3" aria-hidden />
-							) : null}
-
-							{reveal && !sharedMeaning && meta?.meaningZh ? (
-								<span
-									className={cn(
-										'text-textcolor/80 px-0.5 text-center text-sm leading-snug',
-										compactMeaning && 'max-w-32',
-									)}
-								>
-									{meta.meaningZh}
-								</span>
-							) : null}
+							<span
+								className="inline-flex items-center rounded px-1.5 pt-1 pb-[5px] text-[13px] leading-none font-medium whitespace-nowrap"
+								style={tone}
+							>
+								{chunk.roleZh}
+							</span>
 						</div>
 					);
 				})}

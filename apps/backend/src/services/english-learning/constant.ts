@@ -116,6 +116,7 @@ export const ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE =
  * 变更 SENTENCE_WORDS_ANNOTATE_SYSTEM 输出约定或字段语义时递增；
  * 升版后首次标注请求会删掉 schema_version ≠ 当前值的旧行。
  * v3：拒绝缺词垫空 / 空 IPA·释义的脏验收（v2 进度虚高）。
+ * roleZh 只是可选展示字段，不升版本：旧行缺该键仍命中，界面不画成分。
  */
 export const SENTENCE_WORD_ANNOTATION_CACHE_VERSION = 'v3';
 

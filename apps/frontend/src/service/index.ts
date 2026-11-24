@@ -95,11 +95,16 @@ import {
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_BATCH,
 	ENGLISH_LEARNING_PRACTICE_ANNOTATE_SENTENCE_WORDS_IMPORT,
+	ENGLISH_LEARNING_PRACTICE_CARD_ANNOTATE_RUNNING,
 	ENGLISH_LEARNING_PRACTICE_DAILY,
+	ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS,
+	ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS_CANCEL,
 	ENGLISH_LEARNING_PRACTICE_REPORTS,
 	ENGLISH_LEARNING_PRACTICE_REVIEW,
 	ENGLISH_LEARNING_PRACTICE_REVIEW_EXPORT_DOCX,
 	ENGLISH_LEARNING_STREAM_CANCEL,
+	ENGLISH_LEARNING_VOCAB_DETAIL_CANCEL,
+	ENGLISH_LEARNING_VOCAB_DETAIL_REGENERATE,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
@@ -1676,6 +1681,56 @@ export type EnglishSentenceWordAnnotation = {
 	posZh: string;
 	ipa: string;
 	meaningZh: string;
+	/** 句子成分；旧缓存缺此键 */
+	roleZh?: string;
+};
+
+/** 卡片上正在跑的单条标注。刷新后靠它把按钮画回停止。 */
+export const getCardAnnotateRunning = async () => {
+	return await http.get<{
+		sentences: string[];
+		words: string[];
+		finished?: {
+			sentences: { id: string; ok: boolean }[];
+			words: { id: string; ok: boolean }[];
+		};
+	}>(ENGLISH_LEARNING_PRACTICE_CARD_ANNOTATE_RUNNING, { silent: true });
+};
+
+/** 语句卡重标。服务端立刻返回，模型在后台跑，断开页面也不停。 */
+export const reannotateEnglishSentenceWords = async (english: string) => {
+	return await http.post<{ running: boolean }>(
+		ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS,
+		{ english },
+		{ silent: true },
+	);
+};
+
+/** 停止这一句的重标，并断开上游模型。 */
+export const cancelReannotateEnglishSentenceWords = async (english: string) => {
+	return await http.post<{ cancelled: boolean }>(
+		ENGLISH_LEARNING_PRACTICE_REANNOTATE_SENTENCE_WORDS_CANCEL,
+		{ english },
+		{ silent: true },
+	);
+};
+
+/** 单词卡重标：只写该用户的重新生成行。 */
+export const regenerateEnglishVocabDetail = async (word: string) => {
+	return await http.post<{ detail?: unknown; cancelled?: boolean }>(
+		ENGLISH_LEARNING_VOCAB_DETAIL_REGENERATE,
+		{},
+		{ silent: true, timeout: 180_000, querys: { word } },
+	);
+};
+
+/** 停止这一词的重标。scope=regen 只断该用户这一轮。 */
+export const cancelEnglishVocabDetail = async (word: string) => {
+	return await http.post<{ cancelled: boolean }>(
+		ENGLISH_LEARNING_VOCAB_DETAIL_CANCEL,
+		{},
+		{ silent: true, querys: { word, scope: 'regen' } },
+	);
 };
 
 /** 经典句看中写：按分词生成词性 / IPA / 释义 */

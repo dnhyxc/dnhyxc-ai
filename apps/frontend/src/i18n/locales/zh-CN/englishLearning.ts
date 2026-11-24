@@ -10,6 +10,10 @@ export const englishLearning = {
 	'englishLearning.agentTool.skillChip': 'Skill · {title}',
 	'englishLearning.annotateSource.aborted': '已停止标注（已完成部分仍保留）',
 	'englishLearning.annotateSource.action': '标注',
+	'englishLearning.cardAnnotate.action': '标注',
+	'englishLearning.cardAnnotate.failed': '标注失败，请稍后重试',
+	'englishLearning.cardAnnotate.stop': '停止标注',
+	'englishLearning.cardAnnotate.success': '标注完成',
 	'englishLearning.annotateSource.confirmAction': '开始标注',
 	'englishLearning.annotateSource.confirmDesc':
 		'将为本集合中尚未缓存的句子调用模型生成词性 / 音标 / 释义并写入缓存，可能较久，确认继续？',
@@ -28,6 +32,10 @@ export const englishLearning = {
 	'englishLearning.annotateSource.importInvalid': '标注文件格式不正确',
 	'englishLearning.annotateSource.importSuccess':
 		'已导入 {accepted} 句（可为部分标注）；跳过 {skipped}，覆盖 {overwritten}',
+	'englishLearning.annotateSource.importPromptCopyFailed':
+		'复制失败，请稍后重试',
+	'englishLearning.annotateSource.importPromptTitle': '生成标注的提示词',
+	'englishLearning.annotateSource.importTitle': '手动导入标注',
 	'englishLearning.annotateSource.menuImport': '手动导入',
 	'englishLearning.annotateSource.menuOnline': '在线标注',
 	'englishLearning.annotateSource.preparing': '正在连接并筛缓存…',

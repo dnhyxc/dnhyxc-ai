@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import { HostPoint, POINT } from '@/federation';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { AnnotateButton } from '../annotate/Button';
 
 export type CardVariant = 'library' | 'selectable';
 
@@ -80,6 +81,7 @@ function CardActionButtons({
 	trailingActions,
 	pagePointId,
 	payload,
+	english,
 }: {
 	playing: boolean;
 	playDisabled: boolean;
@@ -88,6 +90,7 @@ function CardActionButtons({
 	trailingActions?: ReactNode;
 	pagePointId?: string;
 	payload: Record<string, unknown>;
+	english: string;
 }) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
@@ -113,6 +116,7 @@ function CardActionButtons({
 					)}
 				</Button>
 			) : null}
+			<AnnotateButton kind="sentence" text={english} />
 			{trailingActions}
 			<HostPoint
 				pointId={POINT.classicCard}
@@ -169,6 +173,7 @@ export function Card({
 					trailingActions={trailingActions}
 					pagePointId={pagePointId}
 					payload={payload}
+					english={english}
 				/>
 			</div>
 			<div className="text-textcolor/95 text-sm leading-snug">

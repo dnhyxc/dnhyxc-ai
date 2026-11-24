@@ -45,6 +45,7 @@ import {
 import {
 	AnnotateSentenceWordsBatchDto,
 	AnnotateSentenceWordsDto,
+	ReannotateSentenceWordsDto,
 } from './dto/annotate-sentence-words.dto';
 import { CreateAnnotateSourceTaskDto } from './dto/annotate-source-task.dto';
 import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
@@ -1388,6 +1389,57 @@ export class EnglishLearningController {
 			throw new BadRequestException('文件无效');
 		}
 		return this.vocabDetailService.deleteManualDetails(userId, libraryId);
+	}
+
+	/** 卡片单条重标。不接断开信号：切页和刷新都不停模型。 */
+	@Post('practice/reannotate-sentence-words')
+	reannotateSentenceWords(
+		@Req() req: AuthedRequest,
+		@Body() dto: ReannotateSentenceWordsDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		return this.englishLearningService.beginReannotateSentenceWords({
+			userId,
+			english: dto.english,
+		});
+	}
+
+	/** 停止这一句的重标，并断开已经发出的模型请求。 */
+	@Post('practice/reannotate-sentence-words/cancel')
+	cancelReannotateSentenceWords(
+		@Req() req: AuthedRequest,
+		@Body() dto: ReannotateSentenceWordsDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const cancelled = this.englishLearningService.cancelReannotateSentenceWords(
+			userId,
+			dto.english,
+		);
+		return { cancelled };
+	}
+
+	/** 本用户正在跑的单卡标注。刷新后按钮靠这个恢复停止图标。 */
+	@Get('practice/card-annotate/running')
+	cardAnnotateRunning(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		return {
+			sentences:
+				this.englishLearningService.listReannotateSentenceEnglish(userId),
+			words: this.vocabDetailService.listRegenLemmas(userId),
+			finished: {
+				sentences: this.englishLearningService.takeReannotateOutcomes(userId),
+				words: this.vocabDetailService.takeRegenOutcomes(userId),
+			},
+		};
 	}
 
 	/** 经典句看中写：按分词标注词性 / IPA / 释义 */
