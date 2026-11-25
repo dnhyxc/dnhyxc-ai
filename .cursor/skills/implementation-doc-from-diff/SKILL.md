@@ -203,7 +203,7 @@ description: >-
 1. 以**定稿后的** `项目更新信息.md` / `项目指南.md` 为源，更新 `updateInfoSections.ts` / `projectGuideSections.ts`（中文主数据）。
 2. **同 id** 更新 `updateInfoSectionsEnOverlay.ts` / `projectGuideSectionsEnOverlay.ts`（英文 title + description；新章节补 section 标题映射）。
 3. 新增 update-info 条目使用 `{sN}-{下一序号}`；新增 guide 小节使用 `pg-s{N}-{x}`，勿复用已删 id。
-4. 本地预览：切换界面语言访问 `/update-info`、`/project-guide`，确认中英文一致。
+4. 本地预览：切换界面语言访问 `/update-info`、`/project-guide`，确认中英文一致。更新页默认只显示 `dateLabel` 最大的那一天（`pickLatestUpdate`）；点「了解更多历史更新」或打开 `?scope=all` 核对原章节。日期规则见 `product-user-docs.md` §2。同步时不要改 `updateInfo/index.tsx`。
 
 **注意**：`项目指南.md` 对开发文档仅保留「查阅仓库内开发文档总索引」级表述，**不写** `wiki/` / `docs/` 下具体文件名；同步到对应 guide section 时保持产品向措辞、不写仓库路径。
 
@@ -250,6 +250,7 @@ description: >-
 - [ ] 是否误将专题文中的路径或代码块粘贴进产品向文档？
 - [ ] `updateInfoSections.ts` / `projectGuideSections.ts` 是否与姊妹稿对齐？
 - [ ] 两个 `*EnOverlay.ts` 是否已为每个新增/修改条目补齐英文？
+- [ ] 要进更新页默认视图的条目，`dateLabel` 是否为当天？是否仍写在原产品章，而没有另建「最新」清单？
 
 ## 输出格式建议
 

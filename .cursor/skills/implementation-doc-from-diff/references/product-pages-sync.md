@@ -24,6 +24,8 @@
 
 新增条目 id：`{sN}-{下一序号}`，勿复用已删 id。
 
+`dateLabel` 与 Markdown 的 `（更新：YYYY-MM-DD）` 用同一个发布日。页面用 `pickLatestUpdate` 取全表最大的这一天作为默认视图；`?scope=all` 或按钮「了解更多历史更新」才展开分域全文。同步时仍把新条追加进所属章节。不要另建最新清单，不要改 `updateInfo/index.tsx`，也不要改 `pickLatestUpdate` / `scope` 的判断。
+
 ### 1.2 产品指南（project-guide）
 
 | Markdown | 前端小节 id 形态 |
@@ -39,7 +41,7 @@
 1. 定稿 `<WIKI_ROOT>/项目更新信息.md` / `项目指南.md`（产品向、无路径）。
 2. 更新对应 `*Sections.ts`（中文主数据）。
 3. **同 id** 更新 `*EnOverlay.ts`（英文）。
-4. 本地切换界面语言 **中文 / English** 预览 `/update-info` 与 `/project-guide`。
+4. 本地切换界面语言 **中文 / English** 预览 `/update-info` 与 `/project-guide`。更新页默认视图只含最大 `dateLabel` 那天，导语带这个日期，按钮是「了解更多历史更新」。点该按钮或打开 `?scope=all` 后，新条应在原来的产品章里，历史条目还在；再点「只看最新」回到默认视图。中英文是同一批 id。
 
 ---
 
@@ -47,4 +49,5 @@
 
 - [ ] 每条修改的 update-info / project-guide 条目 **EN overlay 已对齐**。
 - [ ] 正文无 `apps/`、`docs/`、`wiki/`、`.ts` 路径（路由如 `/update-info` 可保留）。
-- [ ] 未改动白名单外的本仓业务源码。
+- [ ] 未改动白名单外的本仓业务源码（含未改 `updateInfo/index.tsx`）。
+- [ ] 本轮要展示的更新条，`dateLabel` 已写成当天，且中英文是同一个 id。
