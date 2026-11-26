@@ -486,7 +486,7 @@ class KnowledgeStore {
 			if (this.knowledgeViewing?.id === updated.id) {
 				this.knowledgeViewing = {
 					...this.knowledgeViewing,
-					isPublic: updated.isPublic,
+					isPublic: updated.isPublic ?? isPublic,
 				};
 			}
 		});

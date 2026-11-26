@@ -3,6 +3,7 @@ import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import { notifyUnauthorized } from '@/router/authSession';
 import {
+	isGatewayErrorPage,
 	isTransientNetworkError,
 	shouldMaskAsUserFacingNetworkError,
 } from './retryAsync';
@@ -163,6 +164,10 @@ function resolveRequestErrorToastTitle(requestError: RequestError): string {
 		candidates.find((msg) => msg && msg.trim().length > 0) ?? null;
 	if (shouldMaskAsUserFacingNetworkError(display)) {
 		return translateSync('common.networkErrorTryAgain');
+	}
+	// 502 页面是 HTML，不是业务文案；换成短句，避免 Toast 铺开整页源码
+	if (isGatewayErrorPage(display)) {
+		return translateSync('common.requestFailed');
 	}
 
 	return display ?? translateSync('common.requestFailed');
@@ -401,9 +406,14 @@ class HttpClient {
 					success: responseBody.success,
 				};
 			} else if (responseBody && typeof responseBody === 'string') {
+				const raw = responseBody.trim();
+				// 网关错误页不能当 message，否则登录等页面会把 <html> 弹出来
+				const message = isGatewayErrorPage(raw)
+					? translateSync('common.requestFailed')
+					: raw || response.statusText || '请求失败';
 				return {
 					code: response.status || 500,
-					message: responseBody || response.statusText || '请求失败',
+					message,
 					data: responseBody,
 				};
 			}

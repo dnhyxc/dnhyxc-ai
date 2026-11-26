@@ -29,6 +29,28 @@ export function shouldMaskAsUserFacingNetworkError(
 	return /error sending request for url\s*\(/i.test(trimmed);
 }
 
+/** nginx/网关把 502 页面当响应体时，不要把 HTML 原样给用户看 */
+export function isGatewayErrorPage(
+	message: string | null | undefined,
+): boolean {
+	if (!message) return false;
+	const head = message.trim().slice(0, 500).toLowerCase();
+	if (!head) return false;
+	if (
+		head.startsWith('<!doctype') ||
+		head.startsWith('<html') ||
+		head.includes('<html>')
+	) {
+		return true;
+	}
+	return (
+		head === 'bad gateway' ||
+		head === 'service unavailable' ||
+		head === 'gateway timeout' ||
+		head === 'gateway time-out'
+	);
+}
+
 export type RetryAsyncOptions = {
 	/** 额外重试次数（总尝试 = retries + 1） */
 	retries?: number;
@@ -87,4 +109,17 @@ export async function runTasksWithConcurrency<T>(
 
 	await Promise.all(Array.from({ length: workerCount }, () => worker()));
 	return results;
+}
+
+const gatewayCheckArgv = (globalThis as { process?: { argv?: string[] } })
+	.process?.argv?.[1];
+if (gatewayCheckArgv?.includes('retryAsync')) {
+	console.assert(
+		isGatewayErrorPage(
+			'<html><head><title>502 Bad Gateway</title></head></html>',
+		),
+	);
+	console.assert(isGatewayErrorPage('Bad Gateway'));
+	console.assert(!isGatewayErrorPage('验证码错误'));
+	console.log('isGatewayErrorPage ok');
 }

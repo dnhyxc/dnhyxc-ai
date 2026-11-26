@@ -249,7 +249,8 @@ export const register = async ({
 };
 
 export const createVerifyCode = async () => {
-	return await http.post(CREATE_VERIFY_CODE);
+	// 登录页自己提示「获取验证码失败」，这里不再弹第二段（含网关 HTML）
+	return await http.post(CREATE_VERIFY_CODE, undefined, { silent: true });
 };
 
 export const updateUser = async (id: number, params: object): Promise<any> => {

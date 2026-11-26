@@ -57,7 +57,6 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 			// 获取验证码
 			setIsLoading(true);
 			const res = await createVerifyCode();
-			setIsLoading(false);
 			if (res) {
 				setCaptchaInfo({
 					captchaId: res.data.captchaId,
@@ -69,6 +68,8 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 				title: t('auth.captcha.fetchFailed'),
 				type: 'error',
 			});
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
