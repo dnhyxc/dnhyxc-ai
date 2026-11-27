@@ -27,6 +27,7 @@ export const home = {
 	'home.hero.plugins.desc':
 		'安装社区插件扩展能力，或按开发手册自建插件。支持按需启停与权限控制，把对话、知识与外部工具接入你的工作流，让工作台随需求持续扩展。',
 	'home.hero.plugins.subtitle': '可扩展架构',
+	'home.hero.previewHub': '预览门户',
 	'home.hero.product': '智能工作台',
 	'home.hero.quickStart': '快速开始',
 	'home.hero.skills.desc':

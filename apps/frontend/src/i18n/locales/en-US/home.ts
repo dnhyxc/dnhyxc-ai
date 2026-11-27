@@ -28,6 +28,7 @@ export const home = {
 	'home.hero.plugins.desc':
 		'Install community plugins or build your own with the developer guide. Toggle on demand with permission control, and wire chat, knowledge, and tools into your workflow.',
 	'home.hero.plugins.subtitle': 'Extensible',
+	'home.hero.previewHub': 'Preview Hub',
 	'home.hero.product': 'Smart Workspace',
 	'home.hero.quickStart': 'Get started',
 	'home.hero.skills.desc':

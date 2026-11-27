@@ -408,6 +408,16 @@ export function createHeroSlides(opts: {
 					onClick: () =>
 						void openExternalUrl(getPluginDevGuideAbsoluteUrl(locale)),
 				},
+				{
+					label: t('home.hero.previewHub'),
+					primary: false,
+					onClick: () =>
+						void openExternalUrl(
+							import.meta.env.DEV
+								? 'http://127.0.0.1:8999'
+								: 'https://dnhyxc.cn:9021',
+						),
+				},
 			],
 			tags: [],
 		},
