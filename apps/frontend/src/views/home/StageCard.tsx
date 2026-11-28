@@ -62,6 +62,7 @@ export function StageCard({
 	const tiltMx = useMotionValue(0);
 	const tiltMy = useMotionValue(0);
 	const tiltIdleRef = useRef<number | null>(null);
+	const tiltOnControlRef = useRef(false);
 	const tiltRafRef = useRef(0);
 	const tiltPendingRef = useRef<{ x: number; y: number } | null>(null);
 	const tiltRectRef = useRef<DOMRect | null>(null);
@@ -129,7 +130,12 @@ export function StageCard({
 		tiltMx.set((p.x - rect.left) / rect.width - 0.5);
 		tiltMy.set((p.y - rect.top) / rect.height - 0.5);
 		if (tiltIdleRef.current != null) window.clearTimeout(tiltIdleRef.current);
-		tiltIdleRef.current = window.setTimeout(tiltReset, 1500);
+		tiltIdleRef.current = window.setTimeout(() => {
+			tiltIdleRef.current = null;
+			// 停在按钮/链接上不回中，避免目标从光标下挪开
+			if (tiltOnControlRef.current) return;
+			tiltReset();
+		}, 1500);
 	};
 
 	const endTiltSession = () => {
@@ -138,6 +144,7 @@ export function StageCard({
 			tiltRafRef.current = 0;
 		}
 		tiltPendingRef.current = null;
+		tiltOnControlRef.current = false;
 		if (tiltIdleRef.current != null) {
 			window.clearTimeout(tiltIdleRef.current);
 			tiltIdleRef.current = null;
@@ -154,6 +161,8 @@ export function StageCard({
 
 	const onTiltMove = (e: ReactMouseEvent<HTMLDivElement>) => {
 		if (!tilt || tiltReducedRef.current || !tiltVisibleRef.current) return;
+		const hit = e.target instanceof Element ? e.target : null;
+		tiltOnControlRef.current = !!hit?.closest('a, button, [role="button"]');
 		tiltPendingRef.current = { x: e.clientX, y: e.clientY };
 		if (!tiltRectRef.current) syncTiltRect(e.currentTarget);
 		if (tiltRafRef.current !== 0) return;
