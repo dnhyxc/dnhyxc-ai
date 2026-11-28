@@ -67,6 +67,7 @@ export class KnowledgeCommentService {
 		const qb = this.comments.createQueryBuilder('c');
 		qb.where('c.knowledge_id = :knowledgeId', { knowledgeId });
 		qb.andWhere('c.deleted_at IS NULL');
+		qb.andWhere('c.hidden_at IS NULL');
 		qb.andWhere('c.parent_id IS NULL');
 		if (!doc.isOwned) qb.andWhere("c.audience = 'readers'");
 		const mark = this.parseCursor(cursor);
@@ -107,6 +108,7 @@ export class KnowledgeCommentService {
 				knowledgeId,
 				parentId: IsNull(),
 				deletedAt: IsNull(),
+				hiddenAt: IsNull(),
 			},
 		});
 		if (!root) throw new NotFoundException('要回复的留言不存在');
@@ -117,6 +119,7 @@ export class KnowledgeCommentService {
 		qb.where('c.knowledge_id = :knowledgeId', { knowledgeId });
 		qb.andWhere('c.parent_id = :rootId', { rootId });
 		qb.andWhere('c.deleted_at IS NULL');
+		qb.andWhere('c.hidden_at IS NULL');
 		if (!doc.isOwned) qb.andWhere("c.audience = 'readers'");
 		const mark = this.parseCursor(cursor);
 		if (mark) {
@@ -144,11 +147,21 @@ export class KnowledgeCommentService {
 	): Promise<{ readerCount: number; ownerOnlyCount: number }> {
 		const doc = await this.knowledgeService.findOneById(userId, knowledgeId);
 		const readerCount = await this.comments.count({
-			where: { knowledgeId, audience: 'readers', deletedAt: IsNull() },
+			where: {
+				knowledgeId,
+				audience: 'readers',
+				deletedAt: IsNull(),
+				hiddenAt: IsNull(),
+			},
 		});
 		const ownerOnlyCount = doc.isOwned
 			? await this.comments.count({
-					where: { knowledgeId, audience: 'owner', deletedAt: IsNull() },
+					where: {
+						knowledgeId,
+						audience: 'owner',
+						deletedAt: IsNull(),
+						hiddenAt: IsNull(),
+					},
 				})
 			: 0;
 		return { readerCount, ownerOnlyCount };
@@ -199,6 +212,7 @@ export class KnowledgeCommentService {
 				audience,
 				editedAt: null,
 				deletedAt: null,
+				hiddenAt: null,
 			}),
 		);
 		const [view] = await this.toViews([saved], doc.authorId, userId);
@@ -355,6 +369,7 @@ export class KnowledgeCommentService {
 		qb.where('c.knowledge_id = :knowledgeId', { knowledgeId });
 		qb.andWhere('c.parent_id IN (:...rootIds)', { rootIds });
 		qb.andWhere('c.deleted_at IS NULL');
+		qb.andWhere('c.hidden_at IS NULL');
 		if (!isOwned) qb.andWhere("c.audience = 'readers'");
 		qb.orderBy('c.created_at', 'DESC');
 		qb.addOrderBy('c.id', 'DESC');

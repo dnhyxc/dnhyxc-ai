@@ -39,6 +39,10 @@ export class KnowledgeComment {
 	@Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
 	deletedAt: Date | null;
 
+	/** 管理端下架时间。非空则读者不可见，行仍在。 */
+	@Column({ name: 'hidden_at', type: 'timestamp', nullable: true })
+	hiddenAt: Date | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 }

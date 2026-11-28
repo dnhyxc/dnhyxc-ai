@@ -40,10 +40,15 @@ export function attachPortalScopeBridge(
 	return () => {
 		portalPlugins.delete(pluginId);
 		portalRealmByPlugin.delete(pluginId);
-		removeBodyPortalScope(pluginId);
 		if (portalState.lastTouchedPluginId === pluginId) {
 			portalState.lastTouchedPluginId = null;
 		}
-		maybeReleaseBodyPortalPatch();
+		// 父级 useLayoutEffect 清理早于子树 portal 的 removeChild。
+		// 同步拆掉 scope 并还原原生 removeChild 时，React 再对 body 调用会 NotFoundError。
+		queueMicrotask(() => {
+			if (portalPlugins.has(pluginId)) return;
+			removeBodyPortalScope(pluginId);
+			maybeReleaseBodyPortalPatch();
+		});
 	};
 }
